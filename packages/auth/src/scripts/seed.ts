@@ -32,10 +32,11 @@ const seedUser = async ({
     const userId = context.generateId({ model: "user" }).toString();
     const userToInsert = {
       name,
-      image: getImage(name),
       email,
-      emailVerified: true,
       role,
+      image: getImage(name),
+      emailVerified: true,
+      isAnonymous: false,
     };
 
     const [user] = await tx
