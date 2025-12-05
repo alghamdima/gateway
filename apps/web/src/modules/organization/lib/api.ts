@@ -162,10 +162,17 @@ const mutations = {
       mutationFn: (
         params: Parameters<typeof authClient.organization.inviteMember>[0],
       ) =>
-        authClient.organization.inviteMember({
-          ...params,
-          resend: true,
-        }),
+        authClient.organization.inviteMember(
+          {
+            ...params,
+            resend: true,
+          },
+          {
+            headers: {
+              "x-url": new URL(pathsConfig.auth.join, appConfig.url).toString(),
+            },
+          },
+        ),
     },
   },
 };
