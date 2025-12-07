@@ -690,11 +690,11 @@ importers:
         specifier: workspace:*
         version: link:../../shared
       '@vemetric/node':
-        specifier: 0.1.3
-        version: 0.1.3
+        specifier: 0.2.0
+        version: 0.2.0
       '@vemetric/react':
-        specifier: 0.5.5
-        version: 0.5.5(react@19.1.0)
+        specifier: 0.6.1
+        version: 0.6.1(react@19.1.0)
       '@vercel/analytics':
         specifier: 1.5.0
         version: 1.5.0(next@16.0.7(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
@@ -7034,11 +7034,11 @@ packages:
     peerDependencies:
       '@urql/core': ^5.0.0
 
-  '@vemetric/node@0.1.3':
-    resolution: {integrity: sha512-1eU7IzDtjkAPFHpa+TtWcQ0gz3MlJ2suBDwqM6Cb3UKCgu7ro/LZx4nYbTMHGQqfOrxGgV0sWz2gaw50y2/mQw==}
+  '@vemetric/node@0.2.0':
+    resolution: {integrity: sha512-IG2kNkuLciTuIZD2hdaGL+xvzugTF5u5EZ4P+i30WRUFcz3z+OZbLPfU5MUKb+eFE1cqgpJJqvCU5rdbZ4Sr3w==}
 
-  '@vemetric/react@0.5.5':
-    resolution: {integrity: sha512-AUH6ysISXgLHpmDgbbBL+DUuqf5TTQOdCAVMlfWCpPXWwHhgryrTdLJMNKkLNVh3b36/jCHj7Kug9H5IK5wh8A==}
+  '@vemetric/react@0.6.1':
+    resolution: {integrity: sha512-BNI4S3dWdlfSMHPIYef220P4yP/kTz64/N/k8uzMCZYIlZmCl31WuTOXnjvpbKh7lU0m6wFA2fmqX1ri/Kd8Uw==}
     peerDependencies:
       react: ^18 || ^19
     peerDependenciesMeta:
@@ -20658,9 +20658,9 @@ snapshots:
       '@urql/core': 5.2.0
       wonka: 6.3.5
 
-  '@vemetric/node@0.1.3': {}
+  '@vemetric/node@0.2.0': {}
 
-  '@vemetric/react@0.5.5(react@19.1.0)':
+  '@vemetric/react@0.6.1(react@19.1.0)':
     optionalDependencies:
       react: 19.1.0
 

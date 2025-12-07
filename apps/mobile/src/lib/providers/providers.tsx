@@ -8,12 +8,12 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { Provider as AnalyticsProvider } from "@turbostarter/analytics-mobile";
-
 import { I18nProvider } from "~/lib/providers/i18n";
 import { ThemeProvider } from "~/lib/providers/theme";
 import { QueryClientProvider } from "~/lib/query";
 import { Verification } from "~/modules/auth/verification";
+
+import { AnalyticsProvider } from "./analytics";
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);

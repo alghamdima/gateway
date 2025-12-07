@@ -26,9 +26,11 @@ const useSetup = () => {
   const params = useGlobalSearchParams();
 
   useEffect(() => {
-    if (granted) {
-      void setup();
+    if (!granted) {
+      return;
     }
+
+    void setup();
   }, [granted]);
 
   useEffect(() => {
@@ -54,4 +56,17 @@ const track: AnalyticsProviderStrategy["track"] = (name, params) => {
   void analytics().logEvent(name, params);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
+  void analytics().setUserId(userId);
+
+  if (traits) {
+    void analytics().setUserProperties(traits);
+  }
+};
+
+const reset: AnalyticsProviderStrategy["reset"] = () => {
+  void analytics().setUserId(null);
+  void analytics().setUserProperties({});
+};
+
+export { Provider, track, identify, reset };

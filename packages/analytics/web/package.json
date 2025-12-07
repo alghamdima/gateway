@@ -26,8 +26,8 @@
   "dependencies": {
     "@openpanel/nextjs": "1.0.9",
     "@turbostarter/shared": "workspace:*",
-    "@vemetric/node": "0.1.3",
-    "@vemetric/react": "0.5.5",
+    "@vemetric/node": "0.2.0",
+    "@vemetric/react": "0.6.1",
     "@vercel/analytics": "1.5.0",
     "mixpanel": "0.18.1",
     "mixpanel-browser": "2.71.1",

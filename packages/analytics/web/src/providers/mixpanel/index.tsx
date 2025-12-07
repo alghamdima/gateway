@@ -34,4 +34,26 @@ const track: AnalyticsProviderClientStrategy["track"] = (event, properties) => {
   mixpanel.track(event, properties);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderClientStrategy["identify"] = (
+  userId,
+  traits,
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  mixpanel.identify(userId);
+  if (traits) {
+    mixpanel.people.set(traits);
+  }
+};
+
+const reset: AnalyticsProviderClientStrategy["reset"] = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  mixpanel.reset();
+};
+
+export { Provider, track, identify, reset };

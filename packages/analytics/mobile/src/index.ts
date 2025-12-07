@@ -1,3 +1,3 @@
-export { Provider, track } from "./providers";
+export { Provider, track, identify, reset } from "./providers";
 
 export * from "./hooks";

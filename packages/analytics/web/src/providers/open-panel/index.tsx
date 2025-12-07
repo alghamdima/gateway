@@ -1,4 +1,4 @@
-import { OpenPanelComponent, useOpenPanel } from "@openpanel/nextjs";
+import { OpenPanelComponent } from "@openpanel/nextjs";
 
 import { env } from "./env";
 
@@ -21,8 +21,33 @@ const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
 };
 
 const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useOpenPanel().track(event, data);
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.op("track", event, data);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderClientStrategy["identify"] = (
+  userId,
+  traits,
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.op("identify", {
+    profileId: userId,
+    ...traits,
+  });
+};
+
+const reset: AnalyticsProviderClientStrategy["reset"] = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.op("clear");
+};
+
+export { Provider, track, identify, reset };

@@ -3,10 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 
 import { env } from "./env";
 
-import type {
-  AllowedPropertyValues,
-  AnalyticsProviderStrategy,
-} from "../types";
+import type { AnalyticsProviderStrategy } from "../types";
 
 const posthog = new PostHog();
 
@@ -33,20 +30,25 @@ const init = async () => {
   });
 };
 
-const capture = async (
-  name: string,
-  params?: Record<string, AllowedPropertyValues>,
-) => {
-  await init();
-  if (posthog.has_opted_out_capturing()) {
-    return;
-  }
-
-  posthog.capture(name, params);
-};
-
 const track: AnalyticsProviderStrategy["track"] = (name, params) => {
-  void capture(name, params);
+  void (async () => {
+    await init();
+    posthog.capture(name, params);
+  })();
 };
 
-export { track };
+const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
+  void (async () => {
+    await init();
+    posthog.identify(userId, traits);
+  })();
+};
+
+const reset: AnalyticsProviderStrategy["reset"] = () => {
+  void (async () => {
+    await init();
+    posthog.reset();
+  })();
+};
+
+export { track, identify, reset };

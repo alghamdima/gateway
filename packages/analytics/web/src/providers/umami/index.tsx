@@ -1,9 +1,18 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { env } from "./env";
 
 import type { AnalyticsProviderClientStrategy } from "../types";
+
+declare global {
+  interface Window {
+    umami?: {
+      track: (event: string, data?: Record<string, unknown>) => void;
+      identify: (
+        userId?: string | Record<string, unknown>,
+        traits?: Record<string, unknown>,
+      ) => void;
+    };
+  }
+}
 
 const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
   children,
@@ -21,13 +30,26 @@ const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
 };
 
 const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  if (typeof window === "undefined" || !(window as any).umami) {
+  if (typeof window === "undefined" || !window.umami) {
     return;
   }
 
-  (window as any).umami.track(event, {
-    props: data,
-  });
+  window.umami.track(event, data);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderClientStrategy["identify"] = (
+  userId,
+  traits,
+) => {
+  if (typeof window === "undefined" || !window.umami) {
+    return;
+  }
+
+  window.umami.identify(userId, traits);
+};
+
+const reset: AnalyticsProviderClientStrategy["reset"] = () => {
+  // Umami does not explicitly support resetting the session via the client-side API
+};
+
+export { Provider, track, identify, reset };

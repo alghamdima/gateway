@@ -1,11 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { env } from "./env";
 
 import type { AnalyticsProviderClientStrategy } from "../types";
+
+declare global {
+  interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
   children,
@@ -21,16 +23,16 @@ const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
             return;
           }
 
-          (window as any).dataLayer = (window as any).dataLayer ?? [];
+          window.dataLayer = window.dataLayer ?? [];
 
-          function gtag(...rest: any[]) {
-            (window as any).dataLayer.push(...rest);
+          function gtag(...args: unknown[]) {
+            window.dataLayer?.push(args);
           }
 
-          (window as any).gtag = gtag;
+          window.gtag = gtag;
 
-          (window as any).gtag("js", new Date());
-          (window as any).gtag(
+          window.gtag("js", new Date());
+          window.gtag(
             "config",
             env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID,
           );
@@ -41,11 +43,35 @@ const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
 };
 
 const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  if (typeof window === "undefined" || !(window as any).gtag) {
+  if (typeof window === "undefined" || !window.gtag) {
     return;
   }
 
-  (window as any).gtag("event", event, data);
+  window.gtag("event", event, data);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderClientStrategy["identify"] = (
+  userId,
+  traits,
+) => {
+  if (typeof window === "undefined" || !window.gtag) {
+    return;
+  }
+
+  window.gtag("config", env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+    user_id: userId,
+    ...traits,
+  });
+};
+
+const reset: AnalyticsProviderClientStrategy["reset"] = () => {
+  if (typeof window === "undefined" || !window.gtag) {
+    return;
+  }
+
+  window.gtag("config", env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+    user_id: null,
+  });
+};
+
+export { Provider, track, identify, reset };

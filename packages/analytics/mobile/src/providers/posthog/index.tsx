@@ -25,10 +25,6 @@ const getClient = () => {
 const Wrapper = ({ children }: { children: React.ReactNode }) => {
   const client = getClient();
 
-  if (client.optedOut) {
-    return children;
-  }
-
   return (
     <PostHogProvider client={client} autocapture>
       {children}
@@ -62,12 +58,17 @@ const Provider: AnalyticsProviderStrategy["Provider"] = ({ children }) => {
 
 const track: AnalyticsProviderStrategy["track"] = (name, params) => {
   const client = getClient();
-
-  if (client.optedOut) {
-    return;
-  }
-
   client.capture(name, params);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
+  const client = getClient();
+  client.identify(userId, traits);
+};
+
+const reset: AnalyticsProviderStrategy["reset"] = () => {
+  const client = getClient();
+  client.reset();
+};
+
+export { Provider, track, identify, reset };

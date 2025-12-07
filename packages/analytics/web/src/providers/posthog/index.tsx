@@ -44,4 +44,23 @@ const track: AnalyticsProviderClientStrategy["track"] = (event, properties) => {
   posthog.capture(event, properties);
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderClientStrategy["identify"] = (
+  userId,
+  traits,
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  posthog.identify(userId, traits);
+};
+
+const reset: AnalyticsProviderClientStrategy["reset"] = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  posthog.reset();
+};
+
+export { Provider, track, identify, reset };

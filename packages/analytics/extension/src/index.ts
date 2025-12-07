@@ -1,1 +1,1 @@
-export { track } from "./providers";
+export { track, identify, reset } from "./providers";

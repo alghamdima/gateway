@@ -30,4 +30,28 @@ const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
   });
 };
 
-export { Provider, track };
+const identify: AnalyticsProviderClientStrategy["identify"] = (
+  userId,
+  traits,
+) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  void vemetric.identify({
+    identifier: userId,
+    data: {
+      set: traits,
+    },
+  });
+};
+
+const reset: AnalyticsProviderClientStrategy["reset"] = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  void vemetric.resetUser();
+};
+
+export { Provider, track, identify, reset };

@@ -9,6 +9,7 @@ import { appConfig } from "~/config/app";
 import { useLocale } from "~/lib/i18n";
 import { QueryClientProvider } from "~/lib/query";
 import { StorageKey, useStorage } from "~/lib/storage";
+import { AnalyticsIdentity } from "~/modules/common/analytics-identity";
 import { ErrorBoundary } from "~/modules/common/error-boundary";
 import { Footer } from "~/modules/common/layout/footer";
 import { Header } from "~/modules/common/layout/header";
@@ -48,6 +49,7 @@ const Providers = ({
     <ErrorBoundary fallback={errorFallback}>
       <Suspense fallback={loadingFallback}>
         <QueryClientProvider>
+          <AnalyticsIdentity />
           <I18n>{children}</I18n>
         </QueryClientProvider>
       </Suspense>
@@ -75,14 +77,14 @@ export const Layout = ({ children, className, ...props }: LayoutProps) => {
         <div
           id="main"
           className={cn(
-            "bg-background text-foreground flex min-h-screen w-full min-w-[23rem] flex-col font-sans text-base",
+            "bg-background text-foreground flex min-h-screen w-full min-w-92 flex-col font-sans text-base",
             `theme-${theme.color}`,
           )}
         >
           <Toaster />
           <div
             className={cn(
-              "flex w-full max-w-[80rem] grow flex-col items-center justify-between gap-16 p-4",
+              "flex w-full max-w-7xl grow flex-col items-center justify-between gap-16 p-4",
               className,
             )}
           >
