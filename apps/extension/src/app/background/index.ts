@@ -1,9 +1,11 @@
 import { defineBackground } from "wxt/utils/define-background";
 
+import { logger } from "@turbostarter/shared/logger";
+
 import "./messaging/hello";
 
 const main = () => {
-  console.log(
+  logger.info(
     "Background service worker is running! Edit `src/app/background` and save to reload.",
   );
 };

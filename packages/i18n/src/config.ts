@@ -1,3 +1,5 @@
+import { logger } from "@turbostarter/shared/logger";
+
 import { env } from "./env";
 
 import type { InitOptions, Namespace } from "i18next";
@@ -38,7 +40,7 @@ export const getInitOptions = ({
     escapeValue: false,
   },
   missingInterpolationHandler: (text, value, options) => {
-    console.debug(
+    logger.debug(
       `Missing interpolation value for key: ${text}`,
       value,
       options,

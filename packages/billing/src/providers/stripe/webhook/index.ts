@@ -1,4 +1,5 @@
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { checkoutStatusChangeHandler } from "../checkout";
@@ -29,7 +30,7 @@ export const webhookHandler: BillingProviderStrategy["webhookHandler"] = async (
     secret: env.STRIPE_WEBHOOK_SECRET,
   });
 
-  console.log(`🔔  Webhook received: ${event.type}`);
+  logger.info(`🔔  Webhook received: ${event.type}`);
   await callbacks?.onEvent?.(event);
 
   switch (event.type) {

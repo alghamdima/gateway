@@ -1,3 +1,5 @@
+import { logger } from "@turbostarter/shared/logger";
+
 import { send } from "./providers";
 import { getTemplate } from "./templates";
 
@@ -14,13 +16,23 @@ const sendEmail = async <T extends EmailTemplate>({
   variables: EmailVariables[T];
   locale?: string;
 }) => {
-  const { html, text, subject } = await getTemplate({
-    id: template,
-    variables,
-    locale,
-  });
+  logger.info(`Sending email ${template} to ${to}`);
 
-  return send({ to, subject, html, text });
+  try {
+    const { html, text, subject } = await getTemplate({
+      id: template,
+      variables,
+      locale,
+    });
+
+    const result = await send({ to, subject, html, text });
+    logger.info(`Email sent successfully to ${to}`);
+
+    return result;
+  } catch (error) {
+    logger.error(error, `Failed to send email ${template} to ${to}`);
+    throw error;
+  }
 };
 
 export { sendEmail };

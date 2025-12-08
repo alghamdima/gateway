@@ -4,6 +4,8 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { logger } from "@turbostarter/shared/logger";
+
 export const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
@@ -23,7 +25,7 @@ export const createQueryClient = () =>
             error = error.error;
           }
 
-          console.error(error);
+          logger.error(error);
           toast.error(error.message);
         },
       },

@@ -6,6 +6,8 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { logger } from "@turbostarter/shared/logger";
+
 export function QueryClientProvider(props: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -17,7 +19,7 @@ export function QueryClientProvider(props: { children: React.ReactNode }) {
                 error = error.error;
               }
 
-              console.error(error);
+              logger.error(error);
               toast.error(error.message);
             },
           },

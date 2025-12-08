@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Alert, Share } from "react-native";
 
 import { useTranslation } from "@turbostarter/i18n";
+import { logger } from "@turbostarter/shared/logger";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
@@ -128,7 +129,7 @@ const Download = () => {
         message: codes.join("\n"),
       });
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       Alert.alert(t("error.general"));
     }
   };

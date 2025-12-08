@@ -4,6 +4,7 @@ import {
 } from "@polar-sh/sdk/webhooks";
 
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { checkoutStatusChangeHandler } from "../checkout";
@@ -27,7 +28,7 @@ export const webhookHandler: BillingProviderStrategy["webhookHandler"] = async (
 
     const type = event.type;
 
-    console.log(`🔔  Webhook received: ${type}`);
+    logger.info(`🔔  Webhook received: ${type}`);
     await callbacks?.onEvent?.(event);
 
     switch (type) {

@@ -18,6 +18,7 @@ import { EmailTemplate } from "@turbostarter/email";
 import { sendEmail } from "@turbostarter/email/server";
 import { getLocaleFromRequest } from "@turbostarter/i18n/server";
 import { NodeEnv } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 
 import { env } from "./env";
 import { getUrl } from "./lib/utils";
@@ -193,6 +194,9 @@ export const auth = betterAuth({
         },
       },
     },
+  },
+  logger: {
+    log: (level, ...args) => logger[level](...args),
   },
 });
 

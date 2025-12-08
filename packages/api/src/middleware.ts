@@ -175,7 +175,7 @@ export const enforceMembership = ({
  * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
  * network latency that would occur in production but not in local development.
  */
-export const timing = createMiddleware<{
+export const delay = createMiddleware<{
   Bindings: {
     NODE_ENV: string;
   };

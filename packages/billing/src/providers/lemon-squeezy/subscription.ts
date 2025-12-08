@@ -1,6 +1,7 @@
 import { getSubscription } from "@lemonsqueezy/lemonsqueezy.js";
 
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { config } from "../../config";
@@ -41,7 +42,7 @@ export const subscriptionStatusChangeHandler = async ({
     ...(plan && { plan: plan.id }),
   });
 
-  console.log(
+  logger.info(
     `✅ Subscription status changed for user ${customer.userId} to ${subscription.attributes.status}`,
   );
 };

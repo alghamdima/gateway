@@ -1,4 +1,5 @@
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { config } from "../../config";
@@ -23,7 +24,7 @@ export const getPromotionCode = async (code: string) => {
 
     return data[0];
   } catch (e) {
-    console.error(e);
+    logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
       code: "billing:error.promotionCodeRetrieve",
     });
@@ -55,7 +56,7 @@ export const subscriptionStatusChangeHandler = async ({
     ...(plan && { plan: plan.id }),
   });
 
-  console.log(
+  logger.info(
     `✅ Subscription status changed for user ${customer.userId} to ${subscription.status}`,
   );
 };

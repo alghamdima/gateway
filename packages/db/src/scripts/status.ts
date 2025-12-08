@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 
+import { logger } from "@turbostarter/shared/logger";
+
 import { db } from "../server";
 
 interface JournalEntry {
@@ -74,24 +76,24 @@ async function main() {
     (entry) => !appliedTimestampSet.has(entry.when),
   );
 
-  console.log("\nApplied migrations:");
+  logger.info("\nApplied migrations:");
   if (appliedMigrations.length === 0) {
-    console.log("(none)");
+    logger.info("(none)");
   } else {
-    appliedMigrations.forEach((entry) => console.log(`- ${entry.tag}`));
+    appliedMigrations.forEach((entry) => logger.info(`- ${entry.tag}`));
   }
 
-  console.log("\nPending migrations:");
+  logger.info("\nPending migrations:");
   if (pendingMigrations.length === 0) {
-    console.log("(none)");
+    logger.info("(none)");
   } else {
-    pendingMigrations.forEach((entry) => console.log(`- ${entry.tag}`));
+    pendingMigrations.forEach((entry) => logger.info(`- ${entry.tag}`));
   }
 }
 
 void main()
   .catch((err) => {
-    console.error(err);
+    logger.error(err);
     process.exit(1);
   })
   .then(() => {

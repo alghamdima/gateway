@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { logger } from "@turbostarter/shared/logger";
+
 import { env } from "./env";
 
 import type {
@@ -88,7 +90,7 @@ const postEvent = async (
   );
 
   if (!response.ok) {
-    console.error("Failed to post event to Google Analytics: ", response);
+    logger.error("Failed to post event to Google Analytics: ", response);
   }
 };
 

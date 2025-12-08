@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { Trans, useTranslation } from "@turbostarter/i18n";
+import { logger } from "@turbostarter/shared/logger";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";
@@ -11,7 +12,7 @@ export default function Error({ error }: { error: Error }) {
   const { t } = useTranslation(["marketing", "common"]);
 
   useEffect(() => {
-    console.error(error);
+    logger.error(error);
   }, [error]);
 
   return (

@@ -1,6 +1,7 @@
 import { Component } from "react";
 
 import { useTranslation } from "@turbostarter/i18n";
+import { logger } from "@turbostarter/shared/logger";
 
 import type { ReactNode } from "react";
 
@@ -30,7 +31,7 @@ class ReactErrorBoundary extends Component<
   }
 
   componentDidCatch(error: unknown, errorInfo: unknown) {
-    console.error(error, errorInfo);
+    logger.error("Error boundary caught an error: ", error, errorInfo);
   }
 
   render() {

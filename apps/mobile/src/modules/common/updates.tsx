@@ -276,9 +276,13 @@ export const Updates = () => {
         return;
       }
 
-      void checkForUpdateAsync().then(({ isAvailable }) => {
-        setVisible(isAvailable);
-      });
+      void checkForUpdateAsync()
+        .then(({ isAvailable }) => {
+          setVisible(isAvailable);
+        })
+        .catch(() => {
+          setVisible(false);
+        });
     });
 
     return () => {

@@ -1,9 +1,11 @@
+import { logger } from "@turbostarter/shared/logger";
+
 function main() {
   /**
    * Place your seeding logic here
    */
 
-  console.log("Database seeded successfully!");
+  logger.info("Database seeded successfully!");
   process.exit(0);
 }
 

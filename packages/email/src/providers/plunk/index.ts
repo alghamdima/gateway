@@ -1,3 +1,5 @@
+import { logger } from "@turbostarter/shared/logger";
+
 import { env } from "./env";
 
 import type { EmailProviderStrategy } from "../types";
@@ -26,7 +28,7 @@ const send: EmailProviderStrategy["send"] = async ({
   });
 
   if (!response.ok) {
-    console.error(await response.json());
+    logger.error(await response.json());
     throw new Error("Could not send email!");
   }
 };

@@ -1,3 +1,5 @@
+import { logger } from "@turbostarter/shared/logger";
+
 import { env } from "./env";
 
 import type { AnalyticsProviderServerStrategy } from "../types";
@@ -32,7 +34,7 @@ const track: AnalyticsProviderServerStrategy["track"] = (event, data) => {
     }),
   }).then((res) => {
     if (!res.ok) {
-      console.error("Failed to post event to Plausible: ", res);
+      logger.error("Failed to post event to Plausible: ", res);
     }
   });
 };

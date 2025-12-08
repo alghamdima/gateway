@@ -1,3 +1,5 @@
+import { logger } from "@turbostarter/shared/logger";
+
 import { config } from "../config";
 import { translations } from "../translations";
 
@@ -13,7 +15,7 @@ export const loadTranslation = async (
 
     return data.default;
   } catch {
-    console.log(`Error while loading i18n file: ${locale}/${namespace}.json`);
+    logger.error(`Error while loading i18n file: ${locale}/${namespace}.json`);
 
     return {};
   }

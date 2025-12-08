@@ -1,4 +1,5 @@
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { config } from "../../config";
@@ -30,7 +31,7 @@ const createCheckoutSession = async (
   try {
     return await stripe().checkout.sessions.create(params);
   } catch (e) {
-    console.error(e);
+    logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
       code: "billing:error.checkout",
     });
@@ -43,7 +44,7 @@ const getCheckoutSession = async (sessionId: string) => {
       expand: ["line_items", "line_items.data.price"],
     });
   } catch (e) {
-    console.error(e);
+    logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
       code: "billing:error.checkoutRetrieve",
     });
@@ -97,7 +98,7 @@ export const checkoutStatusChangeHandler = async (
     ...(plan && { plan: plan.id }),
   });
 
-  console.log(
+  logger.info(
     `✅ Checkout status changed for user ${customer.userId} to ${checkoutSession.status}`,
   );
 };
@@ -161,7 +162,8 @@ export const checkout: BillingProviderStrategy["checkout"] = async ({
     });
 
     return { url: session.url };
-  } catch {
+  } catch (e) {
+    logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR);
   }
 };
@@ -180,7 +182,8 @@ export const getBillingPortal: BillingProviderStrategy["getBillingPortal"] =
       });
 
       return { url };
-    } catch {
+    } catch (e) {
+      logger.error(e);
       throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR);
     }
   };

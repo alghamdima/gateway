@@ -1,6 +1,7 @@
 import { eq } from "@turbostarter/db";
 import * as schema from "@turbostarter/db/schema";
 import { db } from "@turbostarter/db/server";
+import { logger } from "@turbostarter/shared/logger";
 
 import { env } from "../env";
 import { generateName } from "../lib/utils";
@@ -231,11 +232,11 @@ async function main() {
   await seedUsers();
   await seedOrganization();
 
-  console.log("Auth seeded successfully");
+  logger.info("Auth seeded successfully");
   process.exit(0);
 }
 
 main().catch((error) => {
-  console.error(error);
+  logger.error(error);
   process.exit(1);
 });

@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { createShadowRootUi } from "wxt/utils/content-script-ui/shadow-root";
 import { defineContentScript } from "wxt/utils/define-content-script";
 
+import { logger } from "@turbostarter/shared/logger";
 import { Button } from "@turbostarter/ui-web/button";
 
 import "~/assets/styles/globals.css";
@@ -20,7 +21,7 @@ export default defineContentScript({
   cssInjectionMode: "ui",
 
   async main(ctx) {
-    console.log(
+    logger.info(
       "Content script is running! Edit `app/content` and save to reload.",
     );
 

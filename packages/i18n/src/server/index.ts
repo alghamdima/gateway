@@ -6,6 +6,8 @@ import Negotiator from "negotiator";
 import { initReactI18next } from "react-i18next/initReactI18next";
 import * as z from "zod";
 
+import { logger } from "@turbostarter/shared/logger";
+
 import { config, getInitOptions } from "../config";
 import { env } from "../env";
 import { loadTranslation, makeZodI18nMap } from "../utils";
@@ -50,7 +52,7 @@ export const initializeServerI18n = async ({
             iterations++;
 
             if (iterations > maxIterations) {
-              console.error(
+              logger.error(
                 `i18next is not initialized after ${maxIterations} iterations`,
               );
 
@@ -104,7 +106,7 @@ export const initializeServerI18n = async ({
   const success = await waitForNamespaces();
 
   if (!success) {
-    console.warn(
+    logger.warn(
       `Not all namespaces were loaded after ${maxWaitTimeMs}ms. Initialization may be incomplete.`,
     );
   }

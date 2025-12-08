@@ -33,6 +33,7 @@ const RootNavigator = () => {
 
   return (
     <Providers>
+      <Updates />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -60,7 +61,7 @@ const useSetupAuth = () => {
   return !activeOrganization.isPending && !activeMember.isPending;
 };
 
-const RootLayout = () => {
+export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     GeistMono_400Regular,
     Geist_400Regular,
@@ -83,13 +84,4 @@ const RootLayout = () => {
   }
 
   return <RootNavigator />;
-};
-
-export default function Root() {
-  return (
-    <>
-      <Updates />
-      <RootLayout />
-    </>
-  );
 }

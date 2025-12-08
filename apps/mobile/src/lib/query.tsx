@@ -8,6 +8,8 @@ import * as Network from "expo-network";
 import { useState } from "react";
 import { Alert } from "react-native";
 
+import { logger } from "@turbostarter/shared/logger";
+
 import { useRefetchOnAppFocus } from "~/modules/common/hooks/use-refetch-on-app-focus";
 
 onlineManager.setEventListener((setOnline) => {
@@ -28,7 +30,7 @@ export function QueryClientProvider(props: { children: React.ReactNode }) {
                 error = error.error;
               }
 
-              console.error(error);
+              logger.error(error);
               Alert.alert(error.message);
             },
           },

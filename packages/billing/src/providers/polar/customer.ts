@@ -1,3 +1,5 @@
+import { logger } from "@turbostarter/shared/logger";
+
 import { updateCustomer, upsertCustomer } from "../../lib/customer";
 import { getCustomerByUserId } from "../../server";
 
@@ -44,7 +46,7 @@ export const createOrRetrieveCustomer = async ({
       await updateCustomer(id, {
         customerId: polarCustomerToProcess.id,
       });
-      console.warn(
+      logger.warn(
         `Customer ${id} had a different customerId. Updated to ${polarCustomerToProcess.id}.`,
       );
     }

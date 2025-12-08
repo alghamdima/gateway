@@ -12,6 +12,8 @@ import {
 } from "react-i18next";
 import * as z from "zod";
 
+import { logger } from "@turbostarter/shared/logger";
+
 import { getInitOptions, config } from "../config";
 import { loadTranslation, makeZodI18nMap } from "../utils";
 
@@ -86,13 +88,13 @@ export const initializeI18nClient = async ({
       },
       (err) => {
         if (err) {
-          console.error("Error initializing i18n client", err);
+          logger.error("Error initializing i18n client", err);
         }
       },
     );
 
   if (iteration >= MAX_ITERATIONS) {
-    console.debug(`Max iterations reached: ${MAX_ITERATIONS}`);
+    logger.debug(`Max iterations reached: ${MAX_ITERATIONS}`);
 
     client = i18n;
     return client;
@@ -101,7 +103,7 @@ export const initializeI18nClient = async ({
   if (loadedLanguages.size === 0 || loadedNamespaces.size === 0) {
     iteration++;
 
-    console.debug(
+    logger.debug(
       `Keeping component from rendering if no languages or namespaces are loaded. Iteration: ${iteration}. Will stop after ${MAX_ITERATIONS} iterations.`,
     );
 

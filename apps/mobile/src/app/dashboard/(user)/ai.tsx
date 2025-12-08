@@ -8,6 +8,7 @@ import Markdown from "react-native-marked";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTranslation } from "@turbostarter/i18n";
+import { logger } from "@turbostarter/shared/logger";
 import { cn } from "@turbostarter/ui";
 import { Button } from "@turbostarter/ui-mobile/button";
 import { Icons } from "@turbostarter/ui-mobile/icons";
@@ -47,7 +48,7 @@ export default function AI() {
       fetch: expoFetch as unknown as typeof globalThis.fetch,
       api: api.ai.chat.$url().toString(),
     }),
-    onError: (error) => console.error(error),
+    onError: (error) => logger.error(error),
   });
 
   if (error) {

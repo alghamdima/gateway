@@ -1,6 +1,7 @@
 import Mixpanel from "mixpanel";
 
 import { NodeEnv } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 
 import { env } from "./env";
 
@@ -25,7 +26,7 @@ const track: AnalyticsProviderServerStrategy["track"] = (event, properties) => {
     const mixpanel = getClient();
     mixpanel.track(event, properties ?? {});
   } catch (error) {
-    console.warn("Failed to track Mixpanel event: ", error);
+    logger.warn("Failed to track Mixpanel event: ", error);
   }
 };
 

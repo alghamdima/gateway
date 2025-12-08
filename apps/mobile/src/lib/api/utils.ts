@@ -1,6 +1,8 @@
 import env from "env.config";
 import Constants from "expo-constants";
 
+import { logger } from "@turbostarter/shared/logger";
+
 export const getBaseUrl = () => {
   /**
    * Gets the IP address of your host-machine. If it cannot automatically find it,
@@ -14,7 +16,7 @@ export const getBaseUrl = () => {
   const localhost = debuggerHost?.split(":")[0];
 
   if (!localhost) {
-    console.warn("Failed to get localhost. Pointing to production server...");
+    logger.warn("Failed to get localhost. Pointing to production server...");
     return env.EXPO_PUBLIC_SITE_URL;
   }
   return `http://${localhost}:3000`;

@@ -2,12 +2,13 @@ import { Hono } from "hono";
 import { some } from "hono/combine";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
-import { logger } from "hono/logger";
+import { logger as loggerMiddleware } from "hono/logger";
 
 import { auth } from "@turbostarter/auth/server";
+import { logger } from "@turbostarter/shared/logger";
 import { matchesPattern } from "@turbostarter/shared/utils";
 
-import { localize, timing } from "./middleware";
+import { localize, delay } from "./middleware";
 import { adminRouter } from "./modules/admin/router";
 import { aiRouter } from "./modules/ai/router";
 import { authRouter } from "./modules/auth/router";
@@ -20,7 +21,6 @@ import type { Context } from "hono";
 
 const appRouter = new Hono()
   .basePath("/api")
-  .use(logger())
   .use(
     some(
       (c: Context) => !!c.req.header("x-client-platform")?.startsWith("mobile"),
@@ -40,8 +40,10 @@ const appRouter = new Hono()
       credentials: true,
     }),
   )
-  .use(timing)
+  .use(loggerMiddleware((...args) => logger.info(...args)))
+  .use(delay)
   .use(localize)
+  .get("/health", (c) => c.json({ status: "ok" }))
   .route("/admin", adminRouter)
   .route("/ai", aiRouter)
   .route("/auth", authRouter)

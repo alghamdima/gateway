@@ -1,4 +1,5 @@
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { checkoutStatusChangeHandler } from "../checkout";
@@ -36,7 +37,7 @@ export const webhookHandler: BillingProviderStrategy["webhookHandler"] = async (
 
   const type = data.meta.event_name;
 
-  console.log(`🔔  Webhook received: ${type}`);
+  logger.info(`🔔  Webhook received: ${type}`);
 
   if (!webhookHasData(data)) {
     throw new HttpException(HttpStatusCode.BAD_REQUEST, {

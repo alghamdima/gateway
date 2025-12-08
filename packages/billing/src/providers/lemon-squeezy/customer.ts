@@ -5,6 +5,7 @@ import {
 } from "@lemonsqueezy/lemonsqueezy.js";
 
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { updateCustomer, upsertCustomer } from "../../lib/customer";
@@ -63,7 +64,7 @@ export const createOrRetrieveCustomer = async ({
       await updateCustomer(id, {
         customerId: lemonSqueezyCustomerToProcess.id,
       });
-      console.warn(
+      logger.warn(
         `Customer ${id} had a different customerId. Updated to ${lemonSqueezyCustomerToProcess.id}.`,
       );
     }

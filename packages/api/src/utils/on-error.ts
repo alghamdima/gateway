@@ -2,6 +2,7 @@ import * as z from "zod";
 
 import { isKey } from "@turbostarter/i18n";
 import { getTranslation } from "@turbostarter/i18n/server";
+import { logger } from "@turbostarter/shared/logger";
 import { getStatusCode } from "@turbostarter/shared/utils";
 
 import type { Context } from "hono";
@@ -37,8 +38,7 @@ export const onError = async (
   const path = c?.req.raw.url ? new URL(c.req.raw.url).pathname : "/api";
 
   if (isError(e)) {
-    console.log(e.code, e.message);
-
+    logger.error(e.code, e.message);
     return new Response(
       JSON.stringify({
         code: e.code,
@@ -55,6 +55,7 @@ export const onError = async (
     );
   }
 
+  logger.error(e);
   return new Response(
     JSON.stringify({
       code: "common:error.general",

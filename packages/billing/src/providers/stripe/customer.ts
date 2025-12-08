@@ -1,4 +1,5 @@
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import {
@@ -55,7 +56,7 @@ export const createOrRetrieveCustomer = async ({
       await updateCustomer(id, {
         customerId: stripeCustomerId,
       });
-      console.warn(
+      logger.warn(
         `Customer ${id} had a different customerId. Updated to ${stripeCustomerId}.`,
       );
     }
@@ -77,7 +78,7 @@ export const createBillingPortalSession = async (
   try {
     return await stripe().billingPortal.sessions.create(params);
   } catch (e) {
-    console.error(e);
+    logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
       code: "billing:error.portal",
     });

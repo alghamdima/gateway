@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { cache } from "react";
 
 import { auth } from "@turbostarter/auth/server";
+import { logger } from "@turbostarter/shared/logger";
 
 const getHeaders = async () => {
   const newHeaders = new Headers(await headers());
@@ -31,7 +32,7 @@ export const getOrganization = cache(
         headers: await getHeaders(),
       });
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       return null;
     }
   },

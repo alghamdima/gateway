@@ -5,6 +5,7 @@ import {
 } from "@lemonsqueezy/lemonsqueezy.js";
 
 import { HttpStatusCode } from "@turbostarter/shared/constants";
+import { logger } from "@turbostarter/shared/logger";
 import { HttpException } from "@turbostarter/shared/utils";
 
 import { config } from "../../config";
@@ -59,7 +60,8 @@ export const checkout: BillingProviderStrategy["checkout"] = async ({
     });
 
     return { url: session.data?.data.attributes.url ?? null };
-  } catch {
+  } catch (e) {
+    logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
       code: "billing:error.checkout",
     });
@@ -84,7 +86,8 @@ export const getBillingPortal: BillingProviderStrategy["getBillingPortal"] =
       const url = lemonCustomer.data?.data.attributes.urls.customer_portal;
 
       return { url: url ?? defaultUrl };
-    } catch {
+    } catch (e) {
+      logger.error(e);
       throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
         code: "billing:error.portal",
       });
@@ -120,7 +123,7 @@ export const checkoutStatusChangeHandler = async ({ id }: { id: string }) => {
     ...(plan && { plan: plan.id }),
   });
 
-  console.log(
+  logger.info(
     `✅ Checkout status changed for user ${customer.userId} to ${order.attributes.status}`,
   );
 };
