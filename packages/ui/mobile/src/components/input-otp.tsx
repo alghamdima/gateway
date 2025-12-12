@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   useSharedValue,
 } from "react-native-reanimated";
+import { useCSSVariable } from "uniwind";
 
 import { cn } from "@turbostarter/ui";
 
@@ -20,7 +21,7 @@ function InputOTPGroup({
   return (
     <View
       data-slot="input-otp-group"
-      className={cn("justify-center3 flex-row items-center", className)}
+      className={cn("flex-row items-center justify-center", className)}
       {...props}
     />
   );
@@ -42,8 +43,8 @@ function InputOTPSlot({
   return (
     <View
       className={cn(
-        "border-input relative flex size-14 items-center justify-center border transition-all outline-none",
-        "dark:bg-input/10",
+        "border-input relative flex size-12 items-center justify-center border transition-all outline-none",
+        "dark:bg-input/30",
         {
           "border-ring": isActive,
           "rounded-l-md": isFirst,
@@ -54,9 +55,7 @@ function InputOTPSlot({
       {...props}
     >
       {char !== null && (
-        <Text className="text-foreground font-sans-medium text-2xl">
-          {char}
-        </Text>
+        <Text className="text-foreground font-sans-medium text-xl">{char}</Text>
       )}
       {hasFakeCaret && <FakeCaret />}
     </View>
@@ -65,6 +64,7 @@ function InputOTPSlot({
 
 function FakeCaret() {
   const opacity = useSharedValue(1);
+  const foregroundColor = useCSSVariable("--foreground");
 
   useEffect(() => {
     opacity.value = withRepeat(
@@ -84,8 +84,8 @@ function FakeCaret() {
   const baseStyle = {
     width: 2,
     height: 20,
-    backgroundColor: "#000",
     borderRadius: 1,
+    ...(foregroundColor && { backgroundColor: foregroundColor.toString() }),
   };
 
   return (
@@ -102,9 +102,9 @@ function InputOTPSeparator({
   return (
     <View
       {...props}
-      className={cn("w-2 items-center justify-center", className)}
+      className={cn("w-1 items-center justify-center", className)}
     >
-      <View className="bg-muted-foreground h-0.5 w-2 rounded-sm" />
+      <View className="bg-muted-foreground h-0.5 w-1 rounded-sm" />
     </View>
   );
 }

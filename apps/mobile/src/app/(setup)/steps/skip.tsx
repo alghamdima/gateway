@@ -22,7 +22,7 @@ export default function SkipStep() {
           <Text className="font-sans-bold text-3xl tracking-tight">
             {t("setup.steps.step.skip.title")}
           </Text>
-          <Text className="text-muted-foreground text-lg leading-snug">
+          <Text className="text-muted-foreground leading-snug">
             {t("setup.steps.step.skip.description")}
           </Text>
         </View>

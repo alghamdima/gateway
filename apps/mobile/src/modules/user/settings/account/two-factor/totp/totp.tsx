@@ -6,6 +6,7 @@ import QRCode from "react-qr-code";
 
 import { otpSchema } from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
+import { ThemeMode } from "@turbostarter/ui";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -89,11 +90,11 @@ export const TotpSheet = ({ ref: passedRef }: TotpSheetProps) => {
                 value={uri}
                 size={180}
                 bgColor="transparent"
-                fgColor={resolvedTheme === "dark" ? "#fff" : "#000"}
+                fgColor={resolvedTheme === ThemeMode.DARK ? "#fff" : "#000"}
               />
 
               <Form {...form}>
-                <View className="w-full flex-1 items-center gap-4">
+                <View className="w-full flex-1 items-center gap-6">
                   <FormField
                     control={form.control}
                     name="code"
@@ -180,16 +181,11 @@ const Secret = () => {
   };
 
   return (
-    <View className="mb-2 flex-row flex-wrap items-center gap-2 px-5">
+    <View className="flex-row flex-wrap items-center gap-2 px-5">
       <Text>
         <Text className="text-muted-foreground text-center">{secret}</Text>
 
-        <Text
-          onPress={handleCopy}
-          style={{
-            marginLeft: 10,
-          }}
-        >
+        <Text onPress={handleCopy} className="pl-2.5">
           {showCheck ? (
             <Icons.Check className="text-foreground" size={12} />
           ) : (

@@ -14,10 +14,10 @@ import * as Slot from "@rn-primitives/slot";
 import * as React from "react";
 import { memo } from "react";
 import { Keyboard, Platform, Pressable, View } from "react-native";
-import { styled } from "react-native-css/native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { withUniwind } from "uniwind";
 
 import { cn } from "@turbostarter/ui";
 
@@ -241,13 +241,9 @@ const BottomSheetKeyboardAwareScrollView = memo(
   ),
 );
 
-const StyledBottomSheetKeyboardAwareScrollView = styled(
+const StyledBottomSheetKeyboardAwareScrollView = withUniwind(
   BottomSheetKeyboardAwareScrollView,
-  {
-    className: "style",
-    contentContainerClassName: "contentContainerStyle",
-  },
-) as typeof BottomSheetKeyboardAwareScrollView;
+);
 
 function BottomSheetScrollView({
   children,
@@ -331,7 +327,7 @@ function BottomSheetTitle({
       role="heading"
       aria-level={3}
       className={cn(
-        "font-sans-semibold text-xl leading-none tracking-tight",
+        "font-sans-semibold text-xl leading-tight tracking-tight",
         className,
       )}
       {...props}
@@ -345,7 +341,7 @@ function BottomSheetDescription({
 }: React.ComponentProps<typeof Text>) {
   return (
     <Text
-      className={cn("text-muted-foreground text-sm leading-none", className)}
+      className={cn("text-muted-foreground text-sm", className)}
       {...props}
     />
   );

@@ -27,10 +27,8 @@ export const BaseLayout = ({ children, locale }: BaseLayoutProps) => {
     <html lang={locale} className={cn(sans.variable, mono.variable)}>
       <body
         suppressHydrationWarning
-        className={cn(
-          "bg-background text-foreground flex min-h-screen flex-col items-center justify-center font-sans antialiased",
-          `theme-${appConfig.theme.color}`,
-        )}
+        className="bg-background text-foreground flex min-h-screen flex-col items-center justify-center font-sans antialiased"
+        data-theme={appConfig.theme.color}
       >
         {children}
       </body>

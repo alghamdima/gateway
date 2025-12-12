@@ -82,7 +82,7 @@ export const ThemeControls = () => {
       </PopoverTrigger>
       <PopoverContent
         align="center"
-        className="z-40 w-[21.5rem] space-y-4 rounded-lg p-6"
+        className="z-40 w-86 space-y-4 rounded-lg p-6"
       >
         <Customizer />
       </PopoverContent>

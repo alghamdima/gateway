@@ -25,7 +25,7 @@ export const BaseHeader = ({ onBack, title }: BaseHeaderProps) => {
         }),
       }}
     >
-      <View className="h-12 w-full flex-row items-center justify-center gap-3 pb-2">
+      <View className="h-12 w-full flex-row items-center justify-center gap-3 pb-1">
         {onBack && (
           <Button
             size="icon"
@@ -34,17 +34,15 @@ export const BaseHeader = ({ onBack, title }: BaseHeaderProps) => {
             className="absolute bottom-2 left-6"
           >
             <Icons.ChevronLeft
-              width={20}
-              height={20}
+              width={22}
+              height={22}
               className="text-muted-foreground"
             />
           </Button>
         )}
 
         {title && (
-          <Text className="font-sans-medium mt-0.5 text-lg leading-none">
-            {title}
-          </Text>
+          <Text className="font-sans-medium mt-0.5 leading-none">{title}</Text>
         )}
       </View>
     </View>
@@ -56,7 +54,7 @@ export const UserHeader = () => {
 
   return (
     <View
-      className="bg-background w-full flex-row items-center justify-between pr-6 pb-2 pl-4"
+      className="bg-background w-full flex-row items-center justify-between pr-6 pb-1 pl-4"
       style={{
         paddingTop: Platform.select({
           ios: insets.top,

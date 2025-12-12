@@ -100,7 +100,7 @@ export const ThemeControlsProvider = ({
         <PopoverPortal>
           <PopoverContent
             align="end"
-            className="w-[22rem] space-y-4 rounded-lg p-6"
+            className="w-88 space-y-4 rounded-lg p-6"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
             }}

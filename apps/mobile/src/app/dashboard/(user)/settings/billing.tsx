@@ -11,10 +11,10 @@ export default function Billing() {
   return (
     <View className="bg-background flex flex-1 items-center justify-center px-6">
       <View className="items-center gap-6 text-center">
-        <Text className="font-sans-bold mt-4 text-4xl tracking-tight">
+        <Text className="font-sans-bold mt-4 text-3xl tracking-tight">
           {t("workInProgress.title")}
         </Text>
-        <Text className="text-muted-foreground text-center text-lg text-pretty">
+        <Text className="text-muted-foreground text-center text-pretty">
           {t("workInProgress.description", { feature: t("billing") })}
         </Text>
         <Pressable

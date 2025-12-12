@@ -2,7 +2,6 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Fragment } from "react/jsx-runtime";
 import { View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
 import { FlatList, RefreshControl } from "react-native-gesture-handler";
 
 import { useTranslation } from "@turbostarter/i18n";
@@ -21,7 +20,6 @@ import {
 
 export const InvitationsList = () => {
   const { t } = useTranslation(["common", "organization"]);
-  const primaryColor = useNativeVariable("--primary") as string;
 
   const activeOrganization = authClient.useActiveOrganization();
   const [filters, setFilters] = useState<
@@ -64,7 +62,9 @@ export const InvitationsList = () => {
             "items-center justify-center":
               !data.length && !invitations.isLoading,
           })}
-          ItemSeparatorComponent={() => <View className="bg-border h-px" />}
+          ItemSeparatorComponent={() => (
+            <View className="bg-border h-px w-full" />
+          )}
           showsVerticalScrollIndicator={false}
           onEndReached={() => invitations.fetchNextPage()}
           onEndReachedThreshold={0.5}
@@ -73,7 +73,7 @@ export const InvitationsList = () => {
               <View>
                 {Array.from({ length: 10 }).map((_, index) => (
                   <Fragment key={index}>
-                    <View className="bg-border h-px" />
+                    <View className="bg-border h-px w-full" />
                     <InvitationListItemSkeleton />
                   </Fragment>
                 ))}
@@ -84,8 +84,8 @@ export const InvitationsList = () => {
             <RefreshControl
               refreshing={invitations.isRefetching}
               onRefresh={() => invitations.refetch()}
-              tintColor={primaryColor}
-              colors={[primaryColor]}
+              tintColorClassName="accent-primary"
+              colorsClassName="accent-primary"
             />
           }
           ListEmptyComponent={
@@ -95,7 +95,7 @@ export const InvitationsList = () => {
                   <Fragment key={index}>
                     <InvitationListItemSkeleton />
                     {index !== arr.length - 1 && (
-                      <View className="bg-border h-px" />
+                      <View className="bg-border h-px w-full" />
                     )}
                   </Fragment>
                 ))}

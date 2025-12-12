@@ -121,7 +121,7 @@ const UserOrganizationInvitationsListModalItem = ({
   });
 
   if (isLoading) {
-    return <Skeleton className="w-full" style={{ height: 105 }} />;
+    return <Skeleton className="h-26 w-full" />;
   }
 
   if (!data?.organization) {

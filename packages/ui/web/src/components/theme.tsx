@@ -34,32 +34,26 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
         <div className="w-full space-y-1.5">
           <Label className="text-xs">{t("theme.color.label")}</Label>
           <div className="grid grid-cols-3 gap-2">
-            {Object.values(ThemeColor)
-              .filter((color) => Object.values(ThemeColor).includes(color))
-              .map((color) => {
-                const isActive = config.color === color;
+            {Object.values(ThemeColor).map((color) => {
+              const isActive = config.color === color;
 
-                return (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    key={color}
-                    onClick={() => onChange({ ...config, color })}
-                    className={cn(
-                      "justify-start gap-2 text-xs capitalize",
-                      isActive && "border-primary dark:border-primary border-2",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "bg-primary flex size-4 shrink-0 items-center justify-center rounded-full",
-                        `theme-${color}`,
-                      )}
-                    ></span>
-                    {t(`theme.color.${color}`)}
-                  </Button>
-                );
-              })}
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  key={color}
+                  onClick={() => onChange({ ...config, color })}
+                  className={cn(
+                    "justify-start gap-2 text-xs capitalize",
+                    isActive && "border-primary dark:border-primary border-2",
+                  )}
+                  data-theme={color}
+                >
+                  <span className="bg-primary flex size-4 shrink-0 items-center justify-center rounded-full"></span>
+                  {t(`theme.color.${color}`)}
+                </Button>
+              );
+            })}
           </div>
         </div>
         <div className="w-full space-y-1.5">

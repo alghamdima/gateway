@@ -102,9 +102,7 @@ export default function AI() {
                       key={`${message.id}-${i}`}
                     />
                   ) : (
-                    <Text className="text-lg" key={`${message.id}-${i}`}>
-                      {part.text}
-                    </Text>
+                    <Text key={`${message.id}-${i}`}>{part.text}</Text>
                   );
               }
             })}
@@ -113,7 +111,7 @@ export default function AI() {
         {isLoading && (
           <View className="mr-auto py-2.5">
             <Spin>
-              <Icons.Loader className="text-muted-foreground size-5" />
+              <Icons.Loader className="text-muted-foreground" size={18} />
             </Spin>
           </View>
         )}
@@ -122,7 +120,7 @@ export default function AI() {
       {!messagesToDisplay.length && (
         <FlatList
           data={EXAMPLES}
-          contentContainerClassName="gap-2 mt-auto mb-4"
+          contentContainerClassName="gap-2 mt-auto mb-3"
           bounces={false}
           renderItem={({ item }) => (
             <Button
@@ -132,16 +130,14 @@ export default function AI() {
               }}
               key={item.prompt}
               variant="outline"
-              className="h-auto grow flex-row justify-start gap-4 py-3 text-left"
+              className="h-auto grow flex-row justify-start gap-3 py-3 text-left"
             >
               <item.icon
                 className="text-muted-foreground shrink-0"
                 width={20}
                 height={20}
               />
-              <Text className="text-muted-foreground text-base">
-                {t(item.prompt)}
-              </Text>
+              <Text className="text-muted-foreground">{t(item.prompt)}</Text>
             </Button>
           )}
         />
@@ -158,7 +154,7 @@ export default function AI() {
             setInput("");
           }}
           onChange={(e) => setInput(e.nativeEvent.text)}
-          style={{ minHeight: 86 }}
+          className="min-h-24"
         />
 
         <Button

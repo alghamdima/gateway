@@ -70,15 +70,15 @@ const EditEmail = () => {
               <Badge
                 className={cn(
                   data?.user.emailVerified
-                    ? "bg-success border-transparent"
-                    : "bg-destructive border-transparent",
+                    ? "bg-success/15 border-transparent"
+                    : "bg-destructive/15 border-transparent",
                 )}
               >
                 <Text
                   className={
                     data?.user.emailVerified
-                      ? "text-success-foreground"
-                      : "text-destructive-foreground"
+                      ? "text-success"
+                      : "text-destructive"
                   }
                 >
                   {data?.user.emailVerified ? t("verified") : t("unverified")}

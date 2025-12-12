@@ -67,7 +67,6 @@ const BackupCodeForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
           name="trustDevice"
           render={({ field }) => (
             <FormCheckbox
-              className="-mt-2 -ml-0.5"
               name="trustDevice"
               label={t("login.twoFactor.trustDevice")}
               value={field.value ?? false}

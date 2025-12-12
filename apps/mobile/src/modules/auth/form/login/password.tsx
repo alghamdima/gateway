@@ -96,7 +96,7 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
 
                   <Link
                     href={pathsConfig.setup.auth.forgotPassword}
-                    className="text-muted-foreground self-end font-sans text-sm underline"
+                    className="text-muted-foreground self-end font-sans text-sm underline underline-offset-4"
                   >
                     {t("account.password.forgot.label")}
                   </Link>
@@ -116,7 +116,6 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
             name="rememberMe"
             render={({ field }) => (
               <FormCheckbox
-                className="-mt-2 -ml-0.5"
                 name="rememberMe"
                 label={t("rememberMe")}
                 disabled={isSubmitting}

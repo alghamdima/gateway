@@ -1,68 +1,75 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
-import { Appearance, useColorScheme } from "react-native";
+import { useCallback, useEffect, useMemo } from "react";
+import { useColorScheme } from "react-native";
+import { Uniwind } from "uniwind";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
-import { ThemeMode } from "@turbostarter/ui";
+import { ThemeMode, themes } from "@turbostarter/ui";
 
 import { appConfig } from "~/config/app";
 
+import type { ColorVariable, ThemeConfig } from "@turbostarter/ui";
+
+const useThemeConfig = create<{
+  config: ThemeConfig;
+  setConfig: (config: ThemeConfig) => void;
+}>()(
+  persist(
+    (set) => ({
+      config: appConfig.theme,
+      setConfig: (config) => set({ config }),
+    }),
+    {
+      name: "theme-config",
+      storage: createJSONStorage(() => AsyncStorage),
+    },
+  ),
+);
+
 export const useTheme = () => {
   const colorScheme = useColorScheme();
-  const [loaded, setLoaded] = useState(true);
-  const [theme, setTheme] = useState<ThemeMode>(colorScheme ?? ThemeMode.DARK);
+  const { config, setConfig } = useThemeConfig();
 
-  const setupTheme = useCallback(async () => {
-    const storedTheme = await AsyncStorage.getItem("theme");
+  const isDark = useMemo(
+    () =>
+      config.mode === ThemeMode.DARK ||
+      (config.mode === ThemeMode.SYSTEM && colorScheme === ThemeMode.DARK),
+    [config.mode, colorScheme],
+  );
 
-    if (storedTheme === ThemeMode.SYSTEM) {
-      setTheme(storedTheme);
-      setLoaded(true);
-      return;
-    }
+  const resolvedTheme = useMemo(
+    () => (isDark ? ThemeMode.DARK : ThemeMode.LIGHT),
+    [isDark],
+  );
 
-    if (!storedTheme) {
-      await AsyncStorage.setItem("theme", appConfig.theme.mode);
-      setTheme(appConfig.theme.mode);
-      setLoaded(true);
-      return;
-    }
+  const updateTheme = useCallback(() => {
+    Uniwind.setTheme(config.mode);
 
-    const colorTheme =
-      storedTheme === ThemeMode.DARK ? ThemeMode.DARK : ThemeMode.LIGHT;
-
-    if (colorTheme !== colorScheme) {
-      Appearance.setColorScheme(colorTheme);
-      setTheme(colorTheme);
-      setLoaded(true);
-      return;
-    }
-    setLoaded(true);
-  }, [colorScheme]);
-
-  const changeTheme = useCallback(async (theme: ThemeMode) => {
-    setTheme(theme);
-    Appearance.setColorScheme(
-      theme === ThemeMode.SYSTEM ? Appearance.getColorScheme() : theme,
+    const colors = themes[config.color][resolvedTheme];
+    Uniwind.updateCSSVariables(
+      resolvedTheme,
+      Object.entries(colors).reduce(
+        (acc, [key, value]: [string, ColorVariable]) => {
+          const [l, c, h, a] = value;
+          acc[`--${key}`] =
+            a !== undefined
+              ? `oklch(${l} ${c} ${h} / ${a * 100}%)`
+              : `oklch(${l} ${c} ${h})`;
+          return acc;
+        },
+        {} as Record<string, string>,
+      ),
     );
-    await AsyncStorage.setItem("theme", theme);
-  }, []);
+  }, [resolvedTheme, config]);
 
   useEffect(() => {
-    setTheme(colorScheme ?? ThemeMode.DARK);
-  }, [colorScheme]);
-
-  const isDark =
-    theme === ThemeMode.DARK ||
-    (theme === ThemeMode.SYSTEM && colorScheme === ThemeMode.DARK);
-
-  const resolvedTheme = isDark ? ThemeMode.DARK : ThemeMode.LIGHT;
+    updateTheme();
+  }, [updateTheme]);
 
   return {
-    setupTheme,
-    changeTheme,
-    loaded,
-    theme,
-    isDark,
+    config,
+    setConfig,
     resolvedTheme,
   };
 };

@@ -44,7 +44,7 @@ export default function RequiredStep() {
             <Text className="font-sans-bold text-3xl tracking-tight">
               {t("setup.steps.step.required.title")}
             </Text>
-            <Text className="text-muted-foreground text-lg leading-snug">
+            <Text className="text-muted-foreground leading-snug">
               {t("setup.steps.step.required.description")}
             </Text>
           </View>
@@ -56,7 +56,6 @@ export default function RequiredStep() {
                 name="data"
                 render={({ field }) => (
                   <FormCheckbox
-                    className="-mt-2 -ml-0.5"
                     name="data"
                     label={t("setup.steps.step.required.fields.data")}
                     value={!!field.value}
@@ -71,7 +70,6 @@ export default function RequiredStep() {
                 name="privacy"
                 render={({ field }) => (
                   <FormCheckbox
-                    className="-mt-2 -ml-0.5"
                     name="privacy"
                     label={
                       <Trans
@@ -85,7 +83,7 @@ export default function RequiredStep() {
                                   `${appConfig.url}/legal/privacy-policy`,
                                 )
                               }
-                              className="font-sans-medium text-primary underline hover:no-underline"
+                              className="font-sans-medium text-primary text-sm underline hover:no-underline"
                             />
                           ),
                         }}

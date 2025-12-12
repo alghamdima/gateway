@@ -9,7 +9,6 @@ import {
 import { GeistMono_400Regular } from "@expo-google-fonts/geist-mono";
 import { Stack, useNavigationContainerRef } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
 
 import "~/assets/styles/globals.css";
 import { authClient } from "~/lib/auth";
@@ -62,6 +61,7 @@ const useSetupAuth = () => {
 };
 
 export default function RootLayout() {
+  useTheme();
   const [fontsLoaded] = useFonts({
     GeistMono_400Regular,
     Geist_400Regular,
@@ -71,13 +71,8 @@ export default function RootLayout() {
   });
 
   const authLoaded = useSetupAuth();
-  const { loaded: themeLoaded, setupTheme } = useTheme();
 
-  const loaded = fontsLoaded && themeLoaded && authLoaded;
-
-  useEffect(() => {
-    void setupTheme();
-  }, [setupTheme]);
+  const loaded = fontsLoaded && authLoaded;
 
   if (loaded) {
     SplashScreen.hide();

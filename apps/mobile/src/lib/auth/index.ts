@@ -13,6 +13,9 @@ export const authClient = createClient({
     storage: SecureStore,
     cookiePrefix: "turbostarter",
   },
+  lastLoginMethod: {
+    storage: SecureStore,
+  },
   fetchOptions: {
     headers: {
       Cookie: `${config.cookie}=${useI18nConfig.getState().config.locale}`,

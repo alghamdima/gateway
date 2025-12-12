@@ -79,7 +79,7 @@ const SocialProvider = ({
         </Spin>
       ) : (
         <>
-          <View className="size-6">
+          <View className="size-5">
             <Icon className="text-foreground" />
           </View>
           <Text>
@@ -96,13 +96,7 @@ const SocialProvider = ({
       )}
 
       {authClient.isLastUsedLoginMethod(provider) && (
-        <Badge
-          className="absolute shadow-sm"
-          style={{
-            top: -8,
-            right: -12,
-          }}
-        >
+        <Badge className="absolute -top-2 -right-3 shadow-sm">
           <Text>{t("lastUsed")}</Text>
         </Badge>
       )}

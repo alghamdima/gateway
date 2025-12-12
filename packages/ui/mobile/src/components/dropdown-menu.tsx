@@ -118,7 +118,7 @@ function DropdownMenuContent({
             <TextClassContext.Provider value="text-popover-foreground">
               <DropdownMenuPrimitive.Content
                 className={cn(
-                  "bg-popover border-border min-w-[8rem] overflow-hidden rounded-md border p-1 shadow-lg shadow-black/5",
+                  "bg-popover border-border min-w-32 overflow-hidden rounded-md border p-1 shadow-lg shadow-black/5",
                   className,
                 )}
                 {...props}
@@ -145,14 +145,14 @@ function DropdownMenuItem({
   return (
     <TextClassContext.Provider
       value={cn(
-        "text-popover-foreground group-active:text-popover-foreground select-none",
+        "text-popover-foreground group-active:text-popover-foreground text-sm select-none",
         variant === "destructive" &&
           "text-destructive group-active:text-destructive",
       )}
     >
       <DropdownMenuPrimitive.Item
         className={cn(
-          "active:bg-accent group relative flex flex-row items-center gap-3 rounded-sm px-2 py-2 sm:py-1.5",
+          "active:bg-accent group relative flex flex-row items-center gap-2 rounded-sm px-2 py-2 sm:py-1.5",
           variant === "destructive" &&
             "active:bg-destructive/10 dark:active:bg-destructive/20",
           props.disabled && "opacity-50",
@@ -235,7 +235,7 @@ function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       className={cn(
-        "text-foreground font-sans-medium px-2 py-2 text-sm sm:py-1.5",
+        "text-foreground font-sans-medium px-2 py-2 text-xs sm:py-1.5",
         inset && "pl-8",
         className,
       )}

@@ -26,7 +26,7 @@ export const SettingsTile = ({
     <Pressable
       hitSlop={4}
       className={cn(
-        "bg-background active:bg-muted flex-row items-center justify-between gap-5 px-7 py-4 transition-colors",
+        "bg-background active:bg-accent dark:active:bg-accent/50 flex-row items-center justify-between gap-4 px-6 py-3.5 transition-colors",
         {
           "opacity-50": disabled,
         },
@@ -35,14 +35,14 @@ export const SettingsTile = ({
       disabled={disabled}
     >
       <Icon
-        width={22}
-        height={22}
+        width={24}
+        height={24}
         className={cn("text-muted-foreground", {
           "text-destructive": destructive,
         })}
       />
       <TextClassContext.Provider
-        value={cn("mr-auto", {
+        value={cn("mr-auto text-base", {
           "text-destructive": destructive,
         })}
       >
@@ -51,10 +51,18 @@ export const SettingsTile = ({
 
       {loading ? (
         <Spin>
-          <Icons.Loader2 className="text-muted-foreground" />
+          <Icons.Loader2
+            className="text-muted-foreground"
+            width={20}
+            height={20}
+          />
         </Spin>
       ) : (
-        <Icons.ChevronRight className="text-muted-foreground" />
+        <Icons.ChevronRight
+          className="text-muted-foreground"
+          width={20}
+          height={20}
+        />
       )}
     </Pressable>
   );

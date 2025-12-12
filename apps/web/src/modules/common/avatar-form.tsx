@@ -352,7 +352,7 @@ const AvatarFormRemoveButton = ({
         variant="outline"
         size="icon"
         className={cn(
-          "bg-background dark:bg-background hover:bg-muted absolute -top-1 -right-1 size-6 rounded-full",
+          "bg-background dark:bg-background hover:bg-muted dark:hover:bg-muted absolute -top-1 -right-1 size-6 rounded-full",
           className,
         )}
         disabled={remove.isPending}

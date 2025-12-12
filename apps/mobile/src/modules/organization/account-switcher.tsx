@@ -100,7 +100,7 @@ export const AccountSwitcher = () => {
 
             <View className="shrink">
               <Text
-                className="font-sans-medium self-start leading-tight"
+                className="font-sans-medium self-start text-base leading-tight"
                 numberOfLines={1}
               >
                 {activeOrganization.data
@@ -110,14 +110,7 @@ export const AccountSwitcher = () => {
               {customer.isPending ? (
                 <Skeleton className="mt-1.5 h-3 w-20" />
               ) : (
-                <Text
-                  className={cn(
-                    "text-muted-foreground font-sans text-sm leading-tight capitalize",
-                    {
-                      "text-accent-foreground": open,
-                    },
-                  )}
-                >
+                <Text className="text-muted-foreground font-sans leading-tight capitalize">
                   {(customer.data?.plan ?? "free").toLowerCase()}
                 </Text>
               )}
@@ -137,7 +130,7 @@ export const AccountSwitcher = () => {
               setActiveOrganization.mutate({ organizationId: null })
             }
           >
-            <Avatar alt={session.data?.user.name ?? ""} className="size-7">
+            <Avatar alt={session.data?.user.name ?? ""} className="size-6">
               <AvatarImage
                 source={{ uri: session.data?.user.image ?? undefined }}
               />
@@ -170,7 +163,7 @@ export const AccountSwitcher = () => {
                       })
                     }
                   >
-                    <Avatar className="size-7" alt={organization.name}>
+                    <Avatar className="size-6" alt={organization.name}>
                       <AvatarImage
                         source={{ uri: organization.logo ?? undefined }}
                       />
@@ -198,7 +191,7 @@ export const AccountSwitcher = () => {
 
           <DropdownMenuSeparator />
           <DropdownMenuItem onPress={createOrganizationBottomSheet.open}>
-            <View className="border-border flex size-7 items-center justify-center rounded-md border bg-transparent">
+            <View className="border-border flex size-6 items-center justify-center rounded-md border bg-transparent">
               <Icons.Plus size={16} className="text-muted-foreground" />
             </View>
             <Text>{t("create.cta")}</Text>

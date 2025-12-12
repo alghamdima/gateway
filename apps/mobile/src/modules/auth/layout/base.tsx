@@ -7,7 +7,7 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => {
       <ScrollView
         bounces={false}
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="gap-6 px-6 pt-4 pb-10"
+        contentContainerClassName="gap-5 px-6 pt-4 pb-10"
       >
         {children}
       </ScrollView>

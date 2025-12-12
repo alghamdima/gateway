@@ -81,8 +81,10 @@
   "role": "Role",
   "joinedAt": "Joined at",
   "createdAt": "Created at",
+  "expiresIn": "Expires in",
   "expiresAt": "Expires at",
   "expires": "Expires",
+  "expired": "Expired",
   "review": "Review",
   "resend": "Resend",
   "status": "Status",
@@ -151,7 +153,6 @@
   "share": "Share",
   "privacy": "Privacy",
   "reason": "Reason",
-  "expiresIn": "Expires in",
   "never": "Never",
   "language": {
     "label": "Language",

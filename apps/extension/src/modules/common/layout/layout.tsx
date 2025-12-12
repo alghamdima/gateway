@@ -64,22 +64,22 @@ type LayoutProps = ProvidersProps & {
 export const Layout = ({ children, className, ...props }: LayoutProps) => {
   const { data: theme } = useStorage(StorageKey.THEME);
 
+  const isDark =
+    theme.mode === ThemeMode.DARK ||
+    (theme.mode === ThemeMode.SYSTEM &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+
   return (
     <Providers {...props}>
       <div
         className={cn({
-          dark:
-            theme.mode === ThemeMode.DARK ||
-            (theme.mode === ThemeMode.SYSTEM &&
-              window.matchMedia("(prefers-color-scheme: dark)").matches),
+          dark: isDark,
         })}
       >
         <div
           id="main"
-          className={cn(
-            "bg-background text-foreground flex min-h-screen w-full min-w-92 flex-col font-sans text-base",
-            `theme-${theme.color}`,
-          )}
+          className="bg-background text-foreground flex min-h-screen w-full min-w-92 flex-col font-sans text-base"
+          data-theme={theme.color}
         >
           <Toaster />
           <div

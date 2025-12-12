@@ -1,17 +1,17 @@
 // Learn more: https://docs.expo.dev/guides/monorepos/
 const { getDefaultConfig } = require("expo/metro-config");
 const { FileStore } = require("metro-cache");
-const { withNativewind } = require("nativewind/metro");
+const { withUniwindConfig } = require("uniwind/metro");
 
 const path = require("path");
 
 const config = withTurborepoManagedCache(
-  withMonorepoPaths(withNativewind(getDefaultConfig(__dirname))),
+  withMonorepoPaths(
+    withUniwindConfig(getDefaultConfig(__dirname), {
+      cssEntryFile: "./src/assets/styles/globals.css",
+    }),
+  ),
 );
-
-// Force resolving nested modules to the folders below
-// https://github.com/nativewind/nativewind/issues/734
-config.resolver.disableHierarchicalLookup = true;
 
 const { transformer, resolver } = config;
 

@@ -1,10 +1,7 @@
 import { Portal } from "@rn-primitives/portal";
 import { Fragment } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
 import { FullWindowOverlay as RNFullWindowOverlay } from "react-native-screens";
-
-import { cn } from "@turbostarter/ui";
 
 import { isIOS } from "~/utils/device";
 
@@ -15,15 +12,13 @@ interface SpinnerProps {
 }
 
 export const Spinner = ({ modal = true }: SpinnerProps) => {
-  const primaryColor = useNativeVariable("--primary") as string;
-
   if (!modal) {
     return (
       <View
         style={StyleSheet.absoluteFill}
         className="bg-background flex-1 items-center justify-center"
       >
-        <ActivityIndicator size="large" color={primaryColor} />
+        <ActivityIndicator size="large" colorClassName="accent-primary" />
       </View>
     );
   }
@@ -35,13 +30,8 @@ export const Spinner = ({ modal = true }: SpinnerProps) => {
           style={StyleSheet.absoluteFill}
           className="flex-1 items-center justify-center"
         >
-          <View
-            style={StyleSheet.absoluteFill}
-            className={cn("bg-background", {
-              "opacity-70": modal,
-            })}
-          />
-          <ActivityIndicator size="large" color={primaryColor} />
+          <View style={StyleSheet.absoluteFill} className="bg-background/80" />
+          <ActivityIndicator size="large" colorClassName="accent-primary" />
         </View>
       </FullWindowOverlay>
     </Portal>

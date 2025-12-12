@@ -11,7 +11,7 @@ export default function Home() {
   return (
     <ScrollView
       className="bg-background"
-      contentContainerClassName="gap-6 items-center bg-background px-6 py-2"
+      contentContainerClassName="gap-4 items-center bg-background px-6 py-2"
       showsVerticalScrollIndicator={false}
     >
       <BarChart />

@@ -58,7 +58,7 @@ export const OrganizationPicker = () => {
                 </span>
               </div>
 
-              <Icons.ChevronRight className="mt-2 size-4 self-start" />
+              <Icons.ChevronRight className="mt-2 -mr-1 size-5 self-start" />
             </TurboLink>
           </li>
         ))}

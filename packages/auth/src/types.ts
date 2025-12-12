@@ -83,6 +83,7 @@ type AuthConfig = z.infer<typeof authConfigSchema>;
 
 const ERROR_MESSAGES: Record<AuthErrorCode, TranslationKey> = {
   YOU_CANNOT_BAN_YOURSELF: "auth:error.user.cannotBanYourself",
+  YOU_CANNOT_IMPERSONATE_ADMINS: "auth:error.user.cannotImpersonateAdmins",
   INVALID_EMAIL_FORMAT: "auth:error.credentials.email.invalidFormat",
   ORGANIZATION_SLUG_ALREADY_TAKEN: "organization:error.slugAlreadyTaken",
   YOU_ARE_NOT_ALLOWED_TO_SET_NON_EXISTENT_VALUE:

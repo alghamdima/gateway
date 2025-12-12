@@ -84,7 +84,7 @@ export const Invitation = (props: InvitationProps) => {
               inviterEmail: props.invitation.inviterEmail,
               organizationName: props.organization.name,
             }}
-            components={{ bold: <Text className="font-sans-medium" /> }}
+            components={{ bold: <Text className="font-sans-medium text-sm" /> }}
           />
         }
       />

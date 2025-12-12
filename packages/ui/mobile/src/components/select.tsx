@@ -28,7 +28,7 @@ function SelectValue({
     <SelectPrimitive.Value
       ref={ref}
       className={cn(
-        "text-foreground line-clamp-1 flex flex-row items-center gap-2 font-sans text-base",
+        "text-foreground line-clamp-1 flex flex-row items-center gap-2 font-sans text-sm",
         !value && "text-muted-foreground",
         className,
       )}
@@ -52,9 +52,9 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       ref={ref}
       className={cn(
-        "border-input dark:bg-input/10 dark:active:bg-input/20 bg-background flex h-12 flex-row items-center justify-between gap-2 rounded-md border px-3 py-2 shadow-sm shadow-black/5",
+        "border-input dark:bg-input/30 dark:active:bg-input/50 bg-background flex h-10 flex-row items-center justify-between gap-2 rounded-sm border px-3 py-2 shadow-sm shadow-black/5",
         props.disabled && "opacity-50",
-        size === "sm" && "h-10 py-2 sm:py-1.5",
+        size === "sm" && "h-8 py-2 sm:py-1.5",
         className,
       )}
       {...props}
@@ -91,7 +91,7 @@ function SelectContent({
             <Animated.View className="z-50" entering={FadeIn} exiting={FadeOut}>
               <SelectPrimitive.Content
                 className={cn(
-                  "bg-popover border-border relative z-50 min-w-[8rem] rounded-sm border p-1 shadow-md shadow-black/5",
+                  "bg-popover border-border relative z-50 min-w-32 rounded-sm border p-1 shadow-md shadow-black/5",
                   className,
                 )}
                 position={position}
@@ -136,7 +136,7 @@ function SelectItem({
       className={cn(
         "active:bg-accent group relative flex w-full flex-row items-center gap-2 rounded-sm py-2 pr-8 pl-2 sm:py-1.5",
         Platform.select({
-          web: "focus:bg-accent focus:text-accent-foreground cursor-default outline-none data-[disabled]:pointer-events-none [&_svg]:pointer-events-none *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+          web: "focus:bg-accent focus:text-accent-foreground cursor-default outline-none data-disabled:pointer-events-none [&_svg]:pointer-events-none *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         }),
         props.disabled && "opacity-50",
         className,
@@ -148,7 +148,7 @@ function SelectItem({
           <Icons.Check className="text-muted-foreground shrink-0" size={16} />
         </SelectPrimitive.ItemIndicator>
       </View>
-      <TextClassContext.Provider value="text-foreground font-sans group-active:text-accent-foreground text-base select-none">
+      <TextClassContext.Provider value="text-foreground font-sans group-active:text-accent-foreground text-sm select-none">
         {children as React.ReactNode}
       </TextClassContext.Provider>
     </SelectPrimitive.Item>

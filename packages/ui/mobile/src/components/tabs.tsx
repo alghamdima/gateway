@@ -11,7 +11,7 @@ function Tabs({
 }: TabsPrimitive.RootProps & React.RefAttributes<TabsPrimitive.RootRef>) {
   return (
     <TabsPrimitive.Root
-      className={cn("flex flex-col gap-4", className)}
+      className={cn("flex flex-col gap-2", className)}
       {...props}
     />
   );
@@ -24,7 +24,7 @@ function TabsList({
   return (
     <TabsPrimitive.List
       className={cn(
-        "bg-muted mr-auto flex h-12 flex-row items-center justify-center rounded-lg p-[3px]",
+        "bg-muted mr-auto flex h-10 flex-row items-center justify-center rounded-lg p-[3px]",
         className,
       )}
       {...props}
@@ -40,16 +40,16 @@ function TabsTrigger({
   return (
     <TextClassContext.Provider
       value={cn(
-        "text-foreground dark:text-muted-foreground font-sans-medium",
+        "text-foreground dark:text-muted-foreground font-sans-medium text-sm",
         value === props.value && "dark:text-foreground",
       )}
     >
       <TabsPrimitive.Trigger
         className={cn(
-          "flex h-[calc(100%-1px)] flex-row items-center justify-center gap-1.5 rounded-md border border-transparent px-4 py-2 shadow-none shadow-black/5",
+          "flex flex-row items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1.5 shadow-none shadow-black/5",
           props.disabled && "opacity-50",
           props.value === value &&
-            "bg-background dark:border-foreground/10 dark:bg-input/10 shadow-xs",
+            "bg-background dark:border-foreground/10 dark:bg-input/30 shadow-sm",
           className,
         )}
         {...props}

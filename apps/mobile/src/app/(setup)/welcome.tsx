@@ -44,7 +44,7 @@ const WelcomePage = () => {
 
   return (
     <View className="bg-background flex-1 px-6 pt-2 pb-4">
-      <SafeAreaView className="bg-background flex-1 gap-16">
+      <SafeAreaView className="bg-background flex-1 gap-12">
         <View className="flex-1 gap-8 pt-2">
           <Slider threshold={ITEM_WIDTH}>
             <SliderList
@@ -58,10 +58,7 @@ const WelcomePage = () => {
                   <Image
                     source={item[resolvedTheme]}
                     contentFit="contain"
-                    style={{
-                      flex: 1,
-                      width: "100%",
-                    }}
+                    style={{ flex: 1, width: "100%" }}
                   />
                 </SliderListItem>
               )}
@@ -74,11 +71,11 @@ const WelcomePage = () => {
           </Slider>
 
           <View className="mx-auto mt-auto max-w-xl gap-3">
-            <Text className="font-sans-bold text-center text-4xl tracking-tighter sm:text-5xl">
+            <Text className="font-sans-bold text-center text-3xl tracking-tighter sm:text-4xl">
               {t("product.title")}
             </Text>
 
-            <Text className="text-muted-foreground px-6 text-center text-lg leading-snug sm:text-xl">
+            <Text className="text-muted-foreground px-6 text-center text-base leading-snug sm:text-lg">
               {t("product.description")}
             </Text>
           </View>

@@ -232,8 +232,10 @@ const AvatarFormUploadButton = ({
       hitSlop={4}
       variant="outline"
       size="icon"
-      className={cn("absolute -right-1 rounded-full", className)}
-      style={[{ bottom: -8 }]}
+      className={cn(
+        "dark:bg-background active:bg-muted absolute -right-2 -bottom-2.5 rounded-full",
+        className,
+      )}
       onPress={handlePick}
       disabled={disabled ?? (upload.isPending || removeStatus === "pending")}
       {...props}
@@ -269,7 +271,7 @@ const AvatarFormPreview = ({
     <View className="relative">
       <Avatar
         className={cn(
-          "size-28",
+          "size-26",
           hasError ? "ring-destructive ring-2 ring-offset-2" : "",
           className,
         )}
@@ -334,8 +336,10 @@ const AvatarFormRemoveButton = ({
     <Button
       variant="outline"
       size="icon"
-      className={cn("absolute -right-1 rounded-full", className)}
-      style={[{ top: -8 }]}
+      className={cn(
+        "dark:bg-background active:bg-muted absolute -top-2 -right-2 rounded-full",
+        className,
+      )}
       disabled={remove.isPending}
       onPress={() => {
         clearErrors();

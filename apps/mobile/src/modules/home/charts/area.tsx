@@ -1,7 +1,7 @@
 import { LinearGradient, matchFont, vec } from "@shopify/react-native-skia";
 import { useState } from "react";
 import { Platform, View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
+import { useCSSVariable } from "uniwind";
 import { CartesianChart, StackedArea } from "victory-native";
 
 import { useTranslation } from "@turbostarter/i18n";
@@ -118,9 +118,9 @@ const chartData = [
 
 export function AreaChart() {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
-  const mutedForeground = useNativeVariable("--muted-foreground") as string;
-  const color1 = useNativeVariable("--chart-1") as string;
-  const color4 = useNativeVariable("--chart-4") as string;
+  const mutedForeground = useCSSVariable("--muted-foreground");
+  const color1 = useCSSVariable("--chart-1");
+  const color4 = useCSSVariable("--chart-4");
 
   const [timeRange, setTimeRange] = useState("90d");
 
@@ -168,7 +168,9 @@ export function AreaChart() {
     <Card className="w-full">
       <CardHeader className="items-center gap-4">
         <View className="items-center">
-          <CardTitle className="text-xl">{t("chart.area")}</CardTitle>
+          <CardTitle className="text-lg leading-tight">
+            {t("chart.area")}
+          </CardTitle>
           <CardDescription>{t("chart.showing")}</CardDescription>
         </View>
 
@@ -228,7 +230,7 @@ export function AreaChart() {
                 day: "numeric",
               });
             },
-            labelColor: mutedForeground,
+            labelColor: mutedForeground?.toString(),
           }}
         >
           {({ points, chartBounds }) => (
@@ -249,7 +251,10 @@ export function AreaChart() {
                           <LinearGradient
                             start={vec(0, highestY - 50)}
                             end={vec(0, lowestY)}
-                            colors={[color, `${color}4d`]}
+                            colors={[
+                              color?.toString() ?? "",
+                              `${color?.toString() ?? ""}4d`,
+                            ]}
                           />
                         ),
                       };
@@ -259,7 +264,10 @@ export function AreaChart() {
                           <LinearGradient
                             start={vec(0, highestY - 100)}
                             end={vec(0, lowestY)}
-                            colors={[color, `${color}4d`]}
+                            colors={[
+                              color?.toString() ?? "",
+                              `${color?.toString() ?? ""}4d`,
+                            ]}
                           />
                         ),
                       };
@@ -278,9 +286,9 @@ export function AreaChart() {
           <View key={config.color} className="flex-row items-center gap-2">
             <View
               className="size-3 rounded-sm"
-              style={{ backgroundColor: config.color }}
+              style={{ backgroundColor: config.color?.toString() }}
             />
-            <Text>{config.label}</Text>
+            <Text className="text-sm">{config.label}</Text>
           </View>
         ))}
       </CardFooter>

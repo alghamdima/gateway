@@ -1,8 +1,9 @@
+import { oklch, formatHex } from "culori";
 import { memo } from "react";
 import { FlatList, View } from "react-native";
 
 import { useTranslation } from "@turbostarter/i18n";
-import { cn, ThemeColor, ThemeMode } from "@turbostarter/ui";
+import { cn, ThemeColor, ThemeMode, themes } from "@turbostarter/ui";
 
 import { Button } from "./button";
 import { Icons } from "./icons";
@@ -13,7 +14,8 @@ import type { ThemeConfig } from "@turbostarter/ui";
 
 interface ThemeCustomizerProps {
   readonly config: ThemeConfig;
-  readonly onChange: (config: ThemeConfig) => Promise<void>;
+  readonly onChange: (config: ThemeConfig) => void;
+  readonly resolvedTheme: Exclude<ThemeMode, "system">;
 }
 
 export const MODE_ICONS = {
@@ -23,8 +25,9 @@ export const MODE_ICONS = {
 } as const;
 
 export const ThemeCustomizer = memo<ThemeCustomizerProps>(
-  ({ config, onChange }) => {
+  ({ config, onChange, resolvedTheme }) => {
     const { t } = useTranslation("common");
+
     return (
       <View className="mt-2 flex-1 items-center gap-4">
         <View className="w-full gap-1.5">
@@ -35,33 +38,38 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
             bounces={false}
             showsVerticalScrollIndicator={false}
             numColumns={3}
-            data={Object.values(ThemeColor).filter((color) =>
-              Object.values(ThemeColor).includes(color),
-            )}
+            data={Object.values(ThemeColor)}
             columnWrapperClassName="gap-2"
             contentContainerClassName="gap-2"
             renderItem={({ item }) => {
+              const [l, c, h, alpha] = themes[item][resolvedTheme].primary;
               return (
                 <Button
                   variant="outline"
-                  size="sm"
                   key={item}
                   onPress={() => onChange({ ...config, color: item })}
                   hitSlop={2}
                   className={cn(
-                    "h-11 grow basis-[100px] flex-row justify-start gap-3 px-3",
-                    config.color === item && "border-primary border-2",
-                    `theme-${item}`,
+                    "grow basis-24 flex-row justify-start gap-2.5 px-3",
+                    config.color === item &&
+                      "border-primary dark:border-primary border-2",
                   )}
                 >
                   <View
-                    className={cn(
-                      "bg-primary flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
-                    )}
+                    className="flex size-4.5 shrink-0 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: formatHex(
+                        oklch({
+                          mode: "oklch",
+                          l,
+                          c,
+                          h,
+                          alpha,
+                        }),
+                      ),
+                    }}
                   />
-                  <Text className="text-sm capitalize">
-                    {t(`theme.color.${item}`)}
-                  </Text>
+                  <Text className="capitalize">{t(`theme.color.${item}`)}</Text>
                 </Button>
               );
             }}
@@ -85,19 +93,18 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
               return (
                 <Button
                   variant="outline"
-                  size="sm"
                   key={item}
                   onPress={() => onChange({ ...config, mode: item })}
                   hitSlop={2}
                   className={cn(
-                    "h-11 grow basis-[100px] flex-row justify-start gap-2 capitalize",
-                    isActive && "border-primary border-2",
+                    "grow basis-24 flex-row justify-start gap-2 px-3 capitalize",
+                    isActive && "border-primary dark:border-primary border-2",
                   )}
                 >
                   <Icon
                     className="text-foreground shrink-0"
-                    width={20}
-                    height={20}
+                    width={18}
+                    height={18}
                   />
                   <Text className="text-sm capitalize">
                     {t(`theme.mode.${item}`)}

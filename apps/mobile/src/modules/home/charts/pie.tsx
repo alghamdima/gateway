@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { useState } from "react";
 import { View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
+import { useCSSVariable } from "uniwind";
 import { Pie, PolarChart } from "victory-native";
 
 import { useTranslation } from "@turbostarter/i18n";
@@ -23,18 +23,18 @@ import {
 import { Text } from "@turbostarter/ui-mobile/text";
 
 const useChart = () => {
-  const color1 = useNativeVariable("--chart-1") as string;
-  const color2 = useNativeVariable("--chart-2") as string;
-  const color3 = useNativeVariable("--chart-3") as string;
-  const color4 = useNativeVariable("--chart-4") as string;
-  const color5 = useNativeVariable("--chart-5") as string;
+  const color1 = useCSSVariable("--chart-1");
+  const color2 = useCSSVariable("--chart-2");
+  const color3 = useCSSVariable("--chart-3");
+  const color4 = useCSSVariable("--chart-4");
+  const color5 = useCSSVariable("--chart-5");
 
   const data = [
-    { month: "may", desktop: 209, color: color5 },
-    { month: "april", desktop: 173, color: color4 },
-    { month: "march", desktop: 237, color: color3 },
-    { month: "february", desktop: 305, color: color2 },
-    { month: "january", desktop: 186, color: color1 },
+    { month: "may", desktop: 209, color: color5?.toString() ?? "" },
+    { month: "april", desktop: 173, color: color4?.toString() ?? "" },
+    { month: "march", desktop: 237, color: color3?.toString() ?? "" },
+    { month: "february", desktop: 305, color: color2?.toString() ?? "" },
+    { month: "january", desktop: 186, color: color1?.toString() ?? "" },
   ];
 
   const config = {
@@ -65,7 +65,7 @@ const useChart = () => {
 
 export function PieChart() {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
-  const backgroundColor = useNativeVariable("--background") as string;
+  const backgroundColor = useCSSVariable("--background");
 
   const { data, config } = useChart();
   const [activeMonth, setActiveMonth] = useState(
@@ -78,7 +78,9 @@ export function PieChart() {
     <Card className="w-full pb-2">
       <CardHeader className="flex-row items-start justify-between gap-0.5">
         <View>
-          <CardTitle className="text-xl">{t("chart.pie")}</CardTitle>
+          <CardTitle className="text-lg leading-tight">
+            {t("chart.pie")}
+          </CardTitle>
           <CardDescription>{t("chart.period")}</CardDescription>
         </View>
 
@@ -92,18 +94,17 @@ export function PieChart() {
           <SelectTrigger
             className="ml-auto rounded-lg"
             aria-label={t("selectMonth")}
-            size="sm"
           >
             <View
               className="size-3 shrink-0 rounded-sm"
               style={{
                 backgroundColor:
-                  config[activeMonth as keyof typeof config].color,
+                  config[activeMonth as keyof typeof config].color?.toString(),
               }}
             />
             <SelectValue
               placeholder={t("selectMonth")}
-              className="text-foreground text-sm"
+              className="text-foreground"
             />
           </SelectTrigger>
           <SelectContent align="start" className="rounded-xl" sideOffset={4}>
@@ -111,11 +112,11 @@ export function PieChart() {
               const monthConfig = config[month as keyof typeof config];
               return (
                 <SelectItem key={month} value={month} label={monthConfig.label}>
-                  <View className="flex-row items-center gap-2 text-xs">
+                  <View className="flex-row items-center gap-2">
                     <View
                       className={cn("size-3 shrink-0 rounded-sm")}
                       style={{
-                        backgroundColor: monthConfig.color,
+                        backgroundColor: monthConfig.color?.toString(),
                       }}
                     />
                     <Text className="text-sm">{monthConfig.label}</Text>
@@ -142,7 +143,7 @@ export function PieChart() {
                   <Pie.SliceAngularInset
                     angularInset={{
                       angularStrokeWidth: 8,
-                      angularStrokeColor: backgroundColor,
+                      angularStrokeColor: backgroundColor?.toString() ?? "",
                     }}
                   />
                 )}
@@ -152,7 +153,7 @@ export function PieChart() {
         </PolarChart>
 
         <View className="absolute inset-0 items-center justify-center">
-          <Text className="font-sans-bold text-foreground -mt-3 text-4xl leading-none">
+          <Text className="font-sans-bold text-foreground -mt-3 text-4xl">
             {data
               .find((data) => data.month === activeMonth)
               ?.desktop.toLocaleString(i18n.language)}

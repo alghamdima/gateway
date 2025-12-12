@@ -50,7 +50,7 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
 
   return (
     <Form {...form}>
-      <View className="flex flex-col gap-6">
+      <View className="flex flex-col items-start gap-6">
         <FormField
           control={form.control}
           name="code"
@@ -87,7 +87,6 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
           name="trustDevice"
           render={({ field }) => (
             <FormCheckbox
-              className="-mt-2 -ml-0.5"
               name="trustDevice"
               label={t("login.twoFactor.trustDevice")}
               value={field.value ?? false}
@@ -121,7 +120,7 @@ const TotpCta = memo<CtaProps>(({ onFactorChange }) => {
   return (
     <View className="flex items-center justify-center pt-2">
       <Text
-        onPress={() => onFactorChange(SecondFactor.BACKUP_CODE)}
+        onPress={() => onFactorChange(SecondFactor.TOTP)}
         className="text-muted-foreground font-sans-medium cursor-pointer pl-2 text-sm underline underline-offset-4"
       >
         {t("login.twoFactor.totp.cta")}

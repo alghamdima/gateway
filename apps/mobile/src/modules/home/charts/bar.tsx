@@ -1,6 +1,6 @@
 import { matchFont } from "@shopify/react-native-skia";
 import { Platform, View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
+import { useCSSVariable } from "uniwind";
 import { Bar, CartesianChart } from "victory-native";
 
 import { useTranslation } from "@turbostarter/i18n";
@@ -16,11 +16,11 @@ import { Icons } from "@turbostarter/ui-mobile/icons";
 import { Text } from "@turbostarter/ui-mobile/text";
 
 const useChartData = () => {
-  const color1 = useNativeVariable("--chart-1") as string;
-  const color2 = useNativeVariable("--chart-2") as string;
-  const color3 = useNativeVariable("--chart-3") as string;
-  const color4 = useNativeVariable("--chart-4") as string;
-  const color5 = useNativeVariable("--chart-5") as string;
+  const color1 = useCSSVariable("--chart-1");
+  const color2 = useCSSVariable("--chart-2");
+  const color3 = useCSSVariable("--chart-3");
+  const color4 = useCSSVariable("--chart-4");
+  const color5 = useCSSVariable("--chart-5");
 
   return [
     {
@@ -48,14 +48,16 @@ const useChartData = () => {
 
 export function BarChart() {
   const { t } = useTranslation(["common", "dashboard"]);
-  const mutedForeground = useNativeVariable("--muted-foreground") as string;
+  const mutedForeground = useCSSVariable("--muted-foreground");
 
   const chartData = useChartData();
 
   return (
     <Card className="w-full">
-      <CardHeader className="gap-0.5">
-        <CardTitle className="text-xl">{t("chart.bar")}</CardTitle>
+      <CardHeader className="gap-0">
+        <CardTitle className="text-lg leading-tight">
+          {t("chart.bar")}
+        </CardTitle>
         <CardDescription>{t("chart.period")}</CardDescription>
       </CardHeader>
 
@@ -78,7 +80,7 @@ export function BarChart() {
             formatXLabel: (value) =>
               chartData.find((data) => data.browser === value)?.label ?? value,
             labelOffset: 6,
-            labelColor: mutedForeground,
+            labelColor: mutedForeground?.toString(),
           }}
         >
           {({ points, chartBounds }) => {
@@ -105,14 +107,14 @@ export function BarChart() {
         </CartesianChart>
       </CardContent>
 
-      <CardFooter className="flex-col items-start gap-1 text-sm">
+      <CardFooter className="flex-col items-start">
         <View className="flex-row items-center gap-2">
-          <Text className="font-sans-medium leading-none">
+          <Text className="font-sans-medium text-sm">
             {t("chart.trending")}
           </Text>
           <Icons.TrendingUp size={16} className="text-foreground" />
         </View>
-        <Text className="text-muted-foreground leading-none">
+        <Text className="text-muted-foreground text-sm">
           {t("chart.showing")}
         </Text>
       </CardFooter>

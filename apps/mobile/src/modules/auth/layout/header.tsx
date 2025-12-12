@@ -12,7 +12,7 @@ export const AuthHeader = memo<AuthHeaderProps>(({ title, description }) => {
   return (
     <View className="gap-1">
       <Text className="font-sans-bold text-3xl tracking-tighter">{title}</Text>
-      <Text className="text-muted-foreground">{description}</Text>
+      <Text className="text-muted-foreground text-sm">{description}</Text>
     </View>
   );
 });

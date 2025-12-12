@@ -53,7 +53,7 @@ import {
   UsersRound,
   MonitorSmartphone,
 } from "lucide-react-native";
-import { styled } from "react-native-css";
+import { withUniwind } from "uniwind";
 
 import { Icons as GlobalIcons } from "@turbostarter/ui/assets";
 
@@ -121,9 +121,9 @@ const Icons = {} as {
 };
 
 (Object.keys(icons) as (keyof typeof icons)[]).forEach((key) => {
-  Icons[key] = styled(icons[key], {
-    className: "style",
-  }) as LucideIcon & React.FC<React.SVGProps<SVGElement>>;
+  Icons[key] = withUniwind(
+    icons[key] as React.FC<React.SVGProps<SVGElement>>,
+  ) as LucideIcon & React.FC<React.SVGProps<SVGElement>>;
 });
 
 export type Icon = (typeof Icons)[keyof typeof Icons];

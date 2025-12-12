@@ -66,6 +66,7 @@
   "createdAt": "Creado el",
   "expiresAt": "Expira el",
   "expires": "Expira",
+  "expired": "Expirado",
   "review": "Revisar",
   "resend": "Reenviar",
   "status": "Estado",

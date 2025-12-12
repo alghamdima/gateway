@@ -86,8 +86,7 @@ const Search = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute right-1"
-          style={{ zIndex: 1 }}
+          className="absolute right-1 z-10"
           onPress={() => setFilter("email", null)}
           accessibilityLabel={t("clear")}
         >
@@ -112,16 +111,12 @@ const AdvancedFilters = () => {
         <Button
           variant="outline"
           size="icon"
-          className="relative h-12 w-12"
-          style={{ width: 48 }}
+          className="relative size-10 shrink-0"
         >
-          <Icons.ListFilter size={20} className="text-muted-foreground" />
+          <Icons.ListFilter size={18} className="text-muted-foreground" />
           {advancedFilterCount > 0 && (
-            <View
-              className="bg-primary absolute size-5 items-center justify-center rounded-full"
-              style={{ top: -6, right: -6 }}
-            >
-              <Text className="text-primary-foreground text-sm">
+            <View className="bg-primary absolute -top-1.5 -right-1.5 size-4 items-center justify-center rounded-full">
+              <Text className="text-primary-foreground text-xs">
                 {advancedFilterCount}
               </Text>
             </View>
@@ -190,7 +185,7 @@ const StatusFilter = () => {
             onPress={() =>
               toggleStatus(status, !selectedStatuses.includes(status))
             }
-            className="native:leading-tight"
+            className="text-sm"
           >
             {t(status)}
           </Text>
@@ -221,14 +216,14 @@ const RoleFilter = () => {
     <View className="grow gap-2">
       <Text className="text-muted-foreground">{t("role")}</Text>
       {Object.values(MemberRole).map((role) => (
-        <View key={role} className="flex-row items-center gap-3">
+        <View key={role} className="flex-row items-center gap-2">
           <Checkbox
             checked={selectedRoles.includes(role)}
             onCheckedChange={(value) => toggleRole(role, value)}
           />
           <Text
             onPress={() => toggleRole(role, !selectedRoles.includes(role))}
-            className="native:leading-tight"
+            className="text-sm"
           >
             {t(role)}
           </Text>

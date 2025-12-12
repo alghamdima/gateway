@@ -40,11 +40,11 @@ export const LocaleCustomizer = ({ onChange }: LocaleCustomizerProps) => {
             <Button
               key={locale}
               variant="outline"
-              size="sm"
               onPress={() => handleLocaleChange(locale)}
               className={cn(
-                "h-11 grow basis-[85px] flex-row justify-start gap-3 px-3",
-                locale === lang && "border-primary border-2",
+                "grow basis-24 flex-row justify-start gap-3 px-3",
+                locale === lang &&
+                  "border-primary dark:border-primary border-2",
               )}
             >
               <Icon className="size-5" />

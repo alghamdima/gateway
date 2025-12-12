@@ -52,7 +52,7 @@ export function ContactForm() {
   };
 
   return (
-    <Card className="w-full max-w-lg border-none shadow-none">
+    <Card className="w-full max-w-lg border-none bg-transparent shadow-none">
       <CardContent className="w-full p-0">
         <Form {...form}>
           <form

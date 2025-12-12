@@ -2,7 +2,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Fragment } from "react/jsx-runtime";
 import { Alert, View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
 import { FlatList, RefreshControl } from "react-native-gesture-handler";
 
 import { useTranslation } from "@turbostarter/i18n";
@@ -20,8 +19,6 @@ import { auth } from "~/modules/auth/lib/api";
 export default function Sessions() {
   const { t } = useTranslation(["common", "auth"]);
   const session = authClient.useSession();
-
-  const primaryColor = useNativeVariable("--primary") as string;
 
   const signOut = useMutation({
     ...auth.mutations.signOut,
@@ -67,7 +64,7 @@ export default function Sessions() {
           renderItem={({ item }) => (
             <View className="flex-row justify-between gap-3 px-4 py-3">
               <View className="flex-1">
-                <Text className="font-sans-medium" numberOfLines={1}>
+                <Text className="font-sans-medium text-sm" numberOfLines={1}>
                   {item.ipAddress}
                 </Text>
                 <Text
@@ -100,8 +97,8 @@ export default function Sessions() {
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={() => refetch()}
-              tintColor={primaryColor}
-              colors={[primaryColor]}
+              tintColorClassName="accent-primary"
+              colorsClassName="accent-primary"
             />
           }
           ListEmptyComponent={

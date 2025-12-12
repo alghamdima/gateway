@@ -108,8 +108,8 @@ export default function StepsLayout() {
             }
           >
             <Icons.ChevronLeft
-              width={20}
-              height={20}
+              width={22}
+              height={22}
               className="text-muted-foreground"
             />
           </Button>

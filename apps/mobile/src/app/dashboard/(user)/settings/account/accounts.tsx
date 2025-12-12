@@ -96,7 +96,7 @@ export default function AccountsScreen() {
                     key={social.accountId}
                     className="border-border flex-row items-center border-b p-4 last:border-b-0"
                   >
-                    <Icon className="text-foreground size-10" />
+                    <Icon className="text-foreground size-8" />
                     <View className="ml-3 flex-1">
                       <Text className="font-sans-medium capitalize">
                         {social.providerId}
@@ -133,7 +133,7 @@ export default function AccountsScreen() {
 
           {missing.length > 0 && (
             <View className="border-border gap-3 rounded-lg border border-dashed px-5 py-4">
-              <Text className="font-sans-medium">{t("addNew")}</Text>
+              <Text className="font-sans-medium text-sm">{t("addNew")}</Text>
               <View className="bg-border h-px" />
               <View className="flex-row flex-wrap gap-2">
                 {missing.map((provider) => {
@@ -161,7 +161,7 @@ export default function AccountsScreen() {
                           <Icons.Loader2 className="size-5" />
                         </Spin>
                       ) : (
-                        <Icon className="text-foreground size-6" />
+                        <Icon className="text-foreground size-5" />
                       )}
                       <Text className="capitalize">{provider}</Text>
                     </Button>

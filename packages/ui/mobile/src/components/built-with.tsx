@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Pressable, View, Linking } from "react-native";
-import { styled } from "react-native-css";
 import NativeSvg, { Path } from "react-native-svg";
+import { withUniwind } from "uniwind";
 
 import { useTranslation } from "@turbostarter/i18n";
 import { cn } from "@turbostarter/ui";
@@ -9,9 +9,7 @@ import { cn } from "@turbostarter/ui";
 import { buttonVariants } from "./button";
 import { Text } from "./text";
 
-const Svg = styled(NativeSvg, {
-  className: "style",
-});
+const Svg = withUniwind(NativeSvg);
 
 export const BuiltWith = ({
   className,
@@ -25,17 +23,17 @@ export const BuiltWith = ({
       className={cn(
         buttonVariants({
           variant: "outline",
-          className: "flex-row items-center justify-center gap-1",
+          className: "flex-row items-center justify-center gap-0",
         }),
         className,
       )}
       {...props}
     >
-      <Text>{t("builtWith")}</Text>
+      <Text className="text-sm leading-tight">{t("builtWith")}</Text>
       <View className="shrink-0 flex-row items-center gap-1.5">
         <Svg
-          height={16}
-          width={16}
+          height={18}
+          width={18}
           viewBox="0 0 512 517"
           fill="none"
           className="text-primary ml-1.5"
@@ -49,8 +47,8 @@ export const BuiltWith = ({
         </Svg>
 
         <Svg
-          height={10}
-          width={82}
+          height={12}
+          width={84}
           viewBox="0 0 667 84"
           fill="none"
           className="text-foreground"

@@ -2,7 +2,6 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Fragment } from "react/jsx-runtime";
 import { View } from "react-native";
-import { useNativeVariable } from "react-native-css/native";
 import { FlatList, RefreshControl } from "react-native-gesture-handler";
 
 import { useTranslation } from "@turbostarter/i18n";
@@ -18,7 +17,6 @@ import { MembersListItem, MembersListItemSkeleton } from "./members-list-item";
 
 export const MembersList = () => {
   const { t } = useTranslation("common");
-  const primaryColor = useNativeVariable("--primary") as string;
   const [filters, setFilters] = useState<
     Record<string, string | string[] | null>
   >({});
@@ -60,7 +58,9 @@ export const MembersList = () => {
             "flex-1": !data.length,
             "items-center justify-center": !data.length && !members.isLoading,
           })}
-          ItemSeparatorComponent={() => <View className="bg-border h-px" />}
+          ItemSeparatorComponent={() => (
+            <View className="bg-border h-px w-full" />
+          )}
           showsVerticalScrollIndicator={false}
           onEndReached={() => members.fetchNextPage()}
           onEndReachedThreshold={0.5}
@@ -69,7 +69,7 @@ export const MembersList = () => {
               <View>
                 {Array.from({ length: 10 }).map((_, index) => (
                   <Fragment key={index}>
-                    <View className="bg-border h-px" />
+                    <View className="bg-border h-px w-full" />
                     <MembersListItemSkeleton />
                   </Fragment>
                 ))}
@@ -80,8 +80,8 @@ export const MembersList = () => {
             <RefreshControl
               refreshing={members.isRefetching}
               onRefresh={() => members.refetch()}
-              tintColor={primaryColor}
-              colors={[primaryColor]}
+              tintColorClassName="accent-primary"
+              colorsClassName="accent-primary"
             />
           }
           ListEmptyComponent={
@@ -91,7 +91,7 @@ export const MembersList = () => {
                   <Fragment key={index}>
                     <MembersListItemSkeleton />
                     {index !== arr.length - 1 && (
-                      <View className="bg-border h-px" />
+                      <View className="bg-border h-px w-full" />
                     )}
                   </Fragment>
                 ))}

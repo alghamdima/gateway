@@ -18,7 +18,6 @@ import { Text } from "@turbostarter/ui-mobile/text";
 import { MODE_ICONS, ThemeCustomizer } from "@turbostarter/ui-mobile/theme";
 
 import { appConfig } from "~/config/app";
-import { useThemeConfig } from "~/lib/providers/theme";
 import { useTheme } from "~/modules/common/hooks/use-theme";
 import { SettingsTile } from "~/modules/common/settings-tile";
 
@@ -26,23 +25,21 @@ import type { ThemeConfig } from "@turbostarter/ui";
 
 export const ThemeSettings = () => {
   const { t } = useTranslation("common");
-  const { theme, changeTheme } = useTheme();
-  const { config, setConfig } = useThemeConfig();
+  const { config, setConfig, resolvedTheme } = useTheme();
 
-  const onChange = async (config: ThemeConfig) => {
-    await changeTheme(config.mode);
+  const onChange = (config: ThemeConfig) => {
     setConfig(config);
   };
 
   return (
     <BottomSheet>
       <BottomSheetOpenTrigger asChild>
-        <SettingsTile icon={MODE_ICONS[theme]}>
+        <SettingsTile icon={MODE_ICONS[config.mode]}>
           <Text>{t("theme.title")}</Text>
 
           <View
             className={cn(
-              "bg-primary flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+              "bg-primary flex size-4.5 shrink-0 items-center justify-center rounded-full",
             )}
           />
         </SettingsTile>
@@ -70,11 +67,9 @@ export const ThemeSettings = () => {
           </View>
 
           <ThemeCustomizer
-            config={{ ...config, mode: theme }}
-            onChange={async ({ mode, ...config }) => {
-              await changeTheme(mode);
-              setConfig(config);
-            }}
+            config={config}
+            onChange={onChange}
+            resolvedTheme={resolvedTheme}
           />
 
           <BottomSheetCloseTrigger asChild>

@@ -99,7 +99,7 @@ export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
                     ? activeOrganization.name
                     : t("account.personal")}
                 </span>
-                <span className="truncate text-xs capitalize">
+                <span className="text-muted-foreground truncate text-xs capitalize">
                   {(customer?.plan ?? PricingPlanType.FREE).toLowerCase()}
                 </span>
               </div>

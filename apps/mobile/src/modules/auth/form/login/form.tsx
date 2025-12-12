@@ -87,13 +87,7 @@ export const LoginForm = ({
             {authClient.isLastUsedLoginMethod(
               LOGIN_OPTIONS_DETAILS[provider].lastUsedMethodId,
             ) && (
-              <Badge
-                className="absolute shadow-sm"
-                style={{
-                  top: -12,
-                  right: -16,
-                }}
-              >
+              <Badge className="absolute -top-3 -right-4 shadow-sm">
                 <Text>{t("lastUsed")}</Text>
               </Badge>
             )}

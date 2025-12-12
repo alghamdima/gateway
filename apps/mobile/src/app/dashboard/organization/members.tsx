@@ -55,8 +55,8 @@ export default function Members() {
       </Tabs>
 
       <InviteMemberBottomSheet>
-        <Button disabled={!hasInvitePermission}>
-          <Icons.UserRoundPlus size={18} className="text-primary-foreground" />
+        <Button disabled={!hasInvitePermission} size="lg">
+          <Icons.UserRoundPlus size={20} className="text-primary-foreground" />
           <Text>{t("invite")}</Text>
         </Button>
       </InviteMemberBottomSheet>

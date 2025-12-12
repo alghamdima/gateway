@@ -28,23 +28,13 @@ interface ThemeProviderProps {
   readonly children: React.ReactNode;
 }
 
-const ThemeConfigProvider = () => {
-  const themeConfig = useThemeConfig((s) => s.config);
+export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
+  const config = useThemeConfig((s) => s.config);
 
   useEffect(() => {
-    Array.from(document.body.classList)
-      .filter((className) => className.startsWith("theme-"))
-      .forEach((className) => {
-        document.body.classList.remove(className);
-      });
+    document.body.dataset.theme = config.color;
+  }, [config.color]);
 
-    document.body.classList.add(`theme-${themeConfig.color}`);
-  }, [themeConfig.color]);
-
-  return null;
-};
-
-export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
   return (
     <NextThemeProvider
       attribute="class"
@@ -53,7 +43,6 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
       disableTransitionOnChange
     >
       {children}
-      <ThemeConfigProvider />
     </NextThemeProvider>
   );
 });

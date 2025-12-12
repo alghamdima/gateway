@@ -41,22 +41,19 @@ const alertTextVariants = cva("text-sm", {
   },
 });
 
-const alertDescriptionVariants = cva(
-  "ml-0.5 pb-1.5 pl-6 text-sm leading-relaxed",
-  {
-    variants: {
-      variant: {
-        default: "text-muted-foreground",
-        destructive: "text-destructive/90",
-        primary: "text-primary/90",
-        success: "text-success/90",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
+const alertDescriptionVariants = cva("ml-0.5 pb-1.5 pl-6 text-sm", {
+  variants: {
+    variant: {
+      default: "text-muted-foreground",
+      destructive: "text-destructive/90",
+      primary: "text-primary/90",
+      success: "text-success/90",
     },
   },
-);
+  defaultVariants: {
+    variant: "default",
+  },
+});
 
 const AlertContext =
   React.createContext<VariantProps<typeof alertVariants>["variant"]>(null);
@@ -106,7 +103,7 @@ function AlertTitle({
   return (
     <Text
       className={cn(
-        "font-sans-medium mb-1 ml-0.5 min-h-4 pl-6 leading-none tracking-tight",
+        "font-sans-medium ml-0.5 min-h-4 pl-6 leading-none tracking-tight",
         className,
       )}
       {...props}

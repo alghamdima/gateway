@@ -1,9 +1,9 @@
 import * as React from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 
 import { cn } from "@turbostarter/ui";
 
-import { TextClassContext } from "./text";
+import { TextClassContext, Text } from "./text";
 
 import type { TextRef, ViewRef } from "@rn-primitives/types";
 import type { ViewProps } from "react-native";
@@ -24,7 +24,7 @@ function CardHeader({
   ...props
 }: React.ComponentPropsWithoutRef<typeof View> & React.RefAttributes<ViewRef>) {
   return (
-    <View className={cn("flex flex-col gap-1.5 p-6", className)} {...props} />
+    <View className={cn("flex flex-col gap-1.5 p-5", className)} {...props} />
   );
 }
 
@@ -61,7 +61,7 @@ function CardContent({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<typeof View> & React.RefAttributes<ViewRef>) {
-  return <View className={cn("p-6 pt-0", className)} {...props} />;
+  return <View className={cn("p-5 pt-0", className)} {...props} />;
 }
 
 function CardFooter({
@@ -70,7 +70,7 @@ function CardFooter({
 }: React.ComponentPropsWithoutRef<typeof View> & React.RefAttributes<ViewRef>) {
   return (
     <View
-      className={cn("flex flex-row items-center p-6 pt-0", className)}
+      className={cn("flex flex-row items-center p-5 pt-0", className)}
       {...props}
     />
   );

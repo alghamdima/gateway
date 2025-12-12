@@ -118,7 +118,7 @@ function FormDescription({
     <Text
       ref={ref}
       nativeID={formDescriptionNativeID}
-      className={cn("text-muted-foreground pt-1 text-sm", className)}
+      className={cn("text-muted-foreground text-sm", className)}
       {...props}
     />
   );
@@ -314,8 +314,8 @@ function FormCheckbox({
   }
 
   return (
-    <FormItem className="px-1">
-      <View className="flex-row items-center gap-3">
+    <FormItem>
+      <View className="flex-row items-center gap-2">
         <Checkbox
           ref={ref}
           aria-labelledby={formItemNativeID}
@@ -330,11 +330,7 @@ function FormCheckbox({
           {...props}
         />
         {!!label && (
-          <FormLabel
-            className="pb-2"
-            nativeID={formItemNativeID}
-            onPress={handleOnLabelPress}
-          >
+          <FormLabel nativeID={formItemNativeID} onPress={handleOnLabelPress}>
             {label}
           </FormLabel>
         )}
