@@ -8,6 +8,7 @@ import type { Preset } from "envin/types";
 
 export const preset = {
   id: "plausible",
+  clientPrefix: "NEXT_PUBLIC_",
   client: {
     NEXT_PUBLIC_PLAUSIBLE_DOMAIN: z.string(),
     NEXT_PUBLIC_PLAUSIBLE_HOST: z.string(),

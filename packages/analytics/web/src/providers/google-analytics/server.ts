@@ -7,7 +7,7 @@ import { env } from "./env";
 import type {
   AllowedPropertyValues,
   AnalyticsProviderServerStrategy,
-} from "../types";
+} from "@turbostarter/analytics";
 
 const postEvent = async (
   event: string,
@@ -29,8 +29,8 @@ const postEvent = async (
   }
 };
 
-const track: AnalyticsProviderServerStrategy["track"] = (event, data) => {
-  void postEvent(event, data);
-};
-
-export { track };
+export const { track } = {
+  track: (event, data) => {
+    void postEvent(event, data);
+  },
+} satisfies AnalyticsProviderServerStrategy;

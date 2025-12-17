@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 import { useTrackingPermissions } from "../../hooks";
 
-import type { AnalyticsProviderStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 const setup = async () => {
   await analytics().setAnalyticsCollectionEnabled(true);
@@ -46,27 +46,24 @@ const useSetup = () => {
   }, [pathname, params, granted]);
 };
 
-const Provider: AnalyticsProviderStrategy["Provider"] = ({ children }) => {
-  useSetup();
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    useSetup();
 
-  return children;
-};
+    return children;
+  },
+  track: (name, params) => {
+    void analytics().logEvent(name, params);
+  },
+  identify: (userId, traits) => {
+    void analytics().setUserId(userId);
 
-const track: AnalyticsProviderStrategy["track"] = (name, params) => {
-  void analytics().logEvent(name, params);
-};
-
-const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
-  void analytics().setUserId(userId);
-
-  if (traits) {
-    void analytics().setUserProperties(traits);
-  }
-};
-
-const reset: AnalyticsProviderStrategy["reset"] = () => {
-  void analytics().setUserId(null);
-  void analytics().setUserProperties({});
-};
-
-export { Provider, track, identify, reset };
+    if (traits) {
+      void analytics().setUserProperties(traits);
+    }
+  },
+  reset: () => {
+    void analytics().setUserId(null);
+    void analytics().setUserProperties({});
+  },
+} satisfies AnalyticsProviderClientStrategy;

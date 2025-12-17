@@ -14,6 +14,7 @@ import { QueryClientProvider } from "~/lib/query";
 import { Verification } from "~/modules/auth/verification";
 
 import { AnalyticsProvider } from "./analytics";
+import { MonitoringProvider } from "./monitoring";
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
@@ -31,11 +32,13 @@ export const Providers = memo<ProvidersProps>(({ children }) => {
             <ThemeProvider>
               <KeyboardProvider>
                 <BottomSheetModalProvider>
-                  <AnalyticsProvider>
-                    {children}
-                    <Verification />
-                    <PortalHost />
-                  </AnalyticsProvider>
+                  <MonitoringProvider>
+                    <AnalyticsProvider>
+                      {children}
+                      <Verification />
+                      <PortalHost />
+                    </AnalyticsProvider>
+                  </MonitoringProvider>
                 </BottomSheetModalProvider>
               </KeyboardProvider>
             </ThemeProvider>

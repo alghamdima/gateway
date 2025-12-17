@@ -2,7 +2,7 @@ import { OpenPanel } from "@openpanel/nextjs";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "../types";
+import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
 
 let client: OpenPanel | null = null;
 
@@ -19,10 +19,10 @@ const getClient = () => {
   return client;
 };
 
-const track: AnalyticsProviderServerStrategy["track"] = (event, data) => {
-  const client = getClient();
+export const { track } = {
+  track: (event, data) => {
+    const client = getClient();
 
-  void client.track(event, data);
-};
-
-export { track };
+    void client.track(event, data);
+  },
+} satisfies AnalyticsProviderServerStrategy;

@@ -2,7 +2,7 @@ import { Vemetric } from "@vemetric/node";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "../types";
+import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
 
 let client: Vemetric | null = null;
 
@@ -18,13 +18,13 @@ const getClient = () => {
   return client;
 };
 
-const track: AnalyticsProviderServerStrategy["track"] = (event, data) => {
-  const client = getClient();
+export const { track } = {
+  track: (event, data) => {
+    const client = getClient();
 
-  void client.trackEvent(event, {
-    userIdentifier: data?.distinctId?.toString() ?? "anonymous",
-    eventData: data,
-  });
-};
-
-export { track };
+    void client.trackEvent(event, {
+      userIdentifier: data?.distinctId?.toString() ?? "anonymous",
+      eventData: data,
+    });
+  },
+} satisfies AnalyticsProviderServerStrategy;

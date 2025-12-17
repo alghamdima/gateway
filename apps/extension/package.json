@@ -25,6 +25,7 @@
     "@turbostarter/auth": "workspace:*",
     "@turbostarter/billing": "workspace:*",
     "@turbostarter/i18n": "workspace:*",
+    "@turbostarter/monitoring-extension": "workspace:*",
     "@turbostarter/shared": "workspace:*",
     "@turbostarter/ui": "workspace:*",
     "@turbostarter/ui-web": "workspace:*",

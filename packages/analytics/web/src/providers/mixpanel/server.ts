@@ -5,7 +5,7 @@ import { logger } from "@turbostarter/shared/logger";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "../types";
+import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
 
 let client: Mixpanel.Mixpanel | null = null;
 
@@ -21,13 +21,13 @@ const getClient = () => {
   return client;
 };
 
-const track: AnalyticsProviderServerStrategy["track"] = (event, properties) => {
-  try {
-    const mixpanel = getClient();
-    mixpanel.track(event, properties ?? {});
-  } catch (error) {
-    logger.warn("Failed to track Mixpanel event: ", error);
-  }
-};
-
-export { track };
+export const { track } = {
+  track: (event, properties) => {
+    try {
+      const mixpanel = getClient();
+      mixpanel.track(event, properties ?? {});
+    } catch (error) {
+      logger.warn("Failed to track Mixpanel event: ", error);
+    }
+  },
+} satisfies AnalyticsProviderServerStrategy;

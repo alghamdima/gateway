@@ -25,6 +25,7 @@
     "@turbostarter/db": "workspace:*",
     "@turbostarter/email": "workspace:*",
     "@turbostarter/i18n": "workspace:*",
+    "@turbostarter/monitoring-web": "workspace:*",
     "@turbostarter/shared": "workspace:*",
     "@turbostarter/storage": "workspace:*",
     "ai": "5.0.86",

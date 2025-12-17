@@ -5,7 +5,7 @@ import { useTrackingPermissions } from "../../hooks";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 let client: PostHog | null = null;
 
@@ -47,7 +47,7 @@ const Setup = () => {
   return null;
 };
 
-const Provider: AnalyticsProviderStrategy["Provider"] = ({ children }) => {
+const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
   return (
     <Wrapper>
       <Setup />
@@ -56,19 +56,18 @@ const Provider: AnalyticsProviderStrategy["Provider"] = ({ children }) => {
   );
 };
 
-const track: AnalyticsProviderStrategy["track"] = (name, params) => {
-  const client = getClient();
-  client.capture(name, params);
-};
-
-const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
-  const client = getClient();
-  client.identify(userId, traits);
-};
-
-const reset: AnalyticsProviderStrategy["reset"] = () => {
-  const client = getClient();
-  client.reset();
-};
-
-export { Provider, track, identify, reset };
+export const { Provider, track, identify, reset } = {
+  Provider: ProviderComponent,
+  track: (name, params) => {
+    const client = getClient();
+    client.capture(name, params);
+  },
+  identify: (userId, traits) => {
+    const client = getClient();
+    client.identify(userId, traits);
+  },
+  reset: () => {
+    const client = getClient();
+    client.reset();
+  },
+} satisfies AnalyticsProviderClientStrategy;

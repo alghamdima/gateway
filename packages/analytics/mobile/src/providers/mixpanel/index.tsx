@@ -5,7 +5,7 @@ import { useTrackingPermissions } from "../../hooks";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 const optOutTracking = true;
 const trackAutomaticEvents = false;
@@ -17,34 +17,31 @@ const mixpanel = new Mixpanel(
 
 void mixpanel.init();
 
-const Provider: AnalyticsProviderStrategy["Provider"] = ({ children }) => {
-  const granted = useTrackingPermissions();
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    const granted = useTrackingPermissions();
 
-  useEffect(() => {
-    void (async () => {
-      const optedOut = await mixpanel.hasOptedOutTracking();
-      if (granted && optedOut) {
-        void mixpanel.optInTracking();
-      }
-    })();
-  }, [granted]);
+    useEffect(() => {
+      void (async () => {
+        const optedOut = await mixpanel.hasOptedOutTracking();
+        if (granted && optedOut) {
+          void mixpanel.optInTracking();
+        }
+      })();
+    }, [granted]);
 
-  return <>{children}</>;
-};
-
-const track: AnalyticsProviderStrategy["track"] = (name, params) => {
-  mixpanel.track(name, params);
-};
-
-const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
-  void mixpanel.identify(userId);
-  if (traits) {
-    void mixpanel.getPeople().set(traits);
-  }
-};
-
-const reset: AnalyticsProviderStrategy["reset"] = () => {
-  mixpanel.reset();
-};
-
-export { Provider, track, identify, reset };
+    return <>{children}</>;
+  },
+  track: (name, params) => {
+    mixpanel.track(name, params);
+  },
+  identify: (userId, traits) => {
+    void mixpanel.identify(userId);
+    if (traits) {
+      void mixpanel.getPeople().set(traits);
+    }
+  },
+  reset: () => {
+    mixpanel.reset();
+  },
+} satisfies AnalyticsProviderClientStrategy;

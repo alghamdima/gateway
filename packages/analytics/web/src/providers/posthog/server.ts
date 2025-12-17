@@ -2,7 +2,7 @@ import { PostHog } from "posthog-node";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "../types";
+import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
 
 let client: PostHog | null = null;
 
@@ -18,14 +18,14 @@ const getClient = () => {
   return client;
 };
 
-const track: AnalyticsProviderServerStrategy["track"] = (event, data) => {
-  const client = getClient();
+export const { track } = {
+  track: (event, data) => {
+    const client = getClient();
 
-  client.capture({
-    event,
-    distinctId: typeof data?.distinctId === "string" ? data.distinctId : "",
-    properties: data,
-  });
-};
-
-export { track };
+    client.capture({
+      event,
+      distinctId: typeof data?.distinctId === "string" ? data.distinctId : "",
+      properties: data,
+    });
+  },
+} satisfies AnalyticsProviderServerStrategy;

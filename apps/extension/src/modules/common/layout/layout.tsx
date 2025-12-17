@@ -1,67 +1,31 @@
-import { StrictMode, useEffect } from "react";
+import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 
-import { I18nProvider } from "@turbostarter/i18n";
 import { ThemeMode, cn } from "@turbostarter/ui";
 
 import "~/assets/styles/globals.css";
-import { appConfig } from "~/config/app";
-import { useLocale } from "~/lib/i18n";
-import { QueryClientProvider } from "~/lib/query";
+import { Providers } from "~/lib/providers/providers";
 import { StorageKey, useStorage } from "~/lib/storage";
-import { AnalyticsIdentity } from "~/modules/common/analytics-identity";
 import { ErrorBoundary } from "~/modules/common/error-boundary";
 import { Footer } from "~/modules/common/layout/footer";
 import { Header } from "~/modules/common/layout/header";
 import { Suspense } from "~/modules/common/suspense";
 import { Toaster } from "~/modules/common/toast";
 
-const I18n = ({ children }: { children: React.ReactNode }) => {
-  const { data: locale, isLoading } = useLocale();
-
-  useEffect(() => {
-    if (locale) {
-      document.documentElement.lang = locale;
-    }
-  }, [locale]);
-
-  if (isLoading) return null;
-
-  return (
-    <I18nProvider locale={locale} defaultLocale={appConfig.locale}>
-      {children}
-    </I18nProvider>
-  );
-};
-
-interface ProvidersProps {
+interface LayoutProps {
   readonly children: React.ReactNode;
   readonly loadingFallback?: React.ReactNode;
   readonly errorFallback?: React.ReactNode;
+
+  readonly className?: string;
 }
 
-const Providers = ({
+export const Layout = ({
   children,
+  className,
   loadingFallback,
   errorFallback,
-}: ProvidersProps) => {
-  return (
-    <ErrorBoundary fallback={errorFallback}>
-      <Suspense fallback={loadingFallback}>
-        <QueryClientProvider>
-          <AnalyticsIdentity />
-          <I18n>{children}</I18n>
-        </QueryClientProvider>
-      </Suspense>
-    </ErrorBoundary>
-  );
-};
-
-type LayoutProps = ProvidersProps & {
-  readonly className?: string;
-};
-
-export const Layout = ({ children, className, ...props }: LayoutProps) => {
+}: LayoutProps) => {
   const { data: theme } = useStorage(StorageKey.THEME);
 
   const isDark =
@@ -70,7 +34,7 @@ export const Layout = ({ children, className, ...props }: LayoutProps) => {
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
-    <Providers {...props}>
+    <Providers>
       <div
         className={cn({
           dark: isDark,
@@ -81,17 +45,21 @@ export const Layout = ({ children, className, ...props }: LayoutProps) => {
           className="bg-background text-foreground flex min-h-screen w-full min-w-92 flex-col font-sans text-base"
           data-theme={theme.color}
         >
-          <Toaster />
-          <div
-            className={cn(
-              "flex w-full max-w-7xl grow flex-col items-center justify-between gap-16 p-4",
-              className,
-            )}
-          >
-            <Header />
-            {children}
-            <Footer />
-          </div>
+          <ErrorBoundary fallback={errorFallback}>
+            <Suspense fallback={loadingFallback}>
+              <Toaster />
+              <div
+                className={cn(
+                  "mx-auto flex w-full max-w-7xl grow flex-col items-center justify-between gap-16 p-4",
+                  className,
+                )}
+              >
+                <Header />
+                {children}
+                <Footer />
+              </div>
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </div>
     </Providers>

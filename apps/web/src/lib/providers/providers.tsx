@@ -7,6 +7,7 @@ import { appConfig } from "~/config/app";
 import { QueryClientProvider } from "~/lib/query/client";
 
 import { AnalyticsProvider } from "./analytics";
+import { MonitoringProvider } from "./monitoring";
 import { ThemeProvider } from "./theme";
 
 interface ProvidersProps {
@@ -20,7 +21,9 @@ export const Providers = memo<ProvidersProps>(({ children, locale }) => {
       <QueryClientProvider>
         <NuqsAdapter>
           <AnalyticsProvider>
-            <ThemeProvider>{children}</ThemeProvider>
+            <MonitoringProvider>
+              <ThemeProvider>{children}</ThemeProvider>
+            </MonitoringProvider>
           </AnalyticsProvider>
         </NuqsAdapter>
       </QueryClientProvider>

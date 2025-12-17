@@ -8,6 +8,7 @@ import type { Preset } from "envin/types";
 
 export const preset = {
   id: "posthog",
+  clientPrefix: "NEXT_PUBLIC_",
   client: {
     NEXT_PUBLIC_POSTHOG_KEY: z.string(),
     NEXT_PUBLIC_POSTHOG_HOST: z

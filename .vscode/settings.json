@@ -16,7 +16,7 @@
   "eslint.workingDirectories": [
     { "pattern": "apps/*/" },
     { "pattern": "packages/*/" },
-    { "pattern": "packages/{ui,analytics}/*" },
+    { "pattern": "packages/{ui,analytics,monitoring}/*" },
     { "pattern": "tooling/*/" }
   ],
   "prettier.ignorePath": ".gitignore",

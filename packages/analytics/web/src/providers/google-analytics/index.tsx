@@ -1,6 +1,6 @@
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 declare global {
   interface Window {
@@ -9,69 +9,61 @@ declare global {
   }
 }
 
-const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
-  children,
-}) => {
-  return (
-    <>
-      {children}
-      <script
-        async
-        src={`https://www.googletagmanager.com/gtag/js?id=${env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID}`}
-        onLoad={() => {
-          if (typeof window === "undefined") {
-            return;
-          }
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    return (
+      <>
+        {children}
+        <script
+          async
+          src={`https://www.googletagmanager.com/gtag/js?id=${env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID}`}
+          onLoad={() => {
+            if (typeof window === "undefined") {
+              return;
+            }
 
-          window.dataLayer = window.dataLayer ?? [];
+            window.dataLayer = window.dataLayer ?? [];
 
-          function gtag(...args: unknown[]) {
-            window.dataLayer?.push(args);
-          }
+            function gtag(...args: unknown[]) {
+              window.dataLayer?.push(args);
+            }
 
-          window.gtag = gtag;
+            window.gtag = gtag;
 
-          window.gtag("js", new Date());
-          window.gtag(
-            "config",
-            env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID,
-          );
-        }}
-      />
-    </>
-  );
-};
+            window.gtag("js", new Date());
+            window.gtag(
+              "config",
+              env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID,
+            );
+          }}
+        />
+      </>
+    );
+  },
+  track: (event, data) => {
+    if (typeof window === "undefined" || !window.gtag) {
+      return;
+    }
 
-const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  if (typeof window === "undefined" || !window.gtag) {
-    return;
-  }
+    window.gtag("event", event, data);
+  },
+  identify: (userId, traits) => {
+    if (typeof window === "undefined" || !window.gtag) {
+      return;
+    }
 
-  window.gtag("event", event, data);
-};
+    window.gtag("config", env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+      user_id: userId,
+      ...traits,
+    });
+  },
+  reset: () => {
+    if (typeof window === "undefined" || !window.gtag) {
+      return;
+    }
 
-const identify: AnalyticsProviderClientStrategy["identify"] = (
-  userId,
-  traits,
-) => {
-  if (typeof window === "undefined" || !window.gtag) {
-    return;
-  }
-
-  window.gtag("config", env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID, {
-    user_id: userId,
-    ...traits,
-  });
-};
-
-const reset: AnalyticsProviderClientStrategy["reset"] = () => {
-  if (typeof window === "undefined" || !window.gtag) {
-    return;
-  }
-
-  window.gtag("config", env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID, {
-    user_id: null,
-  });
-};
-
-export { Provider, track, identify, reset };
+    window.gtag("config", env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID, {
+      user_id: null,
+    });
+  },
+} satisfies AnalyticsProviderClientStrategy;

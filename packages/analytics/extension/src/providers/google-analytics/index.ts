@@ -6,8 +6,8 @@ import { env } from "./env";
 
 import type {
   AllowedPropertyValues,
-  AnalyticsProviderStrategy,
-} from "../types";
+  AnalyticsProviderClientStrategy,
+} from "@turbostarter/analytics";
 
 const STORAGE_KEYS = {
   CLIENT_ID: "ga_client_id",
@@ -94,27 +94,25 @@ const postEvent = async (
   }
 };
 
-const track: AnalyticsProviderStrategy["track"] = (name, params) => {
-  void postEvent(name, params);
-};
-
-const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
-  void (async () => {
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.USER_ID]: userId,
-      [STORAGE_KEYS.USER_PROPERTIES]: traits,
-    });
-  })();
-};
-
-const reset: AnalyticsProviderStrategy["reset"] = () => {
-  void (async () => {
-    await chrome.storage.local.remove([
-      STORAGE_KEYS.CLIENT_ID,
-      STORAGE_KEYS.USER_ID,
-      STORAGE_KEYS.USER_PROPERTIES,
-    ]);
-  })();
-};
-
-export { track, identify, reset };
+export const { track, identify, reset } = {
+  track: (name, params) => {
+    void postEvent(name, params);
+  },
+  identify: (userId, traits) => {
+    void (async () => {
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.USER_ID]: userId,
+        [STORAGE_KEYS.USER_PROPERTIES]: traits,
+      });
+    })();
+  },
+  reset: () => {
+    void (async () => {
+      await chrome.storage.local.remove([
+        STORAGE_KEYS.CLIENT_ID,
+        STORAGE_KEYS.USER_ID,
+        STORAGE_KEYS.USER_PROPERTIES,
+      ]);
+    })();
+  },
+} satisfies Omit<AnalyticsProviderClientStrategy, "Provider">;

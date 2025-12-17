@@ -1,1 +1,1 @@
-export * from "./nodemailer";
+export { send } from "./nodemailer";

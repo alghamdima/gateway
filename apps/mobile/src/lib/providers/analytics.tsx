@@ -17,10 +17,8 @@ export const AnalyticsProvider = ({
     }
 
     if (session.data?.user) {
-      identify(session.data.user.id, {
-        email: session.data.user.email,
-        name: session.data.user.name,
-      });
+      const { id, email, name } = session.data.user;
+      identify(id, { email, name });
     } else {
       reset();
     }

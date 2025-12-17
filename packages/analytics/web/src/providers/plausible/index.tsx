@@ -5,7 +5,7 @@ import { env } from "./env";
 import type {
   AllowedPropertyValues,
   AnalyticsProviderClientStrategy,
-} from "../types";
+} from "@turbostarter/analytics";
 
 declare global {
   interface Window {
@@ -23,21 +23,6 @@ const STORAGE_KEYS = {
 
 const ValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 const TraitsSchema = z.record(z.string(), ValueSchema);
-
-const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
-  children,
-}) => {
-  return (
-    <>
-      {children}
-      <script
-        defer
-        data-domain={env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
-        src={`${env.NEXT_PUBLIC_PLAUSIBLE_HOST}/js/script.js`}
-      />
-    </>
-  );
-};
 
 const getStoredIdentity = () => {
   if (typeof window === "undefined") {
@@ -62,56 +47,63 @@ const getStoredIdentity = () => {
   }
 };
 
-const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  if (typeof window === "undefined" || !window.plausible) {
-    return;
-  }
-
-  const { userId, traits } = getStoredIdentity();
-
-  const props: Record<string, unknown> = {
-    ...traits,
-    ...data,
-  };
-
-  if (userId) {
-    props.userId = userId;
-  }
-
-  window.plausible(event, {
-    props,
-  });
-};
-
-const identify: AnalyticsProviderClientStrategy["identify"] = (
-  userId,
-  traits,
-) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    localStorage.setItem(STORAGE_KEYS.USER_ID, userId);
-    if (traits) {
-      localStorage.setItem(STORAGE_KEYS.USER_TRAITS, JSON.stringify(traits));
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    return (
+      <>
+        {children}
+        <script
+          defer
+          data-domain={env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
+          src={`${env.NEXT_PUBLIC_PLAUSIBLE_HOST}/js/script.js`}
+        />
+      </>
+    );
+  },
+  track: (event, data) => {
+    if (typeof window === "undefined" || !window.plausible) {
+      return;
     }
-  } catch {
-    // Ignore storage errors
-  }
-};
 
-const reset: AnalyticsProviderClientStrategy["reset"] = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
+    const { userId, traits } = getStoredIdentity();
 
-  try {
-    localStorage.removeItem(STORAGE_KEYS.USER_ID);
-    localStorage.removeItem(STORAGE_KEYS.USER_TRAITS);
-  } catch {
-    // Ignore storage errors
-  }
-};
+    const props: Record<string, unknown> = {
+      ...traits,
+      ...data,
+    };
 
-export { Provider, track, identify, reset };
+    if (userId) {
+      props.userId = userId;
+    }
+
+    window.plausible(event, {
+      props,
+    });
+  },
+  identify: (userId, traits) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.USER_ID, userId);
+      if (traits) {
+        localStorage.setItem(STORAGE_KEYS.USER_TRAITS, JSON.stringify(traits));
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  },
+  reset: () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      localStorage.removeItem(STORAGE_KEYS.USER_ID);
+      localStorage.removeItem(STORAGE_KEYS.USER_TRAITS);
+    } catch {
+      // Ignore storage errors
+    }
+  },
+} satisfies AnalyticsProviderClientStrategy;

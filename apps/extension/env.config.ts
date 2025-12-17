@@ -29,6 +29,9 @@ export default defineEnv({
     VITE_GOOGLE_ANALYTICS_MEASUREMENT_ID: import.meta.env
       .VITE_GOOGLE_ANALYTICS_MEASUREMENT_ID,
     VITE_GOOGLE_ANALYTICS_SECRET: import.meta.env.VITE_GOOGLE_ANALYTICS_SECRET,
+
+    VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
+    VITE_SENTRY_ENVIRONMENT: import.meta.env.VITE_SENTRY_ENVIRONMENT,
   },
   skip:
     (!!import.meta.env.SKIP_ENV_VALIDATION &&

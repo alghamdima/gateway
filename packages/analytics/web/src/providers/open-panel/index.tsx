@@ -2,52 +2,44 @@ import { OpenPanelComponent } from "@openpanel/nextjs";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
-const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
-  children,
-}) => {
-  return (
-    <>
-      {children}
-      <OpenPanelComponent
-        clientId={env.NEXT_PUBLIC_OPEN_PANEL_CLIENT_ID}
-        trackScreenViews
-        trackAttributes
-        trackOutgoingLinks
-      />
-    </>
-  );
-};
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    return (
+      <>
+        {children}
+        <OpenPanelComponent
+          clientId={env.NEXT_PUBLIC_OPEN_PANEL_CLIENT_ID}
+          trackScreenViews
+          trackAttributes
+          trackOutgoingLinks
+        />
+      </>
+    );
+  },
+  track: (event, data) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  if (typeof window === "undefined") {
-    return;
-  }
+    window.op("track", event, data);
+  },
+  identify: (userId, traits) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-  window.op("track", event, data);
-};
+    window.op("identify", {
+      profileId: userId,
+      ...traits,
+    });
+  },
+  reset: () => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-const identify: AnalyticsProviderClientStrategy["identify"] = (
-  userId,
-  traits,
-) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.op("identify", {
-    profileId: userId,
-    ...traits,
-  });
-};
-
-const reset: AnalyticsProviderClientStrategy["reset"] = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.op("clear");
-};
-
-export { Provider, track, identify, reset };
+    window.op("clear");
+  },
+} satisfies AnalyticsProviderClientStrategy;

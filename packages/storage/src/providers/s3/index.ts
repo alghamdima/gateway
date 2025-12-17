@@ -7,84 +7,70 @@ import { getSignedUrl as getSignedUrlCommand } from "@aws-sdk/s3-request-presign
 
 import { getClient } from "./client";
 
+import type { GetObjectUrlInput } from "../../lib/schema";
 import type { StorageProviderStrategy } from "../types";
 
-const getUploadUrl: StorageProviderStrategy["getUploadUrl"] = async ({
-  path,
-  bucket,
-}) => {
-  const client = getClient();
+export const { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl } = {
+  getUploadUrl: async ({ path, bucket }: GetObjectUrlInput) => {
+    const client = getClient();
 
-  const url = await getSignedUrlCommand(
-    client,
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: path,
-    }),
-    {
-      expiresIn: 60,
-    },
-  );
+    const url = await getSignedUrlCommand(
+      client,
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: path,
+      }),
+      {
+        expiresIn: 60,
+      },
+    );
 
-  return { url };
-};
+    return { url };
+  },
+  getSignedUrl: async ({ path, bucket }: GetObjectUrlInput) => {
+    const client = getClient();
 
-const getSignedUrl: StorageProviderStrategy["getSignedUrl"] = async ({
-  path,
-  bucket,
-}) => {
-  const client = getClient();
+    const url = await getSignedUrlCommand(
+      client,
+      new GetObjectCommand({
+        Bucket: bucket,
+        Key: path,
+      }),
+      {
+        expiresIn: 3600,
+      },
+    );
 
-  const url = await getSignedUrlCommand(
-    client,
-    new GetObjectCommand({
-      Bucket: bucket,
-      Key: path,
-    }),
-    {
-      expiresIn: 3600,
-    },
-  );
+    return { url };
+  },
+  getPublicUrl: async ({ path, bucket }: GetObjectUrlInput) => {
+    const client = getClient();
+    const endpoint = await client.config.endpoint?.();
 
-  return { url };
-};
+    if (endpoint?.hostname.includes("supabase.co")) {
+      return {
+        url: `${endpoint.protocol}//${endpoint.hostname}/storage/v1/object/public/${bucket}/${path}`,
+      };
+    }
 
-const getPublicUrl: StorageProviderStrategy["getPublicUrl"] = async ({
-  path,
-  bucket,
-}) => {
-  const client = getClient();
-  const endpoint = await client.config.endpoint?.();
-
-  if (endpoint?.hostname.includes("supabase.co")) {
     return {
-      url: `${endpoint.protocol}//${endpoint.hostname}/storage/v1/object/public/${bucket}/${path}`,
+      url: `${endpoint?.protocol}//${bucket}.${endpoint?.hostname}/${path}`,
     };
-  }
+  },
+  getDeleteUrl: async ({ path, bucket }: GetObjectUrlInput) => {
+    const client = getClient();
 
-  return {
-    url: `${endpoint?.protocol}//${bucket}.${endpoint?.hostname}/${path}`,
-  };
-};
+    const url = await getSignedUrlCommand(
+      client,
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: path,
+      }),
+      {
+        expiresIn: 60,
+      },
+    );
 
-const getDeleteUrl: StorageProviderStrategy["getDeleteUrl"] = async ({
-  path,
-  bucket,
-}) => {
-  const client = getClient();
-
-  const url = await getSignedUrlCommand(
-    client,
-    new DeleteObjectCommand({
-      Bucket: bucket,
-      Key: path,
-    }),
-    {
-      expiresIn: 60,
-    },
-  );
-
-  return { url };
-};
-
-export { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl };
+    return { url };
+  },
+} satisfies StorageProviderStrategy;

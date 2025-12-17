@@ -23,6 +23,7 @@
   },
   "prettier": "@turbostarter/prettier-config",
   "dependencies": {
+    "@turbostarter/analytics": "workspace:*",
     "@turbostarter/shared": "workspace:*",
     "envin": "catalog:",
     "posthog-js": "1.283.0",

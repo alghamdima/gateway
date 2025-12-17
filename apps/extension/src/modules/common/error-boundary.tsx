@@ -9,8 +9,16 @@ const Error = () => {
   const { t } = useTranslation("common");
 
   return (
-    <div className="flex w-full min-w-64 items-center justify-center px-10 py-16">
-      <span className="text-destructive text-center">{t("error.general")}</span>
+    <div className="my-auto flex w-full min-w-64 flex-col items-center justify-center gap-8 px-10 py-16">
+      <div className="flex max-w-md flex-col items-center justify-center gap-4">
+        <span className="text-center text-2xl font-bold md:text-3xl lg:text-4xl">
+          {t("error.general")}
+        </span>
+
+        <p className="text-muted-foreground text-center text-sm leading-snug sm:text-base">
+          {t("error.apologies")}
+        </p>
+      </div>
     </div>
   );
 };

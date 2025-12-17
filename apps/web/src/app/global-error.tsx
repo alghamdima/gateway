@@ -1,6 +1,10 @@
 /* eslint-disable i18next/no-literal-string */
 "use client";
 
+import { useEffect } from "react";
+
+import { captureException } from "@turbostarter/monitoring-web";
+
 export default function GlobalError({
   error,
   reset,
@@ -8,6 +12,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    captureException(error);
+  }, [error]);
+
   return (
     <html>
       <body>

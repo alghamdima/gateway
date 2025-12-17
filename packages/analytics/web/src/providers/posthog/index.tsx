@@ -6,7 +6,7 @@ import { PostHogProvider } from "posthog-js/react";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 const PageView = dynamic(
   () => import("./page-view").then((mod) => mod.PageView),
@@ -25,42 +25,34 @@ if (typeof window !== "undefined") {
   });
 }
 
-const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
-  children,
-}) => {
-  return (
-    <PostHogProvider client={posthog}>
-      {children}
-      <PageView />
-    </PostHogProvider>
-  );
-};
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    return (
+      <PostHogProvider client={posthog}>
+        {children}
+        <PageView />
+      </PostHogProvider>
+    );
+  },
+  track: (event, properties) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-const track: AnalyticsProviderClientStrategy["track"] = (event, properties) => {
-  if (typeof window === "undefined") {
-    return;
-  }
+    posthog.capture(event, properties);
+  },
+  identify: (userId, traits) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-  posthog.capture(event, properties);
-};
+    posthog.identify(userId, traits);
+  },
+  reset: () => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-const identify: AnalyticsProviderClientStrategy["identify"] = (
-  userId,
-  traits,
-) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  posthog.identify(userId, traits);
-};
-
-const reset: AnalyticsProviderClientStrategy["reset"] = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  posthog.reset();
-};
-
-export { Provider, track, identify, reset };
+    posthog.reset();
+  },
+} satisfies AnalyticsProviderClientStrategy;

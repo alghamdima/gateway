@@ -195,8 +195,10 @@
   "error": {
     "title": "¡Ups!",
     "general": "Algo salió mal, por favor intenta de nuevo.",
+    "apologies": "Lo sentimos, ocurrió un error al procesar tu solicitud. Por favor, contáctanos si el problema persiste.",
     "invalid": "¡Datos inválidos!",
     "notFound": "¡No encontrado!",
+    "resourceDoesNotExist": "El recurso que estás buscando no existe.",
     "unauthorized": "¡Necesitas iniciar sesión para acceder a esta función!",
     "forbidden": "¡No tienes permiso para acceder a esta función!"
   },

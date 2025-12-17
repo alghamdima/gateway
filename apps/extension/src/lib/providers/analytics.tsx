@@ -4,7 +4,11 @@ import { identify, reset } from "@turbostarter/analytics-extension";
 
 import { authClient } from "~/lib/auth";
 
-export const AnalyticsIdentity = () => {
+export const AnalyticsProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const session = authClient.useSession();
 
   useEffect(() => {
@@ -13,14 +17,12 @@ export const AnalyticsIdentity = () => {
     }
 
     if (session.data?.user) {
-      identify(session.data.user.id, {
-        email: session.data.user.email,
-        name: session.data.user.name,
-      });
+      const { id, email, name } = session.data.user;
+      identify(id, { email, name });
     } else {
       reset();
     }
   }, [session]);
 
-  return null;
+  return <>{children}</>;
 };

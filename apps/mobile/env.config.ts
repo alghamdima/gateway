@@ -2,6 +2,7 @@ import { defineEnv } from "envin";
 import * as z from "zod";
 
 import { preset as analytics } from "@turbostarter/analytics-mobile/env";
+import { preset as monitoring } from "@turbostarter/monitoring-mobile/env";
 import { envConfig } from "@turbostarter/shared/constants";
 import { ThemeColor, ThemeMode } from "@turbostarter/ui";
 
@@ -15,7 +16,7 @@ const castStringToBool = z.preprocess((val) => {
 
 export default defineEnv({
   ...envConfig,
-  extends: [analytics],
+  extends: [analytics, monitoring],
   clientPrefix: "EXPO_PUBLIC_",
   client: {
     EXPO_PUBLIC_AUTH_PASSWORD: castStringToBool.optional().default(true),
@@ -48,5 +49,7 @@ export default defineEnv({
 
     EXPO_PUBLIC_POSTHOG_KEY: process.env.EXPO_PUBLIC_POSTHOG_KEY,
     EXPO_PUBLIC_POSTHOG_HOST: process.env.EXPO_PUBLIC_POSTHOG_HOST,
+    EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    EXPO_PUBLIC_SENTRY_ENVIRONMENT: process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT,
   },
 });

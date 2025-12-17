@@ -4,8 +4,8 @@ A dedicated guide for coding agents working on the Turbostarter monorepo. Use th
 
 ## Quickstart
 
-- Ensure versions: Node ≥ 22.17.0, pnpm 10.18.x
-- Create `.env` at repo root (loaded automatically by `pnpm with-env`):
+- Ensure versions: Node ≥ 22.17.0, pnpm 10.25.x (repo pins `pnpm@10.25.0` via `packageManager`)
+- Create `.env` at repo root (loaded automatically by root scripts via `pnpm with-env`):
 
 ```bash
 # minimal example — adjust per environment
@@ -17,28 +17,30 @@ DEFAULT_LOCALE="en"
 
 - Install dependencies: `pnpm install`
 - Start databases/services (Docker): `pnpm services:start`
-- First-time DB setup: `pnpm with-env -F @turbostarter/db db:setup`
+- First-time DB setup (migrate + seed): `pnpm with-env -F @turbostarter/db db:setup`
 - Apply migrations: `pnpm with-env -F @turbostarter/db db:migrate`
+- One-shot “get everything running”: `pnpm services:setup` (starts Docker services + runs DB setup)
 - Start dev for all apps: `pnpm dev`
   - Or target a single app (e.g., web): `pnpm --filter web dev`
 
 ## Environment & Tooling
 
 - Node: >= 22.17.0
-- Package manager: pnpm 10.18.x
+- Package manager: pnpm 10.25.x (see root `package.json#packageManager`)
 - Monorepo: Turborepo (`turbo.json`)
 - Env loader: `dotenv-cli` via `with-env` script
-- Global envs (turborepo): `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`
-- Place a `.env` at the repo root; root scripts use `pnpm with-env` to load it.
+- Global envs (Turbo `globalEnv`): `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`
+- Place a `.env` at the repo root; root scripts use `pnpm with-env` to load it. App-level tools may also use app-specific env files (e.g. Next’s `.env.local`).
 
 ## Dev commands
 
-- Start monorepo dev (runs package dev tasks via Turborepo): `pnpm dev`
+- Start monorepo dev (runs tasks via Turborepo, with root `.env` loaded): `pnpm dev`
 - Start a specific app:
   - Web: `pnpm --filter web dev`
-  - Mobile (Expo): `pnpm --filter mobile dev`
+  - Mobile (Expo): `pnpm --filter mobile dev` (alias for `expo start --clear`)
   - Extension (Chrome): `pnpm --filter extension dev`
   - Extension (Firefox): `pnpm --filter extension dev:firefox`
+- Email template preview server: `pnpm --filter @turbostarter/email dev` (React Email preview)
 
 ## Build commands
 
@@ -70,8 +72,10 @@ DEFAULT_LOCALE="en"
 | Typecheck                        | `pnpm typecheck`                                                                 |
 | Clean caches                     | `pnpm clean`                                                                     |
 | Start/stop services (Docker)     | `pnpm services:start` / `pnpm services:stop`                                     |
+| Start services + run DB setup    | `pnpm services:setup`                                                            |
 | DB: generate/apply migrations    | `pnpm with-env -F @turbostarter/db db:generate` / `db:migrate`                   |
 | DB: push/check/studio            | `pnpm with-env -F @turbostarter/db db:push` / `db:check` / `db:studio`           |
+| Tests (workspace / projects)     | `pnpm test` / `pnpm test:projects`                                               |
 
 ## Quality & Types
 
@@ -80,6 +84,7 @@ DEFAULT_LOCALE="en"
 - Lint (check): `pnpm lint`
 - Lint (fix): `pnpm lint:fix`
 - Typecheck: `pnpm typecheck`
+- Tests: `pnpm test` (runs each package `test` via Turbo); `pnpm test:projects` runs the root Vitest project suite
 - Commit messages: follow Conventional Commits (enforced via `commitlint.config.ts`)
 
 ## Database (Drizzle)
@@ -109,6 +114,7 @@ Note: All db commands will load `.env` via `with-env`.
 - Extension release zips:
   - Chrome: `pnpm --filter extension build:chrome`
   - Firefox: `pnpm --filter extension build:firefox`
+- Email template preview: `pnpm --filter @turbostarter/email dev`
 - Code quality loop:
   - `pnpm typecheck`
   - `pnpm lint` → `pnpm lint:fix`
@@ -122,7 +128,7 @@ Note: All db commands will load `.env` via `with-env`.
 ## Troubleshooting
 
 - Node/pnpm version mismatch
-  - Ensure Node ≥ 22.17.0 and pnpm 10.18.x (`node -v`, `pnpm -v`)
+  - Ensure Node ≥ 22.17.0 and pnpm 10.25.x (`node -v`, `pnpm -v`)
 - Services not available / connection refused
   - Make sure Docker is running; start services: `pnpm services:start`
   - Check logs: `pnpm services:logs`
@@ -146,20 +152,22 @@ Note: All db commands will load `.env` via `with-env`.
 ## Project structure
 
 - `apps/` applications
-  - `web`: Next.js App Router web app
-  - `mobile`: React Native (Expo) app
-  - `extension`: WXT (Vite + React) browser extension
+  - `web`: Next.js (App Router) web app (localized routes live under `src/app/[locale]`, with `marketing`, `auth`, `dashboard`, `admin` modules)
+  - `mobile`: React Native (Expo Router) app (`src/app/(setup)` onboarding + `src/app/dashboard` main app)
+  - `extension`: WXT (Vite + React) browser extension (`src/app/*` entrypoints: `background`, `content`, `popup`, `options`, `sidepanel`, `newtab`, `devtools`, `tabs`)
 - `packages/` shared modules
-  - `api`: Hono API logic
-  - `auth`: Better Auth setup and helpers
-  - `billing`: Billing provider integrations (Stripe, LemonSqueezy, etc.)
-  - `cms`: Content Collections
-  - `db`: Drizzle ORM schema and utils
-  - `email`: Email templates and providers
-  - `i18n`: Internationalization utilities
-  - `shared`: Common utilities and helpers
-  - `storage`: File storage integrations
-  - `ui`: Shared UI components (`ui-web`, `ui-mobile`, shared styles/types)
+  - `api` (`@turbostarter/api`): Hono API modules (admin/org/auth/billing/storage + AI module) and shared API schemas/utils
+  - `auth` (`@turbostarter/auth`): Better Auth server + typed clients (`client/web`, `client/mobile`); includes schema generation/seed scripts
+  - `billing` (`@turbostarter/billing`): Stripe/Lemon Squeezy/Polar integrations, plan/feature config, server helpers
+  - `cms` (`@turbostarter/cms`): content-collections (MDX blog/legal/API content + types)
+  - `db` (`@turbostarter/db`): Drizzle ORM schema, migrations, and DB scripts (`db:setup`, `db:migrate`, `db:seed`, `db:reset`, `db:status`)
+  - `email` (`@turbostarter/email`): React Email templates + providers; includes a preview server script
+  - `i18n` (`@turbostarter/i18n`): translations + server/client i18n utilities
+  - `shared` (`@turbostarter/shared`): shared constants, schema, logger, hooks, utilities
+  - `storage` (`@turbostarter/storage`): file storage abstractions + S3 helpers
+  - `analytics/*`: analytics base (`@turbostarter/analytics`) + platform packages (`@turbostarter/analytics-web|mobile|extension`)
+  - `monitoring/*`: monitoring base (`@turbostarter/monitoring`) + platform packages (`@turbostarter/monitoring-web|mobile|extension`)
+  - `ui/*`: UI base/theme (`@turbostarter/ui`) + platform components (`@turbostarter/ui-web`, `@turbostarter/ui-mobile`)
 - `tooling/` ESLint, Prettier, Tailwind, TS configs
 
 ## Code style and structure
@@ -177,7 +185,7 @@ Note: All db commands will load `.env` via `with-env`.
 ## Web app (`apps/web`)
 
 - Stack: Next.js (App Router), React, Tailwind CSS, shared `@turbostarter/ui-web`
-- Structure: `src/app/[locale]` with segments `(marketing)`, `auth`, `dashboard`
+- Structure: `src/app/[locale]` with `marketing`, `auth`, `dashboard`, `admin` modules; `src/app/api` contains route handlers
 - API routes in `src/app/api` may proxy/use `packages/api`
 - Guidance:
   - Favor React Server Components; minimize `use client`, `useEffect`, `setState`
@@ -189,7 +197,7 @@ Note: All db commands will load `.env` via `with-env`.
 ## Mobile app (`apps/mobile`)
 
 - Stack: React Native + Expo, Expo Router, shared `@turbostarter/ui-mobile`
-- Structure: `src/app` with tabs, `auth`, `settings`; components in `src/components`
+- Structure: Expo Router under `src/app` (setup flow + dashboard); feature modules live in `src/modules`
 - Guidance:
   - Safe areas: use `SafeAreaProvider`, `SafeAreaView`, and scroll variants
   - Performance: reduce `useState`/`useEffect`; memoize (`React.memo`, `useMemo`, `useCallback`)
@@ -198,7 +206,7 @@ Note: All db commands will load `.env` via `with-env`.
 ## Browser extension (`apps/extension`)
 
 - Stack: WXT (Vite + React), Tailwind, shared `@turbostarter/ui-web`
-- Entrypoints: `src/app` provides `background`, `content`, `popup`, `options`, `sidepanel`, `newtab`, `devtools`
+- Entrypoints: `src/app` provides `background`, `content`, `popup`, `options`, `sidepanel`, `newtab`, `devtools`, `tabs`
 - Guidance:
   - Background script for long-running tasks; content scripts for DOM interactions
   - Use WXT messaging or `@webext-core/messaging` for communication
@@ -206,17 +214,18 @@ Note: All db commands will load `.env` via `with-env`.
 
 ## Packages overview (`packages/`)
 
-- `analytics` (web/mobile/extension): platform analytics helpers
-- `api`: server-side Hono modules (AI, auth, billing, storage)
-- `auth`: Better Auth server/client, schemas, helpers
-- `billing`: config + providers, checkout/subscriptions/webhooks
-- `cms`: content collections and types
-- `db`: Drizzle schema, migrations, server utils
-- `email`: templates + providers (e.g., Resend)
-- `i18n`: i18n setup, translations, helpers
-- `shared`: utilities, hooks, constants
-- `storage`: file storage providers and types
-- `ui`: shared UI and styling primitives
+- `analytics/*`: base + platform analytics providers (web/mobile/extension)
+- `api`: server-side Hono modules (admin/ai/auth/billing/organization/storage) + shared schemas
+- `auth`: Better Auth server + platform clients (web/mobile)
+- `billing`: providers (Stripe/Lemon Squeezy/Polar) + plans/features + helpers
+- `cms`: content collections and types (MDX content)
+- `db`: Drizzle schema, migrations, scripts, server utilities
+- `email`: templates + providers + preview server
+- `i18n`: translations + server/client helpers
+- `monitoring/*`: base + platform monitoring providers (web/mobile/extension)
+- `shared`: shared utilities, schema, logger, hooks
+- `storage`: storage providers and types (S3 helpers)
+- `ui/*`: shared styles/theme + web/mobile component libraries
 
 ## Next.js specifics
 
@@ -233,5 +242,4 @@ Note: All db commands will load `.env` via `with-env`.
 
 ## Notes
 
-- There is no repository-wide `test` script currently defined. Add tests and scripts when introducing testable modules.
 - Use root scripts for monorepo operations; prefer `pnpm --filter <pkg> <cmd>` when targeting a specific package.

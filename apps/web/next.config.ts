@@ -11,6 +11,7 @@ const INTERNAL_PACKAGES = [
   "@turbostarter/email",
   "@turbostarter/db",
   "@turbostarter/i18n",
+  "@turbostarter/monitoring-web",
   "@turbostarter/shared",
   "@turbostarter/storage",
   "@turbostarter/ui",

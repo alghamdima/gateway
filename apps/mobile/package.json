@@ -34,6 +34,7 @@
     "@turbostarter/cms": "workspace:*",
     "@turbostarter/db": "workspace:*",
     "@turbostarter/i18n": "workspace:*",
+    "@turbostarter/monitoring-mobile": "workspace:*",
     "@turbostarter/shared": "workspace:*",
     "@turbostarter/ui": "workspace:*",
     "@turbostarter/ui-mobile": "workspace:*",

@@ -7,7 +7,7 @@ import { NodeEnv } from "@turbostarter/shared/constants";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 const init = () => {
   mixpanel.init(env.NEXT_PUBLIC_MIXPANEL_TOKEN, {
@@ -17,43 +17,35 @@ const init = () => {
   });
 };
 
-const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
-  children,
-}) => {
-  useEffect(() => {
-    init();
-  }, []);
-  return children;
-};
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    useEffect(() => {
+      init();
+    }, []);
+    return children;
+  },
+  track: (event, properties) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-const track: AnalyticsProviderClientStrategy["track"] = (event, properties) => {
-  if (typeof window === "undefined") {
-    return;
-  }
+    mixpanel.track(event, properties);
+  },
+  identify: (userId, traits) => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-  mixpanel.track(event, properties);
-};
+    mixpanel.identify(userId);
+    if (traits) {
+      mixpanel.people.set(traits);
+    }
+  },
+  reset: () => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-const identify: AnalyticsProviderClientStrategy["identify"] = (
-  userId,
-  traits,
-) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  mixpanel.identify(userId);
-  if (traits) {
-    mixpanel.people.set(traits);
-  }
-};
-
-const reset: AnalyticsProviderClientStrategy["reset"] = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  mixpanel.reset();
-};
-
-export { Provider, track, identify, reset };
+    mixpanel.reset();
+  },
+} satisfies AnalyticsProviderClientStrategy;

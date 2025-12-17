@@ -1,6 +1,6 @@
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 declare global {
   interface Window {
@@ -14,42 +14,34 @@ declare global {
   }
 }
 
-const Provider: AnalyticsProviderClientStrategy["Provider"] = ({
-  children,
-}) => {
-  return (
-    <>
-      {children}
-      <script
-        async
-        src={`${env.NEXT_PUBLIC_UMAMI_HOST}/script.js`}
-        data-website-id={env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
-      ></script>
-    </>
-  );
-};
+export const { Provider, track, identify, reset } = {
+  Provider: ({ children }) => {
+    return (
+      <>
+        {children}
+        <script
+          async
+          src={`${env.NEXT_PUBLIC_UMAMI_HOST}/script.js`}
+          data-website-id={env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+        ></script>
+      </>
+    );
+  },
+  track: (event, data) => {
+    if (typeof window === "undefined" || !window.umami) {
+      return;
+    }
 
-const track: AnalyticsProviderClientStrategy["track"] = (event, data) => {
-  if (typeof window === "undefined" || !window.umami) {
-    return;
-  }
+    window.umami.track(event, data);
+  },
+  identify: (userId, traits) => {
+    if (typeof window === "undefined" || !window.umami) {
+      return;
+    }
 
-  window.umami.track(event, data);
-};
-
-const identify: AnalyticsProviderClientStrategy["identify"] = (
-  userId,
-  traits,
-) => {
-  if (typeof window === "undefined" || !window.umami) {
-    return;
-  }
-
-  window.umami.identify(userId, traits);
-};
-
-const reset: AnalyticsProviderClientStrategy["reset"] = () => {
-  // Umami does not explicitly support resetting the session via the client-side API
-};
-
-export { Provider, track, identify, reset };
+    window.umami.identify(userId, traits);
+  },
+  reset: () => {
+    // Umami does not explicitly support resetting the session via the client-side API
+  },
+} satisfies AnalyticsProviderClientStrategy;

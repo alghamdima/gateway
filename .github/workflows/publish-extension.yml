@@ -25,6 +25,9 @@ jobs:
       VITE_GOOGLE_ANALYTICS_SECRET: ${{ secrets.GOOGLE_ANALYTICS_SECRET }}
       VITE_POSTHOG_KEY: ${{ secrets.POSTHOG_KEY }}
       VITE_POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+      VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      VITE_SENTRY_ENVIRONMENT: ${{ secrets.SENTRY_ENVIRONMENT }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
     steps:
       - name: ✅ Checkout code

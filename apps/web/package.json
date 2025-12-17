@@ -28,6 +28,7 @@
     "@turbostarter/cms": "workspace:*",
     "@turbostarter/email": "workspace:*",
     "@turbostarter/i18n": "workspace:*",
+    "@turbostarter/monitoring-web": "workspace:*",
     "@turbostarter/shared": "workspace:*",
     "@turbostarter/ui": "workspace:*",
     "@turbostarter/ui-web": "workspace:*",

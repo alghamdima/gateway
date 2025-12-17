@@ -19,6 +19,10 @@ vi.mock("@turbostarter/shared/utils", () => ({
   getStatusCode: vi.fn().mockReturnValue(500),
 }));
 
+vi.mock("@turbostarter/monitoring-web/server", () => ({
+  captureException: vi.fn(),
+}));
+
 interface ErrorResponse {
   code: string;
   message: string;

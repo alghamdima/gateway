@@ -2,6 +2,8 @@ import * as z from "zod";
 
 import { isKey } from "@turbostarter/i18n";
 import { getTranslation } from "@turbostarter/i18n/server";
+import { captureException } from "@turbostarter/monitoring-web/server";
+import { HttpStatusCode } from "@turbostarter/shared/constants";
 import { logger } from "@turbostarter/shared/logger";
 import { getStatusCode } from "@turbostarter/shared/utils";
 
@@ -27,8 +29,10 @@ export const onError = async (
     locale: c?.var.locale,
     request: c?.req.raw,
   });
+
+  const status = getStatusCode(e);
   const details = {
-    status: getStatusCode(e),
+    status,
     headers: {
       "Content-Type": "application/json",
     },
@@ -36,6 +40,10 @@ export const onError = async (
 
   const timestamp = new Date().toISOString();
   const path = c?.req.raw.url ? new URL(c.req.raw.url).pathname : "/api";
+
+  if (status >= HttpStatusCode.INTERNAL_SERVER_ERROR) {
+    captureException(e, { path, status, timestamp });
+  }
 
   if (isError(e)) {
     logger.error(e.code, e.message);
@@ -47,7 +55,7 @@ export const onError = async (
           : e.code && isKey(e.code, i18n)
             ? t(e.code)
             : ((e.message || e.code) ?? t("common:error.general")),
-        status: details.status,
+        status,
         timestamp,
         path,
       }),
@@ -60,7 +68,7 @@ export const onError = async (
     JSON.stringify({
       code: "common:error.general",
       message: t("common:error.general"),
-      status: details.status,
+      status,
       path,
     }),
     details,

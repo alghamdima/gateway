@@ -3,7 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderStrategy } from "../types";
+import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
 
 const posthog = new PostHog();
 
@@ -19,6 +19,10 @@ export async function getSharedDistinctId() {
 }
 
 const init = async () => {
+  if (posthog.__loaded) {
+    return;
+  }
+
   const distinctID = await getSharedDistinctId();
   posthog.init(env.VITE_POSTHOG_KEY, {
     bootstrap: {
@@ -30,25 +34,23 @@ const init = async () => {
   });
 };
 
-const track: AnalyticsProviderStrategy["track"] = (name, params) => {
-  void (async () => {
-    await init();
-    posthog.capture(name, params);
-  })();
-};
-
-const identify: AnalyticsProviderStrategy["identify"] = (userId, traits) => {
-  void (async () => {
-    await init();
-    posthog.identify(userId, traits);
-  })();
-};
-
-const reset: AnalyticsProviderStrategy["reset"] = () => {
-  void (async () => {
-    await init();
-    posthog.reset();
-  })();
-};
-
-export { track, identify, reset };
+export const { track, identify, reset } = {
+  track: (name, params) => {
+    void (async () => {
+      await init();
+      posthog.capture(name, params);
+    })();
+  },
+  identify: (userId, traits) => {
+    void (async () => {
+      await init();
+      posthog.identify(userId, traits);
+    })();
+  },
+  reset: () => {
+    void (async () => {
+      await init();
+      posthog.reset();
+    })();
+  },
+} satisfies Omit<AnalyticsProviderClientStrategy, "Provider">;
