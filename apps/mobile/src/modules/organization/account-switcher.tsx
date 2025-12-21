@@ -124,7 +124,7 @@ export const AccountSwitcher = () => {
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent sideOffset={4}>
+        <DropdownMenuContent sideOffset={4} align="start">
           <DropdownMenuItem
             onPress={() =>
               setActiveOrganization.mutate({ organizationId: null })

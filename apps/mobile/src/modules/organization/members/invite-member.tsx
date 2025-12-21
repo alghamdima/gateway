@@ -5,9 +5,9 @@ import { Alert, View } from "react-native";
 import * as z from "zod";
 
 import {
-  getAllRolesAtOrBelow,
   inviteMemberSchema,
   MemberRole,
+  toMemberRole,
 } from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
 import {
@@ -40,7 +40,7 @@ import { Text } from "@turbostarter/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";
-import { toMemberRole } from "~/modules/organization/lib/utils";
+import { WIDTH } from "~/utils/device";
 
 export const InviteMemberBottomSheet = ({
   children,
@@ -170,10 +170,11 @@ export const InviteMemberBottomSheet = ({
                         <SelectTrigger>
                           <SelectValue placeholder={t("member")} />
                         </SelectTrigger>
-                        <SelectContent sideOffset={4}>
-                          {getAllRolesAtOrBelow(
-                            toMemberRole(activeMember.data?.role),
-                          ).map((role) => (
+                        <SelectContent
+                          sideOffset={4}
+                          style={{ width: WIDTH - 48 }}
+                        >
+                          {[MemberRole.ADMIN, MemberRole.MEMBER].map((role) => (
                             <SelectItem key={role} value={role} label={t(role)}>
                               <Text>{t(role)}</Text>
                             </SelectItem>

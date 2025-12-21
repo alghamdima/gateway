@@ -144,8 +144,37 @@ const mutations = {
         params: Parameters<typeof authClient.organization.rejectInvitation>[0],
       ) => authClient.organization.rejectInvitation(params),
     },
+    cancel: {
+      mutationKey: [KEY, "invitations", "cancel"],
+      mutationFn: (
+        params: Parameters<typeof authClient.organization.cancelInvitation>[0],
+      ) => authClient.organization.cancelInvitation(params),
+    },
+    resend: {
+      mutationKey: [KEY, "invitations", "resend"],
+      mutationFn: (
+        params: Parameters<typeof authClient.organization.inviteMember>[0],
+      ) =>
+        authClient.organization.inviteMember(
+          {
+            ...params,
+            resend: true,
+          },
+          {
+            headers: {
+              "x-url": Linking.createURL(pathsConfig.setup.auth.join),
+            },
+          },
+        ),
+    },
   },
   members: {
+    remove: {
+      mutationKey: [KEY, "members", "remove"],
+      mutationFn: (
+        params: Parameters<typeof authClient.organization.removeMember>[0],
+      ) => authClient.organization.removeMember(params),
+    },
     invite: {
       mutationKey: [KEY, "members", "invite"],
       mutationFn: (
@@ -153,9 +182,15 @@ const mutations = {
       ) =>
         authClient.organization.inviteMember(params, {
           headers: {
-            "x-url": `${Linking.createURL(pathsConfig.setup.auth.join)}`,
+            "x-url": Linking.createURL(pathsConfig.setup.auth.join),
           },
         }),
+    },
+    updateRole: {
+      mutationKey: [KEY, "members", "update-role"],
+      mutationFn: (
+        params: Parameters<typeof authClient.organization.updateMemberRole>[0],
+      ) => authClient.organization.updateMemberRole(params),
     },
   },
 };
@@ -163,4 +198,4 @@ const mutations = {
 export const organization = {
   queries,
   mutations,
-};
+} as const;

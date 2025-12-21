@@ -2,8 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
 import { useState } from "react";
-import { View, Keyboard } from "react-native";
-import { FlatList } from "react-native-gesture-handler";
+import { View, FlatList, Keyboard } from "react-native";
 import Markdown from "react-native-marked";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 

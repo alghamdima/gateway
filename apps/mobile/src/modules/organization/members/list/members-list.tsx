@@ -1,8 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Fragment } from "react/jsx-runtime";
-import { View } from "react-native";
-import { FlatList, RefreshControl } from "react-native-gesture-handler";
+import { View, FlatList, RefreshControl } from "react-native";
 
 import { useTranslation } from "@turbostarter/i18n";
 import { pickBy } from "@turbostarter/shared/utils";
@@ -50,7 +49,7 @@ export const MembersList = () => {
   return (
     <View className="flex-1 gap-2">
       <MembersListFilters onFiltersChange={setFilters} />
-      <View className="border-border flex-1 rounded-md border">
+      <View className="border-border flex-1 overflow-hidden rounded-md border">
         <FlatList
           data={data}
           renderItem={({ item }) => <MembersListItem member={item} />}

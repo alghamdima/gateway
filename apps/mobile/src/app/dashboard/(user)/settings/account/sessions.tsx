@@ -1,8 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Fragment } from "react/jsx-runtime";
-import { Alert, View } from "react-native";
-import { FlatList, RefreshControl } from "react-native-gesture-handler";
+import { Alert, View, FlatList, RefreshControl } from "react-native";
 
 import { useTranslation } from "@turbostarter/i18n";
 import { cn } from "@turbostarter/ui";
@@ -19,7 +18,6 @@ import { auth } from "~/modules/auth/lib/api";
 export default function Sessions() {
   const { t } = useTranslation(["common", "auth"]);
   const session = authClient.useSession();
-
   const signOut = useMutation({
     ...auth.mutations.signOut,
     onSuccess: () => {

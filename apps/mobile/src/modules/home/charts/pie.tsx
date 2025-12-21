@@ -107,7 +107,7 @@ export function PieChart() {
               className="text-foreground"
             />
           </SelectTrigger>
-          <SelectContent align="start" className="rounded-xl" sideOffset={4}>
+          <SelectContent className="rounded-xl" align="end" sideOffset={4}>
             {months.map((month) => {
               const monthConfig = config[month as keyof typeof config];
               return (

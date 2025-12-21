@@ -191,7 +191,11 @@ export function AreaChart() {
               className="text-foreground"
             />
           </SelectTrigger>
-          <SelectContent className="rounded-xl" align="start" sideOffset={4}>
+          <SelectContent
+            className="w-[160px] rounded-xl"
+            align="start"
+            sideOffset={4}
+          >
             {options.map((option) => (
               <SelectItem
                 key={option.value}
@@ -199,7 +203,7 @@ export function AreaChart() {
                 label={option.label}
                 className="rounded-lg"
               >
-                <Text> {option.label}</Text>
+                <Text>{option.label}</Text>
               </SelectItem>
             ))}
           </SelectContent>

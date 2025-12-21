@@ -1,9 +1,9 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Fragment } from "react/jsx-runtime";
-import { View } from "react-native";
-import { FlatList, RefreshControl } from "react-native-gesture-handler";
+import { View, FlatList, RefreshControl } from "react-native";
 
+import { InvitationStatus } from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
 import { pickBy } from "@turbostarter/shared/utils";
 import { cn } from "@turbostarter/ui";
@@ -20,11 +20,12 @@ import {
 
 export const InvitationsList = () => {
   const { t } = useTranslation(["common", "organization"]);
-
   const activeOrganization = authClient.useActiveOrganization();
   const [filters, setFilters] = useState<
     Record<string, string | string[] | null>
-  >({});
+  >({
+    status: [InvitationStatus.PENDING],
+  });
 
   const perPage = 20;
   const params = {
@@ -53,7 +54,7 @@ export const InvitationsList = () => {
   return (
     <View className="flex-1 gap-2">
       <InvitationsListFilters onFiltersChange={setFilters} />
-      <View className="border-border flex-1 rounded-md border">
+      <View className="border-border flex-1 overflow-hidden rounded-md border">
         <FlatList
           data={data}
           renderItem={({ item }) => <InvitationListItem invitation={item} />}

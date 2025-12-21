@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { toMemberRole } from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
 import { Button } from "@turbostarter/ui-mobile/button";
 import { Icons } from "@turbostarter/ui-mobile/icons";
@@ -14,7 +15,6 @@ import { Text } from "@turbostarter/ui-mobile/text";
 import { authClient } from "~/lib/auth";
 import { SafeAreaView } from "~/modules/common/styled";
 import { InvitationsList } from "~/modules/organization/invitations/list/invitations-list";
-import { toMemberRole } from "~/modules/organization/lib/utils";
 import { InviteMemberBottomSheet } from "~/modules/organization/members/invite-member";
 import { MembersList } from "~/modules/organization/members/list/members-list";
 

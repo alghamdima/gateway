@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Alert } from "react-native";
 
+import { toMemberRole } from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
 import { Icons } from "@turbostarter/ui-mobile/icons";
 import { Text } from "@turbostarter/ui-mobile/text";
@@ -11,7 +12,6 @@ import { authClient } from "~/lib/auth";
 import { SettingsTile } from "~/modules/common/settings-tile";
 import { Spinner } from "~/modules/common/spinner";
 import { organization } from "~/modules/organization/lib/api";
-import { toMemberRole } from "~/modules/organization/lib/utils";
 
 export const DeleteOrganization = () => {
   const { t } = useTranslation(["common", "organization"]);

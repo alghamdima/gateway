@@ -389,11 +389,10 @@ function FormSelect({
   label,
   description,
   onChange,
-  value,
   ref,
   ...props
 }: Omit<
-  FormItemProps<typeof Select, Partial<Option>>,
+  FormItemProps<typeof Select, Option>,
   "open" | "onOpenChange" | "onValueChange"
 > & { ref?: React.Ref<React.ComponentRef<typeof Select>> }) {
   const {
@@ -415,11 +414,6 @@ function FormSelect({
             : `${formDescriptionNativeID} ${formMessageNativeID}`
         }
         aria-invalid={!!error}
-        value={
-          value
-            ? { label: value.label ?? "", value: value.label ?? "" }
-            : undefined
-        }
         onValueChange={onChange}
         {...props}
       />

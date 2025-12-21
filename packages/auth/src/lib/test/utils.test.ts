@@ -7,6 +7,7 @@ import {
   getAllRolesAtOrBelow,
   getUrl,
   hasAdminPermission,
+  toMemberRole,
 } from "../utils";
 
 import type { User } from "../../types";
@@ -134,4 +135,20 @@ describe("hasAdminPermission", () => {
     const user = {} as User;
     expect(hasAdminPermission(user)).toBe(false);
   });
+});
+
+describe("toMemberRole", () => {
+  it.each([[MemberRole.MEMBER], [MemberRole.ADMIN], [MemberRole.OWNER]])(
+    "should return same role if valid (%s)",
+    (role) => {
+      expect(toMemberRole(role)).toBe(role);
+    },
+  );
+
+  it.each([[undefined], [123], [{}], [null]])(
+    "should default to MEMBER if unknown input is provided",
+    (input) => {
+      expect(toMemberRole(input)).toBe(MemberRole.MEMBER);
+    },
+  );
 });

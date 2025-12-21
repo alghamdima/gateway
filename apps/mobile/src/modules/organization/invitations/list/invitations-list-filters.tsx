@@ -25,7 +25,9 @@ interface FiltersState {
   reset: () => void;
 }
 const useFiltersStore = create<FiltersState>((set) => ({
-  filters: {},
+  filters: {
+    status: [InvitationStatus.PENDING],
+  },
   setFilter: (key, value) =>
     set((state) => ({
       filters: {

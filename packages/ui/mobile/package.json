@@ -40,7 +40,8 @@
     "react-native": "catalog:",
     "react-native-keyboard-controller": "1.18.5",
     "react-native-reanimated": "~4.1.5",
-    "uniwind": "1.2.2"
+    "uniwind": "1.2.2",
+    "zeego": "3.0.6"
   },
   "devDependencies": {
     "@turbostarter/eslint-config": "workspace:*",

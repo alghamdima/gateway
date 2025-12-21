@@ -1,6 +1,6 @@
 import { fileURLToPath } from "url";
 import svgr from "vite-plugin-svgr";
-import { type WxtViteConfig, defineConfig } from "wxt";
+import { defineConfig } from "wxt";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
@@ -25,26 +25,25 @@ export default defineConfig({
   outDir: "build",
   modules: ["@wxt-dev/module-react", "@wxt-dev/auto-icons"],
   imports: false,
-  vite: () =>
-    ({
-      plugins: [
-        svgr({
-          include: "**/*.svg",
-        }),
-        tailwindcss(),
-      ],
-      optimizeDeps: {
-        exclude: ["*/build"],
-      },
-      define: {
-        "process.env": Object.fromEntries(
-          Object.entries(import.meta.env).filter(
-            ([key]) => key.toLowerCase() !== "path",
-          ),
+  vite: () => ({
+    plugins: [
+      svgr({
+        include: "**/*.svg",
+      }),
+      tailwindcss(),
+    ],
+    optimizeDeps: {
+      exclude: ["*/build"],
+    },
+    define: {
+      "process.env": Object.fromEntries(
+        Object.entries(import.meta.env).filter(
+          ([key]) => key.toLowerCase() !== "path",
         ),
-      },
-      alias: {
-        "~": fileURLToPath(new URL("./src", import.meta.url)),
-      },
-    }) as WxtViteConfig,
+      ),
+    },
+    alias: {
+      "~": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  }),
 });

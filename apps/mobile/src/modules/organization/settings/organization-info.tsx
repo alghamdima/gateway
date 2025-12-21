@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { View } from "react-native";
 
+import { toMemberRole } from "@turbostarter/auth";
 import { isKey, useTranslation } from "@turbostarter/i18n";
 import { Badge } from "@turbostarter/ui-mobile/badge";
 import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
@@ -14,7 +15,6 @@ import {
   AvatarFormPreview,
 } from "~/modules/common/avatar-form";
 import { organization } from "~/modules/organization/lib/api";
-import { toMemberRole } from "~/modules/organization/lib/utils";
 
 const OrganizationInfoSkeleton = () => {
   return (

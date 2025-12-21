@@ -4,7 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { getAllRolesAtOrBelow, MemberRole } from "@turbostarter/auth";
+import {
+  getAllRolesAtOrBelow,
+  MemberRole,
+  toMemberRole,
+} from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
 import {
   Avatar,
@@ -57,9 +61,9 @@ const Actions = ({ member }: { member: Member }) => {
       permission: {
         member: ["delete"],
       },
-      role: activeMember?.role ?? MemberRole.MEMBER,
+      role: toMemberRole(activeMember?.role),
     }) &&
-    getAllRolesAtOrBelow(activeMember?.role ?? MemberRole.MEMBER).includes(
+    getAllRolesAtOrBelow(toMemberRole(activeMember?.role)).includes(
       member.role,
     ) &&
     !(me && isOnlyOwner?.status);
@@ -69,9 +73,9 @@ const Actions = ({ member }: { member: Member }) => {
       permission: {
         member: ["update"],
       },
-      role: activeMember?.role ?? MemberRole.MEMBER,
+      role: toMemberRole(activeMember?.role),
     }) &&
-    getAllRolesAtOrBelow(activeMember?.role ?? MemberRole.MEMBER).includes(
+    getAllRolesAtOrBelow(toMemberRole(activeMember?.role)).includes(
       member.role,
     ) &&
     !(me && isOnlyOwner?.status);

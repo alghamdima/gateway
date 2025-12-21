@@ -1,3 +1,7 @@
+nodeLinker: hoisted
+linkWorkspacePackages: true
+savePrefix: ""
+
 packages:
   - apps/*
   - packages/**

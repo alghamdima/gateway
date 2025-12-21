@@ -86,12 +86,15 @@ function SelectContent({
   return (
     <SelectPrimitive.Portal hostName={portalHost}>
       <FullWindowOverlay>
-        <SelectPrimitive.Overlay style={StyleSheet.absoluteFill}>
+        <SelectPrimitive.Overlay
+          style={StyleSheet.absoluteFill}
+          className="z-50"
+        >
           <TextClassContext.Provider value="text-popover-foreground font-sans">
             <Animated.View className="z-50" entering={FadeIn} exiting={FadeOut}>
               <SelectPrimitive.Content
                 className={cn(
-                  "bg-popover border-border relative z-50 min-w-32 rounded-sm border p-1 shadow-md shadow-black/5",
+                  "bg-popover border-border relative min-w-32 rounded-sm border p-1 shadow-md shadow-black/5",
                   className,
                 )}
                 position={position}

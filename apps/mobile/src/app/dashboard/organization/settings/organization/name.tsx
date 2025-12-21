@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
 
-import { updateOrganizationSchema } from "@turbostarter/auth";
+import { toMemberRole, updateOrganizationSchema } from "@turbostarter/auth";
 import { useTranslation } from "@turbostarter/i18n";
 import { Button } from "@turbostarter/ui-mobile/button";
 import {
@@ -20,7 +20,6 @@ import { Text } from "@turbostarter/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";
-import { toMemberRole } from "~/modules/organization/lib/utils";
 
 const EditName = () => {
   const { t } = useTranslation(["common", "organization"]);

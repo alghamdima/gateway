@@ -1,3 +1,5 @@
+import * as z from "zod";
+
 import { getOrigin, mergeSearchParams } from "@turbostarter/shared/utils";
 
 import { MemberRole, UserRole } from "../types";
@@ -74,3 +76,11 @@ export const getAllRolesAtOrAbove = (role: MemberRole): MemberRole[] => {
 
 export const hasAdminPermission = (user: User) =>
   user.role?.split(",").includes(UserRole.ADMIN) ?? false;
+
+export const toMemberRole = (role: unknown): MemberRole => {
+  if (z.enum(MemberRole).safeParse(role).success) {
+    return z.enum(MemberRole).parse(role);
+  }
+
+  return MemberRole.MEMBER;
+};
