@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { memo } from "react";
 import { toast } from "sonner";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import {
   AvatarForm,
@@ -24,7 +24,7 @@ import {
 
 import { user } from "../../lib/api";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 interface EditAvatarProps {
   readonly user: User;

@@ -2,13 +2,13 @@
 import { defineEnv } from "envin";
 import * as z from "zod";
 
-import { preset as auth } from "@turbostarter/auth/env";
-import { preset as billing } from "@turbostarter/billing/env";
-import { preset as db } from "@turbostarter/db/env";
-import { preset as email } from "@turbostarter/email/env";
-import { preset as monitoring } from "@turbostarter/monitoring-web/env";
-import { envConfig } from "@turbostarter/shared/constants";
-import { preset as storage } from "@turbostarter/storage/env";
+import { preset as auth } from "@workspace/auth/env";
+import { preset as billing } from "@workspace/billing/env";
+import { preset as db } from "@workspace/db/env";
+import { preset as email } from "@workspace/email/env";
+import { preset as monitoring } from "@workspace/monitoring-web/env";
+import { envConfig } from "@workspace/shared/constants";
+import { preset as storage } from "@workspace/storage/env";
 
 import type { Preset } from "envin/types";
 

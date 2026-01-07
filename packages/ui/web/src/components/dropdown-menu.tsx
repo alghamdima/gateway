@@ -3,8 +3,8 @@
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import * as React from "react";
 
-import { cn } from "@turbostarter/ui";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { cn } from "@workspace/ui";
+import { Icons } from "@workspace/ui-web/icons";
 
 function DropdownMenu({
   ...props

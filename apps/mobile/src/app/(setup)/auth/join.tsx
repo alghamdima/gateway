@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Redirect, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 
-import { handle } from "@turbostarter/api/utils";
+import { handle } from "@workspace/api/utils";
 
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api";

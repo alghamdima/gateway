@@ -1,24 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { BillingStatus, config } from "@turbostarter/billing";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Button } from "@turbostarter/ui-web/button";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { BillingStatus, config } from "@workspace/billing";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button } from "@workspace/ui-web/button";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "@turbostarter/ui-web/dropdown-menu";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/dropdown-menu";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -29,8 +25,8 @@ import { invalidateCustomers } from "../server/invalidate";
 import { UpdateCustomerPlanModal } from "../update-customer-plan";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { User } from "@turbostarter/auth";
-import type { Customer } from "@turbostarter/billing";
+import type { User } from "@workspace/auth";
+import type { Customer } from "@workspace/billing";
 
 export const CustomerActions = ({
   customer,

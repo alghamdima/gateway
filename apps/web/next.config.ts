@@ -3,19 +3,19 @@ import type { NextConfig } from "next";
 import env from "./env.config";
 
 const INTERNAL_PACKAGES = [
-  "@turbostarter/analytics-web",
-  "@turbostarter/api",
-  "@turbostarter/auth",
-  "@turbostarter/billing",
-  "@turbostarter/cms",
-  "@turbostarter/email",
-  "@turbostarter/db",
-  "@turbostarter/i18n",
-  "@turbostarter/monitoring-web",
-  "@turbostarter/shared",
-  "@turbostarter/storage",
-  "@turbostarter/ui",
-  "@turbostarter/ui-web",
+  "@workspace/analytics-web",
+  "@workspace/api",
+  "@workspace/auth",
+  "@workspace/billing",
+  "@workspace/cms",
+  "@workspace/email",
+  "@workspace/db",
+  "@workspace/i18n",
+  "@workspace/monitoring-web",
+  "@workspace/shared",
+  "@workspace/storage",
+  "@workspace/ui",
+  "@workspace/ui-web",
 ];
 
 const config: NextConfig = {

@@ -8,7 +8,7 @@ import * as Network from "expo-network";
 import { useState } from "react";
 import { Alert } from "react-native";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { useRefetchOnAppFocus } from "~/modules/common/hooks/use-refetch-on-app-focus";
 

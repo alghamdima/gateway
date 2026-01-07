@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { admin } from "~/modules/admin/lib/api";

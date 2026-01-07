@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { browser } from "wxt/browser";
 
-import { config } from "@turbostarter/i18n";
+import { config } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 

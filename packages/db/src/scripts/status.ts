@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { db } from "../server";
 

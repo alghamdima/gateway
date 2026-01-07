@@ -1,14 +1,14 @@
-import { auth } from "@turbostarter/auth/server";
-import { and, eq } from "@turbostarter/db";
-import { invitation, member, organization } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { HttpException } from "@turbostarter/shared/utils";
+import { auth } from "@workspace/auth/server";
+import { and, eq } from "@workspace/db";
+import { invitation, member, organization } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException } from "@workspace/shared/utils";
 
 import type {
   UpdateMemberPayload,
   UpdateOrganizationPayload,
-} from "@turbostarter/auth";
+} from "@workspace/auth";
 
 export const deleteOrganization = async ({ id }: { id: string }) =>
   db.delete(organization).where(eq(organization.id, id));

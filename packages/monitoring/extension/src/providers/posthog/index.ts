@@ -3,7 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 
 import { env } from "./env";
 
-import type { MonitoringProviderStrategy } from "@turbostarter/monitoring";
+import type { MonitoringProviderStrategy } from "@workspace/monitoring";
 
 const posthog = new PostHog();
 

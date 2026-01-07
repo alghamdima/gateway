@@ -1,4 +1,4 @@
-import { getI18n } from "@turbostarter/i18n";
+import { getI18n } from "@workspace/i18n";
 
 import { getLocale } from "~/lib/i18n";
 import { Message, onMessage } from "~/lib/messaging";

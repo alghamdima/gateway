@@ -5,7 +5,7 @@
   "packageRules": [
     {
       "enabled": false,
-      "matchPackageNames": ["/^@turbostarter//"]
+      "matchPackageNames": ["/^@workspace//"]
     }
   ],
   "updateInternalDeps": true,

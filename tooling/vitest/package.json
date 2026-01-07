@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/vitest-config",
+  "name": "@workspace/vitest-config",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,9 +17,9 @@
     "vitest": "catalog:"
   },
   "devDependencies": {
-    "@turbostarter/tsconfig": "workspace:*",
     "@vitest/coverage-v8": "catalog:",
     "@vitest/ui": "4.0.14",
+    "@workspace/tsconfig": "workspace:*",
     "glob": "11.0.1",
     "jsdom": "26.0.0",
     "nyc": "17.1.0",

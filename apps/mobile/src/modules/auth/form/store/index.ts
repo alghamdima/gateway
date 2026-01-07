@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { AuthProvider } from "@turbostarter/auth";
+import { AuthProvider } from "@workspace/auth";
 
 export const useAuthFormStore = create<{
   provider: AuthProvider;

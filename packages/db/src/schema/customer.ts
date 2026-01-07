@@ -1,6 +1,6 @@
 import { pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-import { generateId } from "@turbostarter/shared/utils";
+import { generateId } from "@workspace/shared/utils";
 
 import {
   createInsertSchema,

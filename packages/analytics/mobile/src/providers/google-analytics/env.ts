@@ -1,6 +1,6 @@
 import { defineEnv } from "envin";
 
-import { envConfig } from "@turbostarter/shared/constants";
+import { envConfig } from "@workspace/shared/constants";
 
 import type { Preset } from "envin/types";
 

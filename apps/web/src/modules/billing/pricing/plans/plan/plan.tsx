@@ -1,12 +1,12 @@
 import { memo } from "react";
 
-import { BillingModel, formatPrice } from "@turbostarter/billing";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Button, buttonVariants } from "@turbostarter/ui-web/button";
-import { Card } from "@turbostarter/ui-web/card";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { BillingModel, formatPrice } from "@workspace/billing";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button, buttonVariants } from "@workspace/ui-web/button";
+import { Card } from "@workspace/ui-web/card";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { useCustomer } from "~/modules/billing/hooks/use-customer";
@@ -14,12 +14,12 @@ import { TurboLink } from "~/modules/common/turbo-link";
 
 import { usePlan } from "./hooks/use-plan";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 import type {
   Discount,
   PricingPlan,
   RecurringInterval,
-} from "@turbostarter/billing";
+} from "@workspace/billing";
 
 interface PlanProps {
   readonly plan: PricingPlan;

@@ -1,16 +1,16 @@
 import { useState } from "react";
 
-import { toMemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+import { toMemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@turbostarter/ui-mobile/tabs";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/tabs";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { SafeAreaView } from "~/modules/common/styled";

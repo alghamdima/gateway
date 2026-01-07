@@ -6,20 +6,20 @@ import { memo } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { emailSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Button } from "@turbostarter/ui-web/button";
+import { emailSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormMessage,
   FormField,
   FormControl,
   FormItem,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
 
 import { pathsConfig } from "~/config/paths";
 import { auth } from "~/modules/auth/lib/api";
@@ -32,7 +32,7 @@ import {
   SettingsCardContent,
 } from "~/modules/common/layout/dashboard/settings-card";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 interface EditEmailProps {
   readonly user: User;

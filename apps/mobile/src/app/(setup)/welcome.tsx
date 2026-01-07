@@ -3,16 +3,16 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   Slider,
   SliderList,
   SliderListItem,
   SliderPaginationDots,
   SliderPaginationDot,
-} from "@turbostarter/ui-mobile/slider";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/slider";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { useTheme } from "~/modules/common/hooks/use-theme";

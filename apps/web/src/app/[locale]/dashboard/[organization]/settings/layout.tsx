@@ -1,4 +1,4 @@
-import { getTranslation } from "@turbostarter/i18n/server";
+import { getTranslation } from "@workspace/i18n/server";
 
 import { pathsConfig } from "~/config/paths";
 import {

@@ -4,14 +4,14 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams, usePathname } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
-import { useDebounceCallback } from "@turbostarter/shared/hooks";
+import { useDebounceCallback } from "@workspace/shared/hooks";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
 
 import { organization } from "../lib/api";
 
-import type { MemberRole } from "@turbostarter/auth";
+import type { MemberRole } from "@workspace/auth";
 
 const DEBOUNCE_SET_ACTIVE_MS = 1000;
 

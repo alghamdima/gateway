@@ -5,7 +5,7 @@ import Animated from "react-native-reanimated";
 import { FadeIn } from "react-native-reanimated";
 import { FullWindowOverlay as RNFullWindowOverlay } from "react-native-screens";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { Icons } from "./icons";
 import { TextClassContext } from "./text";

@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 
-import { getTranslation } from "@turbostarter/i18n/server";
+import { getTranslation } from "@workspace/i18n/server";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@turbostarter/ui-web/tabs";
+} from "@workspace/ui-web/tabs";
 
 import { getOrganization } from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";

@@ -1,9 +1,9 @@
 import env from "env.config";
 import { Platform } from "react-native";
 
-import { SocialProvider, authConfigSchema } from "@turbostarter/auth";
+import { SocialProvider, authConfigSchema } from "@workspace/auth";
 
-import type { AuthConfig } from "@turbostarter/auth";
+import type { AuthConfig } from "@workspace/auth";
 
 export const authConfig = authConfigSchema.parse({
   providers: {

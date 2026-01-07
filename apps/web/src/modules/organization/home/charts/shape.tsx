@@ -9,7 +9,7 @@ import {
   RadialBarChart,
 } from "recharts";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Card,
   CardContent,
@@ -17,10 +17,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
-import { ChartContainer } from "@turbostarter/ui-web/chart";
+} from "@workspace/ui-web/card";
+import { ChartContainer } from "@workspace/ui-web/chart";
 
-import type { ChartConfig } from "@turbostarter/ui-web/chart";
+import type { ChartConfig } from "@workspace/ui-web/chart";
 
 const chartData = [
   { browser: "safari", visitors: 1260, fill: "var(--chart-2)" },

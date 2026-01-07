@@ -7,7 +7,7 @@ import * as NavigationBar from "expo-navigation-bar";
 import { memo } from "react";
 import { StatusBar, View } from "react-native";
 
-import { ThemeMode } from "@turbostarter/ui";
+import { ThemeMode } from "@workspace/ui";
 
 import { useTheme } from "~/modules/common/hooks/use-theme";
 import { isAndroid } from "~/utils/device";

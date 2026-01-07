@@ -3,11 +3,11 @@
 import mixpanel from "mixpanel-browser";
 import { useEffect } from "react";
 
-import { NodeEnv } from "@turbostarter/shared/constants";
+import { NodeEnv } from "@workspace/shared/constants";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 const init = () => {
   mixpanel.init(env.NEXT_PUBLIC_MIXPANEL_TOKEN, {

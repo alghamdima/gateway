@@ -6,11 +6,11 @@ import {
 } from "nuqs/server";
 import { Suspense } from "react";
 
-import { getOrganizationsResponseSchema } from "@turbostarter/api/schema";
-import { handle } from "@turbostarter/api/utils";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { pickBy } from "@turbostarter/shared/utils";
-import { DataTableSkeleton } from "@turbostarter/ui-web/data-table/data-table-skeleton";
+import { getOrganizationsResponseSchema } from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
+import { getTranslation } from "@workspace/i18n/server";
+import { pickBy } from "@workspace/shared/utils";
+import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
 
 import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";

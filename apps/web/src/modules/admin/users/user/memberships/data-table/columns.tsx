@@ -1,21 +1,17 @@
 "use client";
 
-import { MemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { MemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 
 import { pathsConfig } from "~/config/paths";
 import { MemberActions } from "~/modules/admin/organizations/organization/members/data-table/columns";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { GetUserMembershipsResponse } from "@turbostarter/api/schema";
+import type { GetUserMembershipsResponse } from "@workspace/api/schema";
 
 export const useColumns = (): ColumnDef<
   GetUserMembershipsResponse["data"][number]

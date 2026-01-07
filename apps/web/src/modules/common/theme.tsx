@@ -2,27 +2,23 @@
 
 import { useTheme } from "next-themes";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { useBreakpoint } from "@turbostarter/ui-web";
-import { Button } from "@turbostarter/ui-web/button";
-import {
-  Drawer,
-  DrawerTrigger,
-  DrawerContent,
-} from "@turbostarter/ui-web/drawer";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { useBreakpoint } from "@workspace/ui-web";
+import { Button } from "@workspace/ui-web/button";
+import { Drawer, DrawerTrigger, DrawerContent } from "@workspace/ui-web/drawer";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
   PopoverPortal,
-} from "@turbostarter/ui-web/popover";
-import { ThemeCustomizer } from "@turbostarter/ui-web/theme";
+} from "@workspace/ui-web/popover";
+import { ThemeCustomizer } from "@workspace/ui-web/theme";
 
 import { appConfig } from "~/config/app";
 import { useThemeConfig } from "~/lib/providers/theme";
 
-import type { ThemeConfig, ThemeMode } from "@turbostarter/ui";
+import type { ThemeConfig, ThemeMode } from "@workspace/ui";
 
 const Trigger = (props: React.ComponentProps<typeof Button>) => {
   const { t } = useTranslation("common");

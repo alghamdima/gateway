@@ -1,9 +1,9 @@
 import { Pressable } from "react-native";
 
-import { cn } from "@turbostarter/ui";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { TextClassContext } from "@turbostarter/ui-mobile/text";
+import { cn } from "@workspace/ui";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { TextClassContext } from "@workspace/ui-mobile/text";
 
 interface SettingsTileProps {
   readonly icon: React.ElementType;

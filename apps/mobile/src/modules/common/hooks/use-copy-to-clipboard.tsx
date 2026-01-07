@@ -1,7 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useState } from "react";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 export const useCopyToClipboard = () => {
   const [copiedText, setCopiedText] = useState<string | null>(null);

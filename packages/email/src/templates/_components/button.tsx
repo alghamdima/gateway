@@ -1,7 +1,7 @@
 import { Button as ReactEmailButton } from "@react-email/components";
 import { cva } from "class-variance-authority";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import type { ButtonProps as ReactEmailButtonProps } from "@react-email/components";
 import type { VariantProps } from "class-variance-authority";

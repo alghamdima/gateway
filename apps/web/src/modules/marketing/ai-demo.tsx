@@ -5,12 +5,12 @@ import { DefaultChatTransport } from "ai";
 import { marked } from "marked";
 import { useState } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { ScrollArea } from "@turbostarter/ui-web/scroll-area";
-import { Textarea } from "@turbostarter/ui-web/textarea";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
+import { ScrollArea } from "@workspace/ui-web/scroll-area";
+import { Textarea } from "@workspace/ui-web/textarea";
 
 import { api } from "~/lib/api/client";
 

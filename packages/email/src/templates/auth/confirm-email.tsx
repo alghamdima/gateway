@@ -1,8 +1,8 @@
 import { Heading, Preview, Text } from "@react-email/components";
 import * as React from "react";
 
-import { getTranslation } from "@turbostarter/i18n/server";
-import { getOrigin } from "@turbostarter/shared/utils";
+import { getTranslation } from "@workspace/i18n/server";
+import { getOrigin } from "@workspace/shared/utils";
 
 import { Button } from "../_components/button";
 import { Layout } from "../_components/layout/layout";

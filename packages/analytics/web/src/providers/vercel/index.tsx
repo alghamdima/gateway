@@ -1,7 +1,7 @@
 import { track as trackEvent } from "@vercel/analytics";
 import { Analytics } from "@vercel/analytics/react";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 export const { Provider, track, identify, reset } = {
   Provider: ({ children }) => {

@@ -2,17 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { buttonVariants } from "@workspace/ui-web/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@turbostarter/ui-web/dialog";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/dialog";
+import { Icons } from "@workspace/ui-web/icons";
 
 const MIN_DELAY_MS = 15_000;
 const STORAGE_LAST_SHOWN_AT = "buyCtaDialog:lastShownAt";

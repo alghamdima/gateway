@@ -4,29 +4,29 @@ import dayjs from "dayjs";
 import * as React from "react";
 import { Label, Pie, PieChart as RechartsPieChart, Sector } from "recharts";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
+} from "@workspace/ui-web/card";
 import {
   ChartContainer,
   ChartStyle,
   ChartTooltip,
   ChartTooltipContent,
-} from "@turbostarter/ui-web/chart";
+} from "@workspace/ui-web/chart";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-web/select";
+} from "@workspace/ui-web/select";
 
-import type { ChartConfig } from "@turbostarter/ui-web/chart";
+import type { ChartConfig } from "@workspace/ui-web/chart";
 import type { PieSectorDataItem } from "recharts/types/polar/Pie";
 
 const desktopData = [

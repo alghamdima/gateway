@@ -1,4 +1,4 @@
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
@@ -9,11 +9,11 @@ import {
   BottomSheetView,
   useBottomSheet,
   BottomSheetHeader,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { LocaleCustomizer, LocaleIcon } from "@turbostarter/ui-mobile/i18n";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { LocaleCustomizer, LocaleIcon } from "@workspace/ui-mobile/i18n";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { useI18nConfig } from "~/lib/providers/i18n";
 import { SettingsTile } from "~/modules/common/settings-tile";

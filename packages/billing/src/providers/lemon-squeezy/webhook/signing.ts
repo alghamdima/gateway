@@ -1,5 +1,5 @@
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { HttpException } from "@turbostarter/shared/utils";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException } from "@workspace/shared/utils";
 
 export const validateSignature = async (
   sig: string,

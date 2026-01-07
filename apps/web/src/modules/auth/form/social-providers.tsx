@@ -3,11 +3,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { memo } from "react";
 
-import { SocialProvider as SocialProviderType } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { SocialProvider as SocialProviderType } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -15,8 +15,8 @@ import { useAuthFormStore } from "~/modules/auth/form/store";
 
 import { auth } from "../lib/api";
 
-import type { AuthProvider } from "@turbostarter/auth";
-import type { Icon } from "@turbostarter/ui-web/icons";
+import type { AuthProvider } from "@workspace/auth";
+import type { Icon } from "@workspace/ui-web/icons";
 
 interface SocialProvidersProps {
   readonly providers: SocialProviderType[];

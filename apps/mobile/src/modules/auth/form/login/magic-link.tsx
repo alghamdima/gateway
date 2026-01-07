@@ -4,19 +4,19 @@ import { memo } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
-import { AuthProvider } from "@turbostarter/auth";
-import { magicLinkLoginSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
+import { AuthProvider } from "@workspace/auth";
+import { magicLinkLoginSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   Form,
   FormField,
   FormInput,
   FormItem,
-} from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { useAuthFormStore } from "~/modules/auth/form/store";

@@ -5,9 +5,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { changePasswordSchema } from "@turbostarter/auth";
-import { Trans, useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { changePasswordSchema } from "@workspace/auth";
+import { Trans, useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
@@ -15,10 +15,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { PasswordInput } from "@turbostarter/ui-web/input";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { PasswordInput } from "@workspace/ui-web/input";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";

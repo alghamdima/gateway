@@ -1,6 +1,6 @@
 import { Polar } from "@polar-sh/sdk";
 
-import { NodeEnv } from "@turbostarter/shared/constants";
+import { NodeEnv } from "@workspace/shared/constants";
 
 import { env } from "./env";
 

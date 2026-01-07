@@ -1,17 +1,17 @@
 import dayjs from "dayjs";
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Avatar,
   AvatarImage,
   AvatarFallback,
-} from "@turbostarter/ui-mobile/avatar";
-import { Badge } from "@turbostarter/ui-mobile/badge";
-import { Card } from "@turbostarter/ui-mobile/card";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/avatar";
+import { Badge } from "@workspace/ui-mobile/badge";
+import { Card } from "@workspace/ui-mobile/card";
+import { Text } from "@workspace/ui-mobile/text";
 
-import type { Invitation } from "@turbostarter/auth";
+import type { Invitation } from "@workspace/auth";
 
 interface InvitationSummaryCardProps {
   readonly invitation: Invitation;

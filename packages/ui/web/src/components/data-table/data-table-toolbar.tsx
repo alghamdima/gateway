@@ -3,8 +3,8 @@
 import * as React from "react";
 import { z } from "zod";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import { DataTableDateFilter } from "./data-table-date-filter";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";

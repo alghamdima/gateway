@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { captureException } from "@turbostarter/monitoring-web";
-import { Button, buttonVariants } from "@turbostarter/ui-web/button";
+import { useTranslation } from "@workspace/i18n";
+import { captureException } from "@workspace/monitoring-web";
+import { Button, buttonVariants } from "@workspace/ui-web/button";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";

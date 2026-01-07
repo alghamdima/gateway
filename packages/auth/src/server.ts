@@ -12,13 +12,13 @@ import {
   lastLoginMethod,
 } from "better-auth/plugins";
 
-import * as schema from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
-import { EmailTemplate } from "@turbostarter/email";
-import { sendEmail } from "@turbostarter/email/server";
-import { getLocaleFromRequest } from "@turbostarter/i18n/server";
-import { NodeEnv } from "@turbostarter/shared/constants";
-import { logger } from "@turbostarter/shared/logger";
+import * as schema from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
+import { EmailTemplate } from "@workspace/email";
+import { sendEmail } from "@workspace/email/server";
+import { getLocaleFromRequest } from "@workspace/i18n/server";
+import { NodeEnv } from "@workspace/shared/constants";
+import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 import { getUrl } from "./lib/utils";

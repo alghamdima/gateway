@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@turbostarter/ui-web/accordion";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+} from "@workspace/ui-web/accordion";
+import { buttonVariants } from "@workspace/ui-web/button";
 import {
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuList,
   navigationMenuTriggerStyle,
-} from "@turbostarter/ui-web/navigation-menu";
+} from "@workspace/ui-web/navigation-menu";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";

@@ -6,7 +6,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 export function QueryClientProvider(props: { children: React.ReactNode }) {
   const [queryClient] = useState(

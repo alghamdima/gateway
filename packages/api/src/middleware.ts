@@ -2,19 +2,16 @@ import { zValidator } from "@hono/zod-validator";
 import { env } from "hono/adapter";
 import { createMiddleware } from "hono/factory";
 
-import { getAllRolesAtOrAbove, hasAdminPermission } from "@turbostarter/auth";
-import { MemberRole } from "@turbostarter/auth";
-import { auth } from "@turbostarter/auth/server";
-import { makeZodI18nMap } from "@turbostarter/i18n";
-import {
-  getLocaleFromRequest,
-  getTranslation,
-} from "@turbostarter/i18n/server";
-import { HttpStatusCode, NodeEnv } from "@turbostarter/shared/constants";
-import { HttpException } from "@turbostarter/shared/utils";
+import { getAllRolesAtOrAbove, hasAdminPermission } from "@workspace/auth";
+import { MemberRole } from "@workspace/auth";
+import { auth } from "@workspace/auth/server";
+import { makeZodI18nMap } from "@workspace/i18n";
+import { getLocaleFromRequest, getTranslation } from "@workspace/i18n/server";
+import { HttpStatusCode, NodeEnv } from "@workspace/shared/constants";
+import { HttpException } from "@workspace/shared/utils";
 
-import type { User } from "@turbostarter/auth";
-import type { TFunction } from "@turbostarter/i18n";
+import type { User } from "@workspace/auth";
+import type { TFunction } from "@workspace/i18n";
 import type { Context, ValidationTargets } from "hono";
 import type { $ZodRawIssue, $ZodType } from "zod/v4/core";
 

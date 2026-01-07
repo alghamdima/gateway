@@ -6,10 +6,10 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { updateCustomerInputSchema } from "@turbostarter/api/schema";
-import { BillingStatus, config } from "@turbostarter/billing";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { updateCustomerInputSchema } from "@workspace/api/schema";
+import { BillingStatus, config } from "@workspace/billing";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
@@ -18,8 +18,8 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalClose,
@@ -29,22 +29,22 @@ import {
   ModalHeader,
   ModalTitle,
   ModalTrigger,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-web/select";
+} from "@workspace/ui-web/select";
 
 import { admin } from "~/modules/admin/lib/api";
 
 import { invalidateCustomers } from "./server/invalidate";
 
-import type { UpdateCustomerInput } from "@turbostarter/api/schema";
-import type { User } from "@turbostarter/auth";
-import type { Customer } from "@turbostarter/billing";
+import type { UpdateCustomerInput } from "@workspace/api/schema";
+import type { User } from "@workspace/auth";
+import type { Customer } from "@workspace/billing";
 import type { UseFormReturn } from "react-hook-form";
 
 interface UpdateCustomerPlanModalProps {

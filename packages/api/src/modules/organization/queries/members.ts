@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 
-import { MemberRole } from "@turbostarter/auth";
+import { MemberRole } from "@workspace/auth";
 import {
   and,
   asc,
@@ -12,9 +12,9 @@ import {
   inArray,
   or,
   sql,
-} from "@turbostarter/db";
-import { member, user } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+} from "@workspace/db";
+import { member, user } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
 import type { GetMembersInput } from "../../../schema";
 

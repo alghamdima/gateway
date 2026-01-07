@@ -1,7 +1,7 @@
 import { useGlobalSearchParams } from "expo-router";
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import { authConfig } from "~/config/auth";
 import { AnonymousLogin } from "~/modules/auth/form/anonymous";

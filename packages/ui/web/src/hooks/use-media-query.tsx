@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { DEFAULT_BREAKPOINTS } from "@turbostarter/ui";
+import { DEFAULT_BREAKPOINTS } from "@workspace/ui";
 
 export const useMediaQuery = (query: string) => {
   const [matches, setMatches] = useState(false);

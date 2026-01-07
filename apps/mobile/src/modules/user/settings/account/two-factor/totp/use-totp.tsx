@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Alert } from "react-native";
 import { create } from "zustand";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import { auth } from "~/modules/auth/lib/api";
 

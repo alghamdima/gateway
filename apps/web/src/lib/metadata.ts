@@ -1,9 +1,9 @@
-import { isKey } from "@turbostarter/i18n";
-import { getTranslation } from "@turbostarter/i18n/server";
+import { isKey } from "@workspace/i18n";
+import { getTranslation } from "@workspace/i18n/server";
 
 import { appConfig } from "~/config/app";
 
-import type { TranslationKey } from "@turbostarter/i18n";
+import type { TranslationKey } from "@workspace/i18n";
 import type { Metadata, Viewport } from "next";
 
 type OpenGraphType =

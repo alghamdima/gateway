@@ -2,7 +2,7 @@ import { OpenPanelComponent } from "@openpanel/nextjs";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 export const { Provider, track, identify, reset } = {
   Provider: ({ children }) => {

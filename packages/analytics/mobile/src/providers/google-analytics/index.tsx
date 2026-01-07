@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 import { useTrackingPermissions } from "../../hooks";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 const setup = async () => {
   await analytics().setAnalyticsCollectionEnabled(true);

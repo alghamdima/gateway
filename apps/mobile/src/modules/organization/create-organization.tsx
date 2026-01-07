@@ -4,8 +4,8 @@ import { router } from "expo-router";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
 
-import { createOrganizationSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
+import { createOrganizationSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -16,20 +16,20 @@ import {
   BottomSheetHeader,
   BottomSheetScrollView,
   useBottomSheet,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Form, FormField, FormInput } from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { Form, FormField, FormInput } from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
 
 import { organization } from "./lib/api";
 
-import type { CreateOrganizationPayload } from "@turbostarter/auth";
-import type { BottomSheetContentRef } from "@turbostarter/ui-mobile/bottom-sheet";
+import type { CreateOrganizationPayload } from "@workspace/auth";
+import type { BottomSheetContentRef } from "@workspace/ui-mobile/bottom-sheet";
 
 export const CreateOrganizationBottomSheet = ({
   children,

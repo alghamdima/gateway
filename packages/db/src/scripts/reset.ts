@@ -1,6 +1,6 @@
 import { reset } from "drizzle-seed";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import * as schema from "../schema";
 import { db } from "../server";

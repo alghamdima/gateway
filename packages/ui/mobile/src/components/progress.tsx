@@ -8,7 +8,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 function Progress({
   className,

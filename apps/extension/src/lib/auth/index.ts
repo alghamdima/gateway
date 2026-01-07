@@ -1,4 +1,4 @@
-import { createClient } from "@turbostarter/auth/client/web";
+import { createClient } from "@workspace/auth/client/web";
 
 import { getBaseUrl } from "~/lib/api";
 

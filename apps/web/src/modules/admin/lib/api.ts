@@ -6,13 +6,13 @@ import {
   getUserInvitationsResponseSchema,
   getUserMembershipsResponseSchema,
   getUserPlansResponseSchema,
-} from "@turbostarter/api/schema";
-import { handle } from "@turbostarter/api/utils";
+} from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
 
 import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 import type { InferRequestType } from "hono/client";
 
 const KEY = "admin";

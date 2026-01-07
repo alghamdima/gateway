@@ -9,9 +9,9 @@ import {
   getOrderByFromSort,
   ilike,
   sql,
-} from "@turbostarter/db";
-import { organization, member } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+} from "@workspace/db";
+import { organization, member } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
 import type { GetOrganizationsInput } from "../../../schema";
 

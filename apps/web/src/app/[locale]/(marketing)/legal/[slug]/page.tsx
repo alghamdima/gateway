@@ -4,8 +4,8 @@ import {
   CollectionType,
   getContentItemBySlug,
   getContentItems,
-} from "@turbostarter/cms";
-import { getTranslation } from "@turbostarter/i18n/server";
+} from "@workspace/cms";
+import { getTranslation } from "@workspace/i18n/server";
 
 import { getMetadata } from "~/lib/metadata";
 import { Mdx } from "~/modules/common/mdx";

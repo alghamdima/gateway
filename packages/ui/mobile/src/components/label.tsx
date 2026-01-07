@@ -1,6 +1,6 @@
 import * as LabelPrimitive from "@rn-primitives/label";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 function Label({
   className,

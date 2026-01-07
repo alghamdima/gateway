@@ -2,25 +2,25 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { toast } from "sonner";
 
-import { InvitationStatus, MemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Avatar, AvatarFallback } from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Button } from "@turbostarter/ui-web/button";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { InvitationStatus, MemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Avatar, AvatarFallback } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button } from "@workspace/ui-web/button";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from "@turbostarter/ui-web/dropdown-menu";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/dropdown-menu";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { admin } from "~/modules/admin/lib/api";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Invitation } from "@turbostarter/auth";
+import type { Invitation } from "@workspace/auth";
 
 export const InvitationActions = ({
   invitation,

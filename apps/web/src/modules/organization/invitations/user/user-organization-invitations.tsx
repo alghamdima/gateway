@@ -7,16 +7,12 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { handle } from "@turbostarter/api/utils";
-import { InvitationStatus } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@turbostarter/ui-web/alert";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { handle } from "@workspace/api/utils";
+import { InvitationStatus } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Alert, AlertDescription, AlertTitle } from "@workspace/ui-web/alert";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalContent,
@@ -24,8 +20,8 @@ import {
   ModalHeader,
   ModalTitle,
   ModalTrigger,
-} from "@turbostarter/ui-web/modal";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+} from "@workspace/ui-web/modal";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
@@ -34,7 +30,7 @@ import { user } from "~/modules/user/lib/api";
 
 import { InvitationSummaryCard } from "../invitation-summary-card";
 
-import type { Invitation } from "@turbostarter/auth";
+import type { Invitation } from "@workspace/auth";
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);

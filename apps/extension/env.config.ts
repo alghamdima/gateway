@@ -1,9 +1,9 @@
 import { defineEnv } from "envin";
 import * as z from "zod";
 
-import { preset as analytics } from "@turbostarter/analytics-extension/env";
-import { envConfig } from "@turbostarter/shared/constants";
-import { ThemeColor, ThemeMode } from "@turbostarter/ui";
+import { preset as analytics } from "@workspace/analytics-extension/env";
+import { envConfig } from "@workspace/shared/constants";
+import { ThemeColor, ThemeMode } from "@workspace/ui";
 
 export default defineEnv({
   ...envConfig,

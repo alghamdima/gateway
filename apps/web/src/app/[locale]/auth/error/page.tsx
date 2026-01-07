@@ -1,5 +1,5 @@
-import { getTranslation } from "@turbostarter/i18n/server";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { getTranslation } from "@workspace/i18n/server";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";

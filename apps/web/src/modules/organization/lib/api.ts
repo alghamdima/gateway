@@ -1,8 +1,8 @@
 import {
   getInvitationsResponseSchema,
   getMembersResponseSchema,
-} from "@turbostarter/api/schema";
-import { handle } from "@turbostarter/api/utils";
+} from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";

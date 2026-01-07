@@ -1,6 +1,6 @@
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 declare global {
   interface Window {

@@ -1,22 +1,18 @@
 import dayjs from "dayjs";
 
-import { InvitationStatus, MemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { InvitationStatus, MemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Avatar, AvatarImage, AvatarFallback } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 
 import { pathsConfig } from "~/config/paths";
 import { InvitationActions } from "~/modules/admin/organizations/organization/invitations/data-table/columns";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { GetUserInvitationsResponse } from "@turbostarter/api/schema";
+import type { GetUserInvitationsResponse } from "@workspace/api/schema";
 
 export const useColumns = (): ColumnDef<
   GetUserInvitationsResponse["data"][number]

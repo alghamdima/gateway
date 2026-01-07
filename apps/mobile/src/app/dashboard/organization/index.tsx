@@ -1,6 +1,6 @@
 import { View } from "react-native";
 
-import { BuiltWith } from "@turbostarter/ui-mobile/built-with";
+import { BuiltWith } from "@workspace/ui-mobile/built-with";
 
 import { ScrollView } from "~/modules/common/styled";
 import { AreaChart } from "~/modules/home/charts/area";

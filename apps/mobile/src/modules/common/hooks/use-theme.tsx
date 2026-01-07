@@ -5,11 +5,11 @@ import { Uniwind } from "uniwind";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { ThemeMode, themes } from "@turbostarter/ui";
+import { ThemeMode, themes } from "@workspace/ui";
 
 import { appConfig } from "~/config/app";
 
-import type { ColorVariable, ThemeConfig } from "@turbostarter/ui";
+import type { ColorVariable, ThemeConfig } from "@workspace/ui";
 
 const useThemeConfig = create<{
   config: ThemeConfig;

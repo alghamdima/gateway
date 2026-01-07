@@ -2,7 +2,7 @@ import { cva } from "class-variance-authority";
 import * as React from "react";
 import { createContext, useContext } from "react";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
+} from "@workspace/ui-web/card";
 
 import type { VariantProps } from "class-variance-authority";
 

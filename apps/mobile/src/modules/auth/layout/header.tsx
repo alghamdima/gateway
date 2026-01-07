@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { View } from "react-native";
 
-import { Text } from "@turbostarter/ui-mobile/text";
+import { Text } from "@workspace/ui-mobile/text";
 
 interface AuthHeaderProps {
   readonly title: React.ReactNode;

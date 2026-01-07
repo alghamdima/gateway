@@ -1,6 +1,6 @@
 import * as SwitchPrimitives from "@rn-primitives/switch";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 function Switch({
   className,

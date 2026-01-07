@@ -1,13 +1,13 @@
 import { hc } from "hono/client";
 
-import { config } from "@turbostarter/i18n";
+import { config } from "@workspace/i18n";
 
 import { authClient } from "~/lib/auth";
 import { useI18nConfig } from "~/lib/providers/i18n";
 
 import { getBaseUrl } from "./utils";
 
-import type { AppRouter } from "@turbostarter/api";
+import type { AppRouter } from "@workspace/api";
 
 export const { api } = hc<AppRouter>(getBaseUrl(), {
   headers: () => ({

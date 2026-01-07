@@ -1,3 +1,3 @@
-import baseConfig from "@turbostarter/vitest-config/base";
+import baseConfig from "@workspace/vitest-config/base";
 
 export default baseConfig;

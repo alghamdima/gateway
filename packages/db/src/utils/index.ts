@@ -2,7 +2,7 @@ import { asc, desc } from "drizzle-orm";
 
 import * as schema from "../schema";
 
-import type { SortPayload } from "@turbostarter/shared/schema";
+import type { SortPayload } from "@workspace/shared/schema";
 import type { PgTableWithColumns, TableConfig } from "drizzle-orm/pg-core";
 
 export const getOrderByFromSort = <Schema extends TableConfig>({

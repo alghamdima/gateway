@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 
-import { ERROR_MESSAGES } from "@turbostarter/auth";
-import { auth } from "@turbostarter/auth/server";
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { HttpException, isHttpStatus } from "@turbostarter/shared/utils";
+import { ERROR_MESSAGES } from "@workspace/auth";
+import { auth } from "@workspace/auth/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException, isHttpStatus } from "@workspace/shared/utils";
 
-import type { AuthErrorCode } from "@turbostarter/auth";
+import type { AuthErrorCode } from "@workspace/auth";
 
 export const authRouter = new Hono().on(["GET", "POST"], "*", async (c) => {
   const res = await auth.handler(c.req.raw);

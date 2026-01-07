@@ -1,7 +1,7 @@
-import { useTranslation } from "@turbostarter/i18n";
-import { isExternal } from "@turbostarter/shared/utils";
-import { cn } from "@turbostarter/ui";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { isExternal } from "@workspace/shared/utils";
+import { cn } from "@workspace/ui";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -10,7 +10,7 @@ import {
   NavigationMenuLink,
   NavigationMenuContent,
   navigationMenuTriggerStyle,
-} from "@turbostarter/ui-web/navigation-menu";
+} from "@workspace/ui-web/navigation-menu";
 
 import { TurboLink } from "~/modules/common/turbo-link";
 

@@ -6,7 +6,7 @@ import { PostHogProvider } from "posthog-js/react";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 const PageView = dynamic(
   () => import("./page-view").then((mod) => mod.PageView),

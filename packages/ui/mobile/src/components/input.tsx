@@ -1,6 +1,6 @@
 import { TextInput } from "react-native";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import type { TextInputProps } from "react-native";
 

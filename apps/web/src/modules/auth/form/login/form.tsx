@@ -3,15 +3,15 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-import { AuthProvider } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Badge } from "@turbostarter/ui-web/badge";
+import { AuthProvider } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
 import {
   Tabs,
   TabsList,
   TabsTrigger,
   TabsContent,
-} from "@turbostarter/ui-web/tabs";
+} from "@workspace/ui-web/tabs";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";

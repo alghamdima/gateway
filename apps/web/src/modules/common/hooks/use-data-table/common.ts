@@ -1,7 +1,7 @@
 import { createParser } from "nuqs/server";
 import * as z from "zod";
 
-import { sortSchema } from "@turbostarter/shared/schema";
+import { sortSchema } from "@workspace/shared/schema";
 
 import type { ColumnDef, ColumnFiltersState } from "@tanstack/react-table";
 

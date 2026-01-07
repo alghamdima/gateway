@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
-import { getTranslation } from "@turbostarter/i18n/server";
+import { getTranslation } from "@workspace/i18n/server";
 
 import { getUser } from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";

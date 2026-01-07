@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/react-native";
 
 import { env } from "./env";
 
-import type { MonitoringProviderStrategy } from "@turbostarter/monitoring";
+import type { MonitoringProviderStrategy } from "@workspace/monitoring";
 
 export const { captureException, identify, initialize } = {
   captureException: (exception) => {

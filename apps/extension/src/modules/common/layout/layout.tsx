@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 
-import { ThemeMode, cn } from "@turbostarter/ui";
+import { ThemeMode, cn } from "@workspace/ui";
 
 import "~/assets/styles/globals.css";
 import { Providers } from "~/lib/providers/providers";

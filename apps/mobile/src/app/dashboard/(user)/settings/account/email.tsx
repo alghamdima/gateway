@@ -6,21 +6,21 @@ import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
-import { emailSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Badge } from "@turbostarter/ui-mobile/badge";
-import { Button } from "@turbostarter/ui-mobile/button";
+import { emailSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-mobile/badge";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   Form,
   FormField,
   FormItem,
   FormInput,
   FormDescription,
-} from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";

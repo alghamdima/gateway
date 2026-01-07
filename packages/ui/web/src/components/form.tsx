@@ -9,8 +9,8 @@ import {
   useFormState,
 } from "react-hook-form";
 
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import type { Label as LabelPrimitive } from "radix-ui";
 import type { ControllerProps, FieldPath, FieldValues } from "react-hook-form";

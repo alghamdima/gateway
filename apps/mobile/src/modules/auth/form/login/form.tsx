@@ -2,16 +2,16 @@ import { useLocalSearchParams } from "expo-router";
 import { Suspense, useState } from "react";
 import { View } from "react-native";
 
-import { AuthProvider } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Badge } from "@turbostarter/ui-mobile/badge";
+import { AuthProvider } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-mobile/badge";
 import {
   Tabs,
   TabsList,
   TabsTrigger,
   TabsContent,
-} from "@turbostarter/ui-mobile/tabs";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/tabs";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";

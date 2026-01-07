@@ -1,5 +1,5 @@
-import { CollectionType, getContentItems } from "@turbostarter/cms";
-import { getPathname, config } from "@turbostarter/i18n";
+import { CollectionType, getContentItems } from "@workspace/cms";
+import { getPathname, config } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";

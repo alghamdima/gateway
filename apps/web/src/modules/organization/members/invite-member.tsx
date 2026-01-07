@@ -10,10 +10,10 @@ import {
   getAllRolesAtOrBelow,
   inviteMemberSchema,
   MemberRole,
-} from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Button } from "@turbostarter/ui-web/button";
+} from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
@@ -21,16 +21,16 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-web/select";
+} from "@workspace/ui-web/select";
 
 import { authClient } from "~/lib/auth/client";
 import {

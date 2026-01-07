@@ -1,11 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { View } from "react-native";
 
-import { toMemberRole } from "@turbostarter/auth";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { Badge } from "@turbostarter/ui-mobile/badge";
-import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { toMemberRole } from "@workspace/auth";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-mobile/badge";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import {

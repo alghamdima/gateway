@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 
 import { getBaseUrl } from "./utils";
 
-import type { AppRouter } from "@turbostarter/api";
+import type { AppRouter } from "@workspace/api";
 
 export const { api } = hc<AppRouter>(getBaseUrl(), {
   headers: async () => ({

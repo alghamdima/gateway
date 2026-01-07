@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/monitoring",
+  "name": "@workspace/monitoring",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,11 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "devDependencies": {
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

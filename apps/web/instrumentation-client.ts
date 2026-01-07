@@ -1,4 +1,4 @@
-import { initialize } from "@turbostarter/monitoring-web";
+import { initialize } from "@workspace/monitoring-web";
 initialize();
 
-export { onRouterTransitionStart } from "@turbostarter/monitoring-web";
+export { onRouterTransitionStart } from "@workspace/monitoring-web";

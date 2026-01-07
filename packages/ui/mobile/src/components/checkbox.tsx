@@ -1,6 +1,6 @@
 import * as CheckboxPrimitive from "@rn-primitives/checkbox";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { Icons } from "./icons";
 

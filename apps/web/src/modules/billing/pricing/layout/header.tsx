@@ -2,9 +2,9 @@
 
 import { memo } from "react";
 
-import { BillingModel } from "@turbostarter/billing";
-import { useTranslation } from "@turbostarter/i18n";
-import { Tabs, TabsList, TabsTrigger } from "@turbostarter/ui-web/tabs";
+import { BillingModel } from "@workspace/billing";
+import { useTranslation } from "@workspace/i18n";
+import { Tabs, TabsList, TabsTrigger } from "@workspace/ui-web/tabs";
 
 import {
   SectionBadge,
@@ -19,7 +19,7 @@ import type {
   Discount as DiscountType,
   PricingPlanPrice,
   RecurringInterval,
-} from "@turbostarter/billing";
+} from "@workspace/billing";
 
 interface PricingHeaderProps {
   readonly currency: string;

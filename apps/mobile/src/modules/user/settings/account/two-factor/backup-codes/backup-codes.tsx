@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { View, Alert, Share } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { logger } from "@turbostarter/shared/logger";
+import { useTranslation } from "@workspace/i18n";
+import { logger } from "@workspace/shared/logger";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
@@ -12,10 +12,10 @@ import {
   BottomSheetTitle,
   BottomSheetDescription,
   BottomSheetHeader,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
 
@@ -24,8 +24,8 @@ import { useTwoFactor } from "../use-two-factor";
 
 import { useBackupCodes } from "./use-backup-codes";
 
-import type { PasswordPayload } from "@turbostarter/auth";
-import type { BottomSheetContentRef } from "@turbostarter/ui-mobile/bottom-sheet";
+import type { PasswordPayload } from "@workspace/auth";
+import type { BottomSheetContentRef } from "@workspace/ui-mobile/bottom-sheet";
 
 interface BackupCodesSheetProps {
   readonly ref?: React.RefObject<BottomSheetContentRef | null>;

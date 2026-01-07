@@ -4,22 +4,22 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import QRCode from "react-qr-code";
 
-import { otpSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { otpSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   FormField,
   FormControl,
   FormItem,
   FormMessage,
   Form,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@turbostarter/ui-web/input-otp";
+} from "@workspace/ui-web/input-otp";
 import {
   Modal,
   ModalContent,
@@ -28,7 +28,7 @@ import {
   ModalDescription,
   ModalFooter,
   ModalClose,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 
 import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
 
@@ -38,7 +38,7 @@ import { useTwoFactor } from "../use-two-factor";
 
 import { useTotp } from "./use-totp";
 
-import type { OtpPayload, PasswordPayload } from "@turbostarter/auth";
+import type { OtpPayload, PasswordPayload } from "@workspace/auth";
 
 interface TotpModalProps {
   readonly open?: boolean;

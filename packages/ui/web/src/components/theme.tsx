@@ -4,10 +4,10 @@ import * as React from "react";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ThemeColor, ThemeMode } from "@turbostarter/ui";
-import { cn } from "@turbostarter/ui";
+import { ThemeColor, ThemeMode } from "@workspace/ui";
+import { cn } from "@workspace/ui";
 
-import type { ThemeConfig } from "@turbostarter/ui";
+import type { ThemeConfig } from "@workspace/ui";
 
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";

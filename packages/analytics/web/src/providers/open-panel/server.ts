@@ -2,7 +2,7 @@ import { OpenPanel } from "@openpanel/nextjs";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
 let client: OpenPanel | null = null;
 

@@ -4,9 +4,9 @@ import { router } from "expo-router";
 import * as StoreReview from "expo-store-review";
 import { Share, View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { useTranslation } from "@workspace/i18n";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";

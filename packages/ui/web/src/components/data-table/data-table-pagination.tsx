@@ -1,5 +1,5 @@
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import type { Table } from "@tanstack/react-table";
 

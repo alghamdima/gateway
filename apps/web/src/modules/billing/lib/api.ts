@@ -1,4 +1,4 @@
-import { handle } from "@turbostarter/api/utils";
+import { handle } from "@workspace/api/utils";
 
 import { api } from "~/lib/api/client";
 

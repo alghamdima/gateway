@@ -10,7 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import type { SlotProps } from "input-otp-native";
 

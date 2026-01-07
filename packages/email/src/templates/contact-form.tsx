@@ -1,7 +1,7 @@
 import { Heading, Preview, Row, Column } from "@react-email/components";
 import * as React from "react";
 
-import { getTranslation } from "@turbostarter/i18n/server";
+import { getTranslation } from "@workspace/i18n/server";
 
 import { Layout } from "./_components/layout/layout";
 

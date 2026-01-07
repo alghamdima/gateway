@@ -1,4 +1,4 @@
-import { LocaleCustomizer } from "@turbostarter/ui-web/i18n";
+import { LocaleCustomizer } from "@workspace/ui-web/i18n";
 
 import { authClient } from "~/lib/auth";
 import { useLocale } from "~/lib/i18n";

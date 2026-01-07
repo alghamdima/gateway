@@ -5,18 +5,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { MemberRole, updateOrganizationSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { MemberRole, updateOrganizationSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
 
 import { authClient } from "~/lib/auth/client";
 import {

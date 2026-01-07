@@ -1,15 +1,11 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { useBreakpoint } from "@turbostarter/ui-web";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Marquee } from "@turbostarter/ui-web/marquee";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { useBreakpoint } from "@workspace/ui-web";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Icons } from "@workspace/ui-web/icons";
+import { Marquee } from "@workspace/ui-web/marquee";
 
 import {
   Section,

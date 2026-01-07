@@ -1,26 +1,26 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { SocialProvider } from "@turbostarter/auth";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { capitalize } from "@turbostarter/shared/utils";
-import { Button } from "@turbostarter/ui-web/button";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { SocialProvider } from "@workspace/auth";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { capitalize } from "@workspace/shared/utils";
+import { Button } from "@workspace/ui-web/button";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 import {
   DropdownMenu,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuSeparator,
-} from "@turbostarter/ui-web/dropdown-menu";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/dropdown-menu";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { admin } from "~/modules/admin/lib/api";
 import { SetPasswordModal } from "~/modules/admin/users/user/accounts/set-password";
 import { SocialIcons } from "~/modules/auth/form/social-providers";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { GetUserAccountsResponse } from "@turbostarter/api/schema";
+import type { GetUserAccountsResponse } from "@workspace/api/schema";
 
 export const AccountActions = ({
   account,

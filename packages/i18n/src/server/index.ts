@@ -6,7 +6,7 @@ import Negotiator from "negotiator";
 import { initReactI18next } from "react-i18next/initReactI18next";
 import * as z from "zod";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { config, getInitOptions } from "../config";
 import { env } from "../env";

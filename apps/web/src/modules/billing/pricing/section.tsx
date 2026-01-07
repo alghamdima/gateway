@@ -7,17 +7,17 @@ import {
   RecurringIntervalDuration,
   config,
   getPriceWithHighestDiscount,
-} from "@turbostarter/billing";
-import { useTranslation } from "@turbostarter/i18n";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+} from "@workspace/billing";
+import { useTranslation } from "@workspace/i18n";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { Section, SectionHeader } from "~/modules/marketing/layout/section";
 
 import { PricingHeader } from "./layout/header";
 import { Plans, PlansSkeleton } from "./plans/plans";
 
-import type { User } from "@turbostarter/auth";
-import type { BillingModel } from "@turbostarter/billing";
+import type { User } from "@workspace/auth";
+import type { BillingModel } from "@workspace/billing";
 
 interface PricingSectionProps {
   readonly user: User | null;

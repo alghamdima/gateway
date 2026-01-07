@@ -9,9 +9,9 @@ import {
   getOrderByFromSort,
   ilike,
   inArray,
-} from "@turbostarter/db";
-import { invitation } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+} from "@workspace/db";
+import { invitation } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
 import type { GetInvitationsInput } from "../../../schema";
 

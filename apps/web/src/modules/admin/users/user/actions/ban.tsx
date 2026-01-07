@@ -9,11 +9,11 @@ import dayjs from "dayjs";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { banUserSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Button } from "@turbostarter/ui-web/button";
-import { Calendar } from "@turbostarter/ui-web/calendar";
+import { banUserSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Button } from "@workspace/ui-web/button";
+import { Calendar } from "@workspace/ui-web/calendar";
 import {
   Form,
   FormField,
@@ -22,8 +22,8 @@ import {
   FormControl,
   FormDescription,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalTrigger,
@@ -34,18 +34,18 @@ import {
   ModalFooter,
   ModalClose,
   ModalBody,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@turbostarter/ui-web/popover";
-import { ScrollArea, ScrollBar } from "@turbostarter/ui-web/scroll-area";
-import { Textarea } from "@turbostarter/ui-web/textarea";
+} from "@workspace/ui-web/popover";
+import { ScrollArea, ScrollBar } from "@workspace/ui-web/scroll-area";
+import { Textarea } from "@workspace/ui-web/textarea";
 
 import { admin } from "~/modules/admin/lib/api";
 
-import type { BanUserPayload } from "@turbostarter/auth";
+import type { BanUserPayload } from "@workspace/auth";
 import type { ComponentProps } from "react";
 
 interface BanProps {

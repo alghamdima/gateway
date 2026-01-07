@@ -2,14 +2,14 @@
 
 import { use } from "react";
 
-import { DataTable } from "@turbostarter/ui-web/data-table/data-table";
-import { DataTableToolbar } from "@turbostarter/ui-web/data-table/data-table-toolbar";
+import { DataTable } from "@workspace/ui-web/data-table/data-table";
+import { DataTableToolbar } from "@workspace/ui-web/data-table/data-table-toolbar";
 
 import { useDataTable } from "~/modules/common/hooks/use-data-table";
 
 import { useColumns } from "./columns";
 
-import type { GetCustomersResponse } from "@turbostarter/api/schema";
+import type { GetCustomersResponse } from "@workspace/api/schema";
 
 interface CustomersDataTableProps {
   readonly promise: Promise<Awaited<GetCustomersResponse>>;

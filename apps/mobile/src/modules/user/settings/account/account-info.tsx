@@ -2,8 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { Redirect } from "expo-router";
 import { View } from "react-native";
 
-import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import * as z from "zod";
 
-import { MemberRole } from "@turbostarter/auth";
+import { MemberRole } from "@workspace/auth";
 
 import { enforceAuth, enforceMembership, validate } from "../../middleware";
 import { getInvitationsInputSchema, getMembersInputSchema } from "../../schema";

@@ -1,10 +1,10 @@
 import { defineEnv } from "envin";
 import * as z from "zod";
 
-import { preset as analytics } from "@turbostarter/analytics-mobile/env";
-import { preset as monitoring } from "@turbostarter/monitoring-mobile/env";
-import { envConfig } from "@turbostarter/shared/constants";
-import { ThemeColor, ThemeMode } from "@turbostarter/ui";
+import { preset as analytics } from "@workspace/analytics-mobile/env";
+import { preset as monitoring } from "@workspace/monitoring-mobile/env";
+import { envConfig } from "@workspace/shared/constants";
+import { ThemeColor, ThemeMode } from "@workspace/ui";
 
 const castStringToBool = z.preprocess((val) => {
   if (typeof val === "string") {

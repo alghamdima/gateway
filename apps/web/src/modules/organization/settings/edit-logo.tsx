@@ -3,8 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { MemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
+import { MemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
 
 import { authClient } from "~/lib/auth/client";
 import {

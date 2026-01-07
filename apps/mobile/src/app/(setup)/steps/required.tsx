@@ -4,10 +4,10 @@ import { useForm } from "react-hook-form";
 import { View } from "react-native";
 import z from "zod";
 
-import { Trans, useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Form, FormCheckbox, FormField } from "@turbostarter/ui-mobile/form";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { Trans, useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
+import { Form, FormCheckbox, FormField } from "@workspace/ui-mobile/form";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { useSetupSteps } from "~/app/(setup)/steps/_layout";
 import { appConfig } from "~/config/app";

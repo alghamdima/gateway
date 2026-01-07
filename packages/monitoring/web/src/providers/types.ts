@@ -1,4 +1,4 @@
-import type { MonitoringProviderStrategy } from "@turbostarter/monitoring";
+import type { MonitoringProviderStrategy } from "@workspace/monitoring";
 
 export interface MonitoringProviderClientStrategy
   extends MonitoringProviderStrategy {

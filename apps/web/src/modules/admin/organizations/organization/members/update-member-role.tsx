@@ -6,9 +6,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { MemberRole, updateMemberSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { MemberRole, updateMemberSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormField,
@@ -17,8 +17,8 @@ import {
   FormControl,
   FormDescription,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalTrigger,
@@ -28,18 +28,18 @@ import {
   ModalDescription,
   ModalClose,
   ModalFooter,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 import {
   Select,
   SelectItem,
   SelectValue,
   SelectContent,
   SelectTrigger,
-} from "@turbostarter/ui-web/select";
+} from "@workspace/ui-web/select";
 
 import { admin } from "~/modules/admin/lib/api";
 
-import type { Member, UpdateMemberPayload } from "@turbostarter/auth";
+import type { Member, UpdateMemberPayload } from "@workspace/auth";
 
 interface UpdateMemberRoleModalProps {
   readonly member: Member;

@@ -2,8 +2,8 @@ import * as React from "react";
 import { Controller, FormProvider, useFormContext } from "react-hook-form";
 import { View } from "react-native";
 
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import { Checkbox } from "./checkbox";
 import { Input } from "./input";

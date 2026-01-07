@@ -2,7 +2,7 @@
 
 import { PolarGrid, RadialBar, RadialBarChart } from "recharts";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Card,
   CardContent,
@@ -10,15 +10,15 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
+} from "@workspace/ui-web/card";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@turbostarter/ui-web/chart";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/chart";
+import { Icons } from "@workspace/ui-web/icons";
 
-import type { ChartConfig } from "@turbostarter/ui-web/chart";
+import type { ChartConfig } from "@workspace/ui-web/chart";
 
 const chartData = [
   { browser: "chrome", visitors: 275, fill: "var(--chart-1)" },

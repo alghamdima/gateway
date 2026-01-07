@@ -2,7 +2,7 @@ import * as Slot from "@rn-primitives/slot";
 import * as React from "react";
 import { Text as RNText } from "react-native";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 

@@ -1,7 +1,7 @@
 import { cva } from "class-variance-authority";
 import * as React from "react";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import type { VariantProps } from "class-variance-authority";
 

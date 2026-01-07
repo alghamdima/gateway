@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { identify, Provider, reset } from "@turbostarter/analytics-mobile";
+import { identify, Provider, reset } from "@workspace/analytics-mobile";
 
 import { authClient } from "~/lib/auth";
 

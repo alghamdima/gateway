@@ -1,13 +1,13 @@
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@turbostarter/ui-web/popover";
-import { ThemeCustomizer } from "@turbostarter/ui-web/theme";
+} from "@workspace/ui-web/popover";
+import { ThemeCustomizer } from "@workspace/ui-web/theme";
 
 import { appConfig } from "~/config/app";
 import { StorageKey, useStorage } from "~/lib/storage";

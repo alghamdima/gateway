@@ -7,12 +7,12 @@ import {
   BillingStatus,
   config,
   PricingPlanType,
-} from "@turbostarter/billing";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { buttonVariants } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/billing";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-web/badge";
+import { buttonVariants } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { useCustomer } from "~/modules/billing/hooks/use-customer";

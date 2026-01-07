@@ -17,7 +17,7 @@ import {
 } from "nuqs";
 import { useCallback, useMemo, useState } from "react";
 
-import { useDebounceCallback } from "@turbostarter/shared/hooks";
+import { useDebounceCallback } from "@workspace/shared/hooks";
 
 import {
   ARRAY_SEPARATOR,

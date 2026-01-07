@@ -7,18 +7,18 @@ import { memo } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { updateUserSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { updateUserSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
 
 import {
   SettingsCard,
@@ -32,7 +32,7 @@ import { onPromise } from "~/utils";
 
 import { user } from "../../lib/api";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 interface EditNameProps {
   readonly user: User;

@@ -3,7 +3,7 @@
 import { useParams, usePathname } from "next/navigation";
 import { memo } from "react";
 
-import { SidebarMenuButton, useSidebar } from "@turbostarter/ui-web/sidebar";
+import { SidebarMenuButton, useSidebar } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";

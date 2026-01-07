@@ -5,9 +5,9 @@ import { Platform, View } from "react-native";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { cn } from "@turbostarter/ui";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+import { cn } from "@workspace/ui";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { SafeAreaView } from "~/modules/common/styled";

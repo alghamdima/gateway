@@ -2,10 +2,10 @@ import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Alert } from "react-native";
 
-import { toMemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { toMemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";

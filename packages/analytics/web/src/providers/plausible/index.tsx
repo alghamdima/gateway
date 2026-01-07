@@ -5,7 +5,7 @@ import { env } from "./env";
 import type {
   AllowedPropertyValues,
   AnalyticsProviderClientStrategy,
-} from "@turbostarter/analytics";
+} from "@workspace/analytics";
 
 declare global {
   interface Window {

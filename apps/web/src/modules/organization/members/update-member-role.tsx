@@ -10,9 +10,9 @@ import {
   getAllRolesAtOrBelow,
   MemberRole,
   updateMemberSchema,
-} from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+} from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormField,
@@ -21,8 +21,8 @@ import {
   FormControl,
   FormDescription,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalTrigger,
@@ -32,20 +32,20 @@ import {
   ModalDescription,
   ModalClose,
   ModalFooter,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 import {
   Select,
   SelectItem,
   SelectValue,
   SelectContent,
   SelectTrigger,
-} from "@turbostarter/ui-web/select";
+} from "@workspace/ui-web/select";
 
 import { organization } from "~/modules/organization/lib/api";
 
 import { useActiveOrganization } from "../hooks/use-active-organization";
 
-import type { Member } from "@turbostarter/auth";
+import type { Member } from "@workspace/auth";
 
 interface UpdateMemberRoleModalProps {
   readonly member: Member;

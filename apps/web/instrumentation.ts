@@ -1,7 +1,7 @@
-import { initialize } from "@turbostarter/monitoring-web/server";
+import { initialize } from "@workspace/monitoring-web/server";
 
 export function register() {
   initialize();
 }
 
-export { onRequestError } from "@turbostarter/monitoring-web/server";
+export { onRequestError } from "@workspace/monitoring-web/server";

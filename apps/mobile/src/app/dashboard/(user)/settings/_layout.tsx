@@ -1,6 +1,6 @@
 import { router, Stack } from "expo-router";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import { BaseHeader } from "~/modules/common/layout/header";
 

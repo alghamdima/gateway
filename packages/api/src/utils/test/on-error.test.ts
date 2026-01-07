@@ -4,22 +4,22 @@ import { onError } from "../on-error";
 
 import type { Context } from "hono";
 
-vi.mock("@turbostarter/i18n/server", () => ({
+vi.mock("@workspace/i18n/server", () => ({
   getTranslation: vi.fn().mockResolvedValue({
     t: (key: string) => key,
     i18n: {},
   }),
 }));
 
-vi.mock("@turbostarter/i18n", () => ({
+vi.mock("@workspace/i18n", () => ({
   isKey: vi.fn().mockReturnValue(true),
 }));
 
-vi.mock("@turbostarter/shared/utils", () => ({
+vi.mock("@workspace/shared/utils", () => ({
   getStatusCode: vi.fn().mockReturnValue(500),
 }));
 
-vi.mock("@turbostarter/monitoring-web/server", () => ({
+vi.mock("@workspace/monitoring-web/server", () => ({
   captureException: vi.fn(),
 }));
 

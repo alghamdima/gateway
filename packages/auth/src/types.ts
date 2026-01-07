@@ -2,7 +2,7 @@ import * as z from "zod";
 
 import type { AuthErrorCode } from "./server";
 import type { expoClient } from "@better-auth/expo/client";
-import type { TranslationKey } from "@turbostarter/i18n";
+import type { TranslationKey } from "@workspace/i18n";
 import type {
   BetterAuthClientPlugin,
   BetterAuthClientOptions,

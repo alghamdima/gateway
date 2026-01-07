@@ -1,6 +1,6 @@
-import { auth } from "@turbostarter/auth/server";
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { HttpException, slugify } from "@turbostarter/shared/utils";
+import { auth } from "@workspace/auth/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException, slugify } from "@workspace/shared/utils";
 
 const MAX_ATTEMPTS = 3;
 

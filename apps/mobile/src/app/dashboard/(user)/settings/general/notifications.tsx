@@ -2,8 +2,8 @@ import * as Linking from "expo-linking";
 import { Pressable } from "react-native";
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { useTranslation } from "@workspace/i18n";
+import { Text } from "@workspace/ui-mobile/text";
 
 export default function Notifications() {
   const { t } = useTranslation(["common", "marketing"]);

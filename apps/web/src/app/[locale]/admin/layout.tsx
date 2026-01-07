@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 
-import { hasAdminPermission } from "@turbostarter/auth";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { SidebarProvider } from "@turbostarter/ui-web/sidebar";
+import { hasAdminPermission } from "@workspace/auth";
+import { Icons } from "@workspace/ui-web/icons";
+import { SidebarProvider } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { getSession } from "~/lib/auth/server";

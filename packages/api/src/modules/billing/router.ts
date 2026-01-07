@@ -7,7 +7,7 @@ import {
   getBillingPortal,
   webhookHandler,
   getCustomerByUserId,
-} from "@turbostarter/billing/server";
+} from "@workspace/billing/server";
 
 import { enforceAuth, validate } from "../../middleware";
 

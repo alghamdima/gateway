@@ -9,9 +9,9 @@ import {
   getOrderByFromSort,
   ilike,
   inArray,
-} from "@turbostarter/db";
-import { customer, user } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+} from "@workspace/db";
+import { customer, user } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
 import type { GetCustomersInput } from "../../../schema";
 

@@ -1,7 +1,7 @@
 import { Component } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { logger } from "@turbostarter/shared/logger";
+import { useTranslation } from "@workspace/i18n";
+import { logger } from "@workspace/shared/logger";
 
 import type { ReactNode } from "react";
 

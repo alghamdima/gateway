@@ -8,8 +8,8 @@ import {
   MemberRole,
   toMemberRole,
   updateMemberSchema,
-} from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
+} from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
@@ -20,26 +20,26 @@ import {
   BottomSheetTitle,
   BottomSheetDescription,
   useBottomSheet,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Form, FormField, FormSelect } from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { Form, FormField, FormSelect } from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
 import {
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-mobile/select";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/select";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";
 import { WIDTH } from "~/utils/device";
 
-import type { MemberRole as MemberRoleType } from "@turbostarter/auth";
-import type { Member, UpdateMemberPayload } from "@turbostarter/auth";
-import type { BottomSheetContentRef } from "@turbostarter/ui-mobile/bottom-sheet";
+import type { MemberRole as MemberRoleType } from "@workspace/auth";
+import type { Member, UpdateMemberPayload } from "@workspace/auth";
+import type { BottomSheetContentRef } from "@workspace/ui-mobile/bottom-sheet";
 
 interface UpdateMemberRoleVariables {
   memberId: string;

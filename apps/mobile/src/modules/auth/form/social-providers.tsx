@@ -10,13 +10,13 @@ import { router } from "expo-router";
 import { memo } from "react";
 import { View } from "react-native";
 
-import { SocialProvider as SocialProviderType } from "@turbostarter/auth";
-import { Trans, useTranslation } from "@turbostarter/i18n";
-import { Badge } from "@turbostarter/ui-mobile/badge";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { SocialProvider as SocialProviderType } from "@workspace/auth";
+import { Trans, useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-mobile/badge";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authConfig } from "~/config/auth";
 import { pathsConfig } from "~/config/paths";
@@ -26,8 +26,8 @@ import { isAndroid, isIOS } from "~/utils/device";
 
 import { auth } from "../lib/api";
 
-import type { AuthProvider } from "@turbostarter/auth";
-import type { Icon } from "@turbostarter/ui-mobile/icons";
+import type { AuthProvider } from "@workspace/auth";
+import type { Icon } from "@workspace/ui-mobile/icons";
 import type { Route } from "expo-router";
 
 interface SocialProvidersProps {

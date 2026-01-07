@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import { createShadowRootUi } from "wxt/utils/content-script-ui/shadow-root";
 import { defineContentScript } from "wxt/utils/define-content-script";
 
-import { logger } from "@turbostarter/shared/logger";
-import { Button } from "@turbostarter/ui-web/button";
+import { logger } from "@workspace/shared/logger";
+import { Button } from "@workspace/ui-web/button";
 
 import "~/assets/styles/globals.css";
 

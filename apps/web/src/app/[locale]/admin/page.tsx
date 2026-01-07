@@ -1,16 +1,16 @@
 import * as z from "zod";
 
-import { handle } from "@turbostarter/api/utils";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { cn } from "@turbostarter/ui";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+import { handle } from "@workspace/api/utils";
+import { getTranslation } from "@workspace/i18n/server";
+import { cn } from "@workspace/ui";
+import { buttonVariants } from "@workspace/ui-web/button";
 import {
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/card";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api/server";

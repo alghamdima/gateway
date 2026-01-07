@@ -1,4 +1,4 @@
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 export const DetailsList = ({
   className,

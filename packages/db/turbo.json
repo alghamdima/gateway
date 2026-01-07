@@ -5,14 +5,14 @@
     "db:generate": {
       "interactive": true,
       "cache": false,
-      "dependsOn": ["@turbostarter/auth#db:generate"]
+      "dependsOn": ["@workspace/auth#db:generate"]
     },
     "db:migrate": {
       "cache": false
     },
     "db:seed": {
       "cache": false,
-      "dependsOn": ["@turbostarter/auth#db:seed"]
+      "dependsOn": ["@workspace/auth#db:seed"]
     },
     "db:setup": {}
   }

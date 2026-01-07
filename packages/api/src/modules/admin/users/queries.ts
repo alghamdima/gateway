@@ -10,7 +10,7 @@ import {
   ilike,
   inArray,
   or,
-} from "@turbostarter/db";
+} from "@workspace/db";
 import {
   account,
   customer,
@@ -18,8 +18,8 @@ import {
   member,
   organization,
   user,
-} from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+} from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
 import type {
   GetUserAccountsInput,

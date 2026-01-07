@@ -6,11 +6,11 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { Trans, useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { Trans, useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
@@ -22,7 +22,7 @@ import { user } from "~/modules/user/lib/api";
 
 import { InvitationSummaryCard } from "./invitation-summary-card";
 
-import type { Invitation as InvitationType } from "@turbostarter/auth";
+import type { Invitation as InvitationType } from "@workspace/auth";
 
 dayjs.extend(relativeTime);
 

@@ -1,7 +1,7 @@
-import { eq } from "@turbostarter/db";
-import * as schema from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
-import { logger } from "@turbostarter/shared/logger";
+import { eq } from "@workspace/db";
+import * as schema from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
+import { logger } from "@workspace/shared/logger";
 
 import { env } from "../env";
 import { generateName } from "../lib/utils";

@@ -1,4 +1,4 @@
-import { SortOrder } from "@turbostarter/shared/constants";
+import { SortOrder } from "@workspace/shared/constants";
 
 import { allBlogs, allLegals } from "../../.content-collections/generated";
 import { ContentStatus } from "../types";

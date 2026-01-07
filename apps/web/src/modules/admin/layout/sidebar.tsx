@@ -1,29 +1,29 @@
 import { memo } from "react";
 
-import { isKey } from "@turbostarter/i18n";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { isKey } from "@workspace/i18n";
+import { getTranslation } from "@workspace/i18n/server";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenuItem,
   SidebarRail,
-} from "@turbostarter/ui-web/sidebar";
-import { SidebarMenu } from "@turbostarter/ui-web/sidebar";
+} from "@workspace/ui-web/sidebar";
+import { SidebarMenu } from "@workspace/ui-web/sidebar";
 import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-} from "@turbostarter/ui-web/sidebar";
-import { Sidebar } from "@turbostarter/ui-web/sidebar";
+} from "@workspace/ui-web/sidebar";
+import { Sidebar } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { SidebarLink } from "~/modules/common/layout/dashboard/sidebar-link";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { UserNavigation } from "~/modules/user/user-navigation";
 
-import type { User } from "@turbostarter/auth";
-import type { Icon } from "@turbostarter/ui-web/icons";
+import type { User } from "@workspace/auth";
+import type { Icon } from "@workspace/ui-web/icons";
 
 interface AdminSidebarProps {
   readonly user: User;

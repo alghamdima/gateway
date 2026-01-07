@@ -1,4 +1,4 @@
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { updateCustomer, upsertCustomer } from "../../lib/customer";
 import { getCustomerByUserId } from "../../server";

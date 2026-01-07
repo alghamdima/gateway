@@ -1,8 +1,8 @@
-import { eq } from "@turbostarter/db";
-import { customer } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+import { eq } from "@workspace/db";
+import { customer } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
-import type { UpdateCustomer } from "@turbostarter/db/schema";
+import type { UpdateCustomer } from "@workspace/db/schema";
 
 export const deleteCustomer = async ({ id }: { id: string }) =>
   db.delete(customer).where(eq(customer.id, id));

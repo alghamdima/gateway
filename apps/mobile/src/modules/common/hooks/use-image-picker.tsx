@@ -1,7 +1,7 @@
 import * as ExpoImagePicker from "expo-image-picker";
 import { useCallback } from "react";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 export const useImagePicker = () => {
   const pick = useCallback(async () => {

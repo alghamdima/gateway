@@ -7,12 +7,12 @@ import {
 import { createSearchParamsCache } from "nuqs/server";
 import { Suspense } from "react";
 
-import { getCustomersResponseSchema } from "@turbostarter/api/schema";
-import { handle } from "@turbostarter/api/utils";
-import { BillingStatus, PricingPlanType } from "@turbostarter/billing";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { pickBy } from "@turbostarter/shared/utils";
-import { DataTableSkeleton } from "@turbostarter/ui-web/data-table/data-table-skeleton";
+import { getCustomersResponseSchema } from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
+import { BillingStatus, PricingPlanType } from "@workspace/billing";
+import { getTranslation } from "@workspace/i18n/server";
+import { pickBy } from "@workspace/shared/utils";
+import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
 
 import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";

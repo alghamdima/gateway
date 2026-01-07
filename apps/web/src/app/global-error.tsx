@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 
-import { captureException } from "@turbostarter/monitoring-web";
+import { captureException } from "@workspace/monitoring-web";
 
 export default function GlobalError({
   error,

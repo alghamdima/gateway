@@ -1,15 +1,11 @@
 import { memo } from "react";
 
-import { hasAdminPermission } from "@turbostarter/auth";
-import { PricingPlanType } from "@turbostarter/billing";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+import { hasAdminPermission } from "@workspace/auth";
+import { PricingPlanType } from "@workspace/billing";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { buttonVariants } from "@workspace/ui-web/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,16 +15,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuPortal,
   DropdownMenuGroup,
-} from "@turbostarter/ui-web/dropdown-menu";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+} from "@workspace/ui-web/dropdown-menu";
+import { Icons } from "@workspace/ui-web/icons";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { appConfig } from "~/config/app";
 import { useCustomer } from "~/modules/billing/hooks/use-customer";
 
 import { Logout } from "./logout";
 
-import type { Organization, User } from "@turbostarter/auth";
+import type { Organization, User } from "@workspace/auth";
 
 const AnonymousUser = () => {
   const { t } = useTranslation("auth");

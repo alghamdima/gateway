@@ -1,8 +1,8 @@
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
 export const { track } = {
   track: (event, data) => {

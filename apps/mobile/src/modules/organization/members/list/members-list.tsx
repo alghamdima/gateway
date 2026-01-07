@@ -3,10 +3,10 @@ import { useState } from "react";
 import { Fragment } from "react/jsx-runtime";
 import { View, FlatList, RefreshControl } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { pickBy } from "@turbostarter/shared/utils";
-import { cn } from "@turbostarter/ui";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { useTranslation } from "@workspace/i18n";
+import { pickBy } from "@workspace/shared/utils";
+import { cn } from "@workspace/ui";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";

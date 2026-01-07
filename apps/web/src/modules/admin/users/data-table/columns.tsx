@@ -1,21 +1,17 @@
-import { UserRole } from "@turbostarter/auth";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { UserRole } from "@workspace/auth";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 export const useColumns = (): ColumnDef<User>[] => {
   const { t, i18n } = useTranslation("common");

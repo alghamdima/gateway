@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { config, isLocaleSupported } from "@turbostarter/i18n";
+import { config, isLocaleSupported } from "@workspace/i18n";
 
 import { getMetadata } from "~/lib/metadata";
 import { Providers } from "~/lib/providers/providers";

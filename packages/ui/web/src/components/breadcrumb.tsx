@@ -1,9 +1,9 @@
 import { Slot } from "@radix-ui/react-slot";
 import * as React from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Icons } from "@workspace/ui-web/icons";
 
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;

@@ -3,9 +3,9 @@ import {
   WebhookVerificationError,
 } from "@polar-sh/sdk/webhooks";
 
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { logger } from "@turbostarter/shared/logger";
-import { HttpException } from "@turbostarter/shared/utils";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { logger } from "@workspace/shared/logger";
+import { HttpException } from "@workspace/shared/utils";
 
 import { checkoutStatusChangeHandler } from "../checkout";
 import { env } from "../env";

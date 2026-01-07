@@ -1,8 +1,8 @@
 import { router } from "expo-router";
-import { useTranslation } from "node_modules/@turbostarter/i18n/src/client";
 
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { AuthLayout } from "~/modules/auth/layout/base";

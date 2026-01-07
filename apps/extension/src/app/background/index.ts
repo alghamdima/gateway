@@ -1,6 +1,6 @@
 import { defineBackground } from "wxt/utils/define-background";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import "./messaging/hello";
 

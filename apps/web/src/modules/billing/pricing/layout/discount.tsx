@@ -6,14 +6,14 @@ import {
   calculatePriceDiscount,
   formatPrice,
   BillingDiscountType,
-} from "@turbostarter/billing";
-import { Trans } from "@turbostarter/i18n";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/billing";
+import { Trans } from "@workspace/i18n";
+import { Icons } from "@workspace/ui-web/icons";
 
 import type {
   Discount as DiscountType,
   PricingPlanPrice,
-} from "@turbostarter/billing";
+} from "@workspace/billing";
 
 interface DiscountProps {
   readonly currency: string;

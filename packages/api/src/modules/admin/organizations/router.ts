@@ -1,9 +1,6 @@
 import { Hono } from "hono";
 
-import {
-  updateMemberSchema,
-  updateOrganizationSchema,
-} from "@turbostarter/auth";
+import { updateMemberSchema, updateOrganizationSchema } from "@workspace/auth";
 
 import { validate } from "../../../middleware";
 import {

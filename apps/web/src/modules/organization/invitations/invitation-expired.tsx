@@ -1,5 +1,5 @@
-import { getTranslation } from "@turbostarter/i18n/server";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+import { getTranslation } from "@workspace/i18n/server";
+import { buttonVariants } from "@workspace/ui-web/button";
 
 import { pathsConfig } from "~/config/paths";
 import { AuthHeader } from "~/modules/auth/layout/header";

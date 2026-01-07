@@ -4,7 +4,7 @@ export function checkPendingMigrations() {
   try {
     console.info("\x1b[34m%s\x1b[0m", "Checking for pending migrations...");
 
-    const output = execSync("pnpm --filter @turbostarter/db db:status", {
+    const output = execSync("pnpm --filter @workspace/db db:status", {
       encoding: "utf-8",
       stdio: "pipe",
     });
@@ -44,7 +44,7 @@ export function checkPendingMigrations() {
         "\nSome functionality may not work as expected until these migrations are applied.",
       );
       console.log(
-        '\nAfter testing the migrations in your local environment and ideally in a staging environment, please run "pnpm --filter @turbostarter/db db:migrate" to apply them to your database. If you have any questions, please open a support ticket.',
+        '\nAfter testing the migrations in your local environment and ideally in a staging environment, please run "pnpm --filter @workspace/db db:migrate" to apply them to your database. If you have any questions, please open a support ticket.',
       );
     } else {
       console.log("\x1b[32m%s\x1b[0m", "✅ All migrations are up to date.");

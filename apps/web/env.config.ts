@@ -2,11 +2,11 @@ import { defineEnv } from "envin";
 import { vercel } from "envin/presets/zod";
 import * as z from "zod";
 
-import { preset as analytics } from "@turbostarter/analytics-web/env";
-import { preset as api } from "@turbostarter/api/env";
-import { preset as i18n } from "@turbostarter/i18n/env";
-import { envConfig, NodeEnv } from "@turbostarter/shared/constants";
-import { ThemeColor, ThemeMode } from "@turbostarter/ui";
+import { preset as analytics } from "@workspace/analytics-web/env";
+import { preset as api } from "@workspace/api/env";
+import { preset as i18n } from "@workspace/i18n/env";
+import { envConfig, NodeEnv } from "@workspace/shared/constants";
+import { ThemeColor, ThemeMode } from "@workspace/ui";
 
 const castStringToBool = z.preprocess((val) => {
   if (typeof val === "string") {

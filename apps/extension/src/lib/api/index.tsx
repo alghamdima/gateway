@@ -2,7 +2,7 @@ import { hc } from "hono/client";
 
 import { appConfig } from "~/config/app";
 
-import type { AppRouter } from "@turbostarter/api";
+import type { AppRouter } from "@workspace/api";
 
 export const getBaseUrl = () => {
   return appConfig.url;

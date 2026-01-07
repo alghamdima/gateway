@@ -3,10 +3,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { config, PricingPlanType } from "@turbostarter/billing";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { config, PricingPlanType } from "@workspace/billing";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { useCustomer } from "~/modules/billing/hooks/use-customer";
 import { billing } from "~/modules/billing/lib/api";

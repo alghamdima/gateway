@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 
 import type {
   AllowedPropertyValues,
   AnalyticsProviderClientStrategy,
-} from "@turbostarter/analytics";
+} from "@workspace/analytics";
 
 const STORAGE_KEYS = {
   CLIENT_ID: "ga_client_id",

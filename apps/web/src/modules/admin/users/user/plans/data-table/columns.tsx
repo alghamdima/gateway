@@ -1,13 +1,13 @@
-import { BillingStatus, config } from "@turbostarter/billing";
-import { isKey, useTranslation } from "@turbostarter/i18n";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { BillingStatus, config } from "@workspace/billing";
+import { isKey, useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 
 import { CustomerActions } from "~/modules/admin/customers/data-table/columns";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { User } from "@turbostarter/auth";
-import type { Customer } from "@turbostarter/billing";
+import type { User } from "@workspace/auth";
+import type { Customer } from "@workspace/billing";
 
 export const useColumns = (): ColumnDef<
   Customer & { user: Pick<User, "name"> }

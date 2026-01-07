@@ -2,11 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 
 import { admin } from "~/modules/admin/lib/api";
 import {

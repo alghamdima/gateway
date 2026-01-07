@@ -2,9 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Switch } from "@turbostarter/ui-web/switch";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Switch } from "@workspace/ui-web/switch";
 
 import {
   SettingsCard,
@@ -23,7 +23,7 @@ import { TotpModal, TotpTile } from "./totp/totp";
 import { useTotp } from "./totp/use-totp";
 import { useTwoFactor } from "./use-two-factor";
 
-import type { PasswordPayload } from "@turbostarter/auth";
+import type { PasswordPayload } from "@workspace/auth";
 
 export const TwoFactorAuthentication = () => {
   const { t } = useTranslation(["auth", "common"]);

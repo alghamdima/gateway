@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { router, useGlobalSearchParams } from "expo-router";
 import { useEffect } from "react";
 
-import { VerificationType } from "@turbostarter/auth";
+import { VerificationType } from "@workspace/auth";
 
 import { useSetupSteps } from "~/app/(setup)/steps/_layout";
 import { pathsConfig } from "~/config/paths";

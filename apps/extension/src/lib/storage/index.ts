@@ -3,7 +3,7 @@ import { storage as browserStorage } from "wxt/utils/storage";
 
 import { appConfig } from "~/config/app";
 
-import type { ThemeConfig } from "@turbostarter/ui";
+import type { ThemeConfig } from "@workspace/ui";
 import type { WxtStorageItem } from "wxt/utils/storage";
 
 export const StorageKey = {

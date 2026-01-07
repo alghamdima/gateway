@@ -1,3 +1,3 @@
-import baseConfig from "@turbostarter/eslint-config/base";
+import baseConfig from "@workspace/eslint-config/base";
 
 export default baseConfig;

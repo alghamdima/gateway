@@ -28,7 +28,7 @@
     },
     "setup": {
       "cache": false,
-      "dependsOn": ["@turbostarter/db#db:setup"]
+      "dependsOn": ["@workspace/db#db:setup"]
     },
     "test": {
       "outputs": ["coverage.json"]

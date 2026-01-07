@@ -1,7 +1,7 @@
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
@@ -11,17 +11,17 @@ import {
   BottomSheetTitle,
   BottomSheetDescription,
   BottomSheetHeader,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Text } from "@turbostarter/ui-mobile/text";
-import { MODE_ICONS, ThemeCustomizer } from "@turbostarter/ui-mobile/theme";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Text } from "@workspace/ui-mobile/text";
+import { MODE_ICONS, ThemeCustomizer } from "@workspace/ui-mobile/theme";
 
 import { appConfig } from "~/config/app";
 import { useTheme } from "~/modules/common/hooks/use-theme";
 import { SettingsTile } from "~/modules/common/settings-tile";
 
-import type { ThemeConfig } from "@turbostarter/ui";
+import type { ThemeConfig } from "@workspace/ui";
 
 export const ThemeSettings = () => {
   const { t } = useTranslation("common");

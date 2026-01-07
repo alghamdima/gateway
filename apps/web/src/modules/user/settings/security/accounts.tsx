@@ -3,10 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { capitalize } from "@turbostarter/shared/utils";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { capitalize } from "@workspace/shared/utils";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalTrigger,
@@ -16,8 +16,8 @@ import {
   ModalDescription,
   ModalFooter,
   ModalClose,
-} from "@turbostarter/ui-web/modal";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+} from "@workspace/ui-web/modal";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { authConfig } from "~/config/auth";
 import { pathsConfig } from "~/config/paths";
@@ -33,7 +33,7 @@ import {
   SettingsCardTitle,
 } from "~/modules/common/layout/dashboard/settings-card";
 
-import type { SocialProvider } from "@turbostarter/auth";
+import type { SocialProvider } from "@workspace/auth";
 
 export const Accounts = () => {
   const { t, i18n } = useTranslation(["auth", "common"]);

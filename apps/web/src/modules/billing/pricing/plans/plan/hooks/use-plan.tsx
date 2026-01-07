@@ -9,20 +9,20 @@ import {
   calculateRecurringDiscount,
   getPlanPrice,
   getHighestDiscountForPrice,
-} from "@turbostarter/billing";
-import { useTranslation } from "@turbostarter/i18n";
+} from "@workspace/billing";
+import { useTranslation } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
 import { billing } from "~/modules/billing/lib/api";
 import { PLAN_FEATURES } from "~/modules/billing/pricing/constants/features";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 import type {
   Discount,
   PricingPlan,
   RecurringInterval,
-} from "@turbostarter/billing";
+} from "@workspace/billing";
 
 export const usePlan = (
   plan: PricingPlan,

@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/monitoring-web",
+  "name": "@workspace/monitoring-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,19 +14,19 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "devDependencies": {
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },
   "dependencies": {
     "@sentry/nextjs": "10.30.0",
-    "@turbostarter/monitoring": "workspace:*",
-    "@turbostarter/shared": "workspace:*",
+    "@workspace/monitoring": "workspace:*",
+    "@workspace/shared": "workspace:*",
     "envin": "catalog:",
     "posthog-js": "1.283.0",
     "posthog-node": "5.11.0"

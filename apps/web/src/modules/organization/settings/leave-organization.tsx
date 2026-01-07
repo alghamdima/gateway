@@ -4,9 +4,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalClose,
@@ -16,7 +16,7 @@ import {
   ModalHeader,
   ModalTitle,
   ModalTrigger,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";

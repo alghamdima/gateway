@@ -6,9 +6,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { updateOrganizationSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { useDebounceCallback } from "@turbostarter/shared/hooks";
+import { updateOrganizationSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { useDebounceCallback } from "@workspace/shared/hooks";
 import {
   Form,
   FormField,
@@ -16,9 +16,9 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
 
 import {
   DetailsList,
@@ -26,7 +26,7 @@ import {
 } from "~/modules/admin/layout/details-list";
 import { admin } from "~/modules/admin/lib/api";
 
-import type { UpdateOrganizationPayload } from "@turbostarter/auth";
+import type { UpdateOrganizationPayload } from "@workspace/auth";
 
 const Name = ({ id }: { id: string }) => {
   const { t } = useTranslation(["common", "admin"]);

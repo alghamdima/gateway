@@ -4,9 +4,9 @@ import { useForm } from "react-hook-form";
 import { View } from "react-native";
 import QRCode from "react-qr-code";
 
-import { otpSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { ThemeMode } from "@turbostarter/ui";
+import { otpSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { ThemeMode } from "@workspace/ui";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -15,22 +15,22 @@ import {
   BottomSheetDescription,
   BottomSheetHeader,
   BottomSheetScrollView,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   FormField,
   FormItem,
   FormMessage,
   Form,
-} from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+} from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@turbostarter/ui-mobile/input-otp";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/input-otp";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
 import { useTheme } from "~/modules/common/hooks/use-theme";
@@ -41,8 +41,8 @@ import { useTwoFactor } from "../use-two-factor";
 
 import { useTotp } from "./use-totp";
 
-import type { OtpPayload, PasswordPayload } from "@turbostarter/auth";
-import type { BottomSheetContentRef } from "@turbostarter/ui-mobile/bottom-sheet";
+import type { OtpPayload, PasswordPayload } from "@workspace/auth";
+import type { BottomSheetContentRef } from "@workspace/ui-mobile/bottom-sheet";
 
 interface TotpSheetProps {
   readonly ref?: React.RefObject<BottomSheetContentRef | null>;

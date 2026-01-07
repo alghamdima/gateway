@@ -4,9 +4,9 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { memo, useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { passwordSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { passwordSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
@@ -14,9 +14,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { PasswordInput } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { PasswordInput } from "@workspace/ui-web/input";
 import {
   Modal,
   ModalClose,
@@ -26,11 +26,11 @@ import {
   ModalHeader,
   ModalTitle,
   ModalTrigger,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 
 import { onPromise } from "~/utils";
 
-import type { PasswordPayload } from "@turbostarter/auth";
+import type { PasswordPayload } from "@workspace/auth";
 import type { ComponentProps } from "react";
 import type { UseFormReturn } from "react-hook-form";
 

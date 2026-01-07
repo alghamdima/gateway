@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/eslint-config",
+  "name": "@workspace/eslint-config",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@eslint/compat": "^1.4.1",
     "@next/eslint-plugin-next": "16.0.10",
@@ -28,8 +28,8 @@
     "typescript-eslint": "^8.46.2"
   },
   "devDependencies": {
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

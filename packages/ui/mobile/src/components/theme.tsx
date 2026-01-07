@@ -2,15 +2,15 @@ import { oklch, formatHex } from "culori";
 import { memo } from "react";
 import { FlatList, View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn, ThemeColor, ThemeMode, themes } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn, ThemeColor, ThemeMode, themes } from "@workspace/ui";
 
 import { Button } from "./button";
 import { Icons } from "./icons";
 import { Label } from "./label";
 import { Text } from "./text";
 
-import type { ThemeConfig } from "@turbostarter/ui";
+import type { ThemeConfig } from "@workspace/ui";
 
 interface ThemeCustomizerProps {
   readonly config: ThemeConfig;

@@ -3,13 +3,9 @@
 import { useRouter } from "next/navigation";
 import { memo, useState } from "react";
 
-import { PricingPlanType } from "@turbostarter/billing";
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
+import { PricingPlanType } from "@workspace/billing";
+import { useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import {
   Command,
   CommandGroup,
@@ -17,20 +13,20 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@turbostarter/ui-web/command";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/command";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
   PopoverPortal,
-} from "@turbostarter/ui-web/popover";
+} from "@workspace/ui-web/popover";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@turbostarter/ui-web/sidebar";
+} from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -40,7 +36,7 @@ import { CreateOrganizationModal } from "~/modules/organization/create-organizat
 
 import { useActiveOrganization } from "./hooks/use-active-organization";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 interface AccountSwitcherProps {
   readonly user: User;

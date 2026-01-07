@@ -3,16 +3,16 @@
 import { useParams, usePathname } from "next/navigation";
 import { memo } from "react";
 
-import { cn } from "@turbostarter/ui";
-import { useBreakpoint } from "@turbostarter/ui-web";
-import { Button } from "@turbostarter/ui-web/button";
+import { cn } from "@workspace/ui";
+import { useBreakpoint } from "@workspace/ui-web";
+import { Button } from "@workspace/ui-web/button";
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
   DrawerTrigger,
-} from "@turbostarter/ui-web/drawer";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/drawer";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { TurboLink } from "~/modules/common/turbo-link";
 

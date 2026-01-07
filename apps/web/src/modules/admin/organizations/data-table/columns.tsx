@@ -1,18 +1,14 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+import { useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { GetOrganizationsResponse } from "@turbostarter/api/schema";
+import type { GetOrganizationsResponse } from "@workspace/api/schema";
 
 type Row = GetOrganizationsResponse["data"][number];
 

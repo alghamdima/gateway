@@ -17,8 +17,8 @@ DEFAULT_LOCALE="en"
 
 - Install dependencies: `pnpm install`
 - Start databases/services (Docker): `pnpm services:start`
-- First-time DB setup (migrate + seed): `pnpm with-env -F @turbostarter/db db:setup`
-- Apply migrations: `pnpm with-env -F @turbostarter/db db:migrate`
+- First-time DB setup (migrate + seed): `pnpm with-env -F @workspace/db db:setup`
+- Apply migrations: `pnpm with-env -F @workspace/db db:migrate`
 - One-shot “get everything running”: `pnpm services:setup` (starts Docker services + runs DB setup)
 - Start dev for all apps: `pnpm dev`
   - Or target a single app (e.g., web): `pnpm --filter web dev`
@@ -40,7 +40,7 @@ DEFAULT_LOCALE="en"
   - Mobile (Expo): `pnpm --filter mobile dev` (alias for `expo start --clear`)
   - Extension (Chrome): `pnpm --filter extension dev`
   - Extension (Firefox): `pnpm --filter extension dev:firefox`
-- Email template preview server: `pnpm --filter @turbostarter/email dev` (React Email preview)
+- Email template preview server: `pnpm --filter @workspace/email dev` (React Email preview)
 
 ## Build commands
 
@@ -73,8 +73,8 @@ DEFAULT_LOCALE="en"
 | Clean caches                     | `pnpm clean`                                                                     |
 | Start/stop services (Docker)     | `pnpm services:start` / `pnpm services:stop`                                     |
 | Start services + run DB setup    | `pnpm services:setup`                                                            |
-| DB: generate/apply migrations    | `pnpm with-env -F @turbostarter/db db:generate` / `db:migrate`                   |
-| DB: push/check/studio            | `pnpm with-env -F @turbostarter/db db:push` / `db:check` / `db:studio`           |
+| DB: generate/apply migrations    | `pnpm with-env -F @workspace/db db:generate` / `db:migrate`                      |
+| DB: push/check/studio            | `pnpm with-env -F @workspace/db db:push` / `db:check` / `db:studio`              |
 | Tests (workspace / projects)     | `pnpm test` / `pnpm test:projects`                                               |
 
 ## Quality & Types
@@ -93,12 +93,12 @@ DEFAULT_LOCALE="en"
 - Stop services: `pnpm services:stop`
 - Services status: `pnpm services:status`
 - Services logs: `pnpm services:logs`
-- First-time setup: `pnpm with-env -F @turbostarter/db db:setup`
-- Generate migrations: `pnpm with-env -F @turbostarter/db db:generate`
-- Apply migrations: `pnpm with-env -F @turbostarter/db db:migrate`
-- Push schema (safe envs): `pnpm with-env -F @turbostarter/db db:push`
-- Check schema drift: `pnpm with-env -F @turbostarter/db db:check`
-- Studio: `pnpm with-env -F @turbostarter/db db:studio`
+- First-time setup: `pnpm with-env -F @workspace/db db:setup`
+- Generate migrations: `pnpm with-env -F @workspace/db db:generate`
+- Apply migrations: `pnpm with-env -F @workspace/db db:migrate`
+- Push schema (safe envs): `pnpm with-env -F @workspace/db db:push`
+- Check schema drift: `pnpm with-env -F @workspace/db db:check`
+- Studio: `pnpm with-env -F @workspace/db db:studio`
 
 Note: All db commands will load `.env` via `with-env`.
 
@@ -114,16 +114,16 @@ Note: All db commands will load `.env` via `with-env`.
 - Extension release zips:
   - Chrome: `pnpm --filter extension build:chrome`
   - Firefox: `pnpm --filter extension build:firefox`
-- Email template preview: `pnpm --filter @turbostarter/email dev`
+- Email template preview: `pnpm --filter @workspace/email dev`
 - Code quality loop:
   - `pnpm typecheck`
   - `pnpm lint` → `pnpm lint:fix`
   - `pnpm format` → `pnpm format:fix`
 - Database iteration:
   1. Update schema in `packages/db/src/schema/*`
-  2. Generate migration: `pnpm with-env -F @turbostarter/db db:generate`
-  3. Apply migration: `pnpm with-env -F @turbostarter/db db:migrate`
-  4. Verify in studio: `pnpm with-env -F @turbostarter/db db:studio`
+  2. Generate migration: `pnpm with-env -F @workspace/db db:generate`
+  3. Apply migration: `pnpm with-env -F @workspace/db db:migrate`
+  4. Verify in studio: `pnpm with-env -F @workspace/db db:studio`
 
 ## Troubleshooting
 
@@ -137,7 +137,7 @@ Note: All db commands will load `.env` via `with-env`.
 - Turbo or module resolution oddities after refactors
   - Clear caches: `pnpm clean`; then reinstall: `pnpm install`
 - Migration drift or conflicts
-  - Run: `pnpm with-env -F @turbostarter/db db:check`
+  - Run: `pnpm with-env -F @workspace/db db:check`
   - Re-generate and apply: `generate` → `migrate`
 
 ## Agent workflow tips
@@ -156,18 +156,18 @@ Note: All db commands will load `.env` via `with-env`.
   - `mobile`: React Native (Expo Router) app (`src/app/(setup)` onboarding + `src/app/dashboard` main app)
   - `extension`: WXT (Vite + React) browser extension (`src/app/*` entrypoints: `background`, `content`, `popup`, `options`, `sidepanel`, `newtab`, `devtools`, `tabs`)
 - `packages/` shared modules
-  - `api` (`@turbostarter/api`): Hono API modules (admin/org/auth/billing/storage + AI module) and shared API schemas/utils
-  - `auth` (`@turbostarter/auth`): Better Auth server + typed clients (`client/web`, `client/mobile`); includes schema generation/seed scripts
-  - `billing` (`@turbostarter/billing`): Stripe/Lemon Squeezy/Polar integrations, plan/feature config, server helpers
-  - `cms` (`@turbostarter/cms`): content-collections (MDX blog/legal/API content + types)
-  - `db` (`@turbostarter/db`): Drizzle ORM schema, migrations, and DB scripts (`db:setup`, `db:migrate`, `db:seed`, `db:reset`, `db:status`)
-  - `email` (`@turbostarter/email`): React Email templates + providers; includes a preview server script
-  - `i18n` (`@turbostarter/i18n`): translations + server/client i18n utilities
-  - `shared` (`@turbostarter/shared`): shared constants, schema, logger, hooks, utilities
-  - `storage` (`@turbostarter/storage`): file storage abstractions + S3 helpers
-  - `analytics/*`: analytics base (`@turbostarter/analytics`) + platform packages (`@turbostarter/analytics-web|mobile|extension`)
-  - `monitoring/*`: monitoring base (`@turbostarter/monitoring`) + platform packages (`@turbostarter/monitoring-web|mobile|extension`)
-  - `ui/*`: UI base/theme (`@turbostarter/ui`) + platform components (`@turbostarter/ui-web`, `@turbostarter/ui-mobile`)
+  - `api` (`@workspace/api`): Hono API modules (admin/org/auth/billing/storage + AI module) and shared API schemas/utils
+  - `auth` (`@workspace/auth`): Better Auth server + typed clients (`client/web`, `client/mobile`); includes schema generation/seed scripts
+  - `billing` (`@workspace/billing`): Stripe/Lemon Squeezy/Polar integrations, plan/feature config, server helpers
+  - `cms` (`@workspace/cms`): content-collections (MDX blog/legal/API content + types)
+  - `db` (`@workspace/db`): Drizzle ORM schema, migrations, and DB scripts (`db:setup`, `db:migrate`, `db:seed`, `db:reset`, `db:status`)
+  - `email` (`@workspace/email`): React Email templates + providers; includes a preview server script
+  - `i18n` (`@workspace/i18n`): translations + server/client i18n utilities
+  - `shared` (`@workspace/shared`): shared constants, schema, logger, hooks, utilities
+  - `storage` (`@workspace/storage`): file storage abstractions + S3 helpers
+  - `analytics/*`: analytics base (`@workspace/analytics`) + platform packages (`@workspace/analytics-web|mobile|extension`)
+  - `monitoring/*`: monitoring base (`@workspace/monitoring`) + platform packages (`@workspace/monitoring-web|mobile|extension`)
+  - `ui/*`: UI base/theme (`@workspace/ui`) + platform components (`@workspace/ui-web`, `@workspace/ui-mobile`)
 - `tooling/` ESLint, Prettier, Tailwind, TS configs
 
 ## Code style and structure
@@ -184,7 +184,7 @@ Note: All db commands will load `.env` via `with-env`.
 
 ## Web app (`apps/web`)
 
-- Stack: Next.js (App Router), React, Tailwind CSS, shared `@turbostarter/ui-web`
+- Stack: Next.js (App Router), React, Tailwind CSS, shared `@workspace/ui-web`
 - Structure: `src/app/[locale]` with `marketing`, `auth`, `dashboard`, `admin` modules; `src/app/api` contains route handlers
 - API routes in `src/app/api` may proxy/use `packages/api`
 - Guidance:
@@ -196,7 +196,7 @@ Note: All db commands will load `.env` via `with-env`.
 
 ## Mobile app (`apps/mobile`)
 
-- Stack: React Native + Expo, Expo Router, shared `@turbostarter/ui-mobile`
+- Stack: React Native + Expo, Expo Router, shared `@workspace/ui-mobile`
 - Structure: Expo Router under `src/app` (setup flow + dashboard); feature modules live in `src/modules`
 - Guidance:
   - Safe areas: use `SafeAreaProvider`, `SafeAreaView`, and scroll variants
@@ -205,7 +205,7 @@ Note: All db commands will load `.env` via `with-env`.
 
 ## Browser extension (`apps/extension`)
 
-- Stack: WXT (Vite + React), Tailwind, shared `@turbostarter/ui-web`
+- Stack: WXT (Vite + React), Tailwind, shared `@workspace/ui-web`
 - Entrypoints: `src/app` provides `background`, `content`, `popup`, `options`, `sidepanel`, `newtab`, `devtools`, `tabs`
 - Guidance:
   - Background script for long-running tasks; content scripts for DOM interactions

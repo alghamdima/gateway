@@ -1,5 +1,5 @@
 import type { CollectionType, ContentCollection } from "../collections";
-import type { SortOrder } from "@turbostarter/shared/constants";
+import type { SortOrder } from "@workspace/shared/constants";
 
 export const ContentStatus = {
   DRAFT: "draft",

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { I18nProvider as I18nClientProvider } from "@turbostarter/i18n";
+import { I18nProvider as I18nClientProvider } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { useLocale } from "~/lib/i18n";

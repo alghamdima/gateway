@@ -5,13 +5,10 @@ import {
   MemberRole,
   SocialProvider,
   UserRole,
-} from "@turbostarter/auth";
-import { BillingStatus, PricingPlanType } from "@turbostarter/billing";
-import { updateCustomerSchema } from "@turbostarter/db/schema";
-import {
-  offsetPaginationSchema,
-  sortSchema,
-} from "@turbostarter/shared/schema";
+} from "@workspace/auth";
+import { BillingStatus, PricingPlanType } from "@workspace/billing";
+import { updateCustomerSchema } from "@workspace/db/schema";
+import { offsetPaginationSchema, sortSchema } from "@workspace/shared/schema";
 
 export const getUsersInputSchema = offsetPaginationSchema.extend({
   sort: z

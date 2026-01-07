@@ -1,6 +1,6 @@
 import * as z from "zod";
 
-import { getOrigin, mergeSearchParams } from "@turbostarter/shared/utils";
+import { getOrigin, mergeSearchParams } from "@workspace/shared/utils";
 
 import { MemberRole, UserRole } from "../types";
 

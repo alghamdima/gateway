@@ -4,17 +4,17 @@ import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { Alert, Text, View } from "react-native";
 import * as z from "zod";
 
-import { handle } from "@turbostarter/api/utils";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { handle } from "@workspace/api/utils";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@turbostarter/ui-mobile/avatar";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Spin } from "@turbostarter/ui-mobile/spin";
+} from "@workspace/ui-mobile/avatar";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Spin } from "@workspace/ui-mobile/spin";
 
 import { api } from "~/lib/api";
 import { useImagePicker } from "~/modules/common/hooks/use-image-picker";

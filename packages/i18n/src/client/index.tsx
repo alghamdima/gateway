@@ -12,7 +12,7 @@ import {
 } from "react-i18next";
 import * as z from "zod";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { getInitOptions, config } from "../config";
 import { loadTranslation, makeZodI18nMap } from "../utils";

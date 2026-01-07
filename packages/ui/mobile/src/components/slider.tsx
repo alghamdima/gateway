@@ -9,7 +9,7 @@ import Animated, {
   Extrapolation,
 } from "react-native-reanimated";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import type { FlatList } from "react-native";
 import type { ViewProps } from "react-native";

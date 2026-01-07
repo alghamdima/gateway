@@ -2,7 +2,7 @@ import { cva } from "class-variance-authority";
 import * as React from "react";
 import { View } from "react-native";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { Text, TextClassContext } from "./text";
 

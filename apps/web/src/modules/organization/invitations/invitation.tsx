@@ -5,9 +5,9 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useRouter } from "next/navigation";
 
-import { Trans, useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { Trans, useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { AuthHeader } from "~/modules/auth/layout/header";
@@ -17,7 +17,7 @@ import { user } from "~/modules/user/lib/api";
 
 import { InvitationSummaryCard } from "./invitation-summary-card";
 
-import type { Invitation as InvitationType } from "@turbostarter/auth";
+import type { Invitation as InvitationType } from "@workspace/auth";
 
 dayjs.extend(relativeTime);
 

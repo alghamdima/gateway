@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import { UpdatePasswordForm } from "~/modules/auth/form/password/update";
 import { AuthLayout } from "~/modules/auth/layout/base";

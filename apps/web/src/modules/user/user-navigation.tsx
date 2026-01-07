@@ -4,13 +4,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { memo } from "react";
 
-import { hasAdminPermission } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
+import { hasAdminPermission } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,10 +16,10 @@ import {
   DropdownMenuTrigger,
   DropdownMenuPortal,
   DropdownMenuGroup,
-} from "@turbostarter/ui-web/dropdown-menu";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { SidebarMenuButton, useSidebar } from "@turbostarter/ui-web/sidebar";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+} from "@workspace/ui-web/dropdown-menu";
+import { Icons } from "@workspace/ui-web/icons";
+import { SidebarMenuButton, useSidebar } from "@workspace/ui-web/sidebar";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -31,7 +27,7 @@ import { auth } from "~/modules/auth/lib/api";
 import { ThemeControlsProvider } from "~/modules/common/theme";
 import { TurboLink } from "~/modules/common/turbo-link";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 interface UserNavigationProps {
   readonly user: User;

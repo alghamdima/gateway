@@ -5,7 +5,7 @@ import { useTrackingPermissions } from "../../hooks";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderClientStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 let client: PostHog | null = null;
 

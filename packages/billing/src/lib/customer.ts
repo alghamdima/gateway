@@ -1,8 +1,8 @@
-import { eq } from "@turbostarter/db";
-import { customer } from "@turbostarter/db/schema";
-import { db } from "@turbostarter/db/server";
+import { eq } from "@workspace/db";
+import { customer } from "@workspace/db/schema";
+import { db } from "@workspace/db/server";
 
-import type { InsertCustomer } from "@turbostarter/db/schema";
+import type { InsertCustomer } from "@workspace/db/schema";
 
 export const getCustomerByUserId = async (userId: string) => {
   const [data] = await db

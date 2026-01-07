@@ -1,9 +1,9 @@
 import { Tabs } from "expo-router";
 import { Easing } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Icons } from "@workspace/ui-mobile/icons";
 
 import { UserHeader } from "~/modules/common/layout/header";
 import { TabBarLabel } from "~/modules/common/styled";

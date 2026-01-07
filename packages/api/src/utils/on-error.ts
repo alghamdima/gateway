@@ -1,11 +1,11 @@
 import * as z from "zod";
 
-import { isKey } from "@turbostarter/i18n";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { captureException } from "@turbostarter/monitoring-web/server";
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { logger } from "@turbostarter/shared/logger";
-import { getStatusCode } from "@turbostarter/shared/utils";
+import { isKey } from "@workspace/i18n";
+import { getTranslation } from "@workspace/i18n/server";
+import { captureException } from "@workspace/monitoring-web/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { logger } from "@workspace/shared/logger";
+import { getStatusCode } from "@workspace/shared/utils";
 
 import type { Context } from "hono";
 

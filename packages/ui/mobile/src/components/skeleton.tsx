@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 const duration = 1000;
 

@@ -1,7 +1,7 @@
-import { getTranslation } from "@turbostarter/i18n/server";
-import { isExternal } from "@turbostarter/shared/utils";
-import { BuiltWith } from "@turbostarter/ui-web/built-with";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { getTranslation } from "@workspace/i18n/server";
+import { isExternal } from "@workspace/shared/utils";
+import { BuiltWith } from "@workspace/ui-web/built-with";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";

@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/tsconfig",
+  "name": "@workspace/tsconfig",
   "version": "0.1.0",
   "private": true,
   "files": [

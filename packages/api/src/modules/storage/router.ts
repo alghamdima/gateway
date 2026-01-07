@@ -6,7 +6,7 @@ import {
   getSignedUrl,
   getPublicUrl,
   getDeleteUrl,
-} from "@turbostarter/storage/server";
+} from "@workspace/storage/server";
 
 import { enforceAuth, validate } from "../../middleware";
 

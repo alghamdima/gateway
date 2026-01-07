@@ -3,15 +3,15 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@turbostarter/ui-mobile/avatar";
-import { useBottomSheet } from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
+} from "@workspace/ui-mobile/avatar";
+import { useBottomSheet } from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,10 +20,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@turbostarter/ui-mobile/dropdown-menu";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/dropdown-menu";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";

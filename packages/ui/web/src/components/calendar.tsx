@@ -3,8 +3,8 @@
 import * as React from "react";
 import { DayPicker, getDefaultClassNames } from "react-day-picker";
 
-import { cn } from "@turbostarter/ui";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { cn } from "@workspace/ui";
+import { Icons } from "@workspace/ui-web/icons";
 
 import type { DayButton } from "react-day-picker";
 

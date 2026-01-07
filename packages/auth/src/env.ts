@@ -1,7 +1,7 @@
 import { defineEnv } from "envin";
 import * as z from "zod";
 
-import { envConfig, NodeEnv } from "@turbostarter/shared/constants";
+import { envConfig, NodeEnv } from "@workspace/shared/constants";
 
 import type { Preset } from "envin/types";
 

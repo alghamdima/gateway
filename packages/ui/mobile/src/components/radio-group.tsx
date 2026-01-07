@@ -1,6 +1,6 @@
 import * as RadioGroupPrimitive from "@rn-primitives/radio-group";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 function RadioGroup({
   className,

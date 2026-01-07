@@ -1,4 +1,4 @@
-import { PricingPlanType, FEATURES } from "@turbostarter/billing";
+import { PricingPlanType, FEATURES } from "@workspace/billing";
 
 interface PlanFeature {
   readonly id: string;

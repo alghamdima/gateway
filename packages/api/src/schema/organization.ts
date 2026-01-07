@@ -1,10 +1,7 @@
 import * as z from "zod";
 
-import { InvitationStatus, MemberRole } from "@turbostarter/auth";
-import {
-  offsetPaginationSchema,
-  sortSchema,
-} from "@turbostarter/shared/schema";
+import { InvitationStatus, MemberRole } from "@workspace/auth";
+import { offsetPaginationSchema, sortSchema } from "@workspace/shared/schema";
 
 export const getMembersInputSchema = offsetPaginationSchema.extend({
   sort: z

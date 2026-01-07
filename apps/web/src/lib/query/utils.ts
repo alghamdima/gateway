@@ -4,7 +4,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 export const createQueryClient = () =>
   new QueryClient({

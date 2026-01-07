@@ -1,8 +1,8 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { buttonVariants } from "@workspace/ui-web/button";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";

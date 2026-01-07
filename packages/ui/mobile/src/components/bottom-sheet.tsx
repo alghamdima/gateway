@@ -19,7 +19,7 @@ import Reanimated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withUniwind } from "uniwind";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { Text } from "./text";
 

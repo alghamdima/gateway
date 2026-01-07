@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/storage",
+  "name": "@workspace/storage",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,16 +14,16 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@aws-sdk/client-s3": "3.922.0",
     "@aws-sdk/s3-request-presigner": "3.922.0",
-    "@turbostarter/shared": "workspace:*"
+    "@workspace/shared": "workspace:*"
   },
   "devDependencies": {
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

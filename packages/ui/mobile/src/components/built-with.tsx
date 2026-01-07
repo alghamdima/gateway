@@ -3,8 +3,8 @@ import { Pressable, View, Linking } from "react-native";
 import NativeSvg, { Path } from "react-native-svg";
 import { withUniwind } from "uniwind";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import { buttonVariants } from "./button";
 import { Text } from "./text";

@@ -2,7 +2,7 @@ import { PostHog } from "posthog-node";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
 let client: PostHog | null = null;
 

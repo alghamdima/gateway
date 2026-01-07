@@ -1,8 +1,8 @@
 import { motion } from "motion/react";
 import { memo } from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 
 import type { ForwardRefComponent, SVGMotionProps } from "motion/react";
 import type { ComponentProps } from "react";

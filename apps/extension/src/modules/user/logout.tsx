@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { authClient } from "~/lib/auth";
 

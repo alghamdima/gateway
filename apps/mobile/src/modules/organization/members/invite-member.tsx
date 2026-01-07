@@ -4,12 +4,8 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 import * as z from "zod";
 
-import {
-  inviteMemberSchema,
-  MemberRole,
-  toMemberRole,
-} from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
+import { inviteMemberSchema, MemberRole, toMemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
@@ -20,23 +16,23 @@ import {
   BottomSheetHeader,
   useBottomSheet,
   BottomSheetScrollView,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   Form,
   FormField,
   FormInput,
   FormSelect,
-} from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+} from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
 import {
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-mobile/select";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/select";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";

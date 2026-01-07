@@ -1,6 +1,6 @@
-import { getTranslation } from "@turbostarter/i18n/server";
-import { cn } from "@turbostarter/ui";
-import { buttonVariants } from "@turbostarter/ui-web/button";
+import { getTranslation } from "@workspace/i18n/server";
+import { cn } from "@workspace/ui";
+import { buttonVariants } from "@workspace/ui-web/button";
 
 import { CtaButton } from "~/modules/marketing/layout/cta-button";
 import { Section } from "~/modules/marketing/layout/section";

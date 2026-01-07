@@ -4,9 +4,9 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
-import { Card, CardContent } from "@turbostarter/ui-web/card";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
+import { Card, CardContent } from "@workspace/ui-web/card";
 import {
   Form,
   FormControl,
@@ -14,10 +14,10 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
-import { Textarea } from "@turbostarter/ui-web/textarea";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
+import { Textarea } from "@workspace/ui-web/textarea";
 
 import { sendContactForm } from "./actions";
 import { contactFormSchema, MAX_MESSAGE_LENGTH } from "./utils/schema";

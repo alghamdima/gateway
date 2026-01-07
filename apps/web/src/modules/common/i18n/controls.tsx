@@ -3,14 +3,14 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback } from "react";
 
-import { getPathname } from "@turbostarter/i18n";
-import { LocaleCustomizer } from "@turbostarter/ui-web/i18n";
+import { getPathname } from "@workspace/i18n";
+import { LocaleCustomizer } from "@workspace/ui-web/i18n";
 
 import { appConfig } from "~/config/app";
 
 import { setLocaleCookie } from "./actions";
 
-import type { Locale } from "@turbostarter/i18n";
+import type { Locale } from "@workspace/i18n";
 
 export const I18nControls = () => {
   const router = useRouter();

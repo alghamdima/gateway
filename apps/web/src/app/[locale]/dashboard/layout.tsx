@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
-import { handle } from "@turbostarter/api/utils";
+import { handle } from "@workspace/api/utils";
 
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api/server";

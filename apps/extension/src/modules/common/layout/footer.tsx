@@ -1,4 +1,4 @@
-import { BuiltWith } from "@turbostarter/ui-web/built-with";
+import { BuiltWith } from "@workspace/ui-web/built-with";
 
 export const Footer = () => {
   return (

@@ -1,4 +1,4 @@
-import { SecondFactor } from "@turbostarter/auth";
+import { SecondFactor } from "@workspace/auth";
 
 import { BackupCodeForm, BackupCodeCta } from "./backup-code";
 import { TotpForm, TotpCta } from "./totp";

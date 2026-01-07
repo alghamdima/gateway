@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 type CopiedValue = string | null;
 

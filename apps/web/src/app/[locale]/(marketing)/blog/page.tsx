@@ -2,20 +2,16 @@ import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import Image from "next/image";
 
-import {
-  CollectionType,
-  ContentStatus,
-  getContentItems,
-} from "@turbostarter/cms";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { SortOrder } from "@turbostarter/shared/constants";
-import { Badge } from "@turbostarter/ui-web/badge";
+import { CollectionType, ContentStatus, getContentItems } from "@workspace/cms";
+import { getTranslation } from "@workspace/i18n/server";
+import { SortOrder } from "@workspace/shared/constants";
+import { Badge } from "@workspace/ui-web/badge";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
+} from "@workspace/ui-web/card";
 
 import { pathsConfig } from "~/config/paths";
 import { getMetadata } from "~/lib/metadata";
@@ -29,7 +25,7 @@ import {
   SectionTitle,
 } from "~/modules/marketing/layout/section";
 
-import type { ContentTag } from "@turbostarter/cms";
+import type { ContentTag } from "@workspace/cms";
 
 dayjs.extend(duration);
 

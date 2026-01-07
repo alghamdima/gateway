@@ -1,11 +1,11 @@
 import Mixpanel from "mixpanel";
 
-import { NodeEnv } from "@turbostarter/shared/constants";
-import { logger } from "@turbostarter/shared/logger";
+import { NodeEnv } from "@workspace/shared/constants";
+import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
 let client: Mixpanel.Mixpanel | null = null;
 

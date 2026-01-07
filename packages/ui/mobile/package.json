@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/ui-mobile",
+  "name": "@workspace/ui-mobile",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "ui:add": "pnpm dlx @react-native-reusables/cli@latest add && prettier src --write --list-different"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.6",
     "@rn-primitives/avatar": "1.2.0",
@@ -31,9 +31,9 @@
     "@rn-primitives/tabs": "1.2.0",
     "@rn-primitives/tooltip": "1.2.0",
     "@rn-primitives/types": "1.2.0",
-    "@turbostarter/i18n": "workspace:*",
-    "@turbostarter/shared": "workspace:*",
-    "@turbostarter/ui": "workspace:*",
+    "@workspace/i18n": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "@workspace/ui": "workspace:*",
     "culori": "4.0.2",
     "input-otp-native": "0.5.0",
     "lucide-react-native": "0.552.0",
@@ -44,9 +44,9 @@
     "zeego": "3.0.6"
   },
   "devDependencies": {
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "@types/culori": "4.0.1",
     "eslint": "catalog:",
     "prettier": "catalog:",

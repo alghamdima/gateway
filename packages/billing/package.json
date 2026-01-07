@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/billing",
+  "name": "@workspace/billing",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,22 +15,22 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@lemonsqueezy/lemonsqueezy.js": "4.0.0",
     "@polar-sh/sdk": "0.40.3",
-    "@turbostarter/auth": "workspace:*",
-    "@turbostarter/db": "workspace:*",
-    "@turbostarter/shared": "workspace:*",
+    "@workspace/auth": "workspace:*",
+    "@workspace/db": "workspace:*",
+    "@workspace/shared": "workspace:*",
     "envin": "catalog:",
     "stripe": "19.2.0",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
-    "@turbostarter/vitest-config": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
+    "@workspace/vitest-config": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",

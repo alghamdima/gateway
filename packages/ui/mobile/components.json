@@ -10,7 +10,7 @@
     "cssVariables": true
   },
   "aliases": {
-    "utils": "@turbostarter/ui",
+    "utils": "@workspace/ui",
     "components": "src/components",
     "ui": "src/components",
     "lib": "src/lib",

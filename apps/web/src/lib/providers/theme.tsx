@@ -7,7 +7,7 @@ import { persist } from "zustand/middleware";
 
 import { appConfig } from "~/config/app";
 
-import type { ThemeConfig } from "@turbostarter/ui";
+import type { ThemeConfig } from "@workspace/ui";
 
 export const useThemeConfig = create<{
   config: Omit<ThemeConfig, "mode">;

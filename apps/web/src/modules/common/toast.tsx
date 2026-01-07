@@ -3,7 +3,7 @@
 import { useTheme } from "next-themes";
 import { Toaster as Sonner } from "sonner";
 
-import { ThemeMode } from "@turbostarter/ui";
+import { ThemeMode } from "@workspace/ui";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 

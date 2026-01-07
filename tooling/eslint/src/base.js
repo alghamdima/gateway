@@ -86,7 +86,7 @@ export default defineConfig(
           },
           pathGroups: [
             {
-              pattern: "@turbostarter/**",
+              pattern: "@workspace/**",
               group: "internal",
               position: "before",
             },

@@ -1,6 +1,6 @@
 import { Geist_Mono, Geist } from "next/font/google";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { appConfig } from "~/config/app";
 

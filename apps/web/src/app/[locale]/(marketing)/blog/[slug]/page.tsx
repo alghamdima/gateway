@@ -3,10 +3,10 @@ import duration from "dayjs/plugin/duration";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
-import { getContentItemBySlug, getContentItems } from "@turbostarter/cms";
-import { CollectionType } from "@turbostarter/cms";
-import { getTranslation } from "@turbostarter/i18n/server";
-import { badgeVariants } from "@turbostarter/ui-web/badge";
+import { getContentItemBySlug, getContentItems } from "@workspace/cms";
+import { CollectionType } from "@workspace/cms";
+import { getTranslation } from "@workspace/i18n/server";
+import { badgeVariants } from "@workspace/ui-web/badge";
 
 import { BLOG_PREFIX } from "~/config/paths";
 import { getMetadata } from "~/lib/metadata";

@@ -1,4 +1,4 @@
-import { SidebarInset } from "@turbostarter/ui-web/sidebar";
+import { SidebarInset } from "@workspace/ui-web/sidebar";
 
 import { DashboardActionBar } from "./action-bar";
 

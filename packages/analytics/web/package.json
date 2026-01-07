@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/analytics-web",
+  "name": "@workspace/analytics-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -15,18 +15,18 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@openpanel/nextjs": "1.0.9",
-    "@turbostarter/analytics": "workspace:*",
-    "@turbostarter/shared": "workspace:*",
+    "@workspace/analytics": "workspace:*",
+    "@workspace/shared": "workspace:*",
     "@vemetric/node": "0.2.0",
     "@vemetric/react": "0.6.1",
     "@vercel/analytics": "1.5.0",

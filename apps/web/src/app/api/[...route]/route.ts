@@ -1,6 +1,6 @@
 import { handle } from "hono/vercel";
 
-import { appRouter } from "@turbostarter/api";
+import { appRouter } from "@workspace/api";
 
 const handler = handle(appRouter);
 export {

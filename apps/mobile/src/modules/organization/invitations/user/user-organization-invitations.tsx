@@ -5,14 +5,14 @@ import dayjs from "dayjs";
 import { memo } from "react";
 import { Alert, Pressable, View } from "react-native";
 
-import { handle } from "@turbostarter/api/utils";
-import { InvitationStatus } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
+import { handle } from "@workspace/api/utils";
+import { InvitationStatus } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
 import {
   Alert as AlertBox,
   AlertDescription,
   AlertTitle,
-} from "@turbostarter/ui-mobile/alert";
+} from "@workspace/ui-mobile/alert";
 import {
   BottomSheet,
   BottomSheetContent,
@@ -22,12 +22,12 @@ import {
   BottomSheetScrollView,
   BottomSheetTitle,
   useBottomSheet,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { api } from "~/lib/api";
 import { authClient } from "~/lib/auth";
@@ -36,7 +36,7 @@ import { user } from "~/modules/user/lib/api";
 
 import { InvitationSummaryCard } from "../invitation-summary-card";
 
-import type { Invitation } from "@turbostarter/auth";
+import type { Invitation } from "@workspace/auth";
 
 export const UserOrganizationInvitationsBanner = memo(() => {
   const { t } = useTranslation(["organization", "common"]);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { identify } from "@turbostarter/monitoring-web";
+import { identify } from "@workspace/monitoring-web";
 
 import { authClient } from "~/lib/auth/client";
 

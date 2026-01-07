@@ -1,12 +1,7 @@
 "use client";
 
-import {
-  config,
-  Locale,
-  LocaleLabel,
-  useTranslation,
-} from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { config, Locale, LocaleLabel, useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import type { Icon } from "#components/icons";
 

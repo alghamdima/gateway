@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
-import { passwordSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { passwordSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormField,
@@ -15,9 +15,9 @@ import {
   FormControl,
   FormDescription,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { PasswordInput } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { PasswordInput } from "@workspace/ui-web/input";
 import {
   Modal,
   ModalContent,
@@ -27,7 +27,7 @@ import {
   ModalFooter,
   ModalClose,
   ModalTrigger,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 
 import { admin } from "~/modules/admin/lib/api";
 

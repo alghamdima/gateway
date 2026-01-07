@@ -1,7 +1,7 @@
 import * as TabsPrimitive from "@rn-primitives/tabs";
 import * as React from "react";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { TextClassContext } from "./text";
 

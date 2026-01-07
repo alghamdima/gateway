@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
-import { handle } from "@turbostarter/api/utils";
-import { env } from "@turbostarter/billing/env";
+import { handle } from "@workspace/api/utils";
+import { env } from "@workspace/billing/env";
 
 import { api } from "~/lib/api/server";
 import { getSession } from "~/lib/auth/server";

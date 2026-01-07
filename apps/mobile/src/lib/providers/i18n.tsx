@@ -4,7 +4,7 @@ import { memo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { config, I18nProvider as I18nClientProvider } from "@turbostarter/i18n";
+import { config, I18nProvider as I18nClientProvider } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 

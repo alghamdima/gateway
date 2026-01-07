@@ -1,9 +1,9 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
-import { getOrganizationResponseSchema } from "@turbostarter/api/schema";
-import { handle } from "@turbostarter/api/utils";
-import { getTranslation } from "@turbostarter/i18n/server";
+import { getOrganizationResponseSchema } from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
+import { getTranslation } from "@workspace/i18n/server";
 
 import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";

@@ -1,5 +1,5 @@
 {
-  "extends": "@turbostarter/tsconfig/internal.json",
+  "extends": "@workspace/tsconfig/internal.json",
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "ES2022"],
     "jsx": "preserve"

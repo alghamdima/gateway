@@ -1,4 +1,4 @@
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import { ForgotPasswordForm } from "~/modules/auth/form/password/forgot";
 import { AuthLayout } from "~/modules/auth/layout/base";

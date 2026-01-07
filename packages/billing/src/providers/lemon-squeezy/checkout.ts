@@ -4,9 +4,9 @@ import {
   getOrder,
 } from "@lemonsqueezy/lemonsqueezy.js";
 
-import { HttpStatusCode } from "@turbostarter/shared/constants";
-import { logger } from "@turbostarter/shared/logger";
-import { HttpException } from "@turbostarter/shared/utils";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { logger } from "@workspace/shared/logger";
+import { HttpException } from "@workspace/shared/utils";
 
 import { config } from "../../config";
 import { getCustomerByCustomerId, updateCustomer } from "../../lib/customer";

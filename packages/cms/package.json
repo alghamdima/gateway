@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/cms",
+  "name": "@workspace/cms",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,19 +14,19 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@content-collections/core": "0.11.1",
-    "@turbostarter/shared": "workspace:*",
+    "@workspace/shared": "workspace:*",
     "reading-time": "1.5.0"
   },
   "devDependencies": {
     "@content-collections/cli": "0.1.7",
     "@content-collections/mdx": "0.2.2",
     "@shikijs/rehype": "3.14.0",
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "concurrently": "9.2.1",
     "eslint": "catalog:",
     "prettier": "catalog:",

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { identify, initialize } from "@turbostarter/monitoring-extension";
+import { identify, initialize } from "@workspace/monitoring-extension";
 
 import { authClient } from "~/lib/auth";
 

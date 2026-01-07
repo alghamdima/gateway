@@ -1,7 +1,7 @@
-import { getTranslation } from "@turbostarter/i18n/server";
-import { buttonVariants } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Marquee } from "@turbostarter/ui-web/marquee";
+import { getTranslation } from "@workspace/i18n/server";
+import { buttonVariants } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
+import { Marquee } from "@workspace/ui-web/marquee";
 
 import { pathsConfig } from "~/config/paths";
 import { ThemedImage } from "~/modules/common/themed-image";

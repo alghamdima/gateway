@@ -2,9 +2,9 @@
 
 import { View } from "react-native";
 
-import { config, LocaleLabel, useTranslation } from "@turbostarter/i18n";
-import { Locale } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { config, LocaleLabel, useTranslation } from "@workspace/i18n";
+import { Locale } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 
 import { Button } from "./button";
 import { Icons } from "./icons";

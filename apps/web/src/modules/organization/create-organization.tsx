@@ -3,9 +3,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
-import { createOrganizationSchema } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-web/button";
+import { createOrganizationSchema } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-web/button";
 import {
   Form,
   FormControl,
@@ -14,9 +14,9 @@ import {
   FormField,
   FormDescription,
   FormMessage,
-} from "@turbostarter/ui-web/form";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Input } from "@turbostarter/ui-web/input";
+} from "@workspace/ui-web/form";
+import { Icons } from "@workspace/ui-web/icons";
+import { Input } from "@workspace/ui-web/input";
 import {
   Modal,
   ModalFooter,
@@ -26,13 +26,13 @@ import {
   ModalTitle,
   ModalClose,
   ModalTrigger,
-} from "@turbostarter/ui-web/modal";
+} from "@workspace/ui-web/modal";
 
 import { pathsConfig } from "~/config/paths";
 
 import { organization } from "./lib/api";
 
-import type { CreateOrganizationPayload } from "@turbostarter/auth";
+import type { CreateOrganizationPayload } from "@workspace/auth";
 
 export const CreateOrganizationModal = ({
   open,

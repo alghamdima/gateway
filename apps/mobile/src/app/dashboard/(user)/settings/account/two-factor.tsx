@@ -3,10 +3,10 @@
 import { useCallback, useMemo } from "react";
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { useBottomSheet } from "@turbostarter/ui-mobile/bottom-sheet";
-import { Switch } from "@turbostarter/ui-mobile/switch";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { useTranslation } from "@workspace/i18n";
+import { useBottomSheet } from "@workspace/ui-mobile/bottom-sheet";
+import { Switch } from "@workspace/ui-mobile/switch";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { BackupCodesTile } from "~/modules/user/settings/account/two-factor/backup-codes/backup-codes";
 import { useBackupCodes } from "~/modules/user/settings/account/two-factor/backup-codes/use-backup-codes";
@@ -18,7 +18,7 @@ import {
 import { useTotp } from "~/modules/user/settings/account/two-factor/totp/use-totp";
 import { useTwoFactor } from "~/modules/user/settings/account/two-factor/use-two-factor";
 
-import type { PasswordPayload } from "@turbostarter/auth";
+import type { PasswordPayload } from "@workspace/auth";
 
 export default function TwoFactor() {
   const { t } = useTranslation(["common", "auth"]);

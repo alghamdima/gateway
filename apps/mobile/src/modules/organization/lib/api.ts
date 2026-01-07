@@ -3,8 +3,8 @@ import * as Linking from "expo-linking";
 import {
   getInvitationsResponseSchema,
   getMembersResponseSchema,
-} from "@turbostarter/api/schema";
-import { handle } from "@turbostarter/api/utils";
+} from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
 
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api";

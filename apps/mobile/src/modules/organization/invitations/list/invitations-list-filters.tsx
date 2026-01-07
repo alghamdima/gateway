@@ -2,22 +2,22 @@ import { useEffect } from "react";
 import { View } from "react-native";
 import { create } from "zustand";
 
-import { InvitationStatus, MemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { useDebounceCallback } from "@turbostarter/shared/hooks";
-import { pickBy } from "@turbostarter/shared/utils";
+import { InvitationStatus, MemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { useDebounceCallback } from "@workspace/shared/hooks";
+import { pickBy } from "@workspace/shared/utils";
 import {
   BottomSheet,
   BottomSheetCloseTrigger,
   BottomSheetContent,
   BottomSheetOpenTrigger,
   BottomSheetView,
-} from "@turbostarter/ui-mobile/bottom-sheet";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Checkbox } from "@turbostarter/ui-mobile/checkbox";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Input } from "@turbostarter/ui-mobile/input";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/bottom-sheet";
+import { Button } from "@workspace/ui-mobile/button";
+import { Checkbox } from "@workspace/ui-mobile/checkbox";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
+import { Text } from "@workspace/ui-mobile/text";
 
 interface FiltersState {
   filters: Record<string, string | string[] | null>;

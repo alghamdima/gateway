@@ -1,14 +1,14 @@
 import React from "react";
 
-import { getTranslation } from "@turbostarter/i18n/server";
-import { cn } from "@turbostarter/ui";
+import { getTranslation } from "@workspace/i18n/server";
+import { cn } from "@workspace/ui";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
+} from "@workspace/ui-web/card";
 
 import { ThemedImage } from "~/modules/common/themed-image";
 import {

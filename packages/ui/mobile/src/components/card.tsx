@@ -1,7 +1,7 @@
 import * as React from "react";
 import { View } from "react-native";
 
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import { TextClassContext, Text } from "./text";
 

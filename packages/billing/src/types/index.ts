@@ -1,7 +1,4 @@
-import {
-  billingStatusEnum,
-  pricingPlanTypeEnum,
-} from "@turbostarter/db/schema";
+import { billingStatusEnum, pricingPlanTypeEnum } from "@workspace/db/schema";
 
 import type {
   billingConfigSchema,
@@ -9,7 +6,7 @@ import type {
   planSchema,
   priceSchema,
 } from "../config/schema";
-import type { EnumToConstant } from "@turbostarter/shared/types";
+import type { EnumToConstant } from "@workspace/shared/types";
 import type * as z from "zod";
 
 export const BillingStatus = Object.fromEntries(
@@ -64,4 +61,4 @@ export type PricingPlan = z.infer<typeof planSchema>;
 export type PricingPlanPrice = z.infer<typeof priceSchema>;
 export type Discount = z.infer<typeof discountSchema>;
 
-export type { SelectCustomer as Customer } from "@turbostarter/db/schema";
+export type { SelectCustomer as Customer } from "@workspace/db/schema";

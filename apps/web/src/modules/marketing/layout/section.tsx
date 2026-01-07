@@ -1,4 +1,4 @@
-import { cn } from "@turbostarter/ui";
+import { cn } from "@workspace/ui";
 
 import type { ComponentProps } from "react";
 

@@ -2,7 +2,7 @@ import { PostHog } from "posthog-react-native";
 
 import { env } from "./env";
 
-import type { MonitoringProviderStrategy } from "@turbostarter/monitoring";
+import type { MonitoringProviderStrategy } from "@workspace/monitoring";
 
 let client: PostHog | null = null;
 

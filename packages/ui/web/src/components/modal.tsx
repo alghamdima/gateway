@@ -2,8 +2,8 @@
 
 import * as React from "react";
 
-import { cn } from "@turbostarter/ui";
-import { useBreakpoint } from "@turbostarter/ui-web";
+import { cn } from "@workspace/ui";
+import { useBreakpoint } from "@workspace/ui-web";
 
 import {
   Dialog,

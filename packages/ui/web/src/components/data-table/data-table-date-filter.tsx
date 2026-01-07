@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import type { Column } from "@tanstack/react-table";
 import type { DateRange } from "react-day-picker";

@@ -1,8 +1,8 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
-import { Icons } from "@turbostarter/ui-web/icons";
-import { SidebarProvider } from "@turbostarter/ui-web/sidebar";
+import { Icons } from "@workspace/ui-web/icons";
+import { SidebarProvider } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { getOrganization, getSession } from "~/lib/auth/server";

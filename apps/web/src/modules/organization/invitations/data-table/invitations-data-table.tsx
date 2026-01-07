@@ -1,10 +1,10 @@
 "use client";
 
-import { InvitationStatus } from "@turbostarter/auth";
-import { pickBy } from "@turbostarter/shared/utils";
-import { DataTable } from "@turbostarter/ui-web/data-table/data-table";
-import { DataTableSkeleton } from "@turbostarter/ui-web/data-table/data-table-skeleton";
-import { DataTableToolbar } from "@turbostarter/ui-web/data-table/data-table-toolbar";
+import { InvitationStatus } from "@workspace/auth";
+import { pickBy } from "@workspace/shared/utils";
+import { DataTable } from "@workspace/ui-web/data-table/data-table";
+import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
+import { DataTableToolbar } from "@workspace/ui-web/data-table/data-table-toolbar";
 
 import { useDataTable } from "~/modules/common/hooks/use-data-table";
 import { organization } from "~/modules/organization/lib/api";

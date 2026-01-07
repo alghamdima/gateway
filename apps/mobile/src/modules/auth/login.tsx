@@ -1,8 +1,8 @@
 import { memo, useState } from "react";
 import { View } from "react-native";
 
-import { SecondFactor } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
+import { SecondFactor } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
 
 import { authConfig } from "~/config/auth";
 import { AnonymousLogin } from "~/modules/auth/form/anonymous";

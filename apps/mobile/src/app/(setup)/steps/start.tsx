@@ -1,8 +1,8 @@
 import { View } from "react-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { useSetupSteps } from "~/app/(setup)/steps/_layout";
 import { ScrollView } from "~/modules/common/styled";

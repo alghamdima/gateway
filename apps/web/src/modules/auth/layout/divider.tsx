@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 export const AuthDivider = () => {
   const { t } = useTranslation("auth");

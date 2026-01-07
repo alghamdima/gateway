@@ -1,16 +1,12 @@
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Card } from "@turbostarter/ui-web/card";
+import { useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarImage, AvatarFallback } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { Card } from "@workspace/ui-web/card";
 
-import type { Invitation } from "@turbostarter/auth";
+import type { Invitation } from "@workspace/auth";
 
 interface InvitationSummaryCardProps {
   readonly invitation: Invitation;

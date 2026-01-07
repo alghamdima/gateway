@@ -1,5 +1,5 @@
-import { getTranslation } from "@turbostarter/i18n/server";
-import { withI18n } from "@turbostarter/i18n/with-i18n";
+import { getTranslation } from "@workspace/i18n/server";
+import { withI18n } from "@workspace/i18n/with-i18n";
 
 import { getMetadata } from "~/lib/metadata";
 import { ContactForm } from "~/modules/marketing/contact/contact-form";

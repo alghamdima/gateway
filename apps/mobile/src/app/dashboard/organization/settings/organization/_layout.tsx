@@ -1,8 +1,8 @@
 import { router, Stack } from "expo-router";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { isKey } from "@turbostarter/i18n";
-import { capitalize } from "@turbostarter/shared/utils";
+import { useTranslation } from "@workspace/i18n";
+import { isKey } from "@workspace/i18n";
+import { capitalize } from "@workspace/shared/utils";
 
 import { BaseHeader } from "~/modules/common/layout/header";
 

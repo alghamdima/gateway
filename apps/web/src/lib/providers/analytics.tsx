@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { identify, Provider, reset } from "@turbostarter/analytics-web";
+import { identify, Provider, reset } from "@workspace/analytics-web";
 
 import { authClient } from "~/lib/auth/client";
 

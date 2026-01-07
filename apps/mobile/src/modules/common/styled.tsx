@@ -6,8 +6,8 @@ import { KeyboardAvoidingView as NativeKeyboardAvoidingView } from "react-native
 import { SafeAreaView as NativeSafeAreaView } from "react-native-safe-area-context";
 import { withUniwind } from "uniwind";
 
-import { cn } from "@turbostarter/ui";
-import { Text } from "@turbostarter/ui-mobile/text";
+import { cn } from "@workspace/ui";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { WIDTH } from "~/utils/device";
 

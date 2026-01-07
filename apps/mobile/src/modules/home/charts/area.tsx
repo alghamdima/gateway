@@ -4,7 +4,7 @@ import { Platform, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { CartesianChart, StackedArea } from "victory-native";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Card,
   CardHeader,
@@ -12,15 +12,15 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@turbostarter/ui-mobile/card";
+} from "@workspace/ui-mobile/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-mobile/select";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/select";
+import { Text } from "@workspace/ui-mobile/text";
 
 const chartData = [
   { date: "2024-04-01", desktop: 222, mobile: 150 },

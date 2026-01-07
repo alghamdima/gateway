@@ -1,5 +1,5 @@
-import type { TranslationKey } from "@turbostarter/i18n";
-import type { Icon } from "@turbostarter/ui-web/icons";
+import type { TranslationKey } from "@workspace/i18n";
+import type { Icon } from "@workspace/ui-web/icons";
 
 export type NavigationLink =
   | {

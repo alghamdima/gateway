@@ -8,30 +8,30 @@ import {
   XAxis,
 } from "recharts";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@turbostarter/ui-web/card";
+} from "@workspace/ui-web/card";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-} from "@turbostarter/ui-web/chart";
+} from "@workspace/ui-web/chart";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-web/select";
+} from "@workspace/ui-web/select";
 
-import type { ChartConfig } from "@turbostarter/ui-web/chart";
+import type { ChartConfig } from "@workspace/ui-web/chart";
 
 const chartData = [
   { date: "2024-04-01", desktop: 222, mobile: 150 },

@@ -1,15 +1,11 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Button, buttonVariants } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Button, buttonVariants } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";

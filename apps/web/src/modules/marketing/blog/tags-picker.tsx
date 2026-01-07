@@ -2,10 +2,10 @@
 
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 
-import { ContentTag } from "@turbostarter/cms";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Button } from "@turbostarter/ui-web/button";
+import { ContentTag } from "@workspace/cms";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Button } from "@workspace/ui-web/button";
 
 export const TagsPicker = () => {
   const { t } = useTranslation("marketing");

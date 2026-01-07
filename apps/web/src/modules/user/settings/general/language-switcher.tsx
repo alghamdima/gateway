@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 
 import { I18nControls } from "~/modules/common/i18n/controls";
 import {

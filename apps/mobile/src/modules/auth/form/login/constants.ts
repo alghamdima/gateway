@@ -1,4 +1,4 @@
-import { AuthProvider } from "@turbostarter/auth";
+import { AuthProvider } from "@workspace/auth";
 
 export const LOGIN_OPTIONS = [AuthProvider.PASSWORD, AuthProvider.MAGIC_LINK];
 

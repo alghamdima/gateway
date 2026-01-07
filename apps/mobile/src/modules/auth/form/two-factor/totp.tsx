@@ -5,24 +5,24 @@ import { memo } from "react";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
 
-import { otpVerificationSchema, SecondFactor } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { Button } from "@turbostarter/ui-mobile/button";
+import { otpVerificationSchema, SecondFactor } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Button } from "@workspace/ui-mobile/button";
 import {
   Form,
   FormCheckbox,
   FormField,
   FormItem,
   FormMessage,
-} from "@turbostarter/ui-mobile/form";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+} from "@workspace/ui-mobile/form";
+import { Icons } from "@workspace/ui-mobile/icons";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
-} from "@turbostarter/ui-mobile/input-otp";
-import { Spin } from "@turbostarter/ui-mobile/spin";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/input-otp";
+import { Spin } from "@workspace/ui-mobile/spin";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 

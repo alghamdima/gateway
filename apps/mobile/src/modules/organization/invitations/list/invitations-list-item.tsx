@@ -2,10 +2,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { Alert, Pressable, View } from "react-native";
 
-import { getAllRolesAtOrBelow, toMemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import { Badge } from "@turbostarter/ui-mobile/badge";
+import { getAllRolesAtOrBelow, toMemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-mobile/badge";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -14,14 +14,14 @@ import {
   ContextMenuItemTitle,
   ContextMenuItemIcon,
   ContextMenuGroup,
-} from "@turbostarter/ui-mobile/context-menu";
-import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/context-menu";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";
 
-import type { Invitation } from "@turbostarter/auth";
+import type { Invitation } from "@workspace/auth";
 
 export const InvitationListItem = ({
   invitation,

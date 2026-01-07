@@ -55,7 +55,7 @@ import {
 } from "lucide-react-native";
 import { withUniwind } from "uniwind";
 
-import { Icons as GlobalIcons } from "@turbostarter/ui/assets";
+import { Icons as GlobalIcons } from "@workspace/ui/assets";
 
 import type { LucideIcon } from "lucide-react-native";
 

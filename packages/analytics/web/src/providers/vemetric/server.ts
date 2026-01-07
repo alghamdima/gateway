@@ -2,7 +2,7 @@ import { Vemetric } from "@vemetric/node";
 
 import { env } from "./env";
 
-import type { AnalyticsProviderServerStrategy } from "@turbostarter/analytics";
+import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
 let client: Vemetric | null = null;
 

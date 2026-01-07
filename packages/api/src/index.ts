@@ -4,9 +4,9 @@ import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { logger as loggerMiddleware } from "hono/logger";
 
-import { auth } from "@turbostarter/auth/server";
-import { logger } from "@turbostarter/shared/logger";
-import { matchesPattern } from "@turbostarter/shared/utils";
+import { auth } from "@workspace/auth/server";
+import { logger } from "@workspace/shared/logger";
+import { matchesPattern } from "@workspace/shared/utils";
 
 import { localize, delay } from "./middleware";
 import { adminRouter } from "./modules/admin/router";

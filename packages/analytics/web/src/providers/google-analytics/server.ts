@@ -1,13 +1,13 @@
 import { randomUUID } from "crypto";
 
-import { logger } from "@turbostarter/shared/logger";
+import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 
 import type {
   AllowedPropertyValues,
   AnalyticsProviderServerStrategy,
-} from "@turbostarter/analytics";
+} from "@workspace/analytics";
 
 const postEvent = async (
   event: string,

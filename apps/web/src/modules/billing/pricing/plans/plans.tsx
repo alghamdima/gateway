@@ -1,16 +1,16 @@
 import { memo } from "react";
 
-import { Skeleton } from "@turbostarter/ui-web/skeleton";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { Plan } from "./plan/plan";
 
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 import type {
   BillingModel,
   Discount,
   PricingPlan,
   RecurringInterval,
-} from "@turbostarter/billing";
+} from "@workspace/billing";
 
 interface PlansProps {
   readonly plans: PricingPlan[];

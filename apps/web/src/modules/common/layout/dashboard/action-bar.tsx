@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 import * as z from "zod";
 
-import { isKey, useTranslation } from "@turbostarter/i18n";
+import { isKey, useTranslation } from "@workspace/i18n";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,11 +12,11 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@turbostarter/ui-web/breadcrumb";
-import { buttonVariants } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
-import { Separator } from "@turbostarter/ui-web/separator";
-import { SidebarTrigger } from "@turbostarter/ui-web/sidebar";
+} from "@workspace/ui-web/breadcrumb";
+import { buttonVariants } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
+import { Separator } from "@workspace/ui-web/separator";
+import { SidebarTrigger } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";

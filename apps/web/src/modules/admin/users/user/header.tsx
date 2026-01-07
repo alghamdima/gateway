@@ -2,15 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Icons } from "@turbostarter/ui-web/icons";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { authClient } from "~/lib/auth/client";
 import { admin } from "~/modules/admin/lib/api";

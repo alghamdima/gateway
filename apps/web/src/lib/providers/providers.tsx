@@ -1,7 +1,7 @@
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { memo } from "react";
 
-import { I18nProvider } from "@turbostarter/i18n";
+import { I18nProvider } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { QueryClientProvider } from "~/lib/query/client";

@@ -1,5 +1,5 @@
 import type { CheckoutPayload, GetBillingPortalPayload } from "../lib/schema";
-import type { User } from "@turbostarter/auth";
+import type { User } from "@workspace/auth";
 
 export interface WebhookCallbacks {
   onCheckoutSessionCompleted?: (sessionId: string) => Promise<void> | void;

@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
-import { createClient } from "@turbostarter/auth/client/mobile";
-import { config } from "@turbostarter/i18n";
+import { createClient } from "@workspace/auth/client/mobile";
+import { config } from "@workspace/i18n";
 
 import { getBaseUrl } from "~/lib/api/utils";
 import { useI18nConfig } from "~/lib/providers/i18n";

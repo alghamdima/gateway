@@ -2,16 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Alert, Pressable, View } from "react-native";
 
-import { getAllRolesAtOrBelow, toMemberRole } from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { getAllRolesAtOrBelow, toMemberRole } from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import {
   Avatar,
   AvatarImage,
   AvatarFallback,
-} from "@turbostarter/ui-mobile/avatar";
-import { Badge } from "@turbostarter/ui-mobile/badge";
-import { useBottomSheet } from "@turbostarter/ui-mobile/bottom-sheet";
+} from "@workspace/ui-mobile/avatar";
+import { Badge } from "@workspace/ui-mobile/badge";
+import { useBottomSheet } from "@workspace/ui-mobile/bottom-sheet";
 import {
   ContextMenu,
   ContextMenuItem,
@@ -20,17 +20,17 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
   ContextMenuGroup,
-} from "@turbostarter/ui-mobile/context-menu";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Skeleton } from "@turbostarter/ui-mobile/skeleton";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/context-menu";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
+import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";
 import { UpdateMemberRoleBottomSheet } from "~/modules/organization/members/update-member-role";
 
-import type { Member } from "@turbostarter/auth";
+import type { Member } from "@workspace/auth";
 
 export const MembersListItem = ({ member }: { member: Member }) => {
   const { t } = useTranslation(["common", "auth", "organization"]);

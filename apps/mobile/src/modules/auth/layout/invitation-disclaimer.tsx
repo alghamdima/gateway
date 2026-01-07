@@ -1,12 +1,12 @@
 "use client";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from "@turbostarter/ui-mobile/alert";
-import { Icons } from "@turbostarter/ui-mobile/icons";
+} from "@workspace/ui-mobile/alert";
+import { Icons } from "@workspace/ui-mobile/icons";
 
 export const InvitationDisclaimer = () => {
   const { t } = useTranslation("organization");

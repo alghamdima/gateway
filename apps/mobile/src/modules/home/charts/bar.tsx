@@ -3,7 +3,7 @@ import { Platform, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { Bar, CartesianChart } from "victory-native";
 
-import { useTranslation } from "@turbostarter/i18n";
+import { useTranslation } from "@workspace/i18n";
 import {
   Card,
   CardHeader,
@@ -11,9 +11,9 @@ import {
   CardDescription,
   CardFooter,
   CardContent,
-} from "@turbostarter/ui-mobile/card";
-import { Icons } from "@turbostarter/ui-mobile/icons";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/card";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Text } from "@workspace/ui-mobile/text";
 
 const useChartData = () => {
   const color1 = useCSSVariable("--chart-1");

@@ -1,12 +1,12 @@
-import { getTranslation } from "@turbostarter/i18n/server";
+import { getTranslation } from "@workspace/i18n/server";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@turbostarter/ui-web/accordion";
-import { buttonVariants } from "@turbostarter/ui-web/button";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/accordion";
+import { buttonVariants } from "@workspace/ui-web/button";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";

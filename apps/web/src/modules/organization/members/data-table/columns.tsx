@@ -8,24 +8,20 @@ import {
   getAllRolesAtOrBelow,
   MemberRole,
   toMemberRole,
-} from "@turbostarter/auth";
-import { useTranslation } from "@turbostarter/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@turbostarter/ui-web/avatar";
-import { Badge } from "@turbostarter/ui-web/badge";
-import { Button } from "@turbostarter/ui-web/button";
-import { DataTableColumnHeader } from "@turbostarter/ui-web/data-table/data-table-column-header";
+} from "@workspace/auth";
+import { useTranslation } from "@workspace/i18n";
+import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button } from "@workspace/ui-web/button";
+import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@turbostarter/ui-web/dropdown-menu";
-import { Icons } from "@turbostarter/ui-web/icons";
+} from "@workspace/ui-web/dropdown-menu";
+import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -35,7 +31,7 @@ import { useActiveOrganization } from "../../hooks/use-active-organization";
 import { UpdateMemberRoleModal } from "../update-member-role";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Member } from "@turbostarter/auth";
+import type { Member } from "@workspace/auth";
 
 const Actions = ({ member }: { member: Member }) => {
   const { t } = useTranslation(["common", "auth", "organization"]);

@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/ui-web",
+  "name": "@workspace/ui-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -20,9 +20,9 @@
   },
   "dependencies": {
     "@tanstack/react-table": "catalog:",
-    "@turbostarter/i18n": "workspace:*",
-    "@turbostarter/shared": "workspace:*",
-    "@turbostarter/ui": "workspace:*",
+    "@workspace/i18n": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "@workspace/ui": "workspace:*",
     "cmdk": "1.1.1",
     "input-otp": "1.4.2",
     "lucide-react": "0.552.0",
@@ -33,9 +33,9 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "0.5.19",
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "react": "catalog:react19",
@@ -45,5 +45,5 @@
     "typescript": "catalog:",
     "zod": "catalog:"
   },
-  "prettier": "@turbostarter/prettier-config"
+  "prettier": "@workspace/prettier-config"
 }

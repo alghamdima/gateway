@@ -1,5 +1,5 @@
 {
-  "name": "@turbostarter/email",
+  "name": "@workspace/email",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,22 +15,22 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@turbostarter/prettier-config",
+  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@react-email/components": "0.3.2",
-    "@turbostarter/i18n": "workspace:*",
-    "@turbostarter/ui": "workspace:*",
+    "@workspace/i18n": "workspace:*",
+    "@workspace/ui": "workspace:*",
     "nodemailer": "7.0.11",
     "react-email": "4.2.4",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@react-email/preview-server": "4.2.4",
-    "@turbostarter/eslint-config": "workspace:*",
-    "@turbostarter/prettier-config": "workspace:*",
-    "@turbostarter/shared": "workspace:*",
-    "@turbostarter/tsconfig": "workspace:*",
     "@types/nodemailer": "7.0.3",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

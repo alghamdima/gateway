@@ -4,23 +4,23 @@ import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { Pie, PolarChart } from "victory-native";
 
-import { useTranslation } from "@turbostarter/i18n";
-import { cn } from "@turbostarter/ui";
+import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import {
   CardDescription,
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-} from "@turbostarter/ui-mobile/card";
+} from "@workspace/ui-mobile/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@turbostarter/ui-mobile/select";
-import { Text } from "@turbostarter/ui-mobile/text";
+} from "@workspace/ui-mobile/select";
+import { Text } from "@workspace/ui-mobile/text";
 
 const useChart = () => {
   const color1 = useCSSVariable("--chart-1");
