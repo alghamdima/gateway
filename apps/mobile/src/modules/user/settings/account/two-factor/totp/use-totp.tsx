@@ -19,17 +19,14 @@ const useUri = create<{
 export const useTotp = () => {
   const { t } = useTranslation(["auth"]);
   const { uri, setUri } = useUri();
-  const { codes, setCodes } = useBackupCodes();
+  const { codes, generate } = useBackupCodes();
 
   const getUri = useMutation({
     ...auth.mutations.twoFactor.totp.getUri,
     onSuccess: async ({ totpURI }, data) => {
       setUri(totpURI);
       if (!codes.length) {
-        const backupCodes =
-          await auth.mutations.twoFactor.backupCodes.generate.mutationFn(data);
-
-        setCodes(backupCodes.backupCodes);
+        await generate.mutateAsync(data);
       }
     },
   });

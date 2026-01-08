@@ -18,8 +18,8 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
-    "@ai-sdk/openai": "2.0.59",
-    "@hono/zod-validator": "0.7.4",
+    "@ai-sdk/openai": "3.0.7",
+    "@hono/zod-validator": "0.7.6",
     "@workspace/auth": "workspace:*",
     "@workspace/billing": "workspace:*",
     "@workspace/db": "workspace:*",
@@ -28,9 +28,10 @@
     "@workspace/monitoring-web": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/storage": "workspace:*",
-    "ai": "5.0.86",
+    "ai": "6.0.18",
     "envin": "catalog:",
-    "hono": "4.10.4",
+    "hono": "4.11.3",
+    "hono-status-monitor": "1.0.7",
     "zod": "catalog:"
   },
   "devDependencies": {

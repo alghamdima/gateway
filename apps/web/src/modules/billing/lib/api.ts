@@ -1,3 +1,5 @@
+import { mutationOptions, queryOptions } from "@tanstack/react-query";
+
 import { handle } from "@workspace/api/utils";
 
 import { api } from "~/lib/api/client";
@@ -8,31 +10,31 @@ const KEY = "billing";
 
 const queries = {
   customer: {
-    get: {
+    get: queryOptions({
       queryKey: [KEY, "customer"],
       queryFn: () => handle(api.billing.customer.$get)(),
-    },
+    }),
   },
 };
 
 const mutations = {
   portal: {
-    get: {
+    get: mutationOptions({
       mutationKey: [KEY, "portal"],
       mutationFn: (data: InferRequestType<typeof api.billing.portal.$get>) =>
         handle(api.billing.portal.$get)(data),
-    },
+    }),
   },
   checkout: {
-    create: {
+    create: mutationOptions({
       mutationKey: [KEY, "checkout"],
       mutationFn: (data: InferRequestType<typeof api.billing.checkout.$post>) =>
         handle(api.billing.checkout.$post)(data),
-    },
+    }),
   },
 };
 
 export const billing = {
   queries,
   mutations,
-};
+} as const;

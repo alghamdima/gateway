@@ -12,7 +12,7 @@ import { HttpException } from "@workspace/shared/utils";
 
 import type { User } from "@workspace/auth";
 import type { TFunction } from "@workspace/i18n";
-import type { Context, ValidationTargets } from "hono";
+import type { ValidationTargets } from "hono";
 import type { $ZodRawIssue, $ZodType } from "zod/v4/core";
 
 type PermissionsInput = NonNullable<
@@ -209,28 +209,27 @@ export const validate = <
   target: Target,
   schema: T,
 ) =>
-  zValidator(
-    target,
-    schema,
-    async (result, c: Context<{ Variables: { locale?: string } }, string>) => {
-      if (!result.success) {
-        const { t } = await getTranslation({
-          locale: c.var.locale,
-        });
-        const error = result.error.issues[0];
+  zValidator(target, schema, async (result, c) => {
+    if (!result.success) {
+      const { t } = await getTranslation({
+        locale:
+          "locale" in c.var && typeof c.var.locale === "string"
+            ? c.var.locale
+            : getLocaleFromRequest(c.req.raw),
+      });
+      const error = result.error.issues[0];
 
-        if (!error) {
-          throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY);
-        }
-
-        const { message, code } = makeZodI18nMap({ t: t as TFunction })(
-          error as $ZodRawIssue,
-        );
-
-        throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY, {
-          code,
-          message,
-        });
+      if (!error) {
+        throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY);
       }
-    },
-  );
+
+      const { message, code } = makeZodI18nMap({ t: t as TFunction })(
+        error as $ZodRawIssue,
+      );
+
+      throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY, {
+        code,
+        message,
+      });
+    }
+  });

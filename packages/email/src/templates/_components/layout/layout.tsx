@@ -6,11 +6,30 @@ import {
   Section,
   Tailwind,
 } from "@react-email/components";
+import { oklch, formatHex } from "culori";
+
+import { mapValues } from "@workspace/shared/utils";
+import { themes, ThemeMode } from "@workspace/ui";
+
+import { env } from "../../../env";
 
 import { Footer } from "./footer";
 import { Header } from "./header";
 
 import type { PropsWithChildren } from "react";
+
+const variables = themes[env.EMAIL_THEME][ThemeMode.LIGHT];
+const colors = mapValues(variables, ([l, c, h, alpha]) =>
+  formatHex(
+    oklch({
+      mode: "oklch",
+      l,
+      c,
+      h,
+      alpha,
+    }),
+  ),
+);
 
 export const Layout = ({
   children,
@@ -35,45 +54,7 @@ export const Layout = ({
         config={{
           theme: {
             extend: {
-              colors: {
-                background: "#ffffff",
-                foreground: "#09090b",
-                card: {
-                  DEFAULT: "#ffffff",
-                  foreground: "#09090b",
-                },
-                popover: {
-                  DEFAULT: "#ffffff",
-                  foreground: "#09090b",
-                },
-                primary: {
-                  DEFAULT: "#f14704",
-                  foreground: "#fff7ed",
-                },
-                secondary: {
-                  DEFAULT: "#f4f4f5",
-                  foreground: "#18181b",
-                },
-                muted: {
-                  DEFAULT: "#f4f4f5",
-                  foreground: "#71717b",
-                },
-                accent: {
-                  DEFAULT: "#f4f4f5",
-                  foreground: "#18181b",
-                },
-                success: {
-                  DEFAULT: "#4ade80",
-                  foreground: "#09090b",
-                },
-                destructive: {
-                  DEFAULT: "#e7000b",
-                  foreground: "#fff7ed",
-                },
-                border: "#e4e4e7",
-                input: "#e4e4e7",
-                ring: "#f14704",
-              },
+              colors,
             },
           },
         }}

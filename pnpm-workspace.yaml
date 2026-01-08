@@ -8,17 +8,17 @@ packages:
   - tooling/*
 
 catalog:
-  "@tanstack/react-query": 5.90.6
-  "@tanstack/react-query-devtools": 5.90.2
+  "@tanstack/react-query": 5.90.16
+  "@tanstack/react-query-devtools": 5.91.2
   "@tanstack/react-table": 8.21.3
-  envin: 1.1.10
+  envin: 1.1.12
   eslint: 9.39.0
   prettier: 3.6.2
   react-hook-form: 7.66.0
   react-native: 0.81.5
   typescript: 5.9.3
-  vitest: 4.0.14
-  "@vitest/coverage-v8": 4.0.14
+  vitest: 4.0.16
+  "@vitest/coverage-v8": 4.0.16
   zod: 4.1.13
 
 catalogs:

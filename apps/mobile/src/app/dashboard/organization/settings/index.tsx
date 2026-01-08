@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
@@ -15,70 +16,79 @@ import { SafeAreaView, ScrollView } from "~/modules/common/styled";
 import { organization } from "~/modules/organization/lib/api";
 import { OrganizationInfo } from "~/modules/organization/settings/organization-info";
 
-const sections = [
-  [
-    {
-      title: "organization",
-      icon: Icons.Building,
-      onPress: () =>
-        router.navigate(
-          pathsConfig.dashboard.organization.settings.organization.index,
-        ),
-      visible: true,
-    },
-  ],
-  [
-    {
-      title: "account",
-      icon: Icons.UserRound,
-      onPress: () => {
-        void organization.mutations.setActive.mutationFn({
-          organizationId: null,
-        });
-        router.navigate(pathsConfig.dashboard.user.settings.index);
-      },
-      visible: true,
-    },
-  ],
-  [
-    {
-      title: "rate",
-      icon: Icons.ThumbsUp,
-      onPress: async () => {
-        const available = await StoreReview.hasAction();
+import type { QueryClient } from "@tanstack/react-query";
 
-        if (available) {
-          return await StoreReview.requestReview();
-        }
-
-        return Share.share({
-          title: Constants.expoConfig?.name,
-          message: appConfig.url,
-        });
+const sections = (queryClient: QueryClient) =>
+  [
+    [
+      {
+        title: "organization",
+        icon: Icons.Building,
+        onPress: () =>
+          router.navigate(
+            pathsConfig.dashboard.organization.settings.organization.index,
+          ),
+        visible: true,
       },
-      visible: true,
-    },
-    {
-      title: "share",
-      icon: Icons.Share2,
-      onPress: () =>
-        Share.share({
-          title: Constants.expoConfig?.name,
-          message: appConfig.url,
-        }),
-      visible: true,
-    },
-    {
-      title: "privacy",
-      icon: Icons.Lock,
-      onPress: () => Linking.openURL(`${appConfig.url}/legal/privacy-policy`),
-      visible: true,
-    },
-  ],
-] as const;
+    ],
+    [
+      {
+        title: "account",
+        icon: Icons.UserRound,
+        onPress: () => {
+          void queryClient
+            .getMutationCache()
+            .build(queryClient, organization.mutations.setActive)
+            .execute({
+              organizationId: null,
+            });
+
+          router.navigate(pathsConfig.dashboard.user.settings.index);
+        },
+        visible: true,
+      },
+    ],
+    [
+      {
+        title: "rate",
+        icon: Icons.ThumbsUp,
+        onPress: async () => {
+          const available = await StoreReview.hasAction();
+
+          if (available) {
+            return await StoreReview.requestReview();
+          }
+
+          return Share.share({
+            title: Constants.expoConfig?.name,
+            message: appConfig.url,
+          });
+        },
+        visible: true,
+      },
+      {
+        title: "share",
+        icon: Icons.Share2,
+        onPress: () =>
+          Share.share({
+            title: Constants.expoConfig?.name,
+            message: appConfig.url,
+          }),
+        visible: true,
+      },
+      {
+        title: "privacy",
+        icon: Icons.Lock,
+        onPress: () => Linking.openURL(`${appConfig.url}/legal/privacy-policy`),
+        visible: true,
+      },
+    ],
+  ] as const;
 
 export default function Settings() {
   const { t } = useTranslation("common");
+
+  const queryClient = useQueryClient();
 
   return (
     <SafeAreaView className="bg-background flex-1">
@@ -90,7 +100,7 @@ export default function Settings() {
         <OrganizationInfo />
 
         <View className="gap-6">
-          {sections.map((section, index) => (
+          {sections(queryClient).map((section, index) => (
             <View key={index}>
               {section.map((item) => (
                 <SettingsTile {...item} key={item.title}>

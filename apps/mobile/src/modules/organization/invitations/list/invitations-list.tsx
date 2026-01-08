@@ -35,19 +35,9 @@ export const InvitationsList = () => {
     ...pickBy(filters, Boolean),
   };
 
-  const invitations = useInfiniteQuery({
-    queryKey: organization.queries.invitations.getAll(params).queryKey,
-    queryFn: ({ pageParam }) =>
-      organization.queries.invitations
-        .getAll({
-          ...params,
-          page: pageParam.toString(),
-        })
-        .queryFn(),
-    initialPageParam: 1,
-    getNextPageParam: ({ total }, pages) =>
-      total > pages.length * perPage ? pages.length + 1 : undefined,
-  });
+  const invitations = useInfiniteQuery(
+    organization.queries.invitations.getAll(params),
+  );
 
   const data = invitations.data?.pages.flatMap((page) => page.data) ?? [];
 

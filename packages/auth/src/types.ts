@@ -88,6 +88,22 @@ const ERROR_MESSAGES: Record<AuthErrorCode, TranslationKey> = {
   ORGANIZATION_SLUG_ALREADY_TAKEN: "organization:error.slugAlreadyTaken",
   YOU_ARE_NOT_ALLOWED_TO_SET_NON_EXISTENT_VALUE:
     "auth:error.cannotSetNonExistentValue",
+  INVALID_ROLE_TYPE: "auth:error.invalidRoleType",
+  MISSING_OR_NULL_ORIGIN: "auth:error.missingOrNullOrigin",
+  FAILED_TO_CREATE_VERIFICATION: "auth:error.failedToCreateVerification",
+  FIELD_NOT_ALLOWED: "auth:error.fieldNotAllowed",
+  ASYNC_VALIDATION_NOT_SUPPORTED: "auth:error.asyncValidationNotSupported",
+  VALIDATION_ERROR: "auth:error.validationError",
+  MISSING_FIELD: "auth:error.missingField",
+  CROSS_SITE_NAVIGATION_LOGIN_BLOCKED:
+    "auth:error.crossSiteNavigationLoginBlocked",
+  VERIFICATION_EMAIL_NOT_ENABLED: "auth:error.user.verificationEmailNotEnabled",
+  EMAIL_ALREADY_VERIFIED: "auth:error.user.emailAlreadyVerified",
+  EMAIL_MISMATCH: "auth:error.user.emailMismatch",
+  SESSION_NOT_FRESH: "auth:error.session.notFresh",
+  LINKED_ACCOUNT_ALREADY_EXISTS:
+    "auth:error.account.linkedAccountAlreadyExists",
+  INVALID_ORIGIN: "auth:error.invalidOrigin",
   YOU_ARE_NOT_ALLOWED_TO_CHANGE_USERS_ROLE: "auth:error.user.cannotChangeRole",
   YOU_ARE_NOT_ALLOWED_TO_CREATE_USERS: "admin:error.cannotCreateUsers",
   YOU_ARE_NOT_ALLOWED_TO_LIST_USERS: "admin:error.cannotListUsers",
@@ -239,6 +255,11 @@ const ERROR_MESSAGES: Record<AuthErrorCode, TranslationKey> = {
   INVALID_CODE: "auth:error.code.invalid",
   TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: "auth:error.code.tooManyAttempts",
   INVALID_TWO_FACTOR_COOKIE: "auth:error.twoFactor.invalidCookie",
+  INVALID_CALLBACK_URL: "auth:error.url.invalidCallbackUrl",
+  INVALID_REDIRECT_URL: "auth:error.url.invalidRedirectUrl",
+  INVALID_ERROR_CALLBACK_URL: "auth:error.url.invalidErrorCallbackUrl",
+  INVALID_NEW_USER_CALLBACK_URL: "auth:error.url.invalidNewUserCallbackUrl",
+  CALLBACK_URL_REQUIRED: "auth:error.url.callbackUrlRequired",
 } as const;
 
 export type {

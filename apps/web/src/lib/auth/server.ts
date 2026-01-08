@@ -4,6 +4,8 @@ import { cache } from "react";
 import { auth } from "@workspace/auth/server";
 import { logger } from "@workspace/shared/logger";
 
+import type { User } from "@workspace/auth/server";
+
 const getHeaders = async () => {
   const newHeaders = new Headers(await headers());
   newHeaders.set("x-client-platform", "web-server");
@@ -53,10 +55,10 @@ export const getInvitation = cache(async ({ id }: { id: string }) => {
 
 export const getUser = cache(async ({ id }: { id: string }) => {
   try {
-    return await auth.api.getUser({
+    return (await auth.api.getUser({
       query: { id },
       headers: await getHeaders(),
-    });
+    })) as User;
   } catch {
     return null;
   }

@@ -1,3 +1,5 @@
+import { mutationOptions, queryOptions } from "@tanstack/react-query";
+
 import {
   getInvitationsResponseSchema,
   getMembersResponseSchema,
@@ -19,166 +21,175 @@ const KEY = "admin";
 
 const queries = {
   users: {
-    get: ({ id }: { id: string }) => ({
-      queryKey: [KEY, "users", id],
-      queryFn: () =>
-        authClient.admin.getUser({
-          query: { id },
-          fetchOptions: { throw: true },
-        }) as Promise<User>,
-    }),
+    get: ({ id }: { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "users", id],
+        queryFn: () =>
+          authClient.admin.getUser({
+            query: { id },
+            fetchOptions: { throw: true },
+          }) as Promise<User>,
+      }),
     getAccounts: ({
       id,
       ...query
     }: InferRequestType<
       (typeof api.admin.users)[":id"]["accounts"]["$get"]
-    >["query"] & { id: string }) => ({
-      queryKey: [KEY, "users", id, "accounts", query],
-      queryFn: () =>
-        handle(api.admin.users[":id"].accounts.$get, {
-          schema: getUserAccountsResponseSchema,
-        })({
-          query,
-          param: {
-            id,
-          },
-        }),
-    }),
+    >["query"] & { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "users", id, "accounts", query],
+        queryFn: () =>
+          handle(api.admin.users[":id"].accounts.$get, {
+            schema: getUserAccountsResponseSchema,
+          })({
+            query,
+            param: {
+              id,
+            },
+          }),
+      }),
     getPlans: ({
       id,
       ...query
     }: InferRequestType<
       (typeof api.admin.users)[":id"]["plans"]["$get"]
-    >["query"] & { id: string }) => ({
-      queryKey: [KEY, "users", id, "plans", query],
-      queryFn: () =>
-        handle(api.admin.users[":id"].plans.$get, {
-          schema: getUserPlansResponseSchema,
-        })({ query, param: { id } }),
-    }),
+    >["query"] & { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "users", id, "plans", query],
+        queryFn: () =>
+          handle(api.admin.users[":id"].plans.$get, {
+            schema: getUserPlansResponseSchema,
+          })({ query, param: { id } }),
+      }),
     getMemberships: ({
       id,
       ...query
     }: InferRequestType<
       (typeof api.admin.users)[":id"]["memberships"]["$get"]
-    >["query"] & { id: string }) => ({
-      queryKey: [KEY, "users", id, "memberships", query],
-      queryFn: () =>
-        handle(api.admin.users[":id"].memberships.$get, {
-          schema: getUserMembershipsResponseSchema,
-        })({ query, param: { id } }),
-    }),
+    >["query"] & { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "users", id, "memberships", query],
+        queryFn: () =>
+          handle(api.admin.users[":id"].memberships.$get, {
+            schema: getUserMembershipsResponseSchema,
+          })({ query, param: { id } }),
+      }),
     getInvitations: ({
       id,
       ...query
     }: InferRequestType<
       (typeof api.admin.users)[":id"]["invitations"]["$get"]
-    >["query"] & { id: string }) => ({
-      queryKey: [KEY, "users", id, "invitations", query],
-      queryFn: () =>
-        handle(api.admin.users[":id"].invitations.$get, {
-          schema: getUserInvitationsResponseSchema,
-        })({ query, param: { id } }),
-    }),
-    getSessions: ({ id }: { id: string }) => ({
-      queryKey: [KEY, "users", id, "sessions"],
-      queryFn: () =>
-        authClient.admin.listUserSessions({
-          userId: id,
-          fetchOptions: { throw: true },
-        }),
-    }),
+    >["query"] & { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "users", id, "invitations", query],
+        queryFn: () =>
+          handle(api.admin.users[":id"].invitations.$get, {
+            schema: getUserInvitationsResponseSchema,
+          })({ query, param: { id } }),
+      }),
+    getSessions: ({ id }: { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "users", id, "sessions"],
+        queryFn: () =>
+          authClient.admin.listUserSessions({
+            userId: id,
+            fetchOptions: { throw: true },
+          }),
+      }),
   },
   organizations: {
-    get: ({ id }: { id: string }) => ({
-      queryKey: [KEY, "organizations", id],
-      queryFn: () =>
-        handle(api.admin.organizations[":id"].$get, {
-          schema: getOrganizationResponseSchema,
-        })({
-          param: { id },
-        }),
-    }),
+    get: ({ id }: { id: string }) =>
+      queryOptions({
+        queryKey: [KEY, "organizations", id],
+        queryFn: () =>
+          handle(api.admin.organizations[":id"].$get, {
+            schema: getOrganizationResponseSchema,
+          })({
+            param: { id },
+          }),
+      }),
     getMembers: ({
       id,
       ...query
     }: InferRequestType<
       (typeof api.admin.organizations)[":id"]["members"]["$get"]
-    >["query"] & { id: string }) => ({
-      queryKey: [
-        ...queries.organizations.get({ id }).queryKey,
-        "members",
-        query,
-      ],
-      queryFn: () =>
-        handle(api.admin.organizations[":id"].members.$get, {
-          schema: getMembersResponseSchema,
-        })({
+    >["query"] & { id: string }) =>
+      queryOptions({
+        queryKey: [
+          ...queries.organizations.get({ id }).queryKey,
+          "members",
           query,
-          param: {
-            id,
-          },
-        }),
-    }),
+        ],
+        queryFn: () =>
+          handle(api.admin.organizations[":id"].members.$get, {
+            schema: getMembersResponseSchema,
+          })({
+            query,
+            param: {
+              id,
+            },
+          }),
+      }),
     getInvitations: ({
       id,
       ...query
     }: InferRequestType<
       (typeof api.admin.organizations)[":id"]["invitations"]["$get"]
-    >["query"] & { id: string }) => ({
-      queryKey: [
-        ...queries.organizations.get({ id }).queryKey,
-        "invitations",
-        query,
-      ],
-      queryFn: () =>
-        handle(api.admin.organizations[":id"].invitations.$get, {
-          schema: getInvitationsResponseSchema,
-        })({ query, param: { id } }),
-    }),
+    >["query"] & { id: string }) =>
+      queryOptions({
+        queryKey: [
+          ...queries.organizations.get({ id }).queryKey,
+          "invitations",
+          query,
+        ],
+        queryFn: () =>
+          handle(api.admin.organizations[":id"].invitations.$get, {
+            schema: getInvitationsResponseSchema,
+          })({ query, param: { id } }),
+      }),
   },
 };
 
 const mutations = {
   users: {
-    ban: {
+    ban: mutationOptions({
       mutationKey: [KEY, "users", "ban"],
       mutationFn: (params: Parameters<typeof authClient.admin.banUser>[0]) =>
         authClient.admin.banUser(params),
-    },
-    unban: {
+    }),
+    unban: mutationOptions({
       mutationKey: [KEY, "users", "unban"],
       mutationFn: (params: Parameters<typeof authClient.admin.unbanUser>[0]) =>
         authClient.admin.unbanUser(params),
-    },
-    delete: {
+    }),
+    delete: mutationOptions({
       mutationKey: [KEY, "users", "delete"],
       mutationFn: (params: Parameters<typeof authClient.admin.removeUser>[0]) =>
         authClient.admin.removeUser(params),
-    },
-    impersonate: {
+    }),
+    impersonate: mutationOptions({
       mutationKey: [KEY, "users", "impersonate"],
       mutationFn: (
         params: Parameters<typeof authClient.admin.impersonateUser>[0],
       ) => authClient.admin.impersonateUser(params),
-    },
-    stopImpersonating: {
+    }),
+    stopImpersonating: mutationOptions({
       mutationKey: [KEY, "users", "impersonate", "stop"],
       mutationFn: () => authClient.admin.stopImpersonating(),
-    },
-    update: {
+    }),
+    update: mutationOptions({
       mutationKey: [KEY, "users", "update"],
       mutationFn: (params: Parameters<typeof authClient.admin.updateUser>[0]) =>
         authClient.admin.updateUser(params),
-    },
-    setPassword: {
+    }),
+    setPassword: mutationOptions({
       mutationKey: [KEY, "users", "setPassword"],
       mutationFn: (
         params: Parameters<typeof authClient.admin.setUserPassword>[0],
       ) => authClient.admin.setUserPassword(params),
-    },
+    }),
     accounts: {
-      delete: {
+      delete: mutationOptions({
         mutationKey: [KEY, "users", "accounts", "delete"],
         mutationFn: (
           param: InferRequestType<
@@ -188,25 +199,25 @@ const mutations = {
           handle(api.admin.users[":id"].accounts[":accountId"].$delete)({
             param,
           }),
-      },
+      }),
     },
     sessions: {
-      revoke: {
+      revoke: mutationOptions({
         mutationKey: [KEY, "users", "sessions", "revoke"],
         mutationFn: (
           params: Parameters<typeof authClient.admin.revokeUserSession>[0],
         ) => authClient.admin.revokeUserSession(params),
-      },
-      revokeAll: {
+      }),
+      revokeAll: mutationOptions({
         mutationKey: [KEY, "users", "sessions", "revokeAll"],
         mutationFn: (
           params: Parameters<typeof authClient.admin.revokeUserSessions>[0],
         ) => authClient.admin.revokeUserSessions(params),
-      },
+      }),
     },
   },
   organizations: {
-    delete: {
+    delete: mutationOptions({
       mutationKey: [KEY, "organizations", "delete"],
       mutationFn: (
         param: InferRequestType<
@@ -216,8 +227,8 @@ const mutations = {
         handle(api.admin.organizations[":id"].$delete)({
           param,
         }),
-    },
-    update: {
+    }),
+    update: mutationOptions({
       mutationKey: [KEY, "organizations", "update"],
       mutationFn: ({
         id,
@@ -226,9 +237,9 @@ const mutations = {
         (typeof api.admin.organizations)[":id"]["$patch"]
       >["json"] & { id: string }) =>
         handle(api.admin.organizations[":id"].$patch)({ param: { id }, json }),
-    },
+    }),
     members: {
-      remove: {
+      remove: mutationOptions({
         mutationKey: [KEY, "organizations", "members", "remove"],
         mutationFn: (
           param: InferRequestType<
@@ -238,8 +249,8 @@ const mutations = {
           handle(api.admin.organizations[":id"].members[":memberId"].$delete)({
             param,
           }),
-      },
-      update: {
+      }),
+      update: mutationOptions({
         mutationKey: [KEY, "organizations", "members", "update"],
         mutationFn: ({
           id,
@@ -252,10 +263,10 @@ const mutations = {
             param: { id, memberId },
             json,
           }),
-      },
+      }),
     },
     invitations: {
-      delete: {
+      delete: mutationOptions({
         mutationKey: [KEY, "organizations", "invitations", "delete"],
         mutationFn: (
           param: InferRequestType<
@@ -267,19 +278,19 @@ const mutations = {
           )({
             param,
           }),
-      },
+      }),
     },
   },
   customers: {
-    delete: {
+    delete: mutationOptions({
       mutationKey: [KEY, "customers", "delete"],
       mutationFn: (
         param: InferRequestType<
           (typeof api.admin.customers)[":id"]["$delete"]
         >["param"],
       ) => handle(api.admin.customers[":id"].$delete)({ param }),
-    },
-    update: {
+    }),
+    update: mutationOptions({
       mutationKey: [KEY, "customers", "update"],
       mutationFn: ({
         id,
@@ -291,7 +302,7 @@ const mutations = {
           param: { id },
           json,
         }),
-    },
+    }),
   },
 };
 

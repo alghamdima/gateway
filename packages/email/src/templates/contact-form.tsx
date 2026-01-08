@@ -1,6 +1,7 @@
 import { Heading, Preview, Row, Column } from "@react-email/components";
 import * as React from "react";
 
+import { isKey } from "@workspace/i18n";
 import { getTranslation } from "@workspace/i18n/server";
 
 import { Layout } from "./_components/layout/layout";
@@ -11,7 +12,7 @@ import type { EmailVariables } from "../types";
 type Props = EmailVariables[typeof EmailTemplate.CONTACT_FORM];
 
 export const ContactForm = async (props: Props) => {
-  const { t } = await getTranslation({ ns: "marketing" });
+  const { t, i18n } = await getTranslation({ ns: ["common", "marketing"] });
 
   return (
     <Layout>
@@ -23,7 +24,10 @@ export const ContactForm = async (props: Props) => {
       {Object.entries(props).map(([key, value]) => (
         <Row key={key}>
           <Column>
-            <strong>{key}</strong>: {value}
+            <strong>
+              {isKey(key, i18n, "common") ? t(`common:${key}`) : key}
+            </strong>
+            : {value}
           </Column>
         </Row>
       ))}

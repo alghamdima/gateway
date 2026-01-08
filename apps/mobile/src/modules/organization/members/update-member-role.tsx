@@ -37,14 +37,8 @@ import { authClient } from "~/lib/auth";
 import { organization } from "~/modules/organization/lib/api";
 import { WIDTH } from "~/utils/device";
 
-import type { MemberRole as MemberRoleType } from "@workspace/auth";
 import type { Member, UpdateMemberPayload } from "@workspace/auth";
 import type { BottomSheetContentRef } from "@workspace/ui-mobile/bottom-sheet";
-
-interface UpdateMemberRoleVariables {
-  memberId: string;
-  role: MemberRoleType;
-}
 
 interface UpdateMemberRoleBottomSheetProps {
   readonly member: Member;
@@ -70,11 +64,7 @@ export const UpdateMemberRoleBottomSheet = ({
     },
   });
 
-  const updateMemberRole = useMutation<
-    unknown,
-    Error,
-    UpdateMemberRoleVariables
-  >({
+  const updateMemberRole = useMutation({
     ...organization.mutations.members.updateRole,
     onSuccess: async (_, variables) => {
       await queryClient.invalidateQueries(
@@ -85,7 +75,7 @@ export const UpdateMemberRoleBottomSheet = ({
       Alert.alert(t("members.update.role.success"));
       ref?.current?.dismiss();
       sheet.close();
-      form.reset({ role: variables.role });
+      form.reset({ role: toMemberRole(variables.role) });
     },
   });
 

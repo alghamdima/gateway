@@ -30,19 +30,7 @@ export const MembersList = () => {
     ...pickBy(filters, Boolean),
   };
 
-  const members = useInfiniteQuery({
-    queryKey: organization.queries.members.getAll(params).queryKey,
-    queryFn: ({ pageParam }) =>
-      organization.queries.members
-        .getAll({
-          ...params,
-          page: pageParam.toString(),
-        })
-        .queryFn(),
-    initialPageParam: 1,
-    getNextPageParam: ({ total }, pages) =>
-      total > pages.length * perPage ? pages.length + 1 : undefined,
-  });
+  const members = useInfiniteQuery(organization.queries.members.getAll(params));
 
   const data = members.data?.pages.flatMap((page) => page.data) ?? [];
 

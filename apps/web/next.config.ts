@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-import env from "./env.config";
+import "./env.config";
 
 const INTERNAL_PACKAGES = [
   "@workspace/analytics-web",
@@ -44,8 +44,4 @@ const config: NextConfig = {
   },
 };
 
-const withBundleAnalyzer = require("@next/bundle-analyzer")({
-  enabled: env.ANALYZE,
-});
-
-export default withBundleAnalyzer(config);
+export default config;

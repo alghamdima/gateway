@@ -21,7 +21,6 @@ export default defineEnv({
   extends: [vercel, api, analytics, i18n],
   shared: {
     NODE_ENV: z.enum(NodeEnv).default(NodeEnv.DEVELOPMENT),
-    ANALYZE: castStringToBool.optional().default(false),
   },
   /**
    * Specify your server-side environment variables schema here.

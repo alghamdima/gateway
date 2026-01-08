@@ -73,7 +73,7 @@ export const usePlan = (
 
   const handleCheckout = (user: User | null) => {
     if (!user) {
-      const url = new URL(pathsConfig.auth.login);
+      const url = new URL(pathsConfig.auth.login, appConfig.url);
       url.searchParams.set("redirectTo", pathsConfig.marketing.pricing);
       return router.push(url.toString());
     }
@@ -97,7 +97,7 @@ export const usePlan = (
 
   const handleOpenPortal = (user: User | null) => {
     if (!user) {
-      const url = new URL(pathsConfig.auth.login);
+      const url = new URL(pathsConfig.auth.login, appConfig.url);
       url.searchParams.set("redirectTo", pathsConfig.marketing.pricing);
       return router.push(url.toString());
     }

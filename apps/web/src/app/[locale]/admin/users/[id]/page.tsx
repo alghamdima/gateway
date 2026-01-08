@@ -46,10 +46,7 @@ export default async function UserPage({
   }
 
   const queryClient = getQueryClient();
-  await queryClient.setQueryData(
-    admin.queries.users.get({ id }).queryKey,
-    user,
-  );
+  queryClient.setQueryData(admin.queries.users.get({ id }).queryKey, user);
 
   const sections = [
     {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -28,6 +28,8 @@ export const PasskeyLogin = ({
     useAuthFormStore();
   const { t } = useTranslation(["auth", "common"]);
 
+  const queryClient = useQueryClient();
+
   const signIn = useMutation({
     ...auth.mutations.signIn.passkey,
     onMutate: () => {
@@ -43,8 +45,11 @@ export const PasskeyLogin = ({
   });
 
   useEffect(() => {
-    void auth.mutations.signIn.passkey.mutationFn({ autoFill: true });
-  }, []);
+    void queryClient
+      .getMutationCache()
+      .build(queryClient, auth.mutations.signIn.passkey)
+      .execute({ autoFill: true });
+  }, [queryClient]);
 
   return (
     <Button

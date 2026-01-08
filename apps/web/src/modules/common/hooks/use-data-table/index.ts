@@ -4,16 +4,15 @@ import { useSearchParamsDataTable } from "./search-params";
 
 import type { UseLocalDataTableProps } from "./local";
 import type { UseSearchParamsDataTableProps } from "./search-params";
-import type { useQuery } from "@tanstack/react-query";
-import type { UseQueryOptions } from "@tanstack/react-query";
+import type { QueryKey, useQuery } from "@tanstack/react-query";
 import type { useReactTable } from "@tanstack/react-table";
 
 export function useDataTable<
   TData,
   TQueryFnData extends { data?: TData[]; total?: number },
-  TQuery extends UseQueryOptions<TQueryFnData>,
+  TQueryKey extends QueryKey,
 >(
-  props: UseLocalDataTableProps<TData, TQueryFnData, TQuery>,
+  props: UseLocalDataTableProps<TData, TQueryFnData, TQueryKey>,
 ): {
   table: ReturnType<typeof useReactTable<TData>>;
   query: ReturnType<typeof useQuery<TQueryFnData>>;
@@ -25,10 +24,10 @@ export function useDataTable<TData>(
 export function useDataTable<
   TData,
   TQueryFnData extends { data?: TData[]; total?: number },
-  TQuery extends UseQueryOptions<TQueryFnData>,
+  TQueryKey extends QueryKey,
 >(
   props:
-    | UseLocalDataTableProps<TData, TQueryFnData, TQuery>
+    | UseLocalDataTableProps<TData, TQueryFnData, TQueryKey>
     | UseSearchParamsDataTableProps<TData>,
 ) {
   if (props.persistance === "local") {

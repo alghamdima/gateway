@@ -2,10 +2,13 @@ import { openai } from "@ai-sdk/openai";
 import { convertToModelMessages, streamText } from "ai";
 import { Hono } from "hono";
 
-export const aiRouter = new Hono().post("/chat", async (c) =>
-  streamText({
+import type { UIMessage } from "ai";
+
+export const aiRouter = new Hono().post("/chat", async (c) => {
+  const { messages }: { messages: UIMessage[] } = await c.req.json();
+
+  return streamText({
     model: openai.responses("gpt-4.1-nano"),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    messages: convertToModelMessages((await c.req.json()).messages),
-  }).toUIMessageStreamResponse(),
-);
+    messages: await convertToModelMessages(messages),
+  }).toUIMessageStreamResponse();
+});

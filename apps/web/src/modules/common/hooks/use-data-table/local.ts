@@ -16,7 +16,7 @@ import { useDebounceCallback } from "@workspace/shared/hooks";
 import { DEBOUNCE_MS, getFiltersFromColumnFilters } from "./common";
 
 import type { CommonProps } from "./common";
-import type { UseQueryOptions } from "@tanstack/react-query";
+import type { QueryKey, UseQueryOptions } from "@tanstack/react-query";
 import type {
   ColumnFiltersState,
   PaginationState,
@@ -29,8 +29,8 @@ import type { TableOptions } from "@tanstack/react-table";
 
 export interface UseLocalDataTableProps<
   TData,
-  TQueryFnData extends { data?: TData[]; pageCount?: number },
-  TQuery extends UseQueryOptions<TQueryFnData>,
+  TQueryFnData extends { data?: TData[]; total?: number },
+  TQueryKey extends QueryKey,
 > extends CommonProps,
     Omit<TableOptions<TData>, "data" | "state" | "getCoreRowModel"> {
   persistance: "local";
@@ -39,14 +39,14 @@ export interface UseLocalDataTableProps<
     perPage: number;
     sorting: SortingState;
     filters: Record<string, string | string[] | null>;
-  }) => TQuery;
+  }) => UseQueryOptions<TQueryFnData, Error, TQueryFnData, TQueryKey>;
 }
 
 export function useLocalDataTable<
   TData,
   TQueryFnData extends { data?: TData[]; total?: number },
-  TQuery extends UseQueryOptions<TQueryFnData>,
->(props: UseLocalDataTableProps<TData, TQueryFnData, TQuery>) {
+  TQueryKey extends QueryKey,
+>(props: UseLocalDataTableProps<TData, TQueryFnData, TQueryKey>) {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>(
     props.initialState?.rowSelection ?? {},
   );

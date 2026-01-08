@@ -3,8 +3,10 @@ import { some } from "hono/combine";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { logger as loggerMiddleware } from "hono/logger";
+import { statusMonitor } from "hono-status-monitor";
 
 import { auth } from "@workspace/auth/server";
+import { db } from "@workspace/db/server";
 import { logger } from "@workspace/shared/logger";
 import { matchesPattern } from "@workspace/shared/utils";
 
@@ -18,6 +20,17 @@ import { storageRouter } from "./modules/storage/router";
 import { onError } from "./utils/on-error";
 
 import type { Context } from "hono";
+
+const monitor = statusMonitor({
+  healthCheck: async () => {
+    const start = performance.now();
+    await db.execute(`SELECT 1`);
+    return {
+      connected: true,
+      latencyMs: performance.now() - start,
+    };
+  },
+});
 
 const appRouter = new Hono()
   .basePath("/api")
@@ -43,7 +56,8 @@ const appRouter = new Hono()
   .use(loggerMiddleware((...args) => logger.info(...args)))
   .use(delay)
   .use(localize)
-  .get("/health", (c) => c.json({ status: "ok" }))
+  .use(monitor.middleware)
+  .route("/status", monitor.routes)
   .route("/admin", adminRouter)
   .route("/ai", aiRouter)
   .route("/auth", authRouter)

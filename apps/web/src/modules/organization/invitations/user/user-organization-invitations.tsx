@@ -84,7 +84,8 @@ const UserOrganizationInvitationsListModalItem = ({
   const { refetch } = authClient.useListOrganizations();
 
   const { data, isLoading } = useQuery({
-    ...organization.queries.get({ id: invitation.organizationId }),
+    queryKey: organization.queries.get({ id: invitation.organizationId })
+      .queryKey,
     queryFn: () =>
       handle(api.organizations[":id"].$get)({
         param: { id: invitation.organizationId },
