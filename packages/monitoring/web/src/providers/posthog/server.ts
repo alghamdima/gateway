@@ -16,7 +16,7 @@ export function getPostHogServer() {
   return posthogInstance;
 }
 
-export const { captureException, initialize, onRequestError } = {
+export const strategy = {
   captureException: (exception, extra = undefined) => {
     const posthog = getPostHogServer();
 

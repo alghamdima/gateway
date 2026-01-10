@@ -1,8 +1,10 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 
+import { getActivePlan } from "@workspace/billing";
+import { useCustomer } from "@workspace/billing-mobile";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import {
@@ -27,21 +29,29 @@ import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
-import { useCustomer } from "~/modules/billing/hooks/use-customer";
+import { billing } from "~/modules/billing/lib/api";
 import { Spinner } from "~/modules/common/spinner";
 import { organization } from "~/modules/organization/lib/api";
 
 import { CreateOrganizationBottomSheet } from "./create-organization";
 
 export const AccountSwitcher = () => {
-  const { t } = useTranslation(["common", "auth", "organization"]);
+  const { t } = useTranslation(["common", "auth", "billing", "organization"]);
   const [open, setOpen] = useState(false);
 
   const session = authClient.useSession();
   const organizations = authClient.useListOrganizations();
   const activeOrganization = authClient.useActiveOrganization();
   const activeMember = authClient.useActiveMember();
-  const customer = useCustomer();
+
+  const { entitlements } = useCustomer();
+  const summary = useQuery(billing.queries.summary.get);
+  const activePlan = getActivePlan(
+    summary.data?.map((customer) => ({
+      ...customer,
+      entitlements,
+    })),
+  );
 
   const createOrganizationBottomSheet = useBottomSheet();
   const setActiveOrganization = useMutation({
@@ -107,11 +117,11 @@ export const AccountSwitcher = () => {
                   ? activeOrganization.data.name
                   : t("account.personal")}
               </Text>
-              {customer.isPending ? (
+              {summary.isPending ? (
                 <Skeleton className="mt-1.5 h-3 w-20" />
               ) : (
-                <Text className="text-muted-foreground font-sans leading-tight capitalize">
-                  {(customer.data?.plan ?? "free").toLowerCase()}
+                <Text className="text-muted-foreground font-sans leading-tight">
+                  {t(`plan.${activePlan}.name`)}
                 </Text>
               )}
             </View>

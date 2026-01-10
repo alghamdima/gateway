@@ -4,7 +4,7 @@ A dedicated guide for coding agents working on the Turbostarter monorepo. Use th
 
 ## Quickstart
 
-- Ensure versions: Node ≥ 22.17.0, pnpm 10.25.x (repo pins `pnpm@10.25.0` via `packageManager`)
+- Ensure versions: Node ≥ 22.17.0, pnpm 10.27.x (repo pins `pnpm@10.27.0` via `packageManager`)
 - Create `.env` at repo root (loaded automatically by root scripts via `pnpm with-env`):
 
 ```bash

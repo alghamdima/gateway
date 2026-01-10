@@ -1,14 +1,11 @@
-type Replace<
-  S extends string,
-  From extends string,
-  To extends string,
-> = S extends `${infer L}${From}${infer R}`
-  ? `${L}${To}${Replace<R, From, To>}`
-  : S;
-
 export type EnumToConstant<T extends readonly string[]> = {
-  [K in Uppercase<Replace<T[number], "-", "_">>]: Extract<
-    T[number],
-    Lowercase<Replace<K, "_", "-">>
-  >;
+  [K in Uppercase<T[number]>]: T[number] extends infer V
+    ? V extends string
+      ? Uppercase<V> extends K
+        ? V
+        : never
+      : never
+    : never;
 };
+
+export type Override<T, R> = Omit<T, keyof R> & R;

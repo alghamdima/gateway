@@ -5,17 +5,15 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getSignedUrlCommand } from "@aws-sdk/s3-request-presigner";
 
-import { getClient } from "./client";
+import { s3 } from "./sdk";
 
 import type { GetObjectUrlInput } from "../../lib/schema";
 import type { StorageProviderStrategy } from "../types";
 
-export const { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl } = {
+export const strategy = {
   getUploadUrl: async ({ path, bucket }: GetObjectUrlInput) => {
-    const client = getClient();
-
     const url = await getSignedUrlCommand(
-      client,
+      s3(),
       new PutObjectCommand({
         Bucket: bucket,
         Key: path,
@@ -28,10 +26,8 @@ export const { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl } = {
     return { url };
   },
   getSignedUrl: async ({ path, bucket }: GetObjectUrlInput) => {
-    const client = getClient();
-
     const url = await getSignedUrlCommand(
-      client,
+      s3(),
       new GetObjectCommand({
         Bucket: bucket,
         Key: path,
@@ -44,8 +40,7 @@ export const { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl } = {
     return { url };
   },
   getPublicUrl: async ({ path, bucket }: GetObjectUrlInput) => {
-    const client = getClient();
-    const endpoint = await client.config.endpoint?.();
+    const endpoint = await s3().config.endpoint?.();
 
     if (endpoint?.hostname.includes("supabase.co")) {
       return {
@@ -58,10 +53,8 @@ export const { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl } = {
     };
   },
   getDeleteUrl: async ({ path, bucket }: GetObjectUrlInput) => {
-    const client = getClient();
-
     const url = await getSignedUrlCommand(
-      client,
+      s3(),
       new DeleteObjectCommand({
         Bucket: bucket,
         Key: path,

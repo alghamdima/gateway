@@ -168,9 +168,7 @@ export function AreaChart() {
     <Card className="w-full">
       <CardHeader className="items-center gap-4">
         <View className="items-center">
-          <CardTitle className="text-lg leading-tight">
-            {t("chart.area")}
-          </CardTitle>
+          <CardTitle>{t("chart.area")}</CardTitle>
           <CardDescription>{t("chart.showing")}</CardDescription>
         </View>
 

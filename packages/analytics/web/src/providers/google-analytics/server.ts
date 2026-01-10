@@ -29,7 +29,7 @@ const postEvent = async (
   }
 };
 
-export const { track } = {
+export const strategy = {
   track: (event, data) => {
     void postEvent(event, data);
   },

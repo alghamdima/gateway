@@ -4,7 +4,7 @@ import { env } from "./env";
 
 import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
-export const { track } = {
+export const strategy = {
   track: (event, data) => {
     const url = typeof data?.url === "string" ? data.url : "app://server-side";
     const referrer =

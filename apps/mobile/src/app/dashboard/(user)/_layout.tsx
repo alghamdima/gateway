@@ -16,7 +16,7 @@ export default function UserLayout() {
       initialRouteName="index"
       screenOptions={{
         tabBarStyle: {
-          paddingTop: 6,
+          paddingTop: 4,
         },
         animation: "fade",
         transitionSpec: {
@@ -35,7 +35,7 @@ export default function UserLayout() {
           title: t("home"),
           tabBarIcon: ({ focused }) => (
             <Icons.House
-              size={22}
+              size={24}
               className={cn("text-muted-foreground", {
                 "text-primary": focused,
               })}
@@ -51,7 +51,7 @@ export default function UserLayout() {
           title: t("ai"),
           tabBarIcon: ({ focused }) => (
             <Icons.WandSparkles
-              size={22}
+              size={24}
               className={cn("text-muted-foreground", {
                 "text-primary": focused,
               })}
@@ -67,7 +67,7 @@ export default function UserLayout() {
           title: t("settings"),
           tabBarIcon: ({ focused }) => (
             <Icons.Settings
-              size={22}
+              size={24}
               className={cn("text-muted-foreground", {
                 "text-primary": focused,
               })}

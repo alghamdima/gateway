@@ -1,1 +1,3 @@
-export { Provider, track, identify, reset } from "./providers";
+import { strategy } from "./providers";
+
+export const { Provider, track, identify, reset } = strategy;

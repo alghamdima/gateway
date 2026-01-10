@@ -94,7 +94,7 @@ const postEvent = async (
   }
 };
 
-export const { track, identify, reset } = {
+export const strategy = {
   track: (name, params) => {
     void postEvent(name, params);
   },

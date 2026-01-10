@@ -2,7 +2,7 @@ import { track as vercelTrack } from "@vercel/analytics/server";
 
 import type { AnalyticsProviderServerStrategy } from "@workspace/analytics";
 
-export const { track } = {
+export const strategy = {
   track: (event, data) => {
     void vercelTrack(event, data);
   },

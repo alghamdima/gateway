@@ -1,5 +1,7 @@
 import { hc } from "hono/client";
 
+import { Platform } from "@workspace/shared/constants";
+
 import { appConfig } from "~/config/app";
 
 import type { AppRouter } from "@workspace/api";
@@ -10,6 +12,6 @@ export const getBaseUrl = () => {
 
 export const { api } = hc<AppRouter>(getBaseUrl(), {
   headers: {
-    "x-client-platform": "extension",
+    "x-client-platform": Platform.EXTENSION,
   },
 });

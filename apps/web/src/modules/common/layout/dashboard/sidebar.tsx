@@ -46,7 +46,7 @@ export const DashboardSidebar = memo<DashboardSidebarProps>(
     return (
       <Sidebar
         collapsible="icon"
-        className="top-(--banner-height) h-[calc(100svh-var(--banner-height))]"
+        className="top-(--banner-height,0px) h-[calc(100svh-var(--banner-height,0px))]"
       >
         <SidebarHeader>
           <AccountSwitcher user={user} />

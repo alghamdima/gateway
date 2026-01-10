@@ -37,7 +37,7 @@ export default function RequiredStep() {
       <ScrollView
         bounces={false}
         showsVerticalScrollIndicator={false}
-        className="pt-4"
+        className="py-4"
       >
         <View className="items-start gap-6">
           <View className="items-start gap-1">

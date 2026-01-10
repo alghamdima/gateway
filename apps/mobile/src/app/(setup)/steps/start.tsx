@@ -14,7 +14,7 @@ export default function StartStep() {
   return (
     <>
       <ScrollView
-        className="pt-4"
+        className="py-4"
         bounces={false}
         showsVerticalScrollIndicator={false}
       >

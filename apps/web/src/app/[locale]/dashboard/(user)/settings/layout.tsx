@@ -53,7 +53,7 @@ export default async function SettingsLayout({
       </DashboardHeader>
       <div className="flex w-full gap-3">
         <div className="hidden w-96 lg:block">
-          <div className="sticky top-[calc(var(--banner-height)+theme(spacing.6))]">
+          <div className="sticky top-[calc(var(--banner-height,0px)+(--spacing(6)))]">
             <SettingsNav
               links={LINKS.map((link) => ({
                 ...link,

@@ -34,7 +34,7 @@ const init = async () => {
   });
 };
 
-export const { track, identify, reset } = {
+export const strategy = {
   track: (name, params) => {
     void (async () => {
       await init();

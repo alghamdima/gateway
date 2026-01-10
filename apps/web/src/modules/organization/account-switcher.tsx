@@ -1,9 +1,10 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { memo, useState } from "react";
 
-import { PricingPlanType } from "@workspace/billing";
+import { getActivePlan } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import {
@@ -27,10 +28,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@workspace/ui-web/sidebar";
+import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
-import { useCustomer } from "~/modules/billing/hooks/use-customer";
+import { billing } from "~/modules/billing/lib/api";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { CreateOrganizationModal } from "~/modules/organization/create-organization";
 
@@ -43,14 +45,15 @@ interface AccountSwitcherProps {
 }
 
 export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
-  const { t } = useTranslation(["common", "auth", "organization"]);
+  const { t } = useTranslation(["common", "auth", "billing", "organization"]);
   const { isMobile } = useSidebar();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
   const [createOrganizationOpen, setCreateOrganizationOpen] = useState(false);
 
-  const { data: customer } = useCustomer();
+  const summary = useQuery(billing.queries.summary.get);
+  const activePlan = getActivePlan(summary.data);
   const { data: organizations } = authClient.useListOrganizations();
   const { activeOrganization } = useActiveOrganization();
 
@@ -95,9 +98,13 @@ export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
                     ? activeOrganization.name
                     : t("account.personal")}
                 </span>
-                <span className="text-muted-foreground truncate text-xs capitalize">
-                  {(customer?.plan ?? PricingPlanType.FREE).toLowerCase()}
-                </span>
+                {summary.isPending ? (
+                  <Skeleton className="mt-1 h-3 w-20" />
+                ) : (
+                  <span className="text-muted-foreground truncate text-xs capitalize">
+                    {t(`plan.${activePlan}.name`)}
+                  </span>
+                )}
               </div>
 
               <Icons.ChevronsUpDown className="ml-auto" />

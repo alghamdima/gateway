@@ -15,33 +15,18 @@ import {
 
 import { Discount } from "./discount";
 
-import type {
-  Discount as DiscountType,
-  PricingPlanPrice,
-  RecurringInterval,
-} from "@workspace/billing";
+import type { RecurringInterval } from "@workspace/billing";
 
 interface PricingHeaderProps {
-  readonly currency: string;
   readonly model: BillingModel;
   readonly intervals: RecurringInterval[];
   readonly activeInterval: RecurringInterval;
   readonly onIntervalChange: (billing: RecurringInterval) => void;
-  readonly priceWithDiscount?: PricingPlanPrice & {
-    discount: DiscountType | undefined;
-  };
 }
 
 export const PricingHeader = memo<PricingHeaderProps>(
-  ({
-    model,
-    activeInterval,
-    intervals,
-    onIntervalChange,
-    priceWithDiscount,
-    currency,
-  }) => {
-    const { t } = useTranslation("billing");
+  ({ model, activeInterval, intervals, onIntervalChange }) => {
+    const { t } = useTranslation(["common", "billing"]);
 
     return (
       <SectionHeader>
@@ -51,12 +36,7 @@ export const PricingHeader = memo<PricingHeaderProps>(
           {t("pricing.description")}
         </SectionDescription>
 
-        <Discount
-          {...(priceWithDiscount && {
-            priceWithDiscount,
-          })}
-          currency={currency}
-        />
+        <Discount />
 
         {model === BillingModel.RECURRING && intervals.length > 0 && (
           <Tabs
@@ -74,7 +54,7 @@ export const PricingHeader = memo<PricingHeaderProps>(
                   className="capitalize"
                   aria-controls={undefined}
                 >
-                  {t(`interval.${interval}`)}
+                  {t(interval)}
                 </TabsTrigger>
               ))}
             </TabsList>

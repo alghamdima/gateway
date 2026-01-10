@@ -17,7 +17,7 @@ const init = () => {
   });
 };
 
-export const { Provider, track, identify, reset } = {
+export const strategy = {
   Provider: ({ children }) => {
     useEffect(() => {
       init();

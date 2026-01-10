@@ -1,1 +1,3 @@
-export { captureException, identify, initialize } from "./providers";
+import { strategy } from "./providers";
+
+export const { captureException, identify, initialize } = strategy;

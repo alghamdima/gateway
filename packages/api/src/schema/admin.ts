@@ -6,37 +6,27 @@ import {
   SocialProvider,
   UserRole,
 } from "@workspace/auth";
-import { BillingStatus, PricingPlanType } from "@workspace/billing";
-import { updateCustomerSchema } from "@workspace/db/schema";
-import { offsetPaginationSchema, sortSchema } from "@workspace/shared/schema";
+import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
+import {
+  selectCustomerSchema,
+  selectOrderSchema,
+  selectSubscriptionSchema,
+} from "@workspace/db/schema";
+import { offsetPaginationSchema } from "@workspace/shared/schema";
+
+import {
+  sortQuerySchema,
+  multiValueQuerySchema,
+  rangeQuerySchema,
+} from "./shared";
 
 export const getUsersInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
+  sort: sortQuerySchema.optional(),
   q: z.string().optional(),
-  role: z
-    .union([
-      z.enum(UserRole).transform((val) => [val]),
-      z.array(z.enum(UserRole)),
-    ])
-    .optional(),
-  twoFactorEnabled: z
-    .union([
-      z.coerce.boolean().transform((val) => [val]),
-      z.array(z.coerce.boolean()),
-    ])
-    .optional(),
-  banned: z
-    .union([
-      z.coerce.boolean().transform((val) => [val]),
-      z.array(z.coerce.boolean()),
-    ])
-    .optional(),
-  createdAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+  role: multiValueQuerySchema(z.enum(UserRole)).optional(),
+  twoFactorEnabled: multiValueQuerySchema(z.coerce.boolean()).optional(),
+  banned: multiValueQuerySchema(z.coerce.boolean()).optional(),
+  createdAt: rangeQuerySchema.optional(),
 });
 
 export type GetUsersInput = z.infer<typeof getUsersInputSchema>;
@@ -65,71 +55,48 @@ export const getUsersResponseSchema = z.object({
 export type GetUsersResponse = z.infer<typeof getUsersResponseSchema>;
 
 export const getUserAccountsInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
-  providerId: z
-    .union([
-      z
-        .enum(["credential", ...Object.values(SocialProvider)])
-        .transform((val) => [val]),
-      z.array(z.enum(["credential", ...Object.values(SocialProvider)])),
-    ])
-    .optional(),
-  createdAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
-  updatedAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+  sort: sortQuerySchema.optional(),
+  providerId: multiValueQuerySchema(
+    z.enum(["credential", ...Object.values(SocialProvider)]),
+  ).optional(),
+  createdAt: rangeQuerySchema.optional(),
+  updatedAt: rangeQuerySchema.optional(),
 });
 
 export type GetUserAccountsInput = z.infer<typeof getUserAccountsInputSchema>;
 
-export const getUserPlansInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
-  plan: z
-    .union([
-      z.enum(PricingPlanType).transform((val) => [val]),
-      z.array(z.enum(PricingPlanType)),
-    ])
-    .nullable()
-    .optional(),
-  status: z
-    .union([
-      z.enum(BillingStatus).transform((val) => [val]),
-      z.array(z.enum(BillingStatus)),
-    ])
-    .nullable()
-    .optional(),
-  createdAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+export const getUserSubscriptionsInputSchema = offsetPaginationSchema.extend({
+  sort: sortQuerySchema.optional(),
+  status: multiValueQuerySchema(z.enum(SubscriptionStatus)).optional(),
+  createdAt: rangeQuerySchema.optional(),
 });
 
-export type GetUserPlansInput = z.infer<typeof getUserPlansInputSchema>;
+export type GetUserSubscriptionsInput = z.infer<
+  typeof getUserSubscriptionsInputSchema
+>;
 
-export const getUserPlansResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      id: z.string(),
-      userId: z.string(),
-      customerId: z.string(),
-      plan: z.enum(PricingPlanType).nullable(),
-      status: z.enum(BillingStatus).nullable(),
-      createdAt: z.coerce.date(),
-      updatedAt: z.coerce.date(),
-      user: z.object({
-        name: z.string(),
-      }),
-    }),
-  ),
+export const getUserSubscriptionsResponseSchema = z.object({
+  data: z.array(selectSubscriptionSchema),
   total: z.number(),
 });
 
-export type GetUserPlansResponse = z.infer<typeof getUserPlansResponseSchema>;
+export type GetUserSubscriptionsResponse = z.infer<
+  typeof getUserSubscriptionsResponseSchema
+>;
+
+export const getUserOrdersInputSchema = offsetPaginationSchema.extend({
+  sort: sortQuerySchema.optional(),
+  status: multiValueQuerySchema(z.enum(PaymentStatus)).optional(),
+  store: multiValueQuerySchema(z.string()).optional(),
+  createdAt: rangeQuerySchema.optional(),
+});
+export type GetUserOrdersInput = z.infer<typeof getUserOrdersInputSchema>;
+
+export const getUserOrdersResponseSchema = z.object({
+  data: z.array(selectOrderSchema),
+  total: z.number(),
+});
+export type GetUserOrdersResponse = z.infer<typeof getUserOrdersResponseSchema>;
 
 export const getUserAccountsResponseSchema = z.object({
   data: z.array(
@@ -150,19 +117,9 @@ export type GetUserAccountsResponse = z.infer<
 >;
 
 export const getUserMembershipsInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
-  role: z
-    .union([
-      z.enum(MemberRole).transform((val) => [val]),
-      z.array(z.enum(MemberRole)),
-    ])
-    .optional(),
-  createdAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+  sort: sortQuerySchema.optional(),
+  role: multiValueQuerySchema(z.enum(MemberRole)).optional(),
+  createdAt: rangeQuerySchema.optional(),
 });
 
 export type GetUserMembershipsInput = z.infer<
@@ -198,25 +155,10 @@ export type GetUserMembershipsResponse = z.infer<
 >;
 
 export const getUserInvitationsInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
-  role: z
-    .union([
-      z.enum(MemberRole).transform((val) => [val]),
-      z.array(z.enum(MemberRole)),
-    ])
-    .optional(),
-  status: z
-    .union([
-      z.enum(InvitationStatus).transform((val) => [val]),
-      z.array(z.enum(InvitationStatus)),
-    ])
-    .optional(),
-  expiresAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+  sort: sortQuerySchema.optional(),
+  role: multiValueQuerySchema(z.enum(MemberRole)).optional(),
+  status: multiValueQuerySchema(z.enum(InvitationStatus)).optional(),
+  expiresAt: rangeQuerySchema.optional(),
 });
 
 export type GetUserInvitationsInput = z.infer<
@@ -249,15 +191,10 @@ export type GetUserInvitationsResponse = z.infer<
 >;
 
 export const getOrganizationsInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
+  sort: sortQuerySchema.optional(),
   q: z.string().optional(),
-  createdAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
-  members: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+  createdAt: rangeQuerySchema.optional(),
+  members: rangeQuerySchema.optional(),
 });
 
 export type GetOrganizationsInput = z.infer<typeof getOrganizationsInputSchema>;
@@ -298,50 +235,35 @@ export type GetOrganizationResponse = z.infer<
 >;
 
 export const getCustomersInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
+  sort: sortQuerySchema.optional(),
   q: z.string().optional(),
-  plan: z
-    .union([
-      z.enum(PricingPlanType).transform((val) => [val]),
-      z.array(z.enum(PricingPlanType)),
-    ])
-    .optional(),
-  status: z
-    .union([
-      z.enum(BillingStatus).transform((val) => [val]),
-      z.array(z.enum(BillingStatus)),
-    ])
-    .optional(),
-  createdAt: z.tuple([z.coerce.number(), z.coerce.number()]).optional(),
+  provider: multiValueQuerySchema(z.string()).optional(),
+  subscriptions: rangeQuerySchema.optional(),
+  orders: rangeQuerySchema.optional(),
+  createdAt: rangeQuerySchema.optional(),
 });
 
 export type GetCustomersInput = z.infer<typeof getCustomersInputSchema>;
 
 export const getCustomersResponseSchema = z.object({
   data: z.array(
-    z.object({
-      id: z.string(),
-      customerId: z.string(),
-      userId: z.string(),
-      plan: z.enum(PricingPlanType).nullable(),
-      status: z.enum(BillingStatus).nullable(),
-      createdAt: z.coerce.date(),
-      updatedAt: z.coerce.date(),
+    selectCustomerSchema.extend({
       user: z.object({
         name: z.string(),
         image: z.string().nullish(),
       }),
+      subscriptions: z.number(),
+      orders: z.number(),
     }),
   ),
   total: z.number(),
+  max: z.object({
+    subscriptions: z.number(),
+    orders: z.number(),
+  }),
+  options: z.object({
+    provider: z.array(z.string()),
+  }),
 });
 
 export type GetCustomersResponse = z.infer<typeof getCustomersResponseSchema>;
-
-export { updateCustomerSchema as updateCustomerInputSchema };
-export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;

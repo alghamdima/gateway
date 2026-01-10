@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -22,7 +22,7 @@
     "@expo-google-fonts/geist": "0.4.1",
     "@expo-google-fonts/geist-mono": "0.4.1",
     "@expo/metro-runtime": "~6.1.2",
-    "@hookform/resolvers": "5.2.2",
+    "@hookform/resolvers": "catalog:",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-google-signin/google-signin": "16.0.0",
     "@react-native-menu/menu": "2.0.0",
@@ -34,6 +34,7 @@
     "@workspace/api": "workspace:*",
     "@workspace/auth": "workspace:*",
     "@workspace/billing": "workspace:*",
+    "@workspace/billing-mobile": "workspace:*",
     "@workspace/cms": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/i18n": "workspace:*",
@@ -87,7 +88,7 @@
     "uniwind": "1.2.2",
     "victory-native": "41.20.1",
     "zod": "catalog:",
-    "zustand": "5.0.9"
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:react19",

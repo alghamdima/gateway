@@ -1,5 +1,6 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 
+import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
 
 import { api } from "~/lib/api/client";
@@ -9,10 +10,13 @@ import type { InferRequestType } from "hono/client";
 const KEY = "billing";
 
 const queries = {
-  customer: {
+  summary: {
     get: queryOptions({
-      queryKey: [KEY, "customer"],
-      queryFn: () => handle(api.billing.customer.$get)(),
+      queryKey: [KEY, "me"],
+      queryFn: () =>
+        handle(api.billing.me.$get, {
+          schema: getBillingSummaryResponseSchema,
+        })(),
     }),
   },
 };

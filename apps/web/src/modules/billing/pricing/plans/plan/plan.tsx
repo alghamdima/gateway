@@ -1,6 +1,15 @@
+import { useQuery } from "@tanstack/react-query";
 import { memo } from "react";
 
-import { BillingModel, formatPrice } from "@workspace/billing";
+import {
+  BillingModel,
+  calculateDiscount,
+  calculateRecurringDiscount,
+  formatPrice,
+  getActivePlan,
+  getLowerPlans,
+  getVariantDiscount,
+} from "@workspace/billing";
 import { isKey, useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-web/badge";
@@ -9,47 +18,110 @@ import { Card } from "@workspace/ui-web/card";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
-import { useCustomer } from "~/modules/billing/hooks/use-customer";
+import { billing } from "~/modules/billing/lib/api";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import { usePlan } from "./hooks/use-plan";
 
 import type { User } from "@workspace/auth";
 import type {
-  Discount,
-  PricingPlan,
-  RecurringInterval,
+  BillingConfigPlan,
+  BillingConfigVariant,
+  BillingConfigDiscount,
 } from "@workspace/billing";
 
+const Price = ({
+  variant,
+  discount,
+}: {
+  variant: BillingConfigVariant;
+  discount?: BillingConfigDiscount;
+}) => {
+  const { t, i18n } = useTranslation(["common", "billing"]);
+
+  const priceWithDiscount = discount
+    ? calculateDiscount(variant, discount)
+    : variant.model === BillingModel.RECURRING
+      ? calculateRecurringDiscount(variant)
+      : null;
+
+  const renderInterval = () =>
+    !variant.custom && (
+      <span className="text-muted-foreground shrink-0 text-lg">
+        /{" "}
+        {variant.model === BillingModel.RECURRING
+          ? t(variant.interval)
+          : t("lifetime")}
+      </span>
+    );
+
+  if (priceWithDiscount) {
+    return (
+      <p className="relative flex w-fit items-end gap-1 py-2">
+        <span className="text-muted-foreground mr-2 text-lg line-through md:text-xl">
+          {formatPrice(
+            {
+              amount: priceWithDiscount.original.cost,
+              currency: priceWithDiscount.original.currency,
+            },
+            i18n.language,
+          )}
+        </span>
+        <span className="text-4xl font-bold tracking-tighter md:text-5xl">
+          {formatPrice(
+            {
+              amount: priceWithDiscount.discounted.cost,
+              currency: priceWithDiscount.discounted.currency,
+            },
+            i18n.language,
+          )}
+        </span>
+        {renderInterval()}
+      </p>
+    );
+  }
+
+  return (
+    <p className="relative flex items-end gap-1 py-2">
+      <span className="text-4xl font-bold tracking-tighter md:text-5xl">
+        {variant.custom
+          ? isKey(variant.label, i18n, "billing")
+            ? t(variant.label)
+            : variant.label
+          : formatPrice(
+              {
+                amount: variant.cost,
+                currency: variant.currency,
+              },
+              i18n.language,
+            )}
+      </span>
+      {renderInterval()}
+    </p>
+  );
+};
+
 interface PlanProps {
-  readonly plan: PricingPlan;
+  readonly plan: BillingConfigPlan;
   readonly user: User | null;
-  readonly interval: RecurringInterval;
-  readonly model: BillingModel;
-  readonly currency: string;
-  readonly discounts: Discount[];
 }
 
-export const Plan = memo<PlanProps>(
-  ({ plan, interval, user, model, currency, discounts }) => {
-    const { data: customer } = useCustomer();
-    const { t, i18n } = useTranslation(["common", "billing"]);
-    const {
-      features,
-      price,
-      discount,
-      isPending,
-      handleCheckout,
-      handleOpenPortal,
-      hasPlan,
-    } = usePlan(plan, { model, interval, discounts, currency });
+export const Plan = memo<PlanProps>(({ plan, user }) => {
+  const { t, i18n } = useTranslation(["common", "billing"]);
 
-    if (!price) {
-      return null;
-    }
+  const summary = useQuery(billing.queries.summary.get);
+  const activePlan = getActivePlan(summary.data);
+
+  const { features, isPending, handleCheckout, handleOpenPortal } =
+    usePlan(plan);
+
+  const hasPlan = !getLowerPlans(plan.id).some((p) => p.id === activePlan);
+
+  return plan.variants.map((variant) => {
+    const discount = getVariantDiscount(variant);
 
     return (
-      <div className="grow basis-[350px] rounded-lg">
+      <div className="grow basis-[350px] rounded-lg" key={variant.id}>
         <Card
           className={cn(
             "relative flex h-full flex-col gap-6 px-7 py-6 md:p-8",
@@ -61,62 +133,25 @@ export const Plan = memo<PlanProps>(
               {isKey(plan.badge, i18n, "billing") ? t(plan.badge) : plan.badge}
             </Badge>
           )}
+
           <div>
             <span className="text-lg font-semibold">
               {isKey(plan.name, i18n, "billing") ? t(plan.name) : plan.name}
             </span>
-            <p className="relative flex items-end gap-1 py-2">
-              {discount?.original &&
-                "amount" in discount.original &&
-                typeof discount.original.amount === "number" &&
-                discount.percentage > 0 && (
-                  <span className="text-muted-foreground mr-2 text-lg line-through md:text-xl">
-                    {formatPrice(
-                      {
-                        amount: discount.original.amount,
-                        currency,
-                      },
-                      i18n.language,
-                    )}
-                  </span>
-                )}
-              <span className="text-4xl font-bold tracking-tighter md:text-5xl">
-                {price.custom
-                  ? isKey(price.label, i18n, "billing")
-                    ? t(price.label)
-                    : price.label
-                  : formatPrice(
-                      {
-                        amount:
-                          discount?.discounted &&
-                          "amount" in discount.discounted
-                            ? discount.discounted.amount
-                            : price.amount,
-                        currency,
-                      },
-                      i18n.language,
-                    )}
-              </span>
-              {!price.custom && (
-                <span className="text-muted-foreground shrink-0 text-lg">
-                  /{" "}
-                  {price.type === BillingModel.RECURRING
-                    ? t(`interval.${price.interval}`)
-                    : t("interval.lifetime")}
-                </span>
-              )}
-            </p>
-            <span className="text-sm">
+
+            <Price variant={variant} discount={discount} />
+
+            <p className="text-sm">
               {isKey(plan.description, i18n, "billing")
                 ? t(plan.description)
                 : plan.description}
-            </span>
+            </p>
           </div>
 
           <div className="flex flex-col gap-1">
-            {features?.map((feature) => (
+            {features.map((feature) => (
               <div
-                key={feature.title}
+                key={feature.id}
                 className={cn("flex items-center gap-3 py-1", {
                   "opacity-50": !feature.available,
                 })}
@@ -134,42 +169,40 @@ export const Plan = memo<PlanProps>(
                   )}
                 </div>
                 <span className="text-md">
-                  {isKey(feature.title, i18n, "billing")
-                    ? t(feature.title)
-                    : feature.title}
-                  {"addon" in feature && (
-                    <span className="ml-2 whitespace-nowrap">
-                      &nbsp;{feature.addon}
-                    </span>
-                  )}
+                  {isKey(feature.key, i18n, "billing")
+                    ? t(feature.key)
+                    : feature.key}
                 </span>
               </div>
             ))}
           </div>
 
           <div className="mt-auto flex flex-col gap-2">
-            {"trialDays" in price &&
-              price.trialDays &&
-              !hasPlan(customer?.plan ?? null) && (
-                <Button
-                  variant="outline"
-                  onClick={() => handleCheckout(user)}
-                  disabled={isPending}
-                >
-                  {isPending ? (
-                    <Icons.Loader2 className="animate-spin" />
-                  ) : (
-                    t("trial.period", { period: price.trialDays })
-                  )}
-                </Button>
-              )}
-            {price.custom ? (
-              <TurboLink href={price.href} className={buttonVariants()}>
-                {hasPlan(customer?.plan ?? null)
-                  ? t("manage.plan.title")
-                  : t("getStarted")}
+            {"trialDays" in variant && variant.trialDays && !hasPlan && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  handleCheckout({
+                    user,
+                    variant: { id: variant.id },
+                    ...(discount ? { discount: { code: discount.code } } : {}),
+                  })
+                }
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <Icons.Loader2 className="animate-spin" />
+                ) : (
+                  t("trial.period", { period: variant.trialDays })
+                )}
+              </Button>
+            )}
+
+            {variant.custom ? (
+              <TurboLink href={variant.href} className={buttonVariants()}>
+                {hasPlan ? t("manage") : t("getStarted")}
               </TurboLink>
-            ) : price.amount === 0 ? (
+            ) : variant.cost === 0 ? (
               <TurboLink
                 href={
                   user
@@ -183,19 +216,23 @@ export const Plan = memo<PlanProps>(
             ) : (
               <Button
                 onClick={() =>
-                  model === BillingModel.RECURRING &&
-                  hasPlan(customer?.plan ?? null)
-                    ? handleOpenPortal(user)
-                    : handleCheckout(user)
+                  variant.model === BillingModel.RECURRING && hasPlan
+                    ? handleOpenPortal({ user })
+                    : handleCheckout({
+                        user,
+                        variant: { id: variant.id },
+                        ...(discount
+                          ? { discount: { code: discount.code } }
+                          : {}),
+                      })
                 }
                 disabled={isPending}
               >
                 {isPending ? (
                   <Icons.Loader2 className="animate-spin" />
-                ) : model === BillingModel.RECURRING &&
-                  hasPlan(customer?.plan ?? null) ? (
-                  t("manage.plan.title")
-                ) : model === BillingModel.RECURRING ? (
+                ) : variant.model === BillingModel.RECURRING && hasPlan ? (
+                  t("manage")
+                ) : variant.model === BillingModel.RECURRING ? (
                   t("subscribe")
                 ) : (
                   t("getLifetimeAccess")
@@ -206,7 +243,7 @@ export const Plan = memo<PlanProps>(
         </Card>
       </div>
     );
-  },
-);
+  });
+});
 
 Plan.displayName = "Plan";

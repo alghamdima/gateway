@@ -4,12 +4,7 @@ import { env } from "./env";
 
 import type { MonitoringProviderClientStrategy } from "../types";
 
-export const {
-  captureException,
-  identify,
-  initialize,
-  onRouterTransitionStart,
-} = {
+export const strategy = {
   captureException: (exception) => {
     posthog.captureException(exception);
   },
@@ -26,6 +21,6 @@ export const {
     });
   },
   onRouterTransitionStart: () => {
-    /*  PostHog does not provide a way to capture router transitions yet */
+    /* PostHog does not provide a way to capture router transitions yet */
   },
 } satisfies MonitoringProviderClientStrategy;

@@ -20,7 +20,7 @@ const getClient = () => {
   return client;
 };
 
-export const { captureException, identify, initialize } = {
+export const strategy = {
   captureException: (exception) => {
     const posthog = getClient();
     posthog.captureException(exception);

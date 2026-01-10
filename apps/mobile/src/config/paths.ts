@@ -19,8 +19,7 @@ const pathsConfig = {
     steps: {
       start: `${STEPS_PREFIX}/start`,
       required: `${STEPS_PREFIX}/required`,
-      skip: `${STEPS_PREFIX}/skip`,
-      final: `${STEPS_PREFIX}/final`,
+      paywall: `${STEPS_PREFIX}/paywall`,
     },
   },
   dashboard: {
@@ -53,6 +52,7 @@ const pathsConfig = {
           index: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/organization`,
           name: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/organization/name`,
         },
+        billing: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/billing`,
       },
       members: `${ORGANIZATION_DASHBOARD_PREFIX}/members`,
     },

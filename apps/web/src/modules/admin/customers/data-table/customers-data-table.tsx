@@ -20,8 +20,8 @@ export const CustomersDataTable = ({
   promise,
   perPage,
 }: CustomersDataTableProps) => {
-  const columns = useColumns();
-  const { data, total } = use(promise);
+  const { data, total, max, options } = use(promise);
+  const columns = useColumns({ max, options });
 
   const { table } = useDataTable({
     persistance: "searchParams",

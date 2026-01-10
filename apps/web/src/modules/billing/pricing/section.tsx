@@ -3,12 +3,11 @@
 import { memo, useState } from "react";
 
 import {
-  RecurringInterval,
-  RecurringIntervalDuration,
   config,
-  getPriceWithHighestDiscount,
+  BillingModel,
+  RecurringInterval,
+  getFilteredPlans,
 } from "@workspace/billing";
-import { useTranslation } from "@workspace/i18n";
 import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { Section, SectionHeader } from "~/modules/marketing/layout/section";
@@ -17,53 +16,44 @@ import { PricingHeader } from "./layout/header";
 import { Plans, PlansSkeleton } from "./plans/plans";
 
 import type { User } from "@workspace/auth";
-import type { BillingModel } from "@workspace/billing";
 
 interface PricingSectionProps {
   readonly user: User | null;
-  readonly model: BillingModel;
 }
 
-export const PricingSection = memo<PricingSectionProps>(({ user, model }) => {
-  const { t } = useTranslation("billing");
-
+export const PricingSection = memo<PricingSectionProps>(({ user }) => {
   const intervals = [
     ...new Set(
       config.plans.flatMap((plan) =>
-        plan.prices
-          .flatMap((price) => ("interval" in price ? price.interval : null))
-          .filter((x): x is RecurringInterval => !!x),
+        plan.variants
+          .flatMap((variant) =>
+            "interval" in variant ? variant.interval : null,
+          )
+          .filter(Boolean),
       ),
     ),
-  ].sort((a, b) => RecurringIntervalDuration[a] - RecurringIntervalDuration[b]);
+  ];
 
   const [activeInterval, setActiveInterval] = useState<RecurringInterval>(
     intervals[0] ?? RecurringInterval.MONTH,
   );
 
-  const priceWithDiscount = getPriceWithHighestDiscount(
-    config.plans,
-    config.discounts,
-  );
+  const filters = {
+    model: BillingModel.RECURRING,
+    interval: activeInterval,
+    hidden: false,
+  };
+  const filteredPlans = getFilteredPlans(filters);
 
   return (
     <Section id="pricing" className="gap-10 sm:gap-12 md:gap-16 lg:gap-20">
       <PricingHeader
-        currency={t("currency")}
-        model={model}
         intervals={intervals}
+        model={BillingModel.RECURRING}
         activeInterval={activeInterval}
         onIntervalChange={setActiveInterval}
-        {...(priceWithDiscount && { priceWithDiscount })}
       />
-      <Plans
-        plans={config.plans}
-        interval={activeInterval}
-        model={model}
-        currency={t("currency")}
-        discounts={config.discounts}
-        user={user}
-      />
+      <Plans plans={filteredPlans} user={user} />
     </Section>
   );
 });

@@ -22,9 +22,20 @@ env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
 
 jobs:
-  test:
-    name: 🧪 Test
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: 🖌️ Format
+            run: pnpm run format
+          - name: 🛻 Lint
+            run: pnpm run lint && pnpm run lint:ws
+          - name: 📝 Typecheck
+            run: pnpm run typecheck
+          - name: 🧪 Test
+            run: pnpm run test
     steps:
       - name: ✅ Checkout code
         uses: actions/checkout@v5
@@ -34,14 +45,5 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: 🖌️ Format
-        run: pnpm run format
-
-      - name: 🛻 Lint
-        run: pnpm run lint && pnpm run lint:ws
-
-      - name: 📝 Typecheck
-        run: pnpm run typecheck
-
-      - name: 🧪 Test
-        run: pnpm run test
+      - name: ▶️ Run
+        run: ${{ matrix.run }}

@@ -168,7 +168,7 @@ export const useColumns = (): ColumnDef<Invitation>[] => {
           <div className="flex items-center gap-3">
             <Avatar>
               <AvatarFallback>
-                <Icons.UserRound className="w-4" />
+                <Icons.UserRound className="w-5" />
               </AvatarFallback>
             </Avatar>
             <span className="truncate font-medium">{row.original.email}</span>

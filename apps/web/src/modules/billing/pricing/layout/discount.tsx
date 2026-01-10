@@ -1,66 +1,50 @@
 "use client";
 
-import { memo } from "react";
-
 import {
-  calculatePriceDiscount,
-  formatPrice,
   BillingDiscountType,
+  calculateDiscount,
+  getVariantWithHighestDiscount,
+  formatPrice,
 } from "@workspace/billing";
 import { Trans } from "@workspace/i18n";
 import { Icons } from "@workspace/ui-web/icons";
 
-import type {
-  Discount as DiscountType,
-  PricingPlanPrice,
-} from "@workspace/billing";
+export const Discount = () => {
+  const variantWithHighestDiscount = getVariantWithHighestDiscount();
 
-interface DiscountProps {
-  readonly currency: string;
-  readonly priceWithDiscount?: PricingPlanPrice & {
-    discount: DiscountType | undefined;
-  };
-}
+  if (!variantWithHighestDiscount?.discount) {
+    return null;
+  }
 
-export const Discount = memo<DiscountProps>(
-  ({ priceWithDiscount, currency }) => {
-    if (!priceWithDiscount?.discount) {
-      return null;
-    }
+  const discount = calculateDiscount(
+    variantWithHighestDiscount,
+    variantWithHighestDiscount.discount,
+  );
 
-    const discount = calculatePriceDiscount(
-      priceWithDiscount,
-      priceWithDiscount.discount,
-    );
+  if (!discount) {
+    return null;
+  }
 
-    if (!discount) {
-      return null;
-    }
-
-    return (
-      <p className="sm mt-2 text-center md:text-lg">
-        <Icons.Gift className="text-primary mr-1.5 mb-1.5 inline-block h-5 w-5" />
-        <span className="text-primary">
-          <Trans
-            i18nKey="billing:discount.specialOffer"
-            values={{
-              discount:
-                discount.type === BillingDiscountType.PERCENT
-                  ? discount.percentage + "%"
-                  : formatPrice({
-                      amount:
-                        discount.original.amount - discount.discounted.amount,
-                      currency,
-                    }),
-            }}
-            components={{
-              bold: <span className="font-semibold" />,
-            }}
-          />
-        </span>
-      </p>
-    );
-  },
-);
-
-Discount.displayName = "Discount";
+  return (
+    <p className="sm mt-2 text-center md:text-lg">
+      <Icons.Gift className="text-primary mr-1.5 mb-1.5 inline-block h-5 w-5" />
+      <span className="text-primary">
+        <Trans
+          i18nKey="billing:discount.specialOffer"
+          values={{
+            discount:
+              discount.type === BillingDiscountType.PERCENT
+                ? `${discount.percentage}%`
+                : formatPrice({
+                    amount: discount.original.cost - discount.discounted.cost,
+                    currency: discount.discounted.currency,
+                  }),
+          }}
+          components={{
+            bold: <span className="font-semibold" />,
+          }}
+        />
+      </span>
+    </p>
+  );
+};

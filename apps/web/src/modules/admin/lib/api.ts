@@ -7,7 +7,8 @@ import {
   getUserAccountsResponseSchema,
   getUserInvitationsResponseSchema,
   getUserMembershipsResponseSchema,
-  getUserPlansResponseSchema,
+  getUserOrdersResponseSchema,
+  getUserSubscriptionsResponseSchema,
 } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
 
@@ -35,32 +36,42 @@ const queries = {
       ...query
     }: InferRequestType<
       (typeof api.admin.users)[":id"]["accounts"]["$get"]
-    >["query"] & { id: string }) =>
-      queryOptions({
-        queryKey: [KEY, "users", id, "accounts", query],
-        queryFn: () =>
-          handle(api.admin.users[":id"].accounts.$get, {
-            schema: getUserAccountsResponseSchema,
-          })({
-            query,
-            param: {
-              id,
-            },
-          }),
-      }),
-    getPlans: ({
+    >["query"] & { id: string }) => ({
+      queryKey: [KEY, "users", id, "accounts", query],
+      queryFn: () =>
+        handle(api.admin.users[":id"].accounts.$get, {
+          schema: getUserAccountsResponseSchema,
+        })({
+          query,
+          param: {
+            id,
+          },
+        }),
+    }),
+    getSubscriptions: ({
       id,
       ...query
     }: InferRequestType<
-      (typeof api.admin.users)[":id"]["plans"]["$get"]
-    >["query"] & { id: string }) =>
-      queryOptions({
-        queryKey: [KEY, "users", id, "plans", query],
-        queryFn: () =>
-          handle(api.admin.users[":id"].plans.$get, {
-            schema: getUserPlansResponseSchema,
-          })({ query, param: { id } }),
-      }),
+      (typeof api.admin.users)[":id"]["subscriptions"]["$get"]
+    >["query"] & { id: string }) => ({
+      queryKey: [KEY, "users", id, "subscriptions", query],
+      queryFn: () =>
+        handle(api.admin.users[":id"].subscriptions.$get, {
+          schema: getUserSubscriptionsResponseSchema,
+        })({ query, param: { id } }),
+    }),
+    getOrders: ({
+      id,
+      ...query
+    }: InferRequestType<
+      (typeof api.admin.users)[":id"]["orders"]["$get"]
+    >["query"] & { id: string }) => ({
+      queryKey: [KEY, "users", id, "orders", query],
+      queryFn: () =>
+        handle(api.admin.users[":id"].orders.$get, {
+          schema: getUserOrdersResponseSchema,
+        })({ query, param: { id } }),
+    }),
     getMemberships: ({
       id,
       ...query
@@ -280,29 +291,6 @@ const mutations = {
           }),
       }),
     },
-  },
-  customers: {
-    delete: mutationOptions({
-      mutationKey: [KEY, "customers", "delete"],
-      mutationFn: (
-        param: InferRequestType<
-          (typeof api.admin.customers)[":id"]["$delete"]
-        >["param"],
-      ) => handle(api.admin.customers[":id"].$delete)({ param }),
-    }),
-    update: mutationOptions({
-      mutationKey: [KEY, "customers", "update"],
-      mutationFn: ({
-        id,
-        ...json
-      }: InferRequestType<
-        (typeof api.admin.customers)[":id"]["$patch"]
-      >["json"] & { id: string }) =>
-        handle(api.admin.customers[":id"].$patch)({
-          param: { id },
-          json,
-        }),
-    }),
   },
 };
 

@@ -4,12 +4,7 @@ import { env } from "./env";
 
 import type { MonitoringProviderClientStrategy } from "../types";
 
-export const {
-  captureException,
-  identify,
-  initialize,
-  onRouterTransitionStart,
-} = {
+export const strategy = {
   captureException: (exception) => {
     Sentry.captureException(exception);
   },

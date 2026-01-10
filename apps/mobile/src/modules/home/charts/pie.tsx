@@ -78,9 +78,7 @@ export function PieChart() {
     <Card className="w-full pb-2">
       <CardHeader className="flex-row items-start justify-between gap-0.5">
         <View>
-          <CardTitle className="text-lg leading-tight">
-            {t("chart.pie")}
-          </CardTitle>
+          <CardTitle>{t("chart.pie")}</CardTitle>
           <CardDescription>{t("chart.period")}</CardDescription>
         </View>
 

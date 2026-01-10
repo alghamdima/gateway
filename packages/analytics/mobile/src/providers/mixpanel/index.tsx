@@ -17,7 +17,7 @@ const mixpanel = new Mixpanel(
 
 void mixpanel.init();
 
-export const { Provider, track, identify, reset } = {
+export const strategy = {
   Provider: ({ children }) => {
     const granted = useTrackingPermissions();
 

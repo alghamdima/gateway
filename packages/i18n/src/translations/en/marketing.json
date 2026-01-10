@@ -78,7 +78,7 @@
     "reviews": {
       "jack": {
         "name": "Jack",
-        "position": "Full Stack Developer",
+        "position": "Software Engineer",
         "body": "The starter freed our team from boilerplate work. We swapped in our copy over a weekend and focused on features customers actually wanted."
       },
       "jill": {
@@ -218,13 +218,21 @@
             "privacy": "I've read and agree to the <a>Privacy Policy</a>"
           }
         },
-        "skip": {
-          "title": "This is a skip step",
-          "description": "You can skip this step and proceed to the next step"
-        },
-        "final": {
-          "title": "This is a final step",
-          "description": "You have completed all the steps, enjoy your new app!"
+        "paywall": {
+          "title": "This is a paywall step",
+          "description": "You can encourage users to purchase the product here or allow them to skip for free",
+          "cta": "Present paywall",
+          "state": {
+            "title": "Paywall state",
+            "description": "Live status updates from the paywall flow, including loading, completion, and errors.",
+            "status": {
+              "opening": "Opening paywall…",
+              "dismissed": "Paywall dismissed",
+              "skipped": "Paywall skipped",
+              "error": "Paywall error",
+              "idle": "Paywall idle"
+            }
+          }
         }
       }
     }

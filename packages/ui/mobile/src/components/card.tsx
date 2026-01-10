@@ -24,7 +24,7 @@ function CardHeader({
   ...props
 }: React.ComponentPropsWithoutRef<typeof View> & React.RefAttributes<ViewRef>) {
   return (
-    <View className={cn("flex flex-col gap-1.5 p-5", className)} {...props} />
+    <View className={cn("flex flex-col gap-1 p-5", className)} {...props} />
   );
 }
 
@@ -37,7 +37,7 @@ function CardTitle({
       role="heading"
       aria-level={3}
       className={cn(
-        "font-sans-medium text-card-foreground text-2xl leading-none tracking-tight",
+        "font-sans-medium text-card-foreground text-lg leading-tight tracking-tight",
         className,
       )}
       {...props}

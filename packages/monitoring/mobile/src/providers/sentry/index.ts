@@ -4,7 +4,7 @@ import { env } from "./env";
 
 import type { MonitoringProviderStrategy } from "@workspace/monitoring";
 
-export const { captureException, identify, initialize } = {
+export const strategy = {
   captureException: (exception) => {
     Sentry.captureException(exception);
   },

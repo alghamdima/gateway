@@ -1,31 +1,136 @@
-import * as Linking from "expo-linking";
-import { Pressable } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { View } from "react-native";
 
+import {
+  BillingPlan,
+  findPlanById,
+  SubscriptionStatus,
+} from "@workspace/billing";
+import { usePaywall } from "@workspace/billing-mobile";
 import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-mobile/badge";
+import { Button } from "@workspace/ui-mobile/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+  CardContent,
+} from "@workspace/ui-mobile/card";
+import { Icons } from "@workspace/ui-mobile/icons";
+import { Skeleton } from "@workspace/ui-mobile/skeleton";
 import { Text } from "@workspace/ui-mobile/text";
 
-export default function Billing() {
-  const { t } = useTranslation(["common", "marketing"]);
+import { FeaturesList } from "~/modules/billing/features-list";
+import { billing } from "~/modules/billing/lib/api";
+import { OrdersList } from "~/modules/billing/orders/list/orders-list";
+import { BillingInfo } from "~/modules/billing/portal/billing-info";
+import { SubscriptionsList } from "~/modules/billing/subscriptions/list/subscriptions-list";
+import { ScrollView } from "~/modules/common/styled";
+
+/**
+ * When there is no billing information available, we show an empty state
+ * that treats the user as a free user with an option to upgrade.
+ */
+const BillingEmpty = () => {
+  const { t } = useTranslation(["common", "billing"]);
+
+  const { present } = usePaywall();
+
+  const plan = findPlanById(BillingPlan.FREE);
+
+  if (!plan) {
+    return null;
+  }
 
   return (
-    <View className="bg-background flex flex-1 items-center justify-center px-6">
-      <View className="items-center gap-6 text-center">
-        <Text className="font-sans-bold mt-4 text-3xl tracking-tight">
-          {t("workInProgress.title")}
+    <View className="bg-background flex-1 gap-4 px-6 py-4">
+      <View className="gap-1">
+        <Text className="font-sans-semibold text-2xl tracking-tight">
+          {t("settings.yourPlan.title")}
         </Text>
-        <Text className="text-muted-foreground text-center text-pretty">
-          {t("workInProgress.description", { feature: t("billing") })}
+        <Text className="text-muted-foreground text-sm">
+          {t("settings.yourPlan.description")}
         </Text>
-        <Pressable
-          onPress={() =>
-            Linking.openURL("https://github.com/orgs/turbostarter/projects/1")
-          }
-          className="mt-6"
-        >
-          <Text className="text-primary underline">{t("seeRoadmap")}</Text>
-        </Pressable>
       </View>
+
+      <Card>
+        <CardHeader>
+          <View className="flex-row items-center justify-start gap-2">
+            <Icons.BadgeCheck size={20} />
+            <CardTitle>{t(`plan.${BillingPlan.FREE}.name`)}</CardTitle>
+            <Badge className="bg-success/15 active:bg-success/25 ml-1 capitalize">
+              <Text className="text-success">
+                {t(`subscription.status.${SubscriptionStatus.ACTIVE}`)}
+              </Text>
+            </Badge>
+          </View>
+
+          <CardDescription>
+            {t(`plan.${BillingPlan.FREE}.description`)}
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="gap-1">
+          <FeaturesList planId={BillingPlan.FREE} />
+        </CardContent>
+
+        <CardFooter>
+          <Button
+            className="w-full"
+            onPress={() =>
+              present({
+                trigger: "billing",
+              })
+            }
+          >
+            <Text>{t("upgrade")}</Text>
+          </Button>
+        </CardFooter>
+      </Card>
     </View>
+  );
+};
+
+const BillingLoading = () => {
+  return (
+    <View className="bg-background flex-1 gap-4 px-6 py-4">
+      <View className="gap-2">
+        <Skeleton className="h-9 w-44" style={{ width: 176 }} />
+        <Skeleton className="h-6 w-56" style={{ width: 224, height: 24 }} />
+      </View>
+
+      <Skeleton className="h-30" />
+      <Skeleton className="h-30" />
+    </View>
+  );
+};
+
+export default function Billing() {
+  const summary = useQuery(billing.queries.summary.get);
+
+  if (summary.isPending) {
+    return <BillingLoading />;
+  }
+
+  if (
+    summary.data?.every(
+      (customer) => !customer.subscriptions.length && !customer.orders.length,
+    )
+  ) {
+    return <BillingEmpty />;
+  }
+
+  return (
+    <ScrollView
+      className="bg-background px-6"
+      contentContainerClassName="gap-8 pt-4 pb-8"
+      showsVerticalScrollIndicator={false}
+    >
+      <SubscriptionsList />
+      <OrdersList />
+      <BillingInfo />
+    </ScrollView>
   );
 }

@@ -9,8 +9,9 @@ import {
   getOrderByFromSort,
   ilike,
   inArray,
+  sql,
 } from "@workspace/db";
-import { customer, user } from "@workspace/db/schema";
+import { customer, order, subscription, user } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
 import type { GetCustomersInput } from "../../../schema";
@@ -26,8 +27,7 @@ export const getCustomers = async (input: GetCustomersInput) => {
 
   const where = and(
     input.q ? ilike(user.name, `%${input.q}%`) : undefined,
-    input.status ? inArray(customer.status, input.status) : undefined,
-    input.plan ? inArray(customer.plan, input.plan) : undefined,
+    input.provider ? inArray(customer.provider, input.provider) : undefined,
     input.createdAt
       ? between(
           customer.createdAt,
@@ -37,43 +37,108 @@ export const getCustomers = async (input: GetCustomersInput) => {
       : undefined,
   );
 
+  const having = and(
+    input.subscriptions
+      ? between(
+          sql<number>`CAST(COUNT(${subscription.id}) AS INTEGER)`,
+          input.subscriptions[0],
+          input.subscriptions[1],
+        )
+      : undefined,
+    input.orders
+      ? between(
+          sql<number>`CAST(COUNT(${order.id}) AS INTEGER)`,
+          input.orders[0],
+          input.orders[1],
+        )
+      : undefined,
+  );
+
   const orderBy = input.sort
-    ? getOrderByFromSort({ sort: input.sort, defaultSchema: customer })
+    ? input.sort.flatMap((s) => {
+        const field = s.id.split(/[_.]/).pop() ?? s.id;
+        if (["subscriptions", "orders"].includes(field)) {
+          return [s.desc ? sql`${field} DESC` : sql`${field} ASC`];
+        }
+        return getOrderByFromSort({ sort: [s], defaultSchema: customer });
+      })
     : [asc(user.name)];
 
   return db.transaction(async (tx) => {
-    const data = await db
+    const results = await db
       .select({
         id: customer.id,
-        customerId: customer.customerId,
-        userId: customer.userId,
-        plan: customer.plan,
-        status: customer.status,
+        referenceId: customer.referenceId,
+        provider: customer.provider,
+        externalId: customer.externalId,
         createdAt: customer.createdAt,
         updatedAt: customer.updatedAt,
         user: {
           name: user.name,
           image: user.image,
         },
+        subscriptions:
+          sql<number>`CAST(COUNT(${subscription.id}) AS INTEGER)`.as(
+            "subscriptions",
+          ),
+        orders: sql<number>`CAST(COUNT(${order.id}) AS INTEGER)`.as("orders"),
+        total: sql<number>`COUNT(*) OVER()`.mapWith(Number).as("total"),
       })
       .from(customer)
-      .leftJoin(user, eq(customer.userId, user.id))
+      .leftJoin(user, eq(customer.referenceId, user.id))
+      .leftJoin(subscription, eq(customer.id, subscription.customerId))
+      .leftJoin(order, eq(customer.id, order.customerId))
       .where(where)
+      .groupBy(customer.id, user.id)
+      .having(having)
       .limit(input.perPage)
       .offset(offset)
       .orderBy(...orderBy);
 
-    const total = await tx
-      .select({ count: count() })
+    const subscriptionsMax = await tx
+      .select({
+        subscriptions:
+          sql<number>`CAST(COUNT(${subscription.id}) AS INTEGER)`.as(
+            "subscriptions",
+          ),
+      })
+      .from(subscription)
+      .groupBy(subscription.customerId)
+      .orderBy(sql`subscriptions DESC`)
+      .limit(1)
+      .then((res) => res[0]?.subscriptions ?? 0);
+
+    const ordersMax = await tx
+      .select({
+        orders: sql<number>`CAST(COUNT(${order.id}) AS INTEGER)`.as("orders"),
+      })
+      .from(order)
+      .groupBy(order.customerId)
+      .orderBy(sql`orders DESC`)
+      .limit(1)
+      .then((res) => res[0]?.orders ?? 0);
+
+    const providerOptions = await tx
+      .selectDistinct({
+        provider: customer.provider,
+      })
       .from(customer)
-      .leftJoin(user, eq(customer.userId, user.id))
-      .where(where)
-      .execute()
-      .then((res) => res[0]?.count ?? 0);
+      .orderBy(sql`provider ASC`)
+      .then((res) => res.map((r) => r.provider));
+
+    const data = results.map(({ total: _, ...rest }) => rest);
+    const total = results[0]?.total ?? 0;
 
     return {
       data,
       total,
+      max: {
+        subscriptions: subscriptionsMax,
+        orders: ordersMax,
+      },
+      options: {
+        provider: providerOptions,
+      },
     };
   });
 };

@@ -56,7 +56,7 @@ const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const { Provider, track, identify, reset } = {
+export const strategy = {
   Provider: ProviderComponent,
   track: (name, params) => {
     const client = getClient();

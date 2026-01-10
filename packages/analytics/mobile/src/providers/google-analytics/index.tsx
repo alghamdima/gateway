@@ -46,7 +46,7 @@ const useSetup = () => {
   }, [pathname, params, granted]);
 };
 
-export const { Provider, track, identify, reset } = {
+export const strategy = {
   Provider: ({ children }) => {
     useSetup();
 

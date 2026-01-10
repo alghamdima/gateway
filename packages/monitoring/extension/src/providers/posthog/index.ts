@@ -37,7 +37,7 @@ const init = async () => {
   });
 };
 
-export const { captureException, identify, initialize } = {
+export const strategy = {
   captureException: (exception) => {
     void (async () => {
       await init();

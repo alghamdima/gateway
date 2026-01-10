@@ -16,6 +16,7 @@ import {
   Moon,
   WandSparkles,
   CircleX,
+  ArrowUpRight,
   Undo2,
   ArrowUp,
   Globe2,
@@ -28,6 +29,8 @@ import {
   Share2,
   Download,
   Bell,
+  BadgeCheck,
+  BadgeX,
   ThumbsUp,
   Lock,
   Building,
@@ -41,6 +44,7 @@ import {
   AtSign,
   Key,
   ChevronsUpDown,
+  WalletCards,
   RefreshCw,
   Workflow,
   LogOut,
@@ -72,6 +76,8 @@ const icons = {
   Check,
   Key,
   ChevronDown,
+  BadgeCheck,
+  BadgeX,
   ChevronUp,
   Building,
   Settings,
@@ -113,7 +119,9 @@ const icons = {
   TrendingUp,
   UsersRound,
   UserRoundPlus,
+  ArrowUpRight,
   MonitorSmartphone,
+  WalletCards,
 };
 
 const Icons = {} as {

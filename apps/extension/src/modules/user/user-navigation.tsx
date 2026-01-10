@@ -1,7 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { memo } from "react";
 
 import { hasAdminPermission } from "@workspace/auth";
-import { PricingPlanType } from "@workspace/billing";
+import { getActivePlan } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
@@ -20,7 +21,7 @@ import { Icons } from "@workspace/ui-web/icons";
 import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { appConfig } from "~/config/app";
-import { useCustomer } from "~/modules/billing/hooks/use-customer";
+import { billing } from "~/modules/billing/lib/api";
 
 import { Logout } from "./logout";
 
@@ -85,9 +86,10 @@ interface UserNavigationProps {
 
 export const UserNavigation = memo<UserNavigationProps>(
   ({ user, organization }) => {
-    const { t } = useTranslation(["common", "auth"]);
+    const { t } = useTranslation(["common", "auth", "billing"]);
 
-    const customer = useCustomer();
+    const summary = useQuery(billing.queries.summary.get);
+    const activePlan = getActivePlan(summary.data);
 
     if (!user) {
       return <AnonymousUser />;
@@ -154,13 +156,11 @@ export const UserNavigation = memo<UserNavigationProps>(
                 <span className="truncate font-medium">
                   {organization ? organization.name : t("account.personal")}
                 </span>
-                {customer.isPending ? (
+                {summary.isPending ? (
                   <Skeleton className="mt-1 h-3 w-20" />
                 ) : (
                   <span className="text-muted-foreground truncate text-xs capitalize">
-                    {(
-                      customer.data?.plan ?? PricingPlanType.FREE
-                    ).toLowerCase()}
+                    {t(`plan.${activePlan}.name`)}
                   </span>
                 )}
               </div>

@@ -1,15 +1,9 @@
-import {
-  parseAsArrayOf,
-  parseAsInteger,
-  parseAsString,
-  parseAsStringEnum,
-} from "nuqs/server";
+import { parseAsArrayOf, parseAsInteger, parseAsString } from "nuqs/server";
 import { createSearchParamsCache } from "nuqs/server";
 import { Suspense } from "react";
 
 import { getCustomersResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
-import { BillingStatus, PricingPlanType } from "@workspace/billing";
 import { getTranslation } from "@workspace/i18n/server";
 import { pickBy } from "@workspace/shared/utils";
 import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
@@ -34,13 +28,10 @@ const searchParamsCache = createSearchParamsCache({
   perPage: parseAsInteger.withDefault(10),
   sort: getSortingStateParser().withDefault([{ id: "user.name", desc: false }]),
   q: parseAsString,
-  status: parseAsArrayOf(
-    parseAsStringEnum<BillingStatus>(Object.values(BillingStatus)),
-  ),
-  plan: parseAsArrayOf(
-    parseAsStringEnum<PricingPlanType>(Object.values(PricingPlanType)),
-  ),
   createdAt: parseAsArrayOf(parseAsInteger),
+  provider: parseAsArrayOf(parseAsString),
+  subscriptions: parseAsArrayOf(parseAsInteger),
+  orders: parseAsArrayOf(parseAsInteger),
 });
 
 export default async function CustomersPage(props: {

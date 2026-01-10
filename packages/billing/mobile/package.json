@@ -1,0 +1,40 @@
+{
+  "name": "@workspace/billing-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts",
+    "./server": "./src/server/index.ts",
+    "./server/env": "./src/server/env.ts"
+  },
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
+  },
+  "prettier": "@workspace/prettier-config",
+  "dependencies": {
+    "@better-fetch/fetch": "1.1.21",
+    "@workspace/billing": "workspace:*",
+    "@workspace/db": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "dayjs": "catalog:",
+    "envin": "catalog:",
+    "expo-iap": "3.4.0",
+    "expo-superwall": "1.0.0",
+    "react-native-purchases": "9.6.11",
+    "react-native-purchases-ui": "9.6.11",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/prettier-config": "workspace:*",
+    "@workspace/tsconfig": "workspace:*",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  }
+}

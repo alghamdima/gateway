@@ -61,11 +61,14 @@ const buttonTextVariants = cva("text-foreground font-sans-medium text-sm", {
   },
 });
 
-type ButtonProps = React.ComponentProps<typeof Pressable> &
+function Button({
+  className,
+  variant,
+  size,
+  ...props
+}: React.ComponentProps<typeof Pressable> &
   React.RefAttributes<typeof Pressable> &
-  VariantProps<typeof buttonVariants>;
-
-function Button({ className, variant, size, ...props }: ButtonProps) {
+  VariantProps<typeof buttonVariants>) {
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
@@ -82,4 +85,3 @@ function Button({ className, variant, size, ...props }: ButtonProps) {
 }
 
 export { Button, buttonTextVariants, buttonVariants };
-export type { ButtonProps };

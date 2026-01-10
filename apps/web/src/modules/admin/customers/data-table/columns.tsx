@@ -1,103 +1,21 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-
-import { BillingStatus, config } from "@workspace/billing";
-import { isKey, useTranslation } from "@workspace/i18n";
+import { useTranslation } from "@workspace/i18n";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import { Badge } from "@workspace/ui-web/badge";
-import { Button } from "@workspace/ui-web/button";
 import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
-import { admin } from "~/modules/admin/lib/api";
 import { TurboLink } from "~/modules/common/turbo-link";
-
-import { invalidateCustomers } from "../server/invalidate";
-import { UpdateCustomerPlanModal } from "../update-customer-plan";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { User } from "@workspace/auth";
 import type { Customer } from "@workspace/billing";
 
-export const CustomerActions = ({
-  customer,
-}: {
-  customer: Customer & { user: Pick<User, "name"> };
-}) => {
-  const { t } = useTranslation(["common", "admin", "billing"]);
-  const queryClient = useQueryClient();
-
-  const deleteCustomer = useMutation({
-    ...admin.mutations.customers.delete,
-    onSuccess: async () => {
-      await invalidateCustomers();
-      await queryClient.invalidateQueries(
-        admin.queries.users.getPlans({
-          id: customer.userId,
-        }),
-      );
-      toast.success(t("customers.customer.delete.success"));
-    },
-  });
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <span className="sr-only">{t("actions")}</span>
-          <Icons.Ellipsis className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <UpdateCustomerPlanModal
-          customer={customer}
-          key={`update-plan-${customer.id}`}
-        >
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            {t("updatePlan")}
-          </DropdownMenuItem>
-        </UpdateCustomerPlanModal>
-        <DropdownMenuSeparator />
-        {(() => {
-          const isPending =
-            deleteCustomer.isPending &&
-            deleteCustomer.variables.id === customer.id;
-
-          return (
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() =>
-                deleteCustomer.mutate({
-                  id: customer.id,
-                })
-              }
-              disabled={isPending}
-              key={`remove-${customer.id}`}
-            >
-              {t("delete")}
-              {isPending && (
-                <Icons.Loader2 className="ml-auto animate-spin text-current" />
-              )}
-            </DropdownMenuItem>
-          );
-        })()}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-};
-
-export const useColumns = (): ColumnDef<
-  Customer & { user: Pick<User, "name" | "image"> }
->[] => {
+export const useColumns = (options?: {
+  max?: { subscriptions: number; orders: number };
+  options?: { provider: string[] };
+}): ColumnDef<Customer & { user: Pick<User, "name" | "image"> }>[] => {
   const { t, i18n } = useTranslation(["common", "billing"]);
   const { data: session } = authClient.useSession();
 
@@ -121,7 +39,7 @@ export const useColumns = (): ColumnDef<
       cell: ({ row }) => {
         return (
           <TurboLink
-            href={pathsConfig.admin.users.user(row.original.userId)}
+            href={pathsConfig.admin.users.user(row.original.referenceId)}
             className="group flex items-center gap-3"
           >
             <Avatar>
@@ -137,7 +55,7 @@ export const useColumns = (): ColumnDef<
               <span className="group-hover:text-primary truncate font-medium underline underline-offset-4">
                 {row.original.user.name}
               </span>
-              {row.original.userId === session?.user.id && (
+              {row.original.referenceId === session?.user.id && (
                 <Badge variant="outline">{t("you")}</Badge>
               )}
             </div>
@@ -147,8 +65,8 @@ export const useColumns = (): ColumnDef<
       enableHiding: false,
     },
     {
-      id: "customerId",
-      accessorKey: "customerId",
+      id: "externalId",
+      accessorKey: "externalId",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("id")} />
       ),
@@ -157,63 +75,49 @@ export const useColumns = (): ColumnDef<
       },
     },
     {
-      id: "plan",
-      accessorKey: "plan",
+      id: "provider",
+      accessorKey: "provider",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("common:plan")} />
+        <DataTableColumnHeader column={column} title={t("provider")} />
       ),
-      cell: ({ row }) => {
-        const plan = config.plans.find((plan) => plan.id === row.original.plan);
-
-        if (!plan) {
-          return <span>-</span>;
-        }
-
-        return (
-          <Badge variant="outline">
-            {isKey(plan.name, i18n, "billing") ? t(plan.name) : plan.name}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => (
+        <code className="bg-muted text-muted-foreground rounded-md px-2 py-1 text-xs">
+          {row.original.provider}
+        </code>
+      ),
       meta: {
-        label: t("common:plan"),
+        label: t("provider"),
         variant: "multiSelect",
-        options: Object.values(config.plans).map((plan) => ({
-          label: isKey(plan.name, i18n, "billing") ? t(plan.name) : plan.name,
-          value: plan.id,
+        options: options?.options?.provider.map((provider) => ({
+          label: provider,
+          value: provider,
         })),
       },
       enableColumnFilter: true,
     },
     {
-      id: "status",
-      accessorKey: "status",
+      id: "subscriptions",
+      accessorKey: "subscriptions",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("common:status")} />
+        <DataTableColumnHeader column={column} title={t("subscriptions")} />
       ),
-      cell: ({ row }) => {
-        const statusKey = `status.${row.original.status?.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}`;
-
-        if (!row.original.status) {
-          return <span>-</span>;
-        }
-
-        return (
-          <Badge variant="secondary">
-            {isKey(statusKey, i18n, "billing") ? t(statusKey) : statusKey}
-          </Badge>
-        );
-      },
       meta: {
-        label: t("common:status"),
-        variant: "multiSelect",
-        options: Object.values(BillingStatus).map((status) => {
-          const statusKey = `status.${status.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}`;
-          return {
-            label: isKey(statusKey, i18n, "billing") ? t(statusKey) : statusKey,
-            value: status,
-          };
-        }),
+        label: t("subscriptions"),
+        range: [0, options?.max?.subscriptions ?? 10],
+        variant: "range",
+      },
+      enableColumnFilter: true,
+    },
+    {
+      id: "orders",
+      accessorKey: "orders",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("orders")} />
+      ),
+      meta: {
+        label: t("orders"),
+        range: [0, options?.max?.orders ?? 10],
+        variant: "range",
       },
       enableColumnFilter: true,
     },
@@ -237,15 +141,6 @@ export const useColumns = (): ColumnDef<
         variant: "dateRange",
       },
       enableColumnFilter: true,
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <div className="ml-auto w-fit">
-          <CustomerActions customer={row.original} />
-        </div>
-      ),
-      enableHiding: false,
     },
   ];
 };

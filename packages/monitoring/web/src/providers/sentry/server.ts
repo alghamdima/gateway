@@ -4,7 +4,7 @@ import { env } from "./env";
 
 import type { MonitoringProviderServerStrategy } from "../types";
 
-export const { captureException, initialize, onRequestError } = {
+export const strategy = {
   captureException: (exception) => {
     Sentry.captureException(exception);
   },

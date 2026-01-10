@@ -7,10 +7,10 @@ import { api } from "~/lib/api";
 const KEY = "billing";
 
 const queries = {
-  customer: {
+  summary: {
     get: queryOptions({
-      queryKey: [KEY, "customer"],
-      queryFn: () => handle(api.billing.customer.$get)(),
+      queryKey: [KEY, "me"],
+      queryFn: () => handle(api.billing.me.$get)(),
     }),
   },
 };

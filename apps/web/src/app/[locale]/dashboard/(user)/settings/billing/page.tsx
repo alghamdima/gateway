@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
 
+import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
+import { handle } from "@workspace/api/utils";
+
 import { pathsConfig } from "~/config/paths";
+import { api } from "~/lib/api/server";
 import { getSession } from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";
-import { ManagePlan } from "~/modules/user/settings/billing/manage-plan";
-import { PlanSummary } from "~/modules/user/settings/billing/plan-summary";
+import { BillingEmpty } from "~/modules/billing/settings/billing-empty";
+import { OrdersList } from "~/modules/billing/settings/orders/list/orders-list";
+import { BillingInfo } from "~/modules/billing/settings/portal/billing-info";
+import { SubscriptionsList } from "~/modules/billing/settings/subscriptions/list/subscriptions-list";
 
 export const generateMetadata = getMetadata({
   title: "billing",
@@ -18,10 +24,23 @@ export default async function BillingPage() {
     return redirect(pathsConfig.auth.login);
   }
 
+  const summary = await handle(api.billing.me.$get, {
+    schema: getBillingSummaryResponseSchema,
+  })();
+
+  if (
+    summary.every(
+      (customer) => !customer.subscriptions.length && !customer.orders.length,
+    )
+  ) {
+    return <BillingEmpty />;
+  }
+
   return (
     <>
-      <PlanSummary />
-      <ManagePlan />
+      <SubscriptionsList />
+      <OrdersList />
+      <BillingInfo />
     </>
   );
 }

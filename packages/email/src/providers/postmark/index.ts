@@ -6,7 +6,7 @@ import type { EmailProviderStrategy } from "../types";
 
 const from = env.EMAIL_FROM;
 
-export const { send } = {
+export const strategy = {
   send: async ({ to, subject, html, text }) => {
     const response = await fetch("https://api.postmarkapp.com/email", {
       method: "POST",

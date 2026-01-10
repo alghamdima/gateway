@@ -16,7 +16,7 @@ export default function OrganizationLayout() {
       initialRouteName="index"
       screenOptions={{
         tabBarStyle: {
-          paddingTop: 6,
+          paddingTop: 4,
         },
         animation: "fade",
         transitionSpec: {
@@ -35,7 +35,7 @@ export default function OrganizationLayout() {
           title: t("home"),
           tabBarIcon: ({ focused }) => (
             <Icons.House
-              size={22}
+              size={24}
               className={cn("text-muted-foreground", {
                 "text-primary": focused,
               })}
@@ -52,7 +52,7 @@ export default function OrganizationLayout() {
           title: t("settings"),
           tabBarIcon: ({ focused }) => (
             <Icons.Settings
-              size={22}
+              size={24}
               className={cn("text-muted-foreground", {
                 "text-primary": focused,
               })}
@@ -69,7 +69,7 @@ export default function OrganizationLayout() {
           title: t("members"),
           tabBarIcon: ({ focused }) => (
             <Icons.UsersRound
-              size={22}
+              size={24}
               className={cn("text-muted-foreground", {
                 "text-primary": focused,
               })}

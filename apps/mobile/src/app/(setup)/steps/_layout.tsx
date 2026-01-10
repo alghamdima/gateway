@@ -15,8 +15,7 @@ import { SafeAreaView } from "~/modules/common/styled";
 const steps = [
   pathsConfig.setup.steps.start,
   pathsConfig.setup.steps.required,
-  pathsConfig.setup.steps.skip,
-  pathsConfig.setup.steps.final,
+  pathsConfig.setup.steps.paywall,
 ] as const;
 
 const useSetupStepsStore = create<{

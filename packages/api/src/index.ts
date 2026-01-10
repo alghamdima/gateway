@@ -7,6 +7,7 @@ import { statusMonitor } from "hono-status-monitor";
 
 import { auth } from "@workspace/auth/server";
 import { db } from "@workspace/db/server";
+import { Platform } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { matchesPattern } from "@workspace/shared/utils";
 
@@ -36,7 +37,8 @@ const appRouter = new Hono()
   .basePath("/api")
   .use(
     some(
-      (c: Context) => !!c.req.header("x-client-platform")?.startsWith("mobile"),
+      (c: Context) =>
+        !!c.req.header("x-client-platform")?.startsWith(Platform.MOBILE),
       csrf({
         origin: (origin, c) =>
           [...auth.options.trustedOrigins, new URL(c.req.url).origin].some(

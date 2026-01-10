@@ -1,6 +1,6 @@
 import { logger } from "@workspace/shared/logger";
 
-import { send } from "./providers";
+import { strategy } from "./providers";
 import { getTemplate } from "./templates";
 
 import type { EmailTemplate, EmailVariables } from "./types";
@@ -25,7 +25,7 @@ const sendEmail = async <T extends EmailTemplate>({
       locale,
     });
 
-    const result = await send({ to, subject, html, text });
+    const result = await strategy.send({ to, subject, html, text });
     logger.info(`Email sent successfully to ${to}`);
 
     return result;

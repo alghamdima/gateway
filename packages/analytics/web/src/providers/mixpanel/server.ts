@@ -21,7 +21,7 @@ const getClient = () => {
   return client;
 };
 
-export const { track } = {
+export const strategy = {
   track: (event, properties) => {
     try {
       const mixpanel = getClient();

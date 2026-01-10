@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import { preset as analytics } from "@workspace/analytics-mobile/env";
 import { preset as monitoring } from "@workspace/monitoring-mobile/env";
+import { preset as billing } from "@workspace/billing-mobile/env";
 import { envConfig } from "@workspace/shared/constants";
 import { ThemeColor, ThemeMode } from "@workspace/ui";
 
@@ -16,7 +17,7 @@ const castStringToBool = z.preprocess((val) => {
 
 export default defineEnv({
   ...envConfig,
-  extends: [analytics, monitoring],
+  extends: [analytics, billing, monitoring],
   clientPrefix: "EXPO_PUBLIC_",
   client: {
     EXPO_PUBLIC_AUTH_PASSWORD: castStringToBool.optional().default(true),
@@ -47,6 +48,16 @@ export default defineEnv({
     EXPO_PUBLIC_AUTH_ANONYMOUS: process.env.EXPO_PUBLIC_AUTH_ANONYMOUS,
     EXPO_PUBLIC_GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
 
+    EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY:
+      process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY,
+    EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY:
+      process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY,
+    EXPO_PUBLIC_SUPERWALL_APPLE_API_KEY:
+      process.env.EXPO_PUBLIC_SUPERWALL_APPLE_API_KEY,
+    EXPO_PUBLIC_SUPERWALL_GOOGLE_API_KEY:
+      process.env.EXPO_PUBLIC_SUPERWALL_GOOGLE_API_KEY,
+
+    EXPO_PUBLIC_MIXPANEL_TOKEN: process.env.EXPO_PUBLIC_MIXPANEL_TOKEN,
     EXPO_PUBLIC_POSTHOG_KEY: process.env.EXPO_PUBLIC_POSTHOG_KEY,
     EXPO_PUBLIC_POSTHOG_HOST: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,

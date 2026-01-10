@@ -1,7 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 
+import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
-import { env } from "@workspace/billing/env";
 
 import { api } from "~/lib/api/server";
 import { getSession } from "~/lib/auth/server";
@@ -17,14 +17,16 @@ export const Pricing = async () => {
 
   if (user) {
     await queryClient.prefetchQuery({
-      ...billing.queries.customer.get,
-      queryFn: handle(api.billing.customer.$get),
+      ...billing.queries.summary.get,
+      queryFn: handle(api.billing.me.$get, {
+        schema: getBillingSummaryResponseSchema,
+      }),
     });
   }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <PricingSection user={user} model={env.BILLING_MODEL} />
+      <PricingSection user={user} />
     </HydrationBoundary>
   );
 };

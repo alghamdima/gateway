@@ -227,13 +227,21 @@
             "privacy": "He leído y acepto la <a>Política de Privacidad</a>"
           }
         },
-        "skip": {
-          "title": "Este es un paso que puedes omitir",
-          "description": "Puedes omitir este paso y proceder al siguiente paso"
-        },
-        "final": {
-          "title": "Este es el paso final",
-          "description": "Has completado todos los pasos, ¡disfruta de tu nueva aplicación!"
+        "paywall": {
+          "title": "Este es un paso de pago",
+          "description": "Puedes animar a los usuarios a comprar el producto aquí o permitirles saltar por gratis",
+          "cta": "Presentar pago",
+          "state": {
+            "title": "Estado del pago",
+            "description": "Actualizaciones en tiempo real del flujo de pago, incluyendo carga, completación y errores.",
+            "status": {
+              "opening": "Abriendo pago…",
+              "dismissed": "Pago descartado",
+              "skipped": "Pago omitido",
+              "error": "Error de pago",
+              "idle": "Pago inactivo"
+            }
+          }
         }
       }
     }

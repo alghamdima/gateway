@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.1.1",
+  version: "1.2.0",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",

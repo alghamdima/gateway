@@ -37,7 +37,7 @@ export const ImpersonatingBanner = () => {
       document.body.style.setProperty("--banner-height", "2.5rem");
       document.body.style.paddingTop = "2.5rem";
     } else {
-      document.body.style.setProperty("--banner-height", "0");
+      document.body.style.removeProperty("--banner-height");
       document.body.style.paddingTop = "0";
     }
   }, [isImpersonating]);

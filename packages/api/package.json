@@ -22,6 +22,8 @@
     "@hono/zod-validator": "0.7.6",
     "@workspace/auth": "workspace:*",
     "@workspace/billing": "workspace:*",
+    "@workspace/billing-mobile": "workspace:*",
+    "@workspace/billing-web": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/email": "workspace:*",
     "@workspace/i18n": "workspace:*",

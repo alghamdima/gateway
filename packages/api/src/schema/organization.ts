@@ -1,23 +1,19 @@
 import * as z from "zod";
 
 import { InvitationStatus, MemberRole } from "@workspace/auth";
-import { offsetPaginationSchema, sortSchema } from "@workspace/shared/schema";
+import { offsetPaginationSchema } from "@workspace/shared/schema";
+
+import {
+  rangeQuerySchema,
+  multiValueQuerySchema,
+  sortQuerySchema,
+} from "./shared";
 
 export const getMembersInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
+  sort: sortQuerySchema.optional(),
   q: z.string().optional(),
-  role: z
-    .union([
-      z.enum(MemberRole).transform((val) => [val]),
-      z.array(z.enum(MemberRole)),
-    ])
-    .optional(),
-  createdAt: z.tuple([z.number(), z.number()]).optional(),
+  role: multiValueQuerySchema(z.enum(MemberRole)).optional(),
+  createdAt: rangeQuerySchema.optional(),
 });
 
 export type GetMembersInput = z.infer<typeof getMembersInputSchema>;
@@ -47,26 +43,11 @@ export const getMembersResponseSchema = z.object({
 export type GetMembersResponse = z.infer<typeof getMembersResponseSchema>;
 
 export const getInvitationsInputSchema = offsetPaginationSchema.extend({
-  sort: z
-    .string()
-    .transform((val) =>
-      z.array(sortSchema).parse(JSON.parse(decodeURIComponent(val))),
-    )
-    .optional(),
+  sort: sortQuerySchema.optional(),
   email: z.string().optional(),
-  role: z
-    .union([
-      z.enum(MemberRole).transform((val) => [val]),
-      z.array(z.enum(MemberRole)),
-    ])
-    .optional(),
-  status: z
-    .union([
-      z.enum(InvitationStatus).transform((val) => [val]),
-      z.array(z.enum(InvitationStatus)),
-    ])
-    .optional(),
-  expiresAt: z.tuple([z.number(), z.number()]).optional(),
+  role: multiValueQuerySchema(z.enum(MemberRole)).optional(),
+  status: multiValueQuerySchema(z.enum(InvitationStatus)).optional(),
+  expiresAt: rangeQuerySchema.optional(),
 });
 
 export type GetInvitationsInput = z.infer<typeof getInvitationsInputSchema>;

@@ -19,7 +19,7 @@ const getClient = () => {
   return client;
 };
 
-export const { track } = {
+export const strategy = {
   track: (event, data) => {
     const client = getClient();
 

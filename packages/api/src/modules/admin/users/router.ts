@@ -6,16 +6,18 @@ import {
   getUsersInputSchema,
   getUserMembershipsInputSchema,
   getUserInvitationsInputSchema,
-  getUserPlansInputSchema,
+  getUserSubscriptionsInputSchema,
+  getUserOrdersInputSchema,
 } from "../../../schema";
 
 import { deleteAccount } from "./mutations";
 import {
   getUsers,
   getUserAccounts,
-  getUserPlans,
   getUserMemberships,
   getUserInvitations,
+  getUserSubscriptions,
+  getUserOrders,
 } from "./queries";
 
 export const usersRouter = new Hono()
@@ -33,9 +35,20 @@ export const usersRouter = new Hono()
         }),
       ),
   )
-  .get("/:id/plans", validate("query", getUserPlansInputSchema), async (c) =>
+  .get(
+    "/:id/subscriptions",
+    validate("query", getUserSubscriptionsInputSchema),
+    async (c) =>
+      c.json(
+        await getUserSubscriptions({
+          userId: c.req.param("id"),
+          ...c.req.valid("query"),
+        }),
+      ),
+  )
+  .get("/:id/orders", validate("query", getUserOrdersInputSchema), async (c) =>
     c.json(
-      await getUserPlans({
+      await getUserOrders({
         userId: c.req.param("id"),
         ...c.req.valid("query"),
       }),

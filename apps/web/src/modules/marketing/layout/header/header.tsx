@@ -89,7 +89,7 @@ const links = [
 export const Header = () => {
   const { t } = useTranslation("common");
   return (
-    <header className="bg-background/80 sticky inset-0 top-[var(--banner-height)] z-40 w-full py-3 backdrop-blur-sm">
+    <header className="bg-background/80 sticky inset-0 top-(--banner-height,0px) z-40 w-full py-3 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 pr-4 sm:container">
         <TurboLink
           href={pathsConfig.index}

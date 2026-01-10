@@ -12,8 +12,9 @@ import { UserDetails } from "~/modules/admin/users/user/details";
 import { UserHeader } from "~/modules/admin/users/user/header";
 import { InvitationsDataTable } from "~/modules/admin/users/user/invitations/data-table/invitations-data-table";
 import { MembershipsDataTable } from "~/modules/admin/users/user/memberships/data-table/memberships-data-table";
-import { PlansDataTable } from "~/modules/admin/users/user/plans/data-table/plans-data-table";
+import { OrdersDataTable } from "~/modules/admin/users/user/orders/data-table/orders-data-table";
 import { SessionsList } from "~/modules/admin/users/user/sessions/sessions-list";
+import { SubscriptionsDataTable } from "~/modules/admin/users/user/subscriptions/data-table/subscriptions-data-table";
 
 export const generateMetadata = async ({
   params,
@@ -54,8 +55,12 @@ export default async function UserPage({
       component: <AccountsDataTable id={id} />,
     },
     {
-      label: t("plans"),
-      component: <PlansDataTable userId={id} />,
+      label: t("subscriptions"),
+      component: <SubscriptionsDataTable userId={id} />,
+    },
+    {
+      label: t("orders"),
+      component: <OrdersDataTable userId={id} />,
     },
     {
       label: t("memberships"),

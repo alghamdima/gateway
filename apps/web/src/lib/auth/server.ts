@@ -2,13 +2,17 @@ import { headers } from "next/headers";
 import { cache } from "react";
 
 import { auth } from "@workspace/auth/server";
+import { ExecutionSide, Platform } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 
 import type { User } from "@workspace/auth/server";
 
 const getHeaders = async () => {
   const newHeaders = new Headers(await headers());
-  newHeaders.set("x-client-platform", "web-server");
+  newHeaders.set(
+    "x-client-platform",
+    `${Platform.WEB}-${ExecutionSide.SERVER}`,
+  );
   return newHeaders;
 };
 

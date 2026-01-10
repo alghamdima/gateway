@@ -54,6 +54,7 @@ const pathsConfig = {
       index: `${DASHBOARD_PREFIX}/${slug}`,
       settings: {
         index: `${DASHBOARD_PREFIX}/${slug}/settings`,
+        billing: `${DASHBOARD_PREFIX}/${slug}/settings/billing`,
       },
       members: `${DASHBOARD_PREFIX}/${slug}/members`,
     }),

@@ -55,9 +55,7 @@ export function BarChart() {
   return (
     <Card className="w-full">
       <CardHeader className="gap-0">
-        <CardTitle className="text-lg leading-tight">
-          {t("chart.bar")}
-        </CardTitle>
+        <CardTitle>{t("chart.bar")}</CardTitle>
         <CardDescription>{t("chart.period")}</CardDescription>
       </CardHeader>
 

@@ -1,6 +1,7 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
+import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
 
 import { pathsConfig } from "~/config/paths";
@@ -22,8 +23,10 @@ export default async function DashboardLayout({
 
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({
-    ...billing.queries.customer.get,
-    queryFn: handle(api.billing.customer.$get),
+    ...billing.queries.summary.get,
+    queryFn: handle(api.billing.me.$get, {
+      schema: getBillingSummaryResponseSchema,
+    }),
   });
 
   return (

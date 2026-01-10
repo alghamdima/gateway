@@ -29,4 +29,4 @@ runs:
     - name: 🔌 Install
       if: ${{ inputs.install-packages == 'true' }}
       shell: bash
-      run: pnpm install
+      run: pnpm install --frozen-lockfile --prefer-offline

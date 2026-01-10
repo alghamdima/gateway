@@ -10,6 +10,17 @@ export const SortOrder = {
   DESCENDING: "desc",
 } as const;
 
+export const Platform = {
+  WEB: "web",
+  MOBILE: "mobile",
+  EXTENSION: "extension",
+} as const;
+
+export const ExecutionSide = {
+  CLIENT: "client",
+  SERVER: "server",
+} as const;
+
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];
 
 export const envConfig = {

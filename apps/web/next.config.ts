@@ -7,6 +7,7 @@ const INTERNAL_PACKAGES = [
   "@workspace/api",
   "@workspace/auth",
   "@workspace/billing",
+  "@workspace/billing-web",
   "@workspace/cms",
   "@workspace/email",
   "@workspace/db",

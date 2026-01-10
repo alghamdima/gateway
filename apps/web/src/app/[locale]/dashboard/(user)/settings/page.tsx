@@ -5,7 +5,6 @@ import { getSession } from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";
 import { DeleteAccount } from "~/modules/user/settings/general/delete-account";
 import { EditAvatar } from "~/modules/user/settings/general/edit-avatar";
-import { EditEmail } from "~/modules/user/settings/general/edit-email";
 import { EditName } from "~/modules/user/settings/general/edit-name";
 import { LanguageSwitcher } from "~/modules/user/settings/general/language-switcher";
 
@@ -24,9 +23,8 @@ export default async function SettingsPage() {
   return (
     <>
       <EditAvatar user={user} />
-      <LanguageSwitcher />
       <EditName user={user} />
-      <EditEmail user={user} />
+      <LanguageSwitcher />
       <DeleteAccount />
     </>
   );
