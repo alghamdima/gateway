@@ -20,13 +20,13 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
-    "@better-auth/expo": "1.4.10",
-    "@better-auth/passkey": "1.4.10",
+    "@better-auth/expo": "1.4.11",
+    "@better-auth/passkey": "1.4.11",
     "@workspace/db": "workspace:*",
     "@workspace/email": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/shared": "workspace:*",
-    "better-auth": "1.4.10",
+    "better-auth": "1.4.11",
     "envin": "catalog:",
     "zod": "catalog:"
   },

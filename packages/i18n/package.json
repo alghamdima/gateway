@@ -17,12 +17,14 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
+    "@formatjs/intl-localematcher": "0.7.5",
     "@workspace/shared": "workspace:*",
-    "i18next": "25.6.0",
+    "i18next": "25.7.4",
     "i18next-browser-languagedetector": "8.2.0",
     "i18next-resources-to-backend": "1.2.1",
     "negotiator": "1.0.0",
-    "react-i18next": "16.2.3"
+    "react-i18next": "16.5.2",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/negotiator": "0.6.4",
