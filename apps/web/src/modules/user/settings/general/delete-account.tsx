@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
@@ -18,6 +19,7 @@ import {
 } from "@workspace/ui-web/modal";
 
 import { pathsConfig } from "~/config/paths";
+import { authClient } from "~/lib/auth/client";
 import {
   SettingsCard,
   SettingsCardHeader,
@@ -28,7 +30,13 @@ import {
 
 import { user } from "../../lib/api";
 
-export const DeleteAccount = () => {
+import type { User } from "@workspace/auth";
+
+interface DeleteAccountProps {
+  readonly user: User;
+}
+
+export const DeleteAccount = ({ user }: DeleteAccountProps) => {
   const { t } = useTranslation("auth");
 
   return (
@@ -41,7 +49,7 @@ export const DeleteAccount = () => {
       </SettingsCardHeader>
 
       <SettingsCardFooter>
-        <ConfirmModal>
+        <ConfirmModal isAnonymous={user.isAnonymous ?? false}>
           <Button size="sm" className="ml-auto" variant="destructive">
             {t("account.delete.cta")}
           </Button>
@@ -51,15 +59,67 @@ export const DeleteAccount = () => {
   );
 };
 
-const ConfirmModal = ({ children }: { children: React.ReactNode }) => {
+const ConfirmModal = ({
+  children,
+  isAnonymous,
+}: {
+  children: React.ReactNode;
+  isAnonymous: boolean;
+}) => {
+  const session = authClient.useSession();
+  const router = useRouter();
   const { t } = useTranslation(["common", "auth"]);
 
   const deleteAccount = useMutation({
-    ...user.mutations.delete,
+    ...user.mutations.delete.user,
     onSuccess: () => {
       toast.success(t("account.delete.confirmation.success"));
     },
   });
+
+  const deleteAnonymousAccount = useMutation({
+    ...user.mutations.delete.anonymous,
+    onSuccess: async () => {
+      await session.refetch();
+      router.replace(pathsConfig.index);
+      toast.success(t("account.delete.anonymous.confirmation.success"));
+    },
+  });
+
+  const disclaimer = isAnonymous
+    ? t("account.delete.anonymous.disclaimer")
+    : t("account.delete.disclaimer");
+
+  const renderCta = () =>
+    isAnonymous ? (
+      <Button
+        onClick={() => deleteAnonymousAccount.mutate(undefined)}
+        variant="destructive"
+        disabled={deleteAnonymousAccount.isPending}
+      >
+        {deleteAnonymousAccount.isPending ? (
+          <Icons.Loader2 className="animate-spin" />
+        ) : (
+          t("account.delete.cta")
+        )}
+      </Button>
+    ) : (
+      <Button
+        onClick={() =>
+          deleteAccount.mutate({
+            callbackURL: pathsConfig.index,
+          })
+        }
+        variant="destructive"
+        disabled={deleteAccount.isPending}
+      >
+        {deleteAccount.isPending ? (
+          <Icons.Loader2 className="animate-spin" />
+        ) : (
+          t("account.delete.confirmation.cta")
+        )}
+      </Button>
+    );
 
   return (
     <Modal>
@@ -68,28 +128,14 @@ const ConfirmModal = ({ children }: { children: React.ReactNode }) => {
         <ModalHeader>
           <ModalTitle>{t("account.delete.title")}</ModalTitle>
           <ModalDescription className="whitespace-pre-line">
-            {t("account.delete.disclaimer")}
+            {disclaimer}
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
           <ModalClose asChild>
             <Button variant="outline">{t("cancel")}</Button>
           </ModalClose>
-          <Button
-            onClick={() =>
-              deleteAccount.mutate({
-                callbackURL: pathsConfig.index,
-              })
-            }
-            variant="destructive"
-            disabled={deleteAccount.isPending}
-          >
-            {deleteAccount.isPending ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("account.delete.confirmation.cta")
-            )}
-          </Button>
+          {renderCta()}
         </ModalFooter>
       </ModalContent>
     </Modal>

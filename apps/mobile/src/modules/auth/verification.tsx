@@ -40,7 +40,7 @@ const useVerificationMutations = ({
       onError,
     }),
     [VerificationType.DELETE_ACCOUNT]: useMutation({
-      ...user.mutations.delete,
+      ...user.mutations.delete.user,
       onSuccess: async () => {
         await signOut.mutateAsync(undefined);
         onSuccess?.();

@@ -25,7 +25,7 @@ export default async function SettingsPage() {
       <EditAvatar user={user} />
       <EditName user={user} />
       <LanguageSwitcher />
-      <DeleteAccount />
+      <DeleteAccount user={user} />
     </>
   );
 }

@@ -19,15 +19,25 @@ const queries = {
 };
 
 const mutations = {
-  delete: mutationOptions({
-    mutationKey: [KEY, "delete"],
-    mutationFn: (params: Parameters<typeof authClient.deleteUser>[0]) =>
-      authClient.deleteUser(params, {
-        headers: {
-          "x-url": Linking.createURL(pathsConfig.dashboard.user.settings.index),
-        },
-      }),
-  }),
+  delete: {
+    user: mutationOptions({
+      mutationKey: [KEY, "delete"],
+      mutationFn: (params: Parameters<typeof authClient.deleteUser>[0]) =>
+        authClient.deleteUser(params, {
+          headers: {
+            "x-url": Linking.createURL(
+              pathsConfig.dashboard.user.settings.index,
+            ),
+          },
+        }),
+    }),
+    anonymous: mutationOptions({
+      mutationKey: [KEY, "delete", "anonymous"],
+      mutationFn: (
+        params?: Parameters<typeof authClient.deleteAnonymousUser>[0],
+      ) => authClient.deleteAnonymousUser(params),
+    }),
+  },
   update: mutationOptions({
     mutationKey: [KEY, "update"],
     mutationFn: (params: Parameters<typeof authClient.updateUser>[0]) =>

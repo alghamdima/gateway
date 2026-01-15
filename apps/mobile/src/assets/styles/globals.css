@@ -6,7 +6,7 @@
 @source "../../../../../packages/ui/shared/";
 @source "../../../../../packages/ui/mobile/";
 
-@theme inline {
+@theme {
   --font-sans: "Geist_400Regular";
   --font-sans-medium: "Geist_500Medium";
   --font-sans-semibold: "Geist_600SemiBold";
