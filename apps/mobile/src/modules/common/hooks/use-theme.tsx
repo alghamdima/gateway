@@ -5,6 +5,8 @@ import { Uniwind } from "uniwind";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
+import { captureException } from "@workspace/monitoring-mobile";
+import { logger } from "@workspace/shared/logger";
 import { ThemeMode, themes } from "@workspace/ui";
 
 import { appConfig } from "~/config/app";
@@ -44,23 +46,28 @@ export const useTheme = () => {
   );
 
   const updateTheme = useCallback(() => {
-    Uniwind.setTheme(config.mode);
+    try {
+      Uniwind.setTheme(config.mode);
 
-    const colors = themes[config.color][resolvedTheme];
-    Uniwind.updateCSSVariables(
-      resolvedTheme,
-      Object.entries(colors).reduce(
-        (acc, [key, value]: [string, ColorVariable]) => {
-          const [l, c, h, a] = value;
-          acc[`--${key}`] =
-            a !== undefined
-              ? `oklch(${l} ${c} ${h} / ${a * 100}%)`
-              : `oklch(${l} ${c} ${h})`;
-          return acc;
-        },
-        {} as Record<string, string>,
-      ),
-    );
+      const colors = themes[config.color][resolvedTheme];
+      Uniwind.updateCSSVariables(
+        resolvedTheme,
+        Object.entries(colors).reduce(
+          (acc, [key, value]: [string, ColorVariable]) => {
+            const [l, c, h, a] = value;
+            acc[`--${key}`] =
+              a !== undefined
+                ? `oklch(${l} ${c} ${h} / ${a * 100}%)`
+                : `oklch(${l} ${c} ${h})`;
+            return acc;
+          },
+          {} as Record<string, string>,
+        ),
+      );
+    } catch (error) {
+      logger.error(error);
+      captureException(error);
+    }
   }, [resolvedTheme, config]);
 
   useEffect(() => {
