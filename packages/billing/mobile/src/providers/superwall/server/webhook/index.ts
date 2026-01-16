@@ -17,6 +17,8 @@ import { webhookEventSchema } from "../schema/webhook-event";
 import { FAILED_PAYMENT_EVENTS, REVENUE_EVENTS } from "./constants";
 import { verifySignature } from "./verify";
 
+import type { WebhookCallbacks } from "../../../types";
+
 const getUserIdFromAttributes = (
   attrs: Record<string, unknown> | null | undefined,
 ) => {
@@ -31,10 +33,14 @@ const getUserIdFromAttributes = (
   return null;
 };
 
-export const webhookHandler = async (req: Request) => {
+export const webhookHandler = async (
+  req: Request,
+  callbacks?: WebhookCallbacks,
+) => {
   const body = await req.text();
   await verifySignature(req.headers, body);
 
+  await callbacks?.onEvent?.(JSON.parse(body));
   const event = webhookEventSchema.parse(JSON.parse(body));
   const userIdFromAttributes = getUserIdFromAttributes(
     event.data.userAttributes ?? null,
@@ -101,6 +107,14 @@ export const webhookHandler = async (req: Request) => {
     logger.info(
       `✅ Subscription ${originalTransactionId} upserted for customer ${customer.id} with status ${status}`,
     );
+
+    if (event.type === "initial_purchase") {
+      await callbacks?.onSubscriptionCreated?.(originalTransactionId);
+    } else if (event.type === "cancellation" || event.type === "expiration") {
+      await callbacks?.onSubscriptionDeleted?.(originalTransactionId);
+    } else {
+      await callbacks?.onSubscriptionUpdated?.(originalTransactionId);
+    }
   }
 
   if (transactionId && REVENUE_EVENTS.has(event.type)) {
@@ -115,6 +129,10 @@ export const webhookHandler = async (req: Request) => {
     logger.info(
       `✅ Order ${transactionId} upserted for customer ${customer.id} with status ${PaymentStatus.SUCCEEDED}`,
     );
+
+    if (event.type === "non_renewing_purchase") {
+      await callbacks?.onOneTimePurchaseSucceeded?.(transactionId);
+    }
   }
 
   if (FAILED_PAYMENT_EVENTS.has(event.type)) {

@@ -38,5 +38,16 @@ export interface BillingProviderClientStrategy {
 
 export interface BillingProviderServerStrategy {
   provider: BillingProvider;
-  webhookHandler: (req: Request) => Promise<Response>;
+  webhookHandler: (
+    req: Request,
+    callbacks?: WebhookCallbacks,
+  ) => Promise<Response>;
+}
+
+export interface WebhookCallbacks {
+  onSubscriptionCreated?: (subscriptionId: string) => Promise<void> | void;
+  onSubscriptionUpdated?: (subscriptionId: string) => Promise<void> | void;
+  onSubscriptionDeleted?: (subscriptionId: string) => Promise<void> | void;
+  onOneTimePurchaseSucceeded?: (orderId: string) => Promise<void> | void;
+  onEvent?: (event: unknown) => Promise<void> | void;
 }

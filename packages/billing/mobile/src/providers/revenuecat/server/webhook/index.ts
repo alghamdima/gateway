@@ -21,7 +21,12 @@ import { revenuecat } from "../sdk";
 
 import { RELEVANT_EVENTS } from "./constants";
 
-export const webhookHandler = async (req: Request) => {
+import type { WebhookCallbacks } from "../../../types";
+
+export const webhookHandler = async (
+  req: Request,
+  callbacks?: WebhookCallbacks,
+) => {
   const body = await req.text();
   const authorization = req.headers.get("Authorization");
 
@@ -31,6 +36,7 @@ export const webhookHandler = async (req: Request) => {
     });
   }
 
+  await callbacks?.onEvent?.(JSON.parse(body));
   const { event } = webhookEventSchema.parse(JSON.parse(body));
 
   if (!RELEVANT_EVENTS.has(event.type)) {
@@ -117,6 +123,31 @@ export const webhookHandler = async (req: Request) => {
         .filter(Boolean),
   );
 
+  const getSubscriptionId = () => {
+    const subscription = subscriber.subscriptions?.[event.product_id];
+    const transactionId =
+      subscription?.original_transaction_id ??
+      subscription?.store_transaction_id ??
+      event.transaction_id;
+
+    return transactionId;
+  };
+
+  const getOneTimePurchaseId = () => {
+    const purchases = subscriber.non_subscriptions?.[event.product_id];
+    const matching = purchases?.find(
+      (purchase) =>
+        purchase.original_transaction_id === event.transaction_id ||
+        purchase.store_transaction_id === event.transaction_id,
+    );
+    const transactionId =
+      matching?.original_transaction_id ??
+      matching?.store_transaction_id ??
+      event.transaction_id;
+
+    return transactionId;
+  };
+
   if (subscriptions.length > 0) {
     await upsertSubscriptions(subscriptions);
     logger.info(
@@ -129,6 +160,28 @@ export const webhookHandler = async (req: Request) => {
     logger.info(
       `✅ ${orders.length} orders upserted for customer ${customer.id}`,
     );
+  }
+
+  if (event.type === "INITIAL_PURCHASE") {
+    const subscriptionId = getSubscriptionId();
+    if (subscriptionId) {
+      await callbacks?.onSubscriptionCreated?.(subscriptionId);
+    }
+  } else if (event.type === "CANCELLATION" || event.type === "EXPIRATION") {
+    const subscriptionId = getSubscriptionId();
+    if (subscriptionId) {
+      await callbacks?.onSubscriptionDeleted?.(subscriptionId);
+    }
+  } else if (event.type === "NON_RENEWING_PURCHASE") {
+    const orderId = getOneTimePurchaseId();
+    if (orderId) {
+      await callbacks?.onOneTimePurchaseSucceeded?.(orderId);
+    }
+  } else {
+    const subscriptionId = getSubscriptionId();
+    if (subscriptionId) {
+      await callbacks?.onSubscriptionUpdated?.(subscriptionId);
+    }
   }
 
   return new Response(JSON.stringify({ received: true }), {
