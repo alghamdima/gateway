@@ -9,3 +9,15 @@ export type EnumToConstant<T extends readonly string[]> = {
 };
 
 export type Override<T, R> = Omit<T, keyof R> & R;
+
+export type CommonKeys<A, B> = keyof A & keyof B extends infer K
+  ? K extends keyof A & keyof B
+    ? A[K] extends B[K]
+      ? B[K] extends A[K]
+        ? K
+        : never
+      : never
+    : never
+  : never;
+
+export type CommonProps<A, B> = Pick<A, CommonKeys<A, B>>;

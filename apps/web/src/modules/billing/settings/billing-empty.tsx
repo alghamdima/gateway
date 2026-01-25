@@ -42,7 +42,7 @@ export const BillingEmpty = () => {
               {t(`plan.${BillingPlan.FREE}.name`)}
             </span>
 
-            <Badge className="bg-success/15 hover:bg-success/25 text-success capitalize">
+            <Badge variant="success" className="capitalize">
               {t(`subscription.status.${SubscriptionStatus.ACTIVE}`)}
             </Badge>
           </div>

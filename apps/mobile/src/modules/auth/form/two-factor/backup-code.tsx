@@ -2,20 +2,16 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
 import { backupCodeVerificationSchema, SecondFactor } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormCheckbox,
-  FormField,
-  FormInput,
-  FormItem,
-} from "@workspace/ui-mobile/form";
+import { Checkbox } from "@workspace/ui-mobile/checkbox";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
@@ -43,57 +39,60 @@ const BackupCodeForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
   });
 
   return (
-    <Form {...form}>
-      <View className="flex flex-col gap-6">
-        <FormField
-          control={form.control}
-          name="code"
-          render={({ field }) => (
-            <FormItem>
-              <FormInput
-                autoFocus
-                placeholder={t("login.twoFactor.backupCode.placeholder")}
-                autoCapitalize="none"
-                autoComplete="one-time-code"
-                editable={!form.formState.isSubmitting}
-                {...field}
-              />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="trustDevice"
-          render={({ field }) => (
-            <FormCheckbox
-              name="trustDevice"
-              label={t("login.twoFactor.trustDevice")}
-              value={field.value ?? false}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
+    <View className="flex flex-col gap-6">
+      <Controller
+        control={form.control}
+        name="code"
+        render={({ field, fieldState }) => (
+          <Field invalid={fieldState.invalid}>
+            <Input
+              {...field}
+              onChangeText={field.onChange}
+              autoFocus
+              placeholder={t("login.twoFactor.backupCode.placeholder")}
+              autoCapitalize="none"
+              autoComplete="one-time-code"
+              editable={!form.formState.isSubmitting}
             />
-          )}
-        />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
-        <Button
-          className="w-full"
-          size="lg"
-          disabled={form.formState.isSubmitting}
-          onPress={form.handleSubmit((data) =>
-            verifyBackupCode.mutateAsync(data),
-          )}
-        >
-          {form.formState.isSubmitting ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground" />
-            </Spin>
-          ) : (
-            <Text>{t("verify")}</Text>
-          )}
-        </Button>
-      </View>
-    </Form>
+      <Controller
+        control={form.control}
+        name="trustDevice"
+        render={({ field }) => (
+          <Field orientation="horizontal">
+            <Checkbox
+              {...field}
+              checked={!!field.value}
+              onCheckedChange={field.onChange}
+            />
+            <FieldLabel onPress={() => field.onChange(!field.value)}>
+              {t("login.twoFactor.trustDevice")}
+            </FieldLabel>
+          </Field>
+        )}
+      />
+
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={form.formState.isSubmitting}
+        onPress={form.handleSubmit((data) =>
+          verifyBackupCode.mutateAsync(data),
+        )}
+      >
+        {form.formState.isSubmitting ? (
+          <Spin>
+            <Icons.Loader2 className="text-primary-foreground" />
+          </Spin>
+        ) : (
+          <Text>{t("verify")}</Text>
+        )}
+      </Button>
+    </View>
   );
 });
 

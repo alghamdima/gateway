@@ -4,7 +4,6 @@ import { Suspense } from "react";
 
 import { getCustomersResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
-import { getTranslation } from "@workspace/i18n/server";
 import { pickBy } from "@workspace/shared/utils";
 import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
 
@@ -12,11 +11,6 @@ import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";
 import { CustomersDataTable } from "~/modules/admin/customers/data-table/customers-data-table";
 import { getSortingStateParser } from "~/modules/common/hooks/use-data-table/common";
-import {
-  DashboardHeader,
-  DashboardHeaderDescription,
-  DashboardHeaderTitle,
-} from "~/modules/common/layout/dashboard/header";
 
 export const generateMetadata = getMetadata({
   title: "admin:customers.header.title",
@@ -37,7 +31,6 @@ const searchParamsCache = createSearchParamsCache({
 export default async function CustomersPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { t } = await getTranslation({ ns: "admin" });
   const searchParams = await props.searchParams;
   const { page, perPage, sort, ...rest } =
     searchParamsCache.parse(searchParams);
@@ -56,30 +49,17 @@ export default async function CustomersPage(props: {
   });
 
   return (
-    <>
-      <DashboardHeader>
-        <div>
-          <DashboardHeaderTitle>
-            {t("customers.header.title")}
-          </DashboardHeaderTitle>
-          <DashboardHeaderDescription>
-            {t("customers.header.description")}
-          </DashboardHeaderDescription>
-        </div>
-      </DashboardHeader>
-
-      <Suspense
-        fallback={
-          <DataTableSkeleton
-            columnCount={3}
-            filterCount={4}
-            cellWidths={["15rem", "10rem", "10rem"]}
-            shrinkZero
-          />
-        }
-      >
-        <CustomersDataTable promise={promise} perPage={perPage} />
-      </Suspense>
-    </>
+    <Suspense
+      fallback={
+        <DataTableSkeleton
+          columnCount={3}
+          filterCount={4}
+          cellWidths={["15rem", "10rem", "10rem"]}
+          shrinkZero
+        />
+      }
+    >
+      <CustomersDataTable promise={promise} perPage={perPage} />
+    </Suspense>
   );
 }

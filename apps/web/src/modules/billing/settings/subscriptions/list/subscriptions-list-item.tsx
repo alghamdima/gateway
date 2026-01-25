@@ -6,7 +6,6 @@ import {
   SubscriptionStatus,
 } from "@workspace/billing";
 import { isKey, useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-web/badge";
 import { Icons } from "@workspace/ui-web/icons";
 
@@ -46,15 +45,13 @@ export const SubscriptionsListItem = ({
             </span>
           )}
           <Badge
-            className={cn(
-              "bg-destructive/15 hover:bg-destructive/25 text-destructive capitalize",
-              {
-                "bg-success/15 hover:bg-success/25 text-success":
-                  subscription.status === SubscriptionStatus.ACTIVE,
-                "bg-muted hover:bg-muted/25 text-muted-foreground":
-                  subscription.status === SubscriptionStatus.TRIALING,
-              },
-            )}
+            variant={
+              subscription.status === SubscriptionStatus.ACTIVE
+                ? "success"
+                : subscription.status === SubscriptionStatus.TRIALING
+                  ? "secondary"
+                  : "destructive"
+            }
           >
             {isKey(statusKey, i18n, "billing") ? t(statusKey) : statusKey}
           </Badge>

@@ -5,6 +5,7 @@ import * as React from "react";
 import { Label, Pie, PieChart as RechartsPieChart, Sector } from "recharts";
 
 import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
 import {
   Card,
   CardContent,
@@ -18,6 +19,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@workspace/ui-web/chart";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Select,
   SelectContent,
@@ -29,89 +31,123 @@ import {
 import type { ChartConfig } from "@workspace/ui-web/chart";
 import type { PieSectorDataItem } from "recharts/types/polar/Pie";
 
-const desktopData = [
-  { month: "january", desktop: 186, fill: "var(--chart-1)" },
-  { month: "february", desktop: 305, fill: "var(--chart-2)" },
-  { month: "march", desktop: 237, fill: "var(--chart-3)" },
-  { month: "april", desktop: 173, fill: "var(--chart-4)" },
-  { month: "may", desktop: 209, fill: "var(--chart-5)" },
-];
+const customersValue = [186, 305, 237, 173, 209];
 
-const chartConfig = {
-  january: {
-    label: dayjs().month(0).format("MMMM"),
-    color: "var(--chart-1)",
-  },
-  february: {
-    label: dayjs().month(1).format("MMMM"),
-    color: "var(--chart-2)",
-  },
-  march: {
-    label: dayjs().month(2).format("MMMM"),
-    color: "var(--chart-3)",
-  },
-  april: {
-    label: dayjs().month(3).format("MMMM"),
-    color: "var(--chart-4)",
-  },
-  may: {
-    label: dayjs().month(4).format("MMMM"),
-    color: "var(--chart-5)",
-  },
-} satisfies ChartConfig;
+const useChartData = (locale: string) => {
+  const labelFormatter = new Intl.DateTimeFormat(locale, {
+    month: "long",
+  });
+
+  const monthData = Array.from({ length: customersValue.length }, (_, i) => {
+    const date = dayjs().subtract(customersValue.length - 1 - i, "month");
+    return {
+      id: date.format("YYYY-MM"),
+      label: labelFormatter.format(date.toDate()),
+    };
+  }).reverse();
+
+  const customersData = monthData.map((month, index) => ({
+    month: month.id,
+    customers: customersValue[index] ?? 0,
+    fill: `var(--chart-${index + 1})`,
+  }));
+
+  const chartConfig = monthData.reduce((config, month, idx) => {
+    config[month.id] = {
+      label: month.label,
+      color: `var(--chart-${idx + 1})`,
+    };
+    return config;
+  }, {} as ChartConfig);
+
+  const items = monthData.map((month) => {
+    const config = chartConfig[month.id];
+    return {
+      value: month.id,
+      label: (
+        <div className="flex items-center gap-2 text-sm">
+          <span
+            className="flex h-3 w-3 shrink-0 rounded-sm"
+            style={{
+              backgroundColor:
+                config && "color" in config ? config.color : undefined,
+            }}
+          />
+          {config?.label ?? month.label}
+        </div>
+      ),
+    };
+  });
+
+  return {
+    chartConfig,
+    customersData,
+    items,
+    defaultMonth: customersData[0]?.month ?? "",
+  };
+};
 
 export function PieChart() {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
   const id = "pie-interactive";
-  const [activeMonth, setActiveMonth] = React.useState(
-    desktopData[0]?.month ?? "january",
+  const { chartConfig, customersData, items, defaultMonth } = useChartData(
+    i18n.language,
   );
+  const [activeMonth, setActiveMonth] = React.useState(defaultMonth);
+
+  React.useEffect(() => {
+    setActiveMonth((current) =>
+      customersData.some((item) => item.month === current)
+        ? current
+        : defaultMonth,
+    );
+  }, [defaultMonth, customersData]);
 
   const activeIndex = React.useMemo(
-    () => desktopData.findIndex((item) => item.month === activeMonth),
-    [activeMonth],
+    () => customersData.findIndex((item) => item.month === activeMonth),
+    [activeMonth, customersData],
   );
-  const months = desktopData.map((item) => item.month);
-
   return (
-    <Card data-chart={id} className="flex flex-col">
+    <Card className="flex flex-col">
       <ChartStyle id={id} config={chartConfig} />
-      <CardHeader className="flex-row items-start space-y-0 pb-0">
+      <CardHeader className="flex-row flex-wrap items-start gap-2 space-y-0 pb-0">
         <div className="grid gap-0.5">
-          <CardTitle className="text-xl">{t("chart.pie")}</CardTitle>
-          <CardDescription>{t("chart.period")}</CardDescription>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-xl leading-tight">
+              {t("organization.home.customers.title")}
+            </CardTitle>
+            <Badge variant="destructive">
+              <Icons.ArrowDown /> 17%
+            </Badge>
+          </div>
+          <CardDescription>
+            {t("organization.home.customers.description")}
+          </CardDescription>
         </div>
-        <Select value={activeMonth} onValueChange={setActiveMonth}>
+        <Select
+          items={items}
+          value={activeMonth}
+          onValueChange={(value) =>
+            setActiveMonth(value ?? customersData[0]?.month ?? "")
+          }
+        >
           <SelectTrigger
-            className="ml-auto w-[130px] rounded-lg pl-3"
+            className="ml-auto rounded-lg pl-3"
             aria-label={t("selectMonth")}
             size="sm"
           >
             <SelectValue placeholder={t("selectMonth")} />
           </SelectTrigger>
           <SelectContent align="end" className="rounded-xl">
-            {months.map((key) => {
-              const config = chartConfig[key as keyof typeof chartConfig];
-
-              return (
-                <SelectItem
-                  key={key}
-                  value={key}
-                  className="rounded-lg [&_span]:flex"
-                >
-                  <div className="flex items-center gap-2 text-xs">
-                    <span
-                      className="flex h-3 w-3 shrink-0 rounded-sm"
-                      style={{
-                        backgroundColor:
-                          "color" in config ? config.color : undefined,
-                      }}
-                    />
-                    {config.label}
-                  </div>
-                </SelectItem>
-              );
-            })}
+            {items.map((item) => (
+              <SelectItem
+                key={item.value}
+                value={item.value}
+                className="rounded-lg [&_span]:flex"
+              >
+                {item.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </CardHeader>
@@ -127,8 +163,8 @@ export function PieChart() {
               content={<ChartTooltipContent hideLabel />}
             />
             <Pie
-              data={desktopData}
-              dataKey="desktop"
+              data={customersData}
+              dataKey="customers"
               nameKey="month"
               innerRadius={60}
               strokeWidth={5}
@@ -150,7 +186,7 @@ export function PieChart() {
               <Label
                 content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                    const data = desktopData[activeIndex];
+                    const data = customersData[activeIndex];
                     if (!data) return null;
 
                     return (
@@ -165,14 +201,14 @@ export function PieChart() {
                           y={viewBox.cy}
                           className="fill-foreground text-3xl font-bold"
                         >
-                          {data.desktop.toLocaleString(i18n.language)}
+                          {data.customers.toLocaleString(i18n.language)}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy ?? 0) + 24}
                           className="fill-muted-foreground"
                         >
-                          {t("visitors")}
+                          {t("customers")}
                         </tspan>
                       </text>
                     );

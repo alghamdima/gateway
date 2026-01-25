@@ -14,7 +14,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuPortal,
   DropdownMenuGroup,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
@@ -50,32 +49,36 @@ const AnonymousUser = () => {
 const DashboardLink = ({ href }: { href: string }) => {
   const { t } = useTranslation("common");
   return (
-    <DropdownMenuItem asChild>
-      <a
-        href={href}
-        target="_blank"
-        className="flex w-full cursor-pointer items-center gap-1.5"
-      >
-        <Icons.Home className="size-4" />
-        {t("dashboard")}
-      </a>
-    </DropdownMenuItem>
+    <DropdownMenuItem
+      render={
+        <a
+          href={href}
+          target="_blank"
+          className="flex w-full cursor-pointer items-center gap-1.5"
+        >
+          <Icons.Home className="size-4" />
+          {t("dashboard")}
+        </a>
+      }
+    />
   );
 };
 
 const SettingsLink = ({ href }: { href: string }) => {
   const { t } = useTranslation("common");
   return (
-    <DropdownMenuItem asChild>
-      <a
-        href={href}
-        target="_blank"
-        className="flex w-full cursor-pointer items-center gap-1.5"
-      >
-        <Icons.Settings className="size-4" />
-        {t("settings")}
-      </a>
-    </DropdownMenuItem>
+    <DropdownMenuItem
+      render={
+        <a
+          href={href}
+          target="_blank"
+          className="flex w-full cursor-pointer items-center gap-1.5"
+        >
+          <Icons.Settings className="size-4" />
+          {t("settings")}
+        </a>
+      }
+    />
   );
 };
 
@@ -97,34 +100,43 @@ export const UserNavigation = memo<UserNavigationProps>(
 
     return (
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="relative flex items-center gap-4 rounded-md">
-            <Avatar className="size-10">
-              {organization ? (
-                <>
-                  <AvatarImage
-                    src={organization.logo ?? undefined}
-                    alt={organization.name}
-                  />
-                  <AvatarFallback>
-                    <span className="text-muted-foreground text-sm uppercase">
-                      {organization.name.charAt(0)}
-                    </span>
-                  </AvatarFallback>
-                </>
-              ) : (
-                <>
-                  <AvatarImage src={user.image ?? undefined} alt={user.name} />
-                  <AvatarFallback>
-                    <Icons.UserRound className="w-5" />
-                  </AvatarFallback>
-                </>
-              )}
-            </Avatar>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuPortal container={document.getElementById("main")}>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuTrigger
+          render={
+            <button className="relative flex items-center gap-4 rounded-md">
+              <Avatar className="size-10">
+                {organization ? (
+                  <>
+                    <AvatarImage
+                      src={organization.logo ?? undefined}
+                      alt={organization.name}
+                    />
+                    <AvatarFallback>
+                      <span className="text-muted-foreground text-sm uppercase">
+                        {organization.name.charAt(0)}
+                      </span>
+                    </AvatarFallback>
+                  </>
+                ) : (
+                  <>
+                    <AvatarImage
+                      src={user.image ?? undefined}
+                      alt={user.name}
+                    />
+                    <AvatarFallback>
+                      <Icons.UserRound className="w-5" />
+                    </AvatarFallback>
+                  </>
+                )}
+              </Avatar>
+            </button>
+          }
+        />
+        <DropdownMenuContent
+          className="w-56"
+          align="end"
+          portal={{ container: document.getElementById("main") }}
+        >
+          <DropdownMenuGroup>
             <DropdownMenuLabel className="flex items-center gap-2 font-normal">
               <Avatar className="size-8">
                 {organization ? (
@@ -165,25 +177,27 @@ export const UserNavigation = memo<UserNavigationProps>(
                 )}
               </div>
             </DropdownMenuLabel>
+          </DropdownMenuGroup>
 
-            <DropdownMenuGroup>
-              <DashboardLink
-                href={
-                  organization
-                    ? `${appConfig.url}/dashboard/${organization.slug}`
-                    : `${appConfig.url}/dashboard`
-                }
-              />
-              <SettingsLink
-                href={
-                  organization
-                    ? `${appConfig.url}/dashboard/${organization.slug}/settings`
-                    : `${appConfig.url}/dashboard/settings`
-                }
-              />
-            </DropdownMenuGroup>
+          <DropdownMenuGroup>
+            <DashboardLink
+              href={
+                organization
+                  ? `${appConfig.url}/dashboard/${organization.slug}`
+                  : `${appConfig.url}/dashboard`
+              }
+            />
+            <SettingsLink
+              href={
+                organization
+                  ? `${appConfig.url}/dashboard/${organization.slug}/settings`
+                  : `${appConfig.url}/dashboard/settings`
+              }
+            />
+          </DropdownMenuGroup>
 
-            <DropdownMenuSeparator />
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
             <DropdownMenuLabel className="flex items-center gap-2 font-normal">
               <Avatar className="size-8">
                 <AvatarImage src={user.image ?? undefined} alt={user.name} />
@@ -203,34 +217,40 @@ export const UserNavigation = memo<UserNavigationProps>(
                 )}
               </div>
             </DropdownMenuLabel>
+          </DropdownMenuGroup>
 
-            <DropdownMenuGroup>
-              <DashboardLink href={`${appConfig.url}/dashboard`} />
-              <SettingsLink href={`${appConfig.url}/dashboard/settings`} />
-            </DropdownMenuGroup>
+          <DropdownMenuGroup>
+            <DashboardLink href={`${appConfig.url}/dashboard`} />
+            <SettingsLink href={`${appConfig.url}/dashboard/settings`} />
+          </DropdownMenuGroup>
 
+          <DropdownMenuGroup>
             {hasAdminPermission(user) && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a
-                    href={`${appConfig.url}/admin`}
-                    target="_blank"
-                    className="flex w-full cursor-pointer items-center gap-1.5"
-                  >
-                    <Icons.ShieldUser className="size-4" />
-                    {t("admin")}
-                  </a>
-                </DropdownMenuItem>
+                <DropdownMenuItem
+                  render={
+                    <a
+                      href={`${appConfig.url}/admin`}
+                      target="_blank"
+                      className="flex w-full cursor-pointer items-center gap-1.5"
+                    >
+                      <Icons.ShieldUser className="size-4" />
+                      {t("admin")}
+                    </a>
+                  }
+                />
               </>
             )}
 
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
-              <Logout />
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenuPortal>
+            <DropdownMenuItem
+              nativeButton
+              render={<Logout />}
+              className="cursor-pointer"
+            />
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
       </DropdownMenu>
     );
   },

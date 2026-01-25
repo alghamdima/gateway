@@ -81,7 +81,7 @@ type VerificationType =
 
 type AuthConfig = z.infer<typeof authConfigSchema>;
 
-const ERROR_MESSAGES: Record<AuthErrorCode, TranslationKey> = {
+const ERROR_MESSAGES = {
   YOU_CANNOT_BAN_YOURSELF: "auth:error.user.cannotBanYourself",
   YOU_CANNOT_IMPERSONATE_ADMINS: "auth:error.user.cannotImpersonateAdmins",
   INVALID_EMAIL_FORMAT: "auth:error.credentials.email.invalidFormat",
@@ -264,7 +264,7 @@ const ERROR_MESSAGES: Record<AuthErrorCode, TranslationKey> = {
   INVALID_ERROR_CALLBACK_URL: "auth:error.url.invalidErrorCallbackUrl",
   INVALID_NEW_USER_CALLBACK_URL: "auth:error.url.invalidNewUserCallbackUrl",
   CALLBACK_URL_REQUIRED: "auth:error.url.callbackUrlRequired",
-} as const;
+} as const satisfies Record<AuthErrorCode, TranslationKey>;
 
 export type {
   BetterAuthClientOptions as AuthClientOptions,

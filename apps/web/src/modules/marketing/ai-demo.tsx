@@ -77,7 +77,7 @@ export const AIDemo = () => {
                       <div
                         key={`${message.id}-${i}`}
                         dangerouslySetInnerHTML={{
-                          __html: marked.parse(part.text),
+                          __html: marked.parse(part.text) as string,
                         }}
                       ></div>
                     ) : (

@@ -39,24 +39,27 @@ export const Delete = ({ id }: DeleteProps) => {
     mutation?.status === "pending" && mutation.variables.id === id;
 
   return (
-    <ConfirmModal organizationId={id}>
-      <Button variant="destructive" disabled={isPending}>
-        {isPending ? (
-          <Icons.Loader2 className="animate-spin" />
-        ) : (
-          <Icons.Trash />
-        )}
-        {t("delete")}
-      </Button>
-    </ConfirmModal>
+    <ConfirmModal
+      organizationId={id}
+      render={
+        <Button variant="destructive" disabled={isPending}>
+          {isPending ? (
+            <Icons.Loader2 className="animate-spin" />
+          ) : (
+            <Icons.Trash />
+          )}
+          {t("delete")}
+        </Button>
+      }
+    />
   );
 };
 
 const ConfirmModal = ({
-  children,
+  render,
   organizationId,
 }: {
-  children: React.ReactNode;
+  render: React.ReactElement;
   organizationId: string;
 }) => {
   const { t } = useTranslation(["common", "admin"]);
@@ -84,7 +87,7 @@ const ConfirmModal = ({
 
   return (
     <Modal>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>
@@ -97,9 +100,13 @@ const ConfirmModal = ({
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
-          <ModalClose asChild>
-            <Button variant="outline">{t("cancel")}</Button>
-          </ModalClose>
+          <ModalClose
+            render={
+              <Button variant="outline" type="button">
+                {t("cancel")}
+              </Button>
+            }
+          />
           <Button
             onClick={handleDelete}
             variant="destructive"

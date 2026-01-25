@@ -3,21 +3,14 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { emailSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
-import {
-  Form,
-  FormMessage,
-  FormField,
-  FormControl,
-  FormItem,
-} from "@workspace/ui-web/form";
+import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 
@@ -66,14 +59,7 @@ export const EditEmail = memo<EditEmailProps>((props) => {
       <SettingsCardHeader>
         <div className="flex items-center gap-3">
           <SettingsCardTitle>{t("email")}</SettingsCardTitle>
-          <Badge
-            className={cn({
-              "bg-success/15 text-success hover:bg-success/25":
-                props.user.emailVerified,
-              "bg-destructive/15 text-destructive hover:bg-destructive/25":
-                !props.user.emailVerified,
-            })}
-          >
+          <Badge variant={props.user.emailVerified ? "success" : "destructive"}>
             {props.user.emailVerified ? t("verified") : t("unverified")}
           </Badge>
           {!props.user.emailVerified && (
@@ -102,8 +88,9 @@ export const EditEmail = memo<EditEmailProps>((props) => {
         </SettingsCardDescription>
       </SettingsCardHeader>
 
-      <Form {...form}>
+      <SettingsCardContent>
         <form
+          id="user-edit-email-form"
           onSubmit={form.handleSubmit((data) =>
             changeEmail.mutateAsync({
               newEmail: data.email,
@@ -111,40 +98,48 @@ export const EditEmail = memo<EditEmailProps>((props) => {
             }),
           )}
         >
-          <SettingsCardContent>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="email"
-                      className="max-w-xs"
-                      placeholder="john@doe.com"
-                      disabled={form.formState.isSubmitting}
-                      autoComplete="email"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </SettingsCardContent>
-
-          <SettingsCardFooter>
-            {t("account.email.change.info")}
-            <Button size="sm" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? (
-                <Icons.Loader2 className="size-4 animate-spin" />
-              ) : (
-                t("save")
-              )}
-            </Button>
-          </SettingsCardFooter>
+          <Controller
+            name="email"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <Input
+                  {...field}
+                  id="user-edit-email"
+                  type="email"
+                  inputMode="email"
+                  spellCheck={false}
+                  required
+                  className="max-w-xs"
+                  placeholder="john@doe.com"
+                  disabled={form.formState.isSubmitting}
+                  autoComplete="email"
+                  aria-invalid={fieldState.invalid}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
         </form>
-      </Form>
+      </SettingsCardContent>
+
+      <SettingsCardFooter>
+        {t("account.email.change.info")}
+        <Button
+          form="user-edit-email-form"
+          type="submit"
+          size="sm"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? (
+            <Icons.Loader2 className="size-4 animate-spin" />
+          ) : (
+            t("save")
+          )}
+        </Button>
+      </SettingsCardFooter>
     </SettingsCard>
   );
 });

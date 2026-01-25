@@ -4,19 +4,13 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { updateUserSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 
@@ -64,45 +58,55 @@ export const EditName = memo<EditNameProps>((props) => {
           {t("account.name.edit.description")}
         </SettingsCardDescription>
       </SettingsCardHeader>
-
-      <Form {...form}>
+      <SettingsCardContent>
         <form
+          id="user-edit-name-form"
           onSubmit={onPromise(
             form.handleSubmit((data) => updateUser.mutateAsync(data)),
           )}
         >
-          <SettingsCardContent>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="text"
-                      disabled={form.formState.isSubmitting}
-                      className="max-w-xs"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </SettingsCardContent>
-
-          <SettingsCardFooter>
-            {t("account.name.edit.info")}
-            <Button size="sm" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? (
-                <Icons.Loader2 className="size-4 animate-spin" />
-              ) : (
-                t("save")
-              )}
-            </Button>
-          </SettingsCardFooter>
+          <Controller
+            name="name"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <Input
+                  {...field}
+                  id="user-edit-name"
+                  autoComplete="name"
+                  spellCheck={false}
+                  required
+                  minLength={2}
+                  maxLength={32}
+                  type="text"
+                  disabled={form.formState.isSubmitting}
+                  className="max-w-xs"
+                  aria-invalid={fieldState.invalid}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
         </form>
-      </Form>
+      </SettingsCardContent>
+
+      <SettingsCardFooter>
+        {t("account.name.edit.info")}
+        <Button
+          form="user-edit-name-form"
+          type="submit"
+          size="sm"
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? (
+            <Icons.Loader2 className="size-4 animate-spin" />
+          ) : (
+            t("save")
+          )}
+        </Button>
+      </SettingsCardFooter>
     </SettingsCard>
   );
 });

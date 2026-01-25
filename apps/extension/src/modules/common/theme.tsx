@@ -20,7 +20,7 @@ const Customizer = () => {
     <>
       <div className="flex items-start">
         <div className="space-y-1 pr-2">
-          <div className="leading-none font-semibold tracking-tight">
+          <div className="text-base leading-none font-semibold tracking-tight">
             {t("theme.customization.title")}
           </div>
           <div className="text-muted-foreground text-xs">
@@ -77,12 +77,11 @@ const Status = ({
 export const ThemeControls = () => {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Status />
-      </PopoverTrigger>
+      <PopoverTrigger render={<Status />} />
       <PopoverContent
         align="center"
-        className="z-40 w-86 space-y-4 rounded-lg p-6"
+        className="z-40 w-86 gap-4 rounded-lg p-6"
+        portal={{ container: document.getElementById("main") }}
       >
         <Customizer />
       </PopoverContent>

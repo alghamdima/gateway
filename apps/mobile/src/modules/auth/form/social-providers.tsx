@@ -21,12 +21,10 @@ import { Text } from "@workspace/ui-mobile/text";
 import { authConfig } from "~/config/auth";
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
-import { useAuthFormStore } from "~/modules/auth/form/store";
 import { isAndroid, isIOS } from "~/utils/device";
 
 import { auth } from "../lib/api";
 
-import type { AuthProvider } from "@workspace/auth";
 import type { Icon } from "@workspace/ui-mobile/icons";
 import type { Route } from "expo-router";
 
@@ -52,14 +50,12 @@ if (
 
 const SocialProvider = ({
   provider,
-  onClick,
-  actualProvider,
+  onPress,
   isSubmitting,
 }: {
   provider: SocialProviderType;
   isSubmitting: boolean;
-  onClick: () => void;
-  actualProvider: AuthProvider;
+  onPress: () => void;
 }) => {
   const { t } = useTranslation("common");
   const Icon = SocialIcons[provider];
@@ -70,10 +66,10 @@ const SocialProvider = ({
       variant="outline"
       size="lg"
       className="relative w-full flex-row justify-center gap-2.5"
-      onPress={onClick}
+      onPress={onPress}
       disabled={isSubmitting}
     >
-      {isSubmitting && actualProvider === provider ? (
+      {isSubmitting ? (
         <Spin>
           <Icons.Loader2 className="text-foreground size-5" />
         </Spin>
@@ -106,22 +102,8 @@ const SocialProvider = ({
 
 export const SocialProviders = memo<SocialProvidersProps>(
   ({ providers, redirectTo = pathsConfig.index }) => {
-    const {
-      provider: actualProvider,
-      setProvider,
-      isSubmitting,
-      setIsSubmitting,
-    } = useAuthFormStore();
-
     const signIn = useMutation({
       ...auth.mutations.signIn.social,
-      onMutate: ({ provider }) => {
-        setProvider(provider as SocialProviderType);
-        setIsSubmitting(true);
-      },
-      onSettled: () => {
-        setIsSubmitting(false);
-      },
       onSuccess: async () => {
         const session = await authClient.getSession({
           fetchOptions: { throw: true },
@@ -188,14 +170,15 @@ export const SocialProviders = memo<SocialProvidersProps>(
           <SocialProvider
             key={provider}
             provider={provider}
-            onClick={async () => {
+            onPress={async () => {
               const params = await getParams(provider);
               if (params) {
                 await signIn.mutateAsync(params);
               }
             }}
-            actualProvider={actualProvider}
-            isSubmitting={isSubmitting}
+            isSubmitting={
+              signIn.isPending && signIn.variables.provider === provider
+            }
           />
         ))}
       </View>

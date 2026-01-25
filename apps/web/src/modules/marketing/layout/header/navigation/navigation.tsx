@@ -24,14 +24,16 @@ export const Navigation = ({ links }: NavigationProps) => {
         {links.map((link) => (
           <NavigationMenuItem key={link.label}>
             {"href" in link ? (
-              <NavigationMenuLink asChild>
-                <TurboLink
-                  href={link.href}
-                  className={navigationMenuTriggerStyle()}
-                >
-                  {t(link.label)}
-                </TurboLink>
-              </NavigationMenuLink>
+              <NavigationMenuLink
+                render={
+                  <TurboLink
+                    href={link.href}
+                    className={navigationMenuTriggerStyle()}
+                  >
+                    {t(link.label)}
+                  </TurboLink>
+                }
+              />
             ) : (
               <>
                 <NavigationMenuTrigger>{t(link.label)}</NavigationMenuTrigger>
@@ -62,33 +64,35 @@ export const Item = ({
 }: React.ComponentProps<typeof TurboLink> & NavigationLinkItem) => {
   const { t } = useTranslation();
   return (
-    <NavigationMenuLink asChild>
-      <TurboLink
-        {...props}
-        href={href}
-        {...(isExternal(href) && {
-          target: "_blank",
-          rel: "noopener noreferrer",
-        })}
-        className={cn("group", props.className)}
-      >
-        <div className="flex items-center gap-3 p-1 py-0.5 lg:py-1">
-          <div className="bg-background flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors">
-            <Icon className="text-muted-foreground group-hover:text-foreground size-5 shrink-0" />
+    <NavigationMenuLink
+      render={
+        <TurboLink
+          {...props}
+          href={href}
+          {...(isExternal(href) && {
+            target: "_blank",
+            rel: "noopener noreferrer",
+          })}
+          className={cn("group", props.className)}
+        >
+          <div className="flex items-center gap-3 p-1 py-0.5 lg:py-1">
+            <div className="bg-background flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors">
+              <Icon className="text-muted-foreground group-hover:text-foreground size-5 shrink-0" />
+            </div>
+            <div className="w-full min-w-0">
+              <span className="relative w-fit text-sm leading-none font-medium">
+                {t(title)}
+                {isExternal(href) && (
+                  <Icons.ArrowUpRight className="-mt-1 ml-0.5 inline size-2.5" />
+                )}
+              </span>
+              <p className="text-muted-foreground truncate text-sm leading-snug">
+                {t(description)}
+              </p>
+            </div>
           </div>
-          <div className="w-full min-w-0">
-            <span className="relative w-fit text-sm leading-none font-medium">
-              {t(title)}
-              {isExternal(href) && (
-                <Icons.ArrowUpRight className="-mt-1 ml-0.5 inline size-2.5" />
-              )}
-            </span>
-            <p className="text-muted-foreground truncate text-sm leading-snug">
-              {t(description)}
-            </p>
-          </div>
-        </div>
-      </TurboLink>
-    </NavigationMenuLink>
+        </TurboLink>
+      }
+    />
   );
 };

@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
 import {
@@ -22,11 +22,17 @@ import {
   useBottomSheet,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
-import { Form, FormField, FormSelect } from "@workspace/ui-mobile/form";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
 import {
   SelectContent,
   SelectItem,
+  Select,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui-mobile/select";
@@ -113,21 +119,19 @@ export const UpdateMemberRoleBottomSheet = ({
             </BottomSheetDescription>
           </BottomSheetHeader>
 
-          <Form {...form}>
-            <View className="gap-4">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormSelect
-                    {...field}
-                    label={t("role")}
-                    description={t("members.update.role.info")}
+          <View className="gap-4">
+            <Controller
+              control={form.control}
+              name="role"
+              render={({ field, fieldState }) => (
+                <Field invalid={fieldState.invalid}>
+                  <FieldLabel>{t("role")}</FieldLabel>
+                  <Select
                     value={{
                       value: field.value ?? MemberRole.MEMBER,
                       label: t(field.value ?? MemberRole.MEMBER),
                     }}
-                    onChange={(option) =>
+                    onValueChange={(option) =>
                       field.onChange(option?.value ?? MemberRole.MEMBER)
                     }
                     disabled={form.formState.isSubmitting}
@@ -142,37 +146,43 @@ export const UpdateMemberRoleBottomSheet = ({
                         </SelectItem>
                       ))}
                     </SelectContent>
-                  </FormSelect>
-                )}
-              />
+                  </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                  <FieldDescription>
+                    {t("members.update.role.info")}
+                  </FieldDescription>
+                </Field>
+              )}
+            />
 
-              <View className="gap-2">
-                <BottomSheetCloseTrigger asChild>
-                  <Button
-                    variant="outline"
-                    disabled={form.formState.isSubmitting}
-                  >
-                    <Text>{t("cancel")}</Text>
-                  </Button>
-                </BottomSheetCloseTrigger>
+            <View className="gap-2">
+              <BottomSheetCloseTrigger asChild>
                 <Button
-                  onPress={form.handleSubmit(onSubmit)}
+                  variant="outline"
                   disabled={form.formState.isSubmitting}
                 >
-                  {form.formState.isSubmitting ? (
-                    <Spin>
-                      <Icons.Loader2
-                        size={16}
-                        className="text-primary-foreground"
-                      />
-                    </Spin>
-                  ) : (
-                    <Text>{t("update")}</Text>
-                  )}
+                  <Text>{t("cancel")}</Text>
                 </Button>
-              </View>
+              </BottomSheetCloseTrigger>
+              <Button
+                onPress={form.handleSubmit(onSubmit)}
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <Spin>
+                    <Icons.Loader2
+                      size={16}
+                      className="text-primary-foreground"
+                    />
+                  </Spin>
+                ) : (
+                  <Text>{t("update")}</Text>
+                )}
+              </Button>
             </View>
-          </Form>
+          </View>
         </BottomSheetScrollView>
       </BottomSheetContent>
     </BottomSheet>

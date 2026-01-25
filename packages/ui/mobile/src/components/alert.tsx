@@ -4,11 +4,11 @@ import { View } from "react-native";
 
 import { cn } from "@workspace/ui";
 
-import { Text, TextClassContext } from "./text";
-
-import type { Icon } from "./icons";
+import type { Icon } from "#components/icons";
 import type { VariantProps } from "class-variance-authority";
 import type { ViewProps } from "react-native";
+
+import { Text, TextClassContext } from "#components/text";
 
 const alertVariants = cva(
   "bg-card border-border relative w-full rounded-lg border px-4 pt-3.5 pb-2",

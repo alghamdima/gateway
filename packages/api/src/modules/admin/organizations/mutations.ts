@@ -38,7 +38,7 @@ export const updateOrganization = async ({
 
       if (!check.status) {
         throw new HttpException(HttpStatusCode.BAD_REQUEST, {
-          code: "auth:error.organization.slugNotAvailable",
+          code: "organization:error.slugNotAvailable",
         });
       }
     }

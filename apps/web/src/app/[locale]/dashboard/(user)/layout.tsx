@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { Icons } from "@workspace/ui-web/icons";
-import { SidebarProvider } from "@workspace/ui-web/sidebar";
+import { SidebarInset, SidebarProvider } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { getSession } from "~/lib/auth/server";
+import { DashboardActionBar } from "~/modules/common/layout/dashboard/action-bar";
 import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
-import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar";
+import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
 
 const menu = [
   {
@@ -15,12 +16,12 @@ const menu = [
       {
         title: "home",
         href: pathsConfig.dashboard.user.index,
-        icon: Icons.Home,
+        icon: <Icons.Home />,
       },
       {
         title: "ai",
         href: pathsConfig.dashboard.user.ai,
-        icon: Icons.Brain,
+        icon: <Icons.Brain />,
       },
     ],
   },
@@ -30,7 +31,28 @@ const menu = [
       {
         title: "settings",
         href: pathsConfig.dashboard.user.settings.index,
-        icon: Icons.Settings,
+        icon: <Icons.Settings />,
+        menu: [
+          {
+            items: [
+              {
+                title: "general",
+                href: pathsConfig.dashboard.user.settings.index,
+                icon: <Icons.Settings />,
+              },
+              {
+                title: "security",
+                href: pathsConfig.dashboard.user.settings.security,
+                icon: <Icons.Lock />,
+              },
+              {
+                title: "billing",
+                href: pathsConfig.dashboard.user.settings.billing,
+                icon: <Icons.CreditCard />,
+              },
+            ],
+          },
+        ],
       },
     ],
   },
@@ -50,7 +72,10 @@ export default async function DashboardLayout({
   return (
     <SidebarProvider>
       <DashboardSidebar user={user} menu={menu} />
-      <DashboardInset>{children}</DashboardInset>
+      <SidebarInset>
+        <DashboardActionBar menu={menu} />
+        <DashboardInset>{children}</DashboardInset>
+      </SidebarInset>
     </SidebarProvider>
   );
 }

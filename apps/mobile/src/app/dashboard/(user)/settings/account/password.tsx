@@ -1,20 +1,20 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
 import { changePasswordSchema } from "@workspace/auth";
 import { Trans, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import {
-  Form,
-  FormField,
-  FormInput,
-  FormItem,
-  FormDescription,
-} from "@workspace/ui-mobile/form";
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
@@ -64,98 +64,104 @@ export default function Password() {
       bounces={false}
       contentContainerClassName="bg-background flex-1 p-6"
     >
-      <Form {...form}>
-        <View className="flex-1 gap-6">
-          <Text className="text-muted-foreground font-sans-medium text-base">
-            {t("account.password.update.description")}
-          </Text>
+      <View className="flex-1 gap-6">
+        <Text className="text-muted-foreground font-sans-medium text-base">
+          {t("account.password.update.description")}
+        </Text>
 
-          {isLoading ? (
-            <View className="bg-muted/50 h-20 animate-pulse" key="loading" />
-          ) : (
-            <View className="gap-4" key="password">
-              {hasPassword ? (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormInput
-                          label={t("currentPassword")}
-                          secureTextEntry
-                          autoComplete="current-password"
-                          editable={!form.formState.isSubmitting}
-                          {...field}
+        {isLoading ? (
+          <View className="bg-muted/50 h-20 animate-pulse" key="loading" />
+        ) : (
+          <View className="gap-4" key="password">
+            {hasPassword ? (
+              <>
+                <Controller
+                  control={form.control}
+                  name="password"
+                  render={({ field, fieldState }) => (
+                    <Field invalid={fieldState.invalid}>
+                      <FieldLabel>{t("currentPassword")}</FieldLabel>
+                      <Input
+                        {...field}
+                        secureTextEntry
+                        autoComplete="current-password"
+                        onChangeText={field.onChange}
+                        editable={!form.formState.isSubmitting}
+                      />
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
+                      )}
+                    </Field>
+                  )}
+                />
+
+                <Controller
+                  control={form.control}
+                  name="newPassword"
+                  render={({ field, fieldState }) => (
+                    <Field invalid={fieldState.invalid}>
+                      <FieldLabel>{t("newPassword")}</FieldLabel>
+                      <Input
+                        {...field}
+                        secureTextEntry
+                        autoComplete="new-password"
+                        onChangeText={field.onChange}
+                        editable={!form.formState.isSubmitting}
+                      />
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
+                      )}
+                      <FieldDescription>
+                        {t("account.password.update.info")}
+                      </FieldDescription>
+                    </Field>
+                  )}
+                />
+              </>
+            ) : (
+              <View className="border-border items-center justify-center rounded-lg border border-dashed p-6">
+                <Text className="text-muted-foreground text-center">
+                  <Trans
+                    i18nKey="account.password.update.noPassword"
+                    ns="auth"
+                    components={{
+                      bold: (
+                        <Link
+                          href={pathsConfig.setup.auth.forgotPassword}
+                          className="font-sans-medium underline hover:no-underline"
                         />
-                      </FormItem>
-                    )}
+                      ),
+                    }}
                   />
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
-                  <FormField
-                    control={form.control}
-                    name="newPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormInput
-                          label={t("newPassword")}
-                          secureTextEntry
-                          autoComplete="new-password"
-                          editable={!form.formState.isSubmitting}
-                          {...field}
-                        />
-                        <FormDescription>
-                          {t("account.password.update.info")}
-                        </FormDescription>
-                      </FormItem>
-                    )}
-                  />
-                </>
-              ) : (
-                <View className="border-border items-center justify-center rounded-lg border border-dashed p-6">
-                  <Text className="text-muted-foreground text-center">
-                    <Trans
-                      i18nKey="account.password.update.noPassword"
-                      ns="auth"
-                      components={{
-                        bold: (
-                          <Link
-                            href={pathsConfig.setup.auth.forgotPassword}
-                            className="font-sans-medium underline hover:no-underline"
-                          />
-                        ),
-                      }}
-                    />
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {!isLoading && hasPassword && (
-            <Button
-              variant="default"
-              size="lg"
-              disabled={form.formState.isSubmitting}
-              onPress={form.handleSubmit((data) =>
-                changePassword.mutateAsync({
-                  ...data,
-                  currentPassword: data.password,
-                  revokeOtherSessions: true,
-                }),
-              )}
-            >
-              {form.formState.isSubmitting ? (
-                <Spin>
-                  <Icons.Loader2 className="text-primary-foreground" />
-                </Spin>
-              ) : (
-                <Text className="text-primary-foreground">{t("save")}</Text>
-              )}
-            </Button>
-          )}
-        </View>
-      </Form>
+        {!isLoading && hasPassword && (
+          <Button
+            variant="default"
+            size="lg"
+            disabled={form.formState.isSubmitting}
+            onPress={form.handleSubmit((data) =>
+              changePassword.mutateAsync({
+                ...data,
+                currentPassword: data.password,
+                revokeOtherSessions: true,
+              }),
+            )}
+          >
+            {form.formState.isSubmitting ? (
+              <Spin>
+                <Icons.Loader2 className="text-primary-foreground" />
+              </Spin>
+            ) : (
+              <Text className="text-primary-foreground">{t("save")}</Text>
+            )}
+          </Button>
+        )}
+      </View>
     </ScrollView>
   );
 }

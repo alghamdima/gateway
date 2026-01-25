@@ -11,7 +11,6 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-  PopoverPortal,
 } from "@workspace/ui-web/popover";
 import { ThemeCustomizer } from "@workspace/ui-web/theme";
 
@@ -48,7 +47,7 @@ const Customizer = () => {
     <>
       <div className="flex items-start">
         <div className="space-y-1 pr-2">
-          <div className="leading-none font-semibold tracking-tight">
+          <div className="text-base leading-none font-semibold tracking-tight">
             {t("theme.customization.title")}
           </div>
           <div className="text-muted-foreground text-xs">
@@ -80,38 +79,23 @@ const Customizer = () => {
   );
 };
 
-export const ThemeControlsProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+const ThemeControlsProvider = ({ render }: { render: React.ReactElement }) => {
   const isDesktop = useBreakpoint("md");
 
   if (isDesktop) {
     return (
       <Popover>
-        <PopoverTrigger asChild>{children}</PopoverTrigger>
-        <PopoverPortal>
-          <PopoverContent
-            align="end"
-            className="w-88 space-y-4 rounded-lg p-6"
-            onOpenAutoFocus={(event) => {
-              event.preventDefault();
-            }}
-            onFocusOutside={(event) => {
-              event.preventDefault();
-            }}
-          >
-            <Customizer />
-          </PopoverContent>
-        </PopoverPortal>
+        <PopoverTrigger render={render} />
+        <PopoverContent align="start" className="w-88 rounded-lg p-6">
+          <Customizer />
+        </PopoverContent>
       </Popover>
     );
   }
 
   return (
     <Drawer>
-      <DrawerTrigger asChild>{children}</DrawerTrigger>
+      <DrawerTrigger asChild>{render}</DrawerTrigger>
       <DrawerContent className="p-6 pt-0">
         <div className="space-y-4 pt-4">
           <Customizer />
@@ -121,10 +105,8 @@ export const ThemeControlsProvider = ({
   );
 };
 
-export const ThemeControls = () => {
-  return (
-    <ThemeControlsProvider>
-      <Trigger />
-    </ThemeControlsProvider>
-  );
+const ThemeControls = () => {
+  return <ThemeControlsProvider render={<Trigger />} />;
 };
+
+export { ThemeControls, Customizer, ThemeControlsProvider };

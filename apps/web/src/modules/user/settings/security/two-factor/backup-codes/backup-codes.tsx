@@ -45,7 +45,7 @@ export const BackupCodesModal = ({
   );
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange}>
+    <Modal open={open} drawer={{ onOpenChange }} dialog={{ onOpenChange }}>
       <ModalContent>
         <ModalHeader>
           <ModalTitle>
@@ -76,9 +76,7 @@ export const BackupCodesModal = ({
           </div>
 
           <ModalFooter className="flex w-full justify-end gap-2">
-            <ModalClose asChild>
-              <Button>{t("continue")}</Button>
-            </ModalClose>
+            <ModalClose render={<Button>{t("continue")}</Button>} />
           </ModalFooter>
         </div>
       </ModalContent>
@@ -166,15 +164,16 @@ export const BackupCodesTile = () => {
         </div>
 
         <RequirePassword
+          render={
+            <Button variant="outline" disabled={!enabled}>
+              {t("regenerate")}
+            </Button>
+          }
           onConfirm={async (data) => {
             await generate.mutateAsync(data);
             setOpen(true);
           }}
-        >
-          <Button variant="outline" disabled={!enabled}>
-            {t("regenerate")}
-          </Button>
-        </RequirePassword>
+        />
       </div>
 
       <BackupCodesModal open={open} onOpenChange={setOpen} />

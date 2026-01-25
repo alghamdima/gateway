@@ -10,11 +10,6 @@ import {
 
 import { getOrganization } from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";
-import {
-  DashboardHeader,
-  DashboardHeaderDescription,
-  DashboardHeaderTitle,
-} from "~/modules/common/layout/dashboard/header";
 import { InvitationsDataTable } from "~/modules/organization/invitations/data-table/invitations-data-table";
 import { MembersDataTable } from "~/modules/organization/members/data-table/members-data-table";
 import { InviteMember } from "~/modules/organization/members/invite-member";
@@ -41,17 +36,6 @@ export default async function MembersPage({
 
   return (
     <>
-      <DashboardHeader>
-        <div>
-          <DashboardHeaderTitle>
-            {t("members.header.title")}
-          </DashboardHeaderTitle>
-          <DashboardHeaderDescription>
-            {t("members.header.description")}
-          </DashboardHeaderDescription>
-        </div>
-      </DashboardHeader>
-
       <InviteMember organizationId={activeOrganization.id} />
 
       <Tabs defaultValue="members" className="mt-4 w-full">

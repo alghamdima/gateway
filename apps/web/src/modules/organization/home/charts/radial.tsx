@@ -7,7 +7,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@workspace/ui-web/card";
@@ -16,72 +15,67 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@workspace/ui-web/chart";
-import { Icons } from "@workspace/ui-web/icons";
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
 
 const chartData = [
-  { browser: "chrome", visitors: 275, fill: "var(--chart-1)" },
-  { browser: "safari", visitors: 200, fill: "var(--chart-2)" },
-  { browser: "firefox", visitors: 187, fill: "var(--chart-3)" },
-  { browser: "edge", visitors: 173, fill: "var(--chart-4)" },
-  { browser: "opera", visitors: 90, fill: "var(--chart-5)" },
+  { plan: "starter", subscriptions: 275, fill: "var(--chart-1)" },
+  { plan: "growth", subscriptions: 200, fill: "var(--chart-2)" },
+  { plan: "pro", subscriptions: 187, fill: "var(--chart-3)" },
+  { plan: "scale", subscriptions: 173, fill: "var(--chart-4)" },
+  { plan: "enterprise", subscriptions: 90, fill: "var(--chart-5)" },
 ];
-
-const chartConfig = {
-  chrome: {
-    label: "Chrome",
-    color: "var(--chart-1)",
-  },
-  safari: {
-    label: "Safari",
-    color: "var(--chart-2)",
-  },
-  firefox: {
-    label: "Firefox",
-    color: "var(--chart-3)",
-  },
-  edge: {
-    label: "Edge",
-    color: "var(--chart-4)",
-  },
-  opera: {
-    label: "Opera",
-    color: "var(--chart-5)",
-  },
-} satisfies ChartConfig;
 
 export function RadialChart() {
   const { t } = useTranslation(["common", "dashboard"]);
+  const chartConfig = {
+    starter: {
+      label: t("organization.home.planDistribution.plans.starter"),
+      color: "var(--chart-1)",
+    },
+    growth: {
+      label: t("organization.home.planDistribution.plans.growth"),
+      color: "var(--chart-2)",
+    },
+    pro: {
+      label: t("organization.home.planDistribution.plans.pro"),
+      color: "var(--chart-3)",
+    },
+    scale: {
+      label: t("organization.home.planDistribution.plans.scale"),
+      color: "var(--chart-4)",
+    },
+    enterprise: {
+      label: t("organization.home.planDistribution.plans.enterprise"),
+      color: "var(--chart-5)",
+    },
+  } satisfies ChartConfig;
+
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center space-y-0.5 pb-0">
-        <CardTitle className="text-xl">{t("chart.radial")}</CardTitle>
-        <CardDescription>{t("chart.period")}</CardDescription>
+        <CardTitle className="text-xl leading-tight">
+          {t("organization.home.planDistribution.title")}
+        </CardTitle>
+        <CardDescription>
+          {t("organization.home.planDistribution.description")}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 pb-0">
+      <CardContent className="flex-1 py-4">
         <ChartContainer
           config={chartConfig}
-          className="mx-auto aspect-square max-h-[250px]"
+          className="mx-auto aspect-square h-[300px]"
         >
-          <RadialBarChart data={chartData} innerRadius={30} outerRadius={100}>
+          <RadialBarChart data={chartData} innerRadius={40} outerRadius={140}>
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent hideLabel nameKey="browser" />}
+              content={<ChartTooltipContent hideLabel nameKey="plan" />}
             />
             <PolarGrid gridType="circle" />
-            <RadialBar dataKey="visitors" />
+            <RadialBar dataKey="subscriptions" />
           </RadialBarChart>
         </ChartContainer>
       </CardContent>
-      <CardFooter className="flex-col gap-2 text-sm">
-        <div className="flex items-center gap-2 leading-none font-medium">
-          {t("chart.trending")} <Icons.TrendingUp className="h-4 w-4" />
-        </div>
-        <div className="text-muted-foreground leading-none">
-          {t("chart.showing")}
-        </div>
-      </CardFooter>
     </Card>
   );
 }

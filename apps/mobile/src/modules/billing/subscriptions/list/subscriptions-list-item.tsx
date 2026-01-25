@@ -7,7 +7,6 @@ import {
   SubscriptionStatus,
 } from "@workspace/billing";
 import { isKey, useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-mobile/badge";
 import {
   Card,
@@ -58,24 +57,15 @@ export const SubscriptionsListItem = ({
             </CardTitle>
           )}
           <Badge
-            className={cn(
-              "bg-destructive/15 active:bg-destructive/25 ml-1 capitalize",
-              {
-                "bg-success/15 active:bg-success/25":
-                  subscription.status === SubscriptionStatus.ACTIVE,
-                "bg-muted active:bg-muted/25":
-                  subscription.status === SubscriptionStatus.TRIALING,
-              },
-            )}
+            variant={
+              subscription.status === SubscriptionStatus.ACTIVE
+                ? "success"
+                : subscription.status === SubscriptionStatus.TRIALING
+                  ? "secondary"
+                  : "destructive"
+            }
           >
-            <Text
-              className={cn("text-destructive", {
-                "text-success":
-                  subscription.status === SubscriptionStatus.ACTIVE,
-                "text-muted-foreground":
-                  subscription.status === SubscriptionStatus.TRIALING,
-              })}
-            >
+            <Text>
               {isKey(statusKey, i18n, "billing") ? t(statusKey) : statusKey}
             </Text>
           </Badge>

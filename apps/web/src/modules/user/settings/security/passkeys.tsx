@@ -101,24 +101,25 @@ export const Passkeys = () => {
 
                   <ConfirmModal
                     onConfirm={() => remove.mutate({ id: passkey.id })}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={remove.isPending}
-                      className="shrink-0"
-                    >
-                      <span className="sr-only">
-                        {t("account.passkeys.remove.cta")}
-                      </span>
-                      {remove.isPending &&
-                      remove.variables.id === passkey.id ? (
-                        <Icons.Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Icons.Trash className="size-4" />
-                      )}
-                    </Button>
-                  </ConfirmModal>
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={remove.isPending}
+                        className="shrink-0"
+                      >
+                        <span className="sr-only">
+                          {t("account.passkeys.remove.cta")}
+                        </span>
+                        {remove.isPending &&
+                        remove.variables.id === passkey.id ? (
+                          <Icons.Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Icons.Trash className="size-4" />
+                        )}
+                      </Button>
+                    }
+                  />
                 </li>
               );
             })}
@@ -150,17 +151,17 @@ export const Passkeys = () => {
 };
 
 const ConfirmModal = ({
-  children,
+  render,
   onConfirm,
 }: {
-  children: React.ReactNode;
+  render: React.ReactElement;
   onConfirm: () => void;
 }) => {
   const { t } = useTranslation(["common", "auth"]);
 
   return (
     <Modal>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>{t("account.passkeys.remove.cta")}</ModalTitle>
@@ -169,12 +170,12 @@ const ConfirmModal = ({
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
-          <ModalClose asChild>
-            <Button variant="outline">{t("cancel")}</Button>
-          </ModalClose>
-          <ModalClose asChild>
-            <Button onClick={onConfirm}>{t("continue")}</Button>
-          </ModalClose>
+          <ModalClose
+            render={<Button variant="outline">{t("cancel")}</Button>}
+          />
+          <ModalClose
+            render={<Button onClick={onConfirm}>{t("continue")}</Button>}
+          />
         </ModalFooter>
       </ModalContent>
     </Modal>

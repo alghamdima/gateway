@@ -1,9 +1,11 @@
 import { matchFont } from "@shopify/react-native-skia";
+import dayjs from "dayjs";
 import { Platform, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { Bar, CartesianChart } from "victory-native";
 
 import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-mobile/badge";
 import {
   Card,
   CardHeader,
@@ -15,55 +17,63 @@ import {
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Text } from "@workspace/ui-mobile/text";
 
-const useChartData = () => {
-  const color1 = useCSSVariable("--chart-1");
-  const color2 = useCSSVariable("--chart-2");
-  const color3 = useCSSVariable("--chart-3");
-  const color4 = useCSSVariable("--chart-4");
-  const color5 = useCSSVariable("--chart-5");
+const revenueValues = [1870, 2000, 2370, 1730, 900];
 
-  return [
-    {
-      browser: "chrome",
-      label: "Chrome",
-      visitors: 187,
-      color: color1,
-    },
-    {
-      browser: "safari",
-      label: "Safari",
-      visitors: 200,
-      color: color2,
-    },
-    {
-      browser: "firefox",
-      label: "Firefox",
-      visitors: 275,
-      color: color3,
-    },
-    { browser: "edge", label: "Edge", visitors: 173, color: color4 },
-    { browser: "other", label: "Opera", visitors: 90, color: color5 },
+const useChartData = (locale: string) => {
+  const colors = [
+    useCSSVariable("--chart-1"),
+    useCSSVariable("--chart-2"),
+    useCSSVariable("--chart-3"),
+    useCSSVariable("--chart-4"),
+    useCSSVariable("--chart-5"),
   ];
+  const labelFormatter = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    year: "2-digit",
+  });
+
+  const monthData = Array.from({ length: revenueValues.length }, (_, i) => {
+    const date = dayjs().subtract(revenueValues.length - 1 - i, "month");
+    return {
+      id: date.format("YYYY-MM"),
+      label: labelFormatter.format(date.toDate()),
+    };
+  });
+
+  return monthData.map((month, index) => ({
+    month: month.id,
+    label: month.label,
+    revenue: revenueValues[index] ?? 0,
+    color: colors[index],
+  }));
 };
 
 export function BarChart() {
-  const { t } = useTranslation(["common", "dashboard"]);
+  const { t, i18n } = useTranslation(["common", "dashboard"]);
   const mutedForeground = useCSSVariable("--muted-foreground");
 
-  const chartData = useChartData();
+  const chartData = useChartData(i18n.language);
 
   return (
     <Card className="w-full">
       <CardHeader className="gap-0">
-        <CardTitle>{t("chart.bar")}</CardTitle>
-        <CardDescription>{t("chart.period")}</CardDescription>
+        <View className="flex-row items-center gap-2">
+          <CardTitle>{t("organization.home.mrr.title")}</CardTitle>
+          <Badge variant="success">
+            <Icons.ArrowUp size={12} className="text-success" />
+            <Text>22%</Text>
+          </Badge>
+        </View>
+        <CardDescription>
+          {t("organization.home.mrr.description")}
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="h-[200px] px-5">
         <CartesianChart
           data={chartData}
-          xKey="browser"
-          yKeys={["visitors"]}
+          xKey="month"
+          yKeys={["revenue"]}
           domainPadding={{ left: 35, right: 35, bottom: 25 }}
           padding={{ bottom: 12 }}
           xAxis={{
@@ -76,17 +86,17 @@ export function BarChart() {
             }),
             lineWidth: 0,
             formatXLabel: (value) =>
-              chartData.find((data) => data.browser === value)?.label ?? value,
+              chartData.find((data) => data.month === value)?.label ?? value,
             labelOffset: 6,
             labelColor: mutedForeground?.toString(),
           }}
         >
           {({ points, chartBounds }) => {
-            return points.visitors.map((point) => {
+            return points.revenue.map((point) => {
               return (
                 <Bar
                   key={point.xValue}
-                  barCount={points.visitors.length}
+                  barCount={points.revenue.length}
                   chartBounds={chartBounds}
                   points={[point]}
                   innerPadding={0.15}
@@ -95,8 +105,7 @@ export function BarChart() {
                     topRight: 10,
                   }}
                   color={
-                    chartData.find((data) => data.browser === point.xValue)
-                      ?.color
+                    chartData.find((data) => data.month === point.xValue)?.color
                   }
                 />
               );
@@ -108,12 +117,12 @@ export function BarChart() {
       <CardFooter className="flex-col items-start">
         <View className="flex-row items-center gap-2">
           <Text className="font-sans-medium text-sm">
-            {t("chart.trending")}
+            {t("trendingUp", { percentage: 22 })}
           </Text>
           <Icons.TrendingUp size={16} className="text-foreground" />
         </View>
         <Text className="text-muted-foreground text-sm">
-          {t("chart.showing")}
+          {t("organization.home.mrr.label")}
         </Text>
       </CardFooter>
     </Card>

@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 import * as z from "zod";
 
@@ -18,16 +18,13 @@ import {
   BottomSheetScrollView,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormField,
-  FormInput,
-  FormSelect,
-} from "@workspace/ui-mobile/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import {
   SelectContent,
   SelectItem,
+  Select,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui-mobile/select";
@@ -125,38 +122,46 @@ export const InviteMemberBottomSheet = ({
             </BottomSheetDescription>
           </BottomSheetHeader>
 
-          <Form {...form}>
-            <View className="gap-3">
-              {fields.map((field, index) => (
-                <View key={field.id} className="gap-3">
-                  <FormField
-                    control={form.control}
-                    name={`invites.${index}.email`}
-                    render={({ field }) => (
-                      <FormInput
+          <View className="gap-3">
+            {fields.map((field, index) => (
+              <View key={field.id} className="gap-3">
+                <Controller
+                  control={form.control}
+                  name={`invites.${index}.email`}
+                  render={({ field, fieldState }) => (
+                    <Field invalid={fieldState.invalid}>
+                      <FieldLabel>{t("email")}</FieldLabel>
+                      <Input
                         {...field}
                         inputMode="email"
                         autoCapitalize="none"
                         autoCorrect={false}
                         autoFocus={index === 0}
-                        label={t("email")}
                         placeholder="jane@example.com"
+                        onChangeText={field.onChange}
                         editable={
                           hasInvitePermission && !form.formState.isSubmitting
                         }
                       />
-                    )}
-                  />
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
+                      )}
+                    </Field>
+                  )}
+                />
 
-                  <FormField
-                    control={form.control}
-                    name={`invites.${index}.role`}
-                    render={({ field }) => (
-                      <FormSelect
-                        {...field}
-                        label={t("role")}
-                        value={{ value: field.value, label: t(field.value) }}
-                        onChange={(option) =>
+                <Controller
+                  control={form.control}
+                  name={`invites.${index}.role`}
+                  render={({ field, fieldState }) => (
+                    <Field invalid={fieldState.invalid}>
+                      <FieldLabel>{t("role")}</FieldLabel>
+                      <Select
+                        value={{
+                          value: field.value,
+                          label: t(field.value),
+                        }}
+                        onValueChange={(option) =>
                           field.onChange(option?.value ?? MemberRole.MEMBER)
                         }
                         disabled={
@@ -176,62 +181,65 @@ export const InviteMemberBottomSheet = ({
                             </SelectItem>
                           ))}
                         </SelectContent>
-                      </FormSelect>
-                    )}
-                  />
-
-                  {fields.length > 1 && (
-                    <View>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          !hasInvitePermission || form.formState.isSubmitting
-                        }
-                        onPress={() => remove(index)}
-                      >
-                        <Icons.Trash size={14} className="text-foreground" />
-                        <Text>{t("remove")}</Text>
-                      </Button>
-                    </View>
+                      </Select>
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
+                      )}
+                    </Field>
                   )}
-                </View>
-              ))}
+                />
 
-              <Button
-                variant="outline"
-                size="sm"
-                onPress={() => append({ email: "", role: MemberRole.MEMBER })}
-                disabled={!hasInvitePermission || form.formState.isSubmitting}
-              >
-                <Icons.Plus size={16} className="text-foreground" />
-                <Text>{t("addMore")}</Text>
-              </Button>
-            </View>
-
-            <View className="gap-2">
-              <BottomSheetCloseTrigger asChild>
-                <Button variant="outline">
-                  <Text>{t("cancel")}</Text>
-                </Button>
-              </BottomSheetCloseTrigger>
-              <Button
-                onPress={form.handleSubmit(onSubmit)}
-                disabled={form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? (
-                  <Spin>
-                    <Icons.Loader2
-                      size={16}
-                      className="text-primary-foreground"
-                    />
-                  </Spin>
-                ) : (
-                  <Text>{t("invite")}</Text>
+                {fields.length > 1 && (
+                  <View>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        !hasInvitePermission || form.formState.isSubmitting
+                      }
+                      onPress={() => remove(index)}
+                    >
+                      <Icons.Trash size={14} className="text-foreground" />
+                      <Text>{t("remove")}</Text>
+                    </Button>
+                  </View>
                 )}
+              </View>
+            ))}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onPress={() => append({ email: "", role: MemberRole.MEMBER })}
+              disabled={!hasInvitePermission || form.formState.isSubmitting}
+            >
+              <Icons.Plus size={16} className="text-foreground" />
+              <Text>{t("addMore")}</Text>
+            </Button>
+          </View>
+
+          <View className="gap-2">
+            <BottomSheetCloseTrigger asChild>
+              <Button variant="outline">
+                <Text>{t("cancel")}</Text>
               </Button>
-            </View>
-          </Form>
+            </BottomSheetCloseTrigger>
+            <Button
+              onPress={form.handleSubmit(onSubmit)}
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <Spin>
+                  <Icons.Loader2
+                    size={16}
+                    className="text-primary-foreground"
+                  />
+                </Spin>
+              ) : (
+                <Text>{t("invite")}</Text>
+              )}
+            </Button>
+          </View>
         </BottomSheetScrollView>
       </BottomSheetContent>
     </BottomSheet>

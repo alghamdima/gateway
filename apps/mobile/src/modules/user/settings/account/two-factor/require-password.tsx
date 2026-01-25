@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { memo, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
 import { passwordSchema } from "@workspace/auth";
@@ -17,13 +17,9 @@ import {
   useBottomSheet,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormField,
-  FormInput,
-  FormItem,
-} from "@workspace/ui-mobile/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
@@ -80,50 +76,52 @@ export const RequirePassword = memo<RequirePasswordProps>(
               </BottomSheetDescription>
             </BottomSheetHeader>
 
-            <Form {...form}>
-              <View className="flex-1 gap-6">
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormInput
-                        autoFocus
-                        label={t("password")}
-                        secureTextEntry
-                        autoComplete="password"
-                        editable={!form.formState.isSubmitting}
-                        {...field}
-                      />
-                    </FormItem>
-                  )}
-                />
-
-                <View className="mt-auto gap-2">
-                  <BottomSheetCloseTrigger asChild>
-                    <Button variant="outline" className="flex-1">
-                      <Text>{t("cancel")}</Text>
-                    </Button>
-                  </BottomSheetCloseTrigger>
-                  <Button
-                    className="flex-1"
-                    disabled={form.formState.isSubmitting}
-                    onPress={form.handleSubmit(handleSubmit)}
-                  >
-                    {form.formState.isSubmitting ? (
-                      <Spin>
-                        <Icons.Loader2
-                          className="text-primary-foreground"
-                          size={16}
-                        />
-                      </Spin>
-                    ) : (
-                      <Text>{cta ?? t("continue")}</Text>
+            <View className="flex-1 gap-6">
+              <Controller
+                control={form.control}
+                name="password"
+                render={({ field, fieldState }) => (
+                  <Field invalid={fieldState.invalid}>
+                    <FieldLabel>{t("password")}</FieldLabel>
+                    <Input
+                      {...field}
+                      autoFocus
+                      secureTextEntry
+                      autoComplete="password"
+                      onChangeText={field.onChange}
+                      editable={!form.formState.isSubmitting}
+                    />
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
                     )}
+                  </Field>
+                )}
+              />
+
+              <View className="mt-auto gap-2">
+                <BottomSheetCloseTrigger asChild>
+                  <Button variant="outline" className="flex-1">
+                    <Text>{t("cancel")}</Text>
                   </Button>
-                </View>
+                </BottomSheetCloseTrigger>
+                <Button
+                  className="flex-1"
+                  disabled={form.formState.isSubmitting}
+                  onPress={form.handleSubmit(handleSubmit)}
+                >
+                  {form.formState.isSubmitting ? (
+                    <Spin>
+                      <Icons.Loader2
+                        className="text-primary-foreground"
+                        size={16}
+                      />
+                    </Spin>
+                  ) : (
+                    <Text>{cta ?? t("continue")}</Text>
+                  )}
+                </Button>
               </View>
-            </Form>
+            </View>
           </BottomSheetScrollView>
         </BottomSheetContent>
       </BottomSheet>

@@ -6,7 +6,6 @@ import {
   PaymentStatus,
 } from "@workspace/billing";
 import { isKey, useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-mobile/badge";
 import {
   Card,
@@ -47,24 +46,15 @@ export const OrdersListItem = ({ order }: { order: Order }) => {
             </CardTitle>
           )}
           <Badge
-            className={cn(
-              "bg-destructive/15 active:bg-destructive/25 ml-1 capitalize",
-              {
-                "bg-success/15 active:bg-success/25":
-                  order.status === PaymentStatus.SUCCEEDED,
-                "bg-muted active:bg-muted/25":
-                  order.status === PaymentStatus.FAILED,
-              },
-            )}
+            variant={
+              order.status === PaymentStatus.SUCCEEDED
+                ? "success"
+                : order.status === PaymentStatus.FAILED
+                  ? "destructive"
+                  : "secondary"
+            }
           >
-            <Text
-              className={cn("text-destructive", {
-                "text-success": order.status === PaymentStatus.SUCCEEDED,
-                "text-muted-foreground": order.status === PaymentStatus.FAILED,
-              })}
-            >
-              {t(`order.status.${order.status}`)}
-            </Text>
+            <Text>{t(`order.status.${order.status}`)}</Text>
           </Badge>
         </View>
         {description && (

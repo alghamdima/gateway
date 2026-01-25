@@ -44,12 +44,14 @@ export const InvitationActions = ({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <span className="sr-only">{t("actions")}</span>
-          <Icons.Ellipsis className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon">
+            <span className="sr-only">{t("actions")}</span>
+            <Icons.Ellipsis className="size-4" />
+          </Button>
+        }
+      />
       <DropdownMenuContent align="end" className="w-40">
         {(() => {
           const isPending =

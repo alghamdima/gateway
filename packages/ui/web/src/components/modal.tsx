@@ -5,6 +5,8 @@ import * as React from "react";
 import { cn } from "@workspace/ui";
 import { useBreakpoint } from "@workspace/ui-web";
 
+import type { CommonProps } from "@workspace/shared/types";
+
 import {
   Dialog,
   DialogClose,
@@ -26,19 +28,24 @@ import {
   DrawerTrigger,
 } from "#components/drawer";
 
-interface BaseProps {
-  children: React.ReactNode;
-}
-
-interface RootModalProps extends BaseProps {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}
-
-interface ModalProps extends BaseProps {
+type WithBaseProps<T> = T & {
+  render?: React.ReactElement;
+  children?: React.ReactNode;
   className?: string;
-  asChild?: true;
-}
+};
+
+type ModalProps<
+  DialogComponent extends React.ElementType,
+  DrawerComponent extends React.ElementType,
+> = WithBaseProps<
+  CommonProps<
+    React.ComponentProps<DialogComponent>,
+    React.ComponentProps<DrawerComponent>
+  >
+> & {
+  dialog?: WithBaseProps<React.ComponentProps<DialogComponent>>;
+  drawer?: WithBaseProps<React.ComponentProps<DrawerComponent>>;
+};
 
 const ModalContext = React.createContext<{ isDesktop: boolean }>({
   isDesktop: false,
@@ -49,109 +56,196 @@ const useModalContext = () => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!context) {
     throw new Error(
-      "Modal components cannot be rendered outside the Modal Context",
+      "Modal components cannot be rendered outside the ModalContext.",
     );
   }
   return context;
 };
 
-const Modal = ({ children, ...props }: RootModalProps) => {
+const Modal = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof Dialog, typeof Drawer>) => {
   const isDesktop = useBreakpoint("md");
-  const ModalComponent = isDesktop ? Dialog : Drawer;
+  const component = isDesktop ? (
+    <Dialog {...props} {...dialog} />
+  ) : (
+    <Drawer {...props} {...drawer} />
+  );
 
   return (
     <ModalContext.Provider value={{ isDesktop }}>
-      <ModalComponent {...props} {...(isDesktop && { autoFocus: true })}>
-        {children}
-      </ModalComponent>
+      {component}
     </ModalContext.Provider>
   );
 };
 
-const ModalTrigger = ({ className, children, ...props }: ModalProps) => {
+const ModalTrigger = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogTrigger, typeof DrawerTrigger>) => {
   const { isDesktop } = useModalContext();
-  const ModalTriggerComponent = isDesktop ? DialogTrigger : DrawerTrigger;
+
+  if (isDesktop) {
+    return <DialogTrigger {...props} {...dialog} />;
+  }
 
   return (
-    <ModalTriggerComponent className={className} {...props}>
-      {children}
-    </ModalTriggerComponent>
+    <DrawerTrigger
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 
-const ModalClose = ({ className, children, ...props }: ModalProps) => {
+const ModalClose = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogClose, typeof DrawerClose>) => {
   const { isDesktop } = useModalContext();
-  const ModalCloseComponent = isDesktop ? DialogClose : DrawerClose;
+
+  if (isDesktop) {
+    return <DialogClose {...props} {...dialog} />;
+  }
 
   return (
-    <ModalCloseComponent className={className} {...props}>
-      {children}
-    </ModalCloseComponent>
+    <DrawerClose
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 
-const ModalContent = ({ className, children, ...props }: ModalProps) => {
+const ModalContent = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogContent, typeof DrawerContent>) => {
   const { isDesktop } = useModalContext();
-  const ModalContentComponent = isDesktop ? DialogContent : DrawerContent;
+
+  if (isDesktop) {
+    return <DialogContent {...props} {...dialog} />;
+  }
 
   return (
-    <ModalContentComponent className={className} {...props}>
-      {children}
-    </ModalContentComponent>
+    <DrawerContent
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 
-const ModalDescription = ({ className, children, ...props }: ModalProps) => {
+const ModalDescription = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogDescription, typeof DrawerDescription>) => {
   const { isDesktop } = useModalContext();
-  const ModalDescriptionComponent = isDesktop
-    ? DialogDescription
-    : DrawerDescription;
+
+  if (isDesktop) {
+    return <DialogDescription {...props} {...dialog} />;
+  }
 
   return (
-    <ModalDescriptionComponent className={className} {...props}>
-      {children}
-    </ModalDescriptionComponent>
+    <DrawerDescription
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 
-const ModalHeader = ({ className, children, ...props }: ModalProps) => {
+const ModalHeader = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogHeader, typeof DrawerHeader>) => {
   const { isDesktop } = useModalContext();
-  const ModalHeaderComponent = isDesktop ? DialogHeader : DrawerHeader;
+
+  if (isDesktop) {
+    return <DialogHeader {...props} {...dialog} />;
+  }
 
   return (
-    <ModalHeaderComponent className={className} {...props}>
-      {children}
-    </ModalHeaderComponent>
+    <DrawerHeader
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 
-const ModalTitle = ({ className, children, ...props }: ModalProps) => {
+const ModalTitle = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogTitle, typeof DrawerTitle>) => {
   const { isDesktop } = useModalContext();
-  const ModalTitleComponent = isDesktop ? DialogTitle : DrawerTitle;
+
+  if (isDesktop) {
+    return <DialogTitle {...props} {...dialog} />;
+  }
 
   return (
-    <ModalTitleComponent className={className} {...props}>
-      {children}
-    </ModalTitleComponent>
+    <DrawerTitle
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 
-const ModalBody = ({ className, children, ...props }: ModalProps) => {
-  return (
-    <div className={cn("px-4 md:px-0", className)} {...props}>
-      {children}
-    </div>
-  );
+const ModalBody = ({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<"div">) => {
+  return <div className={cn("px-6 md:px-0", className)} {...props} />;
 };
 
-const ModalFooter = ({ className, children, ...props }: ModalProps) => {
+const ModalFooter = ({
+  dialog,
+  drawer,
+  ...props
+}: ModalProps<typeof DialogFooter, typeof DrawerFooter>) => {
   const { isDesktop } = useModalContext();
-  const ModalFooterComponent = isDesktop ? DialogFooter : DrawerFooter;
+
+  if (isDesktop) {
+    return <DialogFooter {...props} {...dialog} />;
+  }
 
   return (
-    <ModalFooterComponent className={className} {...props}>
-      {children}
-    </ModalFooterComponent>
+    <DrawerFooter
+      {...props}
+      {...drawer}
+      {...((props.render ?? drawer?.render) && {
+        children: props.render ?? drawer?.render,
+        asChild: true,
+      })}
+    />
   );
 };
 

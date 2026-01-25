@@ -1,12 +1,13 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import * as Linking from "expo-linking";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 import z from "zod";
 
 import { Trans, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
-import { Form, FormCheckbox, FormField } from "@workspace/ui-mobile/form";
+import { Checkbox } from "@workspace/ui-mobile/checkbox";
+import { Field, FieldLabel } from "@workspace/ui-mobile/field";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { useSetupSteps } from "~/app/(setup)/steps/_layout";
@@ -50,52 +51,54 @@ export default function RequiredStep() {
           </View>
 
           <View className="w-full gap-2">
-            <Form {...form}>
-              <FormField
-                control={form.control}
-                name="data"
-                render={({ field }) => (
-                  <FormCheckbox
-                    name="data"
-                    label={t("setup.steps.step.required.fields.data")}
-                    value={!!field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
+            <Controller
+              control={form.control}
+              name="data"
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    {...field}
+                    checked={!!field.value}
+                    onCheckedChange={field.onChange}
                   />
-                )}
-              />
+                  <FieldLabel onPress={() => field.onChange(!field.value)}>
+                    {t("setup.steps.step.required.fields.data")}
+                  </FieldLabel>
+                </Field>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="privacy"
-                render={({ field }) => (
-                  <FormCheckbox
-                    name="privacy"
-                    label={
-                      <Trans
-                        i18nKey="setup.steps.step.required.fields.privacy"
-                        ns="marketing"
-                        components={{
-                          a: (
-                            <Text
-                              onPress={() =>
-                                Linking.openURL(
-                                  `${appConfig.url}/legal/privacy-policy`,
-                                )
-                              }
-                              className="font-sans-medium text-primary text-sm underline hover:no-underline"
-                            />
-                          ),
-                        }}
-                      />
-                    }
-                    value={!!field.value}
-                    onChange={field.onChange}
+            <Controller
+              control={form.control}
+              name="privacy"
+              render={({ field }) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    checked={!!field.value}
+                    onCheckedChange={field.onChange}
                     onBlur={field.onBlur}
                   />
-                )}
-              />
-            </Form>
+                  <FieldLabel onPress={() => field.onChange(!field.value)}>
+                    <Trans
+                      i18nKey="setup.steps.step.required.fields.privacy"
+                      ns="marketing"
+                      components={{
+                        a: (
+                          <Text
+                            onPress={() =>
+                              Linking.openURL(
+                                `${appConfig.url}/legal/privacy-policy`,
+                              )
+                            }
+                            className="font-sans-medium text-primary text-sm underline hover:no-underline"
+                          />
+                        ),
+                      }}
+                    />
+                  </FieldLabel>
+                </Field>
+              )}
+            />
           </View>
         </View>
       </ScrollView>

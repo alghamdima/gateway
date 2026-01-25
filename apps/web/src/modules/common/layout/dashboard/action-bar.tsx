@@ -1,8 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { Fragment } from "react";
-import * as z from "zod";
 
 import { isKey, useTranslation } from "@workspace/i18n";
 import {
@@ -15,162 +13,107 @@ import {
 } from "@workspace/ui-web/breadcrumb";
 import { buttonVariants } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
-import { Separator } from "@workspace/ui-web/separator";
 import { SidebarTrigger } from "@workspace/ui-web/sidebar";
 
-import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";
 
-const ROOT_KEY = "home";
+import { useMenu } from "./sidebar/use-menu";
 
-const indexSchema = z.object({
-  index: z.string(),
-});
+import type { Item, Menu } from "./sidebar/types";
 
-const hasIndex = (value: unknown): value is z.infer<typeof indexSchema> => {
-  return indexSchema.safeParse(value).success;
-};
+const findActivePath = (
+  menu: Menu,
+  isActive: (item: Item) => boolean,
+): Item[] | null => {
+  for (const group of menu) {
+    for (const item of group.items) {
+      if (item.menu) {
+        const activeChildPath = findActivePath(item.menu, isActive);
+        if (activeChildPath) {
+          const firstChildHref = item.menu[0]?.items[0]?.href;
+          const activeChildHref = activeChildPath[0]?.href;
 
-const getDisplayKey = (rawKey: string, hasPrevious: boolean) => {
-  if (rawKey === "index") return hasPrevious ? null : ROOT_KEY;
-  return rawKey;
-};
-const isSkippedKey = (key: string) => ["user", "organization"].includes(key);
-
-const addCrumb = (
-  trail: { key: string; path?: string }[],
-  rawKey: string,
-  path?: string,
-) => {
-  const displayKey = getDisplayKey(rawKey, trail.length > 0);
-  if (!displayKey || isSkippedKey(rawKey)) return trail;
-  return [...trail, { key: displayKey, path }];
-};
-
-const getPath = (
-  obj: unknown,
-  target: string,
-  current: { key: string; path?: string }[] = [],
-): { key: string; path?: string }[] | null => {
-  if (!obj || typeof obj !== "object") return null;
-
-  for (const [rawKey, value] of Object.entries(
-    obj as Record<string, unknown>,
-  )) {
-    if (typeof value === "string") {
-      if (value === target) return addCrumb(current, rawKey, value);
-      continue;
-    }
-
-    if (typeof value === "function") {
-      const candidates = target.split("/").filter(Boolean);
-      for (const candidate of candidates) {
-        try {
-          const result = (value as (arg: string) => unknown)(candidate);
-          if (typeof result === "string") {
-            if (result === target) return addCrumb(current, rawKey, result);
-          } else if (result && typeof result === "object") {
-            const parentPath = addCrumb(
-              current,
-              rawKey,
-              hasIndex(result) ? result.index : undefined,
-            );
-            const found = getPath(result, target, parentPath);
-            if (found) return found;
+          if (
+            firstChildHref &&
+            activeChildHref === firstChildHref &&
+            item.href === firstChildHref
+          ) {
+            return [item];
           }
-        } catch {
-          // Ignore callable errors and continue trying other candidates
+
+          return [item, ...activeChildPath];
         }
       }
-      continue;
-    }
 
-    if (value && typeof value === "object") {
-      const parentPath = addCrumb(
-        current,
-        rawKey,
-        hasIndex(value) ? value.index : undefined,
-      );
-      const found = getPath(value, target, parentPath);
-      if (found) return found;
+      if (isActive(item)) return [item];
     }
   }
 
   return null;
 };
 
-export const DashboardActionBar = () => {
+export const DashboardActionBar = ({ menu }: { menu: Menu }) => {
   const { t, i18n } = useTranslation("common");
-  const pathname = usePathname();
+  const { isActive } = useMenu(menu);
 
-  const rawPath = getPath(pathsConfig, pathname);
-  const path =
-    rawPath?.length === 1 ? [{ ...rawPath[0], key: ROOT_KEY }] : rawPath;
+  const breadcrumbs = findActivePath(menu, isActive);
 
-  const last = path?.at(-1);
+  const last = breadcrumbs?.at(-1);
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 transition-[width,height] ease-linear md:px-6 lg:px-7">
-      <div className="flex items-center gap-2 pr-4">
-        <SidebarTrigger className="-ml-1" />
-        {path ? (
-          <>
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                {path.length > 1 &&
-                  path.slice(1, -1).map((item, index, array) => (
-                    <Fragment key={item.key}>
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <TurboLink href={item.path ?? "#"}>
-                            {isKey(item.key, i18n, "common")
-                              ? t(item.key)
-                              : item.key}
-                          </TurboLink>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                      {index < array.length - 1 && <BreadcrumbSeparator />}
-                    </Fragment>
-                  ))}
-
-                {last && (
-                  <>
-                    {path.length > 2 && <BreadcrumbSeparator />}
+    <header className="bg-background sticky top-(--banner-height,0px) z-10 flex h-14 w-full shrink-0 items-center justify-between gap-2 border-b px-4 transition-[width,height] ease-linear md:px-6 lg:px-7">
+      <SidebarTrigger className="md:-ml-1" />
+      <div className="absolute left-1/2 -translate-x-1/2">
+        {breadcrumbs ? (
+          <Breadcrumb>
+            <BreadcrumbList>
+              {breadcrumbs.length > 1 &&
+                breadcrumbs.slice(0, -1).map((item, index, array) => (
+                  <Fragment key={item.href}>
                     <BreadcrumbItem>
-                      <BreadcrumbPage>
-                        {isKey(last.key, i18n, "common")
-                          ? t(last.key)
-                          : last.key}
-                      </BreadcrumbPage>
+                      <BreadcrumbLink
+                        render={
+                          <TurboLink href={item.href}>
+                            {isKey(item.title, i18n, "common")
+                              ? t(item.title)
+                              : item.title}
+                          </TurboLink>
+                        }
+                      />
                     </BreadcrumbItem>
-                  </>
-                )}
-              </BreadcrumbList>
-            </Breadcrumb>
-          </>
+                    {index < array.length - 1 && <BreadcrumbSeparator />}
+                  </Fragment>
+                ))}
+
+              {last && (
+                <>
+                  {breadcrumbs.length > 1 && <BreadcrumbSeparator />}
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>
+                      {isKey(last.title, i18n, "common")
+                        ? t(last.title)
+                        : last.title}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              )}
+            </BreadcrumbList>
+          </Breadcrumb>
         ) : null}
       </div>
 
-      <div className="text-muted-foreground flex items-center">
-        <a
-          href="https://github.com/turbostarter"
-          rel="noopener noreferrer"
-          target="_blank"
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <Icons.Github className="size-5" />
-        </a>
-
-        <a
-          href="https://discord.gg/KjpK2uk3JP"
-          rel="noopener noreferrer"
-          target="_blank"
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <Icons.Discord className="size-5" />
-        </a>
-      </div>
+      <a
+        href="https://discord.gg/KjpK2uk3JP"
+        rel="noopener noreferrer"
+        target="_blank"
+        className={buttonVariants({
+          variant: "ghost",
+          size: "icon",
+          className: "text-muted-foreground",
+        })}
+      >
+        <Icons.Discord className="size-4.5" />
+      </a>
     </header>
   );
 };

@@ -40,19 +40,21 @@ export function DataTableViewOptions<TData>({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label="Toggle columns"
-          role="combobox"
-          variant="outline"
-          size="sm"
-          className="ml-auto hidden gap-1.5 lg:flex"
-        >
-          <Icons.Settings2 className="size-4" />
-          {t("view")}
-          <Icons.ChevronsUpDown className="ml-auto size-4 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <Button
+            aria-label="Toggle columns"
+            role="combobox"
+            variant="outline"
+            size="sm"
+            className="ml-auto hidden gap-1.5 lg:flex"
+          >
+            <Icons.Settings2 className="size-4" />
+            {t("view")}
+            <Icons.ChevronsUpDown className="ml-auto size-4 opacity-50" />
+          </Button>
+        }
+      />
       <PopoverContent align="end" className="w-44 p-0">
         <Command>
           <CommandInput placeholder={`${t("searchColumns")}...`} />

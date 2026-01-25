@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 
 import { SecondFactor } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
+import { FieldSeparator } from "@workspace/ui-web/field";
 
 import { authConfig } from "~/config/auth";
 
@@ -15,7 +16,6 @@ import { RegisterCta } from "./form/register-form";
 import { SocialProviders } from "./form/social-providers";
 import { TwoFactorForm } from "./form/two-factor";
 import { TwoFactorCta } from "./form/two-factor";
-import { AuthDivider } from "./layout/divider";
 import { AuthHeader } from "./layout/header";
 import { InvitationDisclaimer } from "./layout/invitation-disclaimer";
 
@@ -91,7 +91,7 @@ const Login = memo<LoginProps>(
 
         {(authConfig.providers.oAuth.length > 0 ||
           authConfig.providers.passkey) &&
-          options.length > 0 && <AuthDivider />}
+          options.length > 0 && <FieldSeparator>{t("divider")}</FieldSeparator>}
 
         <div className="flex flex-col gap-2">
           <LoginForm

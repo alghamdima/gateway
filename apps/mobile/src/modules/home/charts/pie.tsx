@@ -6,6 +6,7 @@ import { Pie, PolarChart } from "victory-native";
 
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-mobile/badge";
 import {
   CardDescription,
   Card,
@@ -13,6 +14,7 @@ import {
   CardTitle,
   CardContent,
 } from "@workspace/ui-mobile/card";
+import { Icons } from "@workspace/ui-mobile/icons";
 import {
   Select,
   SelectContent,
@@ -22,72 +24,81 @@ import {
 } from "@workspace/ui-mobile/select";
 import { Text } from "@workspace/ui-mobile/text";
 
-const useChart = () => {
-  const color1 = useCSSVariable("--chart-1");
-  const color2 = useCSSVariable("--chart-2");
-  const color3 = useCSSVariable("--chart-3");
-  const color4 = useCSSVariable("--chart-4");
-  const color5 = useCSSVariable("--chart-5");
+const customersValue = [186, 305, 237, 173, 209];
 
-  const data = [
-    { month: "may", desktop: 209, color: color5?.toString() ?? "" },
-    { month: "april", desktop: 173, color: color4?.toString() ?? "" },
-    { month: "march", desktop: 237, color: color3?.toString() ?? "" },
-    { month: "february", desktop: 305, color: color2?.toString() ?? "" },
-    { month: "january", desktop: 186, color: color1?.toString() ?? "" },
+const useChart = (locale: string) => {
+  const colors = [
+    useCSSVariable("--chart-1"),
+    useCSSVariable("--chart-2"),
+    useCSSVariable("--chart-3"),
+    useCSSVariable("--chart-4"),
+    useCSSVariable("--chart-5"),
   ];
+  const labelFormatter = new Intl.DateTimeFormat(locale, {
+    month: "long",
+  });
 
-  const config = {
-    january: {
-      label: dayjs().month(0).format("MMMM"),
-      color: color1,
-    },
-    february: {
-      label: dayjs().month(1).format("MMMM"),
-      color: color2,
-    },
-    march: {
-      label: dayjs().month(2).format("MMMM"),
-      color: color3,
-    },
-    april: {
-      label: dayjs().month(3).format("MMMM"),
-      color: color4,
-    },
-    may: {
-      label: dayjs().month(4).format("MMMM"),
-      color: color5,
-    },
-  };
+  const monthData = Array.from({ length: customersValue.length }, (_, i) => {
+    const date = dayjs().subtract(customersValue.length - 1 - i, "month");
+    return {
+      id: date.format("YYYY-MM"),
+      label: labelFormatter.format(date.toDate()),
+    };
+  }).reverse();
 
-  return { data, config };
+  const customersData = monthData.map((month, index) => ({
+    month: month.id,
+    customers: customersValue[index] ?? 0,
+    color: colors[index]?.toString() ?? "",
+  }));
+
+  const config = monthData.reduce(
+    (acc, month, index) => {
+      acc[month.id] = {
+        label: month.label,
+        color: colors[index]?.toString(),
+      };
+      return acc;
+    },
+    {} as Record<string, { label: string; color?: string | null }>,
+  );
+
+  return { customersData, config };
 };
 
 export function PieChart() {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
   const backgroundColor = useCSSVariable("--background");
 
-  const { data, config } = useChart();
-  const [activeMonth, setActiveMonth] = useState(
-    data.at(-1)?.month ?? "january",
-  );
+  const { customersData, config } = useChart(i18n.language);
+  const [activeMonth, setActiveMonth] = useState(customersData[0]?.month ?? "");
 
-  const months = data.map((item) => item.month).reverse();
+  const months = customersData.map((item) => item.month);
 
   return (
     <Card className="w-full pb-2">
       <CardHeader className="flex-row items-start justify-between gap-0.5">
         <View>
-          <CardTitle>{t("chart.pie")}</CardTitle>
-          <CardDescription>{t("chart.period")}</CardDescription>
+          <View className="flex-row items-center gap-2">
+            <CardTitle>{t("organization.home.customers.title")}</CardTitle>
+            <Badge variant="destructive">
+              <Icons.ArrowDown size={12} className="text-destructive" />
+              <Text>17%</Text>
+            </Badge>
+          </View>
+          <CardDescription>
+            {t("organization.home.customers.description")}
+          </CardDescription>
         </View>
 
         <Select
           value={{
             value: activeMonth,
-            label: config[activeMonth as keyof typeof config].label,
+            label: config[activeMonth]?.label ?? "",
           }}
-          onValueChange={(option) => setActiveMonth(option?.value ?? "january")}
+          onValueChange={(option) =>
+            setActiveMonth(option?.value ?? customersData[0]?.month ?? "")
+          }
         >
           <SelectTrigger
             className="ml-auto rounded-lg"
@@ -96,8 +107,7 @@ export function PieChart() {
             <View
               className="size-3 shrink-0 rounded-sm"
               style={{
-                backgroundColor:
-                  config[activeMonth as keyof typeof config].color?.toString(),
+                backgroundColor: config[activeMonth]?.color?.toString(),
               }}
             />
             <SelectValue
@@ -107,17 +117,23 @@ export function PieChart() {
           </SelectTrigger>
           <SelectContent className="rounded-xl" align="end" sideOffset={4}>
             {months.map((month) => {
-              const monthConfig = config[month as keyof typeof config];
+              const monthConfig = config[month];
               return (
-                <SelectItem key={month} value={month} label={monthConfig.label}>
+                <SelectItem
+                  key={month}
+                  value={month}
+                  label={monthConfig?.label ?? month}
+                >
                   <View className="flex-row items-center gap-2">
                     <View
                       className={cn("size-3 shrink-0 rounded-sm")}
                       style={{
-                        backgroundColor: monthConfig.color?.toString(),
+                        backgroundColor: monthConfig?.color?.toString(),
                       }}
                     />
-                    <Text className="text-sm">{monthConfig.label}</Text>
+                    <Text className="text-sm">
+                      {monthConfig?.label ?? month}
+                    </Text>
                   </View>
                 </SelectItem>
               );
@@ -128,9 +144,9 @@ export function PieChart() {
 
       <CardContent className="relative h-[250px]">
         <PolarChart
-          data={data}
+          data={[...customersData].reverse()}
           labelKey="month"
-          valueKey="desktop"
+          valueKey="customers"
           colorKey="color"
         >
           <Pie.Chart innerRadius="50%">
@@ -151,13 +167,13 @@ export function PieChart() {
         </PolarChart>
 
         <View className="absolute inset-0 items-center justify-center">
-          <Text className="font-sans-bold text-foreground -mt-3 text-4xl">
-            {data
+          <Text className="font-sans-bold text-foreground -mt-3 text-3xl">
+            {customersData
               .find((data) => data.month === activeMonth)
-              ?.desktop.toLocaleString(i18n.language)}
+              ?.customers.toLocaleString(i18n.language)}
           </Text>
-          <Text className="text-muted-foreground text-sm leading-none">
-            {t("visitors")}
+          <Text className="text-muted-foreground text-xs leading-none">
+            {t("customers")}
           </Text>
         </View>
       </CardContent>

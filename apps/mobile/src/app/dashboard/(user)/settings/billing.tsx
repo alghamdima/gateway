@@ -60,7 +60,7 @@ const BillingEmpty = () => {
           <View className="flex-row items-center justify-start gap-2">
             <Icons.BadgeCheck size={20} />
             <CardTitle>{t(`plan.${BillingPlan.FREE}.name`)}</CardTitle>
-            <Badge className="bg-success/15 active:bg-success/25 ml-1 capitalize">
+            <Badge variant="success" className="ml-1 capitalize">
               <Text className="text-success">
                 {t(`subscription.status.${SubscriptionStatus.ACTIVE}`)}
               </Text>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { MemberRole } from "@workspace/auth";
@@ -28,9 +29,36 @@ import { UpdateMemberRoleModal } from "../update-member-role";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Member } from "@workspace/auth";
 
+const useUpdateMemberRoleAction = (member: Member) => {
+  const { t } = useTranslation("auth");
+  const [open, setOpen] = useState(false);
+
+  const Trigger = () => {
+    return (
+      <DropdownMenuItem closeOnClick={false} onClick={() => setOpen(true)}>
+        {t("updateRole")}
+      </DropdownMenuItem>
+    );
+  };
+
+  const Modal = () => {
+    return (
+      <UpdateMemberRoleModal
+        member={member}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    );
+  };
+
+  return { Trigger, Modal };
+};
+
 export const MemberActions = ({ member }: { member: Member }) => {
   const { t } = useTranslation(["common", "organization", "auth"]);
   const queryClient = useQueryClient();
+
+  const UpdateMemberRole = useUpdateMemberRoleAction(member);
 
   const removeMember = useMutation({
     ...admin.mutations.organizations.members.remove,
@@ -50,46 +78,47 @@ export const MemberActions = ({ member }: { member: Member }) => {
   });
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <span className="sr-only">{t("actions")}</span>
-          <Icons.Ellipsis className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <UpdateMemberRoleModal member={member} key={`update-role-${member.id}`}>
-          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            {t("updateRole")}
-          </DropdownMenuItem>
-        </UpdateMemberRoleModal>
-        <DropdownMenuSeparator />
-        {(() => {
-          const isPending =
-            removeMember.isPending &&
-            removeMember.variables.memberId === member.id;
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon">
+              <span className="sr-only">{t("actions")}</span>
+              <Icons.Ellipsis className="size-4" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-40">
+          <UpdateMemberRole.Trigger key={`update-role-${member.id}`} />
+          <DropdownMenuSeparator />
+          {(() => {
+            const isPending =
+              removeMember.isPending &&
+              removeMember.variables.memberId === member.id;
 
-          return (
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() =>
-                removeMember.mutate({
-                  id: member.organizationId,
-                  memberId: member.id,
-                })
-              }
-              disabled={isPending}
-              key={`remove-${member.id}`}
-            >
-              {t("remove")}
-              {isPending && (
-                <Icons.Loader2 className="ml-auto animate-spin text-current" />
-              )}
-            </DropdownMenuItem>
-          );
-        })()}
-      </DropdownMenuContent>
-    </DropdownMenu>
+            return (
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() =>
+                  removeMember.mutate({
+                    id: member.organizationId,
+                    memberId: member.id,
+                  })
+                }
+                disabled={isPending}
+                key={`remove-${member.id}`}
+              >
+                {t("remove")}
+                {isPending && (
+                  <Icons.Loader2 className="ml-auto animate-spin text-current" />
+                )}
+              </DropdownMenuItem>
+            );
+          })()}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <UpdateMemberRole.Modal />
+    </>
   );
 };
 

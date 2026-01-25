@@ -22,24 +22,41 @@ export const LocaleIcon: Record<Locale, Icon> = {
 interface LocaleCustomizerProps {
   readonly onChange?: (lang: Locale) => Promise<void>;
   readonly variant?: "default" | "icon";
+  readonly container?: HTMLElement | null;
 }
 
 export const LocaleCustomizer = ({
   onChange,
   variant = "default",
+  container,
 }: LocaleCustomizerProps) => {
   const { i18n, t } = useTranslation("common");
   const locale = i18n.language as Locale;
 
-  const handleLocaleChange = async (locale: Locale) => {
+  const handleLocaleChange = async (locale: Locale | null) => {
+    if (!locale) return;
     await onChange?.(locale);
     await i18n.changeLanguage(locale);
   };
 
   const Icon = LocaleIcon[locale];
 
+  const items = config.locales.map((lang) => ({
+    label: (() => {
+      const Icon = LocaleIcon[lang];
+
+      return (
+        <span className="flex items-center gap-2">
+          <Icon className="size-4" />
+          {LocaleLabel[lang]}
+        </span>
+      );
+    })(),
+    value: lang,
+  }));
+
   return (
-    <Select value={locale} onValueChange={handleLocaleChange}>
+    <Select value={locale} onValueChange={handleLocaleChange} items={items}>
       <SelectTrigger
         className={cn({
           "w-full": variant === "default",
@@ -56,19 +73,16 @@ export const LocaleCustomizer = ({
           </SelectValue>
         )}
       </SelectTrigger>
-      <SelectContent align="end">
-        {config.locales.map((lang) => {
-          const Icon = LocaleIcon[lang];
-
-          return (
-            <SelectItem key={lang} value={lang} className="cursor-pointer">
-              <span className="flex items-center gap-2">
-                <Icon className="size-4" />
-                {LocaleLabel[lang]}
-              </span>
-            </SelectItem>
-          );
-        })}
+      <SelectContent align="end" portal={{ container }}>
+        {items.map((item) => (
+          <SelectItem
+            key={item.value}
+            value={item.value}
+            className="cursor-pointer"
+          >
+            {item.label}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

@@ -2,7 +2,7 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
 
@@ -14,14 +14,7 @@ import {
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Button } from "@workspace/ui-web/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import {
@@ -107,6 +100,13 @@ export const InviteMember = ({ organizationId }: InviteMemberProps) => {
     role: activeMember?.role ?? MemberRole.MEMBER,
   });
 
+  const roles = getAllRolesAtOrBelow(
+    activeMember?.role ?? MemberRole.MEMBER,
+  ).map((role) => ({
+    value: role,
+    label: t(role),
+  }));
+
   return (
     <SettingsCard disabled={!hasInvitePermission}>
       <SettingsCardHeader>
@@ -116,126 +116,143 @@ export const InviteMember = ({ organizationId }: InviteMemberProps) => {
         </SettingsCardDescription>
       </SettingsCardHeader>
 
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-2">
-          <SettingsCardContent className="flex w-full flex-col gap-2">
-            {fields.map((field, index) => (
-              <div key={field.id} className="flex w-full gap-2">
-                <FormField
-                  control={form.control}
-                  name={`invites.${index}.email`}
-                  render={({ field }) => (
-                    <FormItem className="w-full">
-                      <FormLabel className={cn({ "sr-only": index > 0 })}>
-                        {t("email")}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder="jane@example.com"
-                          disabled={
-                            !hasInvitePermission || form.formState.isSubmitting
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name={`invites.${index}.role`}
-                  render={({ field }) => (
-                    <FormItem className="w-full">
-                      <FormLabel className={cn({ "sr-only": index > 0 })}>
-                        {t("role")}
-                      </FormLabel>
-                      <FormControl>
-                        <div>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            disabled={
-                              !hasInvitePermission ||
-                              form.formState.isSubmitting
-                            }
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder={t("member")} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getAllRolesAtOrBelow(
-                                activeMember?.role ?? MemberRole.MEMBER,
-                              ).map((role) => (
-                                <SelectItem key={role} value={role}>
-                                  {t(role)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {fields.length > 1 && (
-                  <div
-                    className={cn({
-                      "translate-y-[1.35rem]": !index,
-                    })}
-                  >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="gap-2"
+      <SettingsCardContent>
+        <form id="invite-member-form" onSubmit={form.handleSubmit(onSubmit)}>
+          {fields.map((field, index) => (
+            <div key={field.id} className="my-2 flex w-full gap-2">
+              <Controller
+                name={`invites.${index}.email`}
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid} className="w-full">
+                    <FieldLabel
+                      htmlFor={`invite-member-email-${index}`}
+                      className={cn({ "sr-only": index > 0 })}
+                    >
+                      {t("email")}
+                    </FieldLabel>
+                    <Input
+                      {...field}
+                      id={`invite-member-email-${index}`}
+                      type="email"
+                      placeholder="jane@example.com"
+                      autoComplete="email"
+                      inputMode="email"
+                      spellCheck={false}
+                      required
+                      aria-invalid={fieldState.invalid}
                       disabled={
                         !hasInvitePermission || form.formState.isSubmitting
                       }
-                      onClick={() => remove(index)}
-                    >
-                      <Icons.Trash className="size-4" />
-                      <span className="sr-only"> {t("remove")}</span>
-                    </Button>
-                  </div>
+                    />
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
                 )}
-              </div>
-            ))}
+              />
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => append({ email: "", role: MemberRole.MEMBER })}
-              className="mt-2 w-fit gap-2"
-              disabled={!hasInvitePermission || form.formState.isSubmitting}
-            >
-              <Icons.Plus className="size-4" /> {t("addMore")}
-            </Button>
-          </SettingsCardContent>
+              <Controller
+                name={`invites.${index}.role`}
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid} className="w-full">
+                    <FieldLabel
+                      htmlFor={`invite-member-role-${index}`}
+                      className={cn({ "sr-only": index > 0 })}
+                    >
+                      {t("role")}
+                    </FieldLabel>
+                    <div>
+                      <Select
+                        items={roles}
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={
+                          !hasInvitePermission || form.formState.isSubmitting
+                        }
+                      >
+                        <SelectTrigger
+                          id={`invite-member-role-${index}`}
+                          className="w-full"
+                          aria-invalid={fieldState.invalid}
+                        >
+                          <SelectValue placeholder={t("member")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
 
-          <SettingsCardFooter>
-            {hasInvitePermission ? (
-              <>
-                {t("members.invite.info")}
-                <Button disabled={form.formState.isSubmitting} size="sm">
-                  {form.formState.isSubmitting ? (
-                    <Icons.Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    t("invite")
-                  )}
-                </Button>
-              </>
-            ) : (
-              t("members.invite.missingPermission")
-            )}
-          </SettingsCardFooter>
+              {fields.length > 1 && (
+                <div
+                  className={cn({
+                    "translate-y-7": !index,
+                  })}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="gap-2"
+                    disabled={
+                      !hasInvitePermission || form.formState.isSubmitting
+                    }
+                    onClick={() => remove(index)}
+                  >
+                    <Icons.Trash className="size-4" />
+                    <span className="sr-only"> {t("remove")}</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => append({ email: "", role: MemberRole.MEMBER })}
+            className="mt-2 w-fit gap-2"
+            disabled={!hasInvitePermission || form.formState.isSubmitting}
+          >
+            <Icons.Plus className="size-4" /> {t("addMore")}
+          </Button>
         </form>
-      </Form>
+      </SettingsCardContent>
+
+      <SettingsCardFooter>
+        {hasInvitePermission ? (
+          <>
+            {t("members.invite.info")}
+            <Button
+              type="submit"
+              form="invite-member-form"
+              disabled={form.formState.isSubmitting}
+              size="sm"
+            >
+              {form.formState.isSubmitting ? (
+                <Icons.Loader2 className="size-4 animate-spin" />
+              ) : (
+                t("invite")
+              )}
+            </Button>
+          </>
+        ) : (
+          t("members.invite.missingPermission")
+        )}
+      </SettingsCardFooter>
     </SettingsCard>
   );
 };

@@ -1,4 +1,5 @@
 import { getTranslation } from "@workspace/i18n/server";
+import { FieldSeparator } from "@workspace/ui-web/field";
 
 import { authConfig } from "~/config/auth";
 import { getMetadata } from "~/lib/metadata";
@@ -6,7 +7,6 @@ import { AnonymousLogin } from "~/modules/auth/form/anonymous";
 import { LoginCta } from "~/modules/auth/form/login/form";
 import { RegisterForm } from "~/modules/auth/form/register-form";
 import { SocialProviders } from "~/modules/auth/form/social-providers";
-import { AuthDivider } from "~/modules/auth/layout/divider";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { InvitationDisclaimer } from "~/modules/auth/layout/invitation-disclaimer";
 
@@ -37,7 +37,9 @@ const Register = async ({
         providers={authConfig.providers.oAuth}
         redirectTo={redirectTo}
       />
-      {authConfig.providers.oAuth.length > 0 && <AuthDivider />}
+      {authConfig.providers.oAuth.length > 0 && (
+        <FieldSeparator>{t("divider")}</FieldSeparator>
+      )}
       <div className="flex flex-col gap-2">
         <RegisterForm redirectTo={redirectTo} email={email} />
         {authConfig.providers.anonymous && <AnonymousLogin />}

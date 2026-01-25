@@ -5,19 +5,12 @@ import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
-import { AuthProvider, registerSchema, generateName } from "@workspace/auth";
+import { generateName, registerSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input, PasswordInput } from "@workspace/ui-web/input";
 
@@ -27,8 +20,6 @@ import { onPromise } from "~/utils";
 
 import { auth } from "../lib/api";
 
-import { useAuthFormStore } from "./store";
-
 interface RegisterFormProps {
   readonly redirectTo?: string;
   readonly email?: string;
@@ -37,26 +28,16 @@ interface RegisterFormProps {
 export const RegisterForm = memo<RegisterFormProps>(
   ({ redirectTo = pathsConfig.dashboard.user.index, email }) => {
     const { t } = useTranslation(["common", "auth"]);
-    const { provider, setProvider, isSubmitting, setIsSubmitting } =
-      useAuthFormStore();
 
     const form = useForm({
       resolver: standardSchemaResolver(registerSchema),
       defaultValues: {
-        email,
+        email: email ?? "",
+        password: "",
       },
     });
 
-    const signUp = useMutation({
-      ...auth.mutations.signUp.email,
-      onMutate: () => {
-        setProvider(AuthProvider.PASSWORD);
-        setIsSubmitting(true);
-      },
-      onSettled: () => {
-        setIsSubmitting(false);
-      },
-    });
+    const signUp = useMutation(auth.mutations.signUp.email);
 
     return (
       <AnimatePresence mode="wait">
@@ -77,73 +58,81 @@ export const RegisterForm = memo<RegisterFormProps>(
             <p className="text-center">{t("register.success.description")}</p>
           </motion.div>
         ) : (
-          <Form {...form} key="idle">
-            <motion.form
-              onSubmit={onPromise(
-                form.handleSubmit((data) =>
-                  signUp.mutateAsync({
-                    ...data,
-                    name: generateName(data.email),
-                    callbackURL: redirectTo,
-                  }),
-                ),
+          <motion.form
+            id="register-form"
+            onSubmit={onPromise(
+              form.handleSubmit((data) =>
+                signUp.mutateAsync({
+                  ...data,
+                  name: generateName(data.email),
+                  callbackURL: redirectTo,
+                }),
+              ),
+            )}
+            className="space-y-6"
+            exit={{ opacity: 0 }}
+            key="idle"
+          >
+            <Controller
+              name="email"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="register-email">{t("email")}</FieldLabel>
+                  <Input
+                    {...field}
+                    id="register-email"
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    spellCheck={false}
+                    required
+                    aria-invalid={fieldState.invalid}
+                    disabled={form.formState.isSubmitting}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
               )}
-              className="space-y-6"
-              exit={{ opacity: 0 }}
+            />
+
+            <Controller
+              name="password"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="register-password">
+                    {t("password")}
+                  </FieldLabel>
+                  <PasswordInput
+                    {...field}
+                    id="register-password"
+                    autoComplete="new-password"
+                    required
+                    aria-invalid={fieldState.invalid}
+                    disabled={form.formState.isSubmitting}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={form.formState.isSubmitting}
             >
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("email")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        disabled={isSubmitting}
-                        autoComplete="email"
-                        inputMode="email"
-                        spellCheck={false}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("password")}</FormLabel>
-                    <FormControl>
-                      <PasswordInput
-                        {...field}
-                        disabled={isSubmitting}
-                        autoComplete="new-password"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isSubmitting}
-              >
-                {isSubmitting && provider === AuthProvider.PASSWORD ? (
-                  <Icons.Loader2 className="animate-spin" />
-                ) : (
-                  t("register.cta")
-                )}
-              </Button>
-            </motion.form>
-          </Form>
+              {form.formState.isSubmitting ? (
+                <Icons.Loader2 className="animate-spin" />
+              ) : (
+                t("register.cta")
+              )}
+            </Button>
+          </motion.form>
         )}
       </AnimatePresence>
     );

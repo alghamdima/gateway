@@ -120,25 +120,26 @@ export const Accounts = () => {
                     onConfirm={() =>
                       disconnect.mutate({ providerId: provider })
                     }
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={accounts.length === 1 || disconnect.isPending}
-                    >
-                      <span className="sr-only">
-                        {t("account.accounts.disconnect.cta", {
-                          provider,
-                        })}
-                      </span>
-                      {disconnect.isPending &&
-                      disconnect.variables.providerId === provider ? (
-                        <Icons.Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Icons.Trash className="size-4" />
-                      )}
-                    </Button>
-                  </ConfirmModal>
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={accounts.length === 1 || disconnect.isPending}
+                      >
+                        <span className="sr-only">
+                          {t("account.accounts.disconnect.cta", {
+                            provider,
+                          })}
+                        </span>
+                        {disconnect.isPending &&
+                        disconnect.variables.providerId === provider ? (
+                          <Icons.Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Icons.Trash className="size-4" />
+                        )}
+                      </Button>
+                    }
+                  />
                 </li>
               );
             })}
@@ -196,18 +197,18 @@ export const Accounts = () => {
 
 const ConfirmModal = ({
   provider,
-  children,
+  render,
   onConfirm,
 }: {
   provider: SocialProvider;
-  children: React.ReactNode;
+  render: React.ReactElement;
   onConfirm: () => void;
 }) => {
   const { t } = useTranslation(["common", "auth"]);
 
   return (
     <Modal>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>
@@ -222,12 +223,12 @@ const ConfirmModal = ({
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
-          <ModalClose asChild>
-            <Button variant="outline">{t("cancel")}</Button>
-          </ModalClose>
-          <ModalClose asChild>
-            <Button onClick={onConfirm}>{t("continue")}</Button>
-          </ModalClose>
+          <ModalClose
+            render={<Button variant="outline">{t("cancel")}</Button>}
+          />
+          <ModalClose
+            render={<Button onClick={onConfirm}>{t("continue")}</Button>}
+          />
         </ModalFooter>
       </ModalContent>
     </Modal>

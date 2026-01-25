@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -33,10 +34,37 @@ import { UpdateMemberRoleModal } from "../update-member-role";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Member } from "@workspace/auth";
 
+const useUpdateMemberRoleAction = (member: Member) => {
+  const { t } = useTranslation("auth");
+  const [open, setOpen] = useState(false);
+
+  const Trigger = () => {
+    return (
+      <DropdownMenuItem closeOnClick={false} onClick={() => setOpen(true)}>
+        {t("updateRole")}
+      </DropdownMenuItem>
+    );
+  };
+
+  const Modal = () => {
+    return (
+      <UpdateMemberRoleModal
+        member={member}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    );
+  };
+
+  return { Trigger, Modal };
+};
+
 const Actions = ({ member }: { member: Member }) => {
   const { t } = useTranslation(["common", "auth", "organization"]);
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const UpdateMemberRole = useUpdateMemberRoleAction(member);
 
   const { data: session } = authClient.useSession();
   const { refetch } = authClient.useListOrganizations();
@@ -99,16 +127,7 @@ const Actions = ({ member }: { member: Member }) => {
 
   const groups = [
     hasUpdatePermission
-      ? [
-          <UpdateMemberRoleModal
-            member={member}
-            key={`update-role-${member.id}`}
-          >
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              {t("updateRole")}
-            </DropdownMenuItem>
-          </UpdateMemberRoleModal>,
-        ]
+      ? [<UpdateMemberRole.Trigger key={`update-role-${member.id}`} />]
       : null,
     [
       hasDeletePermission
@@ -167,20 +186,26 @@ const Actions = ({ member }: { member: Member }) => {
   ].filter((group) => group?.filter(Boolean).length);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" disabled={groups.length <= 0}>
-          <Icons.Ellipsis className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        {groups.flatMap((group, idx, array) =>
-          idx < array.length - 1
-            ? [group, <DropdownMenuSeparator key={`sep-${idx}`} />]
-            : [group],
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon" disabled={groups.length <= 0}>
+              <Icons.Ellipsis className="size-4" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-40">
+          {groups.flatMap((group, idx, array) =>
+            idx < array.length - 1
+              ? [group, <DropdownMenuSeparator key={`sep-${idx}`} />]
+              : [group],
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <UpdateMemberRole.Modal />
+    </>
   );
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
@@ -16,7 +16,7 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
-    "@ai-sdk/react": "3.0.19",
+    "@ai-sdk/react": "3.0.45",
     "@dev-plugins/react-navigation": "~0.4.0",
     "@dev-plugins/react-query": "~0.4.0",
     "@expo-google-fonts/geist": "0.4.1",
@@ -85,7 +85,7 @@
     "react-native-svg": "15.15.1",
     "react-native-svg-transformer": "1.5.2",
     "react-native-worklets": "0.5.1",
-    "uniwind": "1.2.2",
+    "uniwind": "1.2.5",
     "victory-native": "41.20.1",
     "zod": "catalog:",
     "zustand": "catalog:"

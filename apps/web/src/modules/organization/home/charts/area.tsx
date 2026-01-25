@@ -1,5 +1,6 @@
 "use client";
 
+import dayjs from "dayjs";
 import * as React from "react";
 import {
   Area,
@@ -9,6 +10,7 @@ import {
 } from "recharts";
 
 import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
 import {
   Card,
   CardContent,
@@ -23,6 +25,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@workspace/ui-web/chart";
+import { Icons } from "@workspace/ui-web/icons";
 import {
   Select,
   SelectContent,
@@ -33,126 +36,134 @@ import {
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
 
-const chartData = [
-  { date: "2024-04-01", desktop: 222, mobile: 150 },
-  { date: "2024-04-02", desktop: 97, mobile: 180 },
-  { date: "2024-04-03", desktop: 167, mobile: 120 },
-  { date: "2024-04-04", desktop: 242, mobile: 260 },
-  { date: "2024-04-05", desktop: 373, mobile: 290 },
-  { date: "2024-04-06", desktop: 301, mobile: 340 },
-  { date: "2024-04-07", desktop: 245, mobile: 180 },
-  { date: "2024-04-08", desktop: 409, mobile: 320 },
-  { date: "2024-04-09", desktop: 59, mobile: 110 },
-  { date: "2024-04-10", desktop: 261, mobile: 190 },
-  { date: "2024-04-11", desktop: 327, mobile: 350 },
-  { date: "2024-04-12", desktop: 292, mobile: 210 },
-  { date: "2024-04-13", desktop: 342, mobile: 380 },
-  { date: "2024-04-14", desktop: 137, mobile: 220 },
-  { date: "2024-04-15", desktop: 120, mobile: 170 },
-  { date: "2024-04-16", desktop: 138, mobile: 190 },
-  { date: "2024-04-17", desktop: 446, mobile: 360 },
-  { date: "2024-04-18", desktop: 364, mobile: 410 },
-  { date: "2024-04-19", desktop: 243, mobile: 180 },
-  { date: "2024-04-20", desktop: 89, mobile: 150 },
-  { date: "2024-04-21", desktop: 137, mobile: 200 },
-  { date: "2024-04-22", desktop: 224, mobile: 170 },
-  { date: "2024-04-23", desktop: 138, mobile: 230 },
-  { date: "2024-04-24", desktop: 387, mobile: 290 },
-  { date: "2024-04-25", desktop: 215, mobile: 250 },
-  { date: "2024-04-26", desktop: 75, mobile: 130 },
-  { date: "2024-04-27", desktop: 383, mobile: 420 },
-  { date: "2024-04-28", desktop: 122, mobile: 180 },
-  { date: "2024-04-29", desktop: 315, mobile: 240 },
-  { date: "2024-04-30", desktop: 454, mobile: 380 },
-  { date: "2024-05-01", desktop: 165, mobile: 220 },
-  { date: "2024-05-02", desktop: 293, mobile: 310 },
-  { date: "2024-05-03", desktop: 247, mobile: 190 },
-  { date: "2024-05-04", desktop: 385, mobile: 420 },
-  { date: "2024-05-05", desktop: 481, mobile: 390 },
-  { date: "2024-05-06", desktop: 498, mobile: 520 },
-  { date: "2024-05-07", desktop: 388, mobile: 300 },
-  { date: "2024-05-08", desktop: 149, mobile: 210 },
-  { date: "2024-05-09", desktop: 227, mobile: 180 },
-  { date: "2024-05-10", desktop: 293, mobile: 330 },
-  { date: "2024-05-11", desktop: 335, mobile: 270 },
-  { date: "2024-05-12", desktop: 197, mobile: 240 },
-  { date: "2024-05-13", desktop: 197, mobile: 160 },
-  { date: "2024-05-14", desktop: 448, mobile: 490 },
-  { date: "2024-05-15", desktop: 473, mobile: 380 },
-  { date: "2024-05-16", desktop: 338, mobile: 400 },
-  { date: "2024-05-17", desktop: 499, mobile: 420 },
-  { date: "2024-05-18", desktop: 315, mobile: 350 },
-  { date: "2024-05-19", desktop: 235, mobile: 180 },
-  { date: "2024-05-20", desktop: 177, mobile: 230 },
-  { date: "2024-05-21", desktop: 82, mobile: 140 },
-  { date: "2024-05-22", desktop: 81, mobile: 120 },
-  { date: "2024-05-23", desktop: 252, mobile: 290 },
-  { date: "2024-05-24", desktop: 294, mobile: 220 },
-  { date: "2024-05-25", desktop: 201, mobile: 250 },
-  { date: "2024-05-26", desktop: 213, mobile: 170 },
-  { date: "2024-05-27", desktop: 420, mobile: 460 },
-  { date: "2024-05-28", desktop: 233, mobile: 190 },
-  { date: "2024-05-29", desktop: 78, mobile: 130 },
-  { date: "2024-05-30", desktop: 340, mobile: 280 },
-  { date: "2024-05-31", desktop: 178, mobile: 230 },
-  { date: "2024-06-01", desktop: 178, mobile: 200 },
-  { date: "2024-06-02", desktop: 470, mobile: 410 },
-  { date: "2024-06-03", desktop: 103, mobile: 160 },
-  { date: "2024-06-04", desktop: 439, mobile: 380 },
-  { date: "2024-06-05", desktop: 88, mobile: 140 },
-  { date: "2024-06-06", desktop: 294, mobile: 250 },
-  { date: "2024-06-07", desktop: 323, mobile: 370 },
-  { date: "2024-06-08", desktop: 385, mobile: 320 },
-  { date: "2024-06-09", desktop: 438, mobile: 480 },
-  { date: "2024-06-10", desktop: 155, mobile: 200 },
-  { date: "2024-06-11", desktop: 92, mobile: 150 },
-  { date: "2024-06-12", desktop: 492, mobile: 420 },
-  { date: "2024-06-13", desktop: 81, mobile: 130 },
-  { date: "2024-06-14", desktop: 426, mobile: 380 },
-  { date: "2024-06-15", desktop: 307, mobile: 350 },
-  { date: "2024-06-16", desktop: 371, mobile: 310 },
-  { date: "2024-06-17", desktop: 475, mobile: 520 },
-  { date: "2024-06-18", desktop: 107, mobile: 170 },
-  { date: "2024-06-19", desktop: 341, mobile: 290 },
-  { date: "2024-06-20", desktop: 408, mobile: 450 },
-  { date: "2024-06-21", desktop: 169, mobile: 210 },
-  { date: "2024-06-22", desktop: 317, mobile: 270 },
-  { date: "2024-06-23", desktop: 480, mobile: 530 },
-  { date: "2024-06-24", desktop: 132, mobile: 180 },
-  { date: "2024-06-25", desktop: 141, mobile: 190 },
-  { date: "2024-06-26", desktop: 434, mobile: 380 },
-  { date: "2024-06-27", desktop: 448, mobile: 490 },
-  { date: "2024-06-28", desktop: 149, mobile: 200 },
-  { date: "2024-06-29", desktop: 103, mobile: 160 },
-  { date: "2024-06-30", desktop: 446, mobile: 400 },
+const chartValues = [
+  { web: 222, mobile: 150 },
+  { web: 97, mobile: 180 },
+  { web: 167, mobile: 120 },
+  { web: 242, mobile: 260 },
+  { web: 373, mobile: 290 },
+  { web: 301, mobile: 340 },
+  { web: 245, mobile: 180 },
+  { web: 409, mobile: 320 },
+  { web: 59, mobile: 110 },
+  { web: 261, mobile: 190 },
+  { web: 327, mobile: 350 },
+  { web: 292, mobile: 210 },
+  { web: 342, mobile: 380 },
+  { web: 137, mobile: 220 },
+  { web: 120, mobile: 170 },
+  { web: 138, mobile: 190 },
+  { web: 446, mobile: 360 },
+  { web: 364, mobile: 410 },
+  { web: 243, mobile: 180 },
+  { web: 89, mobile: 150 },
+  { web: 137, mobile: 200 },
+  { web: 224, mobile: 170 },
+  { web: 138, mobile: 230 },
+  { web: 387, mobile: 290 },
+  { web: 215, mobile: 250 },
+  { web: 75, mobile: 130 },
+  { web: 383, mobile: 420 },
+  { web: 122, mobile: 180 },
+  { web: 315, mobile: 240 },
+  { web: 454, mobile: 380 },
+  { web: 165, mobile: 220 },
+  { web: 293, mobile: 310 },
+  { web: 247, mobile: 190 },
+  { web: 385, mobile: 420 },
+  { web: 481, mobile: 390 },
+  { web: 498, mobile: 520 },
+  { web: 388, mobile: 300 },
+  { web: 149, mobile: 210 },
+  { web: 227, mobile: 180 },
+  { web: 293, mobile: 330 },
+  { web: 335, mobile: 270 },
+  { web: 197, mobile: 240 },
+  { web: 197, mobile: 160 },
+  { web: 448, mobile: 490 },
+  { web: 473, mobile: 380 },
+  { web: 338, mobile: 400 },
+  { web: 499, mobile: 420 },
+  { web: 315, mobile: 350 },
+  { web: 235, mobile: 180 },
+  { web: 177, mobile: 230 },
+  { web: 82, mobile: 140 },
+  { web: 81, mobile: 120 },
+  { web: 252, mobile: 290 },
+  { web: 294, mobile: 220 },
+  { web: 201, mobile: 250 },
+  { web: 213, mobile: 170 },
+  { web: 420, mobile: 460 },
+  { web: 233, mobile: 190 },
+  { web: 78, mobile: 130 },
+  { web: 340, mobile: 280 },
+  { web: 178, mobile: 230 },
+  { web: 178, mobile: 200 },
+  { web: 470, mobile: 410 },
+  { web: 103, mobile: 160 },
+  { web: 439, mobile: 380 },
+  { web: 88, mobile: 140 },
+  { web: 294, mobile: 250 },
+  { web: 323, mobile: 370 },
+  { web: 385, mobile: 320 },
+  { web: 438, mobile: 480 },
+  { web: 155, mobile: 200 },
+  { web: 92, mobile: 150 },
+  { web: 492, mobile: 420 },
+  { web: 81, mobile: 130 },
+  { web: 426, mobile: 380 },
+  { web: 307, mobile: 350 },
+  { web: 371, mobile: 310 },
+  { web: 475, mobile: 520 },
+  { web: 107, mobile: 170 },
+  { web: 341, mobile: 290 },
+  { web: 408, mobile: 450 },
+  { web: 169, mobile: 210 },
+  { web: 317, mobile: 270 },
+  { web: 480, mobile: 530 },
+  { web: 132, mobile: 180 },
+  { web: 141, mobile: 190 },
+  { web: 434, mobile: 380 },
+  { web: 448, mobile: 490 },
+  { web: 149, mobile: 200 },
+  { web: 103, mobile: 160 },
+  { web: 446, mobile: 400 },
 ];
+
+const chartData = chartValues.map((values, index) => {
+  const date = dayjs().subtract(chartValues.length - 1 - index, "day");
+
+  return {
+    date: date.format("YYYY-MM-DD"),
+    ...values,
+  };
+});
 
 export const AreaChart = () => {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
   const [timeRange, setTimeRange] = React.useState("90d");
 
   const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date);
-    const referenceDate = new Date("2024-06-30");
+    const date = dayjs(item.date);
+    const referenceDate = dayjs();
     let daysToSubtract = 90;
     if (timeRange === "30d") {
       daysToSubtract = 30;
     } else if (timeRange === "7d") {
       daysToSubtract = 7;
     }
-    const startDate = new Date(referenceDate);
-    startDate.setDate(startDate.getDate() - daysToSubtract);
-    return date >= startDate;
+    const startDate = referenceDate.subtract(daysToSubtract, "day");
+    return date.isAfter(startDate, "day") || date.isSame(startDate, "day");
   });
 
   const chartConfig = {
-    desktop: {
-      label: t("desktop"),
+    web: {
+      label: t("web"),
       color: "var(--chart-1)",
     },
     mobile: {
       label: t("mobile"),
-      color: "var(--chart-2)",
+      color: "var(--chart-4)",
     },
   } satisfies ChartConfig;
 
@@ -174,11 +185,24 @@ export const AreaChart = () => {
   return (
     <Card>
       <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-        <div className="grid flex-1 gap-0.5 text-center sm:text-left">
-          <CardTitle className="text-xl">{t("chart.area")}</CardTitle>
-          <CardDescription>{t("chart.showing")}</CardDescription>
+        <div className="flex flex-1 flex-col items-center gap-0.5 sm:items-start">
+          <div className="flex w-fit items-center gap-2">
+            <CardTitle className="text-xl">
+              {t("organization.home.visitors.title")}
+            </CardTitle>
+            <Badge variant="success">
+              <Icons.ArrowUp /> 67%
+            </Badge>
+          </div>
+          <CardDescription>
+            {t("organization.home.visitors.description")}
+          </CardDescription>
         </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
+        <Select
+          items={options}
+          value={timeRange}
+          onValueChange={(value) => setTimeRange(value ?? "90d")}
+        >
           <SelectTrigger
             className="w-[160px] rounded-lg sm:ml-auto"
             aria-label="Select a value"
@@ -209,15 +233,15 @@ export const AreaChart = () => {
         >
           <RechartsAreaChart data={filteredData}>
             <defs>
-              <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="fillWeb" x1="0" y1="0" x2="0" y2="1">
                 <stop
                   offset="5%"
-                  stopColor="var(--color-desktop)"
+                  stopColor="var(--color-web)"
                   stopOpacity={0.8}
                 />
                 <stop
                   offset="95%"
-                  stopColor="var(--color-desktop)"
+                  stopColor="var(--color-web)"
                   stopOpacity={0.1}
                 />
               </linearGradient>
@@ -271,10 +295,10 @@ export const AreaChart = () => {
               stackId="a"
             />
             <Area
-              dataKey="desktop"
+              dataKey="web"
               type="natural"
-              fill="url(#fillDesktop)"
-              stroke="var(--color-desktop)"
+              fill="url(#fillWeb)"
+              stroke="var(--color-web)"
               stackId="a"
             />
             <ChartLegend content={<ChartLegendContent />} />

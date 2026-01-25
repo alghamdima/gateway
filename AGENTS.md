@@ -4,7 +4,7 @@ A dedicated guide for coding agents working on the Turbostarter monorepo. Use th
 
 ## Quickstart
 
-- Ensure versions: Node ≥ 22.17.0, pnpm 10.27.x (repo pins `pnpm@10.27.0` via `packageManager`)
+- Ensure versions: Node ≥ 22.17.0, pnpm 10.28.x (repo pins `pnpm@10.28.1` via `packageManager`)
 - Create `.env` at repo root (loaded automatically by root scripts via `pnpm with-env`):
 
 ```bash
@@ -190,7 +190,7 @@ Note: All db commands will load `.env` via `with-env`.
 - Guidance:
   - Favor React Server Components; minimize `use client`, `useEffect`, `setState`
   - Wrap client components in `Suspense` with fallbacks; use dynamic import for non-critical code
-  - Use Tailwind; Shadcn/Radix for components; mobile-first responsive design
+  - Use Tailwind; Base UI for components; mobile-first responsive design
   - Optimize images (WebP, sizes, lazy loading); focus on Web Vitals (LCP, CLS, FID)
   - Use `nuqs` for URL search param state
 

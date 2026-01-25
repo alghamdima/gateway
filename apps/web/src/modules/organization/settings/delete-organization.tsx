@@ -66,11 +66,14 @@ export const DeleteOrganization = ({
 
       <SettingsCardFooter>
         {hasDeletePermission ? (
-          <ConfirmModal organizationId={activeOrganization.id}>
-            <Button size="sm" className="ml-auto" variant="destructive">
-              {t("delete.cta")}
-            </Button>
-          </ConfirmModal>
+          <ConfirmModal
+            organizationId={activeOrganization.id}
+            render={
+              <Button size="sm" className="ml-auto" variant="destructive">
+                {t("delete.cta")}
+              </Button>
+            }
+          />
         ) : (
           t("delete.missingPermission")
         )}
@@ -80,10 +83,10 @@ export const DeleteOrganization = ({
 };
 
 const ConfirmModal = ({
-  children,
+  render,
   organizationId,
 }: {
-  children: React.ReactNode;
+  render: React.ReactElement;
   organizationId: string;
 }) => {
   const { t } = useTranslation(["common", "organization"]);
@@ -103,7 +106,7 @@ const ConfirmModal = ({
 
   return (
     <Modal>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>{t("delete.title")}</ModalTitle>
@@ -112,9 +115,9 @@ const ConfirmModal = ({
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
-          <ModalClose asChild>
-            <Button variant="outline">{t("cancel")}</Button>
-          </ModalClose>
+          <ModalClose
+            render={<Button variant="outline">{t("cancel")}</Button>}
+          />
           <Button
             onClick={handleDelete}
             variant="destructive"

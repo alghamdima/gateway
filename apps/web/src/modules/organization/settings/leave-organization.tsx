@@ -62,11 +62,14 @@ export const LeaveOrganization = ({
 
       <SettingsCardFooter>
         {canLeave ? (
-          <ConfirmLeaveModal organizationId={activeOrganization.id}>
-            <Button size="sm" className="ml-auto" variant="destructive">
-              {t("leave.cta")}
-            </Button>
-          </ConfirmLeaveModal>
+          <ConfirmLeaveModal
+            organizationId={activeOrganization.id}
+            render={
+              <Button size="sm" className="ml-auto" variant="destructive">
+                {t("leave.cta")}
+              </Button>
+            }
+          />
         ) : (
           t("leave.cannotLeaveAsOnlyOwner")
         )}
@@ -76,10 +79,10 @@ export const LeaveOrganization = ({
 };
 
 const ConfirmLeaveModal = ({
-  children,
+  render,
   organizationId,
 }: {
-  children: React.ReactNode;
+  render: React.ReactElement;
   organizationId: string;
 }) => {
   const { t } = useTranslation(["common", "organization"]);
@@ -101,7 +104,7 @@ const ConfirmLeaveModal = ({
 
   return (
     <Modal>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>{t("leave.title")}</ModalTitle>
@@ -110,9 +113,9 @@ const ConfirmLeaveModal = ({
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
-          <ModalClose asChild>
-            <Button variant="outline">{t("cancel")}</Button>
-          </ModalClose>
+          <ModalClose
+            render={<Button variant="outline">{t("cancel")}</Button>}
+          />
           <Button
             onClick={handleLeave}
             variant="destructive"

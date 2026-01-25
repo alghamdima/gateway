@@ -2,20 +2,13 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { updateUserSchema, UserRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { useDebounceCallback } from "@workspace/shared/hooks";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormControl,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import {
@@ -24,7 +17,6 @@ import {
   SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectPortal,
 } from "@workspace/ui-web/select";
 
 import {
@@ -54,55 +46,60 @@ const Role = ({ id }: { id: string }) => {
     },
   });
 
+  const roles = Object.values(UserRole).map((role) => ({
+    value: role,
+    label: t(role),
+  }));
+
   return (
-    <Form {...form}>
-      <form>
-        <FormField
-          control={form.control}
-          name="role"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center gap-1.5">
-                <FormLabel>{t("role")}</FormLabel>
-                {form.formState.isSubmitting && (
-                  <Icons.Loader2 className="size-3 animate-spin" />
-                )}
-              </div>
-              <FormControl>
-                <div>
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      void form.handleSubmit((data) =>
-                        updateUser.mutateAsync({
-                          data,
-                          userId: id,
-                        }),
-                      )();
-                    }}
-                    disabled={form.formState.isSubmitting}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={t("role")} />
-                    </SelectTrigger>
-                    <SelectPortal>
-                      <SelectContent>
-                        {Object.values(UserRole).map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {t(role)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectPortal>
-                  </Select>
-                </div>
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </form>
-    </Form>
+    <form id="admin-user-role-form">
+      <Controller
+        name="role"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <div className="flex items-center gap-1.5">
+              <FieldLabel htmlFor="admin-user-role">{t("role")}</FieldLabel>
+              {form.formState.isSubmitting && (
+                <Icons.Loader2 className="size-3 animate-spin" />
+              )}
+            </div>
+            <div>
+              <Select
+                items={roles}
+                value={field.value}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  void form.handleSubmit((data) =>
+                    updateUser.mutateAsync({
+                      data,
+                      userId: id,
+                    }),
+                  )();
+                }}
+                disabled={form.formState.isSubmitting}
+              >
+                <SelectTrigger
+                  id="admin-user-role"
+                  className="w-full"
+                  aria-invalid={fieldState.invalid}
+                >
+                  <SelectValue placeholder={t("role")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+    </form>
   );
 };
 
@@ -141,35 +138,33 @@ const Name = ({ id }: { id: string }) => {
   );
 
   return (
-    <Form {...form}>
-      <form>
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center gap-1.5">
-                <FormLabel>{t("name")}</FormLabel>
-                {form.formState.isSubmitting && (
-                  <Icons.Loader2 className="size-3 animate-spin" />
-                )}
-              </div>
-              <FormControl>
-                <Input
-                  {...field}
-                  onChange={(e) => {
-                    field.onChange(e.target.value);
-                    void debouncedOnSubmit();
-                  }}
-                  disabled={form.formState.isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </form>
-    </Form>
+    <form id="admin-user-name-form">
+      <Controller
+        name="name"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <div className="flex items-center gap-1.5">
+              <FieldLabel htmlFor="admin-user-name">{t("name")}</FieldLabel>
+              {form.formState.isSubmitting && (
+                <Icons.Loader2 className="size-3 animate-spin" />
+              )}
+            </div>
+            <Input
+              {...field}
+              id="admin-user-name"
+              aria-invalid={fieldState.invalid}
+              disabled={form.formState.isSubmitting}
+              onChange={(e) => {
+                field.onChange(e.target.value);
+                void debouncedOnSubmit();
+              }}
+            />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+    </form>
   );
 };
 

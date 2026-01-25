@@ -28,7 +28,7 @@
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-js": "1.283.0",
+    "posthog-js": "1.335.2",
     "posthog-node": "5.11.0"
   }
 }

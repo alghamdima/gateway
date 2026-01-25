@@ -59,17 +59,19 @@ export const OrganizationPicker = () => {
           </li>
         ))}
         <li>
-          <CreateOrganizationModal>
-            <Button
-              type="button"
-              variant="outline"
-              className="text-muted-foreground h-36 w-full flex-col gap-2 border-dashed"
-              aria-label={t("create.cta")}
-            >
-              <Icons.Plus className="size-8" strokeWidth={1.5} />
-              <span className="text-base">{t("create.cta")}</span>
-            </Button>
-          </CreateOrganizationModal>
+          <CreateOrganizationModal
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                className="text-muted-foreground h-36 w-full flex-col gap-2 border-dashed"
+                aria-label={t("create.cta")}
+              >
+                <Icons.Plus className="size-8" strokeWidth={1.5} />
+                <span className="text-base">{t("create.cta")}</span>
+              </Button>
+            }
+          />
         </li>
       </ul>
     </nav>

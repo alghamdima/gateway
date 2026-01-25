@@ -4,28 +4,16 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
-import {
-  AuthProvider,
-  generateName,
-  magicLinkLoginSchema,
-} from "@workspace/auth";
+import { generateName, magicLinkLoginSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldLabel, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 
 import { pathsConfig } from "~/config/paths";
-import { useAuthFormStore } from "~/modules/auth/form/store";
 import { onPromise } from "~/utils";
 
 import { auth } from "../../lib/api";
@@ -38,8 +26,6 @@ interface MagicLinkLoginFormProps {
 export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
   ({ redirectTo = pathsConfig.dashboard.user.index, email }) => {
     const { t } = useTranslation(["common", "auth"]);
-    const { provider, setProvider, isSubmitting, setIsSubmitting } =
-      useAuthFormStore();
 
     const form = useForm({
       resolver: standardSchemaResolver(magicLinkLoginSchema),
@@ -48,16 +34,7 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
       },
     });
 
-    const signIn = useMutation({
-      ...auth.mutations.signIn.magicLink,
-      onMutate: () => {
-        setProvider(AuthProvider.MAGIC_LINK);
-        setIsSubmitting(true);
-      },
-      onSettled: () => {
-        setIsSubmitting(false);
-      },
-    });
+    const signIn = useMutation(auth.mutations.signIn.magicLink);
 
     return (
       <AnimatePresence mode="wait">
@@ -80,55 +57,59 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
             </p>
           </motion.div>
         ) : (
-          <Form {...form}>
-            <form
-              onSubmit={onPromise(
-                form.handleSubmit((data) =>
-                  signIn.mutateAsync({
-                    email: data.email,
-                    name: generateName(data.email),
-                    callbackURL: redirectTo,
-                    errorCallbackURL: pathsConfig.auth.error,
-                  }),
-                ),
+          <form
+            id="magic-link-login-form"
+            onSubmit={onPromise(
+              form.handleSubmit((data) =>
+                signIn.mutateAsync({
+                  email: data.email,
+                  name: generateName(data.email),
+                  callbackURL: redirectTo,
+                  errorCallbackURL: pathsConfig.auth.error,
+                }),
+              ),
+            )}
+            className="space-y-6"
+          >
+            <Controller
+              name="email"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="magic-link-login-email">
+                    {t("email")}
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    type="email"
+                    autoComplete="email"
+                    inputMode="email"
+                    spellCheck={false}
+                    required
+                    id="magic-link-login-email"
+                    aria-invalid={fieldState.invalid}
+                    disabled={form.formState.isSubmitting}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
               )}
-              className="space-y-6"
-            >
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("email")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="email"
-                        disabled={form.formState.isSubmitting}
-                        autoComplete="email"
-                        inputMode="email"
-                        spellCheck={false}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            />
 
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isSubmitting}
-              >
-                {isSubmitting && provider === AuthProvider.MAGIC_LINK ? (
-                  <Icons.Loader2 className="animate-spin" />
-                ) : (
-                  t("login.magicLink.cta")
-                )}
-              </Button>
-            </form>
-          </Form>
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <Icons.Loader2 className="animate-spin" />
+              ) : (
+                t("login.magicLink.cta")
+              )}
+            </Button>
+          </form>
         )}
       </AnimatePresence>
     );

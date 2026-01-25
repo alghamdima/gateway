@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import { SecondFactor } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
+import { FieldSeparator } from "@workspace/ui-mobile/field";
 
 import { authConfig } from "~/config/auth";
 import { AnonymousLogin } from "~/modules/auth/form/anonymous";
@@ -12,7 +13,6 @@ import { RegisterCta } from "~/modules/auth/form/register-form";
 import { SocialProviders } from "~/modules/auth/form/social-providers";
 import { TwoFactorForm, TwoFactorCta } from "~/modules/auth/form/two-factor";
 import { AuthLayout } from "~/modules/auth/layout/base";
-import { AuthDivider } from "~/modules/auth/layout/divider";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { InvitationDisclaimer } from "~/modules/auth/layout/invitation-disclaimer";
 
@@ -87,7 +87,7 @@ const Login = memo<LoginProps>(
           redirectTo={redirectTo}
         />
         {authConfig.providers.oAuth.length > 0 && options.length > 0 && (
-          <AuthDivider />
+          <FieldSeparator>{t("divider")}</FieldSeparator>
         )}
 
         <View className="gap-2">

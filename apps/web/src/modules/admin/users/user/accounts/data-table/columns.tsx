@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
 import { toast } from "sonner";
 
 import { SocialProvider } from "@workspace/auth";
@@ -22,6 +23,25 @@ import { SocialIcons } from "~/modules/auth/form/social-providers";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { GetUserAccountsResponse } from "@workspace/api/schema";
 
+const useSetPasswordAction = (userId: string) => {
+  const { t } = useTranslation("auth");
+  const [open, setOpen] = useState(false);
+
+  const Trigger = () => {
+    return (
+      <DropdownMenuItem closeOnClick={false} onClick={() => setOpen(true)}>
+        {t("account.password.update.cta")}
+      </DropdownMenuItem>
+    );
+  };
+
+  const Modal = () => {
+    return <SetPasswordModal id={userId} open={open} onOpenChange={setOpen} />;
+  };
+
+  return { Trigger, Modal };
+};
+
 export const AccountActions = ({
   account,
 }: {
@@ -29,6 +49,8 @@ export const AccountActions = ({
 }) => {
   const { t } = useTranslation(["common", "auth", "admin"]);
   const queryClient = useQueryClient();
+
+  const SetPassword = useSetPasswordAction(account.userId);
 
   const deleteAccount = useMutation({
     ...admin.mutations.users.accounts.delete,
@@ -44,13 +66,7 @@ export const AccountActions = ({
 
   const groups = [
     account.providerId === "credential"
-      ? [
-          <SetPasswordModal id={account.userId} key="set-password">
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              {t("account.password.update.cta")}
-            </DropdownMenuItem>
-          </SetPasswordModal>,
-        ]
+      ? [<SetPassword.Trigger key="set-password" />]
       : null,
     [
       [
@@ -82,21 +98,27 @@ export const AccountActions = ({
   ].filter((group) => group?.filter(Boolean).length);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <span className="sr-only">{t("actions")}</span>
-          <Icons.Ellipsis className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        {groups.flatMap((group, idx, array) =>
-          idx < array.length - 1
-            ? [group, <DropdownMenuSeparator key={`sep-${idx}`} />]
-            : [group],
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button variant="ghost" size="icon">
+              <span className="sr-only">{t("actions")}</span>
+              <Icons.Ellipsis className="size-4" />
+            </Button>
+          }
+        />
+
+        <DropdownMenuContent align="end" className="w-40">
+          {groups.flatMap((group, idx, array) =>
+            idx < array.length - 1
+              ? [group, <DropdownMenuSeparator key={`sep-${idx}`} />]
+              : [group],
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <SetPassword.Modal />
+    </>
   );
 };
 

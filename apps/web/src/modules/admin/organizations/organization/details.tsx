@@ -3,22 +3,20 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { updateOrganizationSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { useDebounceCallback } from "@workspace/shared/hooks";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@workspace/ui-web/input-group";
 
 import {
   DetailsList,
@@ -52,7 +50,7 @@ const Name = ({ id }: { id: string }) => {
       updateOrganizationSchema.pick({ name: true }),
     ),
     defaultValues: {
-      name: organization?.name,
+      name: organization?.name ?? "",
     },
   });
 
@@ -70,35 +68,35 @@ const Name = ({ id }: { id: string }) => {
   );
 
   return (
-    <Form {...form}>
-      <form>
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center gap-1.5">
-                <FormLabel>{t("name")}</FormLabel>
-                {form.formState.isSubmitting && (
-                  <Icons.Loader2 className="size-3 animate-spin" />
-                )}
-              </div>
-              <FormControl>
-                <Input
-                  {...field}
-                  onChange={(e) => {
-                    field.onChange(e.target.value);
-                    void debouncedOnSubmit();
-                  }}
-                  disabled={form.formState.isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </form>
-    </Form>
+    <form id="admin-organization-name-form">
+      <Controller
+        name="name"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <div className="flex items-center gap-1.5">
+              <FieldLabel htmlFor="admin-organization-name">
+                {t("name")}
+              </FieldLabel>
+              {form.formState.isSubmitting && (
+                <Icons.Loader2 className="size-3 animate-spin" />
+              )}
+            </div>
+            <Input
+              {...field}
+              id="admin-organization-name"
+              aria-invalid={fieldState.invalid}
+              disabled={form.formState.isSubmitting}
+              onChange={(e) => {
+                field.onChange(e.target.value);
+                void debouncedOnSubmit();
+              }}
+            />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+    </form>
   );
 };
 
@@ -144,41 +142,41 @@ const Slug = ({ id }: { id: string }) => {
   );
 
   return (
-    <Form {...form}>
-      <form>
-        <FormField
-          control={form.control}
-          name="slug"
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center gap-1.5">
-                <FormLabel>{t("slug")}</FormLabel>
-                {form.formState.isSubmitting && (
-                  <Icons.Loader2 className="size-3 animate-spin" />
-                )}
-              </div>
-              <FormControl>
-                <div className="relative">
-                  <Input
-                    className="peer ps-6"
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(e.target.value);
-                      void debouncedOnSubmit();
-                    }}
-                    disabled={form.formState.isSubmitting}
-                  />
-                  <div className="text-muted-foreground/80 pointer-events-none absolute inset-y-0 start-0 flex items-center justify-center ps-3 text-sm peer-disabled:opacity-50">
-                    /
-                  </div>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </form>
-    </Form>
+    <form id="admin-organization-slug-form">
+      <Controller
+        name="slug"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <div className="flex items-center gap-1.5">
+              <FieldLabel htmlFor="admin-organization-slug">
+                {t("slug")}
+              </FieldLabel>
+              {form.formState.isSubmitting && (
+                <Icons.Loader2 className="size-3 animate-spin" />
+              )}
+            </div>
+            <InputGroup>
+              <InputGroupInput
+                {...field}
+                id="admin-organization-slug"
+                aria-invalid={fieldState.invalid}
+                className="peer ps-6"
+                disabled={form.formState.isSubmitting}
+                onChange={(e) => {
+                  field.onChange(e.target.value);
+                  void debouncedOnSubmit();
+                }}
+              />
+              <InputGroupAddon className="text-muted-foreground/80 pointer-events-none pl-3 peer-disabled:opacity-50">
+                /
+              </InputGroupAddon>
+            </InputGroup>
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
+    </form>
   );
 };
 

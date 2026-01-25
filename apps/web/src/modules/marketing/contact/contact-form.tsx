@@ -1,20 +1,13 @@
 "use client";
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Card, CardContent } from "@workspace/ui-web/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldLabel, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import { Textarea } from "@workspace/ui-web/textarea";
@@ -35,8 +28,6 @@ export function ContactForm() {
     },
   });
 
-  const message = form.watch("message");
-
   const onSubmit = async (data: ContactFormPayload) => {
     const { error } = await sendContactForm(data);
 
@@ -54,82 +45,100 @@ export function ContactForm() {
   return (
     <Card className="w-full max-w-lg border-none bg-transparent shadow-none">
       <CardContent className="w-full p-0">
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-4"
+        <form
+          id="contact-form"
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex flex-col gap-6"
+        >
+          <Controller
+            name="name"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="contact-form-name">{t("name")}</FieldLabel>
+                <Input
+                  {...field}
+                  id="contact-form-name"
+                  autoComplete="name"
+                  spellCheck={false}
+                  aria-invalid={fieldState.invalid}
+                  placeholder={t("contact.form.name.placeholder")}
+                  required
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          <Controller
+            name="email"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="contact-form-email">
+                  {t("email")}
+                </FieldLabel>
+                <Input
+                  {...field}
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  spellCheck={false}
+                  required
+                  id="contact-form-email"
+                  aria-invalid={fieldState.invalid}
+                  placeholder={t("contact.form.email.placeholder")}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          <Controller
+            name="message"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel
+                  className="flex justify-between"
+                  htmlFor="contact-form-message"
+                >
+                  <span>{t("message")}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {field.value.length}/{MAX_MESSAGE_LENGTH}
+                  </span>
+                </FieldLabel>
+                <Textarea
+                  {...field}
+                  id="contact-form-message"
+                  aria-invalid={fieldState.invalid}
+                  placeholder={t("contact.form.message.placeholder")}
+                  maxLength={MAX_MESSAGE_LENGTH}
+                  required
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          <Button
+            type="submit"
+            className="mt-2"
+            disabled={form.formState.isSubmitting}
           >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("name")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={t("contact.form.name.placeholder")}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("email")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder={t("contact.form.email.placeholder")}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="message"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="mt-2 flex justify-between">
-                    <span>{t("message")}</span>
-                    <span className="text-muted-foreground text-xs">
-                      {message.length}/{MAX_MESSAGE_LENGTH}
-                    </span>
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder={t("contact.form.message.placeholder")}
-                      className="min-h-[120px]"
-                      maxLength={MAX_MESSAGE_LENGTH}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button
-              type="submit"
-              className="mt-2"
-              disabled={form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? (
-                <Icons.Loader2 className="size-5 animate-spin" />
-              ) : (
-                t("contact.form.submit")
-              )}
-            </Button>
-          </form>
-        </Form>
+            {form.formState.isSubmitting ? (
+              <Icons.Loader2 className="size-5 animate-spin" />
+            ) : (
+              t("contact.form.submit")
+            )}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );

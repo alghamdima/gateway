@@ -13,7 +13,11 @@ export const Header = () => {
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <LocaleCustomizer onChange={change} variant="icon" />
+      <LocaleCustomizer
+        onChange={change}
+        variant="icon"
+        container={document.getElementById("main")}
+      />
       <ThemeControls />
       <User />
     </div>

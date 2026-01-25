@@ -1,25 +1,19 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
-import { AuthProvider } from "@workspace/auth";
 import { magicLinkLoginSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormField,
-  FormInput,
-  FormItem,
-} from "@workspace/ui-mobile/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
-import { useAuthFormStore } from "~/modules/auth/form/store";
 
 import { auth } from "../../lib/api";
 
@@ -33,9 +27,6 @@ interface MagicLinkLoginFormProps {
 export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
   ({ redirectTo = pathsConfig.index, email }) => {
     const { t } = useTranslation(["common", "auth"]);
-    const { provider, setProvider, isSubmitting, setIsSubmitting } =
-      useAuthFormStore();
-
     const form = useForm({
       resolver: standardSchemaResolver(magicLinkLoginSchema),
       defaultValues: {
@@ -45,13 +36,6 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
 
     const signIn = useMutation({
       ...auth.mutations.signIn.magicLink,
-      onMutate: () => {
-        setProvider(AuthProvider.MAGIC_LINK);
-        setIsSubmitting(true);
-      },
-      onSettled: () => {
-        setIsSubmitting(false);
-      },
       onSuccess: () => {
         Alert.alert(
           t("login.magicLink.success.title"),
@@ -62,45 +46,49 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
     });
 
     return (
-      <Form {...form}>
-        <View className="gap-6">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormInput
-                  label={t("email")}
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  editable={!isSubmitting}
-                  {...field}
-                />
-              </FormItem>
-            )}
-          />
+      <View className="gap-6">
+        <Controller
+          name="email"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field invalid={fieldState.invalid}>
+              <FieldLabel>{t("common:email")}</FieldLabel>
+              <Input
+                {...field}
+                onChangeText={field.onChange}
+                autoCapitalize="none"
+                autoComplete="email"
+                inputMode="email"
+                keyboardType="email-address"
+                spellCheck={false}
+                maxLength={254}
+                editable={!form.formState.isSubmitting}
+              />
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
 
-          <Button
-            className="w-full"
-            size="lg"
-            onPress={form.handleSubmit((data) =>
-              signIn.mutateAsync({
-                ...data,
-                callbackURL: redirectTo,
-              }),
-            )}
-            disabled={isSubmitting}
-          >
-            {isSubmitting && provider === AuthProvider.MAGIC_LINK ? (
-              <Spin>
-                <Icons.Loader2 className="text-primary-foreground size-5" />
-              </Spin>
-            ) : (
-              <Text>{t("login.magicLink.cta")}</Text>
-            )}
-          </Button>
-        </View>
-      </Form>
+        <Button
+          className="w-full"
+          size="lg"
+          onPress={form.handleSubmit((data) =>
+            signIn.mutateAsync({
+              ...data,
+              callbackURL: redirectTo,
+            }),
+          )}
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? (
+            <Spin>
+              <Icons.Loader2 className="text-primary-foreground size-5" />
+            </Spin>
+          ) : (
+            <Text>{t("login.magicLink.cta")}</Text>
+          )}
+        </Button>
+      </View>
     );
   },
 );

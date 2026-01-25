@@ -14,7 +14,6 @@ import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
 
 import { auth } from "../../lib/api";
-import { useAuthFormStore } from "../store";
 
 interface PasskeyLoginProps {
   readonly redirectTo?: string;
@@ -24,21 +23,12 @@ export const PasskeyLogin = ({
   redirectTo = pathsConfig.dashboard.user.index,
 }: PasskeyLoginProps) => {
   const router = useRouter();
-  const { setProvider, setIsSubmitting, isSubmitting, provider } =
-    useAuthFormStore();
   const { t } = useTranslation(["auth", "common"]);
 
   const queryClient = useQueryClient();
 
   const signIn = useMutation({
     ...auth.mutations.signIn.passkey,
-    onMutate: () => {
-      setProvider(AuthProvider.PASSKEY);
-      setIsSubmitting(true);
-    },
-    onSettled: () => {
-      setIsSubmitting(false);
-    },
     onSuccess: () => {
       router.replace(redirectTo);
     },
@@ -57,9 +47,9 @@ export const PasskeyLogin = ({
       className="relative gap-2"
       size="lg"
       onClick={() => signIn.mutate(undefined)}
-      disabled={isSubmitting}
+      disabled={signIn.isPending}
     >
-      {isSubmitting && provider === AuthProvider.PASSKEY ? (
+      {signIn.isPending ? (
         <Icons.Loader2 className="size-4 animate-spin" />
       ) : (
         <>

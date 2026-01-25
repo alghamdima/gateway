@@ -2,13 +2,14 @@ import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
 
 import { Icons } from "@workspace/ui-web/icons";
-import { SidebarProvider } from "@workspace/ui-web/sidebar";
+import { SidebarInset, SidebarProvider } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
 import { getOrganization, getSession } from "~/lib/auth/server";
 import { getQueryClient } from "~/lib/query/server";
+import { DashboardActionBar } from "~/modules/common/layout/dashboard/action-bar";
 import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
-import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar";
+import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
 import { organization } from "~/modules/organization/lib/api";
 
 const menu = (organization: string) => [
@@ -18,7 +19,7 @@ const menu = (organization: string) => [
       {
         title: "home",
         href: pathsConfig.dashboard.organization(organization).index,
-        icon: Icons.Home,
+        icon: <Icons.Home />,
       },
     ],
   },
@@ -28,12 +29,24 @@ const menu = (organization: string) => [
       {
         title: "settings",
         href: pathsConfig.dashboard.organization(organization).settings.index,
-        icon: Icons.Settings,
+        icon: <Icons.Settings />,
+        menu: [
+          {
+            items: [
+              {
+                title: "general",
+                href: pathsConfig.dashboard.organization(organization).settings
+                  .index,
+                icon: <Icons.Settings />,
+              },
+            ],
+          },
+        ],
       },
       {
         title: "members",
         href: pathsConfig.dashboard.organization(organization).members,
-        icon: Icons.UsersRound,
+        icon: <Icons.UsersRound />,
       },
     ],
   },
@@ -75,7 +88,10 @@ export default async function DashboardLayout({
     <HydrationBoundary state={dehydrate(queryClient)}>
       <SidebarProvider>
         <DashboardSidebar user={user} menu={menu(organizationSlug)} />
-        <DashboardInset>{children}</DashboardInset>
+        <SidebarInset>
+          <DashboardActionBar menu={menu(organizationSlug)} />
+          <DashboardInset>{children}</DashboardInset>
+        </SidebarInset>
       </SidebarProvider>
     </HydrationBoundary>
   );

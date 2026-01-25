@@ -1,19 +1,13 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useTheme } from "next-themes";
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import QRCode from "react-qr-code";
 
 import { otpSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import {
-  FormField,
-  FormControl,
-  FormItem,
-  FormMessage,
-  Form,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import {
   InputOTP,
@@ -74,7 +68,7 @@ export const TotpModal = ({ open, onOpenChange }: TotpModalProps) => {
 
   return (
     <>
-      <Modal open={open} onOpenChange={onOpenChange}>
+      <Modal open={open} drawer={{ onOpenChange }} dialog={{ onOpenChange }}>
         <ModalContent>
           <ModalHeader>
             <ModalTitle>{t("account.twoFactor.totp.enable.title")}</ModalTitle>
@@ -83,51 +77,60 @@ export const TotpModal = ({ open, onOpenChange }: TotpModalProps) => {
             </ModalDescription>
           </ModalHeader>
 
-          <div className="mt-2 flex w-full flex-col-reverse items-center gap-2">
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="mt-2 flex w-full flex-col items-center space-y-4 md:space-y-6"
-              >
-                <FormField
-                  control={form.control}
-                  name="code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <InputOTP
-                          maxLength={6}
-                          disabled={form.formState.isSubmitting}
-                          onComplete={form.handleSubmit(onSubmit)}
-                          {...field}
-                        >
-                          <InputOTPGroup>
-                            {Array.from({ length: 6 }).map((_, index) => (
-                              <InputOTPSlot key={index} index={index} />
-                            ))}
-                          </InputOTPGroup>
-                        </InputOTP>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <ModalFooter className="flex w-full justify-end">
-                  <ModalClose asChild>
+          <div className="flex w-full flex-col-reverse items-center gap-2">
+            <form
+              id="user-two-factor-totp-form"
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="mt-2 flex w-full flex-col items-center space-y-4"
+            >
+              <Controller
+                name="code"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid} className="w-fit">
+                    <FieldLabel
+                      htmlFor="user-two-factor-totp-code"
+                      className="sr-only"
+                    >
+                      {t("code")}
+                    </FieldLabel>
+                    <InputOTP
+                      {...field}
+                      maxLength={6}
+                      disabled={form.formState.isSubmitting}
+                      aria-invalid={fieldState.invalid}
+                      aria-label={t("code")}
+                      onComplete={form.handleSubmit(onSubmit)}
+                    >
+                      <InputOTPGroup id="user-two-factor-totp-code">
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <InputOTPSlot key={index} index={index} />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                )}
+              />
+              <ModalFooter className="flex w-full justify-end">
+                <ModalClose
+                  render={
                     <Button variant="outline" type="button">
                       {t("close")}
                     </Button>
-                  </ModalClose>
-                  <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? (
-                      <Icons.Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      t("continue")
-                    )}
-                  </Button>
-                </ModalFooter>
-              </form>
-            </Form>
+                  }
+                />
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? (
+                    <Icons.Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    t("continue")
+                  )}
+                </Button>
+              </ModalFooter>
+            </form>
 
             <QRCode
               value={uri}
@@ -220,11 +223,14 @@ export const TotpTile = () => {
         </p>
       </div>
 
-      <RequirePassword onConfirm={onEdit}>
-        <Button variant="outline" disabled={!enabled}>
-          {enabled ? t("edit") : t("add")}
-        </Button>
-      </RequirePassword>
+      <RequirePassword
+        onConfirm={onEdit}
+        render={
+          <Button variant="outline" disabled={!enabled}>
+            {enabled ? t("edit") : t("add")}
+          </Button>
+        }
+      />
       <TotpModal open={open} onOpenChange={setOpen} />
     </div>
   );

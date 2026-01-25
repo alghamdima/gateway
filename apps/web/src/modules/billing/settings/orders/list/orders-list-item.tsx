@@ -2,7 +2,6 @@
 
 import { findPlanByVariantId, PaymentStatus } from "@workspace/billing";
 import { isKey, useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-web/badge";
 import { Icons } from "@workspace/ui-web/icons";
 
@@ -33,15 +32,13 @@ export const OrdersListItem = ({ order }: { order: Order }) => {
             </span>
           )}
           <Badge
-            className={cn(
-              "bg-destructive/15 hover:bg-destructive/25 text-destructive capitalize",
-              {
-                "bg-success/15 hover:bg-success/25 text-success":
-                  order.status === PaymentStatus.SUCCEEDED,
-                "bg-muted hover:bg-muted/25 text-muted-foreground":
-                  order.status === PaymentStatus.FAILED,
-              },
-            )}
+            variant={
+              order.status === PaymentStatus.SUCCEEDED
+                ? "success"
+                : order.status === PaymentStatus.FAILED
+                  ? "destructive"
+                  : "secondary"
+            }
           >
             {t(`order.status.${order.status}`)}
           </Badge>

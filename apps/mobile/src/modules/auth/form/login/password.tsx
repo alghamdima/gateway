@@ -2,27 +2,20 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
-import { AuthProvider } from "@workspace/auth";
 import { passwordLoginSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormCheckbox,
-  FormField,
-  FormInput,
-  FormItem,
-  FormLabel,
-} from "@workspace/ui-mobile/form";
+import { Checkbox } from "@workspace/ui-mobile/checkbox";
+import { Field, FieldLabel, FieldError } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
-import { useAuthFormStore } from "~/modules/auth/form/store";
 import { Link } from "~/modules/common/styled";
 
 import { auth } from "../../lib/api";
@@ -39,8 +32,6 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
   ({ redirectTo = pathsConfig.index, email, onTwoFactorRedirect }) => {
     const { t } = useTranslation(["common", "auth"]);
 
-    const { provider, setProvider, isSubmitting, setIsSubmitting } =
-      useAuthFormStore();
     const form = useForm({
       resolver: standardSchemaResolver(passwordLoginSchema),
       defaultValues: {
@@ -51,13 +42,6 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
 
     const signIn = useMutation({
       ...auth.mutations.signIn.email,
-      onMutate: () => {
-        setProvider(AuthProvider.PASSWORD);
-        setIsSubmitting(true);
-      },
-      onSettled: () => {
-        setIsSubmitting(false);
-      },
       onSuccess: (ctx) => {
         if ("twoFactorRedirect" in ctx) {
           return onTwoFactorRedirect?.();
@@ -68,80 +52,88 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
     });
 
     return (
-      <Form {...form}>
-        <View className="gap-6">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormInput
-                  label={t("email")}
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  editable={!isSubmitting}
-                  {...field}
-                />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <View className="flex-row items-center justify-between">
-                  <FormLabel nativeID="password">{t("password")}</FormLabel>
-
-                  <Link
-                    href={pathsConfig.setup.auth.forgotPassword}
-                    className="text-muted-foreground self-end font-sans text-sm underline underline-offset-4"
-                  >
-                    {t("account.password.forgot.label")}
-                  </Link>
-                </View>
-                <FormInput
-                  secureTextEntry
-                  autoComplete="password"
-                  editable={!isSubmitting}
-                  {...field}
-                />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="rememberMe"
-            render={({ field }) => (
-              <FormCheckbox
-                name="rememberMe"
-                label={t("rememberMe")}
-                disabled={isSubmitting}
-                value={!!field.value}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
+      <View className="gap-6">
+        <Controller
+          name="email"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field invalid={fieldState.invalid}>
+              <FieldLabel>{t("common:email")}</FieldLabel>
+              <Input
+                {...field}
+                onChangeText={field.onChange}
+                autoCapitalize="none"
+                autoComplete="email"
+                inputMode="email"
+                keyboardType="email-address"
+                spellCheck={false}
+                maxLength={254}
+                editable={!form.formState.isSubmitting}
               />
-            )}
-          />
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
 
-          <Button
-            className="w-full"
-            size="lg"
-            onPress={form.handleSubmit((data) => signIn.mutate(data))}
-            disabled={isSubmitting}
-          >
-            {isSubmitting && provider === AuthProvider.PASSWORD ? (
-              <Spin>
-                <Icons.Loader2 className="text-primary-foreground" />
-              </Spin>
-            ) : (
-              <Text>{t("login.cta")}</Text>
-            )}
-          </Button>
-        </View>
-      </Form>
+        <Controller
+          name="password"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field invalid={fieldState.invalid}>
+              <View className="flex-row items-center justify-between">
+                <FieldLabel>{t("password")}</FieldLabel>
+                <Link
+                  href={pathsConfig.setup.auth.forgotPassword}
+                  className="text-muted-foreground self-end font-sans text-sm underline underline-offset-4"
+                >
+                  {t("account.password.forgot.label")}
+                </Link>
+              </View>
+              <Input
+                {...field}
+                secureTextEntry
+                autoComplete="password"
+                onChangeText={field.onChange}
+                editable={!form.formState.isSubmitting}
+              />
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+
+        <Controller
+          name="rememberMe"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field invalid={fieldState.invalid} orientation="horizontal">
+              <Checkbox
+                {...field}
+                checked={!!field.value}
+                onCheckedChange={field.onChange}
+                disabled={form.formState.isSubmitting}
+              />
+              <FieldLabel onPress={() => field.onChange(!field.value)}>
+                {t("rememberMe")}
+              </FieldLabel>
+            </Field>
+          )}
+        />
+
+        <Button
+          className="w-full"
+          size="lg"
+          onPress={form.handleSubmit((data) => signIn.mutateAsync(data))}
+          disabled={form.formState.isSubmitting}
+        >
+          {form.formState.isSubmitting ? (
+            <Spin>
+              <Icons.Loader2 className="text-primary-foreground" />
+            </Spin>
+          ) : (
+            <Text>{t("login.cta")}</Text>
+          )}
+        </Button>
+      </View>
     );
   },
 );

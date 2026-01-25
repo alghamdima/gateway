@@ -14,14 +14,23 @@ export const authRouter = new Hono().on(["GET", "POST"], "*", async (c) => {
     return res;
   }
 
-  const json = (await res.json()) as { code: AuthErrorCode; message: string };
+  const text = await res.text();
+  const json = (() => {
+    try {
+      return JSON.parse(text) as { code: AuthErrorCode; message: string };
+    } catch {
+      return null;
+    }
+  })();
 
   throw new HttpException(
     isHttpStatus(res.status)
       ? res.status
       : HttpStatusCode.INTERNAL_SERVER_ERROR,
-    {
-      code: ERROR_MESSAGES[json.code],
-    },
+    json
+      ? {
+          code: ERROR_MESSAGES[json.code],
+        }
+      : undefined,
   );
 });

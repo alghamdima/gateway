@@ -15,14 +15,14 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
-    "lodash": "4.17.21",
+    "lodash": "4.17.23",
     "pino": "10.1.0",
     "react": "catalog:react19",
     "slugify": "1.6.6",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/lodash": "4.17.20",
+    "@types/lodash": "4.17.23",
     "@types/react": "catalog:react19",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/prettier-config": "workspace:*",

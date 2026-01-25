@@ -1,5 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 "use client";
 
+import dayjs from "dayjs";
+import * as React from "react";
 import {
   Bar,
   BarChart as RechartsBarChart,
@@ -9,6 +13,7 @@ import {
 } from "recharts";
 
 import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
 import {
   Card,
   CardContent,
@@ -26,51 +31,63 @@ import { Icons } from "@workspace/ui-web/icons";
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
 
-const chartData = [
-  { browser: "chrome", visitors: 187, fill: "var(--chart-1)" },
-  { browser: "safari", visitors: 200, fill: "var(--chart-2)" },
-  { browser: "firefox", visitors: 275, fill: "var(--chart-3)" },
-  { browser: "edge", visitors: 173, fill: "var(--chart-4)" },
-  { browser: "other", visitors: 90, fill: "var(--chart-5)" },
-];
+const revenueValues = [1870, 2000, 2370, 1730, 900];
 
-const chartConfig = {
-  chrome: {
-    label: "Chrome",
-    color: "var(--chart-1)",
-  },
-  safari: {
-    label: "Safari",
-    color: "var(--chart-2)",
-  },
-  firefox: {
-    label: "Firefox",
-    color: "var(--chart-3)",
-  },
-  edge: {
-    label: "Edge",
-    color: "var(--chart-4)",
-  },
-  other: {
-    label: "Opera",
-    color: "var(--chart-5)",
-  },
-} satisfies ChartConfig;
+const useChartData = (locale: string) => {
+  const labelFormatter = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    year: "2-digit",
+  });
+
+  const monthData = Array.from({ length: revenueValues.length }, (_, i) => {
+    const date = dayjs().subtract(revenueValues.length - 1 - i, "month");
+    return {
+      id: date.format("YYYY-MM"),
+      label: labelFormatter.format(date.toDate()),
+    };
+  });
+
+  const chartData = monthData.map((month, index) => ({
+    month: month.id,
+    revenue: revenueValues[index] ?? 0,
+    fill: `var(--chart-${index + 1})`,
+  }));
+
+  const chartConfig = monthData.reduce((config, month, idx) => {
+    config[month.id] = {
+      label: month.label,
+      color: `var(--chart-${idx + 1})`,
+    };
+    return config;
+  }, {} as ChartConfig);
+
+  return { chartData, chartConfig };
+};
 
 export function BarChart() {
-  const { t } = useTranslation(["common", "dashboard"]);
+  const { t, i18n } = useTranslation(["common", "dashboard"]);
+  const { chartData, chartConfig } = useChartData(i18n.language);
 
   return (
     <Card>
       <CardHeader className="space-y-0.5">
-        <CardTitle className="text-xl">{t("chart.bar")}</CardTitle>
-        <CardDescription>{t("chart.period")}</CardDescription>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-xl leading-tight">
+            {t("organization.home.mrr.title")}
+          </CardTitle>
+          <Badge variant="success">
+            <Icons.ArrowUp /> 22%
+          </Badge>
+        </div>
+        <CardDescription>
+          {t("organization.home.mrr.description")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer
           config={{
-            visitors: {
-              label: t("visitors"),
+            revenue: {
+              label: t("revenue"),
             },
             ...chartConfig,
           }}
@@ -78,20 +95,43 @@ export function BarChart() {
           <RechartsBarChart accessibilityLayer data={chartData}>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="browser"
+              dataKey="month"
               tickLine={false}
               tickMargin={10}
               axisLine={false}
               tickFormatter={(value) =>
-                chartConfig[value as keyof typeof chartConfig].label
+                chartConfig[value as keyof typeof chartConfig]?.label as string
               }
             />
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent hideLabel />}
+              content={
+                <ChartTooltipContent
+                  hideLabel
+                  formatter={(value, _, item) => (
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="size-2.5 rounded-[2px] border"
+                        style={{
+                          backgroundColor: item.payload.fill,
+                          borderColor: item.payload.fill,
+                        }}
+                      />
+                      {dayjs(item.payload.month as string).format("MMMM")}
+                      <span className="text-foreground ml-auto block font-mono font-medium tabular-nums">
+                        {new Intl.NumberFormat(i18n.language, {
+                          style: "currency",
+                          currency: "USD",
+                          maximumFractionDigits: 0,
+                        }).format(Number(value))}
+                      </span>
+                    </div>
+                  )}
+                />
+              }
             />
             <Bar
-              dataKey="visitors"
+              dataKey="revenue"
               strokeWidth={2}
               radius={8}
               activeIndex={2}
@@ -100,7 +140,6 @@ export function BarChart() {
                   <Rectangle
                     {...props}
                     fillOpacity={0.8}
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
                     stroke={props.payload.fill}
                     strokeDasharray={4}
                     strokeDashoffset={4}
@@ -111,12 +150,13 @@ export function BarChart() {
           </RechartsBarChart>
         </ChartContainer>
       </CardContent>
-      <CardFooter className="flex-col items-start gap-2 text-sm">
-        <div className="flex gap-2 leading-none font-medium">
-          {t("chart.trending")} <Icons.TrendingUp className="h-4 w-4" />
+      <CardFooter className="flex-col items-start text-sm">
+        <div className="flex gap-2 font-medium">
+          {t("trendingUp", { percentage: 22 })}{" "}
+          <Icons.TrendingUp className="h-4 w-4" />
         </div>
-        <div className="text-muted-foreground leading-none">
-          {t("chart.showing")}
+        <div className="text-muted-foreground">
+          {t("organization.home.mrr.label")}
         </div>
       </CardFooter>
     </Card>

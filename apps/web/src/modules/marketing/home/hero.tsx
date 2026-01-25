@@ -50,8 +50,8 @@ export const Hero = async () => {
             dark="/images/hero/dark.webp"
             alt="Hero Image"
             className="relative h-full w-full rounded-[inherit] border object-contain"
-            width={2626}
-            height={1894}
+            width={3000}
+            height={2000}
             priority
             fetchPriority="high"
           />

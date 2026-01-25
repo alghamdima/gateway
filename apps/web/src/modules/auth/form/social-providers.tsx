@@ -11,11 +11,9 @@ import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
-import { useAuthFormStore } from "~/modules/auth/form/store";
 
 import { auth } from "../lib/api";
 
-import type { AuthProvider } from "@workspace/auth";
 import type { Icon } from "@workspace/ui-web/icons";
 
 interface SocialProvidersProps {
@@ -33,12 +31,10 @@ const SocialProvider = ({
   provider,
   isSubmitting,
   onClick,
-  actualProvider,
 }: {
   provider: SocialProviderType;
   isSubmitting: boolean;
   onClick: () => void;
-  actualProvider: AuthProvider;
 }) => {
   const { t } = useTranslation("common");
   const Icon = SocialIcons[provider];
@@ -53,7 +49,7 @@ const SocialProvider = ({
       disabled={isSubmitting}
       onClick={onClick}
     >
-      {isSubmitting && actualProvider === provider ? (
+      {isSubmitting ? (
         <Icons.Loader2 className="animate-spin" />
       ) : (
         <>
@@ -73,23 +69,7 @@ const SocialProvider = ({
 
 export const SocialProviders = memo<SocialProvidersProps>(
   ({ providers, redirectTo = pathsConfig.dashboard.user.index }) => {
-    const {
-      provider: actualProvider,
-      setProvider,
-      isSubmitting,
-      setIsSubmitting,
-    } = useAuthFormStore();
-
-    const signIn = useMutation({
-      ...auth.mutations.signIn.social,
-      onMutate: ({ provider }) => {
-        setProvider(provider as SocialProviderType);
-        setIsSubmitting(true);
-      },
-      onSettled: () => {
-        setIsSubmitting(false);
-      },
-    });
+    const signIn = useMutation(auth.mutations.signIn.social);
 
     return (
       <div className="flex flex-wrap gap-2">
@@ -97,7 +77,9 @@ export const SocialProviders = memo<SocialProvidersProps>(
           <SocialProvider
             key={provider}
             provider={provider}
-            isSubmitting={isSubmitting}
+            isSubmitting={
+              signIn.isPending && signIn.variables.provider === provider
+            }
             onClick={() =>
               signIn.mutate({
                 provider,
@@ -105,7 +87,6 @@ export const SocialProviders = memo<SocialProvidersProps>(
                 errorCallbackURL: pathsConfig.auth.error,
               })
             }
-            actualProvider={actualProvider}
           />
         ))}
       </div>

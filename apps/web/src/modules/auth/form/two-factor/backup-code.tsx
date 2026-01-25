@@ -4,20 +4,13 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import { backupCodeVerificationSchema, SecondFactor } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Checkbox } from "@workspace/ui-web/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 
@@ -47,64 +40,74 @@ const BackupCodeForm = memo<FormProps>(
     });
 
     return (
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit((data) =>
-            verifyBackupCode.mutateAsync(data),
+      <form
+        id="two-factor-backup-code-form"
+        onSubmit={form.handleSubmit((data) =>
+          verifyBackupCode.mutateAsync(data),
+        )}
+        className="space-y-6"
+      >
+        <Controller
+          name="code"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="two-factor-backup-code" className="sr-only">
+                {t("login.twoFactor.backupCode.placeholder")}
+              </FieldLabel>
+              <Input
+                {...field}
+                id="two-factor-backup-code"
+                type="text"
+                autoFocus
+                disabled={form.formState.isSubmitting}
+                aria-invalid={fieldState.invalid}
+                autoComplete="one-time-code"
+                placeholder={t("login.twoFactor.backupCode.placeholder")}
+              />
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
           )}
-          className="flex flex-col gap-6"
+        />
+
+        <Controller
+          name="trustDevice"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field
+              orientation="horizontal"
+              data-invalid={fieldState.invalid}
+              className="-mt-2 ml-px items-center"
+            >
+              <Checkbox
+                id="two-factor-backup-code-trust-device"
+                name={field.name}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                disabled={form.formState.isSubmitting}
+                aria-invalid={fieldState.invalid}
+              />
+              <FieldLabel htmlFor="two-factor-backup-code-trust-device">
+                {t("login.twoFactor.trustDevice")}
+              </FieldLabel>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+
+        <Button
+          type="submit"
+          className="w-full"
+          size="lg"
+          disabled={form.formState.isSubmitting}
         >
-          <FormField
-            control={form.control}
-            name="code"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <Input
-                    {...field}
-                    type="text"
-                    autoFocus
-                    disabled={form.formState.isSubmitting}
-                    autoComplete="one-time-code"
-                    placeholder={t("login.twoFactor.backupCode.placeholder")}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="trustDevice"
-            render={({ field }) => (
-              <FormItem className="-mt-2 ml-px flex items-center gap-2 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={form.formState.isSubmitting}
-                  />
-                </FormControl>
-                <FormLabel>{t("login.twoFactor.trustDevice")}</FormLabel>
-              </FormItem>
-            )}
-          />
-
-          <Button
-            type="submit"
-            className="w-full"
-            size="lg"
-            disabled={form.formState.isSubmitting}
-          >
-            {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("verify")
-            )}
-          </Button>
-        </form>
-      </Form>
+          {form.formState.isSubmitting ? (
+            <Icons.Loader2 className="animate-spin" />
+          ) : (
+            t("verify")
+          )}
+        </Button>
+      </form>
     );
   },
 );

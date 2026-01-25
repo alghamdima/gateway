@@ -1,7 +1,7 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
 import { createOrganizationSchema } from "@workspace/auth";
@@ -18,8 +18,14 @@ import {
   useBottomSheet,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
-import { Form, FormField, FormInput } from "@workspace/ui-mobile/form";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
@@ -97,44 +103,48 @@ export const CreateOrganizationBottomSheet = ({
             </BottomSheetDescription>
           </BottomSheetHeader>
 
-          <Form {...form}>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormInput
+          <Controller
+            control={form.control}
+            name="name"
+            render={({ field, fieldState }) => (
+              <Field invalid={fieldState.invalid}>
+                <FieldLabel>{t("common:name")}</FieldLabel>
+                <Input
                   {...field}
                   autoFocus
-                  label={t("common:name")}
-                  description={t("create.info")}
+                  onChangeText={field.onChange}
                   editable={!form.formState.isSubmitting}
                 />
-              )}
-            />
-
-            <View className="gap-2">
-              <BottomSheetCloseTrigger asChild>
-                <Button variant="outline">
-                  <Text>{t("cancel")}</Text>
-                </Button>
-              </BottomSheetCloseTrigger>
-              <Button
-                onPress={form.handleSubmit(onSubmit)}
-                disabled={form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? (
-                  <Spin>
-                    <Icons.Loader2
-                      className="text-primary-foreground"
-                      size={16}
-                    />
-                  </Spin>
-                ) : (
-                  <Text>{t("create.cta")}</Text>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
                 )}
+                <FieldDescription>{t("create.info")}</FieldDescription>
+              </Field>
+            )}
+          />
+
+          <View className="gap-2">
+            <BottomSheetCloseTrigger asChild>
+              <Button variant="outline">
+                <Text>{t("cancel")}</Text>
               </Button>
-            </View>
-          </Form>
+            </BottomSheetCloseTrigger>
+            <Button
+              onPress={form.handleSubmit(onSubmit)}
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <Spin>
+                  <Icons.Loader2
+                    className="text-primary-foreground"
+                    size={16}
+                  />
+                </Spin>
+              ) : (
+                <Text>{t("create.cta")}</Text>
+              )}
+            </Button>
+          </View>
         </BottomSheetScrollView>
       </BottomSheetContent>
     </BottomSheet>

@@ -3,19 +3,12 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import { forgotPasswordSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@workspace/ui-web/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 
@@ -29,6 +22,9 @@ export const ForgotPasswordForm = () => {
   const { t } = useTranslation(["common", "auth"]);
   const form = useForm({
     resolver: standardSchemaResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
+    },
   });
 
   const forgetPassword = useMutation({
@@ -65,63 +61,68 @@ export const ForgotPasswordForm = () => {
           </TurboLink>
         </motion.div>
       ) : (
-        <Form {...form} key="idle">
-          <motion.form
-            onSubmit={onPromise(
-              form.handleSubmit((data) =>
-                forgetPassword.mutateAsync({
-                  ...data,
-                  redirectTo: pathsConfig.auth.updatePassword,
-                }),
-              ),
+        <motion.form
+          id="forgot-password-form"
+          onSubmit={onPromise(
+            form.handleSubmit((data) =>
+              forgetPassword.mutateAsync({
+                ...data,
+                redirectTo: pathsConfig.auth.updatePassword,
+              }),
+            ),
+          )}
+          className="space-y-6"
+          exit={{ opacity: 0 }}
+          key="idle"
+        >
+          <Controller
+            name="email"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="forgot-password-email">
+                  {t("email")}
+                </FieldLabel>
+                <Input
+                  {...field}
+                  id="forgot-password-email"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  spellCheck={false}
+                  required
+                  aria-invalid={fieldState.invalid}
+                  disabled={form.formState.isSubmitting}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
             )}
-            className="space-y-6"
-            exit={{ opacity: 0 }}
+          />
+
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            disabled={form.formState.isSubmitting}
           >
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("email")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="email"
-                      disabled={form.formState.isSubmitting}
-                      autoComplete="email"
-                      inputMode="email"
-                      spellCheck={false}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {form.formState.isSubmitting ? (
+              <Icons.Loader2 className="animate-spin" />
+            ) : (
+              t("account.password.forgot.cta")
+            )}
+          </Button>
 
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={form.formState.isSubmitting}
+          <div className="flex items-center justify-center pt-2">
+            <TurboLink
+              href={pathsConfig.auth.login}
+              className="text-muted-foreground hover:text-primary pl-2 text-sm font-medium underline underline-offset-4"
             >
-              {form.formState.isSubmitting ? (
-                <Icons.Loader2 className="animate-spin" />
-              ) : (
-                t("account.password.forgot.cta")
-              )}
-            </Button>
-
-            <div className="flex items-center justify-center pt-2">
-              <TurboLink
-                href={pathsConfig.auth.login}
-                className="text-muted-foreground hover:text-primary pl-2 text-sm font-medium underline underline-offset-4"
-              >
-                {t("account.password.forgot.back")}
-              </TurboLink>
-            </div>
-          </motion.form>
-        </Form>
+              {t("account.password.forgot.back")}
+            </TurboLink>
+          </div>
+        </motion.form>
       )}
     </AnimatePresence>
   );

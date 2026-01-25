@@ -1,19 +1,15 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
-import { AuthProvider, generateName, registerSchema } from "@workspace/auth";
+import { generateName, registerSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormInput,
-} from "@workspace/ui-mobile/form";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
+import { Input } from "@workspace/ui-mobile/input";
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
@@ -21,8 +17,6 @@ import { pathsConfig } from "~/config/paths";
 import { Link } from "~/modules/common/styled";
 
 import { auth } from "../lib/api";
-
-import { useAuthFormStore } from "./store";
 
 import type { Route } from "expo-router";
 
@@ -36,8 +30,6 @@ export const RegisterForm = ({
   email,
 }: RegisterFormProps) => {
   const { t } = useTranslation(["common", "auth"]);
-  const { provider, setProvider, isSubmitting, setIsSubmitting } =
-    useAuthFormStore();
 
   const form = useForm({
     resolver: standardSchemaResolver(registerSchema),
@@ -48,13 +40,6 @@ export const RegisterForm = ({
 
   const signUp = useMutation({
     ...auth.mutations.signUp.email,
-    onMutate: () => {
-      setProvider(AuthProvider.PASSWORD);
-      setIsSubmitting(true);
-    },
-    onSettled: () => {
-      setIsSubmitting(false);
-    },
     onSuccess: () => {
       Alert.alert(
         t("register.success.title"),
@@ -73,62 +58,68 @@ export const RegisterForm = ({
   });
 
   return (
-    <Form {...form}>
-      <View className="gap-6">
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormInput
-                label={t("email")}
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!isSubmitting}
-                {...field}
-              />
-            </FormItem>
-          )}
-        />
+    <View className="gap-6">
+      <Controller
+        control={form.control}
+        name="email"
+        render={({ field, fieldState }) => (
+          <Field invalid={fieldState.invalid}>
+            <FieldLabel>{t("common:email")}</FieldLabel>
+            <Input
+              {...field}
+              onChangeText={field.onChange}
+              autoCapitalize="none"
+              autoComplete="email"
+              inputMode="email"
+              keyboardType="email-address"
+              spellCheck={false}
+              maxLength={254}
+              editable={!form.formState.isSubmitting}
+            />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormInput
-                label={t("password")}
-                secureTextEntry
-                autoComplete="password"
-                editable={!isSubmitting}
-                {...field}
-              />
-            </FormItem>
-          )}
-        />
+      <Controller
+        control={form.control}
+        name="password"
+        render={({ field, fieldState }) => (
+          <Field invalid={fieldState.invalid}>
+            <FieldLabel>{t("password")}</FieldLabel>
+            <Input
+              {...field}
+              secureTextEntry
+              autoComplete="password"
+              onChangeText={field.onChange}
+              editable={!form.formState.isSubmitting}
+            />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
-        <Button
-          className="w-full"
-          size="lg"
-          onPress={form.handleSubmit((data) =>
-            signUp.mutateAsync({
-              ...data,
-              name: generateName(data.email),
-              callbackURL: redirectTo,
-            }),
-          )}
-          disabled={isSubmitting}
-        >
-          {isSubmitting && provider === AuthProvider.PASSWORD ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground size-5" />
-            </Spin>
-          ) : (
-            <Text>{t("register.cta")}</Text>
-          )}
-        </Button>
-      </View>
-    </Form>
+      <Button
+        className="w-full"
+        size="lg"
+        onPress={form.handleSubmit((data) =>
+          signUp.mutateAsync({
+            ...data,
+            name: generateName(data.email),
+            callbackURL: redirectTo,
+          }),
+        )}
+        disabled={form.formState.isSubmitting}
+      >
+        {form.formState.isSubmitting ? (
+          <Spin>
+            <Icons.Loader2 className="text-primary-foreground size-5" />
+          </Spin>
+        ) : (
+          <Text>{t("register.cta")}</Text>
+        )}
+      </Button>
+    </View>
   );
 };
 

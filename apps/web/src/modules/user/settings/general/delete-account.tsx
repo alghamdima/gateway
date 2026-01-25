@@ -49,21 +49,24 @@ export const DeleteAccount = ({ user }: DeleteAccountProps) => {
       </SettingsCardHeader>
 
       <SettingsCardFooter>
-        <ConfirmModal isAnonymous={user.isAnonymous ?? false}>
-          <Button size="sm" className="ml-auto" variant="destructive">
-            {t("account.delete.cta")}
-          </Button>
-        </ConfirmModal>
+        <ConfirmModal
+          isAnonymous={user.isAnonymous ?? false}
+          render={
+            <Button size="sm" className="ml-auto" variant="destructive">
+              {t("account.delete.cta")}
+            </Button>
+          }
+        />
       </SettingsCardFooter>
     </SettingsCard>
   );
 };
 
 const ConfirmModal = ({
-  children,
+  render,
   isAnonymous,
 }: {
-  children: React.ReactNode;
+  render: React.ReactElement;
   isAnonymous: boolean;
 }) => {
   const session = authClient.useSession();
@@ -123,7 +126,7 @@ const ConfirmModal = ({
 
   return (
     <Modal>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>{t("account.delete.title")}</ModalTitle>
@@ -132,9 +135,9 @@ const ConfirmModal = ({
           </ModalDescription>
         </ModalHeader>
         <ModalFooter>
-          <ModalClose asChild>
-            <Button variant="outline">{t("cancel")}</Button>
-          </ModalClose>
+          <ModalClose
+            render={<Button variant="outline">{t("cancel")}</Button>}
+          />
           {renderCta()}
         </ModalFooter>
       </ModalContent>

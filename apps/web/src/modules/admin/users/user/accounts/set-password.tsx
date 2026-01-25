@@ -1,21 +1,18 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { passwordSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormMessage,
-} from "@workspace/ui-web/form";
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { PasswordInput } from "@workspace/ui-web/input";
 import {
@@ -27,37 +24,57 @@ import {
   ModalFooter,
   ModalClose,
   ModalTrigger,
+  ModalBody,
 } from "@workspace/ui-web/modal";
 
 import { admin } from "~/modules/admin/lib/api";
 
 interface SetPasswordModalProps {
-  readonly id: string;
-  readonly children: React.ReactNode;
+  id: string;
+  render?: React.ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export const SetPasswordModal = ({ id, children }: SetPasswordModalProps) => {
+export const SetPasswordModal = ({
+  id,
+  render,
+  open: _open,
+  onOpenChange: _onOpenChange,
+}: SetPasswordModalProps) => {
   const { t } = useTranslation(["common", "auth", "admin"]);
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = _open !== undefined;
+  const open = controlled ? _open : uncontrolledOpen;
 
   const { data: user } = useQuery(admin.queries.users.get({ id }));
 
   const form = useForm({
     resolver: standardSchemaResolver(passwordSchema),
+    defaultValues: {
+      password: "",
+    },
   });
 
   const setPassword = useMutation({
     ...admin.mutations.users.setPassword,
     onSuccess: () => {
       toast.success(t("users.user.accounts.password.update.success"));
-      setOpen(false);
+      onOpenChange(false);
       form.reset();
     },
   });
 
+  const onOpenChange = (nextOpen: boolean) => {
+    if (!controlled) {
+      setUncontrolledOpen(nextOpen);
+    }
+    _onOpenChange?.(nextOpen);
+  };
+
   return (
-    <Modal open={open} onOpenChange={setOpen}>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+    <Modal open={open} drawer={{ onOpenChange }} dialog={{ onOpenChange }}>
+      {render && <ModalTrigger render={render} />}
       <ModalContent>
         <ModalHeader>
           <ModalTitle>
@@ -70,8 +87,9 @@ export const SetPasswordModal = ({ id, children }: SetPasswordModalProps) => {
           </ModalDescription>
         </ModalHeader>
 
-        <Form {...form}>
+        <ModalBody>
           <form
+            id="admin-set-password-form"
             onSubmit={form.handleSubmit((data) =>
               setPassword.mutateAsync({
                 userId: id,
@@ -80,39 +98,54 @@ export const SetPasswordModal = ({ id, children }: SetPasswordModalProps) => {
             )}
             className="space-y-6"
           >
-            <FormField
-              control={form.control}
+            <Controller
               name="password"
-              render={({ field }) => (
-                <FormItem className="px-4 md:px-0">
-                  <FormLabel>{t("newPassword")}</FormLabel>
-                  <FormControl>
-                    <PasswordInput {...field} />
-                  </FormControl>
-                  <FormDescription>
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="admin-set-password">
+                    {t("newPassword")}
+                  </FieldLabel>
+                  <PasswordInput
+                    {...field}
+                    id="admin-set-password"
+                    autoComplete="new-password"
+                    required
+                    aria-invalid={fieldState.invalid}
+                    disabled={form.formState.isSubmitting}
+                  />
+                  <FieldDescription>
                     {t("users.user.accounts.password.update.info")}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
+                  </FieldDescription>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
               )}
             />
-
-            <ModalFooter>
-              <ModalClose asChild>
-                <Button variant="outline" type="button">
-                  {t("cancel")}
-                </Button>
-              </ModalClose>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
-                  <Icons.Loader2 className="animate-spin" />
-                ) : (
-                  t("update")
-                )}
-              </Button>
-            </ModalFooter>
           </form>
-        </Form>
+        </ModalBody>
+
+        <ModalFooter>
+          <ModalClose
+            render={
+              <Button variant="outline" type="button">
+                {t("cancel")}
+              </Button>
+            }
+          />
+          <Button
+            type="submit"
+            form="admin-set-password-form"
+            disabled={form.formState.isSubmitting}
+          >
+            {form.formState.isSubmitting ? (
+              <Icons.Loader2 className="animate-spin" />
+            ) : (
+              t("update")
+            )}
+          </Button>
+        </ModalFooter>
       </ModalContent>
     </Modal>
   );

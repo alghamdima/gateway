@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 import QRCode from "react-qr-code";
 
@@ -17,12 +17,7 @@ import {
   BottomSheetScrollView,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  FormField,
-  FormItem,
-  FormMessage,
-  Form,
-} from "@workspace/ui-mobile/form";
+import { Field, FieldError } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
 import {
   InputOTP,
@@ -93,64 +88,64 @@ export const TotpSheet = ({ ref: passedRef }: TotpSheetProps) => {
                 fgColor={resolvedTheme === ThemeMode.DARK ? "#fff" : "#000"}
               />
 
-              <Form {...form}>
-                <View className="w-full flex-1 items-center gap-6">
-                  <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <InputOTP
-                          maxLength={6}
-                          autoFocus
-                          value={field.value}
-                          onChange={field.onChange}
-                          onComplete={() => form.handleSubmit(onSubmit)()}
-                          render={({ slots }) => (
-                            <InputOTPGroup>
-                              {slots.map((slot, index) => (
-                                <InputOTPSlot
-                                  key={index}
-                                  index={index}
-                                  max={6}
-                                  {...slot}
-                                />
-                              ))}
-                            </InputOTPGroup>
-                          )}
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <View className="mt-auto w-full gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onPress={() => ref.current?.close()}
-                    >
-                      <Text>{t("close")}</Text>
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      disabled={form.formState.isSubmitting}
-                      onPress={form.handleSubmit(onSubmit)}
-                    >
-                      {form.formState.isSubmitting ? (
-                        <Spin>
-                          <Icons.Loader2
-                            className="text-primary-foreground"
-                            size={16}
-                          />
-                        </Spin>
-                      ) : (
-                        <Text>{t("continue")}</Text>
+              <View className="w-full flex-1 items-center gap-6">
+                <Controller
+                  control={form.control}
+                  name="code"
+                  render={({ field, fieldState }) => (
+                    <Field invalid={fieldState.invalid}>
+                      <InputOTP
+                        maxLength={6}
+                        autoFocus
+                        value={field.value}
+                        onChange={field.onChange}
+                        onComplete={() => form.handleSubmit(onSubmit)()}
+                        render={({ slots }) => (
+                          <InputOTPGroup>
+                            {slots.map((slot, index) => (
+                              <InputOTPSlot
+                                key={index}
+                                index={index}
+                                max={6}
+                                {...slot}
+                              />
+                            ))}
+                          </InputOTPGroup>
+                        )}
+                      />
+                      {fieldState.invalid && (
+                        <FieldError errors={[fieldState.error]} />
                       )}
-                    </Button>
-                  </View>
+                    </Field>
+                  )}
+                />
+
+                <View className="mt-auto w-full gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onPress={() => ref.current?.close()}
+                  >
+                    <Text>{t("close")}</Text>
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    disabled={form.formState.isSubmitting}
+                    onPress={form.handleSubmit(onSubmit)}
+                  >
+                    {form.formState.isSubmitting ? (
+                      <Spin>
+                        <Icons.Loader2
+                          className="text-primary-foreground"
+                          size={16}
+                        />
+                      </Spin>
+                    ) : (
+                      <Text>{t("continue")}</Text>
+                    )}
+                  </Button>
                 </View>
-              </Form>
+              </View>
             </View>
           </BottomSheetScrollView>
         </BottomSheetContent>

@@ -1,6 +1,5 @@
 import { UserRole } from "@workspace/auth";
 import { isKey, useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import { Badge } from "@workspace/ui-web/badge";
 import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-column-header";
@@ -74,12 +73,7 @@ export const useColumns = (): ColumnDef<User>[] => {
             {row.original.email}
 
             <Badge
-              className={cn({
-                "bg-success/15 text-success hover:bg-success/25":
-                  row.original.emailVerified,
-                "bg-destructive/15 text-destructive hover:bg-destructive/25":
-                  !row.original.emailVerified,
-              })}
+              variant={row.original.emailVerified ? "success" : "destructive"}
             >
               {row.original.emailVerified ? t("verified") : t("unverified")}
             </Badge>

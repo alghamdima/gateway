@@ -14,8 +14,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuPortal,
   DropdownMenuGroup,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
 import { SidebarMenuButton, useSidebar } from "@workspace/ui-web/sidebar";
@@ -24,7 +26,7 @@ import { Skeleton } from "@workspace/ui-web/skeleton";
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
 import { auth } from "~/modules/auth/lib/api";
-import { ThemeControlsProvider } from "~/modules/common/theme";
+import { Customizer } from "~/modules/common/theme";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { User } from "@workspace/auth";
@@ -50,37 +52,38 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <SidebarMenuButton
-          size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-        >
-          <Avatar className="size-8">
-            <AvatarImage src={user.image ?? undefined} alt={user.name} />
-            <AvatarFallback>
-              <Icons.UserRound className="w-5" />
-            </AvatarFallback>
-          </Avatar>
+      <DropdownMenuTrigger
+        render={
+          <SidebarMenuButton
+            size="lg"
+            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          >
+            <Avatar className="size-8">
+              <AvatarImage src={user.image ?? undefined} alt={user.name} />
+              <AvatarFallback>
+                <Icons.UserRound className="w-5" />
+              </AvatarFallback>
+            </Avatar>
 
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            {user.name && (
-              <span className="truncate font-medium">{user.name}</span>
-            )}
-            {user.email && (
-              <span className="truncate text-xs">{user.email}</span>
-            )}
-          </div>
-          <Icons.EllipsisVertical className="ml-auto size-4" />
-        </SidebarMenuButton>
-      </DropdownMenuTrigger>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              {user.name && (
+                <span className="truncate font-medium">{user.name}</span>
+              )}
+              {user.email && (
+                <span className="truncate text-xs">{user.email}</span>
+              )}
+            </div>
+            <Icons.EllipsisVertical className="ml-auto size-4" />
+          </SidebarMenuButton>
+        }
+      />
 
-      <DropdownMenuPortal>
-        <DropdownMenuContent
-          className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-          side={isMobile ? "bottom" : "right"}
-          align="end"
-          sideOffset={4}
-        >
+      <DropdownMenuContent
+        side={isMobile ? "bottom" : "right"}
+        align="end"
+        sideOffset={4}
+      >
+        <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center gap-2 font-normal">
             <Avatar className="size-8">
               <AvatarImage src={user.image ?? undefined} alt={user.name} />
@@ -102,10 +105,12 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
               )}
             </div>
           </DropdownMenuLabel>
+        </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem asChild>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            render={
               <TurboLink
                 href={pathsConfig.dashboard.user.index}
                 className="flex w-full cursor-pointer items-center gap-1.5"
@@ -114,9 +119,11 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
                 <Icons.Home className="size-4" />
                 {t("dashboard")}
               </TurboLink>
-            </DropdownMenuItem>
+            }
+          />
 
-            <DropdownMenuItem asChild>
+          <DropdownMenuItem
+            render={
               <TurboLink
                 href={pathsConfig.dashboard.user.settings.index}
                 className="flex w-full cursor-pointer items-center gap-1.5"
@@ -125,29 +132,31 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
                 <Icons.Settings className="size-4" />
                 {t("settings")}
               </TurboLink>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+            }
+          />
+        </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
+        <DropdownMenuSeparator />
 
-          <DropdownMenuGroup>
-            <ThemeControlsProvider>
-              <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()}>
-                <div className="flex w-full cursor-pointer items-center gap-1.5">
-                  <Icons.Sun className="size-4 dark:hidden" />
-                  <Icons.Moon className="hidden size-4 dark:block" />
-                  {t("theme.title")}
+        <DropdownMenuGroup>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="[&_svg]:last:hidden">
+              <Icons.Sun className="text-muted-foreground size-4 dark:hidden" />
+              <Icons.Moon className="text-muted-foreground hidden size-4 dark:block" />
+              {t("theme.title")}
+              <div className="bg-primary text-muted-foreground ml-auto size-3 rounded-full"></div>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="space-y-4 p-6">
+              <Customizer />
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuGroup>
 
-                  <div className="bg-primary ml-auto size-3 rounded-full"></div>
-                </div>
-              </DropdownMenuItem>
-            </ThemeControlsProvider>
-          </DropdownMenuGroup>
-
-          {hasAdminPermission(user) && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
+        {hasAdminPermission(user) && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              render={
                 <TurboLink
                   href={pathsConfig.admin.index}
                   className="flex w-full cursor-pointer items-center gap-1.5"
@@ -155,23 +164,21 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
                   <Icons.ShieldUser className="size-4" />
                   {t("common:admin")}
                 </TurboLink>
-              </DropdownMenuItem>
-            </>
-          )}
+              }
+            />
+          </>
+        )}
 
-          <DropdownMenuSeparator />
+        <DropdownMenuSeparator />
 
-          <DropdownMenuItem asChild className="cursor-pointer">
-            <button
-              className="flex w-full items-center gap-1.5"
-              onClick={() => signOut.mutate(undefined)}
-            >
-              <Icons.LogOut className="size-4" />
-              {t("logout.cta")}
-            </button>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenuPortal>
+        <DropdownMenuItem
+          className="flex w-full cursor-pointer items-center gap-1.5"
+          onClick={() => signOut.mutate(undefined)}
+        >
+          <Icons.LogOut className="size-4" />
+          {t("logout.cta")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
     </DropdownMenu>
   );
 });

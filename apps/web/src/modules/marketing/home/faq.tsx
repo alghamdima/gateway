@@ -72,7 +72,7 @@ export const Faq = async () => {
         </TurboLink>
       </SectionHeader>
 
-      <Accordion type="multiple" className="grow basis-0">
+      <Accordion multiple className="grow basis-0">
         {questions.map((question) => (
           <AccordionItem key={question.question} value={question.question}>
             <AccordionTrigger className="text-base">

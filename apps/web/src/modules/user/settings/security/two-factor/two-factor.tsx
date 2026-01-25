@@ -102,20 +102,22 @@ const TwoFactorSwitch = ({
 
   return (
     <RequirePassword
+      nativeButton={false}
       onConfirm={onSubmit}
       open={open}
       onOpenChange={onOpenChange}
       title={t(`account.twoFactor.${key}.title`)}
       description={t(`account.twoFactor.${key}.description`)}
       cta={t(key)}
-    >
-      <Switch
-        checked={enabled}
-        className={cn({
-          "bg-input": !enabled,
-          "bg-primary": enabled,
-        })}
-      />
-    </RequirePassword>
+      render={
+        <Switch
+          checked={enabled}
+          className={cn({
+            "bg-input": !enabled,
+            "bg-primary": enabled,
+          })}
+        />
+      }
+    />
   );
 };

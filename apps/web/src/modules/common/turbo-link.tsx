@@ -41,8 +41,6 @@ export const TurboLink = (props: TurboLinkProps) => {
         conditionalPrefetch();
         return props.onFocus?.(e);
       }}
-    >
-      {props.children}
-    </Link>
+    />
   );
 };

@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import { Badge } from "@workspace/ui-web/badge";
 import { Icons } from "@workspace/ui-web/icons";
@@ -55,14 +54,7 @@ export const UserHeader = ({ id }: UserHeaderProps) => {
             <DashboardHeaderDescription>
               {user?.email}
             </DashboardHeaderDescription>
-            <Badge
-              className={cn({
-                "bg-success/15 text-success hover:bg-success/25":
-                  user?.emailVerified,
-                "bg-destructive/15 text-destructive hover:bg-destructive/25":
-                  !user?.emailVerified,
-              })}
-            >
+            <Badge variant={user?.emailVerified ? "success" : "destructive"}>
               {user?.emailVerified ? t("verified") : t("unverified")}
             </Badge>
           </div>

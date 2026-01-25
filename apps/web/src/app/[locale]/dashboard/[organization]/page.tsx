@@ -1,11 +1,4 @@
-import { getTranslation } from "@workspace/i18n/server";
-
 import { getMetadata } from "~/lib/metadata";
-import {
-  DashboardHeader,
-  DashboardHeaderTitle,
-  DashboardHeaderDescription,
-} from "~/modules/common/layout/dashboard/header";
 import { AreaChart } from "~/modules/organization/home/charts/area";
 import { BarChart } from "~/modules/organization/home/charts/bar";
 import { LineChart } from "~/modules/organization/home/charts/line";
@@ -19,35 +12,20 @@ export const generateMetadata = getMetadata({
   description: "dashboard:organization.home.description",
 });
 
-export default async function OrganizationPage() {
-  const { t } = await getTranslation({ ns: "dashboard" });
-
+export default function OrganizationPage() {
   return (
-    <>
-      <DashboardHeader>
-        <div>
-          <DashboardHeaderTitle>
-            {t("organization.home.title")}
-          </DashboardHeaderTitle>
-          <DashboardHeaderDescription>
-            {t("organization.home.description")}
-          </DashboardHeaderDescription>
-        </div>
-      </DashboardHeader>
-
-      <div className="flex w-full flex-col gap-4">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <BarChart />
-          <PieChart />
-          <ShapeChart />
-        </div>
-        <AreaChart />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <RadialChart />
-          <RadarChart />
-        </div>
-        <LineChart />
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-col flex-wrap gap-4 *:grow *:basis-80 lg:flex-row">
+        <BarChart />
+        <PieChart />
+        <ShapeChart />
       </div>
-    </>
+      <AreaChart />
+      <div className="flex flex-col flex-wrap gap-4 *:grow *:basis-80 lg:flex-row">
+        <RadialChart />
+        <RadarChart />
+      </div>
+      <LineChart />
+    </div>
   );
 }

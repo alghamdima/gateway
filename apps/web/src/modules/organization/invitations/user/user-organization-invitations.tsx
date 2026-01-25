@@ -50,25 +50,28 @@ export const UserOrganizationInvitationsBanner = () => {
   }
 
   return (
-    <UserOrganizationInvitationsListModal invitations={pendingInvitations}>
-      <button className="ring-offset-background focus-visible:ring-ring w-full cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
-        <Alert
-          variant="primary"
-          className="hover:bg-primary/10 flex flex-wrap items-center justify-between gap-4 transition-colors"
-        >
-          <div className="flex flex-col items-start gap-y-0.5">
-            <AlertTitle>
-              {t("invitations.user.banner.title", {
-                count: pendingInvitations.length,
-              })}
-            </AlertTitle>
-            <AlertDescription>
-              {t("invitations.user.banner.description")}
-            </AlertDescription>
-          </div>
-        </Alert>
-      </button>
-    </UserOrganizationInvitationsListModal>
+    <UserOrganizationInvitationsListModal
+      invitations={pendingInvitations}
+      render={
+        <button className="ring-offset-background focus-visible:ring-ring w-full cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
+          <Alert
+            variant="primary"
+            className="hover:bg-primary/10 flex flex-wrap items-center justify-between gap-4 transition-colors"
+          >
+            <div className="flex flex-col items-start gap-y-0.5">
+              <AlertTitle>
+                {t("invitations.user.banner.title", {
+                  count: pendingInvitations.length,
+                })}
+              </AlertTitle>
+              <AlertDescription>
+                {t("invitations.user.banner.description")}
+              </AlertDescription>
+            </div>
+          </Alert>
+        </button>
+      }
+    />
   );
 };
 
@@ -170,18 +173,22 @@ const UserOrganizationInvitationsListModalItem = ({
 };
 
 export const UserOrganizationInvitationsListModal = ({
-  children,
+  render,
   invitations,
 }: {
   invitations: Invitation[];
-  children: React.ReactNode;
+  render: React.ReactElement;
 }) => {
   const { t } = useTranslation("organization");
   const [open, setOpen] = useState(false);
 
   return (
-    <Modal open={open} onOpenChange={setOpen}>
-      <ModalTrigger asChild>{children}</ModalTrigger>
+    <Modal
+      open={open}
+      drawer={{ onOpenChange: setOpen }}
+      dialog={{ onOpenChange: setOpen }}
+    >
+      <ModalTrigger render={render} />
       <ModalContent>
         <ModalHeader>
           <ModalTitle>{t("invitations.user.list.title")}</ModalTitle>

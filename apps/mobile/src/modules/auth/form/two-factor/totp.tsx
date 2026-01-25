@@ -2,19 +2,14 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { memo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
 import { otpVerificationSchema, SecondFactor } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
-import {
-  Form,
-  FormCheckbox,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@workspace/ui-mobile/form";
+import { Checkbox } from "@workspace/ui-mobile/checkbox";
+import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
 import { Icons } from "@workspace/ui-mobile/icons";
 import {
   InputOTP,
@@ -49,69 +44,65 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
   });
 
   return (
-    <Form {...form}>
-      <View className="flex flex-col items-start gap-6">
-        <FormField
-          control={form.control}
-          name="code"
-          render={({ field }) => (
-            <FormItem>
-              <InputOTP
-                maxLength={6}
-                autoFocus
-                value={field.value}
-                onChange={field.onChange}
-                onComplete={() =>
-                  form.handleSubmit((data) => verifyTotp.mutateAsync(data))()
-                }
-                render={({ slots }) => (
-                  <InputOTPGroup>
-                    {slots.map((slot, index) => (
-                      <InputOTPSlot
-                        key={index}
-                        index={index}
-                        max={6}
-                        {...slot}
-                      />
-                    ))}
-                  </InputOTPGroup>
-                )}
-              />
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="trustDevice"
-          render={({ field }) => (
-            <FormCheckbox
-              name="trustDevice"
-              label={t("login.twoFactor.trustDevice")}
-              value={field.value ?? false}
+    <View className="flex flex-col items-start gap-6">
+      <Controller
+        control={form.control}
+        name="code"
+        render={({ field, fieldState }) => (
+          <Field invalid={fieldState.invalid} className="items-start">
+            <InputOTP
+              maxLength={6}
+              autoFocus
+              value={field.value}
               onChange={field.onChange}
-              onBlur={field.onBlur}
+              onComplete={() =>
+                form.handleSubmit((data) => verifyTotp.mutateAsync(data))()
+              }
+              render={({ slots }) => (
+                <InputOTPGroup>
+                  {slots.map((slot, index) => (
+                    <InputOTPSlot key={index} index={index} max={6} {...slot} />
+                  ))}
+                </InputOTPGroup>
+              )}
             />
-          )}
-        />
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+          </Field>
+        )}
+      />
 
-        <Button
-          className="w-full"
-          size="lg"
-          disabled={form.formState.isSubmitting}
-          onPress={form.handleSubmit((data) => verifyTotp.mutateAsync(data))}
-        >
-          {form.formState.isSubmitting ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground" />
-            </Spin>
-          ) : (
-            <Text>{t("verify")}</Text>
-          )}
-        </Button>
-      </View>
-    </Form>
+      <Controller
+        control={form.control}
+        name="trustDevice"
+        render={({ field }) => (
+          <Field orientation="horizontal">
+            <Checkbox
+              {...field}
+              checked={!!field.value}
+              onCheckedChange={field.onChange}
+            />
+            <FieldLabel onPress={() => field.onChange(!field.value)}>
+              {t("login.twoFactor.trustDevice")}
+            </FieldLabel>
+          </Field>
+        )}
+      />
+
+      <Button
+        className="w-full"
+        size="lg"
+        disabled={form.formState.isSubmitting}
+        onPress={form.handleSubmit((data) => verifyTotp.mutateAsync(data))}
+      >
+        {form.formState.isSubmitting ? (
+          <Spin>
+            <Icons.Loader2 className="text-primary-foreground" />
+          </Spin>
+        ) : (
+          <Text>{t("verify")}</Text>
+        )}
+      </Button>
+    </View>
   );
 });
 

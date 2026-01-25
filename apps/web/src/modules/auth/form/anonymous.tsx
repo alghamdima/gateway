@@ -3,7 +3,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
-import { AuthProvider } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
@@ -11,8 +10,6 @@ import { Icons } from "@workspace/ui-web/icons";
 import { pathsConfig } from "~/config/paths";
 
 import { auth } from "../lib/api";
-
-import { useAuthFormStore } from "./store";
 
 interface AnonymousLoginProps {
   readonly redirectTo?: string;
@@ -23,18 +20,9 @@ export const AnonymousLogin = ({
 }: AnonymousLoginProps) => {
   const router = useRouter();
   const { t } = useTranslation("auth");
-  const { provider, setProvider, isSubmitting, setIsSubmitting } =
-    useAuthFormStore();
 
   const signIn = useMutation({
     ...auth.mutations.signIn.anonymous,
-    onMutate: () => {
-      setProvider(AuthProvider.ANONYMOUS);
-      setIsSubmitting(true);
-    },
-    onSettled: () => {
-      setIsSubmitting(false);
-    },
     onSuccess: () => {
       router.replace(redirectTo);
     },
@@ -46,10 +34,10 @@ export const AnonymousLogin = ({
       className="gap-2"
       size="lg"
       type="button"
-      disabled={isSubmitting}
+      disabled={signIn.isPending}
       onClick={() => signIn.mutate(undefined)}
     >
-      {isSubmitting && provider === AuthProvider.ANONYMOUS ? (
+      {signIn.isPending ? (
         <Icons.Loader2 className="animate-spin" />
       ) : (
         <>

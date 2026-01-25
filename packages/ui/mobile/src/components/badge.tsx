@@ -14,10 +14,12 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary border-transparent active:opacity-80",
-        secondary: "bg-secondary border-transparent active:opacity-80",
-        destructive: "bg-destructive border-transparent active:opacity-80",
-        outline: "text-foreground",
+        default: "bg-primary border-transparent",
+        secondary: "bg-secondary border-transparent",
+        destructive:
+          "bg-destructive/10 dark:bg-destructive/20 border-transparent",
+        success: "bg-success/10 dark:bg-success/20 border-transparent",
+        outline: "border-border",
       },
     },
     defaultVariants: {
@@ -31,7 +33,8 @@ const badgeTextVariants = cva("font-sans-medium text-xs", {
     variant: {
       default: "text-primary-foreground",
       secondary: "text-secondary-foreground",
-      destructive: "text-destructive-foreground",
+      destructive: "text-destructive",
+      success: "text-success",
       outline: "text-foreground",
     },
   },
