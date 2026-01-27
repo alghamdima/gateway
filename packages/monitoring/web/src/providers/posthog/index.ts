@@ -16,6 +16,10 @@ export const strategy = {
     }
   },
   initialize: () => {
+    if (posthog.__loaded) {
+      return;
+    }
+
     posthog.init(env.NEXT_PUBLIC_POSTHOG_KEY, {
       api_host: env.NEXT_PUBLIC_POSTHOG_HOST,
     });
