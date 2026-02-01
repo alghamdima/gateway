@@ -6,14 +6,7 @@ import { preset as monitoring } from "@workspace/monitoring-mobile/env";
 import { preset as billing } from "@workspace/billing-mobile/env";
 import { envConfig } from "@workspace/shared/constants";
 import { ThemeColor, ThemeMode } from "@workspace/ui";
-
-const castStringToBool = z.preprocess((val) => {
-  if (typeof val === "string") {
-    if (["1", "true"].includes(val.toLowerCase())) return true;
-    if (["0", "false"].includes(val.toLowerCase())) return false;
-  }
-  return val;
-}, z.coerce.boolean());
+import { castStringToBool } from "@workspace/shared/schema";
 
 export default defineEnv({
   ...envConfig,
@@ -22,6 +15,7 @@ export default defineEnv({
   client: {
     EXPO_PUBLIC_AUTH_PASSWORD: castStringToBool.optional().default(true),
     EXPO_PUBLIC_AUTH_MAGIC_LINK: castStringToBool.optional().default(false),
+    EXPO_PUBLIC_AUTH_EMAIL_OTP: castStringToBool.optional().default(false),
     EXPO_PUBLIC_AUTH_ANONYMOUS: castStringToBool.optional().default(true),
     EXPO_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional().default(""),
 
@@ -45,6 +39,7 @@ export default defineEnv({
 
     EXPO_PUBLIC_AUTH_PASSWORD: process.env.EXPO_PUBLIC_AUTH_PASSWORD,
     EXPO_PUBLIC_AUTH_MAGIC_LINK: process.env.EXPO_PUBLIC_AUTH_MAGIC_LINK,
+    EXPO_PUBLIC_AUTH_EMAIL_OTP: process.env.EXPO_PUBLIC_AUTH_EMAIL_OTP,
     EXPO_PUBLIC_AUTH_ANONYMOUS: process.env.EXPO_PUBLIC_AUTH_ANONYMOUS,
     EXPO_PUBLIC_GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
 

@@ -36,6 +36,11 @@ const mutations = {
       mutationFn: (params: Parameters<typeof authClient.signIn.magicLink>[0]) =>
         authClient.signIn.magicLink(params),
     }),
+    emailOtp: mutationOptions({
+      mutationKey: [KEY, "signIn", "emailOtp"],
+      mutationFn: (params: Parameters<typeof authClient.signIn.emailOtp>[0]) =>
+        authClient.signIn.emailOtp(params),
+    }),
     anonymous: mutationOptions({
       mutationKey: [KEY, "signIn", "anonymous"],
       mutationFn: (
@@ -50,6 +55,14 @@ const mutations = {
         await authClient.signIn.social(params);
         await authClient.getSession();
       },
+    }),
+  },
+  emailOtp: {
+    sendVerificationOtp: mutationOptions({
+      mutationKey: [KEY, "emailOtp", "sendVerificationOtp"],
+      mutationFn: (
+        params: Parameters<typeof authClient.emailOtp.sendVerificationOtp>[0],
+      ) => authClient.emailOtp.sendVerificationOtp(params),
     }),
   },
   magicLink: {

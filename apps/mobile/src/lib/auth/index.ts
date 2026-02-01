@@ -1,22 +1,28 @@
 import * as SecureStore from "expo-secure-store";
 
-import { createClient } from "@workspace/auth/client/mobile";
+import {
+  adminClient,
+  anonymousClient,
+  emailOTPClient,
+  magicLinkClient,
+  twoFactorClient,
+  organizationClient,
+  inferAdditionalFields,
+  lastLoginMethodClient,
+  createAuthClient,
+  expoClient,
+} from "@workspace/auth/client/mobile";
 import { config } from "@workspace/i18n";
 import { Platform } from "@workspace/shared/constants";
 
 import { getBaseUrl } from "~/lib/api/utils";
 import { useI18nConfig } from "~/lib/providers/i18n";
 
-export const authClient = createClient({
+import type { auth } from "@workspace/auth/server";
+
+export const authClient = createAuthClient({
   baseURL: getBaseUrl(),
   disableDefaultFetchPlugins: true,
-  mobile: {
-    storage: SecureStore,
-    cookiePrefix: "turbostarter",
-  },
-  lastLoginMethod: {
-    storage: SecureStore,
-  },
   fetchOptions: {
     headers: {
       Cookie: `${config.cookie}=${useI18nConfig.getState().config.locale}`,
@@ -24,4 +30,20 @@ export const authClient = createClient({
     },
     throw: true,
   },
+  plugins: [
+    anonymousClient(),
+    emailOTPClient(),
+    magicLinkClient(),
+    twoFactorClient(),
+    adminClient(),
+    organizationClient(),
+    lastLoginMethodClient({
+      storage: SecureStore,
+    }),
+    inferAdditionalFields<typeof auth>(),
+    expoClient({
+      storage: SecureStore,
+      cookiePrefix: "turbostarter",
+    }),
+  ],
 });

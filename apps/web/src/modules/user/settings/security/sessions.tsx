@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
+import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import { Skeleton } from "@workspace/ui-web/skeleton";
@@ -23,7 +24,7 @@ import {
 
 export const Sessions = () => {
   const { t } = useTranslation(["common", "auth"]);
-  const session = authClient.useSession();
+  const currentSession = authClient.useSession();
   const router = useRouter();
 
   const signOut = useMutation({
@@ -39,7 +40,7 @@ export const Sessions = () => {
     refetch,
   } = useQuery({
     ...auth.queries.sessions.getAll,
-    enabled: !!session.data?.user.id,
+    enabled: !!currentSession.data?.user.id,
   });
 
   const revoke = useMutation({
@@ -47,7 +48,7 @@ export const Sessions = () => {
     onSuccess: async (_, token) => {
       toast.success(t("account.sessions.revoke.success"));
       await refetch();
-      if (token === session.data?.session.token) {
+      if (token === currentSession.data?.session.token) {
         await signOut.mutateAsync(undefined);
       }
     },
@@ -76,9 +77,16 @@ export const Sessions = () => {
                   <Icons.MonitorSmartphone className="size-6 shrink-0" />
 
                   <div className="mr-auto grid grid-cols-1">
-                    <span className="truncate text-sm font-medium capitalize">
-                      {session.ipAddress}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="truncate text-sm font-medium capitalize">
+                        {session.ipAddress}
+                      </span>
+                      {session.token === currentSession.data?.session.token && (
+                        <Badge variant="outline" className="mb-0.5">
+                          {t("current")}
+                        </Badge>
+                      )}
+                    </div>
                     <span className="text-muted-foreground truncate text-xs">
                       {session.userAgent}
                     </span>

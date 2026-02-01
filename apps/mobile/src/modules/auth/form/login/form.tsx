@@ -17,6 +17,7 @@ import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
 import { Link } from "~/modules/common/styled";
 
+import { EmailOtpLoginForm } from "./email-otp";
 import { MagicLinkLoginForm } from "./magic-link";
 import { PasswordLoginForm } from "./password";
 
@@ -33,6 +34,11 @@ const LOGIN_OPTIONS_DETAILS = {
     lastUsedMethodId: AuthProvider.MAGIC_LINK,
     component: MagicLinkLoginForm,
     label: "login.magicLink.label",
+  },
+  [AuthProvider.EMAIL_OTP]: {
+    lastUsedMethodId: AuthProvider.EMAIL_OTP,
+    component: EmailOtpLoginForm,
+    label: "login.emailOtp.label",
   },
 } as const;
 
@@ -80,7 +86,7 @@ export const LoginForm = ({
           <TabsTrigger
             key={provider}
             value={provider}
-            className="relative grow"
+            className="relative w-full shrink grow"
           >
             <Text>{t(LOGIN_OPTIONS_DETAILS[provider].label)}</Text>
 

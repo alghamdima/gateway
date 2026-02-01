@@ -50,7 +50,7 @@ export const ForgotPasswordForm = () => {
           <h2 className="text-center text-2xl font-semibold tracking-tight">
             {t("account.password.forgot.success.title")}
           </h2>
-          <p className="text-center">
+          <p className="max-w-sm text-center text-balance">
             {t("account.password.forgot.success.description")}
           </p>
           <TurboLink

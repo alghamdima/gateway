@@ -1,5 +1,6 @@
-import { passkeyClient } from "@better-auth/passkey/client";
-import {
+export { passkeyClient } from "@better-auth/passkey/client";
+export {
+  emailOTPClient,
   magicLinkClient,
   twoFactorClient,
   anonymousClient,
@@ -7,24 +8,7 @@ import {
   organizationClient,
   inferAdditionalFields,
   lastLoginMethodClient,
+  oneTapClient,
 } from "better-auth/client/plugins";
-import { createAuthClient } from "better-auth/react";
 
-import type { auth } from "../server";
-import type { AuthClientOptions } from "../types";
-
-export const createClient = (options?: AuthClientOptions) =>
-  createAuthClient({
-    ...options,
-    plugins: [
-      ...(options?.plugins ?? []),
-      passkeyClient(),
-      anonymousClient(),
-      magicLinkClient(),
-      twoFactorClient(),
-      adminClient(),
-      organizationClient(),
-      lastLoginMethodClient(),
-      inferAdditionalFields<typeof auth>(),
-    ],
-  });
+export { createAuthClient } from "better-auth/react";

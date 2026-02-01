@@ -52,7 +52,7 @@ export function RadarChart() {
   } satisfies ChartConfig;
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col overflow-hidden">
       <CardHeader className="items-center space-y-0.5 pb-4">
         <CardTitle className="text-xl leading-tight">
           {t("organization.home.engagement.title")}

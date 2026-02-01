@@ -5,6 +5,7 @@ import { Alert, View, FlatList, RefreshControl } from "react-native";
 
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
+import { Badge } from "@workspace/ui-mobile/badge";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Skeleton } from "@workspace/ui-mobile/skeleton";
@@ -17,7 +18,7 @@ import { auth } from "~/modules/auth/lib/api";
 
 export default function Sessions() {
   const { t } = useTranslation(["common", "auth"]);
-  const session = authClient.useSession();
+  const currentSession = authClient.useSession();
   const signOut = useMutation({
     ...auth.mutations.signOut,
     onSuccess: () => {
@@ -32,7 +33,7 @@ export default function Sessions() {
     isRefetching,
   } = useQuery({
     ...auth.queries.sessions.getAll,
-    enabled: !!session.data?.user.id,
+    enabled: !!currentSession.data?.user.id,
   });
 
   const revoke = useMutation({
@@ -41,7 +42,7 @@ export default function Sessions() {
       Alert.alert(t("account.sessions.revoke.success"));
       await refetch();
 
-      if (token === session.data?.session.token) {
+      if (token === currentSession.data?.session.token) {
         await signOut.mutateAsync(undefined);
       }
     },
@@ -62,9 +63,19 @@ export default function Sessions() {
           renderItem={({ item }) => (
             <View className="flex-row justify-between gap-3 px-4 py-3">
               <View className="flex-1">
-                <Text className="font-sans-medium text-sm" numberOfLines={1}>
-                  {item.ipAddress}
-                </Text>
+                <View className="shrink flex-row items-center gap-1">
+                  <Text
+                    className="font-sans-medium shrink text-sm"
+                    numberOfLines={1}
+                  >
+                    {item.ipAddress}
+                  </Text>
+                  {item.token === currentSession.data?.session.token && (
+                    <Badge variant="outline" className="mb-0.5">
+                      <Text>{t("current")}</Text>
+                    </Badge>
+                  )}
+                </View>
                 <Text
                   className="text-muted-foreground text-sm"
                   numberOfLines={1}

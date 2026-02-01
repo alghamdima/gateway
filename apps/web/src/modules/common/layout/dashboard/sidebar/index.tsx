@@ -66,7 +66,7 @@ export const DashboardSidebar = memo<DashboardSidebarProps>(
         <div className="relative h-full overflow-clip">
           {Object.values(history)
             .filter(Boolean)
-            .map((href) => {
+            .map((href, index) => {
               const item = findItemByHref(href);
               const parentHref = findParentByHref(href);
 
@@ -86,9 +86,9 @@ export const DashboardSidebar = memo<DashboardSidebarProps>(
                   })}
                   style={{
                     transition:
-                      currentHref === history.next
-                        ? "translate 0.3s, opacity 0.2s 0.1s, filter 0.3s"
-                        : "translate 0.3s, opacity 0.2s, filter 0.3s",
+                      index === 0
+                        ? "translate 0.2s ease, opacity 0.2s ease, filter 0.2s ease"
+                        : "translate 0.2s, opacity 0.2s, filter 0.2s",
                   }}
                   inert={href !== currentHref}
                 >

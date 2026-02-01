@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 
 import { SocialProvider as SocialProviderType } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -19,6 +19,7 @@ import type { Icon } from "@workspace/ui-web/icons";
 interface SocialProvidersProps {
   readonly providers: SocialProviderType[];
   readonly redirectTo?: string;
+  readonly context?: "signin" | "signup";
 }
 
 export const SocialIcons: Record<SocialProviderType, Icon> = {
@@ -29,15 +30,28 @@ export const SocialIcons: Record<SocialProviderType, Icon> = {
 
 const SocialProvider = ({
   provider,
+  redirectTo,
+  context,
   isSubmitting,
   onClick,
 }: {
   provider: SocialProviderType;
   isSubmitting: boolean;
   onClick: () => void;
+  context?: "signin" | "signup";
+  redirectTo?: string;
 }) => {
   const { t } = useTranslation("common");
   const Icon = SocialIcons[provider];
+
+  useEffect(() => {
+    if (provider === SocialProviderType.GOOGLE) {
+      void authClient.oneTap({
+        context,
+        callbackURL: redirectTo,
+      });
+    }
+  }, [provider, context, redirectTo]);
 
   return (
     <Button
@@ -68,7 +82,7 @@ const SocialProvider = ({
 };
 
 export const SocialProviders = memo<SocialProvidersProps>(
-  ({ providers, redirectTo = pathsConfig.dashboard.user.index }) => {
+  ({ providers, redirectTo = pathsConfig.dashboard.user.index, context }) => {
     const signIn = useMutation(auth.mutations.signIn.social);
 
     return (
@@ -77,6 +91,8 @@ export const SocialProviders = memo<SocialProvidersProps>(
           <SocialProvider
             key={provider}
             provider={provider}
+            redirectTo={redirectTo}
+            context={context}
             isSubmitting={
               signIn.isPending && signIn.variables.provider === provider
             }

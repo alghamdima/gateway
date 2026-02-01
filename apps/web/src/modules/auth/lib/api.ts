@@ -43,6 +43,11 @@ const mutations = {
       mutationFn: (params: Parameters<typeof authClient.signIn.magicLink>[0]) =>
         authClient.signIn.magicLink(params),
     }),
+    emailOtp: mutationOptions({
+      mutationKey: [KEY, "signIn", "emailOtp"],
+      mutationFn: (params: Parameters<typeof authClient.signIn.emailOtp>[0]) =>
+        authClient.signIn.emailOtp(params),
+    }),
     anonymous: mutationOptions({
       mutationKey: [KEY, "signIn", "anonymous"],
       mutationFn: (
@@ -146,6 +151,14 @@ const mutations = {
       }),
     },
   },
+  emailOtp: {
+    sendVerificationOtp: mutationOptions({
+      mutationKey: [KEY, "emailOtp", "sendVerificationOtp"],
+      mutationFn: (
+        params: Parameters<typeof authClient.emailOtp.sendVerificationOtp>[0],
+      ) => authClient.emailOtp.sendVerificationOtp(params),
+    }),
+  },
   email: {
     sendVerification: mutationOptions({
       mutationKey: [KEY, "email", "sendVerification"],
@@ -190,15 +203,9 @@ const mutations = {
     }),
     delete: mutationOptions({
       mutationKey: [KEY, "passkeys", "delete"],
-      mutationFn: async (
+      mutationFn: (
         params: Parameters<typeof authClient.passkey.deletePasskey>[0],
-      ) => {
-        const response = await authClient.passkey.deletePasskey(params);
-        if (response.error) {
-          throw new Error(response.error.message);
-        }
-        return response.data;
-      },
+      ) => authClient.passkey.deletePasskey(params),
     }),
   },
 };

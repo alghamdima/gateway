@@ -36,6 +36,7 @@ const Register = async ({
       <SocialProviders
         providers={authConfig.providers.oAuth}
         redirectTo={redirectTo}
+        context="signup"
       />
       {authConfig.providers.oAuth.length > 0 && (
         <FieldSeparator>{t("divider")}</FieldSeparator>

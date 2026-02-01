@@ -83,6 +83,7 @@ const Login = memo<LoginProps>(
           <SocialProviders
             providers={authConfig.providers.oAuth}
             redirectTo={redirectTo}
+            context="signin"
           />
           {authConfig.providers.passkey && (
             <PasskeyLogin redirectTo={redirectTo} />

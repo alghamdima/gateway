@@ -19,9 +19,7 @@ import { api } from "~/lib/api/client";
 interface AvatarFormProps {
   readonly id: string;
   readonly image?: string | null;
-  readonly update: (
-    image: string | null,
-  ) => Promise<{ error: { message?: string } | null }>;
+  readonly update: (image: string | null) => Promise<unknown>;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -65,13 +63,14 @@ const mutations = {
         query: { path },
       });
 
-      const { error } = await update(publicUrl);
-
-      if (error) {
-        throw new Error(error.message);
+      try {
+        await update(publicUrl);
+        return { publicUrl, oldImage: image };
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "Something went wrong",
+        );
       }
-
-      return { publicUrl, oldImage: image };
     },
   },
   remove: {
@@ -86,15 +85,16 @@ const mutations = {
         query: { path: `avatars/${path}` },
       });
 
-      const { error } = await update(null);
-
-      if (error) {
-        throw new Error(error.message);
+      try {
+        await update(null);
+        void fetch(deleteUrl, {
+          method: "DELETE",
+        });
+      } catch (error) {
+        throw new Error(
+          error instanceof Error ? error.message : "Something went wrong",
+        );
       }
-
-      void fetch(deleteUrl, {
-        method: "DELETE",
-      });
     },
   },
 };

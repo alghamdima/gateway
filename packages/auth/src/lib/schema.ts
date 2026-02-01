@@ -46,6 +46,10 @@ const passwordLoginSchema = z.object({
 });
 
 const magicLinkLoginSchema = emailSchema;
+const emailOtpLoginSchema = z.object({
+  ...emailSchema.shape,
+  otp: z.string().min(6).max(6),
+});
 const forgotPasswordSchema = emailSchema;
 const updatePasswordSchema = passwordSchema;
 
@@ -89,6 +93,7 @@ const banUserSchema = z.object({
 type EmailPayload = z.infer<typeof emailSchema>;
 type PasswordLoginPayload = z.infer<typeof passwordLoginSchema>;
 type MagicLinkLoginPayload = z.infer<typeof magicLinkLoginSchema>;
+type EmailOtpLoginPayload = z.infer<typeof emailOtpLoginSchema>;
 type RegisterPayload = z.infer<typeof registerSchema>;
 type ForgotPasswordPayload = z.infer<typeof forgotPasswordSchema>;
 type UpdatePasswordPayload = z.infer<typeof updatePasswordSchema>;
@@ -112,6 +117,7 @@ export {
   registerSchema,
   passwordLoginSchema,
   magicLinkLoginSchema,
+  emailOtpLoginSchema,
   forgotPasswordSchema,
   updatePasswordSchema,
   updateUserSchema,
@@ -131,6 +137,7 @@ export {
 export type {
   PasswordLoginPayload,
   MagicLinkLoginPayload,
+  EmailOtpLoginPayload,
   RegisterPayload,
   ForgotPasswordPayload,
   UpdatePasswordPayload,

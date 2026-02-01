@@ -5,15 +5,11 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    overscroll-behavior: none;
   }
 
   html {
     scroll-behavior: smooth;
-  }
-
-  body {
-    @apply bg-background text-foreground;
+    overscroll-behavior: none;
   }
 
   ::selection {

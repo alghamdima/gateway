@@ -3,8 +3,10 @@ import { passkey } from "@better-auth/passkey";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
+import { oneTap } from "better-auth/plugins";
 import {
   anonymous,
+  emailOTP,
   magicLink,
   twoFactor,
   organization,
@@ -127,6 +129,22 @@ export const auth = betterAuth({
           },
         }),
     }),
+    emailOTP({
+      async sendVerificationOTP({ email, otp, type }, ctx) {
+        if (type !== "sign-in") {
+          /* Handle other types if you want to use OTP verification 
+          for other purposes (e.g. change email, delete account, etc.) */
+          return;
+        }
+
+        return sendEmail({
+          to: email,
+          template: EmailTemplate.SIGN_IN_OTP,
+          locale: getLocaleFromRequest(ctx?.request),
+          variables: { otp, url: getUrl({ request: ctx?.request }).toString() },
+        });
+      },
+    }),
     passkey(),
     twoFactor(),
     anonymous(),
@@ -161,11 +179,14 @@ export const auth = betterAuth({
             return AuthProvider.MAGIC_LINK;
           case "/passkey/verify-authentication":
             return AuthProvider.PASSKEY;
+          case "/sign-in/email-otp":
+            return AuthProvider.EMAIL_OTP;
           default:
             return null;
         }
       },
     }),
+    oneTap(),
     expo(),
     nextCookies(),
   ],

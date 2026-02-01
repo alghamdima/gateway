@@ -15,6 +15,7 @@ import {
 import { Icons } from "@workspace/ui-web/icons";
 
 const MIN_DELAY_MS = 15_000;
+const MAX_DELAY_MS = 7_200_000;
 const STORAGE_LAST_SHOWN_AT = "buyCtaDialog:lastShownAt";
 const STORAGE_PREV_DELAY_MS = "buyCtaDialog:prevDelayMs";
 
@@ -34,9 +35,14 @@ export const BuyCtaDialog = () => {
         window.localStorage.getItem(STORAGE_PREV_DELAY_MS) ?? "0",
       );
 
-      const nextDelay = Math.max(
-        MIN_DELAY_MS,
-        prevDelayMs ? prevDelayMs * 2 : MIN_DELAY_MS,
+      const nextDelay = Math.min(
+        MAX_DELAY_MS,
+        Math.max(
+          MIN_DELAY_MS,
+          prevDelayMs && Number.isFinite(prevDelayMs)
+            ? prevDelayMs * 2
+            : MIN_DELAY_MS,
+        ),
       );
 
       const baseNextShow = storedLastShown

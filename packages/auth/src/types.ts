@@ -1,14 +1,7 @@
 import * as z from "zod";
 
 import type { AuthErrorCode } from "./server";
-import type { expoClient } from "@better-auth/expo/client";
 import type { TranslationKey } from "@workspace/i18n";
-import type {
-  BetterAuthClientPlugin,
-  BetterAuthClientOptions,
-} from "better-auth";
-
-type AuthMobileClientOptions = Parameters<typeof expoClient>[0];
 
 const SocialProvider = {
   APPLE: "apple",
@@ -22,6 +15,7 @@ const AuthProvider = {
   ...SocialProvider,
   PASSWORD: "password",
   MAGIC_LINK: "magicLink",
+  EMAIL_OTP: "emailOtp",
   ANONYMOUS: "anonymous",
   PASSKEY: "passkey",
 } as const;
@@ -39,6 +33,7 @@ const authConfigSchema = z.object({
   providers: z.object({
     [AuthProvider.PASSWORD]: z.boolean(),
     [AuthProvider.MAGIC_LINK]: z.boolean(),
+    [AuthProvider.EMAIL_OTP]: z.boolean(),
     [AuthProvider.ANONYMOUS]: z.boolean(),
     [AuthProvider.PASSKEY]: z.boolean().optional(),
     oAuth: z.array(z.enum(SocialProvider)),
@@ -252,6 +247,9 @@ const ERROR_MESSAGES = {
     "auth:error.anonymous.cannotSignInAgain",
   OTP_NOT_ENABLED: "auth:error.otp.notEnabled",
   OTP_HAS_EXPIRED: "auth:error.otp.expired",
+  OTP_EXPIRED: "auth:error.otp.expired",
+  INVALID_OTP: "auth:error.code.invalid",
+  TOO_MANY_ATTEMPTS: "auth:error.code.tooManyAttempts",
   TOTP_NOT_ENABLED: "auth:error.totp.notEnabled",
   TWO_FACTOR_NOT_ENABLED: "auth:error.twoFactor.notEnabled",
   BACKUP_CODES_NOT_ENABLED: "auth:error.backupCodes.notEnabled",
@@ -266,13 +264,7 @@ const ERROR_MESSAGES = {
   CALLBACK_URL_REQUIRED: "auth:error.url.callbackUrlRequired",
 } as const satisfies Record<AuthErrorCode, TranslationKey>;
 
-export type {
-  BetterAuthClientOptions as AuthClientOptions,
-  BetterAuthClientPlugin as AuthClientPlugin,
-  AuthMobileClientOptions,
-  AuthConfig,
-  AuthErrorCode,
-};
+export type { AuthConfig, AuthErrorCode };
 
 export {
   authConfigSchema,

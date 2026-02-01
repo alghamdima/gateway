@@ -21,7 +21,7 @@ export const ResetPassword = async ({ url, locale }: Props) => {
   const origin = getOrigin(url);
 
   return (
-    <Layout origin={origin}>
+    <Layout origin={origin} locale={locale}>
       <Preview>{t("account.password.update.email.preview")}</Preview>
       <Heading className="leading-tight tracking-tight">
         {t("account.password.update.email.subject")}

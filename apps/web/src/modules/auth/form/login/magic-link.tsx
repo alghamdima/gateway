@@ -52,7 +52,7 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
             <h2 className="text-center text-2xl font-semibold tracking-tight">
               {t("login.magicLink.success.title")}
             </h2>
-            <p className="text-center">
+            <p className="max-w-sm text-center text-balance">
               {t("login.magicLink.success.description")}
             </p>
           </motion.div>

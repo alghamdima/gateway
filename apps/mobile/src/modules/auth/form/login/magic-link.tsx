@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
-import { magicLinkLoginSchema } from "@workspace/auth";
+import { generateName, magicLinkLoginSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
@@ -75,6 +75,7 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
           onPress={form.handleSubmit((data) =>
             signIn.mutateAsync({
               ...data,
+              name: generateName(data.email),
               callbackURL: redirectTo,
             }),
           )}

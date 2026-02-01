@@ -5,6 +5,7 @@ export interface CommonEmailProps {
 const AuthEmailTemplate = {
   RESET_PASSWORD: "reset-password",
   MAGIC_LINK: "magic-link",
+  SIGN_IN_OTP: "sign-in-otp",
   CONFIRM_EMAIL: "confirm-email",
   DELETE_ACCOUNT: "delete-account",
   CHANGE_EMAIL: "change-email",
@@ -15,11 +16,24 @@ type AuthEmailTemplate =
   (typeof AuthEmailTemplate)[keyof typeof AuthEmailTemplate];
 
 type AuthEmailVariables = Record<
-  Exclude<AuthEmailTemplate, typeof EmailTemplate.ORGANIZATION_INVITATION>,
-  {
+  Exclude<
+    AuthEmailTemplate,
+    | typeof AuthEmailTemplate.ORGANIZATION_INVITATION
+    | typeof AuthEmailTemplate.SIGN_IN_OTP
+  >,
+  { url: string }
+> & {
+  [AuthEmailTemplate.SIGN_IN_OTP]: { url: string; otp: string };
+  [AuthEmailTemplate.CHANGE_EMAIL]: {
     url: string;
-  }
->;
+    newEmail: string;
+  };
+  [AuthEmailTemplate.ORGANIZATION_INVITATION]: {
+    url: string;
+    inviter: string;
+    organization: string;
+  };
+};
 
 export const EmailTemplate = {
   ...AuthEmailTemplate,
@@ -29,15 +43,6 @@ export const EmailTemplate = {
 export type EmailTemplate = (typeof EmailTemplate)[keyof typeof EmailTemplate];
 
 export type EmailVariables = AuthEmailVariables & {
-  [EmailTemplate.CHANGE_EMAIL]: {
-    url: string;
-    newEmail: string;
-  };
-  [EmailTemplate.ORGANIZATION_INVITATION]: {
-    url: string;
-    inviter: string;
-    organization: string;
-  };
   [EmailTemplate.CONTACT_FORM]: {
     name: string;
     email: string;
