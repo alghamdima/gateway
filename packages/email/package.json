@@ -20,12 +20,14 @@
     "@react-email/components": "0.3.2",
     "@workspace/i18n": "workspace:*",
     "@workspace/ui": "workspace:*",
+    "culori": "4.0.2",
     "nodemailer": "7.0.11",
     "react-email": "4.2.4",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@react-email/preview-server": "4.2.4",
+    "@types/culori": "4.0.1",
     "@types/nodemailer": "7.0.3",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/prettier-config": "workspace:*",
