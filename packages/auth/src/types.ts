@@ -159,7 +159,7 @@ const ERROR_MESSAGES = {
   MEMBER_NOT_FOUND: "organization:error.memberNotFound",
   YOU_DO_NOT_HAVE_AN_ACTIVE_TEAM: "organization:error.team.noActive",
   YOU_ARE_NOT_A_MEMBER_OF_THIS_ORGANIZATION: "organization:error.userNotMember",
-  ROLE_NOT_FOUND: "organization:error.roleNotFound",
+  ROLE_NOT_FOUND: "organization:error.role.notFound",
   YOU_ARE_NOT_ALLOWED_TO_CREATE_A_NEW_TEAM_MEMBER:
     "organization:error.team.cannotCreateNewMember",
   YOU_ARE_NOT_ALLOWED_TO_REMOVE_A_TEAM_MEMBER:

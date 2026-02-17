@@ -2,8 +2,8 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { marked } from "marked";
 import { useState } from "react";
+import { Streamdown } from "streamdown";
 
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
@@ -61,7 +61,7 @@ export const AIDemo = () => {
   return (
     <div className="mx-auto flex w-full max-w-2xl grow flex-col items-center justify-between gap-4 self-stretch">
       <ScrollArea className="w-full grow">
-        <div className="prose dark:prose-invert flex flex-col gap-2">
+        <div className="flex flex-col gap-4 lg:gap-6">
           {messagesToDisplay.map((message) => (
             <article
               key={message.id}
@@ -74,12 +74,9 @@ export const AIDemo = () => {
                 switch (part.type) {
                   case "text":
                     return message.role === "assistant" ? (
-                      <div
-                        key={`${message.id}-${i}`}
-                        dangerouslySetInnerHTML={{
-                          __html: marked.parse(part.text) as string,
-                        }}
-                      ></div>
+                      <Streamdown key={`${message.id}-${i}`}>
+                        {part.text}
+                      </Streamdown>
                     ) : (
                       <div key={`${message.id}-${i}`}>{part.text}</div>
                     );
@@ -124,6 +121,7 @@ export const AIDemo = () => {
           onKeyDown={handleKeyDown}
           disabled={isLoading}
           value={input}
+          autoFocus
           onChange={(e) => setInput(e.currentTarget.value)}
         />
 

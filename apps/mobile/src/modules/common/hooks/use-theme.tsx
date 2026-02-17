@@ -46,6 +46,11 @@ export const useTheme = () => {
   );
 
   const updateTheme = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!config) {
+      return;
+    }
+
     try {
       Uniwind.setTheme(config.mode);
 

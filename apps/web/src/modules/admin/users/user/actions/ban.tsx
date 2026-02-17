@@ -327,8 +327,7 @@ const BanModal = ({
                                     type="button"
                                     disabled={form.formState.isSubmitting}
                                     variant={
-                                      field.value &&
-                                      field.value.getMinutes() === minute
+                                      field.value?.getMinutes() === minute
                                         ? "default"
                                         : "ghost"
                                     }

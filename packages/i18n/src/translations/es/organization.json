@@ -133,7 +133,6 @@
     "noActive": "No se encontró ninguna organización activa.",
     "userAlreadyMember": "Ya eres miembro de esta organización.",
     "memberNotFound": "No pudimos encontrar al miembro.",
-    "roleNotFound": "No pudimos encontrar el rol.",
     "cannotLeaveAsOnlyOwner": "No puedes dejar la organización como el único propietario.",
     "cannotLeaveWithoutOwner": "No puedes dejar la organización sin un propietario.",
     "cannotDeleteMember": "No puedes eliminar a este miembro.",
@@ -141,6 +140,9 @@
     "membershipLimitReached": "Has alcanzado el límite de miembros para esta organización.",
     "cannotAccess": "No puedes acceder a esta organización.",
     "slugNotAvailable": "El slug no está disponible.",
+    "role": {
+      "notFound": "No pudimos encontrar el rol."
+    },
     "team": {
       "cannotCreateNew": "No puedes crear un nuevo equipo.",
       "alreadyExists": "Ya existe un equipo con este nombre.",

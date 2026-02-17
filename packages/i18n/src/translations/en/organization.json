@@ -143,7 +143,6 @@
     "noActive": "No active organization found.",
     "userAlreadyMember": "You are already a member of this organization.",
     "memberNotFound": "We couldn't find the member.",
-    "roleNotFound": "We couldn't find the role.",
     "cannotLeaveAsOnlyOwner": "You cannot leave the organization as the only owner.",
     "cannotLeaveWithoutOwner": "You cannot leave the organization without an owner.",
     "cannotDeleteMember": "You cannot delete this member.",
@@ -151,6 +150,9 @@
     "membershipLimitReached": "You have reached the membership limit for this organization.",
     "cannotAccess": "You cannot access this organization.",
     "slugNotAvailable": "The slug is not available.",
+    "role": {
+      "notFound": "We couldn't find the role."
+    },
     "team": {
       "cannotCreateNew": "You cannot create a new team.",
       "alreadyExists": "A team with this name already exists.",

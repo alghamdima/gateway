@@ -59,7 +59,7 @@ const SocialProvider = ({
       variant="outline"
       type="button"
       size="lg"
-      className="relative grow basis-28 gap-2"
+      className="relative flex-1 gap-2"
       disabled={isSubmitting}
       onClick={onClick}
     >

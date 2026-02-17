@@ -9,6 +9,8 @@ export default function Index() {
   const { data, isPending } = authClient.useSession();
   const { step } = useSetupSteps();
 
+  console.log("data", data, isPending, authClient.getCookie());
+
   if (isPending) {
     return <Spinner modal={false} />;
   }
