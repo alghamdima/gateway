@@ -2,7 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Alert, Pressable, View } from "react-native";
 
-import { getAllRolesAtOrBelow, toMemberRole } from "@workspace/auth";
+import {
+  getAllRolesAtOrBelow,
+  MemberRole,
+  toMemberRole,
+} from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import {
@@ -47,8 +51,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
     ...organization.queries.members.getIsOnlyOwner({
       id: member.organizationId,
     }),
-    enabled: me,
-    retry: false,
+    enabled: me && member.role === MemberRole.OWNER,
   });
 
   const hasDeletePermission =

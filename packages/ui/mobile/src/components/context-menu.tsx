@@ -40,7 +40,9 @@ export const ContextMenuItemIcon = ContextMenuPrimitive.create(
   "ItemIcon",
 );
 
-export const ContextMenuItemImage = ContextMenuPrimitive.create(
+export const ContextMenuItemImage: React.ComponentType<
+  React.ComponentProps<typeof ContextMenuPrimitive.ItemImage>
+> = ContextMenuPrimitive.create(
   (props: React.ComponentProps<typeof ContextMenuPrimitive.ItemImage>) => (
     <ContextMenuPrimitive.ItemImage {...props} />
   ),
@@ -103,7 +105,9 @@ export const ContextMenuItemIndicator = ContextMenuPrimitive.create(
   "ItemIndicator",
 );
 
-export const ContextMenuPreview = ContextMenuPrimitive.create(
+export const ContextMenuPreview: React.ComponentType<
+  React.ComponentProps<typeof ContextMenuPrimitive.Preview>
+> = ContextMenuPrimitive.create(
   (props: React.ComponentProps<typeof ContextMenuPrimitive.Preview>) => (
     <ContextMenuPrimitive.Preview {...props} />
   ),

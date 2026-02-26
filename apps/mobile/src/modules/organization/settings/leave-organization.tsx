@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Alert } from "react-native";
 
+import { MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Text } from "@workspace/ui-mobile/text";
@@ -22,7 +23,7 @@ export const LeaveOrganization = () => {
     ...organization.queries.members.getIsOnlyOwner({
       id: activeOrganization.data?.id ?? "",
     }),
-    retry: false,
+    enabled: activeMember.data?.role === MemberRole.OWNER,
   });
 
   const leaveOrganization = useMutation({

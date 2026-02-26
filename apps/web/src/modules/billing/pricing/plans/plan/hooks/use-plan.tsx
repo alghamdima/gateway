@@ -89,9 +89,7 @@ export const usePlan = (plan: BillingConfigPlan) => {
 
   return {
     isPending: checkout.isPending || getPortal.isPending,
-    // price,
     features,
-    // discount,
     handleCheckout,
     handleOpenPortal,
   };

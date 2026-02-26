@@ -76,8 +76,7 @@ const Actions = ({ member }: { member: Member }) => {
     ...organization.queries.members.getIsOnlyOwner({
       id: member.organizationId,
     }),
-    enabled: me,
-    retry: false,
+    enabled: me && member.role === MemberRole.OWNER,
   });
 
   const hasDeletePermission =

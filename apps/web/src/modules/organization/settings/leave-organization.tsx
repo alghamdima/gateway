@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
@@ -27,6 +28,7 @@ import {
   SettingsCardDescription,
   SettingsCardFooter,
 } from "~/modules/common/layout/dashboard/settings-card";
+import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
 import { organization } from "~/modules/organization/lib/api";
 
 export const LeaveOrganization = ({
@@ -35,6 +37,7 @@ export const LeaveOrganization = ({
   organizationId: string;
 }) => {
   const { t } = useTranslation("organization");
+  const { activeMember } = useActiveOrganization();
 
   const { data: activeOrganization } = useQuery(
     organization.queries.get({ id: organizationId }),
@@ -42,7 +45,7 @@ export const LeaveOrganization = ({
 
   const { data: isOnlyOwner } = useQuery({
     ...organization.queries.members.getIsOnlyOwner({ id: organizationId }),
-    retry: false,
+    enabled: activeMember?.role === MemberRole.OWNER,
   });
 
   const canLeave = !isOnlyOwner?.status;
