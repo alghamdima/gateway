@@ -109,7 +109,7 @@ interface PlanProps {
 export const Plan = memo<PlanProps>(({ plan, user }) => {
   const { t, i18n } = useTranslation(["common", "billing"]);
 
-  const summary = useQuery(billing.queries.summary.get);
+  const summary = useQuery({ ...billing.queries.summary.get, enabled: !!user });
   const activePlan = getActivePlan(summary.data);
 
   const { features, isPending, handleCheckout, handleOpenPortal } =

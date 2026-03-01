@@ -91,7 +91,10 @@ export const UserNavigation = memo<UserNavigationProps>(
   ({ user, organization }) => {
     const { t } = useTranslation(["common", "auth", "billing"]);
 
-    const summary = useQuery(billing.queries.summary.get);
+    const summary = useQuery({
+      ...billing.queries.summary.get,
+      enabled: !!user,
+    });
     const activePlan = getActivePlan(summary.data);
 
     if (!user) {
