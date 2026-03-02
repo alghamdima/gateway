@@ -49,7 +49,7 @@ export const DeleteOrganization = ({
   }
 
   const hasDeletePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       organization: ["delete"],
     },
     role: activeMember?.role ?? MemberRole.MEMBER,

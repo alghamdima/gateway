@@ -262,6 +262,13 @@ const ERROR_MESSAGES = {
   INVALID_ERROR_CALLBACK_URL: "auth:error.url.invalidErrorCallbackUrl",
   INVALID_NEW_USER_CALLBACK_URL: "auth:error.url.invalidNewUserCallbackUrl",
   CALLBACK_URL_REQUIRED: "auth:error.url.callbackUrlRequired",
+  ROLE_IS_ASSIGNED_TO_MEMBERS: "organization:error.ac.roleAssignedToMembers",
+  INVALID_USER: "auth:error.user.invalid",
+  TOKEN_EXPIRED: "auth:error.token.expired",
+  METHOD_NOT_ALLOWED_DEFER_SESSION_REQUIRED:
+    "auth:error.methodNotAllowedDeferSessionRequired",
+  BODY_MUST_BE_AN_OBJECT: "auth:error.bodyMustBeAnObject",
+  PASSWORD_ALREADY_SET: "auth:error.credentials.password.alreadySet",
 } as const satisfies Record<AuthErrorCode, TranslationKey>;
 
 export type { AuthConfig, AuthErrorCode };

@@ -183,6 +183,7 @@
       "limitReached": "You have reached the invitation limit for this organization."
     },
     "ac": {
+      "roleAssignedToMembers": "The role is assigned to members.",
       "missingAcInstance": "Missing AC instance.",
       "mustBeInOrganizationToCreateRole": "You must be in an organization to create a role.",
       "cannotCreateRole": "You cannot create a role.",

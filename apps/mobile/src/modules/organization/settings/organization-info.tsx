@@ -46,7 +46,7 @@ export const OrganizationInfo = () => {
   const role = activeMember.data.role;
 
   const hasUpdatePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       organization: ["update"],
     },
     role: toMemberRole(role),

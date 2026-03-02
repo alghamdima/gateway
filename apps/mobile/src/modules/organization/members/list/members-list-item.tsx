@@ -56,7 +56,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
 
   const hasDeletePermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         member: ["delete"],
       },
       role: toMemberRole(activeMember.data?.role),
@@ -68,7 +68,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
 
   const hasUpdatePermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         member: ["update"],
       },
       role: toMemberRole(activeMember.data?.role),

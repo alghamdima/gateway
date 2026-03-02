@@ -37,7 +37,7 @@ const EditName = () => {
   });
 
   const hasUpdatePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       organization: ["update"],
     },
     role: toMemberRole(activeMember?.role),

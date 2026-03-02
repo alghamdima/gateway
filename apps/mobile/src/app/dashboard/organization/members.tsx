@@ -25,7 +25,7 @@ export default function Members() {
   const activeMember = authClient.useActiveMember();
 
   const hasInvitePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       invitation: ["create"],
     },
     role: toMemberRole(activeMember.data?.role),

@@ -1,9 +1,8 @@
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { expo } from "@better-auth/expo";
 import { passkey } from "@better-auth/passkey";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
-import { oneTap } from "better-auth/plugins";
 import {
   anonymous,
   emailOTP,
@@ -11,6 +10,7 @@ import {
   twoFactor,
   organization,
   admin,
+  oneTap,
   lastLoginMethod,
 } from "better-auth/plugins";
 

@@ -35,10 +35,6 @@ export const authClient = createAuthClient({
     lastLoginMethodClient(),
     oneTapClient({
       clientId: envConfig.NEXT_PUBLIC_GOOGLE_ONE_TAP_CLIENT_ID,
-      promptOptions: {
-        /* https://github.com/better-auth/better-auth/issues/2243 */
-        fedCM: false,
-      },
     }),
     inferAdditionalFields<typeof auth>(),
   ],

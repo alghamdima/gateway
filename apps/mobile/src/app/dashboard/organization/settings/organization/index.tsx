@@ -17,7 +17,7 @@ export default function Organization() {
   const { data: activeMember } = authClient.useActiveMember();
 
   const hasUpdatePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       organization: ["update"],
     },
     role: toMemberRole(activeMember?.role),

@@ -81,7 +81,7 @@ const Actions = ({ member }: { member: Member }) => {
 
   const hasDeletePermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         member: ["delete"],
       },
       role: toMemberRole(activeMember?.role),
@@ -93,7 +93,7 @@ const Actions = ({ member }: { member: Member }) => {
 
   const hasUpdatePermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         member: ["update"],
       },
       role: toMemberRole(activeMember?.role),

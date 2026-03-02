@@ -68,7 +68,7 @@ export const EditName = ({ organizationId }: { organizationId: string }) => {
   }
 
   const hasUpdatePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       organization: ["update"],
     },
     role: activeMember?.role ?? MemberRole.MEMBER,

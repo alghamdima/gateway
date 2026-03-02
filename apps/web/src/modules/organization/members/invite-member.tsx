@@ -94,7 +94,7 @@ export const InviteMember = ({ organizationId }: InviteMemberProps) => {
   };
 
   const hasInvitePermission = authClient.organization.checkRolePermission({
-    permission: {
+    permissions: {
       invitation: ["create"],
     },
     role: activeMember?.role ?? MemberRole.MEMBER,

@@ -61,7 +61,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
 
   const hasInvitePermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         invitation: ["create"],
       },
       role: activeMember?.role ?? MemberRole.MEMBER,
@@ -72,7 +72,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
 
   const hasCancelPermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         invitation: ["cancel"],
       },
       role: activeMember?.role ?? MemberRole.MEMBER,

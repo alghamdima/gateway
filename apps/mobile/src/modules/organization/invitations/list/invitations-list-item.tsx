@@ -58,7 +58,7 @@ export const InvitationListItem = ({
 
   const hasInvitePermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         invitation: ["create"],
       },
       role: toMemberRole(activeMember.data?.role),
@@ -69,7 +69,7 @@ export const InvitationListItem = ({
 
   const hasCancelPermission =
     authClient.organization.checkRolePermission({
-      permission: {
+      permissions: {
         invitation: ["cancel"],
       },
       role: toMemberRole(activeMember.data?.role),

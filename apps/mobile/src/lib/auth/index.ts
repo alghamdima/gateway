@@ -25,7 +25,6 @@ export const authClient = createAuthClient({
   disableDefaultFetchPlugins: true,
   fetchOptions: {
     headers: {
-      Cookie: `${config.cookie}=${useI18nConfig.getState().config.locale}`,
       "x-client-platform": Platform.MOBILE,
     },
     throw: true,
@@ -45,5 +44,27 @@ export const authClient = createAuthClient({
       storage: SecureStore,
       cookiePrefix: "turbostarter",
     }),
+    {
+      id: "locale-cookie",
+      fetchPlugins: [
+        {
+          id: "locale-cookie",
+          name: "Locale",
+          hooks: {
+            onRequest: (ctx) => {
+              const locale = `${config.cookie}=${useI18nConfig.getState().config.locale}`;
+              if (ctx.headers instanceof Headers) {
+                const cookie = ctx.headers.get("cookie");
+                ctx.headers.set(
+                  "cookie",
+                  `${locale}${cookie ? `; ${cookie}` : ""}`,
+                );
+              }
+              return ctx;
+            },
+          },
+        },
+      ],
+    },
   ],
 });
