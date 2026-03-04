@@ -14,7 +14,7 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
-    "@ai-sdk/react": "3.0.45",
+    "@ai-sdk/react": "3.0.107",
     "@hookform/resolvers": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",

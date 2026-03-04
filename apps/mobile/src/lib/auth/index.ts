@@ -1,3 +1,4 @@
+import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 
 import {
@@ -23,9 +24,13 @@ import type { auth } from "@workspace/auth/server";
 export const authClient = createAuthClient({
   baseURL: getBaseUrl(),
   disableDefaultFetchPlugins: true,
+  sessionOptions: {
+    refetchOnWindowFocus: false,
+  },
   fetchOptions: {
     headers: {
       "x-client-platform": Platform.MOBILE,
+      origin: Linking.createURL(""),
     },
     throw: true,
   },

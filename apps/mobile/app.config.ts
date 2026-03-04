@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.2.3",
+  version: "1.3.0",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",
@@ -23,7 +23,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   updates: {
     url: "https://u.expo.dev/a7958179-7450-4e6f-8791-da222215909e",
   },
-  newArchEnabled: true,
   ios: {
     bundleIdentifier: "com.turbostarter.core",
     supportsTablet: true,
@@ -39,7 +38,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: "./public/images/icon/android/adaptive.png",
       backgroundColor: "#0D121C",
     },
-    edgeToEdgeEnabled: true,
   },
   extra: {
     eas: {

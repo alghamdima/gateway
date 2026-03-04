@@ -20,7 +20,7 @@
   },
   "prettier": "@workspace/prettier-config",
   "dependencies": {
-    "@gorhom/bottom-sheet": "5.2.6",
+    "@gorhom/bottom-sheet": "5.2.8",
     "@rn-primitives/avatar": "1.2.0",
     "@rn-primitives/checkbox": "1.2.0",
     "@rn-primitives/context-menu": "1.2.0",
@@ -42,9 +42,9 @@
     "input-otp-native": "0.5.0",
     "lucide-react-native": "0.562.0",
     "react-native": "catalog:",
-    "react-native-keyboard-controller": "1.18.5",
-    "react-native-reanimated": "~4.1.5",
-    "uniwind": "1.2.5",
+    "react-native-keyboard-controller": "1.20.7",
+    "react-native-reanimated": "~4.2.1",
+    "uniwind": "1.4.0",
     "zeego": "3.0.6"
   },
   "devDependencies": {

@@ -16,7 +16,7 @@ export const useI18nConfig = create<{
 }>()(
   persist(
     (set) => ({
-      config: { locale: getLocales()[0]?.languageCode ?? config.defaultLocale },
+      config: { locale: getLocales()[0].languageCode ?? config.defaultLocale },
       setConfig: (config) => set({ config }),
     }),
     {

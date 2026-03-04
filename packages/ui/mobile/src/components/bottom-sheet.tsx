@@ -33,7 +33,6 @@ import type {
 } from "@gorhom/bottom-sheet";
 import type { BottomSheetModalMethods } from "@gorhom/bottom-sheet/lib/typescript/types";
 import type { GestureResponderEvent, ViewStyle } from "react-native";
-import type { KeyboardAwareScrollViewProps } from "react-native-keyboard-controller";
 
 interface BottomSheetContext {
   sheetRef: React.RefObject<BottomSheetModal | null>;
@@ -235,9 +234,7 @@ const BottomSheetKeyboardAwareScrollView = memo(
     BottomSheetScrollViewProps
   >(
     SCROLLABLE_TYPE.SCROLLVIEW,
-    Reanimated.createAnimatedComponent<KeyboardAwareScrollViewProps>(
-      KeyboardAwareScrollView,
-    ),
+    Reanimated.createAnimatedComponent(KeyboardAwareScrollView),
   ),
 );
 
