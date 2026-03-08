@@ -9,19 +9,15 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "format": "prettier --check . --ignore-path ../../../.gitignore",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:"
   },
-  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@workspace/analytics": "workspace:*",
     "@workspace/shared": "workspace:*",

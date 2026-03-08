@@ -11,11 +11,9 @@
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "dotenv -e ../../apps/web/.env.local -c -- email dev --port 3005 --dir src/templates",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@react-email/components": "0.3.2",
     "@workspace/i18n": "workspace:*",
@@ -30,11 +28,9 @@
     "@types/culori": "4.0.1",
     "@types/nodemailer": "7.0.3",
     "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:"
   }
 }

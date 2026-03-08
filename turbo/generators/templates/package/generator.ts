@@ -71,7 +71,7 @@ export function createPackageGenerator(plop: PlopTypes.NodePlopAPI): void {
           return JSON.stringify(pkg, null, 2);
         },
       },
-      async (answers) => {
+      async () => {
         /**
          * Install dependencies and format everything
          */

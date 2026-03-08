@@ -5,8 +5,8 @@
     "build": "pnpm with-env turbo build",
     "clean": "turbo clean && git clean -xdf .turbo .cache node_modules",
     "dev": "pnpm with-env turbo dev",
-    "format": "turbo format --continue -- --cache --cache-location .cache/.prettiercache",
-    "format:fix": "turbo format --continue -- --write --cache --cache-location .cache/.prettiercache",
+    "format": "prettier . --check --cache --cache-location .cache/.prettiercache --experimental-cli",
+    "format:fix": "prettier . --write --cache --cache-location .cache/.prettiercache --experimental-cli",
     "postinstall": "pnpm lint:ws",
     "lint": "turbo lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
@@ -33,7 +33,6 @@
     "cross-env": "10.1.0",
     "dotenv-cli": "11.0.0",
     "husky": "^9.1.7",
-    "prettier": "catalog:",
     "turbo": "2.8.12",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -11,17 +11,13 @@
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "build": "pnpm dlx tsx ./src/styles/themes/build.ts",
-    "format": "prettier --check . --ignore-path ../../../.gitignore",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@workspace/prettier-config",
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "react": "catalog:react19",
     "tailwind-merge": "3.3.1",
     "typescript": "catalog:"

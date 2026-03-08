@@ -15,7 +15,6 @@ catalog:
   envin: 1.2.0
   eslint: 9.39.0
   dayjs: 1.11.19
-  prettier: 3.6.2
   react-hook-form: 7.66.0
   react-native: 0.83.2
   tailwindcss: 4.2.1

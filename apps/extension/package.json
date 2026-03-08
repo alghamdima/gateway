@@ -10,12 +10,10 @@
     "dev": "dotenv -c -- pnpm dev:chrome",
     "dev:chrome": "wxt",
     "dev:firefox": "wxt -b firefox",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
     "postinstall": "wxt prepare",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@tailwindcss/vite": "4.1.18",
     "@tanstack/react-query": "catalog:",
@@ -43,12 +41,10 @@
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
     "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "@wxt-dev/auto-icons": "1.1.0",
     "@wxt-dev/module-react": "1.1.5",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
     "wxt": "0.20.18"
   }

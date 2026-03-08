@@ -9,12 +9,10 @@
     "dev": "expo start --clear",
     "dev:android": "expo start --android",
     "dev:ios": "expo start --ios",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
     "ios": "expo run:ios",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@ai-sdk/react": "3.0.107",
     "@dev-plugins/react-navigation": "~0.4.0",
@@ -94,10 +92,8 @@
     "@types/react": "catalog:react19",
     "@types/ungap__structured-clone": "1.2.0",
     "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:"
   }
 }

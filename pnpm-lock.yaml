@@ -30,9 +30,6 @@ catalogs:
     eslint:
       specifier: 9.39.0
       version: 9.39.0
-    prettier:
-      specifier: 3.6.2
-      version: 3.6.2
     react-hook-form:
       specifier: 7.66.0
       version: 7.66.0
@@ -100,9 +97,6 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       turbo:
         specifier: 2.8.12
         version: 2.8.12
@@ -188,9 +182,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -203,9 +194,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -444,18 +432,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -577,9 +559,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -589,9 +568,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -620,18 +596,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -663,18 +633,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -684,18 +648,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -739,18 +697,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -812,9 +764,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -824,9 +773,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -870,9 +816,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -882,9 +825,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -931,18 +871,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -962,9 +896,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
@@ -974,9 +905,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1017,18 +945,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1057,9 +979,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -1069,9 +988,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1100,9 +1016,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -1115,9 +1028,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1158,9 +1068,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/shared':
         specifier: workspace:*
         version: link:../shared
@@ -1170,9 +1077,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1210,18 +1114,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1250,18 +1148,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1287,18 +1179,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1308,18 +1194,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1348,18 +1228,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1391,9 +1265,6 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
@@ -1403,9 +1274,6 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1428,18 +1296,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1531,18 +1393,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       react:
         specifier: catalog:react19
         version: 19.2.0
@@ -1568,18 +1424,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       react:
         specifier: catalog:react19
         version: 19.2.0
@@ -1632,18 +1482,12 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../../../tooling/prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       react:
         specifier: catalog:react19
         version: 19.2.0
@@ -1699,18 +1543,12 @@ importers:
         specifier: ^8.46.2
         version: 8.56.0(eslint@9.39.0(jiti@2.6.1))(typescript@5.9.3)
     devDependencies:
-      '@workspace/prettier-config':
-        specifier: workspace:*
-        version: link:../prettier
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../typescript
       eslint:
         specifier: 'catalog:'
         version: 9.39.0(jiti@2.6.1)
-      prettier:
-        specifier: 'catalog:'
-        version: 3.6.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1720,18 +1558,11 @@ importers:
   tooling/prettier:
     dependencies:
       prettier:
-        specifier: 'catalog:'
+        specifier: 3.6.2
         version: 3.6.2
       prettier-plugin-tailwindcss:
         specifier: ^0.7.1
-        version: 0.7.2(prettier@3.6.2)
-    devDependencies:
-      '@workspace/tsconfig':
-        specifier: workspace:*
-        version: link:../typescript
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
+        version: 0.7.2(@prettier/plugin-oxc@0.1.3)(prettier@3.6.2)
 
   tooling/scripts: {}
 
@@ -3164,8 +2995,14 @@ packages:
   '@electric-sql/pglite@0.3.15':
     resolution: {integrity: sha512-Cj++n1Mekf9ETfdc16TlDi+cDDQF0W7EcbyRHYOAeZdsAe8M/FJg18itDTSwyHfar2WIezawM9o0EKaRGVKygQ==}
 
+  '@emnapi/core@1.8.1':
+    resolution: {integrity: sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg==}
+
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
+
+  '@emnapi/wasi-threads@1.1.0':
+    resolution: {integrity: sha512-WI0DdZ8xFSbgMjR1sFsKABJ/C5OnRrjT06JXbZKexJGrDuPTzZdDYfFlsgcCXCyf+suG5QU2e/y1Wo2V/OapLQ==}
 
   '@epic-web/invariant@1.0.0':
     resolution: {integrity: sha512-lrTPqgvfFQtR/eY/qkIzp98OGdNJu0m5ji3q/nJI8v3SXkRKEnWiOxMmbvcSoAIzv/cGiuvRy57k4suKQSAdwA==}
@@ -4614,6 +4451,9 @@ packages:
     resolution: {integrity: sha512-XyroGQXcHrZdvmrGJvsA9KNeOOgGMg1Vg9OlheUsBOSKznLMDl+YChxbkboRHvtFYJEMRYmlV3uoo/njCw05iw==}
     engines: {node: '>=16'}
 
+  '@napi-rs/wasm-runtime@1.1.1':
+    resolution: {integrity: sha512-p64ah1M1ld8xjWv3qbvFwHiFVWrq1yFvV4f7w+mzaqiR4IlSgkqhcRdHwsGgomwzBH51sRY4NEowLxnaBjcW/A==}
+
   '@next/env@15.4.1':
     resolution: {integrity: sha512-DXQwFGAE2VH+f2TJsKepRXpODPU+scf5fDbKOME8MMyeyswe4XwgRdiiIYmBfkXU+2ssliLYznajTrOQdnLR5A==}
 
@@ -4992,6 +4832,104 @@ packages:
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
 
+  '@oxc-parser/binding-android-arm64@0.99.0':
+    resolution: {integrity: sha512-V4jhmKXgQQdRnm73F+r3ZY4pUEsijQeSraFeaCGng7abSNJGs76X6l82wHnmjLGFAeY00LWtjcELs7ZmbJ9+lA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [android]
+
+  '@oxc-parser/binding-darwin-arm64@0.99.0':
+    resolution: {integrity: sha512-Rp41nf9zD5FyLZciS9l1GfK8PhYqrD5kEGxyTOA2esTLeAy37rZxetG2E3xteEolAkeb2WDkVrlxPtibeAncMg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@oxc-parser/binding-darwin-x64@0.99.0':
+    resolution: {integrity: sha512-WVonp40fPPxo5Gs0POTI57iEFv485TvNKOHMwZRhigwZRhZY2accEAkYIhei9eswF4HN5B44Wybkz7Gd1Qr/5Q==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [darwin]
+
+  '@oxc-parser/binding-freebsd-x64@0.99.0':
+    resolution: {integrity: sha512-H30bjOOttPmG54gAqu6+HzbLEzuNOYO2jZYrIq4At+NtLJwvNhXz28Hf5iEAFZIH/4hMpLkM4VN7uc+5UlNW3Q==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@oxc-parser/binding-linux-arm-gnueabihf@0.99.0':
+    resolution: {integrity: sha512-0Z/Th0SYqzSRDPs6tk5lQdW0i73UCupnim3dgq2oW0//UdLonV/5wIZCArfKGC7w9y4h8TxgXpgtIyD1kKzzlQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm]
+    os: [linux]
+
+  '@oxc-parser/binding-linux-arm-musleabihf@0.99.0':
+    resolution: {integrity: sha512-xo0wqNd5bpbzQVNpAIFbHk1xa+SaS/FGBABCd942SRTnrpxl6GeDj/s1BFaGcTl8MlwlKVMwOcyKrw/2Kdfquw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm]
+    os: [linux]
+
+  '@oxc-parser/binding-linux-arm64-gnu@0.99.0':
+    resolution: {integrity: sha512-u26I6LKoLTPTd4Fcpr0aoAtjnGf5/ulMllo+QUiBhupgbVCAlaj4RyXH/mvcjcsl2bVBv9E/gYJZz2JjxQWXBA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@oxc-parser/binding-linux-arm64-musl@0.99.0':
+    resolution: {integrity: sha512-qhftDo2D37SqCEl3ZTa367NqWSZNb1Ddp34CTmShLKFrnKdNiUn55RdokLnHtf1AL5ssaQlYDwBECX7XiBWOhw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@oxc-parser/binding-linux-riscv64-gnu@0.99.0':
+    resolution: {integrity: sha512-zxn/xkf519f12FKkpL5XwJipsylfSSnm36h6c1zBDTz4fbIDMGyIhHfWfwM7uUmHo9Aqw1pLxFpY39Etv398+Q==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [riscv64]
+    os: [linux]
+    libc: [glibc]
+
+  '@oxc-parser/binding-linux-s390x-gnu@0.99.0':
+    resolution: {integrity: sha512-Y1eSDKDS5E4IVC7Oxw+NbYAKRmJPMJTIjW+9xOWwteDHkFqpocKe0USxog+Q1uhzalD9M0p9eXWEWdGQCMDBMQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@oxc-parser/binding-linux-x64-gnu@0.99.0':
+    resolution: {integrity: sha512-YVJMfk5cFWB8i2/nIrbk6n15bFkMHqWnMIWkVx7r2KwpTxHyFMfu2IpeVKo1ITDSmt5nBrGdLHD36QRlu2nDLg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@oxc-parser/binding-linux-x64-musl@0.99.0':
+    resolution: {integrity: sha512-2+SDPrie5f90A1b9EirtVggOgsqtsYU5raZwkDYKyS1uvJzjqHCDhG/f4TwQxHmIc5YkczdQfwvN91lwmjsKYQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@oxc-parser/binding-wasm32-wasi@0.99.0':
+    resolution: {integrity: sha512-DKA4j0QerUWSMADziLM5sAyM7V53Fj95CV9SjP77bPfEfT7MnvFKnneaRMqPK1cpzjAGiQF52OBUIKyk0dwOQA==}
+    engines: {node: '>=14.0.0'}
+    cpu: [wasm32]
+
+  '@oxc-parser/binding-win32-arm64-msvc@0.99.0':
+    resolution: {integrity: sha512-EaB3AvsxqdNUhh9FOoAxRZ2L4PCRwDlDb//QXItwyOJrX7XS+uGK9B1KEUV4FZ/7rDhHsWieLt5e07wl2Ti5AQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [arm64]
+    os: [win32]
+
+  '@oxc-parser/binding-win32-x64-msvc@0.99.0':
+    resolution: {integrity: sha512-sJN1Q8h7ggFOyDn0zsHaXbP/MklAVUvhrbq0LA46Qum686P3SZQHjbATqJn9yaVEvaSKXCshgl0vQ1gWkGgpcQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [win32]
+
+  '@oxc-project/types@0.99.0':
+    resolution: {integrity: sha512-LLDEhXB7g1m5J+woRSgfKsFPS3LhR9xRhTeIoEBm5WrkwMxn6eZ0Ld0c0K5eHB57ChZX6I3uSmmLjZ8pcjlRcw==}
+
   '@peculiar/asn1-android@2.6.0':
     resolution: {integrity: sha512-cBRCKtYPF7vJGN76/yG8VbxRcHLPF3HnkoHhKOZeHpoVtbMYfY9ROKtH3DtYUY9m8uI1Mh47PRhHf2hSK3xcSQ==}
 
@@ -5065,6 +5003,10 @@ packages:
 
   '@posthog/types@1.356.2':
     resolution: {integrity: sha512-KRrOv1c1rJpEh0rt7ZGZqIVGao72ONl0N2vkI3NwVzrazXRnEBp9PGx5/BCqayOaCC0hreMAA4Im0aYWpAw+sQ==}
+
+  '@prettier/plugin-oxc@0.1.3':
+    resolution: {integrity: sha512-aABz3zIRilpWMekbt1FL1JVBQrQLR8L4Td2SRctECrWSsXGTNn/G1BqNSKCdbvQS1LWstAXfqcXzDki7GAAJyg==}
+    engines: {node: '>=14'}
 
   '@prisma/client-runtime-utils@7.4.2':
     resolution: {integrity: sha512-cID+rzOEb38VyMsx5LwJMEY4NGIrWCNpKu/0ImbeooQ2Px7TI+kOt7cm0NelxUzF2V41UVVXAmYjANZQtCu1/Q==}
@@ -7375,6 +7317,9 @@ packages:
   '@turbo/gen@2.8.12':
     resolution: {integrity: sha512-9Zw71/j/ejnasg++4bM1jfwqSWo/F3WT0A0OTeeS1aVhlmzdstQY7gdj9hFgB7qnSbx/P/hFSnltKLfWDQeY4A==}
     hasBin: true
+
+  '@tybys/wasm-util@0.10.1':
+    resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -12317,6 +12262,10 @@ packages:
     resolution: {integrity: sha512-qFOyK5PjiWZd+QQIh+1jhdb9LpxTF0qs7Pm8o5QHYZ0M3vKqSqzsZaEB6oWlxZ+q2sJBMI/Ktgd2N5ZwQoRHfg==}
     engines: {node: '>= 0.4'}
 
+  oxc-parser@0.99.0:
+    resolution: {integrity: sha512-MpS1lbd2vR0NZn1v0drpgu7RUFu3x9Rd0kxExObZc2+F+DIrV0BOMval/RO3BYGwssIOerII6iS8EbbpCCZQpQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+
   p-limit@2.3.0:
     resolution: {integrity: sha512-//88mFWSJx8lxCzwdAABTJL2MyWB12+eIY7MDL2SqLmAkeKU9qxRvWuSyTjm3FUmpBEMuFfckAIqEaVGUDxb6w==}
     engines: {node: '>=6'}
@@ -17154,7 +17103,18 @@ snapshots:
   '@electric-sql/pglite@0.3.15':
     optional: true
 
+  '@emnapi/core@1.8.1':
+    dependencies:
+      '@emnapi/wasi-threads': 1.1.0
+      tslib: 2.8.1
+    optional: true
+
   '@emnapi/runtime@1.8.1':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
+
+  '@emnapi/wasi-threads@1.1.0':
     dependencies:
       tslib: 2.8.1
     optional: true
@@ -18592,6 +18552,13 @@ snapshots:
       lilconfig: 2.1.0
     optional: true
 
+  '@napi-rs/wasm-runtime@1.1.1':
+    dependencies:
+      '@emnapi/core': 1.8.1
+      '@emnapi/runtime': 1.8.1
+      '@tybys/wasm-util': 0.10.1
+    optional: true
+
   '@next/env@15.4.1': {}
 
   '@next/env@16.1.6': {}
@@ -18965,6 +18932,56 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.5.1(@opentelemetry/api@1.9.0)
 
+  '@oxc-parser/binding-android-arm64@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-darwin-arm64@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-darwin-x64@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-freebsd-x64@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-arm-gnueabihf@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-arm-musleabihf@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-arm64-gnu@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-arm64-musl@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-riscv64-gnu@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-s390x-gnu@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-x64-gnu@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-linux-x64-musl@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-wasm32-wasi@0.99.0':
+    dependencies:
+      '@napi-rs/wasm-runtime': 1.1.1
+    optional: true
+
+  '@oxc-parser/binding-win32-arm64-msvc@0.99.0':
+    optional: true
+
+  '@oxc-parser/binding-win32-x64-msvc@0.99.0':
+    optional: true
+
+  '@oxc-project/types@0.99.0':
+    optional: true
+
   '@peculiar/asn1-android@2.6.0':
     dependencies:
       '@peculiar/asn1-schema': 2.6.0
@@ -19096,6 +19113,11 @@ snapshots:
   '@posthog/types@1.335.2': {}
 
   '@posthog/types@1.356.2': {}
+
+  '@prettier/plugin-oxc@0.1.3':
+    dependencies:
+      oxc-parser: 0.99.0
+    optional: true
 
   '@prisma/client-runtime-utils@7.4.2':
     optional: true
@@ -22161,6 +22183,11 @@ snapshots:
       '@turbo/gen-windows-64': 2.8.12
     transitivePeerDependencies:
       - '@types/node'
+
+  '@tybys/wasm-util@0.10.1':
+    dependencies:
+      tslib: 2.8.1
+    optional: true
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -28191,6 +28218,27 @@ snapshots:
       object-keys: 1.1.1
       safe-push-apply: 1.0.0
 
+  oxc-parser@0.99.0:
+    dependencies:
+      '@oxc-project/types': 0.99.0
+    optionalDependencies:
+      '@oxc-parser/binding-android-arm64': 0.99.0
+      '@oxc-parser/binding-darwin-arm64': 0.99.0
+      '@oxc-parser/binding-darwin-x64': 0.99.0
+      '@oxc-parser/binding-freebsd-x64': 0.99.0
+      '@oxc-parser/binding-linux-arm-gnueabihf': 0.99.0
+      '@oxc-parser/binding-linux-arm-musleabihf': 0.99.0
+      '@oxc-parser/binding-linux-arm64-gnu': 0.99.0
+      '@oxc-parser/binding-linux-arm64-musl': 0.99.0
+      '@oxc-parser/binding-linux-riscv64-gnu': 0.99.0
+      '@oxc-parser/binding-linux-s390x-gnu': 0.99.0
+      '@oxc-parser/binding-linux-x64-gnu': 0.99.0
+      '@oxc-parser/binding-linux-x64-musl': 0.99.0
+      '@oxc-parser/binding-wasm32-wasi': 0.99.0
+      '@oxc-parser/binding-win32-arm64-msvc': 0.99.0
+      '@oxc-parser/binding-win32-x64-msvc': 0.99.0
+    optional: true
+
   p-limit@2.3.0:
     dependencies:
       p-try: 2.2.0
@@ -28527,9 +28575,11 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier-plugin-tailwindcss@0.7.2(prettier@3.6.2):
+  prettier-plugin-tailwindcss@0.7.2(@prettier/plugin-oxc@0.1.3)(prettier@3.6.2):
     dependencies:
       prettier: 3.6.2
+    optionalDependencies:
+      '@prettier/plugin-oxc': 0.1.3
 
   prettier@3.6.2: {}
 

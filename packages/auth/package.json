@@ -13,12 +13,10 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "db:generate": "cross-env SKIP_ENV_VALIDATION=1 pnpm dlx auth generate --config src/server.ts --output ../db/src/schema/auth.ts --y",
     "db:seed": "cross-env SKIP_ENV_VALIDATION=1 pnpm dlx tsx ./src/scripts/seed.ts",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "prettier": "@workspace/prettier-config",
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.5.3",
     "@better-auth/expo": "1.5.3",
@@ -33,11 +31,9 @@
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "@workspace/vitest-config": "workspace:*",
     "eslint": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
