@@ -15,16 +15,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@react-email/components": "0.3.2",
+    "@react-email/components": "1.0.8",
     "@workspace/i18n": "workspace:*",
     "@workspace/ui": "workspace:*",
     "culori": "4.0.2",
     "nodemailer": "7.0.11",
-    "react-email": "4.2.4",
+    "react-email": "5.2.9",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@react-email/preview-server": "4.2.4",
+    "@react-email/preview-server": "5.2.9",
     "@types/culori": "4.0.1",
     "@types/nodemailer": "7.0.3",
     "@workspace/eslint-config": "workspace:*",

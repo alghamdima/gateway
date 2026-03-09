@@ -47,6 +47,7 @@ SignInOtp.subject = async ({ locale }: CommonEmailProps) => {
 SignInOtp.PreviewProps = {
   otp: "123456",
   locale: "en",
+  url: "http://localhost:3000",
 };
 
 export default SignInOtp;
