@@ -8,12 +8,10 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "prettier": "@workspace/prettier-config",
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",

@@ -13,7 +13,7 @@ export const strategy = {
     );
   },
   track: trackEvent,
-  identify: () => {
+  identify: (_userId, _traits) => {
     // Vercel Web Analytics doesn't expose identify() on the client
   },
   reset: () => {
