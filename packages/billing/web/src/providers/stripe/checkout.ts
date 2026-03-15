@@ -8,7 +8,6 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-
 import {
   createBillingPortalSession,
   createOrRetrieveCustomer,
@@ -23,7 +22,7 @@ import {
 
 import type { CheckoutPayload, GetBillingPortalPayload } from "../../schema";
 import type { User } from "@workspace/auth";
-import type Stripe from "stripe";
+import type { Stripe } from "stripe";
 
 const createCheckoutSession = async (
   params: Stripe.Checkout.SessionCreateParams,

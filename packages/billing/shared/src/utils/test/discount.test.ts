@@ -11,7 +11,6 @@ import {
   getVariantDiscount,
   getVariantWithHighestDiscount,
 } from "../discount";
-
 import { config as mockConfig } from "./__mocks__/config";
 
 vi.mock("../../config", () => import("./__mocks__/config"));
@@ -622,7 +621,7 @@ describe("calculateRecurringDiscount", () => {
       return;
     }
 
-    const sorted = [...recurringVariants].sort((a, b) => {
+    const sorted = [...recurringVariants].toSorted((a, b) => {
       const costA = "cost" in a ? a.cost : 0;
       const costB = "cost" in b ? b.cost : 0;
       return costB - costA;

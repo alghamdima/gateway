@@ -1,3 +1,4 @@
+// oxlint-disable oxc/approx-constant
 import { ThemeMode } from "../../../types";
 
 import type { ThemeColors } from "../../../types";

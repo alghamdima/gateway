@@ -91,7 +91,7 @@ export const getActivePlan = <
 
   return (
     availablePlans
-      .sort((a, b) => findPlanIndexById(a.id) - findPlanIndexById(b.id))
+      .toSorted((a, b) => findPlanIndexById(a.id) - findPlanIndexById(b.id))
       .at(-1)?.id ?? BillingPlan.FREE
   );
 };
@@ -145,6 +145,6 @@ export const getFilteredPlans = (filters?: {
         );
       }
 
-      return { ...plan, variants };
+      return Object.assign({}, plan, { variants });
     })
     .filter((plan) => !!plan.variants.length);

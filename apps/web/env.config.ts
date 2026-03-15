@@ -6,8 +6,8 @@ import { preset as analytics } from "@workspace/analytics-web/env";
 import { preset as api } from "@workspace/api/env";
 import { preset as i18n } from "@workspace/i18n/env";
 import { envConfig, NodeEnv } from "@workspace/shared/constants";
-import { ThemeColor, ThemeMode } from "@workspace/ui";
 import { castStringToBool } from "@workspace/shared/schema";
+import { ThemeColor, ThemeMode } from "@workspace/ui";
 
 export default defineEnv({
   ...envConfig,

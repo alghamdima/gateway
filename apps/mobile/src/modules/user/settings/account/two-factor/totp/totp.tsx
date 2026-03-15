@@ -33,7 +33,6 @@ import { useTheme } from "~/modules/common/hooks/use-theme";
 import { BackupCodesSheet } from "../backup-codes/backup-codes";
 import { RequirePassword } from "../require-password";
 import { useTwoFactor } from "../use-two-factor";
-
 import { useTotp } from "./use-totp";
 
 import type { OtpPayload, PasswordPayload } from "@workspace/auth";

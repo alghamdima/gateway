@@ -3,11 +3,6 @@ import { flexRender } from "@tanstack/react-table";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 
-import { DataTablePagination } from "./data-table-pagination";
-
-import type { Table as TanstackTable } from "@tanstack/react-table";
-import type * as React from "react";
-
 import {
   Table,
   TableBody,
@@ -16,6 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "#components/table";
+
+import { DataTablePagination } from "./data-table-pagination";
+
+import type { Table as TanstackTable } from "@tanstack/react-table";
+import type * as React from "react";
 
 interface DataTableProps<TData> extends React.ComponentProps<"div"> {
   table: TanstackTable<TData>;

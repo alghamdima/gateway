@@ -1,15 +1,16 @@
 import type { MonitoringProviderStrategy } from "@workspace/monitoring";
 
-export interface MonitoringProviderClientStrategy
-  extends MonitoringProviderStrategy {
+export interface MonitoringProviderClientStrategy extends MonitoringProviderStrategy {
   onRouterTransitionStart: (
     href: string,
     navigationType: string,
   ) => void | Promise<void>;
 }
 
-export interface MonitoringProviderServerStrategy
-  extends Omit<MonitoringProviderStrategy, "identify"> {
+export interface MonitoringProviderServerStrategy extends Omit<
+  MonitoringProviderStrategy,
+  "identify"
+> {
   onRequestError: (
     error: unknown,
     errorRequest: Readonly<{

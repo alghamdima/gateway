@@ -132,7 +132,7 @@ export const auth = betterAuth({
     emailOTP({
       async sendVerificationOTP({ email, otp, type }, ctx) {
         if (type !== "sign-in") {
-          /* Handle other types if you want to use OTP verification 
+          /* Handle other types if you want to use OTP verification
           for other purposes (e.g. change email, delete account, etc.) */
           return;
         }

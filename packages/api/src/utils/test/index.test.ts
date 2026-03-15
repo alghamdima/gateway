@@ -99,7 +99,12 @@ describe("handle", () => {
     });
 
     const handler = handle(mockFn, { schema });
-    await expect(handler({})).rejects.toThrow();
+    await expect(handler({})).rejects.toThrowError(
+      expect.objectContaining({
+        name: "ZodError",
+        message: expect.stringContaining('expected": "number"'),
+      }),
+    );
   });
 
   it("should return null if schema validation fails and throwOnError is false", async () => {

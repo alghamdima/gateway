@@ -3,18 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#*": "./src/*.tsx"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./globals.css": "./src/styles/globals.css",
     "./*": "./src/components/*.tsx"
   },
-  "imports": {
-    "#*": "./src/*.tsx"
-  },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
     "ui:add": "pnpm dlx @react-native-reusables/cli@latest add"
   },
   "dependencies": {
@@ -34,6 +32,7 @@
     "@rn-primitives/tooltip": "1.2.0",
     "@rn-primitives/types": "1.2.0",
     "@workspace/i18n": "workspace:*",
+    "@workspace/oxlint": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/ui": "workspace:*",
     "culori": "4.0.2",
@@ -47,9 +46,7 @@
   },
   "devDependencies": {
     "@types/culori": "4.0.1",
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
-    "eslint": "catalog:",
     "react": "catalog:react19",
     "typescript": "catalog:",
     "zod": "catalog:"

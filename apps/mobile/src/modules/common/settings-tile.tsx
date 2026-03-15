@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Pressable } from "react-native";
 
 import { cn } from "@workspace/ui";
@@ -22,6 +23,13 @@ export const SettingsTile = ({
   loading = false,
   disabled = false,
 }: SettingsTileProps) => {
+  const textClassName = useMemo(
+    () =>
+      cn("mr-auto text-base", {
+        "text-destructive": destructive,
+      }),
+    [destructive],
+  );
   return (
     <Pressable
       hitSlop={4}
@@ -41,11 +49,7 @@ export const SettingsTile = ({
           "text-destructive": destructive,
         })}
       />
-      <TextClassContext.Provider
-        value={cn("mr-auto text-base", {
-          "text-destructive": destructive,
-        })}
-      >
+      <TextClassContext.Provider value={textClassName}>
         {children}
       </TextClassContext.Provider>
 

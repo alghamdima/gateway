@@ -10,9 +10,7 @@
     "./server/env": "./src/server/env.ts"
   },
   "scripts": {
-    "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
     "@better-fetch/fetch": "1.1.21",
@@ -28,9 +26,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
-    "eslint": "catalog:",
     "typescript": "catalog:"
   }
 }

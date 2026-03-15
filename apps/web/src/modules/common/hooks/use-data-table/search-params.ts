@@ -43,8 +43,7 @@ import type { TableOptions } from "@tanstack/react-table";
 import type { Parser, UseQueryStateOptions } from "nuqs";
 
 export interface UseSearchParamsDataTableProps<TData>
-  extends CommonProps,
-    Omit<TableOptions<TData>, "state" | "getCoreRowModel"> {
+  extends CommonProps, Omit<TableOptions<TData>, "state" | "getCoreRowModel"> {
   persistance: "searchParams";
   history?: "push" | "replace";
   throttleMs?: number;

@@ -10,21 +10,17 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "build": "pnpm dlx tsx ./src/styles/themes/build.ts",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
-    "@workspace/tsconfig": "workspace:*",
-    "eslint": "catalog:",
-    "react": "catalog:react19",
-    "tailwind-merge": "3.3.1",
-    "typescript": "catalog:"
+    "build": "pnpm dlx tsx ./src/styles/themes/build.ts"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",
     "postcss": "8.5.6",
     "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@workspace/tsconfig": "workspace:*",
+    "react": "catalog:react19",
+    "tailwind-merge": "3.3.1",
+    "typescript": "catalog:"
   }
 }

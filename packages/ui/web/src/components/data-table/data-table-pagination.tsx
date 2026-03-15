@@ -1,8 +1,6 @@
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 
-import type { Table } from "@tanstack/react-table";
-
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";
 import {
@@ -12,6 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#components/select";
+
+import type { Table } from "@tanstack/react-table";
 
 interface DataTablePaginationProps<TData> extends React.ComponentProps<"div"> {
   table: Table<TData>;

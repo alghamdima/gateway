@@ -8,15 +8,20 @@ import {
   UserNavigationSkeleton,
 } from "~/modules/user/user-navigation";
 
+import { useElementById } from "../hooks/use-element-by-id";
+
+import type { User } from "@workspace/auth";
+
 export const Header = () => {
   const { change } = useLocale();
+  const container = useElementById("main");
 
   return (
     <div className="flex items-center justify-between gap-2">
       <LocaleCustomizer
         onChange={change}
         variant="icon"
-        container={document.getElementById("main")}
+        container={container}
       />
       <ThemeControls />
       <User />
@@ -26,12 +31,25 @@ export const Header = () => {
 
 const User = () => {
   const session = authClient.useSession();
-  const organization = authClient.useActiveOrganization();
 
-  if (session.isPending || organization.isPending) {
+  if (session.isPending) {
     return <UserNavigationSkeleton />;
   }
   const user = session.data?.user;
+
+  return user ? (
+    <AuthenticatedUser user={user} />
+  ) : (
+    <UserNavigation user={null} organization={null} />
+  );
+};
+
+const AuthenticatedUser = ({ user }: { user: User }) => {
+  const organization = authClient.useActiveOrganization();
+
+  if (organization.isPending) {
+    return <UserNavigationSkeleton />;
+  }
 
   return (
     <UserNavigation user={user ?? null} organization={organization.data} />

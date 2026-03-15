@@ -4,14 +4,14 @@ import * as React from "react";
 
 import { useTranslation } from "@workspace/i18n";
 
-import type { Column } from "@tanstack/react-table";
-import type { DateRange } from "react-day-picker";
-
 import { Button } from "#components/button";
 import { Calendar } from "#components/calendar";
 import { Icons } from "#components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 import { Separator } from "#components/separator";
+
+import type { Column } from "@tanstack/react-table";
+import type { DateRange } from "react-day-picker";
 
 type DateSelection = Date[] | DateRange;
 
@@ -49,7 +49,7 @@ function parseColumnFilterValue(value: unknown) {
 }
 
 interface DataTableDateFilterProps<TData> {
-  column: Column<TData, unknown>;
+  column: Column<TData>;
   title?: string;
   multiple?: boolean;
 }

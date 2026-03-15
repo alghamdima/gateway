@@ -1,6 +1,6 @@
 import { BillingModel } from "@workspace/billing";
 
-import type Stripe from "stripe";
+import type { Stripe } from "stripe";
 
 export const toCheckoutMode = (
   model: BillingModel,
@@ -11,7 +11,6 @@ export const toCheckoutMode = (
     case BillingModel.RECURRING:
       return "subscription";
     default:
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Invalid billing model: ${model}`);
+      throw new Error("Invalid billing model");
   }
 };

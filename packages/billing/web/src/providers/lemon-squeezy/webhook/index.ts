@@ -5,7 +5,6 @@ import { HttpException } from "@workspace/shared/utils";
 import { checkoutStatusChangeHandler } from "../checkout";
 import { env } from "../env";
 import { subscriptionStatusChangeHandler } from "../subscription";
-
 import { LEMON_SQUEEZY_SIGNATURE_HEADER } from "./constants";
 import { webhookHasData, webhookHasMeta } from "./type-guards";
 import { verifySignature } from "./verify";

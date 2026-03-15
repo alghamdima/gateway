@@ -22,6 +22,7 @@ import { Skeleton } from "@workspace/ui-web/skeleton";
 import { appConfig } from "~/config/app";
 import { billing } from "~/modules/billing/lib/api";
 
+import { useElementById } from "../common/hooks/use-element-by-id";
 import { Logout } from "./logout";
 
 import type { Organization, User } from "@workspace/auth";
@@ -90,6 +91,7 @@ interface UserNavigationProps {
 export const UserNavigation = memo<UserNavigationProps>(
   ({ user, organization }) => {
     const { t } = useTranslation(["common", "auth", "billing"]);
+    const container = useElementById("main");
 
     const summary = useQuery({
       ...billing.queries.summary.get,
@@ -137,7 +139,7 @@ export const UserNavigation = memo<UserNavigationProps>(
         <DropdownMenuContent
           className="w-56"
           align="end"
-          portal={{ container: document.getElementById("main") }}
+          portal={{ container }}
         >
           <DropdownMenuGroup>
             <DropdownMenuLabel className="flex items-center gap-2 font-normal">

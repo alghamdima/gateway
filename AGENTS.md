@@ -5,6 +5,7 @@ Guide for AI agents working on the Turbostarter monorepo.
 ## Agent rules
 
 **DO:**
+
 - Read existing files before editing; understand imports and structure first
 - Keep diffs minimal and scoped to the request
 - Use `pnpm --filter <pkg>` for package-specific commands
@@ -17,6 +18,7 @@ Guide for AI agents working on the Turbostarter monorepo.
 - Import from package entry points (`@workspace/ui-web`, not deep paths)
 
 **DON'T:**
+
 - Commit, push, or modify git state unless explicitly asked
 - Run destructive commands (`reset --hard`, force-push) without permission
 - Invent ad-hoc scripts; use repo commands from the table below
@@ -28,18 +30,18 @@ Guide for AI agents working on the Turbostarter monorepo.
 
 ## Where to look first
 
-| Task                | Start here                                      |
-| ------------------- | ----------------------------------------------- |
-| Auth logic          | `packages/auth/` → then app-specific usage      |
-| API endpoints       | `packages/api/src/modules/`                     |
-| Database schema     | `packages/db/src/schema/`                       |
-| UI components       | `packages/ui/web/` or `packages/ui/mobile/`     |
-| Billing             | `packages/billing/{shared,web,mobile}/`         |
-| Translations        | `packages/i18n/src/translations/`               |
-| Email templates     | `packages/email/src/templates/`                 |
-| Web pages           | `apps/web/src/app/[locale]/`                    |
-| Mobile screens      | `apps/mobile/src/app/`                          |
-| Extension entries   | `apps/extension/src/app/`                       |
+| Task              | Start here                                  |
+| ----------------- | ------------------------------------------- |
+| Auth logic        | `packages/auth/` → then app-specific usage  |
+| API endpoints     | `packages/api/src/modules/`                 |
+| Database schema   | `packages/db/src/schema/`                   |
+| UI components     | `packages/ui/web/` or `packages/ui/mobile/` |
+| Billing           | `packages/billing/{shared,web,mobile}/`     |
+| Translations      | `packages/i18n/src/translations/`           |
+| Email templates   | `packages/email/src/templates/`             |
+| Web pages         | `apps/web/src/app/[locale]/`                |
+| Mobile screens    | `apps/mobile/src/app/`                      |
+| Extension entries | `apps/extension/src/app/`                   |
 
 ## Project structure
 
@@ -68,21 +70,21 @@ tooling/       ESLint, Prettier, TypeScript configs
 
 ## Commands
 
-| Task                    | Command                                                  |
-| ----------------------- | -------------------------------------------------------- |
-| Install deps            | `pnpm install`                                           |
-| Dev (all/specific)      | `pnpm dev` / `pnpm --filter <app> dev`                   |
-| Build                   | `pnpm build` / `pnpm --filter <app> build`               |
-| Mobile run              | `pnpm --filter mobile ios` / `android`                   |
-| Extension build         | `pnpm --filter extension build:chrome` / `build:firefox` |
-| Lint/Format/Typecheck   | `pnpm lint` / `pnpm format` / `pnpm typecheck`           |
-| Fix lint/format         | `pnpm lint:fix` / `pnpm format:fix`                      |
-| Test                    | `pnpm test`                                              |
-| Clean                   | `pnpm clean`                                             |
-| Services                | `pnpm services:setup` / `services:start` / `services:stop` |
-| DB migrate              | `pnpm with-env -F @workspace/db db:migrate`              |
-| DB generate             | `pnpm with-env -F @workspace/db db:generate`             |
-| DB studio               | `pnpm with-env -F @workspace/db db:studio`               |
+| Task               | Command                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| Install deps       | `pnpm install`                                             |
+| Dev (all/specific) | `pnpm dev` / `pnpm --filter <app> dev`                     |
+| Build              | `pnpm build` / `pnpm --filter <app> build`                 |
+| Mobile run         | `pnpm --filter mobile ios` / `android`                     |
+| Extension build    | `pnpm --filter extension build:chrome` / `build:firefox`   |
+| Lint/Format        | `pnpm lint` / `pnpm format`                                |
+| Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                        |
+| Test               | `pnpm test`                                                |
+| Clean              | `pnpm clean`                                               |
+| Services           | `pnpm services:setup` / `services:start` / `services:stop` |
+| DB migrate         | `pnpm with-env -F @workspace/db db:migrate`                |
+| DB generate        | `pnpm with-env -F @workspace/db db:generate`               |
+| DB studio          | `pnpm with-env -F @workspace/db db:studio`                 |
 
 Environment: create `.env` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
 
@@ -105,9 +107,9 @@ Environment: create `.env` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `UR
 
 ## Troubleshooting
 
-| Issue                   | Fix                                              |
-| ----------------------- | ------------------------------------------------ |
-| Version mismatch        | Check `package.json#packageManager`              |
-| Services refused        | `pnpm services:start`, verify Docker running     |
-| Env not loaded          | Create `.env` at root; use `pnpm with-env`       |
-| Module issues           | `pnpm clean && pnpm install`                     |
+| Issue            | Fix                                          |
+| ---------------- | -------------------------------------------- |
+| Version mismatch | Check `package.json#packageManager`          |
+| Services refused | `pnpm services:start`, verify Docker running |
+| Env not loaded   | Create `.env` at root; use `pnpm with-env`   |
+| Module issues    | `pnpm clean && pnpm install`                 |

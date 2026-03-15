@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-properties */
 import pino from "pino";
 
 import type { Logger } from "../types";

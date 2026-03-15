@@ -1,13 +1,9 @@
-name: CI / Setup
-description: Common setup steps for Github Actions
+name: "CI / Setup"
+description: "Common setup steps for Github Actions"
 
 inputs:
-  node-version:
-    description: "Node.js version"
-    required: true
-    default: "22.x"
-  install-packages:
-    description: "Install packages"
+  install-deps:
+    description: "Install dependencies"
     required: false
     default: "true"
 
@@ -20,13 +16,13 @@ runs:
     - name: 🎬 Setup pnpm
       uses: pnpm/action-setup@v4
 
-    - name: 🔨 Setup Node.js ${{ inputs.node-version }}
+    - name: 🔨 Setup Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: ${{ inputs.node-version }}
+        node-version-file: ".nvmrc"
         cache: "pnpm"
 
     - name: 🔌 Install
-      if: ${{ inputs.install-packages == 'true' }}
+      if: ${{ inputs.install-deps == 'true' }}
       shell: bash
       run: pnpm install --frozen-lockfile --prefer-offline

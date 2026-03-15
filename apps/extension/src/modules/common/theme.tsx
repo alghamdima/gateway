@@ -1,3 +1,5 @@
+import React from "react";
+
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Button } from "@workspace/ui-web/button";
@@ -11,6 +13,7 @@ import { ThemeCustomizer } from "@workspace/ui-web/theme";
 
 import { appConfig } from "~/config/app";
 import { StorageKey, useStorage } from "~/lib/storage";
+import { useElementById } from "~/modules/common/hooks/use-element-by-id";
 
 const Customizer = () => {
   const { t } = useTranslation("common");
@@ -75,13 +78,15 @@ const Status = ({
 };
 
 export const ThemeControls = () => {
+  const container = useElementById("main");
+
   return (
     <Popover>
       <PopoverTrigger render={<Status />} />
       <PopoverContent
         align="center"
         className="z-40 w-86 gap-4 rounded-lg p-6"
-        portal={{ container: document.getElementById("main") }}
+        portal={{ container }}
       >
         <Customizer />
       </PopoverContent>

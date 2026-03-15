@@ -1,26 +1,25 @@
 {
   "name": "@workspace/ui-web",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
+  "imports": {
+    "#*": "./src/*.tsx"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./globals.css": "./src/styles/globals.css",
     "./*": "./src/components/*.tsx"
   },
-  "imports": {
-    "#*": "./src/*.tsx"
-  },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit",
     "ui:add": "pnpm dlx shadcn@latest add"
   },
   "dependencies": {
-    "@base-ui/react": "1.2.0",
+    "@base-ui/react": "1.3.0",
     "@tanstack/react-table": "catalog:",
     "@workspace/i18n": "workspace:*",
+    "@workspace/oxlint": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/ui": "workspace:*",
     "cmdk": "1.1.1",
@@ -32,9 +31,7 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "0.5.19",
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
-    "eslint": "catalog:",
     "react": "catalog:react19",
     "react-hook-form": "catalog:",
     "tailwindcss": "catalog:",

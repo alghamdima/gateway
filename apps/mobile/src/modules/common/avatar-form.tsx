@@ -1,5 +1,5 @@
 import { useMutation, useMutationState } from "@tanstack/react-query";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { Alert, Text, View } from "react-native";
 import * as z from "zod";
@@ -28,12 +28,12 @@ interface AvatarFormProps {
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_IMAGE_TYPES = [
+const ACCEPTED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
   "image/png",
   "image/webp",
-];
+]);
 
 const mutations = {
   upload: {
@@ -113,8 +113,7 @@ const useAvatarFormSchema = () => {
         path: ["avatar"],
       })
       .refine(
-        (file) =>
-          !file.mimeType || ACCEPTED_IMAGE_TYPES.includes(file.mimeType),
+        (file) => !file.mimeType || ACCEPTED_IMAGE_TYPES.has(file.mimeType),
         {
           message: "error.file.type",
           path: ["avatar"],
@@ -148,10 +147,13 @@ const AvatarForm = ({
   const _avatarSchema = useAvatarFormSchema();
   const form = useForm<z.infer<typeof _avatarSchema>>();
 
+  const value = useMemo(
+    () => ({ id, image, update, previewUrl, setPreviewUrl }),
+    [id, image, update, previewUrl, setPreviewUrl],
+  );
+
   return (
-    <AvatarFormContext.Provider
-      value={{ id, image, update, previewUrl, setPreviewUrl }}
-    >
+    <AvatarFormContext.Provider value={value}>
       <FormProvider {...form}>{children}</FormProvider>
     </AvatarFormContext.Provider>
   );

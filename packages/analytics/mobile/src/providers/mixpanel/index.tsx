@@ -2,7 +2,6 @@ import { Mixpanel } from "mixpanel-react-native";
 import { useEffect } from "react";
 
 import { useTrackingPermissions } from "../../hooks";
-
 import { env } from "./env";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
@@ -25,7 +24,7 @@ export const strategy = {
       void (async () => {
         const optedOut = await mixpanel.hasOptedOutTracking();
         if (granted && optedOut) {
-          void mixpanel.optInTracking();
+          mixpanel.optInTracking();
         }
       })();
     }, [granted]);
@@ -38,7 +37,7 @@ export const strategy = {
   identify: (userId, traits) => {
     void mixpanel.identify(userId);
     if (traits) {
-      void mixpanel.getPeople().set(traits);
+      mixpanel.getPeople().set(traits);
     }
   },
   reset: () => {

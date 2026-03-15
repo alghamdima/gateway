@@ -13,9 +13,7 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "db:generate": "cross-env SKIP_ENV_VALIDATION=1 pnpm dlx auth generate --config src/server.ts --output ../db/src/schema/auth.ts --y",
     "db:seed": "cross-env SKIP_ENV_VALIDATION=1 pnpm dlx tsx ./src/scripts/seed.ts",
-    "lint": "eslint",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.5.3",
@@ -30,10 +28,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "@workspace/vitest-config": "workspace:*",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

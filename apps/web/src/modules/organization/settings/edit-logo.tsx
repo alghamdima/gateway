@@ -37,11 +37,9 @@ export const EditLogo = ({ organizationId }: { organizationId: string }) => {
   const updateOrganization = useMutation({
     ...organization.mutations.update,
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries(
-          organization.queries.get({ id: organizationId }),
-        ),
-      ]);
+      await queryClient.invalidateQueries(
+        organization.queries.get({ id: organizationId }),
+      );
     },
   });
 

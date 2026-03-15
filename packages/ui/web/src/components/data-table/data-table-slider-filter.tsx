@@ -5,8 +5,6 @@ import * as React from "react";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 
-import type { Column } from "@tanstack/react-table";
-
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";
 import { Input } from "#components/input";
@@ -14,6 +12,8 @@ import { Label } from "#components/label";
 import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 import { Separator } from "#components/separator";
 import { Slider } from "#components/slider";
+
+import type { Column } from "@tanstack/react-table";
 
 interface Range {
   min: number;
@@ -47,7 +47,7 @@ function parseValuesAsNumbers(value: unknown): RangeValue | undefined {
 }
 
 interface DataTableSliderFilterProps<TData> {
-  column: Column<TData, unknown>;
+  column: Column<TData>;
   title?: string;
 }
 

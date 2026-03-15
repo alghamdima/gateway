@@ -6,7 +6,6 @@ import {
   SubscriptionStatus,
   MobileStore,
 } from "../types";
-
 import { FEATURES } from "./features";
 import { billingConfigSchema } from "./schema";
 

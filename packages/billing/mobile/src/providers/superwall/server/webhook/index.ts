@@ -13,7 +13,6 @@ import { HttpException } from "@workspace/shared/utils";
 import { BillingProvider } from "../../../types";
 import { toSubscriptionStatus } from "../mappers/to-billing-status";
 import { webhookEventSchema } from "../schema/webhook-event";
-
 import { FAILED_PAYMENT_EVENTS, REVENUE_EVENTS } from "./constants";
 import { verifySignature } from "./verify";
 

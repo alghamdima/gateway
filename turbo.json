@@ -6,13 +6,13 @@
       "dependsOn": ["^build"],
       "outputs": [".cache/tsbuildinfo.json", "dist/**", "build/**"]
     },
-    "lint": {
-      "dependsOn": ["^build"],
-      "outputs": [".cache/.eslintcache"]
+    "//#lint": {},
+    "//#lint:fix": {
+      "cache": false
     },
-    "typecheck": {
-      "dependsOn": ["^build"],
-      "outputs": [".cache/tsbuildinfo.json"]
+    "//#format": {},
+    "//#format:fix": {
+      "cache": false
     },
     "dev": {
       "dependsOn": ["^build"],

@@ -1,6 +1,5 @@
 import { config } from "../config";
 import { BillingDiscountType, RecurringInterval, BillingModel } from "../types";
-
 import { findPlanByVariantId } from "./plan";
 
 import type { BillingConfigDiscount, BillingConfigVariant } from "../config";
@@ -21,25 +20,28 @@ export const getVariantWithHighestDiscount = (
 ) => {
   const variantsWithDiscounts = plans
     .flatMap((plan) => plan.variants)
-    .map((variant) => ({
-      ...variant,
-      discounts: discounts.filter((d) => d.appliesTo.includes(variant.id)),
-    }))
+    .map((variant) =>
+      Object.assign({}, variant, {
+        discounts: discounts.filter((d) => d.appliesTo.includes(variant.id)),
+      }),
+    )
     .filter((variant) => variant.discounts.length > 0);
 
-  const [variantWithHighestDiscount] = variantsWithDiscounts.sort((a, b) => {
-    const highestDiscountA = getVariantDiscount(a, discounts);
-    const highestDiscountB = getVariantDiscount(b, discounts);
+  const [variantWithHighestDiscount] = variantsWithDiscounts.toSorted(
+    (a, b) => {
+      const highestDiscountA = getVariantDiscount(a, discounts);
+      const highestDiscountB = getVariantDiscount(b, discounts);
 
-    const discountA = highestDiscountA
-      ? calculateDiscount(a, highestDiscountA)
-      : null;
-    const discountB = highestDiscountB
-      ? calculateDiscount(b, highestDiscountB)
-      : null;
+      const discountA = highestDiscountA
+        ? calculateDiscount(a, highestDiscountA)
+        : null;
+      const discountB = highestDiscountB
+        ? calculateDiscount(b, highestDiscountB)
+        : null;
 
-    return (discountB?.original.cost ?? 0) - (discountA?.original.cost ?? 0);
-  });
+      return (discountB?.original.cost ?? 0) - (discountA?.original.cost ?? 0);
+    },
+  );
 
   if (!variantWithHighestDiscount) {
     return null;
@@ -142,7 +144,7 @@ export const getVariantDiscount = (
     d.appliesTo.includes(variant.id),
   );
 
-  const [highestDiscount] = discountsForVariant.sort((a, b) => {
+  const [highestDiscount] = discountsForVariant.toSorted((a, b) => {
     const discountA = calculateDiscount(variant, a);
     const discountB = calculateDiscount(variant, b);
 

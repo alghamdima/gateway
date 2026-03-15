@@ -37,6 +37,7 @@ export const strategy = {
       if (!res.ok) {
         logger.error("Failed to post event to Plausible: ", res);
       }
+      return;
     });
   },
 } satisfies AnalyticsProviderServerStrategy;

@@ -21,7 +21,6 @@ import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard
 
 import { RequirePassword } from "../require-password";
 import { useTwoFactor } from "../use-two-factor";
-
 import { useBackupCodes } from "./use-backup-codes";
 
 import type { PasswordPayload } from "@workspace/auth";

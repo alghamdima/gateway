@@ -61,20 +61,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...getContentItems({
       collection: CollectionType.BLOG,
       locale: appConfig.locale,
-    }).items.map<MetadataRoute.Sitemap[number]>((post) => ({
-      ...getEntry(pathsConfig.marketing.blog.post(post.slug)),
-      lastModified: new Date(post.lastModifiedAt),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    })),
+    }).items.map<MetadataRoute.Sitemap[number]>((post) =>
+      Object.assign({}, getEntry(pathsConfig.marketing.blog.post(post.slug)), {
+        lastModified: new Date(post.lastModifiedAt),
+        changeFrequency: "monthly" as const,
+        priority: 0.7,
+      }),
+    ),
     ...getContentItems({
       collection: CollectionType.LEGAL,
       locale: appConfig.locale,
-    }).items.map<MetadataRoute.Sitemap[number]>((post) => ({
-      ...getEntry(pathsConfig.marketing.legal(post.slug)),
-      lastModified: new Date(post.lastModifiedAt),
-      changeFrequency: "yearly",
-      priority: 0.5,
-    })),
+    }).items.map<MetadataRoute.Sitemap[number]>((post) =>
+      Object.assign({}, getEntry(pathsConfig.marketing.legal(post.slug)), {
+        lastModified: new Date(post.lastModifiedAt),
+        changeFrequency: "yearly" as const,
+        priority: 0.5,
+      }),
+    ),
   ];
 }

@@ -9,9 +9,7 @@
   "scripts": {
     "build": "content-collections build",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "content-collections watch",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "dev": "content-collections watch"
   },
   "dependencies": {
     "@content-collections/core": "0.11.1",
@@ -22,10 +20,8 @@
     "@content-collections/cli": "0.1.7",
     "@content-collections/mdx": "0.2.2",
     "@shikijs/rehype": "3.14.0",
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "concurrently": "9.2.1",
-    "eslint": "catalog:",
     "typescript": "catalog:"
   }
 }

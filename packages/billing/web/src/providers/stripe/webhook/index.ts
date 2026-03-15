@@ -5,7 +5,6 @@ import { HttpException } from "@workspace/shared/utils";
 import { checkoutStatusChangeHandler } from "../checkout";
 import { env } from "../env";
 import { subscriptionStatusChangeHandler } from "../subscription";
-
 import { STRIPE_SIGNATURE_HEADER } from "./constants";
 import { constructEvent } from "./event";
 

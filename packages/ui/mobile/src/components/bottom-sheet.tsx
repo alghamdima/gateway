@@ -15,7 +15,7 @@ import * as React from "react";
 import { memo } from "react";
 import { Keyboard, Platform, Pressable, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import Reanimated from "react-native-reanimated";
+import { createAnimatedComponent } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withUniwind } from "uniwind";
 
@@ -234,7 +234,7 @@ const BottomSheetKeyboardAwareScrollView = memo(
     BottomSheetScrollViewProps
   >(
     SCROLLABLE_TYPE.SCROLLVIEW,
-    Reanimated.createAnimatedComponent(KeyboardAwareScrollView),
+    createAnimatedComponent(KeyboardAwareScrollView),
   ),
 );
 

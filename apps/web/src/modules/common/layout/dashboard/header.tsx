@@ -23,7 +23,9 @@ export const DashboardHeaderTitle = ({
     <h1
       className={cn("text-3xl font-bold tracking-tighter", className)}
       {...props}
-    />
+    >
+      {props.children ?? ""}
+    </h1>
   );
 };
 

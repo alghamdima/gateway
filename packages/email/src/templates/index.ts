@@ -1,15 +1,14 @@
 import { render } from "@react-email/render";
 
 import { EmailTemplate } from "../types";
-
-import ChangeEmail from "./auth/change-email";
+import { ChangeEmail } from "./auth/change-email";
 import { ConfirmEmail } from "./auth/confirm-email";
-import DeleteAccount from "./auth/delete-account";
+import { DeleteAccount } from "./auth/delete-account";
 import { MagicLink } from "./auth/magic-link";
 import { OrganizationInvitation } from "./auth/organization-invitation";
 import { ResetPassword } from "./auth/reset-password";
 import { SignInOtp } from "./auth/sign-in-otp";
-import ContactForm from "./contact-form";
+import { ContactForm } from "./contact-form";
 
 import type { CommonEmailProps, EmailVariables } from "../types";
 

@@ -1,6 +1,6 @@
 import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 
-import type Stripe from "stripe";
+import type { Stripe } from "stripe";
 
 export const toSubscriptionStatus = (status: string): SubscriptionStatus => {
   switch (status) {
@@ -37,7 +37,6 @@ export const toPaymentStatus = (
     case "no_payment_required":
       return PaymentStatus.SUCCEEDED;
     default:
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-      throw new Error(`Invalid payment status: ${status}`);
+      throw new Error("Invalid payment status");
   }
 };

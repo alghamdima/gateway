@@ -28,7 +28,7 @@ export const SubscriptionsListItem = ({
   const description = plan?.description;
   const statusKey = `subscription.status.${subscription.status
     .toLowerCase()
-    .replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}`;
+    .replaceAll(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}`;
 
   return (
     <div className="flex flex-col gap-4 p-6">

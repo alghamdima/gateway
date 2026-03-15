@@ -31,7 +31,9 @@ export interface UseLocalDataTableProps<
   TData,
   TQueryFnData extends { data?: TData[]; total?: number },
   TQueryKey extends QueryKey,
-> extends CommonProps,
+>
+  extends
+    CommonProps,
     Omit<TableOptions<TData>, "data" | "state" | "getCoreRowModel"> {
   persistance: "local";
   query: (params: {

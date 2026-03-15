@@ -6,11 +6,11 @@ import { useTranslation } from "react-i18next";
 
 import { ThemeColor, ThemeMode, cn } from "@workspace/ui";
 
-import type { ThemeConfig } from "@workspace/ui";
-
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";
 import { Label } from "#components/label";
+
+import type { ThemeConfig } from "@workspace/ui";
 
 interface ThemeCustomizerProps {
   readonly config: ThemeConfig;

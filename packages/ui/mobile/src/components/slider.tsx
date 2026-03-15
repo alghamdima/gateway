@@ -22,7 +22,7 @@ import type {
 interface SliderContextType {
   threshold: number;
   scrollX: SharedValue<number> | null;
-  onScroll: ScrollHandlerProcessed<Record<string, unknown>>;
+  onScroll: ScrollHandlerProcessed;
 }
 
 const SliderContext = createContext<SliderContextType>({

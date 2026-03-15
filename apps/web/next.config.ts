@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-
 import "./env.config";
 
 const INTERNAL_PACKAGES = [
@@ -43,6 +42,9 @@ const config: NextConfig = {
   experimental: {
     optimizePackageImports: INTERNAL_PACKAGES,
   },
+
+  /** We already do linting and typechecking as separate tasks in CI */
+  typescript: { ignoreBuildErrors: true },
 };
 
 export default config;

@@ -6,7 +6,7 @@ export const ContextMenu = ContextMenuPrimitive.Root;
 export const ContextMenuTrigger = ContextMenuPrimitive.create(
   (props: React.ComponentProps<typeof ContextMenuPrimitive.Trigger>) => (
     <ContextMenuPrimitive.Trigger {...props} asChild>
-      <View aria-role="button">{props.children}</View>
+      <View>{props.children}</View>
     </ContextMenuPrimitive.Trigger>
   ),
   "Trigger",

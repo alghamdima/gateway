@@ -148,7 +148,7 @@ export const Footer = async () => {
             </div>
           </div>
 
-          <div className="mt-1 grid w-full max-w-[50rem] grid-cols-2 gap-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-1 grid w-full max-w-200 grid-cols-2 gap-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
             {links.map((link) => (
               <div className="flex w-full flex-col gap-4" key={link.label}>
                 <span className="text-foreground text-sm font-medium">
@@ -178,6 +178,7 @@ export const Footer = async () => {
         <div className="mt-8 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <p className="text-muted-foreground text-sm">
+              {/* oxlint-disable-next-line i18next/no-literal-string */}
               &copy; {new Date().getFullYear()} {appConfig.name}.{" "}
               {t("legal.copyright")}.
             </p>

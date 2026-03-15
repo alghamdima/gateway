@@ -1,6 +1,6 @@
 import { cva } from "class-variance-authority";
 import * as React from "react";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 
 import { cn } from "@workspace/ui";
 import {
@@ -41,21 +41,24 @@ const SettingsCard = ({
   disabled = false,
   ...props
 }: React.ComponentProps<typeof Card> &
-  VariantProps<typeof settingsCardVariant> & { disabled?: boolean }) => (
-  <SettingsCardContext.Provider value={{ disabled, variant }}>
-    <Card
-      className={cn(
-        settingsCardVariant({ variant: disabled ? "default" : variant }),
-        "pb-0",
-        {
-          "text-muted-foreground cursor-not-allowed": disabled,
-        },
-        className,
-      )}
-      {...props}
-    />
-  </SettingsCardContext.Provider>
-);
+  VariantProps<typeof settingsCardVariant> & { disabled?: boolean }) => {
+  const value = useMemo(() => ({ disabled, variant }), [disabled, variant]);
+  return (
+    <SettingsCardContext.Provider value={value}>
+      <Card
+        className={cn(
+          settingsCardVariant({ variant: disabled ? "default" : variant }),
+          "pb-0",
+          {
+            "text-muted-foreground cursor-not-allowed": disabled,
+          },
+          className,
+        )}
+        {...props}
+      />
+    </SettingsCardContext.Provider>
+  );
+};
 
 const SettingsCardHeader = CardHeader;
 

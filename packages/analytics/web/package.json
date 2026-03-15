@@ -1,7 +1,7 @@
 {
   "name": "@workspace/analytics-web",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.tsx",
@@ -9,27 +9,23 @@
     "./server": "./src/server.ts"
   },
   "scripts": {
-    "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
-    "@workspace/tsconfig": "workspace:*",
-    "eslint": "catalog:",
-    "typescript": "catalog:"
+    "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
     "@openpanel/nextjs": "1.0.9",
-    "@workspace/analytics": "workspace:*",
-    "@workspace/shared": "workspace:*",
     "@vemetric/node": "0.2.0",
     "@vemetric/react": "0.6.1",
     "@vercel/analytics": "1.5.0",
+    "@workspace/analytics": "workspace:*",
+    "@workspace/shared": "workspace:*",
     "mixpanel": "0.18.1",
     "mixpanel-browser": "2.71.1",
     "posthog-js": "1.356.2",
     "posthog-node": "5.26.1",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@workspace/tsconfig": "workspace:*",
+    "typescript": "catalog:"
   }
 }

@@ -1,5 +1,4 @@
 import { BillingProvider } from "../types";
-
 import { checkout, getBillingPortal } from "./checkout";
 import { webhookHandler } from "./webhook";
 

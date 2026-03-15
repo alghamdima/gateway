@@ -7,9 +7,7 @@
     "build": "next build",
     "clean": "git clean -xdf .cache .next .turbo node_modules",
     "dev": "next dev",
-    "lint": "eslint",
-    "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "start": "next start"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.107",
@@ -26,6 +24,7 @@
     "@workspace/email": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/monitoring-web": "workspace:*",
+    "@workspace/oxlint": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/ui": "workspace:*",
     "@workspace/ui-web": "workspace:*",
@@ -51,10 +50,8 @@
     "@types/node": "catalog:node22",
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "autoprefixer": "10.4.21",
-    "eslint": "catalog:",
     "typescript": "catalog:"
   }
 }

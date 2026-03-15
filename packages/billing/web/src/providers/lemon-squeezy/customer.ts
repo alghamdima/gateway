@@ -14,7 +14,6 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-
 import { env } from "./env";
 
 const getLemonSqueezyCustomerById = async (customerId: string) => {

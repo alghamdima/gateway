@@ -1,9 +1,9 @@
 import { Hono } from "hono";
+import { statusMonitor } from "hono-status-monitor";
 import { some } from "hono/combine";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { logger as loggerMiddleware } from "hono/logger";
-import { statusMonitor } from "hono-status-monitor";
 
 import { auth } from "@workspace/auth/server";
 import { db } from "@workspace/db/server";

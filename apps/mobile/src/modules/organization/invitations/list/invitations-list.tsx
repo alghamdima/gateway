@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Fragment } from "react/jsx-runtime";
 import { View, FlatList, RefreshControl } from "react-native";
+import { Fragment } from "react/jsx-runtime";
 
 import { InvitationStatus } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";

@@ -116,13 +116,13 @@ const BackupCodeCta = memo<CtaProps>(({ onFactorChange }) => {
   const { t } = useTranslation(["auth"]);
   return (
     <div className="flex items-center justify-center pt-2">
-      <span
-        role="link"
+      <button
+        type="button"
         onClick={() => onFactorChange(SecondFactor.BACKUP_CODE)}
         className="text-muted-foreground hover:text-primary cursor-pointer pl-2 text-sm font-medium underline underline-offset-4"
       >
         {t("login.twoFactor.backupCode.cta")}
-      </span>
+      </button>
     </div>
   );
 });

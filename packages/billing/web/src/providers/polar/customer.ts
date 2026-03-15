@@ -6,7 +6,6 @@ import {
 import { logger } from "@workspace/shared/logger";
 
 import { BillingProvider } from "../types";
-
 import { polar } from "./sdk";
 
 const getPolarCustomerById = async (customerId: string) => {

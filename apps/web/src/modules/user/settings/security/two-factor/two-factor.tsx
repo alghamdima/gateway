@@ -16,7 +16,6 @@ import {
 } from "~/modules/common/layout/dashboard/settings-card";
 
 import { RequirePassword } from "../require-password";
-
 import { BackupCodesTile } from "./backup-codes/backup-codes";
 import { useBackupCodes } from "./backup-codes/use-backup-codes";
 import { TotpModal, TotpTile } from "./totp/totp";

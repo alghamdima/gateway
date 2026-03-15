@@ -18,7 +18,6 @@ import {
 import { customerInfoSchema } from "../schema/customer-info";
 import { webhookEventSchema } from "../schema/webhook-event";
 import { revenuecat } from "../sdk";
-
 import { RELEVANT_EVENTS } from "./constants";
 
 import type { WebhookCallbacks } from "../../../types";
@@ -79,15 +78,17 @@ export const webhookHandler = async (
       const periodStartsAt = dayjs(subscription.purchase_date).toDate();
       const periodEndsAt = dayjs(subscription.expires_date).toDate();
 
-      return {
-        customerId: customer.id,
-        externalId: transactionId,
-        variantId,
-        status: toSubscriptionStatus(subscription),
-        store: subscription.store,
-        periodStartsAt,
-        periodEndsAt,
-        ...(subscription.period_type === "trial"
+      return Object.assign(
+        {
+          customerId: customer.id,
+          externalId: transactionId,
+          variantId,
+          status: toSubscriptionStatus(subscription),
+          store: subscription.store,
+          periodStartsAt,
+          periodEndsAt,
+        },
+        subscription.period_type === `trial`
           ? {
               trialStartsAt: subscription.original_purchase_date
                 ? dayjs(subscription.original_purchase_date).toDate()
@@ -96,8 +97,8 @@ export const webhookHandler = async (
                 ? dayjs(subscription.expires_date).toDate()
                 : null,
             }
-          : {}),
-      };
+          : {},
+      );
     })
     .filter(Boolean);
 

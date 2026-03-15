@@ -6,6 +6,10 @@ import { z } from "zod";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 
+import { Button } from "#components/button";
+import { Icons } from "#components/icons";
+import { Input } from "#components/input";
+
 import { DataTableDateFilter } from "./data-table-date-filter";
 import { DataTableFacetedFilter } from "./data-table-faceted-filter";
 import { DataTableSliderFilter } from "./data-table-slider-filter";
@@ -13,10 +17,6 @@ import { DataTableViewOptions } from "./data-table-view-options";
 
 import type { Icon } from "#components/icons";
 import type { Column, Table } from "@tanstack/react-table";
-
-import { Button } from "#components/button";
-import { Icons } from "#components/icons";
-import { Input } from "#components/input";
 
 interface DataTableToolbarProps<TData> extends React.ComponentProps<"div"> {
   table: Table<TData>;

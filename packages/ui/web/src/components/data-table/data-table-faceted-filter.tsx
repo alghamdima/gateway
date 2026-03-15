@@ -5,9 +5,6 @@ import * as React from "react";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 
-import type { Icon } from "#components/icons";
-import type { Column } from "@tanstack/react-table";
-
 import { Badge } from "#components/badge";
 import { Button } from "#components/button";
 import {
@@ -22,6 +19,9 @@ import {
 import { Icons } from "#components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 import { Separator } from "#components/separator";
+
+import type { Icon } from "#components/icons";
+import type { Column } from "@tanstack/react-table";
 
 interface Option {
   label: string;

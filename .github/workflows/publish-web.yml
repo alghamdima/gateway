@@ -3,9 +3,6 @@ name: CI / Publish web
 on:
   workflow_dispatch:
 
-env:
-  NODE_VERSION: 22.x
-
 jobs:
   tests:
     name: 🧪 Tests
@@ -27,8 +24,6 @@ jobs:
 
       - name: 🔨 Setup
         uses: ./tooling/github/setup
-        with:
-          node-version: ${{ env.NODE_VERSION }}
 
       - name: 🔼 Install Vercel CLI
         run: pnpm install --global vercel@latest

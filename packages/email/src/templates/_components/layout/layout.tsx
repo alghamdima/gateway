@@ -12,7 +12,6 @@ import { mapValues } from "@workspace/shared/utils";
 import { themes, ThemeMode } from "@workspace/ui";
 
 import { env } from "../../../env";
-
 import { Footer } from "./footer";
 import { Header } from "./header";
 

@@ -40,6 +40,7 @@ export const strategy = {
       if (!res.ok) {
         logger.error("Failed to post event to Umami: ", res);
       }
+      return;
     });
   },
 } satisfies AnalyticsProviderServerStrategy;

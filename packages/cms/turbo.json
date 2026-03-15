@@ -4,12 +4,6 @@
   "tasks": {
     "build": {
       "outputs": [".content-collections/**"]
-    },
-    "lint": {
-      "dependsOn": ["build"]
-    },
-    "typecheck": {
-      "dependsOn": ["build"]
     }
   }
 }

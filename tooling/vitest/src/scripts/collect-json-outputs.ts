@@ -1,6 +1,9 @@
 import fs from "fs/promises";
-import path from "path";
 import { glob } from "glob";
+import path from "path";
+
+// Create clean patterns for display (without any "../" prefixes)
+const replaceDotPatterns = (str: string) => str.replace(/\.\.\//g, "");
 
 async function collectCoverageFiles() {
   try {
@@ -45,15 +48,12 @@ async function collectCoverageFiles() {
             );
 
             await fs.copyFile(coverageFilePath, destinationFile);
-          } catch (err) {
+          } catch {
             // File doesn't exist in this directory, skip
           }
         }
       }
     }
-
-    // Create clean patterns for display (without any "../" prefixes)
-    const replaceDotPatterns = (str: string) => str.replace(/\.\.\//g, "");
 
     if (directoriesWithCoverage.length > 0) {
       console.log(
@@ -70,4 +70,4 @@ async function collectCoverageFiles() {
 }
 
 // Run the function
-collectCoverageFiles();
+void collectCoverageFiles();

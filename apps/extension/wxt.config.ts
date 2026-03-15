@@ -1,7 +1,7 @@
+import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "url";
 import svgr from "vite-plugin-svgr";
 import { defineConfig } from "wxt";
-import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   manifest: async () => {
@@ -34,6 +34,9 @@ export default defineConfig({
     ],
     optimizeDeps: {
       exclude: ["*/build"],
+    },
+    resolve: {
+      dedupe: ["react", "react-dom"],
     },
     define: {
       "process.env": Object.fromEntries(

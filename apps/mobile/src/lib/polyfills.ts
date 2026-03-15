@@ -10,9 +10,8 @@ if (Platform.OS !== "web") {
       "react-native/Libraries/Utilities/PolyfillFunctions"
     );
 
-    const { TextEncoderStream, TextDecoderStream } = await import(
-      "@stardazed/streams-text-encoding"
-    );
+    const { TextEncoderStream, TextDecoderStream } =
+      await import("@stardazed/streams-text-encoding");
 
     if (!("structuredClone" in global)) {
       polyfillGlobal("structuredClone", () => structuredClone);
@@ -24,5 +23,3 @@ if (Platform.OS !== "web") {
 
   void setupPolyfills();
 }
-
-export {};

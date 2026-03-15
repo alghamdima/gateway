@@ -5,7 +5,7 @@ import {
   fetchUpdateAsync,
   checkForUpdateAsync,
 } from "expo-updates";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { AppState, Platform, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -278,7 +278,7 @@ export const Updates = () => {
 
       void checkForUpdateAsync()
         .then(({ isAvailable }) => {
-          setVisible(isAvailable);
+          return setVisible(isAvailable);
         })
         .catch(() => {
           setVisible(false);
@@ -290,8 +290,10 @@ export const Updates = () => {
     };
   }, []);
 
+  const value = useMemo(() => ({ visible, setVisible }), [visible, setVisible]);
+
   return (
-    <UpdatesContext.Provider value={{ visible, setVisible }}>
+    <UpdatesContext.Provider value={value}>
       <Content />
     </UpdatesContext.Provider>
   );

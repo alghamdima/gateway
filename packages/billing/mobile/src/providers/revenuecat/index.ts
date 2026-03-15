@@ -1,5 +1,4 @@
 import { BillingProvider } from "../types";
-
 import { useCustomer } from "./hooks/use-customer";
 import { usePaywall } from "./hooks/use-paywall";
 import { Provider } from "./provider";

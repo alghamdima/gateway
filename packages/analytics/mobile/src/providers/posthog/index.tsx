@@ -2,7 +2,6 @@ import PostHog, { PostHogProvider } from "posthog-react-native";
 import { useEffect } from "react";
 
 import { useTrackingPermissions } from "../../hooks";
-
 import { env } from "./env";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";

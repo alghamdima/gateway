@@ -10,7 +10,6 @@ export function useCopyToClipboard(): [CopiedValue, CopyFn] {
   const [copiedText, setCopiedText] = useState<CopiedValue>(null);
 
   const copy: CopyFn = useCallback(async (text) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!navigator?.clipboard) {
       logger.warn("Clipboard not supported");
       return false;

@@ -3,9 +3,6 @@ name: CI / Publish mobile
 on:
   workflow_dispatch:
 
-env:
-  NODE_VERSION: 22.x
-
 jobs:
   tests:
     name: 🧪 Tests
@@ -23,8 +20,6 @@ jobs:
 
       - name: 🔨 Setup
         uses: ./tooling/github/setup
-        with:
-          node-version: ${{ env.NODE_VERSION }}
 
       - name: 🏗 Setup EAS
         uses: expo/expo-github-action@v8

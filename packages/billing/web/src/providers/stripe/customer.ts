@@ -8,10 +8,9 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-
 import { stripe } from "./sdk";
 
-import type Stripe from "stripe";
+import type { Stripe } from "stripe";
 
 const getStripeCustomerById = async (id: string) => {
   return stripe().customers.retrieve(id);

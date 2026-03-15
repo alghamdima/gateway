@@ -133,10 +133,7 @@ const chartValues = [
 const chartData = chartValues.map((values, index) => {
   const date = dayjs().subtract(chartValues.length - 1 - index, "day");
 
-  return {
-    date: date.format("YYYY-MM-DD"),
-    ...values,
-  };
+  return Object.assign({ date: date.format(`YYYY-MM-DD`) }, values);
 });
 
 export const AreaChart = () => {

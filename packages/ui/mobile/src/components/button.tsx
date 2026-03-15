@@ -4,9 +4,9 @@ import { Pressable } from "react-native";
 
 import { cn } from "@workspace/ui";
 
-import type { VariantProps } from "class-variance-authority";
-
 import { TextClassContext } from "#components/text";
+
+import type { VariantProps } from "class-variance-authority";
 
 const buttonVariants = cva(
   "group shrink-0 flex-row items-center justify-center gap-2 rounded-md shadow-none",

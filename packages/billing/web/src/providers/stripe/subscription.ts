@@ -9,11 +9,10 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-
 import { toSubscriptionStatus } from "./mappers/to-billing-status";
 import { stripe } from "./sdk";
 
-import type Stripe from "stripe";
+import type { Stripe } from "stripe";
 
 const getSubscription = async (subscriptionId: string) => {
   return stripe().subscriptions.retrieve(subscriptionId);

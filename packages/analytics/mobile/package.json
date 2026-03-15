@@ -1,22 +1,14 @@
 {
   "name": "@workspace/analytics-mobile",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./env": "./src/env.ts"
   },
   "scripts": {
-    "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
-    "@workspace/tsconfig": "workspace:*",
-    "eslint": "catalog:",
-    "typescript": "catalog:"
+    "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
     "@workspace/analytics": "workspace:*",
@@ -26,5 +18,9 @@
     "posthog-react-native": "4.36.1",
     "react-native": "catalog:",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@workspace/tsconfig": "workspace:*",
+    "typescript": "catalog:"
   }
 }

@@ -9,7 +9,6 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-
 import { createOrRetrieveCustomer } from "./customer";
 import { env } from "./env";
 import { toPaymentStatus } from "./mappers/to-billing-status";

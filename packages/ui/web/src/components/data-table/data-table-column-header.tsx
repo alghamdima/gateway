@@ -3,8 +3,6 @@
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 
-import type { Column } from "@tanstack/react-table";
-
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -14,8 +12,12 @@ import {
 } from "#components/dropdown-menu";
 import { Icons } from "#components/icons";
 
-interface DataTableColumnHeaderProps<TData, TValue>
-  extends React.ComponentProps<typeof DropdownMenuTrigger> {
+import type { Column } from "@tanstack/react-table";
+
+interface DataTableColumnHeaderProps<
+  TData,
+  TValue,
+> extends React.ComponentProps<typeof DropdownMenuTrigger> {
   column: Column<TData, TValue>;
   title: string;
 }

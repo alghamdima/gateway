@@ -10,7 +10,6 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-
 import { toSubscriptionStatus } from "./mappers/to-billing-status";
 
 export const subscriptionStatusChangeHandler = async ({

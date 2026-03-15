@@ -1,4 +1,3 @@
-/* eslint-disable turbo/no-undeclared-env-vars */
 import { defineEnv } from "envin";
 import * as z from "zod";
 

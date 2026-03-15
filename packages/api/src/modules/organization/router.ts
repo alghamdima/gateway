@@ -5,7 +5,6 @@ import { MemberRole } from "@workspace/auth";
 
 import { enforceAuth, enforceMembership, validate } from "../../middleware";
 import { getInvitationsInputSchema, getMembersInputSchema } from "../../schema";
-
 import { generateSlug } from "./queries/generate-slug";
 import { getInvitations } from "./queries/invitations";
 import { getIsOnlyOwner, getMembers } from "./queries/members";

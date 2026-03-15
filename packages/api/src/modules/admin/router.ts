@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 
 import { enforceAdmin, enforceAuth } from "../../middleware";
-
 import { getCustomersCount } from "./customers/queries";
 import { customersRouter } from "./customers/router";
 import { getOrganizationsCount } from "./organizations/queries";

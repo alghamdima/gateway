@@ -12,16 +12,14 @@
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "db:check": "drizzle-kit check",
-    "db:generate": "drizzle-kit generate && eslint --fix && prettier . --write",
+    "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:reset": "pnpm dlx tsx ./src/scripts/reset.ts",
     "db:seed": "pnpm dlx tsx ./src/scripts/seed.ts",
     "db:setup": "turbo db:migrate && turbo db:seed",
     "db:status": "pnpm dlx tsx ./src/scripts/status.ts",
-    "db:studio": "drizzle-kit studio",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@workspace/shared": "workspace:*",
@@ -32,13 +30,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
-    "@workspace/prettier-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "drizzle-kit": "0.31.7",
     "drizzle-seed": "0.3.1",
-    "eslint": "catalog:",
     "typescript": "catalog:"
-  },
-  "prettier": "@workspace/prettier-config"
+  }
 }

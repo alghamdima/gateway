@@ -2,7 +2,7 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useMutationState } from "@tanstack/react-query";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -69,6 +69,9 @@ const mutations = {
       } catch (error) {
         throw new Error(
           error instanceof Error ? error.message : "Something went wrong",
+          {
+            cause: error,
+          },
         );
       }
     },
@@ -93,6 +96,7 @@ const mutations = {
       } catch (error) {
         throw new Error(
           error instanceof Error ? error.message : "Something went wrong",
+          { cause: error },
         );
       }
     },
@@ -159,10 +163,13 @@ const AvatarForm = ({
     resolver: standardSchemaResolver(avatarSchema),
   });
 
+  const value = useMemo(
+    () => ({ id, image, update, previewUrl, setPreviewUrl }),
+    [id, image, update, previewUrl, setPreviewUrl],
+  );
+
   return (
-    <AvatarFormContext.Provider
-      value={{ id, image, update, previewUrl, setPreviewUrl }}
-    >
+    <AvatarFormContext.Provider value={value}>
       <FormProvider {...form}>{children}</FormProvider>
     </AvatarFormContext.Provider>
   );
@@ -192,7 +199,7 @@ const AvatarFormInput = ({
       await new Promise((resolve) => {
         const img = new Image();
         img.src = publicUrl;
-        img.onload = resolve;
+        img.addEventListener("load", resolve);
       });
 
       if (oldImage) {

@@ -2,7 +2,7 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import * as Linking from "expo-linking";
 import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
-import z from "zod";
+import * as z from "zod";
 
 import { Trans, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";

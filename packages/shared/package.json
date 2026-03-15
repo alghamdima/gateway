@@ -8,9 +8,7 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "lint": "eslint",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run"
   },
   "dependencies": {
     "lodash": "4.17.23",
@@ -22,10 +20,8 @@
   "devDependencies": {
     "@types/lodash": "4.17.23",
     "@types/react": "catalog:react19",
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "@workspace/vitest-config": "workspace:*",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -9,6 +9,10 @@ declare global {
   }
 }
 
+function gtag(...args: unknown[]) {
+  window.dataLayer?.push(args);
+}
+
 export const strategy = {
   Provider: ({ children }) => {
     return (
@@ -23,10 +27,6 @@ export const strategy = {
             }
 
             window.dataLayer = window.dataLayer ?? [];
-
-            function gtag(...args: unknown[]) {
-              window.dataLayer?.push(args);
-            }
 
             window.gtag = gtag;
 

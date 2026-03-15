@@ -1,5 +1,3 @@
-/* eslint-disable turbo/no-undeclared-env-vars */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { defineEnv } from "envin";
 import * as z from "zod";
 

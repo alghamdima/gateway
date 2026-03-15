@@ -1,6 +1,6 @@
 {
   "name": "extension",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,9 +10,7 @@
     "dev": "dotenv -c -- pnpm dev:chrome",
     "dev:chrome": "wxt",
     "dev:firefox": "wxt -b firefox",
-    "postinstall": "wxt prepare",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "postinstall": "wxt prepare"
   },
   "dependencies": {
     "@tailwindcss/vite": "4.1.18",
@@ -25,6 +23,7 @@
     "@workspace/billing": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/monitoring-extension": "workspace:*",
+    "@workspace/oxlint": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/ui": "workspace:*",
     "@workspace/ui-web": "workspace:*",
@@ -40,11 +39,9 @@
     "@types/node": "catalog:node22",
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
-    "@workspace/eslint-config": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "@wxt-dev/auto-icons": "1.1.0",
     "@wxt-dev/module-react": "1.1.5",
-    "eslint": "catalog:",
     "typescript": "catalog:",
     "wxt": "0.20.18"
   }

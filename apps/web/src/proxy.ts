@@ -12,8 +12,7 @@ export const proxy = (request: NextRequest) =>
   i18nRouter(request, {
     locales: i18nConfig.locales,
     defaultLocale:
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      appConfig.locale ?? env.DEFAULT_LOCALE ?? i18nConfig.defaultLocale,
+      appConfig.locale || env.DEFAULT_LOCALE || i18nConfig.defaultLocale,
     localeCookie: i18nConfig.cookie,
     localeDetector: getLocaleFromRequest,
   });
