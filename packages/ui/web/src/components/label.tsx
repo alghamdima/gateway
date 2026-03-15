@@ -4,9 +4,12 @@ import * as React from "react";
 
 import { cn } from "@workspace/ui";
 
-function Label({ className, ...props }: React.ComponentProps<"label">) {
+function Label({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"label">) {
   return (
-    // oxlint-disable-next-line jsx_a11y/label-has-associated-control
     <label
       data-slot="label"
       className={cn(
@@ -14,7 +17,9 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+    </label>
   );
 }
 
