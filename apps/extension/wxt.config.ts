@@ -28,7 +28,7 @@ export default defineConfig({
   vite: () => ({
     plugins: [
       svgr({
-        include: "**/*.svg",
+        include: "*.svg",
       }),
       tailwindcss(),
     ],

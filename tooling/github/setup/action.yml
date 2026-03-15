@@ -6,6 +6,10 @@ inputs:
     description: "Install dependencies"
     required: false
     default: "true"
+  node-version:
+    description: "Override Node.js version (optional)"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -16,11 +20,19 @@ runs:
     - name: 🎬 Setup pnpm
       uses: pnpm/action-setup@v4
 
-    - name: 🔨 Setup Node.js
+    - name: 🔨 Setup Node.js (custom)
+      if: ${{ inputs.node-version != '' }}
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+
+    - name: 🔨 Setup Node.js (.nvmrc)
+      if: ${{ inputs.node-version == '' }}
       uses: actions/setup-node@v6
       with:
         node-version-file: ".nvmrc"
-        cache: "pnpm"
+        cache: pnpm
 
     - name: 🔌 Install
       if: ${{ inputs.install-deps == 'true' }}
