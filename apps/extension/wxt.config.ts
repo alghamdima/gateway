@@ -1,7 +1,31 @@
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "url";
+import { type Plugin, transformWithOxc } from "vite";
 import svgr from "vite-plugin-svgr";
 import { defineConfig } from "wxt";
+
+const svgJsxTransformPlugin = (): Plugin => ({
+  name: "extension-svg-jsx-transform",
+  async transform(code, id) {
+    const path = id.split("?")[0] ?? id;
+
+    if (!path.endsWith(".svg")) {
+      return null;
+    }
+
+    const result = await transformWithOxc(code, id, {
+      lang: "jsx",
+      jsx: {
+        runtime: "classic",
+      },
+    });
+
+    return {
+      code: result.code,
+      map: null,
+    };
+  },
+});
 
 export default defineConfig({
   manifest: async () => {
@@ -27,10 +51,11 @@ export default defineConfig({
   imports: false,
   vite: () => ({
     plugins: [
-      svgr({
-        include: "*.svg",
-      }),
       tailwindcss(),
+      svgr({
+        include: "**/*.svg",
+      }),
+      svgJsxTransformPlugin(),
     ],
     optimizeDeps: {
       exclude: ["*/build"],
