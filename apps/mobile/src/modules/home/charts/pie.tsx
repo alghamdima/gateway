@@ -44,7 +44,7 @@ const useChart = (locale: string) => {
       id: date.format("YYYY-MM"),
       label: labelFormatter.format(date.toDate()),
     };
-  }).toReversed();
+  }).reverse();
 
   const customersData = monthData.map((month, index) => ({
     month: month.id,
@@ -144,7 +144,7 @@ export function PieChart() {
 
       <CardContent className="relative h-[250px]">
         <PolarChart
-          data={[...customersData].toReversed()}
+          data={[...customersData].reverse()}
           labelKey="month"
           valueKey="customers"
           colorKey="color"

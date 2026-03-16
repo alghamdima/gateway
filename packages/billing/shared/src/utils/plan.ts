@@ -91,7 +91,7 @@ export const getActivePlan = <
 
   return (
     availablePlans
-      .toSorted((a, b) => findPlanIndexById(a.id) - findPlanIndexById(b.id))
+      .sort((a, b) => findPlanIndexById(a.id) - findPlanIndexById(b.id))
       .at(-1)?.id ?? BillingPlan.FREE
   );
 };

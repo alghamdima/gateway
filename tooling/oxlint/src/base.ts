@@ -43,6 +43,9 @@ export default defineConfig({
 
     "typescript/no-unsafe-type-assertion": "off",
 
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+
     "import/namespace": "off",
     "import/no-unassigned-import": "off",
 

@@ -38,7 +38,7 @@ const sortItems = <T extends CollectionType>(
   sortBy: keyof ContentCollectionItem<T>,
   sortOrder: SortOrder,
 ) => {
-  return items.toSorted((a, b) => {
+  return items.sort((a, b) => {
     const aValue = a[sortBy];
     const bValue = b[sortBy];
 

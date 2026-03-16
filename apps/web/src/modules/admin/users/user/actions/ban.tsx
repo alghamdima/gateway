@@ -284,7 +284,7 @@ const BanModal = ({
                             <ScrollArea className="w-64 sm:w-auto">
                               <div className="flex p-2 sm:flex-col">
                                 {Array.from({ length: 12 }, (_, i) => i + 1)
-                                  .toReversed()
+                                  .reverse()
                                   .map((hour) => (
                                     <Button
                                       key={hour}

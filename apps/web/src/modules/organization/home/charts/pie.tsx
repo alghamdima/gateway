@@ -44,7 +44,7 @@ const useChartData = (locale: string) => {
       id: date.format("YYYY-MM"),
       label: labelFormatter.format(date.toDate()),
     };
-  }).toReversed();
+  }).reverse();
 
   const customersData = monthData.map((month, index) => ({
     month: month.id,
