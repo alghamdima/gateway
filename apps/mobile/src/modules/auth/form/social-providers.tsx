@@ -4,7 +4,6 @@ import {
   isSuccessResponse,
 } from "@react-native-google-signin/google-signin";
 import { useMutation } from "@tanstack/react-query";
-import env from "env.config";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { memo } from "react";
@@ -23,6 +22,7 @@ import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
 import { isAndroid, isIOS } from "~/utils/device";
 
+import env from "../../../../env.config";
 import { auth } from "../lib/api";
 
 import type { Icon } from "@workspace/ui-mobile/icons";

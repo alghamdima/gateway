@@ -1,5 +1,3 @@
-import envConfig from "env.config";
-
 import {
   createAuthClient,
   passkeyClient,
@@ -14,6 +12,8 @@ import {
   inferAdditionalFields,
 } from "@workspace/auth/client/web";
 import { ExecutionSide, Platform } from "@workspace/shared/constants";
+
+import envConfig from "../../../env.config";
 
 import type { auth } from "@workspace/auth/server";
 

@@ -1,4 +1,4 @@
-import env from "env.config";
+import env from "../../env.config";
 
 export const appConfig = {
   locale: env.EXPO_PUBLIC_DEFAULT_LOCALE,

@@ -1,7 +1,8 @@
-import env from "env.config";
 import { Platform } from "react-native";
 
 import { SocialProvider, authConfigSchema } from "@workspace/auth";
+
+import env from "../../env.config";
 
 import type { AuthConfig } from "@workspace/auth";
 

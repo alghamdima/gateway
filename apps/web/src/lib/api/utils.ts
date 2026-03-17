@@ -1,4 +1,4 @@
-import env from "env.config";
+import env from "../../../env.config";
 
 export const getBaseUrl = () => {
   if (typeof window !== "undefined") return window.location.origin;

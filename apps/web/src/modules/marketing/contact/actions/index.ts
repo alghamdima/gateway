@@ -1,10 +1,10 @@
 "use server";
 
-import env from "env.config";
-
 import { EmailTemplate } from "@workspace/email";
 import { sendEmail } from "@workspace/email/server";
 import { getTranslation } from "@workspace/i18n/server";
+
+import env from "../../../../../env.config";
 
 import type { ContactFormPayload } from "../utils/schema";
 

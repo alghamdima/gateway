@@ -1,7 +1,8 @@
-import env from "env.config";
 import Constants from "expo-constants";
 
 import { logger } from "@workspace/shared/logger";
+
+import env from "../../../env.config";
 
 export const getBaseUrl = () => {
   /**

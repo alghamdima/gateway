@@ -1,6 +1,6 @@
-import env from "env.config";
-
 import { SocialProvider, authConfigSchema } from "@workspace/auth";
+
+import env from "../../env.config";
 
 import type { AuthConfig } from "@workspace/auth";
 
