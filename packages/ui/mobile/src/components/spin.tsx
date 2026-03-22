@@ -18,7 +18,7 @@ export const Spin = ({ children }: { children: React.ReactNode }) => {
         },
       ],
     };
-  }, [rotation.value]);
+  }, [rotation]);
 
   useEffect(() => {
     rotation.value = withRepeat(

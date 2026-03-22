@@ -269,6 +269,10 @@ const ERROR_MESSAGES = {
     "auth:error.methodNotAllowedDeferSessionRequired",
   BODY_MUST_BE_AN_OBJECT: "auth:error.bodyMustBeAnObject",
   PASSWORD_ALREADY_SET: "auth:error.credentials.password.alreadySet",
+  PREVIOUSLY_REGISTERED: "auth:error.user.previouslyRegistered",
+  REGISTRATION_CANCELLED: "auth:error.user.registrationCancelled",
+  AUTH_CANCELLED: "auth:error.authCancelled",
+  UNKNOWN_ERROR: "auth:error.unknown",
 } as const satisfies Record<AuthErrorCode, TranslationKey>;
 
 export type { AuthConfig, AuthErrorCode };

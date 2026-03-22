@@ -196,7 +196,8 @@ const mutations = {
       mutationFn: async () => {
         const response = await authClient.passkey.addPasskey();
         if (response.error) {
-          throw new Error(response.error.message);
+          const { message, statusText } = response.error;
+          throw new Error(typeof message === "string" ? message : statusText);
         }
         return response.data;
       },

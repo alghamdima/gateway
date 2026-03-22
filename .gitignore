@@ -22,8 +22,8 @@ next-env.d.ts
 # expo
 .expo/
 expo-env.d.ts
-ios
-android
+apps/*/ios
+apps/*/android
 
 # wxt
 .wxt
