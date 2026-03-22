@@ -44,9 +44,9 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
   const signOut = useMutation({
     ...auth.mutations.signOut,
     onSuccess: async () => {
-      await refetch();
       router.replace(pathsConfig.index);
       router.refresh();
+      await refetch();
     },
   });
 

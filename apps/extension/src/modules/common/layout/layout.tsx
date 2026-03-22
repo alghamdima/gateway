@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import ReactDOM from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 
 import { ThemeMode, cn } from "@workspace/ui";
 
@@ -16,7 +16,6 @@ interface LayoutProps {
   readonly children: React.ReactNode;
   readonly loadingFallback?: React.ReactNode;
   readonly errorFallback?: React.ReactNode;
-
   readonly className?: string;
 }
 
@@ -66,9 +65,21 @@ export const Layout = ({
   );
 };
 
+const REACT_ROOT = Symbol.for("@turbostarter/extension.reactRoot");
+
+type RootContainer = HTMLElement & { [REACT_ROOT]?: Root };
+
 export const render = (id: string, element: React.ReactElement) => {
-  const container = document.getElementById(id);
-  if (container) {
-    ReactDOM.createRoot(container).render(<StrictMode>{element}</StrictMode>);
+  const container = document.getElementById(id) as RootContainer | null;
+  if (!container) {
+    return;
   }
+
+  let root = container[REACT_ROOT];
+  if (!root) {
+    root = createRoot(container);
+    container[REACT_ROOT] = root;
+  }
+
+  root.render(<StrictMode>{element}</StrictMode>);
 };

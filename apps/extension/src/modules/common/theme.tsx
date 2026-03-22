@@ -62,7 +62,7 @@ const Status = ({
     <Button
       variant="outline"
       className={cn(
-        "overflow-hidden rounded-full bg-transparent p-0 pr-3",
+        "h-10.5 overflow-hidden rounded-full bg-transparent p-0 pr-3",
         className,
       )}
       {...props}

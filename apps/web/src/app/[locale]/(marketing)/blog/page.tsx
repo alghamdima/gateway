@@ -72,11 +72,11 @@ export default async function BlogPage({
           <TurboLink
             key={post.slug}
             href={pathsConfig.marketing.blog.post(post.slug)}
-            className="group h-full basis-[34rem]"
+            className="group h-full basis-136"
           >
             <Card className="group-hover:bg-muted/50 h-full border-none shadow-none">
               <CardHeader className="space-y-2 p-3 pb-2">
-                <div className="bg-muted -mx-3 -mt-3 mb-3 aspect-[12/8] overflow-hidden rounded-lg">
+                <div className="bg-muted -mx-3 -mt-3 mb-3 aspect-12/8 overflow-hidden rounded-lg">
                   <div className="relative h-full w-full transition-transform duration-300 group-hover:scale-105">
                     <Image
                       alt=""

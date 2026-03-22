@@ -20,6 +20,9 @@ export const authClient = createAuthClient({
     },
     throw: true,
   },
+  sessionOptions: {
+    refetchOnWindowFocus: false,
+  },
   plugins: [
     anonymousClient(),
     twoFactorClient(),

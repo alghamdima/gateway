@@ -16,7 +16,7 @@ catalog:
   dayjs: 1.11.19
   react-hook-form: 7.66.0
   react-native: 0.83.2
-  tailwindcss: 4.2.1
+  tailwindcss: 4.2.2
   typescript: 5.9.3
   vitest: 4.1.0
   "@vitest/coverage-v8": 4.1.0
@@ -32,6 +32,6 @@ catalogs:
     react: 19.2.0
     react-dom: 19.2.0
   turbo:
-    "@turbo/gen": 2.8.17
-    turbo: 2.8.17
-    eslint-plugin-turbo: 2.8.17
+    "@turbo/gen": 2.8.20
+    turbo: 2.8.20
+    eslint-plugin-turbo: 2.8.20
