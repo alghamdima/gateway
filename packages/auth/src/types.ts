@@ -273,6 +273,9 @@ const ERROR_MESSAGES = {
   REGISTRATION_CANCELLED: "auth:error.user.registrationCancelled",
   AUTH_CANCELLED: "auth:error.authCancelled",
   UNKNOWN_ERROR: "auth:error.unknown",
+  RESOLVED_USER_INVALID: "auth:error.user.invalid",
+  RESOLVE_USER_REQUIRED: "auth:error.user.resolveRequired",
+  SESSION_REQUIRED: "auth:error.session.required",
 } as const satisfies Record<AuthErrorCode, TranslationKey>;
 
 export type { AuthConfig, AuthErrorCode };
