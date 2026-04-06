@@ -39,7 +39,7 @@
     "input-otp-native": "0.5.0",
     "lucide-react-native": "0.562.0",
     "react-native": "catalog:",
-    "react-native-keyboard-controller": "1.20.7",
+    "react-native-keyboard-controller": "1.21.4",
     "react-native-reanimated": "4.2.1",
     "uniwind": "1.6.0",
     "zeego": "3.0.6"

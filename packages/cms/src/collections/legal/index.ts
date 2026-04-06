@@ -13,6 +13,7 @@ export const legal = defineCollection({
     title: z.string(),
     description: z.string(),
     status: z.enum(ContentStatus),
+    content: z.string(),
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document);

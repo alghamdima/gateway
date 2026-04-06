@@ -16,10 +16,10 @@ import {
   BottomSheetContent,
   BottomSheetHeader,
   BottomSheetOpenTrigger,
-  BottomSheetScrollView,
   BottomSheetTitle,
   BottomSheetDescription,
   useBottomSheet,
+  BottomSheetView,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
 import {
@@ -104,10 +104,9 @@ export const UpdateMemberRoleBottomSheet = ({
 
       <BottomSheetContent
         ref={ref ?? sheet.ref}
-        stackBehavior="replace"
         name={`update-member-role-${member.id}`}
       >
-        <BottomSheetScrollView>
+        <BottomSheetView>
           <BottomSheetHeader>
             <BottomSheetTitle>
               {t("members.update.role.title", {
@@ -183,7 +182,7 @@ export const UpdateMemberRoleBottomSheet = ({
               </Button>
             </View>
           </View>
-        </BottomSheetScrollView>
+        </BottomSheetView>
       </BottomSheetContent>
     </BottomSheet>
   );

@@ -37,7 +37,7 @@ export const I18nSettings = () => {
           {Icon && <Icon className="size-4.5" />}
         </SettingsTile>
       </BottomSheetOpenTrigger>
-      <BottomSheetContent ref={ref} stackBehavior="replace" name="i18n">
+      <BottomSheetContent ref={ref} name="i18n">
         <BottomSheetView>
           <BottomSheetHeader>
             <BottomSheetTitle>{t("language.label")}</BottomSheetTitle>

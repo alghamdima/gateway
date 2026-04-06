@@ -109,11 +109,7 @@ export const InviteMemberBottomSheet = ({
         <BottomSheetOpenTrigger asChild>{children}</BottomSheetOpenTrigger>
       )}
 
-      <BottomSheetContent
-        ref={ref}
-        stackBehavior="replace"
-        name="invite-member"
-      >
+      <BottomSheetContent ref={ref} name="invite-member">
         <BottomSheetScrollView>
           <BottomSheetHeader>
             <BottomSheetTitle>{t("members.invite.title")}</BottomSheetTitle>

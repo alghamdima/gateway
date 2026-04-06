@@ -18,6 +18,7 @@ export const blog = defineCollection({
     publishedAt: z.coerce.date(),
     tags: z.array(z.enum(ContentTag)),
     status: z.enum(ContentStatus),
+    content: z.string(),
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {

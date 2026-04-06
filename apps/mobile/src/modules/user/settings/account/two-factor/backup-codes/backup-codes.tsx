@@ -39,7 +39,7 @@ export const BackupCodesSheet = ({ ref: passedRef }: BackupCodesSheetProps) => {
 
   return (
     <BottomSheet>
-      <BottomSheetContent ref={ref} stackBehavior="replace" name="backup-codes">
+      <BottomSheetContent ref={ref} name="backup-codes">
         <BottomSheetView>
           <BottomSheetHeader>
             <BottomSheetTitle>

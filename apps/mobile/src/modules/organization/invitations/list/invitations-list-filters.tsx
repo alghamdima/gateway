@@ -126,10 +126,7 @@ const AdvancedFilters = () => {
         </Button>
       </BottomSheetOpenTrigger>
 
-      <BottomSheetContent
-        stackBehavior="replace"
-        name="invitations-advanced-filters"
-      >
+      <BottomSheetContent name="invitations-advanced-filters">
         <BottomSheetView className="gap-6">
           <View className="flex-row gap-2">
             <StatusFilter />

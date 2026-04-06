@@ -16,8 +16,8 @@
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-js": "1.356.2",
-    "posthog-node": "5.26.1"
+    "posthog-js": "1.364.7",
+    "posthog-node": "5.28.11"
   },
   "devDependencies": {
     "@workspace/tsconfig": "workspace:*",

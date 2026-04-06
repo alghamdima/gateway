@@ -15,7 +15,7 @@
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-react-native": "4.36.1"
+    "posthog-react-native": "4.39.4"
   },
   "devDependencies": {
     "@workspace/tsconfig": "workspace:*",

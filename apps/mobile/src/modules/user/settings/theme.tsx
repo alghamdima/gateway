@@ -44,7 +44,7 @@ export const ThemeSettings = () => {
           />
         </SettingsTile>
       </BottomSheetOpenTrigger>
-      <BottomSheetContent stackBehavior="replace" name="theme-settings">
+      <BottomSheetContent name="theme-settings">
         <BottomSheetView>
           <View className="flex-row items-start">
             <BottomSheetHeader>

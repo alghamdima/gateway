@@ -36,7 +36,6 @@ export const getInitOptions = ({
   fallbackNS: config.namespaces,
   ns: ns ?? config.namespaces,
   preload: false,
-  showSupportNotice: false,
   interpolation: {
     escapeValue: false,
   },

@@ -1,11 +1,11 @@
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
+  BottomSheetTextInput,
   BottomSheetFooter as GBottomSheetFooter,
   BottomSheetView as GBottomSheetView,
+  BottomSheetScrollView as GBottomSheetScrollView,
   useBottomSheetModal,
-} from "@gorhom/bottom-sheet";
-import {
   SCROLLABLE_TYPE,
   createBottomSheetScrollableComponent,
 } from "@gorhom/bottom-sheet";
@@ -13,22 +13,19 @@ import { useTheme } from "@react-navigation/native";
 import * as Slot from "@rn-primitives/slot";
 import * as React from "react";
 import { memo } from "react";
-import { Keyboard, Platform, Pressable, View } from "react-native";
+import { Keyboard, Pressable, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { createAnimatedComponent } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { withUniwind } from "uniwind";
 
 import { cn } from "@workspace/ui";
 
+import { inputVariants } from "./input";
 import { Text } from "./text";
 
 import type {
-  BottomSheetScrollViewMethods,
-  BottomSheetScrollView as GBottomSheetScrollView,
-} from "@gorhom/bottom-sheet";
-import type {
   BottomSheetBackdropProps,
+  BottomSheetScrollViewMethods,
   BottomSheetFooterProps as GBottomSheetFooterProps,
 } from "@gorhom/bottom-sheet";
 import type { BottomSheetModalMethods } from "@gorhom/bottom-sheet/lib/typescript/types";
@@ -81,7 +78,6 @@ const BottomSheetContent = React.forwardRef<
       enableDynamicSizing = true,
       backdropProps,
       backgroundStyle,
-      android_keyboardInputMode = "adjustResize",
       ...props
     },
     ref,
@@ -134,12 +130,12 @@ const BottomSheetContent = React.forwardRef<
         enablePanDownToClose={enablePanDownToClose}
         backdropComponent={renderBackdrop}
         enableDynamicSizing={enableDynamicSizing}
+        stackBehavior="replace"
         backgroundStyle={[{ backgroundColor: colors.card }, backgroundStyle]}
         handleIndicatorStyle={{
           backgroundColor: colors.border,
         }}
         topInset={insets.top}
-        android_keyboardInputMode={android_keyboardInputMode}
         {...props}
       />
     );
@@ -194,13 +190,9 @@ function BottomSheetView({
   style?: ViewStyle;
 }) {
   const insets = useSafeAreaInsets();
+
   const paddingBottom =
-    insets.bottom +
-    (Platform.select({
-      ios: 4,
-      android: 16,
-    }) ?? 0) +
-    (hadHeader ? BOTTOM_SHEET_HEADER_HEIGHT : 0);
+    insets.bottom + 8 + (hadHeader ? BOTTOM_SHEET_HEADER_HEIGHT : 0);
 
   return (
     <GBottomSheetView
@@ -218,8 +210,28 @@ function BottomSheetView({
   );
 }
 
+const BottomSheetScrollViewComponent = createBottomSheetScrollableComponent<
+  BottomSheetScrollViewMethods,
+  BottomSheetScrollViewProps
+>(SCROLLABLE_TYPE.SCROLLVIEW, Animated.ScrollView);
+
+const BottomSheetKeyboardAwareScrollView = memo<BottomSheetScrollViewProps>(
+  (props) => {
+    const insets = useSafeAreaInsets();
+
+    return (
+      <KeyboardAwareScrollView
+        {...props}
+        mode="layout"
+        extraKeyboardSpace={-insets.bottom + 16}
+        ScrollViewComponent={BottomSheetScrollViewComponent}
+      />
+    );
+  },
+);
+
 type BottomSheetScrollViewProps = Omit<
-  React.ComponentPropsWithoutRef<typeof GBottomSheetScrollView>,
+  React.ComponentProps<typeof GBottomSheetScrollView>,
   "style"
 > & {
   hadHeader?: boolean;
@@ -228,55 +240,36 @@ type BottomSheetScrollViewProps = Omit<
   style?: ViewStyle;
 };
 
-const BottomSheetKeyboardAwareScrollView = memo(
-  createBottomSheetScrollableComponent<
-    BottomSheetScrollViewMethods,
-    BottomSheetScrollViewProps
-  >(
-    SCROLLABLE_TYPE.SCROLLVIEW,
-    createAnimatedComponent(KeyboardAwareScrollView),
-  ),
-);
-
-const StyledBottomSheetKeyboardAwareScrollView = withUniwind(
-  BottomSheetKeyboardAwareScrollView,
-);
-
 function BottomSheetScrollView({
   children,
   hadHeader = false,
-  style,
   className,
   contentContainerClassName,
+  contentContainerStyle,
   ...props
 }: BottomSheetScrollViewProps) {
   const insets = useSafeAreaInsets();
+
   const paddingBottom =
-    insets.bottom +
-    (Platform.select({
-      ios: 8,
-      android: 16,
-    }) ?? 0) +
-    (hadHeader ? BOTTOM_SHEET_HEADER_HEIGHT : 0);
+    insets.bottom - 8 + (hadHeader ? BOTTOM_SHEET_HEADER_HEIGHT : 0);
 
   return (
-    <StyledBottomSheetKeyboardAwareScrollView
-      className={cn("h-full px-6 pt-4", className)}
-      contentContainerClassName={cn("gap-4", contentContainerClassName)}
+    <BottomSheetKeyboardAwareScrollView
+      className={cn("h-full px-6", className)}
       keyboardShouldPersistTaps="handled"
       bounces={false}
       showsVerticalScrollIndicator={false}
+      contentContainerClassName={cn("gap-4 pt-4", contentContainerClassName)}
       contentContainerStyle={[
         {
-          gap: 16,
           paddingBottom,
         },
-        style,
+        contentContainerStyle,
       ]}
       {...props}
     >
       {children}
-    </StyledBottomSheetKeyboardAwareScrollView>
+    </BottomSheetKeyboardAwareScrollView>
   );
 }
 
@@ -344,6 +337,29 @@ function BottomSheetDescription({
   );
 }
 
+function BottomSheetInput({
+  className,
+  placeholderTextColorClassName,
+  selectionColorClassName,
+  ...props
+}: React.ComponentProps<typeof BottomSheetTextInput>) {
+  return (
+    <BottomSheetTextInput
+      placeholderTextColorClassName={cn(
+        "accent-muted-foreground",
+        placeholderTextColorClassName,
+      )}
+      selectionColorClassName={cn("accent-foreground", selectionColorClassName)}
+      className={cn(
+        inputVariants(),
+        props.editable === false && "opacity-50",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 function useBottomSheet() {
   const ref = React.useRef<BottomSheetContentRef>(null);
 
@@ -369,6 +385,7 @@ export {
   BottomSheetView,
   BottomSheetTitle,
   BottomSheetDescription,
+  BottomSheetInput,
   type BottomSheetContentRef,
   useBottomSheet,
 };

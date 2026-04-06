@@ -14,8 +14,8 @@ import {
   BottomSheetTitle,
   BottomSheetDescription,
   BottomSheetHeader,
-  BottomSheetScrollView,
   useBottomSheet,
+  BottomSheetScrollView,
 } from "@workspace/ui-mobile/bottom-sheet";
 import { Button } from "@workspace/ui-mobile/button";
 import {
@@ -89,12 +89,7 @@ export const CreateOrganizationBottomSheet = ({
       {children && (
         <BottomSheetOpenTrigger asChild>{children}</BottomSheetOpenTrigger>
       )}
-
-      <BottomSheetContent
-        ref={ref ?? sheet.ref}
-        stackBehavior="replace"
-        name="create-organization"
-      >
+      <BottomSheetContent ref={ref ?? sheet.ref} name="create-organization">
         <BottomSheetScrollView>
           <BottomSheetHeader>
             <BottomSheetTitle>{t("create.title")}</BottomSheetTitle>

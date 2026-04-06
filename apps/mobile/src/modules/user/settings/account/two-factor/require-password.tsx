@@ -61,11 +61,7 @@ export const RequirePassword = memo<RequirePasswordProps>(
     return (
       <BottomSheet>
         <BottomSheetOpenTrigger asChild>{children}</BottomSheetOpenTrigger>
-        <BottomSheetContent
-          ref={ref}
-          stackBehavior="replace"
-          name="require-password"
-        >
+        <BottomSheetContent ref={ref} name="require-password">
           <BottomSheetScrollView>
             <BottomSheetHeader>
               <BottomSheetTitle>

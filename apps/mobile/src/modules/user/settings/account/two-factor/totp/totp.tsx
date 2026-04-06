@@ -66,7 +66,7 @@ export const TotpSheet = ({ ref: passedRef }: TotpSheetProps) => {
   return (
     <>
       <BottomSheet>
-        <BottomSheetContent ref={ref} stackBehavior="replace" name="totp">
+        <BottomSheetContent ref={ref} name="totp">
           <BottomSheetScrollView>
             <BottomSheetHeader>
               <BottomSheetTitle>
