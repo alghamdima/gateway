@@ -3,6 +3,18 @@ import { z } from "zod";
 
 import { handle, isAPIError, withTimeout } from "../index";
 
+import type { ClientRequestOptions } from "hono";
+
+interface MockResponse {
+  ok: boolean;
+  json: () => Promise<unknown>;
+}
+
+type MockRequest = (
+  input: unknown,
+  options?: ClientRequestOptions,
+) => Promise<MockResponse>;
+
 describe("isAPIError", () => {
   it("should return true for valid API error object", () => {
     const error = {
@@ -31,7 +43,7 @@ describe("isAPIError", () => {
 
 describe("handle", () => {
   it("should return data on success", async () => {
-    const mockFn = vi.fn().mockResolvedValue({
+    const mockFn = vi.fn<MockRequest>().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ success: true }),
     });
@@ -43,7 +55,7 @@ describe("handle", () => {
   });
 
   it("should throw error on failure if throwOnError is true (default)", async () => {
-    const mockFn = vi.fn().mockResolvedValue({
+    const mockFn = vi.fn<MockRequest>().mockResolvedValue({
       ok: false,
       json: () => Promise.resolve({ message: "Failed" }),
     });
@@ -53,7 +65,7 @@ describe("handle", () => {
   });
 
   it("should return null on failure if throwOnError is false", async () => {
-    const mockFn = vi.fn().mockResolvedValue({
+    const mockFn = vi.fn<MockRequest>().mockResolvedValue({
       ok: false,
       json: () => Promise.resolve({ message: "Failed" }),
     });
@@ -65,13 +77,17 @@ describe("handle", () => {
   });
 
   it("should throw error if fetch throws and throwOnError is true", async () => {
-    const mockFn = vi.fn().mockRejectedValue(new Error("Network Error"));
+    const mockFn = vi
+      .fn<MockRequest>()
+      .mockRejectedValue(new Error("Network Error"));
     const handler = handle(mockFn);
     await expect(handler({})).rejects.toThrow("Network Error");
   });
 
   it("should allow error propagation if fetch throws and throwOnError is false", async () => {
-    const mockFn = vi.fn().mockRejectedValue(new Error("Network Error"));
+    const mockFn = vi
+      .fn<MockRequest>()
+      .mockRejectedValue(new Error("Network Error"));
     const handler = handle(mockFn, { throwOnError: false });
 
     // Expect it to throw because handle doesn't catch fn() errors
@@ -80,7 +96,7 @@ describe("handle", () => {
 
   it("should validate data with schema if provided", async () => {
     const schema = z.object({ id: z.number() });
-    const mockFn = vi.fn().mockResolvedValue({
+    const mockFn = vi.fn<MockRequest>().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: 123 }),
     });
@@ -93,7 +109,7 @@ describe("handle", () => {
 
   it("should throw error if schema validation fails and throwOnError is true", async () => {
     const schema = z.object({ id: z.number() });
-    const mockFn = vi.fn().mockResolvedValue({
+    const mockFn = vi.fn<MockRequest>().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: "invalid" }),
     });
@@ -109,7 +125,7 @@ describe("handle", () => {
 
   it("should return null if schema validation fails and throwOnError is false", async () => {
     const schema = z.object({ id: z.number() });
-    const mockFn = vi.fn().mockResolvedValue({
+    const mockFn = vi.fn<MockRequest>().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ id: "invalid" }),
     });

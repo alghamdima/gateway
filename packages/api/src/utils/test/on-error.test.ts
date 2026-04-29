@@ -5,22 +5,24 @@ import { onError } from "../on-error";
 import type { Context } from "hono";
 
 vi.mock("@workspace/i18n/server", () => ({
-  getTranslation: vi.fn().mockResolvedValue({
-    t: (key: string) => key,
-    i18n: {},
-  }),
+  getTranslation: vi
+    .fn<() => Promise<{ t: (key: string) => string; i18n: object }>>()
+    .mockResolvedValue({
+      t: (key: string) => key,
+      i18n: {},
+    }),
 }));
 
 vi.mock("@workspace/i18n", () => ({
-  isKey: vi.fn().mockReturnValue(true),
+  isKey: vi.fn<(key: string) => boolean>().mockReturnValue(true),
 }));
 
 vi.mock("@workspace/shared/utils", () => ({
-  getStatusCode: vi.fn().mockReturnValue(500),
+  getStatusCode: vi.fn<(error: unknown) => number>().mockReturnValue(500),
 }));
 
 vi.mock("@workspace/monitoring-web/server", () => ({
-  captureException: vi.fn(),
+  captureException: vi.fn<(exception: unknown) => void>(),
 }));
 
 interface ErrorResponse {

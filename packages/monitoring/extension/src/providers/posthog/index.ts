@@ -1,6 +1,7 @@
 import { PostHog } from "posthog-js/dist/module.no-external";
 import { v7 as uuidv7 } from "uuid";
 
+import { hasTechnicalAndInteractionConsent } from "../data-collection";
 import { env } from "./env";
 
 import type { MonitoringProviderStrategy } from "@workspace/monitoring";
@@ -29,6 +30,9 @@ const init = async () => {
       distinctID,
     },
     api_host: env.VITE_POSTHOG_HOST,
+    autocapture: false,
+    capture_pageleave: false,
+    capture_pageview: false,
     disable_external_dependency_loading: true,
     error_tracking: {
       captureExtensionExceptions: true,
@@ -40,12 +44,20 @@ const init = async () => {
 export const strategy = {
   captureException: (exception) => {
     void (async () => {
+      if (!(await hasTechnicalAndInteractionConsent())) {
+        return;
+      }
+
       await init();
       posthog.captureException(exception);
     })();
   },
   identify: <T extends { id: string }>(user: T | null) => {
     void (async () => {
+      if (!(await hasTechnicalAndInteractionConsent())) {
+        return;
+      }
+
       await init();
       if (user) {
         posthog.identify(user.id);
@@ -56,6 +68,10 @@ export const strategy = {
   },
   initialize: () => {
     void (async () => {
+      if (!(await hasTechnicalAndInteractionConsent())) {
+        return;
+      }
+
       await init();
     })();
   },

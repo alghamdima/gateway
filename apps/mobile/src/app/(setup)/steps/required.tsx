@@ -58,7 +58,7 @@ export default function RequiredStep() {
                 <Field orientation="horizontal">
                   <Checkbox
                     {...field}
-                    checked={!!field.value}
+                    checked={field.value}
                     onCheckedChange={field.onChange}
                   />
                   <FieldLabel onPress={() => field.onChange(!field.value)}>
@@ -74,7 +74,7 @@ export default function RequiredStep() {
               render={({ field }) => (
                 <Field orientation="horizontal">
                   <Checkbox
-                    checked={!!field.value}
+                    checked={field.value}
                     onCheckedChange={field.onChange}
                     onBlur={field.onBlur}
                   />

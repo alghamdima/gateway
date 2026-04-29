@@ -1,4 +1,4 @@
-import { Img, Link, Text } from "@react-email/components";
+import { Img, Link, Text } from "react-email";
 
 import { env } from "../../../env";
 

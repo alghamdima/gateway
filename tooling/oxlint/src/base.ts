@@ -40,8 +40,11 @@ export default defineConfig({
 
     "no-shadow": "off",
     "no-await-in-loop": "off",
+    "no-underscore-dangle": "off",
 
     "typescript/no-unsafe-type-assertion": "off",
+    "typescript/consistent-return": "off",
+    "typescript/no-unnecessary-type-parameters": "off",
 
     "unicorn/no-array-sort": "off",
     "unicorn/no-array-reverse": "off",
@@ -68,6 +71,7 @@ export default defineConfig({
       plugins: ["jest", "vitest"],
       rules: {
         "jest/no-conditional-expect": "off",
+        "vitest/no-conditional-expect": "off",
       },
     },
   ],

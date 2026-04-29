@@ -12,14 +12,14 @@
     "dev": "content-collections watch"
   },
   "dependencies": {
-    "@content-collections/core": "0.14.3",
+    "@content-collections/core": "0.15.0",
     "@workspace/shared": "workspace:*",
     "reading-time": "1.5.0"
   },
   "devDependencies": {
-    "@content-collections/cli": "0.1.7",
+    "@content-collections/cli": "0.1.9",
     "@content-collections/mdx": "0.2.2",
-    "@shikijs/rehype": "3.14.0",
+    "@shikijs/rehype": "4.0.2",
     "@types/node": "catalog:node24",
     "@workspace/tsconfig": "workspace:*",
     "concurrently": "9.2.1",

@@ -1,5 +1,5 @@
-import { Heading, Preview, Text } from "@react-email/components";
 import * as React from "react";
+import { Heading, Preview, Text } from "react-email";
 
 import { getTranslation } from "@workspace/i18n/server";
 import { getOrigin } from "@workspace/shared/utils";

@@ -23,7 +23,7 @@ import { NodeEnv } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
-import { getUrl } from "./lib/utils";
+import { generateName, getUrl } from "./lib/utils";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
 export const auth = betterAuth({
@@ -113,6 +113,22 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          const name = user.name?.trim() || generateName(user.email);
+
+          return {
+            data: {
+              ...user,
+              name,
+            },
+          };
+        },
+      },
+    },
+  },
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }, ctx) =>

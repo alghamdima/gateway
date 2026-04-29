@@ -13,7 +13,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "@tailwindcss/vite": "4.2.2",
+    "@tailwindcss/vite": "4.2.4",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
     "@webext-core/messaging": "2.3.0",
@@ -31,11 +31,11 @@
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
     "sonner": "2.0.7",
-    "vite-plugin-svgr": "4.5.0",
+    "vite-plugin-svgr": "5.2.0",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/chrome": "0.1.27",
+    "@types/chrome": "0.1.40",
     "@types/node": "catalog:node24",
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
@@ -43,6 +43,6 @@
     "@wxt-dev/auto-icons": "1.1.1",
     "@wxt-dev/module-react": "1.2.2",
     "typescript": "catalog:",
-    "wxt": "0.20.19"
+    "wxt": "0.20.25"
   }
 }

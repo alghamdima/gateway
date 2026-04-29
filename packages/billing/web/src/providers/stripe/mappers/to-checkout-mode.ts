@@ -1,10 +1,10 @@
-import { BillingModel } from "@workspace/billing";
+import { Stripe } from "stripe";
 
-import type { Stripe } from "stripe";
+import { BillingModel } from "@workspace/billing";
 
 export const toCheckoutMode = (
   model: BillingModel,
-): Stripe.Checkout.SessionCreateParams.Mode => {
+): Stripe.Checkout.SessionCreateParams["mode"] => {
   switch (model) {
     case BillingModel.ONE_TIME:
       return "payment";

@@ -27,7 +27,7 @@ export const toSubscriptionStatus = (status: string): SubscriptionStatus => {
 };
 
 export const toPaymentStatus = (
-  status: Stripe.Checkout.Session.PaymentStatus,
+  status: Stripe.Checkout.Session["payment_status"],
 ): PaymentStatus => {
   switch (status) {
     case "paid":

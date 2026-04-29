@@ -41,6 +41,11 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
       defaultTheme={appConfig.theme.mode}
       enableSystem
       disableTransitionOnChange
+      scriptProps={
+        typeof window === "undefined"
+          ? undefined
+          : ({ type: "application/json" } as const)
+      }
     >
       {children}
     </NextThemeProvider>

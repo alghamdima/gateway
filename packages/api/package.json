@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ai-sdk/openai": "3.0.47",
+    "@ai-sdk/openai": "3.0.53",
     "@hono/zod-validator": "0.7.6",
     "@workspace/auth": "workspace:*",
     "@workspace/billing": "workspace:*",
@@ -26,9 +26,9 @@
     "@workspace/monitoring-web": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/storage": "workspace:*",
-    "ai": "6.0.134",
+    "ai": "6.0.168",
     "envin": "catalog:",
-    "hono": "4.12.12",
+    "hono": "4.12.15",
     "hono-status-monitor": "1.0.7",
     "zod": "catalog:"
   },

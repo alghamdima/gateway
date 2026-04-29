@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logger } from "@workspace/shared/logger";
 
+import { hasTechnicalAndInteractionConsent } from "../data-collection";
 import { env } from "./env";
 
 import type {
@@ -52,6 +53,10 @@ const postEvent = async (
   event: string,
   data?: Record<string, AllowedPropertyValues>,
 ) => {
+  if (!(await hasTechnicalAndInteractionConsent())) {
+    return;
+  }
+
   const identity = await getIdentity();
 
   // Prefer clientId passed in data, fall back to stored identity

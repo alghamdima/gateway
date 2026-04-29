@@ -1,12 +1,5 @@
-import {
-  Container,
-  Font,
-  Head,
-  Html,
-  Section,
-  Tailwind,
-} from "@react-email/components";
 import { oklch, formatHex } from "culori";
+import { Container, Font, Head, Html, Section, Tailwind } from "react-email";
 
 import { mapValues } from "@workspace/shared/utils";
 import { themes, ThemeMode } from "@workspace/ui";

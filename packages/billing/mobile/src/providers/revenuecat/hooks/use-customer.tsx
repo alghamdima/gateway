@@ -56,17 +56,14 @@ export const useCustomer = () => {
       return Purchases.showManageSubscriptions();
     }
 
-    const url = new URL(
-      MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS],
-    );
+    const url = MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS];
 
     if (store === MobileStore.PLAY_STORE && variantId) {
-      url.searchParams.set("sku", variantId);
+      await Linking.openURL(`${url}?sku=${encodeURIComponent(variantId)}`);
+      return;
     }
 
-    await Linking.openURL(
-      MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS],
-    );
+    await Linking.openURL(url);
   };
 
   return {

@@ -11,13 +11,14 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
-    "@sentry/react-native": "7.7.0",
+    "@sentry/react-native": "8.9.2",
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-react-native": "4.39.4"
+    "posthog-react-native": "4.43.10"
   },
   "devDependencies": {
+    "@types/node": "catalog:node24",
     "@workspace/tsconfig": "workspace:*",
     "typescript": "catalog:"
   }

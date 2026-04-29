@@ -19,13 +19,14 @@
     "@workspace/shared": "workspace:*",
     "dayjs": "catalog:",
     "envin": "catalog:",
-    "expo-iap": "3.4.9",
-    "expo-superwall": "1.0.4",
-    "react-native-purchases": "9.10.5",
-    "react-native-purchases-ui": "9.10.5",
+    "expo-iap": "4.2.3",
+    "expo-superwall": "1.0.11",
+    "react-native-purchases": "10.0.1",
+    "react-native-purchases-ui": "10.0.1",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:node24",
     "@workspace/tsconfig": "workspace:*",
     "typescript": "catalog:"
   }

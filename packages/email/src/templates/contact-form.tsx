@@ -1,5 +1,5 @@
-import { Heading, Preview, Row, Column } from "@react-email/components";
 import * as React from "react";
+import { Heading, Preview, Row, Column } from "react-email";
 
 import { isKey } from "@workspace/i18n";
 import { getTranslation } from "@workspace/i18n/server";

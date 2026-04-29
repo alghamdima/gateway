@@ -1,7 +1,11 @@
 import * as z from "zod";
 
 import type { ClientRequestOptions } from "hono";
-import type { ClientResponse } from "hono/client";
+
+interface JsonResponse<T> {
+  ok: boolean;
+  json: () => Promise<T>;
+}
 
 type HandleReturn<
   T,
@@ -43,7 +47,7 @@ export const handle = <
   fn: (
     args: TArgs,
     options?: ClientRequestOptions,
-  ) => Promise<ClientResponse<TResponse, number, "json">>,
+  ) => Promise<JsonResponse<TResponse>>,
   options: HandleOptions<E, S> = {},
 ) => {
   const { throwOnError = true as E, schema } = options;

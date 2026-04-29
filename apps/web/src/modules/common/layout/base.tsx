@@ -24,7 +24,11 @@ interface BaseLayoutProps {
 
 export const BaseLayout = ({ children, locale }: BaseLayoutProps) => {
   return (
-    <html lang={locale} className={cn(sans.variable, mono.variable)}>
+    <html
+      lang={locale}
+      className={cn(sans.variable, mono.variable)}
+      data-scroll-behavior="smooth"
+    >
       <body
         suppressHydrationWarning
         className="bg-background text-foreground flex min-h-screen flex-col items-center justify-center font-sans antialiased"

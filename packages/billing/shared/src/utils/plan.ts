@@ -141,7 +141,7 @@ export const getFilteredPlans = (filters?: {
       }
       if (typeof filters.hidden !== "undefined") {
         variants = variants.filter(
-          (variant) => Boolean(variant.hidden) === filters.hidden,
+          (variant) => variant.hidden === filters.hidden,
         );
       }
 

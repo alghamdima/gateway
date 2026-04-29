@@ -34,6 +34,18 @@ export default defineConfig({
       name: appConfig.name,
       permissions: ["storage", "cookies", "sidePanel"],
       host_permissions: ["<all_urls>"],
+      browser_specific_settings: {
+        gecko: {
+          strict_min_version: "140.0",
+          data_collection_permissions: {
+            required: ["personallyIdentifyingInfo"],
+            optional: ["technicalAndInteraction"],
+          },
+        },
+        gecko_android: {
+          strict_min_version: "142.0",
+        },
+      },
     };
   },
   dev: {

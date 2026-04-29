@@ -58,7 +58,7 @@ const hierarchy: MemberRole[] = [
 ];
 
 export const generateName = (email?: string) => {
-  return email?.split("@")[0] ?? "Anonymous";
+  return email?.split("@")[0]?.trim() ?? "Anonymous";
 };
 
 export const getAllRolesAtOrBelow = (role: MemberRole): MemberRole[] => {

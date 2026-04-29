@@ -17,7 +17,7 @@ export function getPostHogServer() {
 }
 
 export const strategy = {
-  captureException: (exception, extra = undefined) => {
+  captureException: (exception, extra) => {
     const posthog = getPostHogServer();
 
     const distinctId = typeof extra?.id === "string" ? extra.id : undefined;

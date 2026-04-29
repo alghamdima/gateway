@@ -21,6 +21,8 @@ export const toSubscriptionStatus = (
       return SubscriptionStatus.UNPAID;
     case "incomplete":
       return SubscriptionStatus.INCOMPLETE;
+    default:
+      throw new Error(`Invalid subscription status: ${status}`);
   }
 };
 
@@ -33,5 +35,7 @@ export const toPaymentStatus = (status: OrderStatus): PaymentStatus => {
       return PaymentStatus.FAILED;
     case "pending":
       return PaymentStatus.PENDING;
+    default:
+      throw new Error(`Invalid payment status: ${status}`);
   }
 };

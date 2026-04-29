@@ -35,15 +35,14 @@ export const useCustomer = () => {
       throw new Error(`Invalid store: ${store}`);
     }
 
-    const url = new URL(
-      MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS],
-    );
+    const url = MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS];
 
     if (store === MobileStore.PLAY_STORE && variantId) {
-      url.searchParams.set("sku", variantId);
+      await Linking.openURL(`${url}?sku=${encodeURIComponent(variantId)}`);
+      return;
     }
 
-    await Linking.openURL(url.toString());
+    await Linking.openURL(url);
   };
 
   return {

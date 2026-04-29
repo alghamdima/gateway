@@ -1,3 +1,7 @@
+import { Buffer } from "node:buffer";
+import { webcrypto } from "node:crypto";
+import { TextEncoder } from "node:util";
+
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
@@ -39,7 +43,7 @@ export const verifySignature = async (headers: Headers, body: string) => {
 
   const secretBytes = Buffer.from(secretPart, "base64");
 
-  const key = await crypto.subtle.importKey(
+  const key = await webcrypto.subtle.importKey(
     "raw",
     secretBytes,
     { name: "HMAC", hash: "SHA-256" },
@@ -47,7 +51,7 @@ export const verifySignature = async (headers: Headers, body: string) => {
     ["sign"],
   );
 
-  const signatureBuffer = await crypto.subtle.sign(
+  const signatureBuffer = await webcrypto.subtle.sign(
     "HMAC",
     key,
     new TextEncoder().encode(signedContent),

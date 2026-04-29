@@ -1,6 +1,8 @@
 {
   "extends": "@workspace/tsconfig/internal.json",
-  "compilerOptions": {},
+  "compilerOptions": {
+    "types": ["node"]
+  },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
 }

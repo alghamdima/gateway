@@ -1,7 +1,8 @@
 {
   "extends": "@workspace/tsconfig/internal.json",
   "compilerOptions": {
-    "lib": ["dom"],
+    "lib": ["ES2023", "dom", "dom.iterable"],
+    "types": ["chrome"],
     "jsx": "preserve"
   },
   "include": ["*.ts", "src/**/*"],

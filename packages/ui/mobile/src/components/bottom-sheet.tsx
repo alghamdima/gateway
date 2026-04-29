@@ -68,79 +68,72 @@ type BottomSheetContentProps = Omit<
   backdropProps?: Partial<React.ComponentProps<typeof BottomSheetBackdrop>>;
 };
 
-const BottomSheetContent = React.forwardRef<
-  BottomSheetContentRef,
-  BottomSheetContentProps
->(
-  (
-    {
-      enablePanDownToClose = true,
-      enableDynamicSizing = true,
-      backdropProps,
-      backgroundStyle,
-      ...props
+const BottomSheetContent = ({
+  enablePanDownToClose = true,
+  enableDynamicSizing = true,
+  backdropProps,
+  backgroundStyle,
+  ref,
+  ...props
+}: BottomSheetContentProps) => {
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const { sheetRef } = useBottomSheetContext();
+
+  React.useImperativeHandle(ref, () => {
+    if (!sheetRef.current) {
+      return {} as BottomSheetModalMethods;
+    }
+    return sheetRef.current;
+  }, [sheetRef]);
+
+  const renderBackdrop = React.useCallback(
+    (props: BottomSheetBackdropProps) => {
+      const {
+        pressBehavior = "close",
+        disappearsOnIndex = CLOSED_INDEX,
+        style,
+        onPress,
+        ...rest
+      } = {
+        ...props,
+        ...backdropProps,
+      };
+      return (
+        <BottomSheetBackdrop
+          disappearsOnIndex={disappearsOnIndex}
+          pressBehavior={pressBehavior}
+          style={style}
+          onPress={() => {
+            if (Keyboard.isVisible()) {
+              Keyboard.dismiss();
+            }
+            onPress?.();
+          }}
+          {...rest}
+        />
+      );
     },
-    ref,
-  ) => {
-    const insets = useSafeAreaInsets();
-    const { colors } = useTheme();
-    const { sheetRef } = useBottomSheetContext();
+    [backdropProps],
+  );
 
-    React.useImperativeHandle(ref, () => {
-      if (!sheetRef.current) {
-        return {} as BottomSheetModalMethods;
-      }
-      return sheetRef.current;
-    }, [sheetRef]);
-
-    const renderBackdrop = React.useCallback(
-      (props: BottomSheetBackdropProps) => {
-        const {
-          pressBehavior = "close",
-          disappearsOnIndex = CLOSED_INDEX,
-          style,
-          onPress,
-          ...rest
-        } = {
-          ...props,
-          ...backdropProps,
-        };
-        return (
-          <BottomSheetBackdrop
-            disappearsOnIndex={disappearsOnIndex}
-            pressBehavior={pressBehavior}
-            style={style}
-            onPress={() => {
-              if (Keyboard.isVisible()) {
-                Keyboard.dismiss();
-              }
-              onPress?.();
-            }}
-            {...rest}
-          />
-        );
-      },
-      [backdropProps],
-    );
-
-    return (
-      <BottomSheetModal
-        ref={sheetRef}
-        index={0}
-        enablePanDownToClose={enablePanDownToClose}
-        backdropComponent={renderBackdrop}
-        enableDynamicSizing={enableDynamicSizing}
-        stackBehavior="replace"
-        backgroundStyle={[{ backgroundColor: colors.card }, backgroundStyle]}
-        handleIndicatorStyle={{
-          backgroundColor: colors.border,
-        }}
-        topInset={insets.top}
-        {...props}
-      />
-    );
-  },
-);
+  return (
+    <BottomSheetModal
+      ref={sheetRef}
+      index={0}
+      enablePanDownToClose={enablePanDownToClose}
+      backdropComponent={renderBackdrop}
+      enableDynamicSizing={enableDynamicSizing}
+      stackBehavior="replace"
+      backgroundStyle={[{ backgroundColor: colors.card }, backgroundStyle]}
+      handleIndicatorStyle={{
+        backgroundColor: colors.border,
+      }}
+      topInset={insets.top}
+      {...props}
+    />
+  );
+};
 
 function BottomSheetOpenTrigger({
   onPress,
@@ -177,7 +170,7 @@ function BottomSheetCloseTrigger({
   return <Trigger onPress={handleOnPress} {...props} />;
 }
 
-const BOTTOM_SHEET_HEADER_HEIGHT = 60; // BottomSheetHeader height
+const BOTTOM_SHEET_HEADER_HEIGHT = 60;
 
 function BottomSheetView({
   className,

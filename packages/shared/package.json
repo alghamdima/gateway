@@ -11,14 +11,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "lodash": "4.17.23",
-    "pino": "10.1.0",
+    "lodash": "4.18.1",
+    "pino": "10.3.1",
     "react": "catalog:react19",
-    "slugify": "1.6.6",
+    "slugify": "1.6.9",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/lodash": "4.17.23",
+    "@types/lodash": "4.17.24",
     "@types/node": "catalog:node24",
     "@types/react": "catalog:react19",
     "@workspace/tsconfig": "workspace:*",

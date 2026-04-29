@@ -1,6 +1,8 @@
 {
   "extends": "@workspace/tsconfig/internal.json",
   "compilerOptions": {
+    "lib": ["ES2023", "dom", "dom.iterable"],
+    "types": ["node"],
     "jsx": "preserve"
   },
   "include": ["*.ts", "src/**/*"],

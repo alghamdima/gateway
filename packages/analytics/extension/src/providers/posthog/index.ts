@@ -1,6 +1,7 @@
 import { PostHog } from "posthog-js/dist/module.no-external";
 import { v7 as uuidv7 } from "uuid";
 
+import { hasTechnicalAndInteractionConsent } from "../data-collection";
 import { env } from "./env";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
@@ -29,6 +30,9 @@ const init = async () => {
       distinctID,
     },
     api_host: env.VITE_POSTHOG_HOST,
+    autocapture: false,
+    capture_pageleave: false,
+    capture_pageview: false,
     disable_external_dependency_loading: true,
     persistence: "localStorage",
   });
@@ -37,6 +41,10 @@ const init = async () => {
 export const strategy = {
   track: (name, params) => {
     void (async () => {
+      if (!(await hasTechnicalAndInteractionConsent())) {
+        return;
+      }
+
       await init();
       posthog.capture(name, params);
     })();

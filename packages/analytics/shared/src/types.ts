@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type AllowedPropertyValues = string | number | boolean;
 
 type TrackFunction = (
@@ -11,7 +13,7 @@ type IdentifyFunction = (
 ) => void;
 
 export interface AnalyticsProviderClientStrategy {
-  Provider: ({ children }: { children: React.ReactNode }) => React.ReactNode;
+  Provider: ({ children }: { children: ReactNode }) => ReactNode;
   track: TrackFunction;
   identify: IdentifyFunction;
   reset: () => void;
