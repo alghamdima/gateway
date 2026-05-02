@@ -55,7 +55,7 @@ export const planSchema = z.object({
   id: z.enum(BillingPlan),
   name: z.string(),
   description: z.string(),
-  badge: z.string().nullable().default(null),
+  badge: z.string().nullish().default(null),
   features: z.array(z.string()),
   variants: z.array(variantSchema),
 });

@@ -17,7 +17,6 @@ export const config = billingConfigSchema.parse({
       id: BillingPlan.FREE,
       name: "plan.free.name",
       description: "plan.free.description",
-      badge: null,
       features: Object.values(FEATURES[BillingPlan.FREE]),
       variants: [
         {
@@ -96,7 +95,6 @@ export const config = billingConfigSchema.parse({
       id: BillingPlan.ENTERPRISE,
       name: "plan.enterprise.name",
       description: "plan.enterprise.description",
-      badge: null,
       features: Object.values(FEATURES[BillingPlan.ENTERPRISE]),
       variants: [
         {

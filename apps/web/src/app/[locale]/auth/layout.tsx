@@ -14,7 +14,7 @@ export default async function AuthLayout({
   const { t } = await getTranslation({ ns: "common" });
 
   return (
-    <main className="grid h-full w-full flex-1 lg:grid-cols-2">
+    <main className="grid w-full flex-1 lg:grid-cols-2">
       <section className="flex h-full flex-col items-center justify-center p-6 lg:p-10">
         <header className="text-navy -mt-1 mb-auto flex self-start justify-self-start">
           <TurboLink

@@ -63,6 +63,7 @@ export const useActiveOrganization = () => {
     return (
       !member.isPending &&
       !member.isRefetching &&
+      !!activeOrganizationId &&
       memberOrganizationId !== activeOrganizationId &&
       allowRefetch
     );
