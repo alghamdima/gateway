@@ -50,7 +50,6 @@ export const initializeI18nClient = async ({
 
   await i18n
     .use(initReactI18next)
-    .use(initReactI18next)
     .use(
       resourcesToBackend(
         async (

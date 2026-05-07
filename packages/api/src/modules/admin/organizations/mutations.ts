@@ -73,8 +73,14 @@ export const deleteOrganizationMember = async ({
 
 export const updateOrganizationMember = async ({
   id,
+  organizationId,
   data,
 }: {
   id: string;
+  organizationId: string;
   data: UpdateMemberPayload;
-}) => db.update(member).set(data).where(eq(member.id, id));
+}) =>
+  db
+    .update(member)
+    .set(data)
+    .where(and(eq(member.id, id), eq(member.organizationId, organizationId)));

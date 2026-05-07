@@ -82,9 +82,9 @@ tooling/       ESLint, Prettier, TypeScript configs
 | Test               | `pnpm test`                                                |
 | Clean              | `pnpm clean`                                               |
 | Services           | `pnpm services:setup` / `services:start` / `services:stop` |
-| DB migrate         | `pnpm with-env -F @workspace/db db:migrate`                |
-| DB generate        | `pnpm with-env -F @workspace/db db:generate`               |
-| DB studio          | `pnpm with-env -F @workspace/db db:studio`                 |
+| DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`           |
+| DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`          |
+| DB studio          | `pnpm with-env pnpm -F @workspace/db db:studio`            |
 
 Environment: create `.env` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
 

@@ -81,6 +81,7 @@ export const organizationsRouter = new Hono()
       c.json(
         await updateOrganizationMember({
           id: c.req.param("memberId"),
+          organizationId: c.req.param("id"),
           data: c.req.valid("json"),
         }),
       ),
