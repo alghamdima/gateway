@@ -22,9 +22,17 @@ import { FeaturesList } from "~/modules/billing/features-list";
 import { NativePortalLink } from "~/modules/billing/portal/native-portal-link";
 import { WebPortalLink } from "~/modules/billing/portal/web-portal-link";
 
-import type { Order } from "@workspace/billing";
+import type { BillingReference, Order } from "@workspace/billing";
 
-export const OrdersListItem = ({ order }: { order: Order }) => {
+export const OrdersListItem = ({
+  order,
+  referenceId,
+  referenceType,
+}: {
+  order: Order;
+  referenceId: string;
+  referenceType: BillingReference;
+}) => {
   const { t, i18n } = useTranslation(["common", "billing"]);
   const { plan } = findPlanByVariantId(order.variantId);
 
@@ -82,21 +90,16 @@ export const OrdersListItem = ({ order }: { order: Order }) => {
             <Icons.ArrowUpRight className="text-foreground" size={18} />
           </NativePortalLink>
         ) : (
-          <WebPortalLink variant="outline" className="w-full gap-1">
+          <WebPortalLink
+            variant="outline"
+            className="w-full gap-1"
+            referenceId={referenceId}
+            referenceType={referenceType}
+          >
             <Text>{t("order.cta")}</Text>
             <Icons.ArrowUpRight className="text-foreground" size={18} />
           </WebPortalLink>
         )}
-
-        <View className="w-full flex-row items-center justify-between gap-2">
-          <Text className="text-muted-foreground text-xs">
-            {t("updatedAt")}
-          </Text>
-
-          <Text className="text-foreground text-xs">
-            {order.updatedAt.toLocaleString(i18n.language)}
-          </Text>
-        </View>
       </CardFooter>
     </Card>
   );

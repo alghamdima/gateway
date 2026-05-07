@@ -1,5 +1,5 @@
-import { and, eq, inArray, sql } from "@workspace/db";
-import { customer } from "@workspace/db/schema";
+import { and, count, eq, inArray, sql } from "@workspace/db";
+import { customer, member } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
 import { ACTIVE_SUBSCRIPTION_STATUSES } from "../config";
@@ -81,4 +81,14 @@ export const upsertCustomer = (data: InsertCustomer) => {
       set: data,
     })
     .returning();
+};
+
+export const getOrganizationBillableSeatsCount = async (
+  organizationId: string,
+) => {
+  const [total] = await db
+    .select({ count: count() })
+    .from(member)
+    .where(eq(member.organizationId, organizationId));
+  return Math.max(1, total?.count ?? 0);
 };

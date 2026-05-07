@@ -21,7 +21,14 @@ import type { WebhookCallbacks } from "../../../types";
 const getUserIdFromAttributes = (
   attrs: Record<string, unknown> | null | undefined,
 ) => {
-  const candidates = [attrs?.userId, attrs?.user_id, attrs?.uid, attrs?.id];
+  const candidates = [
+    attrs?.referenceId,
+    attrs?.organizationId,
+    attrs?.userId,
+    attrs?.user_id,
+    attrs?.uid,
+    attrs?.id,
+  ];
 
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.length > 0) {

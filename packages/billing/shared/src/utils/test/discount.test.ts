@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  BillingType,
   BillingDiscountType,
   BillingModel,
   RecurringInterval,
@@ -9,702 +10,387 @@ import {
   calculateDiscount,
   calculateRecurringDiscount,
   getVariantDiscount,
+  getVariantInitialCost,
   getVariantWithHighestDiscount,
 } from "../discount";
-import { config as mockConfig } from "./__mocks__/config";
 
 vi.mock("../../config", () => import("./__mocks__/config"));
 
+const createRecurringVariant = (
+  id: string,
+  cost: number,
+  interval: RecurringInterval,
+) => ({
+  id,
+  type: BillingType.FLAT,
+  cost,
+  custom: false as const,
+  currency: "usd",
+  hidden: false,
+  model: BillingModel.RECURRING,
+  interval,
+});
+
+const createAmountDiscount = (
+  code: string,
+  off: number,
+  appliesTo: string[],
+) => ({
+  code,
+  type: BillingDiscountType.AMOUNT,
+  off,
+  appliesTo,
+});
+
+const createPercentDiscount = (
+  code: string,
+  off: number,
+  appliesTo: string[],
+) => ({
+  code,
+  type: BillingDiscountType.PERCENT,
+  off,
+  appliesTo,
+});
+
+describe("getVariantInitialCost", () => {
+  it("returns 0 when variant is undefined", () => {
+    expect(getVariantInitialCost()).toBe(0);
+  });
+
+  it("returns flat cost for cost-based variants", () => {
+    const variant = createRecurringVariant(
+      "flat",
+      1250,
+      RecurringInterval.MONTH,
+    );
+    expect(getVariantInitialCost(variant)).toBe(1250);
+  });
+
+  it("returns first tier cost for tier-based variants", () => {
+    const variant = {
+      id: "tiered",
+      type: BillingType.METERED,
+      unit: "request",
+      meterId: "meter-tiered",
+      custom: false as const,
+      currency: "usd",
+      hidden: false,
+      model: BillingModel.RECURRING,
+      interval: RecurringInterval.MONTH,
+      tiers: [
+        { cost: 300, upTo: 100 },
+        { cost: 250, upTo: "infinite" as const },
+      ],
+    };
+
+    expect(getVariantInitialCost(variant)).toBe(300);
+  });
+
+  it("returns 0 for empty tier lists", () => {
+    const variant = {
+      id: "tiered-empty",
+      type: BillingType.METERED,
+      unit: "request",
+      meterId: "meter-tiered-empty",
+      custom: false as const,
+      currency: "usd",
+      hidden: false,
+      model: BillingModel.RECURRING,
+      interval: RecurringInterval.MONTH,
+      tiers: [],
+    };
+
+    expect(getVariantInitialCost(variant)).toBe(0);
+  });
+});
+
 describe("calculateDiscount", () => {
-  describe("amount discount", () => {
-    it("should calculate amount discount correctly", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
+  it("returns null for custom variants", () => {
+    const variant = {
+      id: "enterprise-monthly",
+      type: BillingType.FLAT,
+      custom: true as const,
+      label: "Contact",
+      href: "/contact",
+      hidden: false,
+      currency: "usd",
+      model: BillingModel.RECURRING,
+      interval: RecurringInterval.MONTH,
+    };
 
-      const discount = {
-        code: "TEST50",
-        type: BillingDiscountType.AMOUNT,
-        off: 2000,
-        appliesTo: [variant.id],
-      };
+    const result = calculateDiscount(
+      variant,
+      createPercentDiscount("P50", 50, [variant.id]),
+    );
 
-      const result = calculateDiscount(variant, discount);
-
-      expect(result).toBeDefined();
-      expect(result?.original.cost).toBe(10000);
-      expect(result?.discounted.cost).toBe(8000);
-      expect(result?.percentage).toBe(20);
-      expect(result?.type).toBe(BillingDiscountType.AMOUNT);
-    });
-
-    it("should calculate percentage correctly for amount discount", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
-
-      const discount = {
-        code: "TEST50",
-        type: BillingDiscountType.AMOUNT,
-        off: 5000,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.percentage).toBe(50);
-    });
-
-    it("should handle discount larger than cost", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 1000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
-
-      const discount = {
-        code: "TEST50",
-        type: BillingDiscountType.AMOUNT,
-        off: 2000,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.discounted.cost).toBe(-1000);
-      expect(result?.percentage).toBe(200);
-    });
-
-    it("should handle zero cost", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 0,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
-
-      const discount = {
-        code: "TEST50",
-        type: BillingDiscountType.AMOUNT,
-        off: 1000,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.discounted.cost).toBe(-1000);
-    });
+    expect(result).toBeNull();
   });
 
-  describe("percent discount", () => {
-    it("should calculate percent discount correctly", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
+  it("calculates amount discount for flat variants", () => {
+    const variant = createRecurringVariant(
+      "premium-monthly",
+      10000,
+      RecurringInterval.MONTH,
+    );
+    const result = calculateDiscount(
+      variant,
+      createAmountDiscount("A2000", 2000, [variant.id]),
+    );
 
-      const discount = {
-        code: "TEST50",
-        type: BillingDiscountType.PERCENT,
-        off: 25,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result).toBeDefined();
-      expect(result?.original.cost).toBe(10000);
-      expect(result?.discounted.cost).toBe(7500);
-      expect(result?.percentage).toBe(25);
-      expect(result?.type).toBe(BillingDiscountType.PERCENT);
-    });
-
-    it("should handle 100% discount", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
-
-      const discount = {
-        code: "FREE",
-        type: BillingDiscountType.PERCENT,
-        off: 100,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.discounted.cost).toBe(0);
-      expect(result?.percentage).toBe(100);
-    });
-
-    it("should handle 50% discount", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
-
-      const discount = {
-        code: "HALF",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.discounted.cost).toBe(5000);
-      expect(result?.percentage).toBe(50);
-    });
-
-    it("should handle fractional percentages", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
-
-      const discount = {
-        code: "TEST",
-        type: BillingDiscountType.PERCENT,
-        off: 33.33,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.discounted.cost).toBeCloseTo(6667, 0);
-      expect(result?.percentage).toBe(33.33);
-    });
+    expect(getVariantInitialCost(result?.original)).toBe(10000);
+    expect(getVariantInitialCost(result?.discounted)).toBe(8000);
+    expect(result?.percentage).toBe(20);
+    expect(result?.type).toBe(BillingDiscountType.AMOUNT);
   });
 
-  describe("custom variants", () => {
-    it("should return null for custom variant", () => {
-      const variant = {
-        id: "enterprise-lifetime",
-        custom: true as const,
-        label: "Contact Us",
-        href: "/contact",
-        hidden: false,
-        model: BillingModel.ONE_TIME,
-      };
+  it("calculates percent discount for flat variants", () => {
+    const variant = createRecurringVariant(
+      "premium-yearly",
+      20000,
+      RecurringInterval.YEAR,
+    );
+    const result = calculateDiscount(
+      variant,
+      createPercentDiscount("P25", 25, [variant.id]),
+    );
 
-      const discount = {
-        code: "TEST",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result).toBeNull();
-    });
+    expect(getVariantInitialCost(result?.original)).toBe(20000);
+    expect(getVariantInitialCost(result?.discounted)).toBe(15000);
+    expect(result?.percentage).toBe(25);
+    expect(result?.type).toBe(BillingDiscountType.PERCENT);
   });
 
-  describe("edge cases", () => {
-    it("should handle very large costs", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 99999999,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
+  it("applies amount discount to all tiers and computes percentage from first tier", () => {
+    const variant = {
+      id: "metered-monthly",
+      type: BillingType.METERED,
+      unit: "request",
+      meterId: "meter-monthly",
+      custom: false as const,
+      currency: "usd",
+      hidden: false,
+      model: BillingModel.RECURRING,
+      interval: RecurringInterval.MONTH,
+      tiers: [
+        { cost: 1000, upTo: 100 },
+        { cost: 800, upTo: "infinite" as const },
+      ],
+    };
+    const result = calculateDiscount(
+      variant,
+      createAmountDiscount("A100", 100, [variant.id]),
+    );
 
-      const discount = {
-        code: "TEST",
-        type: BillingDiscountType.PERCENT,
-        off: 10,
-        appliesTo: [variant.id],
-      };
+    if (!result || !("tiers" in result.discounted)) {
+      throw new Error("Expected discounted tiered variant");
+    }
+    expect(result.discounted.tiers?.[0]?.cost).toBe(900);
+    expect(result.discounted.tiers?.[1]?.cost).toBe(700);
+    expect(result?.percentage).toBe(10);
+  });
 
-      const result = calculateDiscount(variant, discount);
+  it("applies percent discount to all tiers", () => {
+    const variant = {
+      id: "metered-yearly",
+      type: BillingType.METERED,
+      unit: "request",
+      meterId: "meter-yearly",
+      custom: false as const,
+      currency: "usd",
+      hidden: false,
+      model: BillingModel.RECURRING,
+      interval: RecurringInterval.YEAR,
+      tiers: [
+        { cost: 1000, upTo: 100 },
+        { cost: 800, upTo: "infinite" as const },
+      ],
+    };
+    const result = calculateDiscount(
+      variant,
+      createPercentDiscount("P10", 10, [variant.id]),
+    );
 
-      expect(result?.discounted.cost).toBe(89999999.1);
-    });
+    if (!result || !("tiers" in result.discounted)) {
+      throw new Error("Expected discounted tiered variant");
+    }
+    expect(result.discounted.tiers?.[0]?.cost).toBe(900);
+    expect(result.discounted.tiers?.[1]?.cost).toBe(720);
+  });
 
-    it("should preserve variant properties in discounted variant", () => {
-      const variant = {
-        id: "test-variant",
-        cost: 10000,
-        custom: false as const,
-        currency: "usd",
-        hidden: false,
-        model: BillingModel.RECURRING,
-        interval: RecurringInterval.MONTH,
-      };
+  it("handles edge values (discount larger than cost and zero cost)", () => {
+    const variant = createRecurringVariant("low", 100, RecurringInterval.MONTH);
+    const largeAmount = calculateDiscount(
+      variant,
+      createAmountDiscount("A500", 500, [variant.id]),
+    );
+    const zeroCostVariant = createRecurringVariant(
+      "zero",
+      0,
+      RecurringInterval.MONTH,
+    );
+    const zeroCost = calculateDiscount(
+      zeroCostVariant,
+      createAmountDiscount("A10", 10, [zeroCostVariant.id]),
+    );
 
-      const discount = {
-        code: "TEST",
-        type: BillingDiscountType.PERCENT,
-        off: 20,
-        appliesTo: [variant.id],
-      };
-
-      const result = calculateDiscount(variant, discount);
-
-      expect(result?.discounted.id).toBe(variant.id);
-      expect(result?.discounted.model).toBe(variant.model);
-      if (result && "interval" in result.discounted && "interval" in variant) {
-        expect(result.discounted.interval).toBe(variant.interval);
-      }
-      expect(result?.discounted.hidden).toBe(variant.hidden);
-    });
+    expect(largeAmount?.discounted.cost).toBe(-400);
+    expect(largeAmount?.percentage).toBe(500);
+    expect(zeroCost?.discounted.cost).toBe(-10);
+    expect(zeroCost?.percentage).toBe(Infinity);
   });
 });
 
 describe("getVariantDiscount", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should return highest discount for variant with multiple discounts", () => {
-    const variant = {
-      id: "premium-monthly",
-      cost: 1900,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const discounts = [
-      {
-        code: "10OFF",
-        type: BillingDiscountType.PERCENT,
-        off: 10,
-        appliesTo: [variant.id],
-      },
-      {
-        code: "50OFF",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: [variant.id],
-      },
-      {
-        code: "5OFF",
-        type: BillingDiscountType.PERCENT,
-        off: 5,
-        appliesTo: [variant.id],
-      },
-    ];
-
-    const result = getVariantDiscount(variant, discounts);
-
-    expect(result).toBeDefined();
-    expect(result?.code).toBe("50OFF");
-    expect(result?.off).toBe(50);
-  });
-
-  it("should compare amount discounts correctly", () => {
-    const variant = {
-      id: "test-variant",
-      cost: 10000,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const discounts = [
-      {
-        code: "100OFF",
-        type: BillingDiscountType.AMOUNT,
-        off: 1000,
-        appliesTo: [variant.id],
-      },
-      {
-        code: "200OFF",
-        type: BillingDiscountType.AMOUNT,
-        off: 2000,
-        appliesTo: [variant.id],
-      },
-    ];
-
-    const result = getVariantDiscount(variant, discounts);
-
-    expect(result?.code).toBe("200OFF");
-  });
-
-  it("should return undefined when no discounts apply", () => {
-    const variant = {
-      id: "test-variant",
-      cost: 10000,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const discounts = [
-      {
-        code: "TEST",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: ["other-variant"],
-      },
-    ];
-
-    const result = getVariantDiscount(variant, discounts);
+  it("returns undefined when no discount applies", () => {
+    const variant = createRecurringVariant("x", 1000, RecurringInterval.MONTH);
+    const result = getVariantDiscount(variant, [
+      createPercentDiscount("P10", 10, ["other"]),
+    ]);
 
     expect(result).toBeUndefined();
   });
 
-  it("should use config discounts by default", () => {
-    const variant = {
-      id: "premium-monthly",
-      cost: 1900,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
+  it("returns discount with largest absolute savings for mixed discount types", () => {
+    const variant = createRecurringVariant("x", 10000, RecurringInterval.MONTH);
+    const result = getVariantDiscount(variant, [
+      createPercentDiscount("P10", 10, [variant.id]),
+      createAmountDiscount("A1500", 1500, [variant.id]),
+      createPercentDiscount("P20", 20, [variant.id]),
+    ]);
 
+    expect(result?.code).toBe("P20");
+  });
+
+  it("uses config discounts by default", () => {
+    const variant = createRecurringVariant(
+      "premium-monthly",
+      1900,
+      RecurringInterval.MONTH,
+    );
     const result = getVariantDiscount(variant);
 
-    if (result) {
-      expect(result.appliesTo).toContain(variant.id);
-      expect(result.code).toBe("100OFF");
-    }
-  });
-
-  it("should prefer amount discount over percent when amount is higher", () => {
-    const variant = {
-      id: "test-variant",
-      cost: 10000,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const discounts = [
-      {
-        code: "10PERCENT",
-        type: BillingDiscountType.PERCENT,
-        off: 10, // 1000 off
-        appliesTo: [variant.id],
-      },
-      {
-        code: "1500OFF",
-        type: BillingDiscountType.AMOUNT,
-        off: 1500, // 1500 off
-        appliesTo: [variant.id],
-      },
-    ];
-
-    const result = getVariantDiscount(variant, discounts);
-
-    expect(result?.code).toBe("1500OFF");
-  });
-
-  it("should prefer percent discount over amount when percent saves more", () => {
-    const variant = {
-      id: "test-variant",
-      cost: 10000,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const discounts = [
-      {
-        code: "20PERCENT",
-        type: BillingDiscountType.PERCENT,
-        off: 20, // 2000 off
-        appliesTo: [variant.id],
-      },
-      {
-        code: "500OFF",
-        type: BillingDiscountType.AMOUNT,
-        off: 500, // 500 off
-        appliesTo: [variant.id],
-      },
-    ];
-
-    const result = getVariantDiscount(variant, discounts);
-
-    expect(result?.code).toBe("20PERCENT");
+    expect(result?.code).toBe("100OFF");
   });
 });
 
 describe("getVariantWithHighestDiscount", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should return variant with highest discount", () => {
-    const discounts = [
-      {
-        code: "BIG",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: ["premium-monthly"],
-      },
-      {
-        code: "SMALL",
-        type: BillingDiscountType.PERCENT,
-        off: 10,
-        appliesTo: ["free-monthly"],
-      },
-    ];
-
-    const result = getVariantWithHighestDiscount(undefined, discounts);
-
-    expect(result).toBeDefined();
-    expect(result?.discount?.code).toBe("BIG");
-    if (result) {
-      expect("id" in result).toBe(true);
-    }
-  });
-
-  it("should return null when no discounts exist", () => {
-    const result = getVariantWithHighestDiscount(undefined, []);
-
+  it("returns null when there are no discounted variants", () => {
+    const result = getVariantWithHighestDiscount(undefined, [
+      createPercentDiscount("P50", 50, ["unknown-variant"]),
+    ]);
     expect(result).toBeNull();
   });
 
-  it("should compare discounts by original cost", () => {
-    const discounts = [
-      {
-        code: "DISCOUNT1",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: ["free-monthly"], // 0 cost
-      },
-      {
-        code: "DISCOUNT2",
-        type: BillingDiscountType.PERCENT,
-        off: 10,
-        appliesTo: ["premium-monthly"], // 1900 cost
-      },
-    ];
+  it("returns variant/discount pair with highest absolute savings", () => {
+    const result = getVariantWithHighestDiscount(undefined, [
+      createPercentDiscount("P50", 50, ["premium-monthly"]),
+      createPercentDiscount("P10", 10, ["premium-yearly"]),
+    ]);
 
-    const result = getVariantWithHighestDiscount(undefined, discounts);
-
-    // Should prefer variant with higher original cost even if discount % is lower
-    expect(result).toBeDefined();
-    if (result && "cost" in result) {
-      expect(result.cost).toBeGreaterThan(0);
-    }
+    expect(result?.id).toBe("premium-yearly");
+    expect(result?.discount?.code).toBe("P10");
   });
 
-  it("should use config discounts by default", () => {
+  it("uses config defaults and includes chosen discount", () => {
     const result = getVariantWithHighestDiscount();
-
-    if (result) {
-      expect(result.discount).toBeDefined();
-    }
-  });
-
-  it("should handle variants with no discounts", () => {
-    const discounts = [
-      {
-        code: "TEST",
-        type: BillingDiscountType.PERCENT,
-        off: 50,
-        appliesTo: ["non-existent-variant"],
-      },
-    ];
-
-    const result = getVariantWithHighestDiscount(undefined, discounts);
-
-    // Should return null or variant ith no discount
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result?.discount).toBeDefined();
   });
 });
 
 describe("calculateRecurringDiscount", () => {
-  it("should return null for non-recurring variant", () => {
-    const variant = {
-      id: "free-lifetime",
-      cost: 0,
+  it("returns null for non-recurring, custom, hidden, and unknown variants", () => {
+    const nonRecurring = {
+      id: "one-time",
+      type: BillingType.FLAT,
+      cost: 1000,
       custom: false as const,
       currency: "usd",
       hidden: false,
       model: BillingModel.ONE_TIME,
     };
-
-    const result = calculateRecurringDiscount(variant);
-
-    expect(result).toBeNull();
-  });
-
-  it("should return null for custom variant", () => {
-    const variant = {
-      id: "enterprise-monthly",
+    const customRecurring = {
+      id: "custom-recurring",
+      type: BillingType.FLAT,
       custom: true as const,
-      label: "Contact Us",
+      label: "Contact",
       href: "/contact",
       hidden: false,
+      currency: "usd",
       model: BillingModel.RECURRING,
       interval: RecurringInterval.MONTH,
     };
-
-    const result = calculateRecurringDiscount(variant);
-
-    expect(result).toBeNull();
-  });
-
-  it("should return null for hidden variant", () => {
-    const variant = {
-      id: "core_premium_recurring_month_flat",
-      cost: 1900,
-      custom: false as const,
-      currency: "usd",
+    const hiddenRecurring = {
+      ...createRecurringVariant("hidden", 1000, RecurringInterval.MONTH),
       hidden: true,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
     };
+    const unknownRecurring = createRecurringVariant(
+      "unknown",
+      1000,
+      RecurringInterval.MONTH,
+    );
 
-    const result = calculateRecurringDiscount(variant);
-
-    expect(result).toBeNull();
+    expect(calculateRecurringDiscount(nonRecurring)).toBeNull();
+    expect(calculateRecurringDiscount(customRecurring)).toBeNull();
+    expect(calculateRecurringDiscount(hiddenRecurring)).toBeNull();
+    expect(calculateRecurringDiscount(unknownRecurring)).toBeNull();
   });
 
-  it("should return null for highest cost variant in plan", () => {
-    const premiumPlan = mockConfig.plans.find((p) => p.id === "premium");
-    const recurringVariants =
-      premiumPlan?.variants.filter(
-        (v) => v.model === BillingModel.RECURRING && !v.custom && !v.hidden,
-      ) ?? [];
+  it("returns null for highest effective-cost variant within plan", () => {
+    const highestInPremium = createRecurringVariant(
+      "premium-monthly",
+      1900,
+      RecurringInterval.MONTH,
+    );
 
-    if (!recurringVariants.length) {
-      return;
-    }
-
-    const sorted = [...recurringVariants].sort((a, b) => {
-      const costA = "cost" in a ? a.cost : 0;
-      const costB = "cost" in b ? b.cost : 0;
-      return costB - costA;
-    });
-
-    const highestVariant = sorted.at(-1);
-    if (highestVariant && "cost" in highestVariant) {
-      const result = calculateRecurringDiscount(highestVariant);
-
-      expect(result).toBeNull();
-    }
+    expect(calculateRecurringDiscount(highestInPremium)).toBeNull();
   });
 
-  it("should calculate discount for monthly vs yearly", () => {
-    const monthlyVariant = {
-      id: "test-monthly",
-      cost: 1900,
+  it("compares monthly and yearly costs after interval normalization", () => {
+    const target = createRecurringVariant(
+      "premium-yearly",
+      19000,
+      RecurringInterval.YEAR,
+    );
+    const result = calculateRecurringDiscount(target);
+
+    expect(result).not.toBeNull();
+    expect(result?.original.id).toBe("premium-monthly");
+    expect(result?.original.interval).toBe(RecurringInterval.YEAR);
+    expect(result?.original.cost).toBe(10800);
+    expect(result?.discounted.id).toBe("premium-yearly");
+    expect(result?.type).toBe(BillingDiscountType.PERCENT);
+    expect(result?.percentage).toBe(12);
+  });
+
+  it("considers default discounts when comparing recurring variants", () => {
+    const result = calculateRecurringDiscount(
+      createRecurringVariant("premium-yearly", 19000, RecurringInterval.YEAR),
+    );
+
+    expect(result?.original.cost).toBe(10800);
+    expect(getVariantInitialCost(result?.discounted)).toBe(19000);
+  });
+
+  it("skips recurring interval discounts for metered variants", () => {
+    const meteredMonthly = {
+      id: "premium-metered-monthly",
+      type: BillingType.METERED,
+      unit: "credit",
+      meterId: "meter-credits-monthly",
       custom: false as const,
       currency: "usd",
       hidden: false,
       model: BillingModel.RECURRING,
       interval: RecurringInterval.MONTH,
+      tiers: [
+        { cost: 8, upTo: 25_000 },
+        { cost: 6, upTo: 125_000 },
+        { cost: 4, upTo: "infinite" as const },
+      ],
     };
 
-    const result = calculateRecurringDiscount(monthlyVariant);
-
-    if (result) {
-      expect(result.original).toBeDefined();
-      expect(result.discounted).toBeDefined();
-      expect(result.percentage).toBeGreaterThan(0);
-      expect(result.type).toBe(BillingDiscountType.PERCENT);
-    }
-  });
-
-  it("should normalize costs to same interval for comparison", () => {
-    const monthlyVariant = {
-      id: "test-monthly",
-      cost: 1900, // $19/month = $228/year
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const result = calculateRecurringDiscount(monthlyVariant);
-
-    if (result) {
-      expect(result.original.interval).toBe(RecurringInterval.MONTH);
-      expect(result.discounted.id).toBe(monthlyVariant.id);
-      expect(result.percentage).toBeGreaterThan(0);
-    }
-  });
-
-  it("should return null when no higher cost variant exists", () => {
-    const freeMonthlyVariant = {
-      id: "free-monthly",
-      cost: 0,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const result = calculateRecurringDiscount(freeMonthlyVariant);
-
-    expect(result).toBeNull();
-  });
-
-  it("should handle plan not found", () => {
-    const variant = {
-      id: "non-existent-variant",
-      cost: 1000,
-      custom: false as const,
-      currency: "usd",
-      hidden: false,
-      model: BillingModel.RECURRING,
-      interval: RecurringInterval.MONTH,
-    };
-
-    const result = calculateRecurringDiscount(variant);
-
-    expect(result).toBeNull();
+    expect(calculateRecurringDiscount(meteredMonthly)).toBeNull();
   });
 });

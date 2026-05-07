@@ -26,8 +26,12 @@ export const useCustomer = () => {
     );
   }, [customer.data]);
 
-  const identify = (userId: string) => {
+  const identify = (userId: string, traits?: Record<string, string | null>) => {
     void Purchases.logIn(userId);
+
+    if (traits) {
+      void Purchases.setAttributes(traits);
+    }
   };
 
   const reset = () => {

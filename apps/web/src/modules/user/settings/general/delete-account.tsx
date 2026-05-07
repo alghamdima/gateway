@@ -1,10 +1,13 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { toast } from "sonner";
 
+import { isSubscriptionActive } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
+import { Alert, AlertTitle, AlertDescription } from "@workspace/ui-web/alert";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import {
@@ -20,13 +23,17 @@ import {
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
+import { billing } from "~/modules/billing/lib/api";
 import {
   SettingsCard,
   SettingsCardHeader,
   SettingsCardTitle,
   SettingsCardDescription,
   SettingsCardFooter,
+  SettingsCardContent,
 } from "~/modules/common/layout/dashboard/settings-card";
+import { TurboLink } from "~/modules/common/turbo-link";
+import { organization } from "~/modules/organization/lib/api";
 
 import { user } from "../../lib/api";
 
@@ -39,6 +46,33 @@ interface DeleteAccountProps {
 export const DeleteAccount = ({ user }: DeleteAccountProps) => {
   const { t } = useTranslation("auth");
 
+  const summary = useQuery(billing.queries.summary.get(user.id));
+  const organizations = useQuery(
+    organization.queries.getBlockingAccountDeletion,
+  );
+
+  const activeSubscriptions = useMemo(
+    () =>
+      summary.data?.flatMap((customer) =>
+        customer.subscriptions.filter(isSubscriptionActive),
+      ),
+    [summary.data],
+  );
+
+  const canDelete = useMemo(
+    () =>
+      !summary.isLoading &&
+      !activeSubscriptions?.length &&
+      !organizations.isLoading &&
+      !organizations.data?.length,
+    [
+      summary.isLoading,
+      activeSubscriptions,
+      organizations.isLoading,
+      organizations.data?.length,
+    ],
+  );
+
   return (
     <SettingsCard variant="destructive">
       <SettingsCardHeader>
@@ -48,11 +82,68 @@ export const DeleteAccount = ({ user }: DeleteAccountProps) => {
         </SettingsCardDescription>
       </SettingsCardHeader>
 
+      {!canDelete && (
+        <SettingsCardContent className="flex flex-col gap-2">
+          {activeSubscriptions && activeSubscriptions.length > 0 && (
+            <TurboLink
+              href={pathsConfig.dashboard.user.settings.billing}
+              className="group"
+            >
+              <Alert
+                variant="destructive"
+                className="group-hover:bg-destructive/10 transition-colors"
+              >
+                <Icons.AlertTriangle />
+                <AlertTitle>
+                  {t("account.delete.blocker.subscriptions.title", {
+                    count: activeSubscriptions?.length ?? 0,
+                  })}
+                </AlertTitle>
+                <AlertDescription>
+                  {t("account.delete.blocker.subscriptions.description", {
+                    count: activeSubscriptions?.length ?? 0,
+                  })}
+                </AlertDescription>
+              </Alert>
+            </TurboLink>
+          )}
+
+          {organizations.data && organizations.data.length > 0 && (
+            <TurboLink
+              href={pathsConfig.dashboard.user.index}
+              className="group"
+            >
+              <Alert
+                variant="destructive"
+                className="group-hover:bg-destructive/10 transition-colors"
+              >
+                <Icons.AlertTriangle />
+                <AlertTitle>
+                  {t("account.delete.blocker.organizations.title", {
+                    count: organizations.data?.length ?? 0,
+                  })}
+                </AlertTitle>
+                <AlertDescription>
+                  {t("account.delete.blocker.organizations.description", {
+                    count: organizations.data?.length ?? 0,
+                  })}
+                </AlertDescription>
+              </Alert>
+            </TurboLink>
+          )}
+        </SettingsCardContent>
+      )}
+
       <SettingsCardFooter>
         <ConfirmModal
           isAnonymous={user.isAnonymous ?? false}
           render={
-            <Button size="sm" className="ml-auto" variant="destructive">
+            <Button
+              size="sm"
+              className="ml-auto"
+              variant="destructive"
+              disabled={!canDelete}
+            >
               {t("account.delete.cta")}
             </Button>
           }

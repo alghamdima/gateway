@@ -2,12 +2,16 @@ import { Hono } from "hono";
 import * as z from "zod";
 
 import { MemberRole } from "@workspace/auth";
+import {
+  canLeaveOrganization,
+  getOrganizationsBlockingAccountDeletion,
+} from "@workspace/auth/server";
 
 import { enforceAuth, enforceMembership, validate } from "../../middleware";
 import { getInvitationsInputSchema, getMembersInputSchema } from "../../schema";
 import { generateSlug } from "./queries/generate-slug";
 import { getInvitations } from "./queries/invitations";
-import { getIsOnlyOwner, getMembers } from "./queries/members";
+import { getMembers } from "./queries/members";
 import { getOrganization } from "./queries/organizations";
 
 export const organizationRouter = new Hono()
@@ -21,6 +25,11 @@ export const organizationRouter = new Hono()
       }),
     ),
     async (c) => c.json(await generateSlug(c.req.valid("query").name)),
+  )
+  .get("/blocking-account-deletion", async (c) =>
+    c.json(
+      await getOrganizationsBlockingAccountDeletion({ userId: c.var.user.id }),
+    ),
   )
   .get("/:id", async (c) =>
     c.json({ organization: await getOrganization({ id: c.req.param("id") }) }),
@@ -38,21 +47,7 @@ export const organizationRouter = new Hono()
         }),
       ),
   )
-  .get(
-    "/:id/members/is-only-owner",
-    (c, next) =>
-      enforceMembership({
-        organizationId: c.req.param("id"),
-        role: MemberRole.OWNER,
-      })(c, next),
-    async (c) =>
-      c.json({
-        status: await getIsOnlyOwner({
-          organizationId: c.req.param("id"),
-          userId: c.var.user.id,
-        }),
-      }),
-  )
+
   .get(
     "/:id/invitations",
     validate("query", getInvitationsInputSchema),
@@ -65,4 +60,19 @@ export const organizationRouter = new Hono()
           ...c.req.valid("query"),
         }),
       ),
+  )
+  .get(
+    "/:id/can-leave",
+    (c, next) =>
+      enforceMembership({
+        organizationId: c.req.param("id"),
+        role: MemberRole.OWNER,
+      })(c, next),
+    async (c) =>
+      c.json({
+        allowed: await canLeaveOrganization({
+          organizationId: c.req.param("id"),
+          userId: c.var.user.id,
+        }),
+      }),
   );

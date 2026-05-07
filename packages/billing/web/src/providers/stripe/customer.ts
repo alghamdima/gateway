@@ -7,7 +7,8 @@ import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
-import { BillingProvider } from "../types";
+import { GetBillingPortalPayload } from "../../schema";
+import { BillingProvider, BillingUser } from "../types";
 import { stripe } from "./sdk";
 
 import type { Stripe } from "stripe";
@@ -16,36 +17,30 @@ const getStripeCustomerById = async (id: string) => {
   return stripe().customers.retrieve(id);
 };
 
-const getStripeCustomerByEmail = async (email: string) => {
-  const customers = await stripe().customers.list({ email: email });
-
-  return customers.data.length > 0 ? customers.data[0] : null;
-};
-
-const createStripeCustomer = async (userId: string, email: string) => {
-  const customerData = { metadata: { userId }, email };
+const createStripeCustomer = async (referenceId: string, email: string) => {
+  const customerData = { metadata: { referenceId }, email };
   const newCustomer = await stripe().customers.create(customerData);
 
   return newCustomer;
 };
 
 export const createOrRetrieveCustomer = async ({
-  userId,
+  referenceId,
   email,
 }: {
-  userId: string;
+  referenceId: string;
   email: string;
 }) => {
-  const [existingCustomer] = await getCustomersByReferenceId(userId, {
+  const [existingCustomer] = await getCustomersByReferenceId(referenceId, {
     provider: BillingProvider.STRIPE,
   });
 
   const stripeCustomer = existingCustomer?.externalId
     ? await getStripeCustomerById(existingCustomer.externalId)
-    : await getStripeCustomerByEmail(email);
+    : null;
 
   const stripeCustomerToProcess =
-    stripeCustomer ?? (await createStripeCustomer(userId, email));
+    stripeCustomer ?? (await createStripeCustomer(referenceId, email));
 
   if (existingCustomer) {
     if (existingCustomer.externalId !== stripeCustomerToProcess.id) {
@@ -64,7 +59,7 @@ export const createOrRetrieveCustomer = async ({
   }
 
   const [newCustomer] = await upsertCustomer({
-    referenceId: userId,
+    referenceId,
     externalId: stripeCustomerToProcess.id,
     provider: BillingProvider.STRIPE,
   });
@@ -85,5 +80,28 @@ export const createBillingPortalSession = async (
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
       code: "billing:error.portal",
     });
+  }
+};
+
+export const getBillingPortal = async ({
+  redirectUrl,
+  referenceId,
+  user,
+}: GetBillingPortalPayload & { user: BillingUser }) => {
+  try {
+    const { stripeCustomer } = await createOrRetrieveCustomer({
+      referenceId,
+      email: user.email,
+    });
+
+    const { url } = await createBillingPortalSession({
+      customer: stripeCustomer.id,
+      return_url: redirectUrl,
+    });
+
+    return { url };
+  } catch (e) {
+    logger.error(e);
+    throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR);
   }
 };

@@ -2,7 +2,8 @@
   "pricing": {
     "label": "Pricing",
     "title": "This is where you start earning",
-    "description": "Configure pricing based on your use-case and start charging your customers."
+    "description": "Configure pricing based on your use-case and start charging your customers.",
+    "disclaimer": "Mix and match config to create the perfect pricing for your business. <reference>Check docs for more information.</reference>"
   },
   "settings": {
     "subscriptions": {
@@ -22,6 +23,11 @@
       "reviewInStore": "Review in store"
     }
   },
+  "additionalUsage": "Additional {{unit}}",
+  "forFirst": "for the first {{upTo}} {{unit}}",
+  "forNext": "for next {{upTo}} {{unit}}",
+  "upToIncluded": "Up to {{upTo}} {{unit}} included",
+  "infiniteUsage": "above {{threshold}} {{unit}}",
   "currentBillingCycle": "Current billing cycle",
   "subscribe": "Subscribe now",
   "updatePlan": "Update plan",
@@ -50,25 +56,25 @@
     }
   },
   "feature": {
-    "sync": "Seamless sync",
-    "basicSupport": "Basic support",
-    "limitedStorage": "Limited storage",
-    "emailNotifications": "Email notifications",
-    "basicReports": "Basic reports",
-    "advancedSync": "Advanced sync",
-    "prioritySupport": "Priority support",
-    "moreStorage": "More storage",
-    "teamCollaboration": "Team collaboration",
-    "smsNotifications": "SMS notifications",
-    "advancedReports": "Advanced reports",
-    "unlimitedStorage": "Unlimited storage",
-    "customBranding": "Custom branding",
-    "dedicatedSupport": "Dedicated support",
-    "apiAccess": "API access",
-    "userRoles": "User roles management",
-    "auditLogs": "Audit logs",
-    "singleSignOn": "Single sign-on",
-    "advancedAnalytics": "Advanced analytics"
+    "sync": "Seamless sync across devices",
+    "basicSupport": "Basic email support",
+    "limitedStorage": "Limited cloud storage",
+    "emailNotifications": "Email alert notifications",
+    "basicReports": "Basic usage reports",
+    "advancedSync": "Advanced real-time sync",
+    "prioritySupport": "Priority customer support",
+    "moreStorage": "More cloud storage space",
+    "teamCollaboration": "Team collaboration tools",
+    "smsNotifications": "SMS alert notifications",
+    "advancedReports": "Advanced analytics reports",
+    "unlimitedStorage": "Unlimited cloud storage",
+    "customBranding": "Custom branding options",
+    "dedicatedSupport": "Dedicated account support",
+    "apiAccess": "Full API access",
+    "userRoles": "Full user roles management",
+    "auditLogs": "Compliance audit logs",
+    "singleSignOn": "Enterprise single sign-on",
+    "advancedAnalytics": "Advanced usage analytics"
   },
   "error": {
     "checkout": "An error occurred while checking out.",
@@ -92,7 +98,10 @@
       "productIdNotFound": "Product ID not found in webhook event."
     },
     "customerCreation": "Customer creation failed.",
-    "promotionCodeRetrieve": "Could not retrieve promotion code."
+    "promotionCodeRetrieve": "Could not retrieve promotion code.",
+    "usageRetrieve": "Could not retrieve usage from billing provider.",
+    "subscriptionItemNotFound": "No subscription item was found for this subscription.",
+    "subscriptionUpdate": "Unable to update the subscription in the billing provider."
   },
   "subscription": {
     "status": {
@@ -123,5 +132,14 @@
       "skipped": "Skipped",
       "error": "Error"
     }
+  },
+  "type": {
+    "flat": "Flat",
+    "per-seat": "Per seat",
+    "metered": "Metered"
+  },
+  "model": {
+    "one-time": "One-time",
+    "recurring": "Recurring"
   }
 }

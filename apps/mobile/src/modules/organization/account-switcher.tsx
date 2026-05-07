@@ -45,7 +45,11 @@ export const AccountSwitcher = () => {
   const activeMember = authClient.useActiveMember();
 
   const { entitlements } = useCustomer();
-  const summary = useQuery(billing.queries.summary.get);
+  const summary = useQuery(
+    billing.queries.summary.get(
+      activeOrganization.data?.id ?? session.data?.user.id,
+    ),
+  );
   const activePlan = getActivePlan(
     summary.data?.map((customer) => ({
       ...customer,

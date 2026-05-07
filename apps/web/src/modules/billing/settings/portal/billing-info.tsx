@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { MobileStore } from "@workspace/billing";
+import { BillingReference, MobileStore } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 import { Icons } from "@workspace/ui-web/icons";
 
@@ -24,10 +24,16 @@ const MobileStoreIcon: Record<MobileStore, Icon> = {
   [MobileStore.PLAY_STORE]: Icons.AndroidStroke,
 };
 
-export const BillingInfo = () => {
+export const BillingInfo = ({
+  referenceId,
+  referenceType,
+}: {
+  referenceId: string;
+  referenceType: BillingReference;
+}) => {
   const { t } = useTranslation("billing");
 
-  const summary = useQuery(billing.queries.summary.get);
+  const summary = useQuery(billing.queries.summary.get(referenceId));
 
   const stores = useMemo(() => {
     if (!summary.data) return [];
@@ -63,6 +69,8 @@ export const BillingInfo = () => {
               key={store}
               store={store}
               className="w-full sm:w-fit"
+              referenceId={referenceId}
+              referenceType={referenceType}
               {...(index > 0 && { variant: "outline" })}
             >
               {Icon && <Icon className="size-4" />}

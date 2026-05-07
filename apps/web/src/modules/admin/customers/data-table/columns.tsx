@@ -9,13 +9,19 @@ import { authClient } from "~/lib/auth/client";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import type { GetCustomersResponse } from "@workspace/api/schema";
 import type { User } from "@workspace/auth";
-import type { Customer } from "@workspace/billing";
+import type { Organization } from "@workspace/auth";
+
+type CustomerRow = GetCustomersResponse["data"][number] & {
+  user: Pick<User, "name" | "image"> | null;
+  organization: Pick<Organization, "name" | "logo"> | null;
+};
 
 export const useColumns = (options?: {
   max?: { subscriptions: number; orders: number };
   options?: { provider: string[] };
-}): ColumnDef<Customer & { user: Pick<User, "name" | "image"> }>[] => {
+}): ColumnDef<CustomerRow>[] => {
   const { t, i18n } = useTranslation(["common", "billing"]);
   const { data: session } = authClient.useSession();
 
@@ -31,33 +37,50 @@ export const useColumns = (options?: {
       enableColumnFilter: true,
     },
     {
-      id: "user.name",
-      accessorKey: "user.name",
+      id: "name",
+      accessorFn: (row) => row.user?.name ?? row.organization?.name ?? "-",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("name")} />
       ),
       cell: ({ row }) => {
+        const reference = row.original.user ?? row.original.organization;
+        const href = row.original.user
+          ? pathsConfig.admin.users.user(row.original.referenceId)
+          : pathsConfig.admin.organizations.organization(
+              row.original.referenceId,
+            );
+
+        if (!reference) {
+          return <span>-</span>;
+        }
+
         return (
-          <TurboLink
-            href={pathsConfig.admin.users.user(row.original.referenceId)}
-            className="group flex items-center gap-3"
-          >
+          <TurboLink href={href} className="group flex items-center gap-3">
             <Avatar>
               <AvatarImage
-                src={row.original.user.image ?? undefined}
-                alt={row.original.user.name}
+                src={
+                  row.original.user?.image ??
+                  row.original.organization?.logo ??
+                  undefined
+                }
+                alt={reference.name}
               />
               <AvatarFallback>
-                <Icons.UserRound className="w-5" />
+                {row.original.user ? (
+                  <Icons.UserRound className="w-5" />
+                ) : (
+                  <Icons.Building className="w-5" />
+                )}
               </AvatarFallback>
             </Avatar>
             <div className="flex items-center gap-2">
               <span className="group-hover:text-primary truncate font-medium underline underline-offset-4">
-                {row.original.user.name}
+                {reference.name}
               </span>
-              {row.original.referenceId === session?.user.id && (
-                <Badge variant="outline">{t("you")}</Badge>
-              )}
+              {row.original.user &&
+                row.original.referenceId === session?.user.id && (
+                  <Badge variant="outline">{t("you")}</Badge>
+                )}
             </div>
           </TurboLink>
         );

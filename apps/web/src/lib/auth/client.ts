@@ -1,3 +1,4 @@
+import { ac, roles } from "@workspace/auth";
 import {
   createAuthClient,
   passkeyClient,
@@ -30,7 +31,10 @@ export const authClient = createAuthClient({
     magicLinkClient(),
     twoFactorClient(),
     adminClient(),
-    organizationClient(),
+    organizationClient({
+      ac,
+      roles,
+    }),
     passkeyClient(),
     lastLoginMethodClient(),
     oneTapClient({

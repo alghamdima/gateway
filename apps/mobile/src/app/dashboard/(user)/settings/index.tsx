@@ -76,6 +76,15 @@ const getSections = (session?: Session | null) =>
         onPress: () => Linking.openURL(`${appConfig.url}/legal/privacy-policy`),
         visible: true,
       },
+      {
+        title: "sourceCode",
+        icon: Icons.Code,
+        onPress: () =>
+          Linking.openURL(
+            "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
+          ),
+        visible: true,
+      },
     ],
   ] as const;
 

@@ -255,5 +255,10 @@
       "title": "Instalando actualización...",
       "description": "La actualización está siendo instalada. Por favor, espera un momento."
     }
+  },
+  "buyCta": {
+    "title": "Esta aplicación puede ser tuya.",
+    "description": "Personaliza, despliega y empieza a ganar $$$ en minutos.",
+    "link": "Obtén TurboStarter"
   }
 }

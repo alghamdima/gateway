@@ -5,6 +5,7 @@ import {
   calculateDiscount,
   getVariantWithHighestDiscount,
   formatPrice,
+  getVariantInitialCost,
 } from "@workspace/billing";
 import { Trans } from "@workspace/i18n";
 import { Icons } from "@workspace/ui-web/icons";
@@ -36,7 +37,9 @@ export const Discount = () => {
               discount.type === BillingDiscountType.PERCENT
                 ? `${discount.percentage}%`
                 : formatPrice({
-                    amount: discount.original.cost - discount.discounted.cost,
+                    amount:
+                      getVariantInitialCost(discount.original) -
+                      getVariantInitialCost(discount.discounted),
                     currency: discount.discounted.currency,
                   }),
           }}

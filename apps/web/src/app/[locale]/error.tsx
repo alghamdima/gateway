@@ -25,7 +25,9 @@ export default function Error({
   return (
     <main className="mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-8 px-6">
       <div className="flex flex-col items-center justify-center gap-4">
-        <h1 className="text-center text-4xl font-bold">{t("error.general")}</h1>
+        <h1 className="text-center text-4xl font-bold tracking-tighter">
+          {t("error.general")}
+        </h1>
         <p className="text-muted-foreground max-w-md text-center">
           {error.message || t("error.apologies")}
         </p>

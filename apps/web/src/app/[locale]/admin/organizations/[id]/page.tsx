@@ -13,6 +13,8 @@ import { OrganizationDetails } from "~/modules/admin/organizations/organization/
 import { OrganizationHeader } from "~/modules/admin/organizations/organization/header";
 import { InvitationsDataTable } from "~/modules/admin/organizations/organization/invitations/data-table/invitations-data-table";
 import { MembersDataTable } from "~/modules/admin/organizations/organization/members/data-table/members-data-table";
+import { OrdersDataTable } from "~/modules/admin/organizations/organization/orders/data-table/orders-data-table";
+import { SubscriptionsDataTable } from "~/modules/admin/organizations/organization/subscriptions/data-table/subscriptions-data-table";
 
 export const generateMetadata = async ({
   params,
@@ -67,6 +69,14 @@ export default async function OrganizationPage({
     {
       label: t("invitations"),
       component: <InvitationsDataTable organizationId={id} />,
+    },
+    {
+      label: t("subscriptions"),
+      component: <SubscriptionsDataTable organizationId={id} />,
+    },
+    {
+      label: t("orders"),
+      component: <OrdersDataTable organizationId={id} />,
     },
   ];
 

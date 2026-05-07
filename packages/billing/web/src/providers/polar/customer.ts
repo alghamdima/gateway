@@ -12,14 +12,6 @@ const getPolarCustomerById = async (customerId: string) => {
   return polar().customers.get({ id: customerId });
 };
 
-const getPolarCustomerByEmail = async (email: string) => {
-  const customers = await polar().customers.list({
-    email,
-  });
-
-  return customers.result.items[0];
-};
-
 const createPolarCustomer = async (email: string) => {
   const newCustomer = await polar().customers.create({
     email,
@@ -29,19 +21,19 @@ const createPolarCustomer = async (email: string) => {
 };
 
 export const createOrRetrieveCustomer = async ({
-  userId,
+  referenceId,
   email,
 }: {
-  userId: string;
+  referenceId: string;
   email: string;
 }) => {
-  const [existingCustomer] = await getCustomersByReferenceId(userId, {
+  const [existingCustomer] = await getCustomersByReferenceId(referenceId, {
     provider: BillingProvider.POLAR,
   });
 
   const polarCustomer = existingCustomer?.externalId
     ? await getPolarCustomerById(existingCustomer.externalId)
-    : await getPolarCustomerByEmail(email);
+    : null;
 
   const polarCustomerToProcess =
     polarCustomer ?? (await createPolarCustomer(email));
@@ -63,7 +55,7 @@ export const createOrRetrieveCustomer = async ({
   }
 
   const [newCustomer] = await upsertCustomer({
-    referenceId: userId,
+    referenceId,
     externalId: polarCustomerToProcess.id,
     provider: BillingProvider.POLAR,
   });

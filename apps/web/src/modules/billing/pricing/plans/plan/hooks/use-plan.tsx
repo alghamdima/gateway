@@ -1,19 +1,50 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 
-import { getHigherPlans, getLowerPlans } from "@workspace/billing";
+import { Permissions, toMemberRole, type User } from "@workspace/auth";
+import {
+  BillingReference,
+  getHigherPlans,
+  getLowerPlans,
+} from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
+import { authClient } from "~/lib/auth/client";
 import { billing } from "~/modules/billing/lib/api";
+import { usePricingControls } from "~/modules/billing/pricing/controls";
+import { organization } from "~/modules/organization/lib/api";
 
-import type { User } from "@workspace/auth";
 import type { BillingConfigPlan } from "@workspace/billing";
 
-export const usePlan = (plan: BillingConfigPlan) => {
+export const usePlan = ({
+  plan,
+  user,
+}: {
+  plan: BillingConfigPlan;
+  user: User | null;
+}) => {
   const { t } = useTranslation("billing");
+  const controls = usePricingControls((c) => c.controls);
+  const member = useQuery({
+    ...organization.queries.members.getByUserId({
+      organizationId: controls.referenceId ?? "",
+      userId: user?.id ?? "",
+    }),
+    enabled:
+      controls.referenceType === BillingReference.ORGANIZATION &&
+      !!controls.referenceId,
+  });
+
+  const organizations = authClient.useListOrganizations();
+  const referenceOrganization = useMemo(
+    () => organizations.data?.find((o) => o.id === controls.referenceId),
+    [organizations.data, controls.referenceId],
+  );
+
   const router = useRouter();
   const checkout = useMutation({
     ...billing.mutations.checkout.create,
@@ -50,47 +81,78 @@ export const usePlan = (plan: BillingConfigPlan) => {
     key: `feature.${feature.toLowerCase().replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}`,
   }));
 
-  const handleCheckout = ({
-    user,
-    ...rest
-  }: Omit<Parameters<typeof checkout.mutate>[0]["json"], "redirect"> & {
-    user: User | null;
-  }) => {
+  const handleCheckout = (
+    params: Omit<
+      Parameters<typeof checkout.mutate>[0]["json"],
+      "redirect" | "referenceId"
+    >,
+  ) => {
     if (!user) {
       const url = new URL(pathsConfig.auth.login, appConfig.url);
       url.searchParams.set("redirectTo", pathsConfig.marketing.pricing);
       return router.push(url.toString());
     }
 
+    const success = new URL(
+      controls.referenceType === BillingReference.USER
+        ? pathsConfig.dashboard.user.index
+        : pathsConfig.dashboard.organization(referenceOrganization?.slug ?? "")
+            .index,
+      appConfig.url,
+    );
+    const cancel = new URL(pathname, appConfig.url);
+
     checkout.mutate({
       json: {
-        ...rest,
+        ...params,
+        referenceId: controls.referenceId ?? user.id,
         redirect: {
-          success: `${appConfig.url}${pathsConfig.dashboard.user.index}`,
-          cancel: `${appConfig.url}${pathname}`,
+          success: success.toString(),
+          cancel: cancel.toString(),
         },
       },
     });
   };
 
-  const handleOpenPortal = ({ user }: { user: User | null }) => {
+  const handleOpenPortal = () => {
     if (!user) {
       const url = new URL(pathsConfig.auth.login, appConfig.url);
       url.searchParams.set("redirectTo", pathsConfig.marketing.pricing);
       return router.push(url.toString());
     }
 
+    const redirectUrl = new URL(pathname, appConfig.url);
+
     getPortal.mutate({
       query: {
-        redirectUrl: `${appConfig.url}${pathname}`,
+        redirectUrl: redirectUrl.toString(),
+        referenceId: controls.referenceId ?? user.id,
       },
     });
   };
 
+  const can = useCallback(
+    (permission: NonNullable<Permissions["billing"]>[number]) =>
+      !user ||
+      controls.referenceType === BillingReference.USER ||
+      authClient.organization.checkRolePermission({
+        permissions: {
+          billing: [permission],
+        },
+        role: toMemberRole(member.data?.role),
+      }),
+    [member.data?.role, controls.referenceType, user],
+  );
+
   return {
+    canRead: can("read"),
+    canCreate: can("create"),
+    canUpdate: can("update"),
+    canDelete: can("delete"),
     isPending: checkout.isPending || getPortal.isPending,
     features,
     handleCheckout,
     handleOpenPortal,
+    referenceOrganization,
   };
 };

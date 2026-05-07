@@ -2,6 +2,7 @@ import {
   BillingDiscountType,
   BillingModel,
   BillingPlan,
+  BillingType,
   RecurringInterval,
 } from "../../../types";
 
@@ -18,6 +19,7 @@ export const config: BillingConfig = {
       variants: [
         {
           id: "free-lifetime",
+          type: BillingType.FLAT,
           cost: 0,
           custom: false,
           currency: "usd",
@@ -26,6 +28,7 @@ export const config: BillingConfig = {
         },
         {
           id: "free-monthly",
+          type: BillingType.FLAT,
           cost: 0,
           custom: false,
           currency: "usd",
@@ -35,6 +38,7 @@ export const config: BillingConfig = {
         },
         {
           id: "free-yearly",
+          type: BillingType.FLAT,
           cost: 0,
           custom: false,
           currency: "usd",
@@ -53,6 +57,7 @@ export const config: BillingConfig = {
       variants: [
         {
           id: "premium-one-time",
+          type: BillingType.FLAT,
           cost: 19900,
           custom: false,
           currency: "usd",
@@ -61,6 +66,7 @@ export const config: BillingConfig = {
         },
         {
           id: "premium-monthly",
+          type: BillingType.FLAT,
           cost: 1900,
           custom: false,
           currency: "usd",
@@ -71,6 +77,7 @@ export const config: BillingConfig = {
         },
         {
           id: "premium-yearly",
+          type: BillingType.FLAT,
           cost: 19000, // Higher than monthly * 12 to test recurring discount
           custom: false,
           currency: "usd",
@@ -81,6 +88,7 @@ export const config: BillingConfig = {
         },
         {
           id: "premium-monthly-hidden",
+          type: BillingType.FLAT,
           cost: 1900,
           custom: false,
           currency: "usd",
@@ -105,27 +113,33 @@ export const config: BillingConfig = {
       variants: [
         {
           id: "enterprise-lifetime",
+          type: BillingType.FLAT,
           custom: true,
           label: "common:contactUs",
           href: "/contact",
           hidden: false,
+          currency: "usd",
           model: BillingModel.ONE_TIME,
         },
         {
           id: "enterprise-monthly",
+          type: BillingType.FLAT,
           custom: true,
           label: "common:contactUs",
           href: "/contact",
           hidden: false,
+          currency: "usd",
           model: BillingModel.RECURRING,
           interval: RecurringInterval.MONTH,
         },
         {
           id: "enterprise-yearly",
+          type: BillingType.FLAT,
           custom: true,
           label: "common:contactUs",
           href: "/contact",
           hidden: false,
+          currency: "usd",
           model: BillingModel.RECURRING,
           interval: RecurringInterval.YEAR,
         },

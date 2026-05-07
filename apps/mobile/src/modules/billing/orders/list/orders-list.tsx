@@ -8,9 +8,17 @@ import { billing } from "~/modules/billing/lib/api";
 
 import { OrdersListItem } from "./orders-list-item";
 
-export const OrdersList = () => {
+import type { BillingReference } from "@workspace/billing";
+
+export const OrdersList = ({
+  referenceId,
+  referenceType,
+}: {
+  referenceId: string;
+  referenceType: BillingReference;
+}) => {
   const { t } = useTranslation(["common", "billing"]);
-  const summary = useQuery(billing.queries.summary.get);
+  const summary = useQuery(billing.queries.summary.get(referenceId));
 
   const orders = summary.data?.flatMap((customer) => customer.orders) ?? [];
 
@@ -30,7 +38,12 @@ export const OrdersList = () => {
       </View>
 
       {orders.map((order) => (
-        <OrdersListItem key={order.id} order={order} />
+        <OrdersListItem
+          key={order.id}
+          order={order}
+          referenceId={referenceId}
+          referenceType={referenceType}
+        />
       ))}
     </View>
   );

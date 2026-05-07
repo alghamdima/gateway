@@ -17,20 +17,29 @@ const DEBOUNCE_SET_ACTIVE_MS = 1000;
 
 export const useActiveOrganization = () => {
   const session = authClient.useSession();
-  const member = authClient.useActiveMember();
 
   const pathname = usePathname();
   const params = useParams();
   const slug = params.organization?.toString();
+  const userId = session.data?.user.id ?? null;
 
   const allowRefetch = useMemo(
     () => !!(slug ?? pathname.startsWith(pathsConfig.dashboard.user.index)),
     [pathname, slug],
   );
 
-  const { data: activeOrganization, isLoading } = useQuery({
+  const activeOrganization = useQuery({
     ...organization.queries.get({ slug: slug ?? "" }),
     enabled: !!slug,
+  });
+
+  const activeOrganizationId = activeOrganization.data?.id ?? null;
+  const { data: member } = useQuery({
+    ...organization.queries.members.getByUserId({
+      organizationId: activeOrganizationId ?? "",
+      userId: userId ?? "",
+    }),
+    enabled: !!activeOrganizationId && !!userId,
   });
 
   const setActiveOrganization = useMutation({
@@ -47,52 +56,28 @@ export const useActiveOrganization = () => {
 
   const activeMember = useMemo(() => {
     const data =
-      member.data ??
-      activeOrganization?.members.find(
-        (member) => member.userId === session.data?.user.id,
+      member ??
+      activeOrganization.data?.members.find(
+        (member) => member.userId === userId,
       );
     return data ? { ...data, role: data.role as MemberRole } : null;
-  }, [member.data, activeOrganization, session.data]);
+  }, [member, activeOrganization.data, userId]);
 
-  const activeOrganizationId = activeOrganization?.id ?? null;
-  const memberOrganizationId = member.data?.organizationId ?? null;
   const sessionActiveOrganizationId =
     session.data?.session.activeOrganizationId ?? null;
-
-  const shouldRefetchMember = useMemo(() => {
-    return (
-      !member.isPending &&
-      !member.isRefetching &&
-      !!activeOrganizationId &&
-      memberOrganizationId !== activeOrganizationId &&
-      allowRefetch
-    );
-  }, [
-    member.isPending,
-    member.isRefetching,
-    memberOrganizationId,
-    activeOrganizationId,
-    allowRefetch,
-  ]);
-
-  useEffect(() => {
-    if (shouldRefetchMember) {
-      void member.refetch();
-    }
-  }, [member, shouldRefetchMember]);
 
   const shouldUpdateActiveOrganization = useMemo(() => {
     return (
       !session.isPending &&
       !!session.data &&
-      !(isLoading && !activeOrganizationId) &&
+      !(activeOrganization.isLoading && !activeOrganizationId) &&
       sessionActiveOrganizationId !== activeOrganizationId &&
       allowRefetch
     );
   }, [
     session.isPending,
     session.data,
-    isLoading,
+    activeOrganization.isLoading,
     activeOrganizationId,
     sessionActiveOrganizationId,
     allowRefetch,
@@ -111,7 +96,7 @@ export const useActiveOrganization = () => {
   ]);
 
   return {
-    activeOrganization,
+    activeOrganization: activeOrganization.data,
     activeMember,
   };
 };

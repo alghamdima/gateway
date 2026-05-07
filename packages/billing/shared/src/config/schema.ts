@@ -4,6 +4,7 @@ import {
   BillingDiscountType,
   BillingModel,
   BillingPlan,
+  BillingType,
   RecurringInterval,
 } from "../types";
 
@@ -14,26 +15,13 @@ export const discountSchema = z.object({
   appliesTo: z.array(z.string()),
 });
 
-const customVariantSchema = z.discriminatedUnion("custom", [
-  z.object({
-    custom: z.literal(true),
-    label: z.string(),
-    href: z.string(),
-  }),
-  z.object({
-    custom: z.literal(false).optional().default(false),
-    cost: z.number(),
-    currency: z.string().optional().default("usd"),
-  }),
-]);
-
-const sharedVariantSchema = z.intersection(
-  customVariantSchema,
-  z.object({
-    id: z.string(),
-    hidden: z.boolean().optional().default(false),
-  }),
-);
+const tierSchema = z.object({
+  cost: z.number(),
+  upTo: z
+    .union([z.literal("infinite"), z.number()])
+    .optional()
+    .default("infinite"),
+});
 
 const variantModelSchema = z.discriminatedUnion("model", [
   z.object({
@@ -46,10 +34,93 @@ const variantModelSchema = z.discriminatedUnion("model", [
   }),
 ]);
 
-export const variantSchema = z.intersection(
-  sharedVariantSchema,
-  variantModelSchema,
+const variantCostSchema = z.union([
+  z.object({
+    type: z.literal(BillingType.FLAT),
+    cost: z.number(),
+  }),
+  z
+    .object({
+      type: z.literal(BillingType.METERED),
+      unit: z.string(),
+      meterId: z.string(),
+    })
+    .and(
+      z.union([
+        z.object({
+          cost: z.number(),
+        }),
+        z.object({
+          tiers: z.array(tierSchema),
+        }),
+      ]),
+    ),
+  z
+    .object({
+      type: z.literal(BillingType.PER_SEAT),
+    })
+    .and(
+      z.union([
+        z.object({
+          cost: z.number(),
+        }),
+        z.object({
+          tiers: z.array(tierSchema),
+        }),
+      ]),
+    ),
+]);
+
+const customVariantSchema = z.union([
+  z.object({
+    type: z.enum(BillingType).optional().default(BillingType.FLAT),
+    custom: z.literal(true),
+    label: z.string(),
+    href: z.string(),
+  }),
+  z.intersection(
+    z.object({
+      custom: z.literal(false).optional().default(false),
+    }),
+    variantCostSchema,
+  ),
+]);
+
+const sharedVariantSchema = z.intersection(
+  customVariantSchema,
+  z.object({
+    id: z.string(),
+    hidden: z.boolean().optional().default(false),
+    currency: z.string().optional().default("usd"),
+  }),
 );
+
+export const variantSchema = z
+  .intersection(sharedVariantSchema, variantModelSchema)
+  .superRefine((variant, ctx) => {
+    if (
+      variant.model === BillingModel.ONE_TIME &&
+      variant.type === BillingType.METERED
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Metered variants cannot use one-time billing model.",
+        path: ["model"],
+      });
+    }
+
+    if (
+      variant.model === BillingModel.ONE_TIME &&
+      variant.type === BillingType.PER_SEAT &&
+      "tiers" in variant
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "One-time per-seat variants cannot use tiered pricing.",
+        path: ["tiers"],
+      });
+    }
+  });
 
 export const planSchema = z.object({
   id: z.enum(BillingPlan),
@@ -77,3 +148,4 @@ export type BillingConfig = z.infer<typeof billingConfigSchema>;
 export type BillingConfigPlan = z.infer<typeof planSchema>;
 export type BillingConfigVariant = z.infer<typeof variantSchema>;
 export type BillingConfigDiscount = z.infer<typeof discountSchema>;
+export type BillingConfigTier = z.infer<typeof tierSchema>;

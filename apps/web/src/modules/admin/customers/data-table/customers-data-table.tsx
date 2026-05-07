@@ -31,7 +31,7 @@ export const CustomersDataTable = ({
     initialState: {
       sorting: [
         {
-          id: "user.name",
+          id: "name",
           desc: false,
         },
       ],

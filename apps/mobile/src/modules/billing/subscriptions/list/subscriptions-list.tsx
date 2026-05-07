@@ -8,10 +8,18 @@ import { billing } from "~/modules/billing/lib/api";
 
 import { SubscriptionsListItem } from "./subscriptions-list-item";
 
-export const SubscriptionsList = () => {
+import type { BillingReference } from "@workspace/billing";
+
+export const SubscriptionsList = ({
+  referenceId,
+  referenceType,
+}: {
+  referenceId: string;
+  referenceType: BillingReference;
+}) => {
   const { t } = useTranslation(["common", "billing"]);
 
-  const summary = useQuery(billing.queries.summary.get);
+  const summary = useQuery(billing.queries.summary.get(referenceId));
 
   const subscriptions =
     summary.data?.flatMap((customer) => customer.subscriptions) ?? [];
@@ -35,6 +43,8 @@ export const SubscriptionsList = () => {
         <SubscriptionsListItem
           key={subscription.id}
           subscription={subscription}
+          referenceId={referenceId}
+          referenceType={referenceType}
         />
       ))}
     </View>

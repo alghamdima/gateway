@@ -52,3 +52,28 @@ export const subscriptionStatusChangeHandler = async ({
     `✅ Subscription ${subscription.id} status changed for customer ${customer.id} to ${status}`,
   );
 };
+
+export const updateSubscription = async (
+  id: string,
+  data: Partial<{
+    quantity: number;
+  }>,
+) => {
+  if (!data.quantity) {
+    return;
+  }
+
+  try {
+    await polar().subscriptions.update({
+      id,
+      subscriptionUpdate: {
+        seats: data.quantity,
+      },
+    });
+  } catch (error) {
+    logger.error(error);
+    throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
+      code: "billing:error.subscriptionUpdate",
+    });
+  }
+};

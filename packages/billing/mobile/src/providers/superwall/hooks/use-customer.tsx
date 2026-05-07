@@ -16,7 +16,7 @@ export const useCustomer = () => {
       : [];
   }, [user.subscriptionStatus]);
 
-  const identify = (userId: string, traits?: Record<string, unknown>) => {
+  const identify = (userId: string, traits?: Record<string, string | null>) => {
     void user.identify(userId, traits);
   };
 

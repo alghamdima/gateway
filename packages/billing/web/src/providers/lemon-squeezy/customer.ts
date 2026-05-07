@@ -1,8 +1,4 @@
-import {
-  createCustomer,
-  getCustomer,
-  listCustomers,
-} from "@lemonsqueezy/lemonsqueezy.js";
+import { createCustomer, getCustomer } from "@lemonsqueezy/lemonsqueezy.js";
 
 import {
   upsertCustomer,
@@ -20,16 +16,6 @@ const getLemonSqueezyCustomerById = async (customerId: string) => {
   return getCustomer(customerId);
 };
 
-const getLemonSqueezyCustomerByEmail = async (email: string) => {
-  const { data } = await listCustomers({
-    filter: {
-      email: email,
-    },
-  });
-
-  return data?.data[0];
-};
-
 const createLemonSqueezyCustomer = async (email: string) => {
   const newCustomer = await createCustomer(env.LEMON_SQUEEZY_STORE_ID, {
     name: email.split("@")[0] ?? "",
@@ -40,20 +26,20 @@ const createLemonSqueezyCustomer = async (email: string) => {
 };
 
 export const createOrRetrieveCustomer = async ({
-  userId,
+  referenceId,
   email,
 }: {
-  userId: string;
+  referenceId: string;
   email: string;
 }) => {
-  const [existingCustomer] = await getCustomersByReferenceId(userId, {
+  const [existingCustomer] = await getCustomersByReferenceId(referenceId, {
     provider: BillingProvider.LEMON_SQUEEZY,
   });
 
   const lemonSqueezyCustomer = existingCustomer?.externalId
     ? (await getLemonSqueezyCustomerById(existingCustomer.externalId)).data
         ?.data
-    : await getLemonSqueezyCustomerByEmail(email);
+    : null;
 
   const lemonSqueezyCustomerToProcess =
     lemonSqueezyCustomer ?? (await createLemonSqueezyCustomer(email));
@@ -81,7 +67,7 @@ export const createOrRetrieveCustomer = async ({
   }
 
   const [newCustomer] = await upsertCustomer({
-    referenceId: userId,
+    referenceId,
     externalId: lemonSqueezyCustomerToProcess.id,
     provider: BillingProvider.LEMON_SQUEEZY,
   });

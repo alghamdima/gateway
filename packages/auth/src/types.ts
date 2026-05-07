@@ -299,4 +299,5 @@ export type {
   Organization,
   ActiveOrganization,
   Member,
+  Permissions,
 } from "./server";

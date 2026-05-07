@@ -1,6 +1,11 @@
-import { config } from "@workspace/billing";
+import {
+  BillingConfigVariant,
+  BillingType,
+  findVariantById,
+} from "@workspace/billing";
 import {
   getCustomerByExternalId,
+  getOrganizationBillableSeatsCount,
   upsertOrder,
 } from "@workspace/billing/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
@@ -8,10 +13,7 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { BillingProvider } from "../types";
-import {
-  createBillingPortalSession,
-  createOrRetrieveCustomer,
-} from "./customer";
+import { createOrRetrieveCustomer } from "./customer";
 import { toPaymentStatus } from "./mappers/to-billing-status";
 import { toCheckoutMode } from "./mappers/to-checkout-mode";
 import { stripe } from "./sdk";
@@ -20,9 +22,25 @@ import {
   subscriptionStatusChangeHandler,
 } from "./subscription";
 
-import type { CheckoutPayload, GetBillingPortalPayload } from "../../schema";
-import type { User } from "@workspace/auth";
+import type { CheckoutPayload } from "../../schema";
+import type { BillingUser } from "../types";
 import type { Stripe } from "stripe";
+
+const getCheckoutQuantity = async ({
+  variant,
+  referenceId,
+}: {
+  variant: BillingConfigVariant;
+  referenceId: string;
+}) => {
+  if (variant.type === BillingType.PER_SEAT) {
+    return await getOrganizationBillableSeatsCount(referenceId);
+  }
+  if (variant.type === BillingType.METERED) {
+    return null;
+  }
+  return 1;
+};
 
 const createCheckoutSession = async (
   params: Stripe.Checkout.SessionCreateParams,
@@ -103,14 +121,13 @@ export const checkoutStatusChangeHandler = async (
 
 export const checkout = async ({
   user,
+  referenceId,
   variant: { id },
   discount,
   redirect,
-}: CheckoutPayload & { user: User }) => {
+}: CheckoutPayload & { user: BillingUser }) => {
   try {
-    const variant = config.plans
-      .find((plan) => plan.variants.some((v) => v.id === id))
-      ?.variants.find((v) => v.id === id);
+    const variant = findVariantById(id);
 
     if (!variant) {
       throw new HttpException(HttpStatusCode.NOT_FOUND, {
@@ -119,11 +136,12 @@ export const checkout = async ({
     }
 
     const { stripeCustomer } = await createOrRetrieveCustomer({
-      userId: user.id,
+      referenceId,
       email: user.email,
     });
 
     const code = discount?.code ? await getPromotionCode(discount.code) : null;
+    const quantity = await getCheckoutQuantity({ variant, referenceId });
 
     const session = await createCheckoutSession({
       mode: toCheckoutMode(variant.model),
@@ -135,7 +153,7 @@ export const checkout = async ({
       line_items: [
         {
           price: variant.id,
-          quantity: 1,
+          ...(quantity ? { quantity } : {}),
         },
       ],
       success_url: redirect.success,
@@ -157,28 +175,6 @@ export const checkout = async ({
     });
 
     return { url: session.url };
-  } catch (e) {
-    logger.error(e);
-    throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR);
-  }
-};
-
-export const getBillingPortal = async ({
-  redirectUrl,
-  user,
-}: GetBillingPortalPayload & { user: User }) => {
-  try {
-    const { stripeCustomer } = await createOrRetrieveCustomer({
-      userId: user.id,
-      email: user.email,
-    });
-
-    const { url } = await createBillingPortalSession({
-      customer: stripeCustomer.id,
-      return_url: redirectUrl,
-    });
-
-    return { url };
   } catch (e) {
     logger.error(e);
     throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR);

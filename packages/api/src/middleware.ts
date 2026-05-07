@@ -10,16 +10,10 @@ import { getLocaleFromRequest, getTranslation } from "@workspace/i18n/server";
 import { HttpStatusCode, NodeEnv } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
-import type { User } from "@workspace/auth";
+import type { Permissions, User } from "@workspace/auth";
 import type { TFunction } from "@workspace/i18n";
 import type { ValidationTargets } from "hono";
 import type { $ZodRawIssue, $ZodType } from "zod/v4/core";
-
-type PermissionsInput = NonNullable<
-  NonNullable<
-    Parameters<typeof auth.api.hasPermission>[0]
-  >["body"]["permissions"]
->;
 
 /**
  * Reusable middleware that enforces users are logged in before running the
@@ -70,7 +64,7 @@ export const enforceAdmin = createMiddleware<{
 export const enforceUserPermission = ({
   permissions,
 }: {
-  permissions: PermissionsInput;
+  permissions: Permissions;
 }) =>
   createMiddleware<{ Variables: { user: User } }>(async (c, next) => {
     const hasPermission = await auth.api.hasPermission({
@@ -98,7 +92,7 @@ export const enforceOrganizationPermission = ({
   permissions,
 }: {
   organizationId?: string;
-  permissions: PermissionsInput;
+  permissions: Permissions;
 }) =>
   createMiddleware<{
     Variables: {

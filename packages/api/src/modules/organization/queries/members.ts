@@ -81,22 +81,3 @@ export const getMembers = async ({
     };
   });
 };
-
-export const getIsOnlyOwner = async ({
-  organizationId,
-  userId,
-}: {
-  organizationId: string;
-  userId: string;
-}) => {
-  const otherOwners = await db.query.member.findMany({
-    where: (member, { eq, and, not }) =>
-      and(
-        eq(member.organizationId, organizationId),
-        eq(member.role, MemberRole.OWNER),
-        not(eq(member.userId, userId)),
-      ),
-  });
-
-  return otherOwners.length === 0;
-};

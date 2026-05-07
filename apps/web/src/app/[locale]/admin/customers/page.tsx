@@ -20,7 +20,7 @@ export const generateMetadata = getMetadata({
 const searchParamsCache = createSearchParamsCache({
   page: parseAsInteger.withDefault(1),
   perPage: parseAsInteger.withDefault(10),
-  sort: getSortingStateParser().withDefault([{ id: "user.name", desc: false }]),
+  sort: getSortingStateParser().withDefault([{ id: "name", desc: false }]),
   q: parseAsString,
   createdAt: parseAsArrayOf(parseAsInteger),
   provider: parseAsArrayOf(parseAsString),

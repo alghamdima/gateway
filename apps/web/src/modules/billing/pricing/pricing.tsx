@@ -11,16 +11,35 @@ import { billing } from "~/modules/billing/lib/api";
 import { PricingSection } from "./section";
 
 export const Pricing = async () => {
-  const { user } = await getSession();
+  const { user, session } = await getSession();
 
   const queryClient = getQueryClient();
 
   if (user) {
     await queryClient.prefetchQuery({
-      ...billing.queries.summary.get,
-      queryFn: handle(api.billing.me.$get, {
-        schema: getBillingSummaryResponseSchema,
-      }),
+      ...billing.queries.summary.get(user.id),
+      queryFn: () =>
+        handle(api.billing.summary.$get, {
+          schema: getBillingSummaryResponseSchema,
+        })({
+          query: {
+            referenceId: user.id,
+          },
+        }),
+    });
+  }
+
+  if (session?.activeOrganizationId) {
+    await queryClient.prefetchQuery({
+      ...billing.queries.summary.get(session.activeOrganizationId),
+      queryFn: () =>
+        handle(api.billing.summary.$get, {
+          schema: getBillingSummaryResponseSchema,
+        })({
+          query: {
+            referenceId: session.activeOrganizationId ?? "",
+          },
+        }),
     });
   }
 

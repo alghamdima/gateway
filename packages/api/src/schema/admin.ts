@@ -234,6 +234,46 @@ export type GetOrganizationResponse = z.infer<
   typeof getOrganizationResponseSchema
 >;
 
+export const getOrganizationSubscriptionsInputSchema =
+  offsetPaginationSchema.extend({
+    sort: sortQuerySchema.optional(),
+    status: multiValueQuerySchema(z.enum(SubscriptionStatus)).optional(),
+    createdAt: rangeQuerySchema.optional(),
+  });
+
+export type GetOrganizationSubscriptionsInput = z.infer<
+  typeof getOrganizationSubscriptionsInputSchema
+>;
+
+export const getOrganizationSubscriptionsResponseSchema = z.object({
+  data: z.array(selectSubscriptionSchema),
+  total: z.number(),
+});
+
+export type GetOrganizationSubscriptionsResponse = z.infer<
+  typeof getOrganizationSubscriptionsResponseSchema
+>;
+
+export const getOrganizationOrdersInputSchema = offsetPaginationSchema.extend({
+  sort: sortQuerySchema.optional(),
+  status: multiValueQuerySchema(z.enum(PaymentStatus)).optional(),
+  store: multiValueQuerySchema(z.string()).optional(),
+  createdAt: rangeQuerySchema.optional(),
+});
+
+export type GetOrganizationOrdersInput = z.infer<
+  typeof getOrganizationOrdersInputSchema
+>;
+
+export const getOrganizationOrdersResponseSchema = z.object({
+  data: z.array(selectOrderSchema),
+  total: z.number(),
+});
+
+export type GetOrganizationOrdersResponse = z.infer<
+  typeof getOrganizationOrdersResponseSchema
+>;
+
 export const getCustomersInputSchema = offsetPaginationSchema.extend({
   sort: sortQuerySchema.optional(),
   q: z.string().optional(),
@@ -248,10 +288,18 @@ export type GetCustomersInput = z.infer<typeof getCustomersInputSchema>;
 export const getCustomersResponseSchema = z.object({
   data: z.array(
     selectCustomerSchema.extend({
-      user: z.object({
-        name: z.string(),
-        image: z.string().nullish(),
-      }),
+      user: z
+        .object({
+          name: z.string(),
+          image: z.string().nullish(),
+        })
+        .nullable(),
+      organization: z
+        .object({
+          name: z.string(),
+          logo: z.string().nullish(),
+        })
+        .nullable(),
       subscriptions: z.number(),
       orders: z.number(),
     }),

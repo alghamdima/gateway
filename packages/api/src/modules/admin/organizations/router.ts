@@ -6,6 +6,8 @@ import { validate } from "../../../middleware";
 import {
   getInvitationsInputSchema,
   getMembersInputSchema,
+  getOrganizationOrdersInputSchema,
+  getOrganizationSubscriptionsInputSchema,
   getOrganizationsInputSchema,
 } from "../../../schema";
 import { getInvitations } from "../../organization/queries/invitations";
@@ -17,7 +19,12 @@ import {
   updateOrganizationMember,
 } from "./mutations";
 import { updateOrganization } from "./mutations";
-import { getOrganizations, getOrganization } from "./queries";
+import {
+  getOrganizationOrders,
+  getOrganizations,
+  getOrganization,
+  getOrganizationSubscriptions,
+} from "./queries";
 
 export const organizationsRouter = new Hono()
   .get("/", validate("query", getOrganizationsInputSchema), async (c) =>
@@ -25,6 +32,28 @@ export const organizationsRouter = new Hono()
   )
   .get("/:id", async (c) =>
     c.json(await getOrganization({ id: c.req.param("id") })),
+  )
+  .get(
+    "/:id/subscriptions",
+    validate("query", getOrganizationSubscriptionsInputSchema),
+    async (c) =>
+      c.json(
+        await getOrganizationSubscriptions({
+          organizationId: c.req.param("id"),
+          ...c.req.valid("query"),
+        }),
+      ),
+  )
+  .get(
+    "/:id/orders",
+    validate("query", getOrganizationOrdersInputSchema),
+    async (c) =>
+      c.json(
+        await getOrganizationOrders({
+          organizationId: c.req.param("id"),
+          ...c.req.valid("query"),
+        }),
+      ),
   )
   .delete("/:id", async (c) =>
     c.json(await deleteOrganization({ id: c.req.param("id") })),

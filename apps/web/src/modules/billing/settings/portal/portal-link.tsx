@@ -1,31 +1,57 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import React from "react";
+import React, { useMemo } from "react";
 import { toast } from "sonner";
 
-import { MOBILE_STORE_LINKS, MobileStore } from "@workspace/billing";
+import { toMemberRole } from "@workspace/auth";
+import {
+  BillingReference,
+  MOBILE_STORE_LINKS,
+  MobileStore,
+} from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Button, buttonVariants } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 
+import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
+import { authClient } from "~/lib/auth/client";
 import { billing } from "~/modules/billing/lib/api";
 import { TurboLink } from "~/modules/common/turbo-link";
+import { organization as organizationApi } from "~/modules/organization/lib/api";
 
 export const PortalLink = ({
   children,
   store,
-  redirectUrl = pathsConfig.dashboard.user.settings.billing,
+  redirectUrl,
   variantId,
+  referenceId,
+  referenceType,
   ...props
 }: React.ComponentProps<typeof Button> & {
   store?: string;
-  redirectUrl?: string;
+  redirectUrl?: string | URL;
   variantId?: string;
+  referenceId: string;
+  referenceType: BillingReference;
 }) => {
   const { t } = useTranslation("billing");
   const router = useRouter();
+  const session = authClient.useSession();
+
+  const organization = useQuery({
+    ...organizationApi.queries.get({ id: referenceId }),
+    enabled: referenceType === BillingReference.ORGANIZATION,
+  });
+
+  const member = useQuery({
+    ...organizationApi.queries.members.getByUserId({
+      organizationId: referenceId,
+      userId: session.data?.user.id ?? "",
+    }),
+    enabled: referenceType === BillingReference.ORGANIZATION,
+  });
 
   const getPortal = useMutation({
     ...billing.mutations.portal.get,
@@ -36,6 +62,17 @@ export const PortalLink = ({
       return router.push(data.url);
     },
   });
+  const canOpenPortal = useMemo(
+    () =>
+      referenceType === BillingReference.USER ||
+      authClient.organization.checkRolePermission({
+        permissions: {
+          billing: ["update", "delete"],
+        },
+        role: toMemberRole(member.data?.role),
+      }),
+    [member.data?.role, referenceType],
+  );
 
   if (store && Object.values(MobileStore).includes(store)) {
     const url = new URL(
@@ -62,17 +99,28 @@ export const PortalLink = ({
     );
   }
 
+  const url =
+    redirectUrl ??
+    new URL(
+      referenceType === BillingReference.USER || !organization.data
+        ? pathsConfig.dashboard.user.settings.billing
+        : pathsConfig.dashboard.organization(organization.data.slug).settings
+            .billing,
+      appConfig.url,
+    );
+
   return (
     <Button
       {...props}
       onClick={() =>
         getPortal.mutate({
           query: {
-            redirectUrl,
+            referenceId,
+            redirectUrl: url.toString(),
           },
         })
       }
-      disabled={getPortal.isPending || props.disabled}
+      disabled={getPortal.isPending || !canOpenPortal || props.disabled}
     >
       {getPortal.isPending ? (
         <Icons.Loader2 className="size-5 animate-spin" />

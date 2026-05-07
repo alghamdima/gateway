@@ -1,8 +1,15 @@
-import { getSubscription } from "@lemonsqueezy/lemonsqueezy.js";
+import {
+  getSubscription,
+  listSubscriptionItems,
+  updateSubscriptionItem,
+} from "@lemonsqueezy/lemonsqueezy.js";
 import dayjs from "dayjs";
 
+import { isSubscriptionActive } from "@workspace/billing";
 import {
+  getCustomerById,
   getCustomerByExternalId,
+  getSubscriptionsByCustomerId,
   upsertSubscription,
 } from "@workspace/billing/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
@@ -14,8 +21,10 @@ import { toSubscriptionStatus } from "./mappers/to-billing-status";
 
 export const subscriptionStatusChangeHandler = async ({
   id,
+  customerId,
 }: {
   id: string;
+  customerId?: string;
 }) => {
   const { data } = await getSubscription(id);
 
@@ -27,9 +36,11 @@ export const subscriptionStatusChangeHandler = async ({
     });
   }
 
-  const customer = await getCustomerByExternalId(
-    subscription.attributes.customer_id.toString(),
-  );
+  const customer = customerId
+    ? await getCustomerById(customerId)
+    : await getCustomerByExternalId(
+        subscription.attributes.customer_id.toString(),
+      );
 
   if (!customer) {
     throw new HttpException(HttpStatusCode.NOT_FOUND, {
@@ -62,4 +73,84 @@ export const subscriptionStatusChangeHandler = async ({
   logger.info(
     `✅ Subscription ${subscription.id} status changed for customer ${customer.id} to ${status}`,
   );
+};
+
+export const updateSubscription = async (
+  id: string,
+  data: Partial<{
+    quantity: number;
+  }>,
+) => {
+  if (!data.quantity) {
+    return;
+  }
+
+  const { data: itemsData } = await listSubscriptionItems({
+    filter: {
+      subscriptionId: id,
+    },
+    page: {
+      size: 1,
+    },
+  });
+
+  const item = itemsData?.data.at(0);
+
+  if (!item) {
+    throw new HttpException(HttpStatusCode.NOT_FOUND, {
+      code: "billing:error.subscriptionItemNotFound",
+    });
+  }
+
+  try {
+    await updateSubscriptionItem(item.id, { quantity: data.quantity });
+  } catch (error) {
+    logger.error(error);
+    throw new HttpException(HttpStatusCode.INTERNAL_SERVER_ERROR, {
+      code: "billing:error.subscriptionUpdate",
+    });
+  }
+};
+
+export const getSubscriptionItemIdByExternalId = async (externalId: string) => {
+  const customer = await getCustomerByExternalId(externalId);
+
+  if (!customer) {
+    throw new HttpException(HttpStatusCode.NOT_FOUND, {
+      code: "billing:error.customerNotFound",
+    });
+  }
+
+  const subscriptions = await getSubscriptionsByCustomerId(customer.id);
+
+  const subscription = subscriptions.find(
+    (item) =>
+      item.store === BillingProvider.LEMON_SQUEEZY &&
+      isSubscriptionActive(item),
+  );
+
+  if (!subscription) {
+    throw new HttpException(HttpStatusCode.NOT_FOUND, {
+      code: "billing:error.subscriptionNotFound",
+    });
+  }
+
+  const { data } = await listSubscriptionItems({
+    filter: {
+      subscriptionId: subscription.externalId,
+    },
+    page: {
+      size: 1,
+    },
+  });
+
+  const subscriptionItem = data?.data.at(0);
+
+  if (!subscriptionItem) {
+    throw new HttpException(HttpStatusCode.NOT_FOUND, {
+      code: "billing:error.subscriptionItemNotFound",
+    });
+  }
+
+  return subscriptionItem.id;
 };

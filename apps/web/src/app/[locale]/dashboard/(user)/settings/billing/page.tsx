@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
+import { BillingReference } from "@workspace/billing";
 
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api/server";
@@ -24,9 +25,13 @@ export default async function BillingPage() {
     return redirect(pathsConfig.auth.login);
   }
 
-  const summary = await handle(api.billing.me.$get, {
+  const summary = await handle(api.billing.summary.$get, {
     schema: getBillingSummaryResponseSchema,
-  })();
+  })({
+    query: {
+      referenceId: user.id,
+    },
+  });
 
   if (
     summary.every(
@@ -38,9 +43,15 @@ export default async function BillingPage() {
 
   return (
     <>
-      <SubscriptionsList />
-      <OrdersList />
-      <BillingInfo />
+      <SubscriptionsList
+        referenceId={user.id}
+        referenceType={BillingReference.USER}
+      />
+      <OrdersList referenceId={user.id} referenceType={BillingReference.USER} />
+      <BillingInfo
+        referenceId={user.id}
+        referenceType={BillingReference.USER}
+      />
     </>
   );
 }

@@ -8,9 +8,17 @@ import { Icons } from "@workspace/ui-web/icons";
 import { FeaturesList } from "~/modules/billing/features-list";
 import { PortalLink } from "~/modules/billing/settings/portal/portal-link";
 
-import type { Order } from "@workspace/billing";
+import type { BillingReference, Order } from "@workspace/billing";
 
-export const OrdersListItem = ({ order }: { order: Order }) => {
+export const OrdersListItem = ({
+  order,
+  referenceId,
+  referenceType,
+}: {
+  order: Order;
+  referenceId: string;
+  referenceType: BillingReference;
+}) => {
   const { t, i18n } = useTranslation(["common", "billing"]);
   const { plan } = findPlanByVariantId(order.variantId);
 
@@ -56,27 +64,17 @@ export const OrdersListItem = ({ order }: { order: Order }) => {
         </div>
       )}
 
-      <div className="flex flex-col gap-2">
-        <PortalLink
-          store={order.store}
-          variantId={order.variantId}
-          className="w-full gap-1"
-          variant="outline"
-        >
-          <span>{t("order.cta")}</span>
-          <Icons.ArrowUpRight className="size-4" />
-        </PortalLink>
-
-        <div className="flex w-full items-center justify-between gap-2">
-          <span className="text-muted-foreground text-xs">
-            {t("updatedAt")}
-          </span>
-
-          <span className="text-foreground text-xs">
-            {order.updatedAt.toLocaleString(i18n.language)}
-          </span>
-        </div>
-      </div>
+      <PortalLink
+        store={order.store}
+        variantId={order.variantId}
+        className="w-full gap-1"
+        variant="outline"
+        referenceId={referenceId}
+        referenceType={referenceType}
+      >
+        <span>{t("order.cta")}</span>
+        <Icons.ArrowUpRight className="size-4" />
+      </PortalLink>
     </div>
   );
 };

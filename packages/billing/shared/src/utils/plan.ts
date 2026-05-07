@@ -1,9 +1,15 @@
-import { ACTIVE_SUBSCRIPTION_STATUSES, config } from "../config";
-import { BillingPlan, PaymentStatus } from "../types";
+import { config } from "../config";
+import {
+  BillingPlan,
+  BillingType,
+  BillingReference,
+  PaymentStatus,
+} from "../types";
+import { isSubscriptionActive } from "./subscription";
 
 import type {
-  RecurringInterval,
   BillingModel,
+  RecurringInterval,
   SubscriptionStatus,
 } from "../types";
 
@@ -26,6 +32,12 @@ export const findPlanById = (id: string) => {
 
 export const findPlanIndexById = (id: string) => {
   return config.plans.findIndex((plan) => plan.id === id);
+};
+
+export const findVariantById = (id: string) => {
+  return config.plans
+    .flatMap((plan) => plan.variants)
+    .find((variant) => variant.id === id);
 };
 
 export const getPlanFeatures = (id: string) => {
@@ -65,8 +77,7 @@ export const getActivePlan = <
     .flatMap((customer) => customer?.subscriptions)
     .filter(
       (subscription) =>
-        subscription?.status &&
-        ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription.status),
+        subscription?.status && isSubscriptionActive(subscription),
     )
     .map((subscription) => subscription?.variantId)
     .filter(Boolean);
@@ -116,11 +127,15 @@ export const getLowerPlans = (planId: BillingPlan) => {
   return config.plans.slice(0, idx);
 };
 
-export const getFilteredPlans = (filters?: {
-  model?: BillingModel;
-  interval?: RecurringInterval;
-  hidden?: boolean;
-}) =>
+type Filters = {
+  referenceType?: BillingReference | null;
+  type?: BillingType | null;
+  model?: BillingModel | null;
+  interval?: RecurringInterval | null;
+  hidden?: boolean | null;
+};
+
+export const getFilteredPlans = (filters?: Filters) =>
   config.plans
     .map((plan) => {
       if (!filters) {
@@ -128,18 +143,32 @@ export const getFilteredPlans = (filters?: {
       }
       let variants = plan.variants;
 
-      if (typeof filters.model !== "undefined") {
+      if (filters.model) {
         variants = variants.filter(
           (variant) => variant.model === filters.model,
         );
       }
-      if (typeof filters.interval !== "undefined") {
+      if (filters.interval) {
         variants = variants.filter(
           (variant) =>
             "interval" in variant && variant.interval === filters.interval,
         );
       }
-      if (typeof filters.hidden !== "undefined") {
+
+      if (filters.type) {
+        variants = variants.filter((variant) => variant.type === filters.type);
+      }
+
+      if (
+        filters?.referenceType &&
+        filters.referenceType !== BillingReference.ORGANIZATION
+      ) {
+        variants = variants.filter(
+          (variant) => variant.type !== BillingType.PER_SEAT,
+        );
+      }
+
+      if (typeof filters.hidden === "boolean") {
         variants = variants.filter(
           (variant) => variant.hidden === filters.hidden,
         );
@@ -148,3 +177,39 @@ export const getFilteredPlans = (filters?: {
       return Object.assign({}, plan, { variants });
     })
     .filter((plan) => !!plan.variants.length);
+
+export const getAvailableIntervals = (filters?: Filters) => {
+  return [
+    ...new Set(
+      getFilteredPlans(filters).flatMap((plan) =>
+        plan.variants.flatMap((variant) =>
+          "interval" in variant ? variant.interval : null,
+        ),
+      ),
+    ),
+  ].filter(Boolean);
+};
+
+export const getAvailableModels = (filters?: Filters) => {
+  return [
+    ...new Set(
+      getFilteredPlans(filters).flatMap((plan) =>
+        plan.variants.flatMap((variant) =>
+          "model" in variant ? variant.model : null,
+        ),
+      ),
+    ),
+  ].filter(Boolean);
+};
+
+export const getAvailableTypes = (filters?: Filters) => {
+  return [
+    ...new Set(
+      getFilteredPlans(filters).flatMap((plan) =>
+        plan.variants.flatMap((variant) =>
+          "type" in variant ? variant.type : null,
+        ),
+      ),
+    ),
+  ].filter(Boolean);
+};

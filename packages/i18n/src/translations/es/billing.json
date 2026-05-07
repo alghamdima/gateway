@@ -2,7 +2,8 @@
   "pricing": {
     "label": "Precios",
     "title": "Planifica tu ingreso con precios ajustados",
-    "description": "Configura precios basados en tus necesidades y comienza a cobrar a tus clientes."
+    "description": "Configura precios basados en tus necesidades y comienza a cobrar a tus clientes.",
+    "disclaimer": "Combina y ajusta configuraciones para crear el precio perfecto para tu negocio. <reference>Revisa la documentación para más información.</reference>"
   },
   "settings": {
     "subscriptions": {
@@ -22,6 +23,11 @@
       "reviewInStore": "Revisar en la tienda"
     }
   },
+  "additionalUsage": "Adicional {{unit}}",
+  "forFirst": "para el primer {{upTo}} {{unit}}",
+  "forNext": "para el siguiente {{upTo}} {{unit}}",
+  "upToIncluded": "Hasta {{upTo}} {{unit}} incluido",
+  "infiniteUsage": "arriba de {{threshold}} {{unit}}",
   "currentBillingCycle": "Ciclo de facturación actual",
   "subscribe": "Suscribirse ahora",
   "updatePlan": "Actualizar plan",
@@ -50,25 +56,25 @@
     }
   },
   "feature": {
-    "sync": "Sincronización perfecta",
-    "basicSupport": "Soporte básico",
-    "limitedStorage": "Almacenamiento limitado",
-    "emailNotifications": "Notificaciones por correo",
-    "basicReports": "Informes básicos",
-    "advancedSync": "Sincronización avanzada",
-    "prioritySupport": "Soporte prioritario",
-    "moreStorage": "Más almacenamiento",
-    "teamCollaboration": "Colaboración en equipo",
-    "smsNotifications": "Notificaciones SMS",
-    "advancedReports": "Informes avanzados",
-    "unlimitedStorage": "Almacenamiento ilimitado",
-    "customBranding": "Marca personalizada",
-    "dedicatedSupport": "Soporte dedicado",
-    "apiAccess": "Acceso a API",
-    "userRoles": "Gestión de roles de usuario",
-    "auditLogs": "Registros de auditoría",
-    "singleSignOn": "Inicio de sesión único",
-    "advancedAnalytics": "Análisis avanzado"
+    "sync": "Sincronización perfecta entre dispositivos",
+    "basicSupport": "Soporte básico por correo",
+    "limitedStorage": "Almacenamiento en la nube limitado",
+    "emailNotifications": "Notificaciones de alerta por correo",
+    "basicReports": "Informes básicos de uso",
+    "advancedSync": "Sincronización avanzada en tiempo real",
+    "prioritySupport": "Soporte prioritario al cliente",
+    "moreStorage": "Más espacio de almacenamiento en la nube",
+    "teamCollaboration": "Herramientas de colaboración en equipo",
+    "smsNotifications": "Alertas y notificaciones por SMS",
+    "advancedReports": "Informes avanzados de análisis",
+    "unlimitedStorage": "Almacenamiento en la nube ilimitado",
+    "customBranding": "Opciones de marca personalizada",
+    "dedicatedSupport": "Soporte dedicado de cuenta",
+    "apiAccess": "Acceso completo a la API",
+    "userRoles": "Gestión completa de roles de usuario",
+    "auditLogs": "Registros de auditoría de cumplimiento",
+    "singleSignOn": "Inicio de sesión único empresarial",
+    "advancedAnalytics": "Análisis avanzado de uso"
   },
   "error": {
     "checkout": "Ocurrió un error durante el proceso de pago.",
@@ -92,7 +98,10 @@
       "productIdNotFound": "ID de producto no encontrado en el evento de webhook."
     },
     "customerCreation": "Error al crear el cliente.",
-    "promotionCodeRetrieve": "No se pudo recuperar el código de promoción."
+    "promotionCodeRetrieve": "No se pudo recuperar el código de promoción.",
+    "usageRetrieve": "No se pudo recuperar el uso de la facturación.",
+    "subscriptionItemNotFound": "No se encontró ningún elemento de suscripción para esta suscripción.",
+    "subscriptionUpdate": "No se pudo actualizar la suscripción en el proveedor de facturación."
   },
   "subscription": {
     "status": {
@@ -123,5 +132,14 @@
       "skipped": "Omitido",
       "error": "Error"
     }
+  },
+  "type": {
+    "flat": "Fijo",
+    "per-seat": "Por asiento",
+    "metered": "Medido"
+  },
+  "model": {
+    "one-time": "Pago único",
+    "recurring": "Recurrente"
   }
 }

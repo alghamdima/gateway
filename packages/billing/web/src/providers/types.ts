@@ -1,5 +1,11 @@
+import { GetUsagePayload } from "../schema/usage";
+
 import type { CheckoutPayload, GetBillingPortalPayload } from "../schema";
-import type { User } from "@workspace/auth";
+
+export interface BillingUser {
+  id: string;
+  email: string;
+}
 
 export interface WebhookCallbacks {
   onCheckoutSessionCompleted?: (sessionId: string) => Promise<void> | void;
@@ -16,11 +22,26 @@ export interface BillingProviderStrategy {
     callbacks?: WebhookCallbacks,
   ) => Promise<Response>;
   checkout: (
-    input: CheckoutPayload & { user: User },
+    input: CheckoutPayload & { user: BillingUser },
   ) => Promise<{ url: string | null }>;
   getBillingPortal: (
-    input: GetBillingPortalPayload & { user: User },
+    input: GetBillingPortalPayload & { user: BillingUser },
   ) => Promise<{ url: string }>;
+  updateSubscription: (
+    id: string,
+    data: Partial<{
+      quantity: number;
+    }>,
+  ) => Promise<void>;
+  recordUsage: (input: {
+    externalId: string;
+    quantity: number;
+    event?: string;
+    timestamp?: Date;
+  }) => Promise<{ recorded: boolean }>;
+  getUsage: (
+    input: Omit<GetUsagePayload, "referenceId"> & { externalId: string },
+  ) => Promise<{ usage: number; start: Date; end: Date }>;
 }
 
 export const BillingProvider = {

@@ -3,6 +3,8 @@ import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import {
   getInvitationsResponseSchema,
   getMembersResponseSchema,
+  getOrganizationOrdersResponseSchema,
+  getOrganizationSubscriptionsResponseSchema,
   getOrganizationResponseSchema,
   getUserAccountsResponseSchema,
   getUserInvitationsResponseSchema,
@@ -158,6 +160,38 @@ const queries = {
             schema: getInvitationsResponseSchema,
           })({ query, param: { id } }),
       }),
+    getSubscriptions: ({
+      id,
+      ...query
+    }: InferRequestType<
+      (typeof api.admin.organizations)[":id"]["subscriptions"]["$get"]
+    >["query"] & { id: string }) => ({
+      queryKey: [
+        ...queries.organizations.get({ id }).queryKey,
+        "subscriptions",
+        query,
+      ],
+      queryFn: () =>
+        handle(api.admin.organizations[":id"].subscriptions.$get, {
+          schema: getOrganizationSubscriptionsResponseSchema,
+        })({ query, param: { id } }),
+    }),
+    getOrders: ({
+      id,
+      ...query
+    }: InferRequestType<
+      (typeof api.admin.organizations)[":id"]["orders"]["$get"]
+    >["query"] & { id: string }) => ({
+      queryKey: [
+        ...queries.organizations.get({ id }).queryKey,
+        "orders",
+        query,
+      ],
+      queryFn: () =>
+        handle(api.admin.organizations[":id"].orders.$get, {
+          schema: getOrganizationOrdersResponseSchema,
+        })({ query, param: { id } }),
+    }),
   },
 };
 

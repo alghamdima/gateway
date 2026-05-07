@@ -4,7 +4,7 @@ import { config } from "../config";
 import { translations } from "../translations";
 
 import type { TranslationKey } from "../client";
-import type { DefaultNamespace, Namespace, i18n } from "i18next";
+import type { DefaultNamespace, Namespace, TOptions, i18n } from "i18next";
 
 export const loadTranslation = async (
   locale: (typeof config.locales)[number],
@@ -25,8 +25,9 @@ export const isKey = <T extends Namespace = DefaultNamespace>(
   key: string,
   i18n?: i18n,
   ns?: T,
+  options?: TOptions,
 ): key is TranslationKey<T> => {
-  return i18n?.exists(key, { ns }) ?? false;
+  return i18n?.exists(key, { ns, ...options }) ?? false;
 };
 
 export const isLocaleSupported = (

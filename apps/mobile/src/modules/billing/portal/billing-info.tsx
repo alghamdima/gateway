@@ -12,6 +12,7 @@ import { billing } from "~/modules/billing/lib/api";
 import { NativePortalLink } from "~/modules/billing/portal/native-portal-link";
 import { WebPortalLink } from "~/modules/billing/portal/web-portal-link";
 
+import type { BillingReference } from "@workspace/billing";
 import type { Icon } from "@workspace/ui-mobile/icons";
 
 const MobileStoreIcon: Record<MobileStore, Icon> = {
@@ -19,9 +20,15 @@ const MobileStoreIcon: Record<MobileStore, Icon> = {
   [MobileStore.PLAY_STORE]: Icons.AndroidStroke,
 };
 
-export const BillingInfo = () => {
+export const BillingInfo = ({
+  referenceId,
+  referenceType,
+}: {
+  referenceId: string;
+  referenceType: BillingReference;
+}) => {
   const { t } = useTranslation("billing");
-  const summary = useQuery(billing.queries.summary.get);
+  const summary = useQuery(billing.queries.summary.get(referenceId));
 
   const stores = useMemo(() => {
     if (!summary.data) return [];
@@ -81,6 +88,8 @@ export const BillingInfo = () => {
               size="lg"
               variant={variant}
               className="gap-1.5"
+              referenceId={referenceId}
+              referenceType={referenceType}
             >
               <Text>{t("settings.information.visitPortal")}</Text>
               <Icons.ArrowUpRight

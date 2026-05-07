@@ -111,3 +111,27 @@ export const subscriptionStatusChangeHandler = async ({
     `✅ Subscription ${id} status changed for customer ${customer.id} to ${subscription.status}`,
   );
 };
+
+export const updateSubscription = async (
+  id: string,
+  data: Partial<{
+    quantity: number;
+  }>,
+) => {
+  const subscription = await getSubscription(id);
+
+  if (!subscription) {
+    throw new HttpException(HttpStatusCode.NOT_FOUND, {
+      code: "billing:error.subscriptionNotFound",
+    });
+  }
+
+  await stripe().subscriptions.update(id, {
+    items: [
+      {
+        id: subscription.items.data[0]?.id,
+        quantity: data.quantity,
+      },
+    ],
+  });
+};

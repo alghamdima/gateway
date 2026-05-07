@@ -23,22 +23,46 @@ export default function Organization() {
     role: toMemberRole(activeMember?.role),
   });
 
+  const hasBillingReadPermission = authClient.organization.checkRolePermission({
+    permissions: {
+      billing: ["read"],
+    },
+    role: toMemberRole(activeMember?.role),
+  });
+
   return (
     <View className="bg-background flex-1 gap-6 py-2">
-      {hasUpdatePermission && (
-        <SettingsTile
-          icon={Icons.IdCard}
-          onPress={() =>
-            router.navigate(
-              pathsConfig.dashboard.organization.settings.organization.name,
-            )
-          }
-        >
-          <Text>{t("name")}</Text>
-        </SettingsTile>
-      )}
-      <LeaveOrganization />
-      <DeleteOrganization />
+      <View>
+        {hasUpdatePermission && (
+          <SettingsTile
+            icon={Icons.IdCard}
+            onPress={() =>
+              router.navigate(
+                pathsConfig.dashboard.organization.settings.organization.name,
+              )
+            }
+          >
+            <Text>{t("name")}</Text>
+          </SettingsTile>
+        )}
+        {hasBillingReadPermission && (
+          <SettingsTile
+            icon={Icons.Wallet}
+            onPress={() =>
+              router.navigate(
+                pathsConfig.dashboard.organization.settings.organization
+                  .billing,
+              )
+            }
+          >
+            <Text>{t("billing")}</Text>
+          </SettingsTile>
+        )}
+      </View>
+      <View>
+        <LeaveOrganization />
+        <DeleteOrganization />
+      </View>
     </View>
   );
 }

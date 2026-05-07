@@ -1,7 +1,8 @@
-import { config } from "@workspace/billing";
+import { BillingType, config } from "@workspace/billing";
 import {
   getCustomerByExternalId,
   getCustomersByReferenceId,
+  getOrganizationBillableSeatsCount,
   upsertOrder,
 } from "@workspace/billing/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
@@ -15,8 +16,8 @@ import { toPaymentStatus } from "./mappers/to-billing-status";
 import { polar } from "./sdk";
 import { subscriptionStatusChangeHandler } from "./subscription";
 
-import type { CheckoutPayload } from "../../schema";
-import type { User } from "@workspace/auth";
+import type { CheckoutPayload, GetBillingPortalPayload } from "../../schema";
+import type { BillingUser } from "../types";
 
 const getDiscountByCode = async (code: string) => {
   const discounts = await polar().discounts.list({
@@ -28,10 +29,11 @@ const getDiscountByCode = async (code: string) => {
 
 export const checkout = async ({
   user,
+  referenceId,
   variant: { id },
   discount,
   redirect,
-}: CheckoutPayload & { user: User }) => {
+}: CheckoutPayload & { user: BillingUser }) => {
   try {
     const variant = config.plans
       .find((plan) => plan.variants.some((v) => v.id === id))
@@ -44,18 +46,23 @@ export const checkout = async ({
     }
 
     const { polarCustomer } = await createOrRetrieveCustomer({
-      userId: user.id,
+      referenceId,
       email: user.email,
     });
 
     const polarDiscount = discount?.code
       ? await getDiscountByCode(discount.code)
       : null;
+    const quantity =
+      variant.type === BillingType.PER_SEAT
+        ? await getOrganizationBillableSeatsCount(referenceId)
+        : null;
 
     const checkout = await polar().checkouts.create({
       products: [variant.id],
       successUrl: redirect.success,
       customerId: polarCustomer.id,
+      ...(quantity ? { seats: quantity } : {}),
       ...(polarDiscount && { discountId: polarDiscount.id }),
     });
 
@@ -68,11 +75,13 @@ export const checkout = async ({
   }
 };
 
-export const getBillingPortal = async ({ user }: { user: User }) => {
+export const getBillingPortal = async ({
+  referenceId,
+}: GetBillingPortalPayload & { user: BillingUser }) => {
   const defaultUrl = `https://polar.sh/${env.POLAR_ORGANIZATION_SLUG}/portal`;
 
   try {
-    const [customer] = await getCustomersByReferenceId(user.id, {
+    const [customer] = await getCustomersByReferenceId(referenceId, {
       provider: BillingProvider.POLAR,
     });
 

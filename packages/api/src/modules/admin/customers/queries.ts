@@ -2,16 +2,22 @@ import dayjs from "dayjs";
 
 import {
   and,
-  asc,
   between,
   count,
   eq,
   getOrderByFromSort,
   ilike,
   inArray,
+  or,
   sql,
 } from "@workspace/db";
-import { customer, order, subscription, user } from "@workspace/db/schema";
+import {
+  customer,
+  order,
+  organization,
+  subscription,
+  user,
+} from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
 import type { GetCustomersInput } from "../../../schema";
@@ -26,7 +32,12 @@ export const getCustomers = async (input: GetCustomersInput) => {
   const offset = (input.page - 1) * input.perPage;
 
   const where = and(
-    input.q ? ilike(user.name, `%${input.q}%`) : undefined,
+    input.q
+      ? or(
+          ilike(user.name, `%${input.q}%`),
+          ilike(organization.name, `%${input.q}%`),
+        )
+      : undefined,
     input.provider ? inArray(customer.provider, input.provider) : undefined,
     input.createdAt
       ? between(
@@ -60,9 +71,16 @@ export const getCustomers = async (input: GetCustomersInput) => {
         if (["subscriptions", "orders"].includes(field)) {
           return [s.desc ? sql`${field} DESC` : sql`${field} ASC`];
         }
+        if (field === "name") {
+          return [
+            s.desc
+              ? sql`COALESCE(${user.name}, ${organization.name}) DESC`
+              : sql`COALESCE(${user.name}, ${organization.name}) ASC`,
+          ];
+        }
         return getOrderByFromSort({ sort: [s], defaultSchema: customer });
       })
-    : [asc(user.name)];
+    : [sql`COALESCE(${user.name}, ${organization.name}) ASC`];
 
   return db.transaction(async (tx) => {
     const results = await db
@@ -77,6 +95,10 @@ export const getCustomers = async (input: GetCustomersInput) => {
           name: user.name,
           image: user.image,
         },
+        organization: {
+          name: organization.name,
+          logo: organization.logo,
+        },
         subscriptions:
           sql<number>`CAST(COUNT(${subscription.id}) AS INTEGER)`.as(
             "subscriptions",
@@ -86,10 +108,11 @@ export const getCustomers = async (input: GetCustomersInput) => {
       })
       .from(customer)
       .leftJoin(user, eq(customer.referenceId, user.id))
+      .leftJoin(organization, eq(customer.referenceId, organization.id))
       .leftJoin(subscription, eq(customer.id, subscription.customerId))
       .leftJoin(order, eq(customer.id, order.customerId))
       .where(where)
-      .groupBy(customer.id, user.id)
+      .groupBy(customer.id, user.id, organization.id)
       .having(having)
       .limit(input.perPage)
       .offset(offset)

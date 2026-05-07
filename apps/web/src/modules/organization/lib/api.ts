@@ -13,7 +13,7 @@ import { authClient } from "~/lib/auth/client";
 
 import type { InferRequestType } from "hono/client";
 
-const KEY = "organizations";
+const KEY = "organization";
 
 const queries = {
   get: (params: { slug: string } | { id: string }) =>
@@ -31,14 +31,6 @@ const queries = {
         }),
     }),
   members: {
-    getIsOnlyOwner: ({ id }: { id: string }) =>
-      queryOptions({
-        queryKey: [...queries.get({ id }).queryKey, "members", "is-only-owner"],
-        queryFn: () =>
-          handle(api.organizations[":id"].members["is-only-owner"].$get)({
-            param: { id },
-          }),
-      }),
     getAll: ({
       id,
       ...query
@@ -56,6 +48,28 @@ const queries = {
               id,
             },
           }),
+      }),
+    getByUserId: ({
+      organizationId,
+      userId,
+    }: {
+      organizationId: string;
+      userId: string;
+    }) =>
+      queryOptions({
+        queryKey: [KEY, "members", "by-user-id", { organizationId, userId }],
+        queryFn: async () =>
+          (
+            await authClient.organization.listMembers({
+              query: {
+                organizationId,
+                filterField: "userId",
+                filterValue: userId,
+                filterOperator: "eq",
+              },
+              fetchOptions: { throw: true },
+            })
+          ).members[0] ?? null,
       }),
   },
   invitations: {
@@ -78,6 +92,17 @@ const queries = {
           }),
       }),
   },
+  canLeave: ({ id }: { id: string }) =>
+    queryOptions({
+      queryKey: [KEY, "can-leave", id],
+      queryFn: () =>
+        handle(api.organizations[":id"]["can-leave"].$get)({ param: { id } }),
+    }),
+  getBlockingAccountDeletion: queryOptions({
+    queryKey: [KEY, "blocking-account-deletion"],
+    queryFn: () =>
+      handle(api.organizations["blocking-account-deletion"].$get)({}),
+  }),
 };
 
 const mutations = {

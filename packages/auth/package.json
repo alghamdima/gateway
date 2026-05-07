@@ -19,6 +19,8 @@
     "@better-auth/drizzle-adapter": "1.6.9",
     "@better-auth/expo": "1.6.9",
     "@better-auth/passkey": "1.6.9",
+    "@workspace/billing": "workspace:*",
+    "@workspace/billing-web": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/email": "workspace:*",
     "@workspace/i18n": "workspace:*",

@@ -51,10 +51,12 @@ export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
   const [open, setOpen] = useState(false);
   const [createOrganizationOpen, setCreateOrganizationOpen] = useState(false);
 
-  const summary = useQuery(billing.queries.summary.get);
-  const activePlan = getActivePlan(summary.data);
   const { data: organizations } = authClient.useListOrganizations();
   const { activeOrganization } = useActiveOrganization();
+
+  const referenceId = activeOrganization?.id ?? user.id;
+  const summary = useQuery(billing.queries.summary.get(referenceId));
+  const activePlan = getActivePlan(summary.data);
 
   return (
     <SidebarMenu>

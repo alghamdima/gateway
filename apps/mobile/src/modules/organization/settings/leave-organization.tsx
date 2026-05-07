@@ -18,13 +18,15 @@ export const LeaveOrganization = () => {
   const activeOrganization = authClient.useActiveOrganization();
   const listOrganizations = authClient.useListOrganizations();
   const activeMember = authClient.useActiveMember();
+  const isOwner = activeMember.data?.role === MemberRole.OWNER;
 
-  const { data: isOnlyOwner } = useQuery({
-    ...organization.queries.members.getIsOnlyOwner({
+  const canLeave = useQuery({
+    ...organization.queries.canLeave({
       id: activeOrganization.data?.id ?? "",
     }),
-    enabled: activeMember.data?.role === MemberRole.OWNER,
+    enabled: isOwner,
   });
+  const canCurrentMemberLeave = !isOwner || canLeave.data?.allowed === true;
 
   const leaveOrganization = useMutation({
     ...organization.mutations.leave,
@@ -36,9 +38,7 @@ export const LeaveOrganization = () => {
     },
   });
 
-  const canLeave = !isOnlyOwner?.status;
-
-  if (!activeOrganization.data || !canLeave) {
+  if (!activeOrganization.data) {
     return null;
   }
 
@@ -48,6 +48,11 @@ export const LeaveOrganization = () => {
         icon={Icons.LogOut}
         destructive
         onPress={() => {
+          if (!canCurrentMemberLeave) {
+            Alert.alert(t("leave.title"), t("leave.cannotLeaveAsOnlyOwner"));
+            return;
+          }
+
           Alert.alert(t("leave.title"), t("leave.disclaimer"), [
             { text: t("cancel"), style: "cancel" },
             {

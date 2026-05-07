@@ -38,24 +38,25 @@ export const LeaveOrganization = ({
 }) => {
   const { t } = useTranslation("organization");
   const { activeMember } = useActiveOrganization();
+  const isOwner = activeMember?.role === MemberRole.OWNER;
 
   const { data: activeOrganization } = useQuery(
     organization.queries.get({ id: organizationId }),
   );
 
-  const { data: isOnlyOwner } = useQuery({
-    ...organization.queries.members.getIsOnlyOwner({ id: organizationId }),
-    enabled: activeMember?.role === MemberRole.OWNER,
+  const { data: canLeave } = useQuery({
+    ...organization.queries.canLeave({ id: organizationId }),
+    enabled: isOwner,
   });
 
-  const canLeave = !isOnlyOwner?.status;
+  const canCurrentMemberLeave = !isOwner || canLeave?.allowed === true;
 
   if (!activeOrganization) {
     return null;
   }
 
   return (
-    <SettingsCard variant="destructive" disabled={!canLeave}>
+    <SettingsCard variant="destructive" disabled={!canCurrentMemberLeave}>
       <SettingsCardHeader>
         <SettingsCardTitle>{t("leave.title")}</SettingsCardTitle>
         <SettingsCardDescription>
@@ -64,7 +65,7 @@ export const LeaveOrganization = ({
       </SettingsCardHeader>
 
       <SettingsCardFooter>
-        {canLeave ? (
+        {canCurrentMemberLeave ? (
           <ConfirmLeaveModal
             organizationId={activeOrganization.id}
             render={

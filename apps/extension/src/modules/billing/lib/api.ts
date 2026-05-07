@@ -8,10 +8,16 @@ const KEY = "billing";
 
 const queries = {
   summary: {
-    get: queryOptions({
-      queryKey: [KEY, "me"],
-      queryFn: () => handle(api.billing.me.$get)(),
-    }),
+    get: (referenceId: string) =>
+      queryOptions({
+        queryKey: [KEY, "summary", referenceId],
+        queryFn: () =>
+          handle(api.billing.summary.$get)({
+            query: {
+              referenceId,
+            },
+          }),
+      }),
   },
 };
 

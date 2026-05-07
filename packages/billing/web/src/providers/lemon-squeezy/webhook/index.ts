@@ -51,24 +51,28 @@ export const webhookHandler = async (
       await callbacks?.onSubscriptionCreated?.(data.data.id);
       await subscriptionStatusChangeHandler({
         id: data.data.id,
+        customerId: data.meta.custom_data.customer_id,
       });
       break;
     case "subscription_updated":
       await callbacks?.onSubscriptionUpdated?.(data.data.id);
       await subscriptionStatusChangeHandler({
         id: data.data.id,
+        customerId: data.meta.custom_data.customer_id,
       });
       break;
     case "subscription_expired":
       await callbacks?.onSubscriptionDeleted?.(data.data.id);
       await subscriptionStatusChangeHandler({
         id: data.data.id,
+        customerId: data.meta.custom_data.customer_id,
       });
       break;
     case "order_created":
       await callbacks?.onCheckoutSessionCompleted?.(data.data.id);
       await checkoutStatusChangeHandler({
         id: data.data.id,
+        customerId: data.meta.custom_data.customer_id,
       });
       break;
   }

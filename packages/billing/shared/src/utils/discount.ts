@@ -1,8 +1,45 @@
 import { config } from "../config";
-import { BillingDiscountType, RecurringInterval, BillingModel } from "../types";
+import {
+  BillingDiscountType,
+  RecurringInterval,
+  BillingModel,
+  BillingType,
+} from "../types";
 import { findPlanByVariantId } from "./plan";
 
 import type { BillingConfigDiscount, BillingConfigVariant } from "../config";
+
+export const isFree = (variant?: BillingConfigVariant) => {
+  if (!variant) {
+    return false;
+  }
+
+  if ("cost" in variant) {
+    return variant.cost === 0;
+  }
+
+  if ("tiers" in variant) {
+    return variant.tiers.every((tier) => tier.cost === 0);
+  }
+
+  return false;
+};
+
+export const getVariantInitialCost = (variant?: BillingConfigVariant) => {
+  if (!variant) {
+    return 0;
+  }
+
+  if ("cost" in variant) {
+    return variant.cost;
+  }
+
+  if ("tiers" in variant) {
+    return variant.tiers[0]?.cost ?? 0;
+  }
+
+  return 0;
+};
 
 const isRecurringVariant = (
   variant: BillingConfigVariant,
@@ -38,7 +75,10 @@ export const getVariantWithHighestDiscount = (
       ? calculateDiscount(b, highestDiscountB)
       : null;
 
-    return (discountB?.original.cost ?? 0) - (discountA?.original.cost ?? 0);
+    return (
+      (getVariantInitialCost(discountB?.original) ?? 0) -
+      (getVariantInitialCost(discountA?.original) ?? 0)
+    );
   });
 
   if (!variantWithHighestDiscount) {
@@ -59,7 +99,7 @@ export const calculateDiscount = (
     return null;
   }
 
-  const cost = variant.cost;
+  const cost = getVariantInitialCost(variant);
 
   if (discount.type === BillingDiscountType.AMOUNT) {
     return {
@@ -67,6 +107,14 @@ export const calculateDiscount = (
       discounted: {
         ...variant,
         cost: cost - discount.off,
+        ...("tiers" in variant
+          ? {
+              tiers: variant.tiers.map((tier) => ({
+                ...tier,
+                cost: tier.cost - discount.off,
+              })),
+            }
+          : {}),
       },
       percentage: Math.floor((discount.off / cost) * 100),
       type: BillingDiscountType.AMOUNT,
@@ -78,6 +126,14 @@ export const calculateDiscount = (
     discounted: {
       ...variant,
       cost: cost - (cost * discount.off) / 100,
+      ...("tiers" in variant
+        ? {
+            tiers: variant.tiers.map((tier) => ({
+              ...tier,
+              cost: tier.cost - (tier.cost * discount.off) / 100,
+            })),
+          }
+        : {}),
     },
     percentage: discount.off,
     type: BillingDiscountType.PERCENT,
@@ -85,7 +141,7 @@ export const calculateDiscount = (
 };
 
 export const calculateRecurringDiscount = (variant: BillingConfigVariant) => {
-  if (!isRecurringVariant(variant)) {
+  if (!isRecurringVariant(variant) || variant.type === BillingType.METERED) {
     return null;
   }
 
@@ -95,7 +151,9 @@ export const calculateRecurringDiscount = (variant: BillingConfigVariant) => {
     return null;
   }
 
-  const recurringVariants = plan.variants.filter(isRecurringVariant);
+  const recurringVariants = plan.variants
+    .filter(isRecurringVariant)
+    .filter((v) => v.type === variant.type);
 
   if (!recurringVariants.length) {
     return null;
@@ -147,9 +205,11 @@ export const getVariantDiscount = (
     const discountB = calculateDiscount(variant, b);
 
     const amountA =
-      (discountA?.original.cost ?? 0) - (discountA?.discounted.cost ?? 0);
+      (getVariantInitialCost(discountA?.original) ?? 0) -
+      (getVariantInitialCost(discountA?.discounted) ?? 0);
     const amountB =
-      (discountB?.original.cost ?? 0) - (discountB?.discounted.cost ?? 0);
+      (getVariantInitialCost(discountB?.original) ?? 0) -
+      (getVariantInitialCost(discountB?.discounted) ?? 0);
 
     return amountB - amountA;
   });
@@ -167,9 +227,9 @@ const getEffectiveCost = (
   const discount = getVariantDiscount(variant, discounts);
   if (discount) {
     const discountResult = calculateDiscount(variant, discount);
-    return discountResult?.discounted.cost ?? variant.cost;
+    return discountResult?.discounted.cost ?? getVariantInitialCost(variant);
   }
-  return variant.cost;
+  return getVariantInitialCost(variant);
 };
 
 const MONTHS_PER_YEAR = 12;

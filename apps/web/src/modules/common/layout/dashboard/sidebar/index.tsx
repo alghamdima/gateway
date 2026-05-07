@@ -24,6 +24,7 @@ import {
 import { Sidebar } from "@workspace/ui-web/sidebar";
 
 import { pathsConfig } from "~/config/paths";
+import { BuyCta } from "~/modules/common/layout/dashboard/buy-cta";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { AccountSwitcher } from "~/modules/organization/account-switcher";
 import { UserNavigation } from "~/modules/user/user-navigation";
@@ -212,6 +213,7 @@ export const DashboardSidebar = memo<DashboardSidebarProps>(
         </div>
 
         <SidebarFooter>
+          <BuyCta className="mt-auto" />
           <SidebarMenu>
             <SidebarMenuItem>
               <UserNavigation user={user} />

@@ -6,6 +6,6 @@ export const formatPrice = (
     style: "currency",
     currency: price.currency,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(price.amount / 100);
 };

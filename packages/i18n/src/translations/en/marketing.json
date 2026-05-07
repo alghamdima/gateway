@@ -246,5 +246,10 @@
       "title": "Installing update...",
       "description": "The update is being installed. Please wait a moment."
     }
+  },
+  "buyCta": {
+    "title": "This app can be yours.",
+    "description": "Customize, deploy and start earning $$$. In minutes.",
+    "link": "Get TurboStarter"
   }
 }

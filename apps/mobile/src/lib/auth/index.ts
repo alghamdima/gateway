@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 
+import { ac, roles } from "@workspace/auth";
 import {
   adminClient,
   anonymousClient,
@@ -37,7 +38,10 @@ export const authClient = createAuthClient({
     magicLinkClient(),
     twoFactorClient(),
     adminClient(),
-    organizationClient(),
+    organizationClient({
+      ac,
+      roles,
+    }),
     lastLoginMethodClient({
       storage: SecureStore,
     }),

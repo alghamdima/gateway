@@ -23,7 +23,9 @@ import { NodeEnv } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
-import { generateName, getUrl } from "./lib/utils";
+import { hooks } from "./hooks";
+import { getUrl } from "./lib/utils";
+import { ac, roles } from "./rbac";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
 export const auth = betterAuth({
@@ -50,6 +52,7 @@ export const auth = betterAuth({
             }).toString(),
           },
         }),
+      ...hooks.deleteUser,
     },
     changeEmail: {
       enabled: true,
@@ -114,20 +117,7 @@ export const auth = betterAuth({
     schema,
   }),
   databaseHooks: {
-    user: {
-      create: {
-        before: async (user) => {
-          const name = user.name?.trim() || generateName(user.email);
-
-          return {
-            data: {
-              ...user,
-              name,
-            },
-          };
-        },
-      },
-    },
+    user: hooks.user,
   },
   plugins: [
     magicLink({
@@ -187,6 +177,9 @@ export const auth = betterAuth({
           },
         });
       },
+      ac,
+      roles,
+      organizationHooks: hooks.organization,
     }),
     lastLoginMethod({
       customResolveMethod: (ctx) => {
@@ -244,3 +237,11 @@ export type Invitation = typeof auth.$Infer.Invitation;
 export type Organization = typeof auth.$Infer.Organization;
 export type ActiveOrganization = typeof auth.$Infer.ActiveOrganization;
 export type Member = typeof auth.$Infer.Member;
+export type Permissions = NonNullable<
+  NonNullable<
+    Parameters<typeof auth.api.hasPermission>[0]
+  >["body"]["permissions"]
+>;
+
+export * from "./hooks";
+export * from "./lib/server";

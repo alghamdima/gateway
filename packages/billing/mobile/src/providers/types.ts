@@ -20,7 +20,7 @@ export interface BillingProviderClientStrategy {
   useCustomer: () => {
     customer: unknown;
     entitlements: Entitlement[];
-    identify: (userId: string, traits?: Record<string, unknown>) => void;
+    identify: (userId: string, traits?: Record<string, string | null>) => void;
     reset: () => void;
     linkToPortal: ({
       store,

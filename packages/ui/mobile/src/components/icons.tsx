@@ -57,6 +57,7 @@ import {
   TrendingUp,
   UsersRound,
   MonitorSmartphone,
+  Code,
 } from "lucide-react-native";
 import { withUniwind } from "uniwind";
 
@@ -124,6 +125,7 @@ const icons = {
   ArrowUpRight,
   MonitorSmartphone,
   WalletCards,
+  Code,
 };
 
 const Icons = {} as {

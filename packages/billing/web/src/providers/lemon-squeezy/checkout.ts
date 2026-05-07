@@ -4,10 +4,12 @@ import {
   getOrder,
 } from "@lemonsqueezy/lemonsqueezy.js";
 
-import { config } from "@workspace/billing";
+import { BillingType, config } from "@workspace/billing";
 import {
+  getCustomerById,
   getCustomerByExternalId,
   getCustomersByReferenceId,
+  getOrganizationBillableSeatsCount,
   upsertOrder,
 } from "@workspace/billing/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
@@ -19,15 +21,16 @@ import { createOrRetrieveCustomer } from "./customer";
 import { env } from "./env";
 import { toPaymentStatus } from "./mappers/to-billing-status";
 
-import type { CheckoutPayload } from "../../schema";
-import type { User } from "@workspace/auth";
+import type { CheckoutPayload, GetBillingPortalPayload } from "../../schema";
+import type { BillingUser } from "../types";
 
 export const checkout = async ({
   user,
+  referenceId,
   variant: { id },
   discount,
   redirect,
-}: CheckoutPayload & { user: User }) => {
+}: CheckoutPayload & { user: BillingUser }) => {
   try {
     const variant = config.plans
       .find((plan) => plan.variants.some((v) => v.id === id))
@@ -40,9 +43,13 @@ export const checkout = async ({
     }
 
     const { customer, lemonSqueezyCustomer } = await createOrRetrieveCustomer({
-      userId: user.id,
+      referenceId,
       email: user.email,
     });
+    const quantity =
+      variant.type === BillingType.PER_SEAT
+        ? await getOrganizationBillableSeatsCount(referenceId)
+        : undefined;
 
     const session = await createCheckout(env.LEMON_SQUEEZY_STORE_ID, id, {
       checkoutData: {
@@ -52,6 +59,7 @@ export const checkout = async ({
           customer_id: customer?.id,
           user_id: user.id,
         },
+        ...(quantity ? { quantity } : {}),
         ...(discount && { discountCode: discount.code }),
       },
       productOptions: {
@@ -69,11 +77,13 @@ export const checkout = async ({
   }
 };
 
-export const getBillingPortal = async ({ user }: { user: User }) => {
+export const getBillingPortal = async ({
+  referenceId,
+}: GetBillingPortalPayload & { user: BillingUser }) => {
   const defaultUrl = `https://${env.LEMON_SQUEEZY_STORE_ID}.lemonsqueezy.com/billing`;
 
   try {
-    const [customer] = await getCustomersByReferenceId(user.id, {
+    const [customer] = await getCustomersByReferenceId(referenceId, {
       provider: BillingProvider.LEMON_SQUEEZY,
     });
 
@@ -96,7 +106,13 @@ export const getBillingPortal = async ({ user }: { user: User }) => {
   }
 };
 
-export const checkoutStatusChangeHandler = async ({ id }: { id: string }) => {
+export const checkoutStatusChangeHandler = async ({
+  id,
+  customerId,
+}: {
+  id: string;
+  customerId?: string;
+}) => {
   const { data } = await getOrder(id);
 
   const order = data?.data;
@@ -107,9 +123,9 @@ export const checkoutStatusChangeHandler = async ({ id }: { id: string }) => {
     });
   }
 
-  const customer = await getCustomerByExternalId(
-    order.attributes.customer_id.toString(),
-  );
+  const customer = customerId
+    ? await getCustomerById(customerId)
+    : await getCustomerByExternalId(order.attributes.customer_id.toString());
 
   if (!customer) {
     throw new HttpException(HttpStatusCode.NOT_FOUND, {

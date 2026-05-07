@@ -51,8 +51,8 @@ const pathsConfig = {
         organization: {
           index: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/organization`,
           name: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/organization/name`,
+          billing: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/organization/billing`,
         },
-        billing: `${ORGANIZATION_DASHBOARD_PREFIX}/settings/billing`,
       },
       members: `${ORGANIZATION_DASHBOARD_PREFIX}/members`,
     },

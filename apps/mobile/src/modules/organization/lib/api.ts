@@ -35,19 +35,6 @@ const queries = {
         }),
     }),
   members: {
-    getIsOnlyOwner: ({ id }: { id: string }) =>
-      queryOptions({
-        queryKey: [
-          ...queries.get({ id }).queryKey,
-          "members",
-          "is-only-owner",
-          id,
-        ],
-        queryFn: () =>
-          handle(api.organizations[":id"].members["is-only-owner"].$get)({
-            param: { id },
-          }),
-      }),
     getAll: ({
       id,
       ...query
@@ -116,6 +103,17 @@ const queries = {
             : undefined,
       }),
   },
+  canLeave: ({ id }: { id: string }) =>
+    queryOptions({
+      queryKey: [KEY, "can-leave", id],
+      queryFn: () =>
+        handle(api.organizations[":id"]["can-leave"].$get)({ param: { id } }),
+    }),
+  getBlockingAccountDeletion: queryOptions({
+    queryKey: [KEY, "blocking-account-deletion"],
+    queryFn: () =>
+      handle(api.organizations["blocking-account-deletion"].$get)({}),
+  }),
 };
 
 const mutations = {

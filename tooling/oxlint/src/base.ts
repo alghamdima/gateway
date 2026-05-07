@@ -39,6 +39,7 @@ export default defineConfig({
     ...getPluginRules(turboPlugin.configs?.recommended),
 
     "no-shadow": "off",
+    "no-map-spread": "off",
     "no-await-in-loop": "off",
     "no-underscore-dangle": "off",
 

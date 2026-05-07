@@ -11,13 +11,36 @@ const KEY = "billing";
 
 const queries = {
   summary: {
-    get: queryOptions({
-      queryKey: [KEY, "me"],
-      queryFn: () =>
-        handle(api.billing.me.$get, {
-          schema: getBillingSummaryResponseSchema,
-        })(),
-    }),
+    get: (id: string) =>
+      queryOptions({
+        queryKey: [KEY, "summary", id],
+        queryFn: () =>
+          handle(api.billing.summary.$get, {
+            schema: getBillingSummaryResponseSchema,
+          })({
+            query: {
+              referenceId: id,
+            },
+          }),
+      }),
+  },
+  usage: {
+    getByMeterId: (
+      meterId: string,
+      query: InferRequestType<
+        (typeof api.billing.usage)[":meterId"]["$get"]
+      >["query"],
+    ) =>
+      queryOptions({
+        queryKey: [KEY, "usage", meterId, query],
+        queryFn: () =>
+          handle(api.billing.usage[":meterId"].$get)({
+            param: {
+              meterId,
+            },
+            query,
+          }),
+      }),
   },
 };
 

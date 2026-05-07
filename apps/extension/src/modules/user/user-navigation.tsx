@@ -94,8 +94,8 @@ export const UserNavigation = memo<UserNavigationProps>(
     const container = useElementById("main");
 
     const summary = useQuery({
-      ...billing.queries.summary.get,
-      enabled: !!user,
+      ...billing.queries.summary.get(organization?.id ?? user?.id ?? ""),
+      enabled: !!organization || !!user,
     });
     const activePlan = getActivePlan(summary.data);
 

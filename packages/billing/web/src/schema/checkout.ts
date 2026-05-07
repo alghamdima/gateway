@@ -4,6 +4,7 @@ export const checkoutSchema = z.object({
   variant: z.object({
     id: z.string(),
   }),
+  referenceId: z.string(),
   discount: z
     .object({
       code: z.string(),

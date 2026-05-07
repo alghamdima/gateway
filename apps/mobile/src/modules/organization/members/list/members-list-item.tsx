@@ -47,8 +47,8 @@ export const MembersListItem = ({ member }: { member: Member }) => {
 
   const me = member.userId === session.data?.user.id;
 
-  const { data: isOnlyOwner } = useQuery({
-    ...organization.queries.members.getIsOnlyOwner({
+  const { data: canLeave } = useQuery({
+    ...organization.queries.canLeave({
       id: member.organizationId,
     }),
     enabled: me && member.role === MemberRole.OWNER,
@@ -64,7 +64,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
     getAllRolesAtOrBelow(toMemberRole(activeMember.data?.role)).includes(
       member.role,
     ) &&
-    !(me && isOnlyOwner?.status);
+    (!me || member.role !== MemberRole.OWNER || canLeave?.allowed === true);
 
   const hasUpdatePermission =
     authClient.organization.checkRolePermission({
@@ -76,7 +76,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
     getAllRolesAtOrBelow(toMemberRole(activeMember.data?.role)).includes(
       member.role,
     ) &&
-    !(me && isOnlyOwner?.status);
+    (!me || member.role !== MemberRole.OWNER || canLeave?.allowed === true);
 
   const removeMember = useMutation({
     ...organization.mutations.members.remove,

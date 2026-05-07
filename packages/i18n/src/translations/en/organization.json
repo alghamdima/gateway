@@ -129,7 +129,19 @@
     "cta": "Delete organization",
     "disclaimer": "You are about to delete this organization. \n\nAfter deleting it, all organization data (including members and teams) will be permanently deleted and cannot be recovered. \n\nDo you want to continue?",
     "success": "Organization deleted successfully!",
-    "missingPermission": "You need additional permissions to delete this organization."
+    "blocker": {
+      "missingPermission": "You need additional permissions to delete this organization.",
+      "subscriptions": {
+        "title_one": "Active subscription",
+        "title_other": "Active subscriptions",
+        "description_one": "This organization has 1 active subscription. Please cancel all subscriptions before deleting.",
+        "description_other": "This organization has {{count}} active subscriptions. Please cancel all subscriptions before deleting."
+      }
+    }
+  },
+  "billing": {
+    "title": "Organization billing",
+    "description": "Manage your organization's billing settings and subscriptions."
   },
   "error": {
     "slugAlreadyTaken": "The slug is already taken.",

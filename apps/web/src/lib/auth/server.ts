@@ -67,3 +67,31 @@ export const getUser = cache(async ({ id }: { id: string }) => {
     return null;
   }
 });
+
+export const getMemberByUserId = cache(
+  async ({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }) => {
+    try {
+      return (
+        (
+          await auth.api.listMembers({
+            query: {
+              organizationId,
+              filterField: "userId",
+              filterValue: userId,
+              filterOperator: "eq",
+            },
+            headers: await getHeaders(),
+          })
+        ).members[0] ?? null
+      );
+    } catch {
+      return null;
+    }
+  },
+);

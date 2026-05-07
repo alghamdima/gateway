@@ -7,13 +7,24 @@ import {
   count,
   eq,
   getOrderByFromSort,
+  inArray,
   ilike,
   sql,
 } from "@workspace/db";
-import { organization, member } from "@workspace/db/schema";
+import {
+  customer,
+  member,
+  order,
+  organization,
+  subscription,
+} from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
-import type { GetOrganizationsInput } from "../../../schema";
+import type {
+  GetOrganizationOrdersInput,
+  GetOrganizationsInput,
+  GetOrganizationSubscriptionsInput,
+} from "../../../schema";
 
 export const getOrganizationsCount = async () =>
   db
@@ -105,4 +116,125 @@ export const getOrganization = async ({ id }: { id: string }) => {
       where: eq(organization.id, id),
     })) ?? null
   );
+};
+
+export const getOrganizationSubscriptions = async ({
+  organizationId,
+  ...input
+}: GetOrganizationSubscriptionsInput & { organizationId: string }) => {
+  const offset = (input.page - 1) * input.perPage;
+
+  const where = and(
+    input.status ? inArray(subscription.status, input.status) : undefined,
+    input.createdAt
+      ? between(
+          subscription.createdAt,
+          dayjs(input.createdAt[0]).startOf("day").toDate(),
+          dayjs(input.createdAt[1]).endOf("day").toDate(),
+        )
+      : undefined,
+    eq(customer.referenceId, organizationId),
+  );
+
+  const orderBy = input.sort
+    ? getOrderByFromSort({ sort: input.sort, defaultSchema: subscription })
+    : [asc(subscription.id)];
+
+  return db.transaction(async (tx) => {
+    const data = await tx
+      .select({
+        id: subscription.id,
+        externalId: subscription.externalId,
+        customerId: subscription.customerId,
+        variantId: subscription.variantId,
+        status: subscription.status,
+        store: subscription.store,
+        periodStartsAt: subscription.periodStartsAt,
+        periodEndsAt: subscription.periodEndsAt,
+        trialStartsAt: subscription.trialStartsAt,
+        trialEndsAt: subscription.trialEndsAt,
+        createdAt: subscription.createdAt,
+        updatedAt: subscription.updatedAt,
+      })
+      .from(subscription)
+      .leftJoin(customer, eq(subscription.customerId, customer.id))
+      .where(where)
+      .limit(input.perPage)
+      .offset(offset)
+      .orderBy(...orderBy);
+
+    const total = await tx
+      .select({ count: count() })
+      .from(subscription)
+      .leftJoin(customer, eq(subscription.customerId, customer.id))
+      .where(where)
+      .execute()
+      .then((res) => res[0]?.count ?? 0);
+
+    return {
+      data,
+      total,
+    };
+  });
+};
+
+export const getOrganizationOrders = async ({
+  organizationId,
+  ...input
+}: GetOrganizationOrdersInput & { organizationId: string }) => {
+  const offset = (input.page - 1) * input.perPage;
+
+  const where = and(
+    input.status
+      ? inArray(
+          order.status,
+          Array.isArray(input.status) ? input.status : [input.status],
+        )
+      : undefined,
+    input.createdAt
+      ? between(
+          order.createdAt,
+          dayjs(input.createdAt[0]).startOf("day").toDate(),
+          dayjs(input.createdAt[1]).endOf("day").toDate(),
+        )
+      : undefined,
+    eq(customer.referenceId, organizationId),
+  );
+
+  const orderBy = input.sort
+    ? getOrderByFromSort({ sort: input.sort, defaultSchema: order })
+    : [asc(order.id)];
+
+  return db.transaction(async (tx) => {
+    const data = await tx
+      .select({
+        id: order.id,
+        customerId: order.customerId,
+        externalId: order.externalId,
+        variantId: order.variantId,
+        status: order.status,
+        store: order.store,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+      })
+      .from(order)
+      .leftJoin(customer, eq(order.customerId, customer.id))
+      .where(where)
+      .limit(input.perPage)
+      .offset(offset)
+      .orderBy(...orderBy);
+
+    const total = await tx
+      .select({ count: count() })
+      .from(order)
+      .leftJoin(customer, eq(order.customerId, customer.id))
+      .where(where)
+      .execute()
+      .then((res) => res[0]?.count ?? 0);
+
+    return {
+      data,
+      total,
+    };
+  });
 };

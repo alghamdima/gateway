@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 
+import { ACTIVE_SUBSCRIPTION_STATUSES } from "../config";
 import { SubscriptionStatus } from "../types";
 
 export const getBillingPeriod = <
@@ -42,4 +43,14 @@ export const getBillingPeriod = <
     daysRemaining,
     trial: subscription.status === SubscriptionStatus.TRIALING,
   };
+};
+
+export const isSubscriptionActive = <
+  Subscription extends {
+    status: SubscriptionStatus;
+  },
+>(
+  subscription: Subscription,
+) => {
+  return ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription.status);
 };

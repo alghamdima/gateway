@@ -34,17 +34,25 @@ export const BillingModel = {
   RECURRING: "recurring",
 } as const;
 
+export const BillingReference = {
+  USER: "user",
+  ORGANIZATION: "organization",
+} as const;
+
+export type BillingReference =
+  (typeof BillingReference)[keyof typeof BillingReference];
+
 export const RecurringInterval = {
   DAY: "day",
-  MONTH: "month",
   WEEK: "week",
+  MONTH: "month",
   YEAR: "year",
 } as const;
 
 export const BillingType = {
   FLAT: "flat",
-  PER_SEAT: "per-seat",
   METERED: "metered",
+  PER_SEAT: "per-seat",
 } as const;
 
 export const BillingDiscountType = {
