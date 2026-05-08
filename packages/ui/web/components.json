@@ -9,9 +9,12 @@
     "baseColor": "neutral",
     "cssVariables": true
   },
+  "iconLibrary": "lucide",
   "aliases": {
-    "utils": "@workspace/ui",
     "components": "#components",
-    "ui": "#components"
+    "hooks": "#hooks",
+    "lib": "@workspace/ui",
+    "ui": "#components",
+    "utils": "@workspace/ui"
   }
 }

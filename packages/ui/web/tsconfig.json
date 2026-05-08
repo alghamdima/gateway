@@ -3,10 +3,7 @@
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "ES2022"],
     "jsx": "preserve",
-    "rootDir": ".",
-    "paths": {
-      "#*": ["./src/*"]
-    }
+    "rootDir": "."
   },
   "include": ["*.ts", "src/**/*"],
   "exclude": ["node_modules"]

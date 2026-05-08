@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "imports": {
+    "#components/*": "./src/components/*.tsx",
+    "#hooks/*": "./src/hooks/*.tsx",
     "#*": "./src/*.tsx"
   },
   "exports": {
     ".": "./src/index.ts",
     "./globals.css": "./src/styles/globals.css",
+    "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.tsx",
     "./*": "./src/components/*.tsx"
   },
   "scripts": {
