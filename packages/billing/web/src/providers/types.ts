@@ -48,6 +48,7 @@ export const BillingProvider = {
   STRIPE: "stripe",
   LEMON_SQUEEZY: "lemon-squeezy",
   POLAR: "polar",
+  DODO_PAYMENTS: "dodo-payments",
 } as const;
 
 export type BillingProvider =

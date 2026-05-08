@@ -17,6 +17,7 @@
     "@workspace/billing": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/shared": "workspace:*",
+    "dodopayments": "2.31.1",
     "envin": "catalog:",
     "stripe": "22.1.0",
     "zod": "catalog:"
