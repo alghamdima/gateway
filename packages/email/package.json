@@ -17,11 +17,11 @@
     "@workspace/ui": "workspace:*",
     "culori": "4.0.2",
     "nodemailer": "8.0.7",
-    "react-email": "6.0.5",
+    "react-email": "6.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@react-email/ui": "6.0.5",
+    "@react-email/ui": "6.1.1",
     "@types/culori": "4.0.1",
     "@types/nodemailer": "8.0.0",
     "@workspace/shared": "workspace:*",
