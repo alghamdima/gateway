@@ -115,7 +115,7 @@ export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
           />
 
           <PopoverContent
-            className="w-(--anchor-width) rounded-lg p-0"
+            className="w-60 rounded-lg p-0"
             align="start"
             side={isMobile ? "bottom" : "right"}
             sideOffset={4}

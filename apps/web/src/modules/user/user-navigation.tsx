@@ -82,6 +82,7 @@ export const UserNavigation = memo<UserNavigationProps>(({ user }) => {
         side={isMobile ? "bottom" : "right"}
         align="end"
         sideOffset={4}
+        className="w-60"
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center gap-2 font-normal">
