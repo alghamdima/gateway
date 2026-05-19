@@ -155,15 +155,14 @@ const Price = ({
         ? `/ ${isKey(variant.unit, i18n, "common") ? (t(variant.unit) as string) : variant.unit} `
         : "";
 
-  const renderSuffix = () =>
-    !variant.custom && (
-      <span className="text-muted-foreground shrink-0 text-lg">
-        {usageSuffix}/{" "}
-        {variant.model === BillingModel.RECURRING
-          ? t(variant.interval)
-          : t("lifetime")}
-      </span>
-    );
+  const suffix = !variant.custom && (
+    <span className="text-muted-foreground shrink-0 text-lg">
+      {usageSuffix}/{" "}
+      {variant.model === BillingModel.RECURRING
+        ? t(variant.interval)
+        : t("lifetime")}
+    </span>
+  );
 
   if (
     priceWithDiscount &&
@@ -190,7 +189,7 @@ const Price = ({
             i18n.language,
           )}
         </span>
-        {renderSuffix()}
+        {suffix}
       </p>
     );
   }
@@ -210,7 +209,7 @@ const Price = ({
               i18n.language,
             )}
       </span>
-      {renderSuffix()}
+      {suffix}
     </p>
   );
 };
