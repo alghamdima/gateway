@@ -32,6 +32,17 @@ catalogs:
     react: 19.2.0
     react-dom: 19.2.0
   turbo:
-    "@turbo/gen": 2.9.9
-    turbo: 2.9.9
-    eslint-plugin-turbo: 2.9.9
+    "@turbo/gen": 2.9.14
+    turbo: 2.9.14
+    eslint-plugin-turbo: 2.9.14
+
+allowBuilds:
+  "@sentry/cli": true
+  "@shopify/react-native-skia": true
+  core-js: true
+  esbuild: true
+  expo-superwall: true
+  lefthook: true
+  protobufjs: true
+  sharp: true
+  spawn-sync: true
