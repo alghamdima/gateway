@@ -13,6 +13,7 @@ import {
   findPlanIndexById,
   getActivePlan,
   getFilteredPlans,
+  checkPlanLimit,
   getHigherPlans,
   getLowerPlans,
   getPlanFeatures,
@@ -354,6 +355,146 @@ describe("getLowerPlans", () => {
     const result = getLowerPlans("non-existent-plan" as BillingPlan);
 
     expect(result).toEqual([]);
+  });
+});
+
+describe("checkPlanLimit", () => {
+  it("should deny when plan does not exist", () => {
+    const result = checkPlanLimit({
+      id: "non-existent-plan",
+      key: "projects",
+      currentUsage: 0,
+    });
+
+    expect(result).toEqual({
+      allowed: false,
+      limit: null,
+      current: 0,
+      remaining: null,
+    });
+  });
+
+  it("should allow when plan has no limits configured", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.ENTERPRISE,
+      key: "projects",
+      currentUsage: 100,
+    });
+
+    expect(result).toEqual({
+      allowed: true,
+      limit: null,
+      current: 100,
+      remaining: null,
+    });
+  });
+
+  it("should allow when limit key is not defined on plan", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.FREE,
+      key: "unknown",
+      currentUsage: 100,
+    });
+
+    expect(result).toEqual({
+      allowed: true,
+      limit: null,
+      current: 100,
+      remaining: null,
+    });
+  });
+
+  it("should allow when limit value is null (unlimited)", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.FREE,
+      key: "storage",
+      currentUsage: 999,
+      increment: 100,
+    });
+
+    expect(result).toEqual({
+      allowed: true,
+      limit: null,
+      current: 999,
+      remaining: null,
+    });
+  });
+
+  it("should allow when usage is within limit", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.FREE,
+      key: "projects",
+      currentUsage: 1,
+    });
+
+    expect(result).toEqual({
+      allowed: true,
+      limit: 3,
+      current: 1,
+      remaining: 2,
+    });
+  });
+
+  it("should allow when usage exactly reaches limit", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.FREE,
+      key: "projects",
+      currentUsage: 2,
+    });
+
+    expect(result).toEqual({
+      allowed: true,
+      limit: 3,
+      current: 2,
+      remaining: 1,
+    });
+  });
+
+  it("should deny when usage exceeds limit", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.FREE,
+      key: "projects",
+      currentUsage: 3,
+    });
+
+    expect(result).toEqual({
+      allowed: false,
+      limit: 3,
+      current: 3,
+      remaining: 0,
+    });
+  });
+
+  it("should respect custom value when checking limit", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.PREMIUM,
+      key: "members",
+      currentUsage: 2,
+      increment: 2,
+    });
+
+    expect(result).toEqual({
+      allowed: true,
+      limit: 5,
+      current: 2,
+      remaining: 3,
+    });
+  });
+
+  it("should deny when custom value pushes usage over limit", () => {
+    const result = checkPlanLimit({
+      id: BillingPlan.PREMIUM,
+      key: "members",
+      currentUsage: 3,
+      increment: 4,
+    });
+
+    expect(result).toEqual({
+      allowed: false,
+      limit: 5,
+      current: 3,
+      remaining: 2,
+    });
   });
 });
 

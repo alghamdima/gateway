@@ -127,6 +127,47 @@ export const getLowerPlans = (planId: BillingPlan) => {
   return config.plans.slice(0, idx);
 };
 
+export const checkPlanLimit = ({
+  id,
+  key,
+  currentUsage,
+  increment = 1,
+}: {
+  id: string;
+  key: string;
+  currentUsage: number;
+  increment?: number;
+}) => {
+  const plan = findPlanById(id);
+
+  if (!plan) {
+    return {
+      allowed: false,
+      limit: null,
+      current: currentUsage,
+      remaining: null,
+    };
+  }
+
+  const limit = "limits" in plan ? plan.limits?.[key] : null;
+
+  if (!limit) {
+    return {
+      allowed: true,
+      limit: null,
+      current: currentUsage,
+      remaining: null,
+    };
+  }
+
+  return {
+    allowed: currentUsage + increment <= limit,
+    limit,
+    current: currentUsage,
+    remaining: limit - currentUsage,
+  };
+};
+
 type Filters = {
   referenceType?: BillingReference | null;
   type?: BillingType | null;

@@ -81,6 +81,7 @@ const customVariantSchema = z.union([
   z.intersection(
     z.object({
       custom: z.literal(false).optional().default(false),
+      currency: z.string().optional().default("usd"),
     }),
     variantCostSchema,
   ),
@@ -91,7 +92,6 @@ const sharedVariantSchema = z.intersection(
   z.object({
     id: z.string(),
     hidden: z.boolean().optional().default(false),
-    currency: z.string().optional().default("usd"),
   }),
 );
 
@@ -128,6 +128,7 @@ export const planSchema = z.object({
   description: z.string(),
   badge: z.string().nullish().default(null),
   features: z.array(z.string()),
+  limits: z.record(z.string(), z.union([z.number(), z.null()])).optional(),
   variants: z.array(variantSchema),
 });
 

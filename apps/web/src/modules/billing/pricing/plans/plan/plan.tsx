@@ -91,7 +91,7 @@ const Tiers = ({
         {tiers.map((tier, index) => {
           const price = formatPrice({
             amount: tier.cost,
-            currency: variant.currency,
+            ...("currency" in variant ? { currency: variant.currency } : {}),
           });
 
           const isInfiniteTier = !tier.upTo || tier.upTo === "infinite";

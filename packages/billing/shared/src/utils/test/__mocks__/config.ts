@@ -16,6 +16,11 @@ export const config: BillingConfig = {
       description: "plan.free.description",
       badge: null,
       features: ["FEATURE_1", "FEATURE_2"],
+      limits: {
+        projects: 3,
+        members: 1,
+        storage: null,
+      },
       variants: [
         {
           id: "free-lifetime",
@@ -54,6 +59,10 @@ export const config: BillingConfig = {
       description: "plan.premium.description",
       badge: "plan.premium.badge",
       features: ["FEATURE_1", "FEATURE_2", "FEATURE_3", "FEATURE_4"],
+      limits: {
+        projects: 10,
+        members: 5,
+      },
       variants: [
         {
           id: "premium-one-time",
@@ -118,7 +127,6 @@ export const config: BillingConfig = {
           label: "common:contactUs",
           href: "/contact",
           hidden: false,
-          currency: "usd",
           model: BillingModel.ONE_TIME,
         },
         {
@@ -128,7 +136,6 @@ export const config: BillingConfig = {
           label: "common:contactUs",
           href: "/contact",
           hidden: false,
-          currency: "usd",
           model: BillingModel.RECURRING,
           interval: RecurringInterval.MONTH,
         },
@@ -139,7 +146,6 @@ export const config: BillingConfig = {
           label: "common:contactUs",
           href: "/contact",
           hidden: false,
-          currency: "usd",
           model: BillingModel.RECURRING,
           interval: RecurringInterval.YEAR,
         },
