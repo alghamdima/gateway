@@ -79,7 +79,7 @@ export const AccountActions = ({
             <DropdownMenuItem
               variant="destructive"
               key="delete"
-              onSelect={() =>
+              onClick={() =>
                 deleteAccount.mutate({
                   accountId: account.id,
                   id: account.userId,

@@ -57,7 +57,7 @@ export const Hero = async () => {
           />
         </div>
       </div>
-      <div className="md:gap8 flex w-full min-w-0 flex-col items-center justify-center gap-6 lg:gap-10">
+      <div className="flex w-full min-w-0 flex-col items-center justify-center gap-6 md:gap-8 lg:gap-10">
         <span className="text-muted-foreground mt-4 text-sm font-medium uppercase sm:text-base md:mt-6 lg:mt-10 lg:text-lg">
           {t("shippedWith")}
         </span>
