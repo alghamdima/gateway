@@ -24,11 +24,11 @@ const getPeriodStartsAt = (subscription: Stripe.Subscription) => {
   // if it does, we use the period start, otherwise we use the subscription start
   // (Stripe 17 and below)
   if ("current_period_start" in subscription) {
-    return dayjs(subscription.current_period_start as number).toDate();
+    return dayjs.unix(subscription.current_period_start as number).toDate();
   }
 
   // if it doesn't, we use the subscription item start (Stripe 18+)
-  return dayjs(subscription.items.data[0]!.current_period_start).toDate();
+  return dayjs.unix(subscription.items.data[0]!.current_period_start).toDate();
 };
 
 const getPeriodEndsAt = (subscription: Stripe.Subscription) => {
@@ -37,11 +37,11 @@ const getPeriodEndsAt = (subscription: Stripe.Subscription) => {
   // if it does, we use the period end, otherwise we use the subscription end
   // (Stripe 17 and below)
   if ("current_period_end" in subscription) {
-    return dayjs(subscription.current_period_end as number).toDate();
+    return dayjs.unix(subscription.current_period_end as number).toDate();
   }
 
   // if it doesn't, we use the subscription item end (Stripe 18+)
-  return dayjs(subscription.items.data[0]!.current_period_end).toDate();
+  return dayjs.unix(subscription.items.data[0]!.current_period_end).toDate();
 };
 
 export const getPromotionCode = async (code: string) => {
@@ -92,7 +92,7 @@ export const subscriptionStatusChangeHandler = async ({
     ? dayjs.unix(subscription.trial_start).toDate()
     : null;
   const trialEndsAt = subscription.trial_end
-    ? dayjs(subscription.trial_end).toDate()
+    ? dayjs.unix(subscription.trial_end).toDate()
     : null;
 
   await upsertSubscription({
