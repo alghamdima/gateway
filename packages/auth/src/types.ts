@@ -83,6 +83,8 @@ const ERROR_MESSAGES = {
   ORGANIZATION_SLUG_ALREADY_TAKEN: "organization:error.slugAlreadyTaken",
   FAILED_TO_DELETE_ANONYMOUS_USER:
     "auth:error.user.failedToDeleteAnonymousUser",
+  FAILED_TO_DELETE_ANONYMOUS_USER_SESSIONS:
+    "auth:error.user.failedToDeleteAnonymousUserSessions",
   USER_IS_NOT_ANONYMOUS: "auth:error.user.notAnonymous",
   DELETE_ANONYMOUS_USER_DISABLED: "auth:error.user.deleteAnonymousUserDisabled",
   YOU_ARE_NOT_ALLOWED_TO_SET_NON_EXISTENT_VALUE:
@@ -170,6 +172,7 @@ const ERROR_MESSAGES = {
     "organization:error.team.cannotCreateNew",
   TEAM_ALREADY_EXISTS: "organization:error.team.alreadyExists",
   TEAM_NOT_FOUND: "organization:error.team.notFound",
+  INVALID_TEAM_ID: "organization:error.team.invalidId",
   YOU_CANNOT_LEAVE_THE_ORGANIZATION_AS_THE_ONLY_OWNER:
     "organization:error.cannotLeaveAsOnlyOwner",
   YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER:
@@ -203,6 +206,8 @@ const ERROR_MESSAGES = {
   UNABLE_TO_REMOVE_LAST_TEAM: "organization:error.team.unableToRemoveLastTeam",
   EMAIL_VERIFICATION_REQUIRED_BEFORE_ACCEPTING_OR_REJECTING_INVITATION:
     "organization:error.invitation.emailVerificationRequired",
+  EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION:
+    "organization:error.invitation.emailVerificationRequiredForInvitation",
   FAILED_TO_RETRIEVE_INVITATION:
     "organization:error.invitation.failedToRetrieve",
   YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_MEMBER:
@@ -234,6 +239,7 @@ const ERROR_MESSAGES = {
   PASSWORD_TOO_LONG: "auth:error.credentials.password.tooLong",
   USER_ALREADY_EXISTS: "auth:error.user.alreadyExists",
   EMAIL_CAN_NOT_BE_UPDATED: "auth:error.credentials.email.cannotUpdate",
+  CHANGE_EMAIL_DISABLED: "auth:error.credentials.email.changeDisabled",
   CREDENTIAL_ACCOUNT_NOT_FOUND: "auth:error.credentials.notFound",
   SESSION_EXPIRED: "auth:error.session.expired",
   FAILED_TO_UNLINK_LAST_ACCOUNT: "auth:error.social.unlinkLastAccount",

@@ -169,6 +169,7 @@
       "cannotCreateNew": "You cannot create a new team.",
       "alreadyExists": "A team with this name already exists.",
       "notFound": "We couldn't find the team.",
+      "invalidId": "The team ID is invalid.",
       "maximumNumberOfTeams": "You have reached the maximum number of teams.",
       "unableToRemoveLastTeam": "You cannot remove the last team.",
       "cannotCreate": "You cannot create a team in this organization.",
@@ -191,6 +192,7 @@
       "inviterNoLongerMember": "The inviter is no longer a member of the organization.",
       "cannotInviteUserWithRole": "You cannot invite a user with this role.",
       "emailVerificationRequired": "Email verification is required before accepting or rejecting an invitation.",
+      "emailVerificationRequiredForInvitation": "Email verification is required to accept this invitation.",
       "failedToRetrieve": "We couldn't retrieve the invitation.",
       "limitReached": "You have reached the invitation limit for this organization."
     },

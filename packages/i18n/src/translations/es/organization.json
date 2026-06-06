@@ -159,6 +159,7 @@
       "cannotCreateNew": "No puedes crear un nuevo equipo.",
       "alreadyExists": "Ya existe un equipo con este nombre.",
       "notFound": "No pudimos encontrar el equipo.",
+      "invalidId": "El ID del equipo no es válido.",
       "maximumNumberOfTeams": "Has alcanzado el número máximo de equipos.",
       "unableToRemoveLastTeam": "No puedes eliminar el último equipo.",
       "cannotCreate": "No puedes crear un equipo en esta organización.",
@@ -181,6 +182,7 @@
       "inviterNoLongerMember": "El invitador ya no es miembro de la organización.",
       "cannotInviteUserWithRole": "No puedes invitar a un usuario con este rol.",
       "emailVerificationRequired": "Se requiere verificación de correo antes de aceptar o rechazar una invitación.",
+      "emailVerificationRequiredForInvitation": "Se requiere verificación de correo para aceptar esta invitación.",
       "failedToRetrieve": "No pudimos recuperar la invitación.",
       "limitReached": "Has alcanzado el límite de invitaciones para esta organización."
     },
