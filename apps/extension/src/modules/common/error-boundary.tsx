@@ -1,6 +1,7 @@
 import { Component } from "react";
 
 import { useTranslation } from "@workspace/i18n";
+import { captureException } from "@workspace/monitoring-extension";
 import { logger } from "@workspace/shared/logger";
 
 import type { ReactNode } from "react";
@@ -40,6 +41,7 @@ class ReactErrorBoundary extends Component<
 
   componentDidCatch(error: unknown, errorInfo: unknown) {
     logger.error("Error boundary caught an error: ", error, errorInfo);
+    captureException(error);
   }
 
   render() {

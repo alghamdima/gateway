@@ -4,6 +4,11 @@ import { env } from "./env";
 
 import type { MonitoringProviderClientStrategy } from "../types";
 
+const exceptionAutocapture = {
+  capture_unhandled_errors: true,
+  capture_unhandled_rejections: true,
+} as const;
+
 export const strategy = {
   captureException: (exception) => {
     posthog.captureException(exception);
@@ -17,11 +22,13 @@ export const strategy = {
   },
   initialize: () => {
     if (posthog.__loaded) {
+      posthog.startExceptionAutocapture(exceptionAutocapture);
       return;
     }
 
     posthog.init(env.NEXT_PUBLIC_POSTHOG_KEY, {
       api_host: env.NEXT_PUBLIC_POSTHOG_HOST,
+      capture_exceptions: exceptionAutocapture,
     });
   },
   onRouterTransitionStart: () => {
