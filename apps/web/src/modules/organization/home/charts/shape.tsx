@@ -28,6 +28,9 @@ const chartData = [{ metric: "activation", value: 68, fill: "var(--chart-2)" }];
 export function ShapeChart() {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
   const chartConfig = {
+    value: {
+      label: t("organization.home.activation.label"),
+    },
     activation: {
       label: t("organization.home.activation.label"),
       color: "var(--chart-2)",
@@ -61,8 +64,8 @@ export function ShapeChart() {
           <RadialBarChart
             data={chartData}
             endAngle={100}
-            innerRadius={80}
-            outerRadius={140}
+            innerRadius={65}
+            outerRadius={95}
           >
             <PolarGrid
               gridType="circle"

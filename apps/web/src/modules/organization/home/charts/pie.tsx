@@ -29,7 +29,7 @@ import {
 } from "@workspace/ui-web/select";
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
-import type { PieSectorDataItem } from "recharts/types/polar/Pie";
+import type { PieSectorShapeProps } from "recharts/types/polar/Pie";
 
 const customersValue = [186, 305, 237, 173, 209];
 
@@ -107,6 +107,27 @@ export function PieChart() {
     () => customersData.findIndex((item) => item.month === activeMonth),
     [activeMonth, customersData],
   );
+
+  const renderPieShape = React.useCallback(
+    ({ index, outerRadius, ...props }: PieSectorShapeProps) => {
+      if (index === activeIndex) {
+        return (
+          <g>
+            <Sector {...props} outerRadius={outerRadius + 10} />
+            <Sector
+              {...props}
+              outerRadius={outerRadius + 25}
+              innerRadius={outerRadius + 12}
+            />
+          </g>
+        );
+      }
+
+      return <Sector {...props} outerRadius={outerRadius} />;
+    },
+    [activeIndex],
+  );
+
   return (
     <Card className="flex flex-col">
       <ChartStyle id={id} config={chartConfig} />
@@ -168,20 +189,7 @@ export function PieChart() {
               nameKey="month"
               innerRadius={60}
               strokeWidth={5}
-              activeIndex={activeIndex}
-              activeShape={({
-                outerRadius = 0,
-                ...props
-              }: PieSectorDataItem) => (
-                <g>
-                  <Sector {...props} outerRadius={outerRadius + 10} />
-                  <Sector
-                    {...props}
-                    outerRadius={outerRadius + 25}
-                    innerRadius={outerRadius + 12}
-                  />
-                </g>
-              )}
+              shape={renderPieShape}
             >
               <Label
                 content={({ viewBox }) => {

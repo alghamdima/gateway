@@ -274,7 +274,11 @@ export const AreaChart = () => {
               cursor={false}
               content={
                 <ChartTooltipContent
-                  labelFormatter={(value: string) => {
+                  labelFormatter={(value) => {
+                    if (typeof value !== "string") {
+                      return value;
+                    }
+
                     return new Date(value).toLocaleDateString(i18n.language, {
                       month: "short",
                       day: "numeric",

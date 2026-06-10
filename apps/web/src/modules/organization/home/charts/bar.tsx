@@ -28,6 +28,7 @@ import {
 import { Icons } from "@workspace/ui-web/icons";
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
+import type { BarShapeProps } from "recharts/types/cartesian/Bar";
 
 const revenueValues = [1870, 2000, 2370, 1730, 900];
 
@@ -62,6 +63,8 @@ const useChartData = (locale: string) => {
   return { chartData, chartConfig };
 };
 
+const ACTIVE_INDEX = 2;
+
 export function BarChart() {
   const { t, i18n } = useTranslation(["common", "dashboard"]);
   const { chartData, chartConfig } = useChartData(i18n.language);
@@ -83,6 +86,7 @@ export function BarChart() {
       </CardHeader>
       <CardContent>
         <ChartContainer
+          className="min-h-[200px] w-full"
           config={{
             revenue: {
               label: t("revenue"),
@@ -107,7 +111,7 @@ export function BarChart() {
                 <ChartTooltipContent
                   hideLabel
                   formatter={(value, _, item) => (
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full items-center justify-between gap-2">
                       <div
                         className="size-2.5 rounded-[2px] border"
                         style={{
@@ -132,9 +136,8 @@ export function BarChart() {
               dataKey="revenue"
               strokeWidth={2}
               radius={8}
-              activeIndex={2}
-              activeBar={({ ...props }) => {
-                return (
+              shape={({ index, ...props }: BarShapeProps) =>
+                index === ACTIVE_INDEX ? (
                   <Rectangle
                     {...props}
                     fillOpacity={0.8}
@@ -142,8 +145,10 @@ export function BarChart() {
                     strokeDasharray={4}
                     strokeDashoffset={4}
                   />
-                );
-              }}
+                ) : (
+                  <Rectangle {...props} />
+                )
+              }
             />
           </RechartsBarChart>
         </ChartContainer>

@@ -96,13 +96,13 @@ export const BuyCtaDialog = () => {
         </a>
 
         <div className="bg-border relative -mx-6 my-3 h-px">
-          <span className="bg-background text-muted-foreground absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 text-sm">
+          <span className="bg-background text-muted-foreground absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 text-sm lowercase">
             {t("or")}
           </span>
         </div>
 
         <div className="flex flex-col gap-4">
-          <p>{t("cta.buy.join.description")}</p>
+          <p className="text-base">{t("cta.buy.join.description")}</p>
 
           <a
             className={cn(

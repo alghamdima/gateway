@@ -215,7 +215,11 @@ export const LineChart = () => {
                 <ChartTooltipContent
                   className="w-[150px]"
                   nameKey="views"
-                  labelFormatter={(value: string) => {
+                  labelFormatter={(value) => {
+                    if (typeof value !== "string") {
+                      return value;
+                    }
+
                     return new Date(value).toLocaleDateString(i18n.language, {
                       month: "short",
                       day: "numeric",
