@@ -4,6 +4,10 @@ pre-commit:
     format:
       run: pnpm format:fix {staged_files}
       stage_fixed: true
+      glob:
+        - "*.{js,ts,tsx,jsx,mjs,cjs,json,css,md,mdx}"
     lint:
       run: pnpm lint:fix {staged_files}
       stage_fixed: true
+      glob:
+        - "*.{js,ts,tsx,jsx,mjs,cjs}"
