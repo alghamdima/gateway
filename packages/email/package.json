@@ -26,7 +26,7 @@
     "@types/nodemailer": "8.0.0",
     "@workspace/shared": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
-    "esbuild": "0.28.0",
+    "esbuild": "0.28.1",
     "typescript": "catalog:"
   }
 }
