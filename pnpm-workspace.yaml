@@ -46,3 +46,4 @@ allowBuilds:
   protobufjs: true
   sharp: true
   spawn-sync: true
+  workerd: true

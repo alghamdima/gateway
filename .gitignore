@@ -12,8 +12,10 @@ coverage.json
 
 # next.js
 .next/
+.open-next/
 out/
 next-env.d.ts
+cloudflare-env.d.ts
 
 # nitro
 .nitro/
@@ -46,6 +48,10 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
 
 # vercel
 .vercel
