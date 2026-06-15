@@ -1,5 +1,4 @@
 import { zValidator } from "@hono/zod-validator";
-import { env } from "hono/adapter";
 import { createMiddleware } from "hono/factory";
 
 import { getAllRolesAtOrAbove, hasAdminPermission } from "@workspace/auth";
@@ -9,6 +8,8 @@ import { makeZodI18nMap } from "@workspace/i18n";
 import { getLocaleFromRequest, getTranslation } from "@workspace/i18n/server";
 import { HttpStatusCode, NodeEnv } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
+
+import { env } from "./env";
 
 import type { Permissions, User } from "@workspace/auth";
 import type { TFunction } from "@workspace/i18n";
@@ -166,12 +167,8 @@ export const enforceMembership = ({
  * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
  * network latency that would occur in production but not in local development.
  */
-export const delay = createMiddleware<{
-  Bindings: {
-    NODE_ENV: string;
-  };
-}>(async (c, next) => {
-  if (env(c).NODE_ENV === NodeEnv.DEVELOPMENT) {
+export const delay = createMiddleware(async (_, next) => {
+  if (env.NODE_ENV === NodeEnv.DEVELOPMENT) {
     // artificial delay in dev 100-500ms
     const waitMs = Math.floor(Math.random() * 400) + 100;
     await new Promise((resolve) => setTimeout(resolve, waitMs));

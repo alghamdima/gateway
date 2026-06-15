@@ -28,6 +28,24 @@
     },
     "test": {
       "outputs": ["coverage.json"]
+    },
+    "cf:build": {
+      "dependsOn": ["^build"],
+      "outputs": [".open-next/**", "!.open-next/cache/**"]
+    },
+    "cf:deploy": {
+      "cache": false
+    },
+    "cf:preview": {
+      "cache": false,
+      "persistent": true
+    },
+    "cf:typegen": {
+      "cache": false,
+      "outputs": ["cloudflare-env.d.ts"]
+    },
+    "cf:upload": {
+      "cache": false
     }
   },
   "globalEnv": ["DATABASE_URL", "PRODUCT_NAME", "URL", "DEFAULT_LOCALE"],

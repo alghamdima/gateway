@@ -21,7 +21,6 @@ const isError = (e: unknown): e is z.infer<typeof errorSchema> => {
 export const onError = async (
   e: unknown,
   c?: Context<{
-    Bindings: { NODE_ENV: string };
     Variables: { locale: string };
   }>,
 ) => {

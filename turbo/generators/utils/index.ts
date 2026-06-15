@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+const GENERATORS_ROOT = join(process.cwd(), "turbo/generators");
+
+export function readGeneratorTemplate(templatePath: string) {
+  return readFileSync(join(GENERATORS_ROOT, templatePath), "utf8");
+}
+
 export function slugify(value: string) {
   return value
     .toLowerCase()

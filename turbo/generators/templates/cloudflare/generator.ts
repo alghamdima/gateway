@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import {
   getLatestNpmVersion,
   loadRootEnvironmentVariables,
+  readGeneratorTemplate,
   slugify,
 } from "../../utils";
 
@@ -114,26 +115,42 @@ export function createCloudflareGenerator(plop: PlopTypes.NodePlopAPI): void {
         type: "add",
         path: "apps/web/wrangler.jsonc",
         templateFile: "templates/cloudflare/wrangler.jsonc.hbs",
+        force: true,
       },
       {
         type: "add",
         path: "apps/web/open-next.config.ts",
         templateFile: "templates/cloudflare/open-next.config.ts.hbs",
+        force: true,
       },
       {
         type: "add",
         path: "apps/web/scripts/cf-build.mjs",
         templateFile: "templates/cloudflare/cf-build.mjs.hbs",
+        force: true,
       },
       {
         type: "add",
         path: "apps/web/.dev.vars.example",
         templateFile: "templates/cloudflare/dev.vars.example.hbs",
+        force: true,
+      },
+      {
+        type: "modify",
+        path: "packages/db/src/server.ts",
+        transform(content) {
+          if (content.includes("createDbProxy")) {
+            return content;
+          }
+
+          return readGeneratorTemplate("templates/cloudflare/server.ts.hbs");
+        },
       },
       {
         type: "add",
-        path: "packages/db/src/server.ts",
-        templateFile: "templates/cloudflare/server.ts.hbs",
+        path: "apps/web/src/middleware.ts",
+        templateFile: "templates/cloudflare/middleware.ts.hbs",
+        force: true,
       },
       {
         type: "modify",
@@ -245,6 +262,10 @@ export function createCloudflareGenerator(plop: PlopTypes.NodePlopAPI): void {
         },
       },
       async () => {
+        execSync(
+          "pnpm dlx sherif@latest -r packages-without-package-json --fix",
+          { stdio: "inherit" },
+        );
         execSync("pnpm install", { stdio: "inherit" });
         execSync("pnpm format:fix", { stdio: "inherit" });
 

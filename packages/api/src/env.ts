@@ -7,7 +7,7 @@ import { preset as billingWeb } from "@workspace/billing-web/env";
 import { preset as db } from "@workspace/db/env";
 import { preset as email } from "@workspace/email/env";
 import { preset as monitoring } from "@workspace/monitoring-web/env";
-import { envConfig } from "@workspace/shared/constants";
+import { envConfig, NodeEnv } from "@workspace/shared/constants";
 import { preset as storage } from "@workspace/storage/env";
 
 import type { Preset } from "envin/types";
@@ -23,6 +23,9 @@ export const preset = {
 export const env = defineEnv({
   ...envConfig,
   ...preset,
+  shared: {
+    NODE_ENV: z.enum(NodeEnv).default(NodeEnv.DEVELOPMENT),
+  },
   env: {
     ...process.env,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,

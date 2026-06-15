@@ -54,7 +54,6 @@ describe("onError", () => {
       req: { raw: { url: "http://localhost/api/test" } },
       var: { locale: "en" },
     } as Context<{
-      Bindings: { NODE_ENV: string };
       Variables: { locale: string };
     }>;
 
@@ -81,7 +80,6 @@ describe("onError", () => {
       req: { raw: { url: "http://localhost/api/test" } },
       var: { locale: "en" },
     } as Context<{
-      Bindings: { NODE_ENV: string };
       Variables: { locale: string };
     }>;
 
@@ -99,7 +97,6 @@ describe("onError", () => {
       req: { raw: { url: "http://localhost/api/test" } },
       var: { locale: "en" },
     } as Context<{
-      Bindings: { NODE_ENV: string };
       Variables: { locale: string };
     }>;
 
