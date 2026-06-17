@@ -37,3 +37,6 @@ jobs:
 
       - name: 🛻 Lint
         run: pnpm run lint --format=github
+
+      - name: 🧪 Test
+        run: pnpm run test

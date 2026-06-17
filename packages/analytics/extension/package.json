@@ -14,7 +14,7 @@
     "@workspace/analytics": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-js": "1.372.3",
+    "posthog-js": "1.388.0",
     "uuid": "14.0.0",
     "zod": "catalog:"
   },
