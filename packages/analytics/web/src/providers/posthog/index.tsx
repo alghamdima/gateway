@@ -3,8 +3,9 @@
 import dynamic from "next/dynamic";
 import { posthog } from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
+import { useEffect } from "react";
 
-import { env } from "./env";
+import { initPostHog, schedulePostHogInit } from "./client";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
@@ -15,18 +16,12 @@ const PageView = dynamic(
   },
 );
 
-if (typeof window !== "undefined" && !posthog.__loaded) {
-  posthog.init(env.NEXT_PUBLIC_POSTHOG_KEY, {
-    api_host: env.NEXT_PUBLIC_POSTHOG_HOST,
-    person_profiles: "always",
-    capture_pageview: false,
-    disable_external_dependency_loading: true,
-    disable_session_recording: true,
-  });
-}
-
 export const strategy = {
   Provider: ({ children }) => {
+    useEffect(() => {
+      schedulePostHogInit();
+    }, []);
+
     return (
       <PostHogProvider client={posthog}>
         {children}
@@ -39,6 +34,7 @@ export const strategy = {
       return;
     }
 
+    initPostHog();
     posthog.capture(event, properties);
   },
   identify: (userId, traits) => {
@@ -46,6 +42,7 @@ export const strategy = {
       return;
     }
 
+    initPostHog();
     posthog.identify(userId, traits);
   },
   reset: () => {
@@ -53,6 +50,7 @@ export const strategy = {
       return;
     }
 
+    initPostHog();
     posthog.reset();
   },
 } satisfies AnalyticsProviderClientStrategy;

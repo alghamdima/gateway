@@ -355,7 +355,7 @@
 
   @keyframes fade-in {
     0% {
-      opacity: 0;
+      opacity: 0.001;
       translate: 0 -10px;
       filter: blur(4px);
     }
@@ -367,7 +367,7 @@
   }
   @keyframes fade-up {
     0% {
-      opacity: 0;
+      opacity: 0.001;
       translate: 0 20px;
       filter: blur(4px);
     }

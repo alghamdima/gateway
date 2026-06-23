@@ -41,6 +41,7 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
       defaultTheme={appConfig.theme.mode}
       enableSystem
       disableTransitionOnChange
+      // React 19 + next-themes: https://github.com/pacocoursey/next-themes/issues/387
       scriptProps={
         typeof window === "undefined"
           ? undefined

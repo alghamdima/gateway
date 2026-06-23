@@ -14,7 +14,10 @@ export const Hero = async () => {
 
   return (
     <Section id="hero" className="gap-6 sm:gap-6 md:gap-6 lg:gap-6">
-      <TurboLink href="#" className="animate-fade-in -translate-y-4 opacity-0">
+      <TurboLink
+        href="#"
+        className="animate-fade-in -translate-y-4 opacity-[0.001]"
+      >
         <SectionBadge>
           <div className="w-fit py-0.5 text-center text-xs sm:text-sm">🎉</div>
           <div
@@ -27,13 +30,13 @@ export const Hero = async () => {
           <Icons.ChevronRight className="text-foreground ml-1.5 size-3 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </SectionBadge>
       </TurboLink>
-      <h1 className="animate-fade-in mt-4 -translate-y-4 text-center text-5xl leading-[0.95] font-semibold tracking-tighter text-balance opacity-0 [--animation-delay:200ms] sm:text-6xl md:text-7xl lg:text-[5.5rem]">
+      <h1 className="animate-fade-in mt-4 -translate-y-4 text-center text-5xl leading-[0.95] font-semibold tracking-tighter text-balance opacity-[0.001] [--animation-delay:200ms] sm:text-6xl md:text-7xl lg:text-[5.5rem]">
         {t("product.title")}
       </h1>
-      <p className="animate-fade-in text-muted-foreground mx-auto mb-3 max-w-[560px] -translate-y-4 text-center text-lg leading-[26px] text-balance opacity-0 [--animation-delay:400ms] sm:text-xl">
+      <p className="animate-fade-in text-muted-foreground mx-auto mb-3 max-w-[560px] -translate-y-4 text-center text-lg leading-[26px] text-balance opacity-[0.001] [--animation-delay:400ms] sm:text-xl">
         {t("product.description")}
       </p>
-      <div className="animate-fade-in mx-auto flex w-full -translate-y-4 flex-col gap-2 opacity-0 ease-in-out [--animation-delay:600ms] sm:w-auto sm:flex-row sm:gap-3">
+      <div className="animate-fade-in mx-auto flex w-full -translate-y-4 flex-col gap-2 opacity-[0.001] ease-in-out [--animation-delay:600ms] sm:w-auto sm:flex-row sm:gap-3">
         <CtaButton />
 
         <TurboLink
@@ -43,7 +46,7 @@ export const Hero = async () => {
           {t("contact.cta")}
         </TurboLink>
       </div>
-      <div className="animate-fade-up relative mt-4 -mb-10 opacity-0 [--animation-delay:400ms] [perspective:2000px] after:absolute after:inset-0 after:z-50 after:[background:linear-gradient(to_top,var(--background)_10%,transparent)] sm:mt-8 md:mt-12 lg:mt-16">
+      <div className="animate-fade-up relative mt-4 -mb-10 opacity-[0.001] [--animation-delay:400ms] [perspective:2000px] after:absolute after:inset-0 after:z-50 after:[background:linear-gradient(to_top,var(--background)_10%,transparent)] sm:mt-8 md:mt-12 lg:mt-16">
         <div className="bg-opacity-[0.01] before:animate-image-glow rounded-md before:absolute before:top-0 before:bottom-1/2 before:left-0 before:h-full before:w-full before:[background-image:linear-gradient(to_bottom,var(--primary),var(--secondary),transparent_40%)] before:opacity-0 before:[filter:blur(180px)] md:rounded-lg lg:rounded-xl">
           <ThemedImage
             light="/images/hero/light.webp"
@@ -52,6 +55,7 @@ export const Hero = async () => {
             className="relative h-full w-full rounded-[inherit] border object-contain"
             width={3000}
             height={2000}
+            sizes="(max-width: 768px) 100vw, 1400px"
             priority
             fetchPriority="high"
           />
@@ -62,7 +66,7 @@ export const Hero = async () => {
           {t("shippedWith")}
         </span>
 
-        <div className="relative -mx-6 flex w-[calc(100%+3rem)] flex-col items-center justify-center overflow-hidden">
+        <div className="relative -mx-6 w-[calc(100%+3rem)] overflow-x-clip">
           <Marquee
             pauseOnHover
             className="[--duration:60s] [--gap:1.5rem] md:[--gap:2rem] lg:[--gap:3rem] xl:[--gap:3.5rem]"

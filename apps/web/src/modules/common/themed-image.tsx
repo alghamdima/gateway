@@ -1,23 +1,42 @@
-"use client";
-
-import { useTheme } from "next-themes";
 import Image from "next/image";
-import { preload } from "react-dom";
+
+import { cn } from "@workspace/ui";
 
 import type { ComponentProps } from "react";
+
+interface ThemedImageProps extends Omit<ComponentProps<typeof Image>, "src"> {
+  light: string;
+  dark: string;
+}
 
 export const ThemedImage = ({
   light,
   dark,
+  className,
+  priority,
+  sizes = "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px",
   ...props
-}: Omit<ComponentProps<typeof Image>, "src"> & {
-  light: string;
-  dark: string;
-}) => {
-  preload(light, { as: "image" });
-  preload(dark, { as: "image" });
+}: ThemedImageProps) => {
+  const isPriority = priority ?? false;
 
-  const { resolvedTheme } = useTheme();
-
-  return <Image src={resolvedTheme === "dark" ? dark : light} {...props} />;
+  return (
+    <>
+      <Image
+        {...props}
+        src={light}
+        sizes={sizes}
+        priority={isPriority}
+        className={cn(className, "dark:hidden")}
+      />
+      <Image
+        {...props}
+        src={dark}
+        sizes={sizes}
+        priority={false}
+        loading={isPriority ? "eager" : (props.loading ?? "lazy")}
+        fetchPriority={isPriority ? "high" : props.fetchPriority}
+        className={cn(className, "hidden dark:block")}
+      />
+    </>
+  );
 };
