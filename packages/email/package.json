@@ -16,7 +16,7 @@
     "@workspace/i18n": "workspace:*",
     "@workspace/ui": "workspace:*",
     "culori": "4.0.2",
-    "nodemailer": "8.0.7",
+    "nodemailer": "9.0.1",
     "react-email": "6.1.1",
     "zod": "catalog:"
   },
