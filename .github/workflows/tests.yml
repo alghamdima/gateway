@@ -33,10 +33,10 @@ jobs:
         uses: ./tooling/github/setup
 
       - name: 🖌️ Format
-        run: pnpm run format
+        run: node --run format
 
       - name: 🛻 Lint
-        run: pnpm run lint --format=github
+        run: node --run lint -- --format=github
 
       - name: 🧪 Test
-        run: pnpm run test
+        run: node --run test
