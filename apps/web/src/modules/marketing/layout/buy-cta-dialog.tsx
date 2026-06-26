@@ -86,7 +86,7 @@ export const BuyCtaDialog = () => {
         </DialogHeader>
 
         <a
-          href="https://turbostarter.dev/#pricing"
+          href="https://www.turbostarter.dev/#pricing"
           target="_blank"
           rel="noopener noreferrer"
           className={cn(buttonVariants(), "gap-2")}

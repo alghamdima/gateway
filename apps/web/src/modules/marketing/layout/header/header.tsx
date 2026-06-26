@@ -65,7 +65,7 @@ const links = [
       {
         title: "marketing:docs.title",
         description: "marketing:docs.description",
-        href: "https://turbostarter.dev/docs/web",
+        href: "https://www.turbostarter.dev/docs/web",
         icon: Icons.BookOpen,
       },
       {

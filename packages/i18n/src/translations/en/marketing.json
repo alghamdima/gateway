@@ -1,4 +1,9 @@
 {
+  "home": {
+    "seo": {
+      "title": "TurboStarter Demo - launch your SaaS faster with a full-stack starter kit"
+    }
+  },
   "product": {
     "title": "This could be your very own $1M startup",
     "description": "A fully customizable TurboStarter application. Swap in your content and launch your product faster than ever.",

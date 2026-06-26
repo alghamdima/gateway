@@ -38,11 +38,11 @@ const links = [
     items: [
       {
         title: "marketing:product.mobile.ios.title",
-        href: "https://turbostarter.dev",
+        href: "https://apps.apple.com/app/id6754278899",
       },
       {
         title: "marketing:product.mobile.android.title",
-        href: "https://turbostarter.dev",
+        href: "https://play.google.com/store/apps/details?id=com.turbostarter.core",
       },
       {
         title: "marketing:product.extension.chrome.title",
@@ -71,7 +71,7 @@ const links = [
       },
       {
         title: "marketing:docs.title",
-        href: "https://turbostarter.dev/docs/web",
+        href: "https://www.turbostarter.dev/docs/web",
       },
       {
         title: "marketing:api.title",
@@ -120,7 +120,7 @@ export const Footer = async () => {
             <TurboLink
               href={pathsConfig.index}
               className="flex shrink-0 items-center gap-3"
-              aria-label={t("home")}
+              aria-label={t("common:home")}
             >
               <Icons.Logo className="text-primary h-8" />
               <Icons.LogoText className="text-foreground h-4" />

@@ -1421,7 +1421,7 @@ const Core = async () => {
   const { t } = await getTranslation({ ns: "marketing" });
   return (
     <a
-      href="https://turbostarter.dev"
+      href="https://www.turbostarter.dev"
       target="_blank"
       rel="noopener noreferrer"
     >

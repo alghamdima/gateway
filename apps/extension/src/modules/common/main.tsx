@@ -41,7 +41,7 @@ export const Main = ({ className, filename }: MainProps) => {
         <Skeleton className="h-5 w-64" />
       )}
       <a
-        href="https://turbostarter.dev/docs/extension"
+        href="https://www.turbostarter.dev/docs/extension"
         target="_blank"
         rel="noopener noreferrer"
         className="text-primary cursor-pointer text-sm underline underline-offset-4 hover:no-underline"

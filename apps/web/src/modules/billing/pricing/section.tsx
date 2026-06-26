@@ -40,7 +40,7 @@ export const PricingSection = memo<PricingSectionProps>(({ user }) => {
           components={{
             reference: (
               <TurboLink
-                href="https://turbostarter.dev/docs/web/billing/overview"
+                href="https://www.turbostarter.dev/docs/web/billing/overview"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline underline-offset-4 hover:no-underline"

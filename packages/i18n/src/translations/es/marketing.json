@@ -1,4 +1,9 @@
 {
+  "home": {
+    "seo": {
+      "title": "TurboStarter - lanza tu SaaS más rápido con un kit de inicio full-stack"
+    }
+  },
   "product": {
     "title": "Esta podría ser tu propia startup de 1 millón de dólares",
     "description": "Una aplicación TurboStarter totalmente personalizable. Sustituye tu contenido y lanza tu producto más rápido que nunca.",

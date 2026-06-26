@@ -17,7 +17,7 @@ export const Footer = ({ origin }: FooterProps) => {
       />
       <Text className="text-muted-foreground max-w-[250px] leading-normal">
         <Link
-          href="https://turbostarter.dev"
+          href="https://www.turbostarter.dev"
           className="text-muted-foreground"
           style={{ textDecoration: "underline" }}
         >

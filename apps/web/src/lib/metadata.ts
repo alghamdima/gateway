@@ -49,7 +49,7 @@ export const getMetadata =
   (
     {
       title,
-      description = "common:product.description",
+      description = "marketing:product.description",
       url,
       canonical,
       images = [DEFAULT_IMAGE],
