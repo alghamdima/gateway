@@ -20,7 +20,7 @@
     "@workspace/shared": "workspace:*",
     "mixpanel": "0.21.0",
     "mixpanel-browser": "2.78.0",
-    "posthog-js": "1.393.5",
+    "posthog-js": "1.395.0",
     "posthog-node": "5.38.5",
     "zod": "catalog:"
   },

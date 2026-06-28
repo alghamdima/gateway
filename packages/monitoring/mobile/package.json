@@ -11,7 +11,7 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
-    "@sentry/react-native": "8.9.2",
+    "@sentry/react-native": "8.16.0",
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
