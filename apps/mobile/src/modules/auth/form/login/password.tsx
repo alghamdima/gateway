@@ -20,10 +20,10 @@ import { Link } from "~/modules/common/styled";
 
 import { auth } from "../../lib/api";
 
-import type { Route } from "expo-router";
+import type { Href } from "expo-router";
 
 interface PasswordLoginFormProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Href;
   readonly email?: string;
   readonly onTwoFactorRedirect?: () => void;
 }

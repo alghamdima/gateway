@@ -1,0 +1,18 @@
+diff --git a/dist/index.js b/dist/index.js
+index a52b804d30cd691a16553ce17da7821d4f0236cf..852b5b59e96d79c524c87a91e49ed3dbd3c1a194 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -4057,10 +4057,9 @@ async function loadDiagnosticsChannel() {
+     return void 0;
+   }
+   if (diagnosticsChannelPromise == null) {
+-    diagnosticsChannelPromise = import(
+-      /* webpackIgnore: true */
+-      "diagnostics_channel"
+-    ).catch(() => void 0);
++    diagnosticsChannelPromise = Promise.resolve(
++      loadBuiltinModule("node:diagnostics_channel"),
++    );
+   }
+   return diagnosticsChannelPromise;
+ }

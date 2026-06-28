@@ -18,7 +18,6 @@ import { Text } from "@workspace/ui-mobile/text";
 import "~/assets/styles/globals.css";
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
-import "~/lib/polyfills";
 import { Providers } from "~/lib/providers/providers";
 import { useTheme } from "~/modules/common/hooks/use-theme";
 import { Updates } from "~/modules/common/updates";

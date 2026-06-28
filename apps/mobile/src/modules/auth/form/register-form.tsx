@@ -18,10 +18,10 @@ import { Link } from "~/modules/common/styled";
 
 import { auth } from "../lib/api";
 
-import type { Route } from "expo-router";
+import type { Path } from "~/config/paths";
 
 interface RegisterFormProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Path;
   readonly email?: string;
 }
 

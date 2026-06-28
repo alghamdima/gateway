@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.4.0",
+  version: "1.5.0",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",
@@ -47,6 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     tsconfigPaths: true,
     typedRoutes: true,
+    autolinkingModuleResolution: true,
   },
   runtimeVersion: {
     policy: "appVersion",
@@ -54,6 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     "expo-router",
     "expo-font",
+    "expo-image",
     "expo-secure-store",
     "expo-image-picker",
     "expo-web-browser",
@@ -69,6 +71,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           enableProguardInReleaseBuilds: true,
           extraProguardRules: "-keep public class com.horcrux.svg.** {*;}",
           allowBackup: false,
+        },
+        ios: {
+          /* https://github.com/react-native-google-signin/google-signin/issues/1517 */
+          extraPods: [{ name: "AppCheckCore", version: "11.2.0" }],
         },
       },
     ],

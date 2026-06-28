@@ -114,6 +114,8 @@
     "cannotBanUsers": "No puedes banear usuarios.",
     "cannotImpersonateUsers": "No puedes suplantar usuarios.",
     "cannotRevokeUsersSessions": "No puedes revocar sesiones de usuarios.",
-    "cannotSetUsersPassword": "No puedes establecer contraseñas de usuarios."
+    "cannotSetUsersPassword": "No puedes establecer contraseñas de usuarios.",
+    "cannotSetUsersEmail": "No puedes establecer el correo de usuarios.",
+    "cannotUpdateUsersPassword": "No puedes actualizar la contraseña de un usuario mediante actualizar usuario."
   }
 }

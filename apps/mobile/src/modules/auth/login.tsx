@@ -16,7 +16,7 @@ import { AuthLayout } from "~/modules/auth/layout/base";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { InvitationDisclaimer } from "~/modules/auth/layout/invitation-disclaimer";
 
-import type { Route } from "expo-router";
+import type { Path } from "~/config/paths";
 import type { LoginOption } from "~/modules/auth/form/login/constants";
 
 const LoginStep = {
@@ -27,7 +27,7 @@ const LoginStep = {
 type LoginStep = (typeof LoginStep)[keyof typeof LoginStep];
 
 interface LoginFlowProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Path;
   readonly invitationId?: string;
   readonly email?: string;
 }

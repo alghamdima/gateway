@@ -11,7 +11,8 @@ import { user } from "~/modules/user/lib/api";
 
 import { auth } from "./lib/api";
 
-import type { Route } from "expo-router";
+import type { Href } from "expo-router";
+import type { Path } from "~/config/paths";
 
 const useVerificationMutations = ({
   onSuccess,
@@ -59,9 +60,9 @@ const VerificationController = ({
 }: {
   token: string;
   type: VerificationType;
-  callbackURL?: Route;
-  redirectTo?: Route;
-  errorCallbackURL?: Route;
+  callbackURL?: Href;
+  redirectTo?: Href;
+  errorCallbackURL?: Href;
 }) => {
   const resetParams = () => {
     router.setParams({
@@ -115,9 +116,9 @@ export const Verification = () => {
   } = useGlobalSearchParams<{
     token?: string;
     type?: VerificationType;
-    callbackURL?: Route;
-    redirectTo?: Route;
-    errorCallbackURL?: Route;
+    callbackURL?: Path;
+    redirectTo?: Path;
+    errorCallbackURL?: Path;
   }>();
 
   if (!token || !type) {

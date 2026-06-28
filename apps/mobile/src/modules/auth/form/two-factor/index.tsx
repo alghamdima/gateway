@@ -3,10 +3,10 @@ import { SecondFactor } from "@workspace/auth";
 import { BackupCodeForm, BackupCodeCta } from "./backup-code";
 import { TotpForm, TotpCta } from "./totp";
 
-import type { Route } from "expo-router";
+import type { Href } from "expo-router";
 
 export interface FormProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Href;
 }
 
 export interface CtaProps {

@@ -70,7 +70,7 @@ export default defineConfig({
       svgJsxTransformPlugin(),
     ],
     optimizeDeps: {
-      exclude: ["*/build"],
+      entries: ["src/app/**/index.html"],
     },
     resolve: {
       dedupe: ["react", "react-dom"],

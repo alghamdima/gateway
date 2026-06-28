@@ -15,7 +15,7 @@ catalog:
   envin: 1.2.0
   dayjs: 1.11.20
   react-hook-form: 7.74.0
-  react-native: 0.83.6
+  react-native: 0.85.3
   tailwindcss: 4.2.4
   typescript: 6.0.3
   vitest: 4.1.5
@@ -29,12 +29,12 @@ catalogs:
   react19:
     "@types/react": 19.2.14
     "@types/react-dom": 19.2.3
-    react: 19.2.0
-    react-dom: 19.2.0
+    react: 19.2.3
+    react-dom: 19.2.3
   turbo:
-    "@turbo/gen": 2.9.18
-    turbo: 2.9.18
-    eslint-plugin-turbo: 2.9.18
+    "@turbo/gen": 2.10.0
+    turbo: 2.10.0
+    eslint-plugin-turbo: 2.10.0
 
 allowBuilds:
   "@sentry/cli": true
@@ -43,12 +43,24 @@ allowBuilds:
   esbuild: true
   expo-superwall: true
   lefthook: true
+  msgpackr-extract: true
   protobufjs: true
   sharp: true
   spawn-sync: true
   workerd: true
 
+patchedDependencies:
+  ai@7.0.2: patches/ai@7.0.2.patch
+  react-native-ios-utilities@5.2.0: patches/react-native-ios-utilities@5.2.0.patch
+
 minimumReleaseAgeExclude:
-  - "@posthog/core@1.34.0"
-  - "@posthog/types@1.388.0"
-  - posthog-js@1.388.0
+  - "@better-auth/core@1.6.22"
+  - "@better-auth/drizzle-adapter@1.6.22"
+  - "@better-auth/expo@1.6.22"
+  - "@better-auth/kysely-adapter@1.6.22"
+  - "@better-auth/memory-adapter@1.6.22"
+  - "@better-auth/mongo-adapter@1.6.22"
+  - "@better-auth/passkey@1.6.22"
+  - "@better-auth/prisma-adapter@1.6.22"
+  - "@better-auth/telemetry@1.6.22"
+  - better-auth@1.6.22

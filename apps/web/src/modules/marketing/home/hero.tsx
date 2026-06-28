@@ -46,7 +46,7 @@ export const Hero = async () => {
           {t("contact.cta")}
         </TurboLink>
       </div>
-      <div className="animate-fade-up relative mt-4 -mb-10 opacity-[0.001] [--animation-delay:400ms] [perspective:2000px] after:absolute after:inset-0 after:z-50 after:[background:linear-gradient(to_top,var(--background)_10%,transparent)] sm:mt-8 md:mt-12 lg:mt-16">
+      <div className="animate-fade-up relative mt-4 -mb-10 w-full opacity-[0.001] [--animation-delay:400ms] [perspective:2000px] after:absolute after:inset-0 after:z-50 after:[background:linear-gradient(to_top,var(--background)_10%,transparent)] sm:mt-8 md:mt-12 lg:mt-16">
         <div className="bg-opacity-[0.01] before:animate-image-glow rounded-md before:absolute before:top-0 before:bottom-1/2 before:left-0 before:h-full before:w-full before:[background-image:linear-gradient(to_bottom,var(--primary),var(--secondary),transparent_40%)] before:opacity-0 before:[filter:blur(180px)] md:rounded-lg lg:rounded-xl">
           <ThemedImage
             light="/images/hero/light.webp"

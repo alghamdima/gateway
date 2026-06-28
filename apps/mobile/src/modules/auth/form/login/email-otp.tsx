@@ -23,7 +23,7 @@ import { pathsConfig } from "~/config/paths";
 
 import { auth } from "../../lib/api";
 
-import type { Route } from "expo-router";
+import type { Href } from "expo-router";
 
 const STEP = {
   REQUEST: "request",
@@ -33,7 +33,7 @@ const STEP = {
 type Step = (typeof STEP)[keyof typeof STEP];
 
 interface EmailOtpLoginFormProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Href;
   readonly email?: string;
 }
 

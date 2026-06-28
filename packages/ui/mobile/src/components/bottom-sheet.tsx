@@ -4,13 +4,12 @@ import {
   BottomSheetTextInput,
   BottomSheetFooter as GBottomSheetFooter,
   BottomSheetView as GBottomSheetView,
-  BottomSheetScrollView as GBottomSheetScrollView,
   useBottomSheetModal,
   SCROLLABLE_TYPE,
   createBottomSheetScrollableComponent,
 } from "@gorhom/bottom-sheet";
-import { useTheme } from "@react-navigation/native";
 import * as Slot from "@rn-primitives/slot";
+import { useTheme } from "expo-router/react-navigation";
 import * as React from "react";
 import { memo } from "react";
 import { Keyboard, Pressable, View } from "react-native";
@@ -32,13 +31,13 @@ import type { BottomSheetModalMethods } from "@gorhom/bottom-sheet/lib/typescrip
 import type { GestureResponderEvent, ViewStyle } from "react-native";
 
 interface BottomSheetContext {
-  sheetRef: React.RefObject<BottomSheetModal | null>;
+  sheetRef: React.RefObject<BottomSheetModalMethods | null>;
 }
 
 const BottomSheetContext = React.createContext<BottomSheetContext | null>(null);
 
 function BottomSheet({ ...props }: React.ComponentProps<typeof View>) {
-  const sheetRef = React.useRef<BottomSheetModal>(null);
+  const sheetRef = React.useRef<BottomSheetModalMethods>(null);
 
   return (
     <BottomSheetContext.Provider value={{ sheetRef: sheetRef }}>
@@ -59,12 +58,13 @@ function useBottomSheetContext() {
 
 const CLOSED_INDEX = -1;
 
-type BottomSheetContentRef = React.ComponentRef<typeof BottomSheetModal>;
+type BottomSheetContentRef = BottomSheetModalMethods;
 
 type BottomSheetContentProps = Omit<
   React.ComponentProps<typeof BottomSheetModal>,
-  "backdropComponent"
+  "backdropComponent" | "ref"
 > & {
+  ref?: React.Ref<BottomSheetModalMethods>;
   backdropProps?: Partial<React.ComponentProps<typeof BottomSheetBackdrop>>;
 };
 
@@ -80,12 +80,7 @@ const BottomSheetContent = ({
   const { colors } = useTheme();
   const { sheetRef } = useBottomSheetContext();
 
-  React.useImperativeHandle(ref, () => {
-    if (!sheetRef.current) {
-      return {} as BottomSheetModalMethods;
-    }
-    return sheetRef.current;
-  }, [sheetRef]);
+  React.useImperativeHandle(ref, () => sheetRef.current!, [sheetRef]);
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => {
@@ -203,13 +198,17 @@ function BottomSheetView({
   );
 }
 
+type BottomSheetKeyboardAwareScrollViewProps = React.ComponentProps<
+  typeof KeyboardAwareScrollView
+>;
+
 const BottomSheetScrollViewComponent = createBottomSheetScrollableComponent<
   BottomSheetScrollViewMethods,
-  BottomSheetScrollViewProps
+  React.ComponentProps<typeof Animated.ScrollView>
 >(SCROLLABLE_TYPE.SCROLLVIEW, Animated.ScrollView);
 
-const BottomSheetKeyboardAwareScrollView = memo<BottomSheetScrollViewProps>(
-  (props) => {
+const BottomSheetKeyboardAwareScrollView =
+  memo<BottomSheetKeyboardAwareScrollViewProps>((props) => {
     const insets = useSafeAreaInsets();
 
     return (
@@ -220,17 +219,12 @@ const BottomSheetKeyboardAwareScrollView = memo<BottomSheetScrollViewProps>(
         ScrollViewComponent={BottomSheetScrollViewComponent}
       />
     );
-  },
-);
+  });
 
-type BottomSheetScrollViewProps = Omit<
-  React.ComponentProps<typeof GBottomSheetScrollView>,
-  "style"
-> & {
+type BottomSheetScrollViewProps = BottomSheetKeyboardAwareScrollViewProps & {
   hadHeader?: boolean;
   className?: string;
   contentContainerClassName?: string;
-  style?: ViewStyle;
 };
 
 function BottomSheetScrollView({

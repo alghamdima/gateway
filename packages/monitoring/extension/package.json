@@ -15,7 +15,7 @@
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-js": "1.388.0",
+    "posthog-js": "1.393.5",
     "uuid": "14.0.0"
   },
   "devDependencies": {

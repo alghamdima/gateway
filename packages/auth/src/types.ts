@@ -119,6 +119,9 @@ const ERROR_MESSAGES = {
     "admin:error.cannotRevokeUsersSessions",
   YOU_ARE_NOT_ALLOWED_TO_SET_USERS_PASSWORD:
     "admin:error.cannotSetUsersPassword",
+  YOU_ARE_NOT_ALLOWED_TO_SET_USERS_EMAIL: "admin:error.cannotSetUsersEmail",
+  PASSWORD_CANNOT_BE_UPDATED_VIA_UPDATE_USER:
+    "admin:error.cannotUpdateUsersPassword",
   BANNED_USER: "auth:error.user.banned",
   NO_DATA_TO_UPDATE: "auth:error.noDataToUpdate",
   YOU_CANNOT_REMOVE_YOURSELF: "auth:error.user.cannotRemoveYourself",
@@ -258,6 +261,7 @@ const ERROR_MESSAGES = {
   TOO_MANY_ATTEMPTS: "auth:error.code.tooManyAttempts",
   TOTP_NOT_ENABLED: "auth:error.totp.notEnabled",
   TWO_FACTOR_NOT_ENABLED: "auth:error.twoFactor.notEnabled",
+  ACCOUNT_TEMPORARILY_LOCKED: "auth:error.twoFactor.accountTemporarilyLocked",
   BACKUP_CODES_NOT_ENABLED: "auth:error.backupCodes.notEnabled",
   INVALID_BACKUP_CODE: "auth:error.code.invalid",
   INVALID_CODE: "auth:error.code.invalid",

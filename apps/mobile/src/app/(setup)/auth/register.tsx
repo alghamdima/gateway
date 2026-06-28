@@ -13,13 +13,13 @@ import { AuthLayout } from "~/modules/auth/layout/base";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { InvitationDisclaimer } from "~/modules/auth/layout/invitation-disclaimer";
 
-import type { Route } from "expo-router";
+import type { Path } from "~/config/paths";
 
 const RegisterPage = () => {
   const { t } = useTranslation("auth");
 
   const { redirectTo, invitationId, email } = useGlobalSearchParams<{
-    redirectTo?: Route;
+    redirectTo?: Path;
     invitationId?: string;
     email?: string;
   }>();

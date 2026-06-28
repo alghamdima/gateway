@@ -66,7 +66,7 @@ export const AIDemo = () => {
             <article
               key={message.id}
               className={cn("max-w-full", {
-                "bg-muted max-w-4/5 self-end rounded-lg px-5 py-2.5":
+                "bg-muted max-w-4/5 self-end rounded-lg px-4 py-2.5":
                   message.role === "user",
               })}
             >
@@ -126,7 +126,7 @@ export const AIDemo = () => {
         />
 
         <Button
-          className="absolute right-2 bottom-3 size-8 rounded-full"
+          className="absolute right-2 bottom-2 size-8 rounded-full"
           size="icon"
           type="submit"
           disabled={isLoading}

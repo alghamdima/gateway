@@ -13,10 +13,10 @@ import { pathsConfig } from "~/config/paths";
 
 import { auth } from "../lib/api";
 
-import type { Route } from "expo-router";
+import type { Href } from "expo-router";
 
 interface AnonymousLoginProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Href;
 }
 
 export const AnonymousLogin = ({

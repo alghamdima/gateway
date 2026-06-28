@@ -26,6 +26,8 @@ cloudflare-env.d.ts
 expo-env.d.ts
 apps/*/ios
 apps/*/android
+*.ipa
+*.apk
 
 # wxt
 .wxt

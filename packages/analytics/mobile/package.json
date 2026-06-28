@@ -15,7 +15,7 @@
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
     "mixpanel-react-native": "3.3.0",
-    "posthog-react-native": "4.43.10",
+    "posthog-react-native": "4.52.0",
     "react-native": "catalog:",
     "zod": "catalog:"
   },

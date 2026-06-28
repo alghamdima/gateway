@@ -1,12 +1,14 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import * as Linking from "expo-linking";
 import { fetch as expoFetch } from "expo/fetch";
 import { useState } from "react";
 import { View, FlatList, Keyboard } from "react-native";
 import Markdown from "react-native-marked";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useTranslation } from "@workspace/i18n";
+import { config, useTranslation } from "@workspace/i18n";
+import { Platform } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { cn } from "@workspace/ui";
 import { Button } from "@workspace/ui-mobile/button";
@@ -16,6 +18,8 @@ import { Text } from "@workspace/ui-mobile/text";
 import { Textarea } from "@workspace/ui-mobile/textarea";
 
 import { api } from "~/lib/api";
+import { authClient } from "~/lib/auth";
+import { useI18nConfig } from "~/lib/providers/i18n";
 import { KeyboardAvoidingView, ScrollView } from "~/modules/common/styled";
 
 const EXAMPLES = [
@@ -46,6 +50,11 @@ export default function AI() {
     transport: new DefaultChatTransport({
       fetch: expoFetch as unknown as typeof globalThis.fetch,
       api: api.ai.chat.$url().toString(),
+      headers: () => ({
+        cookie: `${config.cookie}=${useI18nConfig.getState().config.locale};${authClient.getCookie()}`,
+        "x-client-platform": Platform.MOBILE,
+        origin: Linking.createURL(""),
+      }),
     }),
     onError: (error) => logger.error(error),
   });

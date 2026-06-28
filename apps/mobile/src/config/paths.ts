@@ -1,3 +1,5 @@
+import { Href } from "expo-router";
+
 const STEPS_PREFIX = "/steps";
 const DASHBOARD_PREFIX = "/dashboard";
 const ORGANIZATION_DASHBOARD_PREFIX = "/dashboard/organization";
@@ -59,4 +61,6 @@ const pathsConfig = {
   },
 } as const;
 
-export { pathsConfig, AUTH_PREFIX, STEPS_PREFIX, DASHBOARD_PREFIX };
+type Path = Extract<Href, string>;
+
+export { pathsConfig, AUTH_PREFIX, STEPS_PREFIX, DASHBOARD_PREFIX, type Path };

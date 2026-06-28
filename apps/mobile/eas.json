@@ -6,11 +6,12 @@
   "build": {
     "base": {
       "node": "24.14.0",
-      "pnpm": "11.1.3",
+      "pnpm": "11.5.2",
       "ios": {
         "resourceClass": "m-medium"
       },
       "env": {
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1",
         "EXPO_PUBLIC_DEFAULT_LOCALE": "en",
         "EXPO_PUBLIC_AUTH_PASSWORD": "true",
         "EXPO_PUBLIC_AUTH_MAGIC_LINK": "true",

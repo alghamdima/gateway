@@ -26,11 +26,11 @@ import env from "../../../../env.config";
 import { auth } from "../lib/api";
 
 import type { Icon } from "@workspace/ui-mobile/icons";
-import type { Route } from "expo-router";
+import type { Path } from "~/config/paths";
 
 interface SocialProvidersProps {
   readonly providers: SocialProviderType[];
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Path;
 }
 
 export const SocialIcons: Record<SocialProviderType, Icon> = {

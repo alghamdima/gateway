@@ -22,7 +22,7 @@ import { MagicLinkLoginForm } from "./magic-link";
 import { PasswordLoginForm } from "./password";
 
 import type { LoginOption } from "./constants";
-import type { Route } from "expo-router";
+import type { Path } from "~/config/paths";
 
 const LOGIN_OPTIONS_DETAILS = {
   [AuthProvider.PASSWORD]: {
@@ -44,7 +44,7 @@ const LOGIN_OPTIONS_DETAILS = {
 
 interface LoginFormProps {
   readonly options: LoginOption[];
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Path;
   readonly email?: string;
   readonly onTwoFactorRedirect?: () => void;
 }

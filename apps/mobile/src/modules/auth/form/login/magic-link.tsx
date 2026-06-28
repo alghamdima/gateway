@@ -17,10 +17,10 @@ import { pathsConfig } from "~/config/paths";
 
 import { auth } from "../../lib/api";
 
-import type { Route } from "expo-router";
+import type { Path } from "~/config/paths";
 
 interface MagicLinkLoginFormProps {
-  readonly redirectTo?: Route;
+  readonly redirectTo?: Path;
   readonly email?: string;
 }
 
