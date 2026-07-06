@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.5.0",
+  version: "1.5.1",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",
@@ -54,6 +54,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-router",
+    "expo-status-bar",
     "expo-font",
     "expo-image",
     "expo-secure-store",
