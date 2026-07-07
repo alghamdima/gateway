@@ -1,6 +1,7 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
+import { useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
@@ -18,6 +19,7 @@ import { Link } from "~/modules/common/styled";
 
 import { auth } from "../lib/api";
 
+import type { TextInput } from "react-native";
 import type { Path } from "~/config/paths";
 
 interface RegisterFormProps {
@@ -57,6 +59,15 @@ export const RegisterForm = ({
     },
   });
 
+  const submit = form.handleSubmit((data) =>
+    signUp.mutateAsync({
+      ...data,
+      name: generateName(data.email),
+      callbackURL: redirectTo,
+    }),
+  );
+  const passwordRef = useRef<TextInput>(null);
+
   return (
     <View className="gap-6">
       <Controller
@@ -75,6 +86,9 @@ export const RegisterForm = ({
               spellCheck={false}
               maxLength={254}
               editable={!form.formState.isSubmitting}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
@@ -89,9 +103,12 @@ export const RegisterForm = ({
             <FieldLabel>{t("password")}</FieldLabel>
             <Input
               {...field}
+              ref={passwordRef}
               secureTextEntry
               autoComplete="password"
               onChangeText={field.onChange}
+              returnKeyType="go"
+              onSubmitEditing={submit}
               editable={!form.formState.isSubmitting}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -102,13 +119,7 @@ export const RegisterForm = ({
       <Button
         className="w-full"
         size="lg"
-        onPress={form.handleSubmit((data) =>
-          signUp.mutateAsync({
-            ...data,
-            name: generateName(data.email),
-            callbackURL: redirectTo,
-          }),
-        )}
+        onPress={submit}
         disabled={form.formState.isSubmitting}
       >
         {form.formState.isSubmitting ? (

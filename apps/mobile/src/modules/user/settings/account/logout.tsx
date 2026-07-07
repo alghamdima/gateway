@@ -30,6 +30,7 @@ export const Logout = () => {
   return (
     <>
       <SettingsTile
+        testID="settings-sign-out"
         icon={Icons.LogOut}
         onPress={() => {
           Alert.alert(t("logout.cta"), t("logout.confirm"), [

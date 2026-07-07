@@ -38,6 +38,10 @@ const BackupCodeForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
     },
   });
 
+  const submit = form.handleSubmit((data) =>
+    verifyBackupCode.mutateAsync(data),
+  );
+
   return (
     <View className="flex flex-col gap-6">
       <Controller
@@ -52,6 +56,8 @@ const BackupCodeForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
               placeholder={t("login.twoFactor.backupCode.placeholder")}
               autoCapitalize="none"
               autoComplete="one-time-code"
+              returnKeyType="go"
+              onSubmitEditing={submit}
               editable={!form.formState.isSubmitting}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -80,9 +86,7 @@ const BackupCodeForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
         className="w-full"
         size="lg"
         disabled={form.formState.isSubmitting}
-        onPress={form.handleSubmit((data) =>
-          verifyBackupCode.mutateAsync(data),
-        )}
+        onPress={submit}
       >
         {form.formState.isSubmitting ? (
           <Spin>

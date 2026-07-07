@@ -45,6 +45,14 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
       },
     });
 
+    const submit = form.handleSubmit((data) =>
+      signIn.mutateAsync({
+        ...data,
+        name: generateName(data.email),
+        callbackURL: redirectTo,
+      }),
+    );
+
     return (
       <View className="gap-6">
         <Controller
@@ -63,6 +71,8 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
                 spellCheck={false}
                 maxLength={254}
                 editable={!form.formState.isSubmitting}
+                returnKeyType="go"
+                onSubmitEditing={submit}
               />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
@@ -72,13 +82,7 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
         <Button
           className="w-full"
           size="lg"
-          onPress={form.handleSubmit((data) =>
-            signIn.mutateAsync({
-              ...data,
-              name: generateName(data.email),
-              callbackURL: redirectTo,
-            }),
-          )}
+          onPress={submit}
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? (

@@ -25,16 +25,16 @@ catalog:
 
 catalogs:
   node24:
-    "@types/node": 24.0.0
+    "@types/node": ^24.0.0
   react19:
     "@types/react": 19.2.14
     "@types/react-dom": 19.2.3
     react: 19.2.3
     react-dom: 19.2.3
   turbo:
-    "@turbo/gen": 2.10.0
-    turbo: 2.10.0
-    eslint-plugin-turbo: 2.10.0
+    "@turbo/gen": 2.10.3
+    turbo: 2.10.3
+    eslint-plugin-turbo: 2.10.3
 
 allowBuilds:
   "@sentry/cli": true
@@ -50,17 +50,4 @@ allowBuilds:
   workerd: true
 
 patchedDependencies:
-  ai@7.0.2: patches/ai@7.0.2.patch
   react-native-ios-utilities@5.2.0: patches/react-native-ios-utilities@5.2.0.patch
-
-minimumReleaseAgeExclude:
-  - "@better-auth/core@1.6.22"
-  - "@better-auth/drizzle-adapter@1.6.22"
-  - "@better-auth/expo@1.6.22"
-  - "@better-auth/kysely-adapter@1.6.22"
-  - "@better-auth/memory-adapter@1.6.22"
-  - "@better-auth/mongo-adapter@1.6.22"
-  - "@better-auth/passkey@1.6.22"
-  - "@better-auth/prisma-adapter@1.6.22"
-  - "@better-auth/telemetry@1.6.22"
-  - better-auth@1.6.22

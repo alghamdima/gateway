@@ -9,6 +9,7 @@ import { OrganizationPicker } from "~/modules/organization/organization-picker";
 export default function Home() {
   return (
     <ScrollView
+      testID="dashboard-home"
       className="bg-background"
       contentContainerClassName="items-center bg-background grow gap-6 px-6 py-2"
       showsVerticalScrollIndicator={false}

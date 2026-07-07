@@ -30,6 +30,7 @@ const getSections = (session?: Session | null) =>
       {
         title: "account",
         icon: Icons.UserRound,
+        testID: "settings-account",
         onPress: () =>
           router.navigate(pathsConfig.dashboard.user.settings.account.index),
         visible: !!session?.session,

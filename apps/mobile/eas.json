@@ -6,7 +6,7 @@
   "build": {
     "base": {
       "node": "24.14.0",
-      "pnpm": "11.5.2",
+      "pnpm": "11.9.0",
       "ios": {
         "resourceClass": "m-medium"
       },
@@ -40,6 +40,27 @@
         "simulator": true
       },
       "environment": "development",
+      "env": {
+        "APP_ENV": "development"
+      }
+    },
+    // Simulator/APK builds for E2E tests
+    "e2e": {
+      "extends": "base",
+      "withoutCredentials": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "env": {
+          "EXPO_PUBLIC_SITE_URL": "http://127.0.0.1:3000"
+        }
+      },
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "EXPO_PUBLIC_SITE_URL": "http://10.0.2.2:3000"
+        }
+      },
       "env": {
         "APP_ENV": "development"
       }

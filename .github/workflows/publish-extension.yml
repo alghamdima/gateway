@@ -1,4 +1,4 @@
-name: CI / Publish extension
+name: CI / Publish / Extension
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
     uses: ./.github/workflows/tests.yml
 
   publish:
-    name: 🚀 Publish extension
+    name: 🚀 Publish
     runs-on: ubuntu-latest
     environment: Production
     needs: [tests]
@@ -28,12 +28,10 @@ jobs:
 
     steps:
       - name: ✅ Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: 🔨 Setup
         uses: ./tooling/github/setup
-        with:
-          node-version: 20
 
       - name: 📦 Build
         run: pnpm turbo build --filter=extension
@@ -43,6 +41,7 @@ jobs:
         with:
           name: extension-${{ github.sha }}
           path: apps/extension/build/*.zip
+          retention-days: 7
 
       - name: 💨 Publish!
         run: |

@@ -43,6 +43,8 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
     },
   });
 
+  const submit = form.handleSubmit((data) => verifyTotp.mutateAsync(data));
+
   return (
     <View className="flex flex-col items-start gap-6">
       <Controller
@@ -55,9 +57,8 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
               autoFocus
               value={field.value}
               onChange={field.onChange}
-              onComplete={() =>
-                form.handleSubmit((data) => verifyTotp.mutateAsync(data))()
-              }
+              onComplete={submit}
+              editable={!form.formState.isSubmitting}
               render={({ slots }) => (
                 <InputOTPGroup>
                   {slots.map((slot, index) => (
@@ -92,7 +93,7 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
         className="w-full"
         size="lg"
         disabled={form.formState.isSubmitting}
-        onPress={form.handleSubmit((data) => verifyTotp.mutateAsync(data))}
+        onPress={submit}
       >
         {form.formState.isSubmitting ? (
           <Spin>

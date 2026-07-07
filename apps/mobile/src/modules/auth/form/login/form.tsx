@@ -85,6 +85,7 @@ export const LoginForm = ({
         {options.map((provider) => (
           <TabsTrigger
             key={provider}
+            testID={`login-tab-${provider}`}
             value={provider}
             className="relative w-full shrink grow"
           >

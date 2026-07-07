@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "build:chrome": "dotenv -c -- wxt zip",
+    "build:chrome:unpacked": "dotenv -c -- wxt build -b chrome",
     "build:firefox": "dotenv -c -- wxt zip -b firefox",
     "clean": "git clean -xdf build .cache .wxt .turbo node_modules",
     "dev": "dotenv -c -- pnpm dev:chrome",
     "dev:chrome": "wxt",
     "dev:firefox": "wxt -b firefox",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/vite": "4.2.4",
@@ -35,6 +37,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.0",
     "@types/chrome": "0.1.40",
     "@types/node": "catalog:node24",
     "@types/react": "catalog:react19",

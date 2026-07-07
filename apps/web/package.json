@@ -7,10 +7,11 @@
     "build": "next build",
     "clean": "git clean -xdf .cache .next .turbo node_modules",
     "dev": "next dev",
+    "test:e2e": "playwright test",
     "start": "next start"
   },
   "dependencies": {
-    "@ai-sdk/react": "4.0.2",
+    "@ai-sdk/react": "4.0.15",
     "@hookform/resolvers": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
@@ -45,6 +46,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.0",
     "@svgr/webpack": "8.1.0",
     "@tailwindcss/postcss": "4.2.4",
     "@types/node": "catalog:node24",

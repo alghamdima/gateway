@@ -50,16 +50,18 @@ export default function RequiredStep() {
             </Text>
           </View>
 
-          <View className="w-full gap-2">
+          <View className="w-full gap-3">
             <Controller
               control={form.control}
               name="data"
               render={({ field }) => (
                 <Field orientation="horizontal">
                   <Checkbox
-                    {...field}
+                    testID="setup-step-data-checkbox"
                     checked={field.value}
                     onCheckedChange={field.onChange}
+                    onBlur={field.onBlur}
+                    hitSlop={{ top: 12, right: 12, bottom: 0, left: 12 }}
                   />
                   <FieldLabel onPress={() => field.onChange(!field.value)}>
                     {t("setup.steps.step.required.fields.data")}
@@ -74,9 +76,11 @@ export default function RequiredStep() {
               render={({ field }) => (
                 <Field orientation="horizontal">
                   <Checkbox
+                    testID="setup-step-privacy-checkbox"
                     checked={field.value}
                     onCheckedChange={field.onChange}
                     onBlur={field.onBlur}
+                    hitSlop={{ top: 0, right: 12, bottom: 12, left: 12 }}
                   />
                   <FieldLabel onPress={() => field.onChange(!field.value)}>
                     <Trans
@@ -106,6 +110,7 @@ export default function RequiredStep() {
       <Button
         className="mt-auto"
         size="lg"
+        testID="setup-step-continue"
         onPress={() => goNext()}
         disabled={Object.values(values).some((value) => !value)}
       >

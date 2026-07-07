@@ -1,7 +1,7 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
@@ -21,6 +21,7 @@ import { Link } from "~/modules/common/styled";
 import { auth } from "../../lib/api";
 
 import type { Href } from "expo-router";
+import type { TextInput } from "react-native";
 
 interface PasswordLoginFormProps {
   readonly redirectTo?: Href;
@@ -51,6 +52,9 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
       },
     });
 
+    const submit = form.handleSubmit((data) => signIn.mutateAsync(data));
+    const passwordRef = useRef<TextInput>(null);
+
     return (
       <View className="gap-6">
         <Controller
@@ -61,6 +65,7 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
               <FieldLabel>{t("common:email")}</FieldLabel>
               <Input
                 {...field}
+                testID="login-email-input"
                 onChangeText={field.onChange}
                 autoCapitalize="none"
                 autoComplete="email"
@@ -69,6 +74,9 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
                 spellCheck={false}
                 maxLength={254}
                 editable={!form.formState.isSubmitting}
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
@@ -91,9 +99,13 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
               </View>
               <Input
                 {...field}
+                ref={passwordRef}
+                testID="login-password-input"
                 secureTextEntry
                 autoComplete="password"
                 onChangeText={field.onChange}
+                returnKeyType="go"
+                onSubmitEditing={submit}
                 editable={!form.formState.isSubmitting}
               />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -120,9 +132,10 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
         />
 
         <Button
+          testID="login-submit"
           className="w-full"
           size="lg"
-          onPress={form.handleSubmit((data) => signIn.mutateAsync(data))}
+          onPress={submit}
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? (

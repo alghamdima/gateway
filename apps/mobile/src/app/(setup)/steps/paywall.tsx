@@ -118,6 +118,7 @@ export default function PaywallStep() {
       <View className="mt-auto gap-2">
         <Button
           size="lg"
+          testID="setup-step-skip"
           onPress={() => {
             goNext();
             router.replace(pathsConfig.dashboard.user.index);

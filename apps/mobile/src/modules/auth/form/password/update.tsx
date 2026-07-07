@@ -44,6 +44,13 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
     },
   });
 
+  const submit = form.handleSubmit((data) =>
+    resetPassword.mutateAsync({
+      newPassword: data.password,
+      token,
+    }),
+  );
+
   return (
     <View className="gap-6">
       <Controller
@@ -57,6 +64,8 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
               secureTextEntry
               autoComplete="new-password"
               onChangeText={field.onChange}
+              returnKeyType="go"
+              onSubmitEditing={submit}
               editable={!form.formState.isSubmitting}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -67,12 +76,7 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
       <Button
         className="w-full"
         size="lg"
-        onPress={form.handleSubmit((data) =>
-          resetPassword.mutateAsync({
-            newPassword: data.password,
-            token,
-          }),
-        )}
+        onPress={submit}
         disabled={form.formState.isSubmitting}
       >
         {form.formState.isSubmitting ? (

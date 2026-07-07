@@ -83,6 +83,7 @@ const WelcomePage = () => {
 
         <View className="mt-auto gap-3">
           <Button
+            testID="welcome-get-started"
             size="lg"
             onPress={() => router.navigate(pathsConfig.setup.auth.register)}
           >
@@ -90,6 +91,7 @@ const WelcomePage = () => {
           </Button>
 
           <Button
+            testID="welcome-login"
             variant="outline"
             size="lg"
             onPress={() => router.navigate(pathsConfig.setup.auth.login)}

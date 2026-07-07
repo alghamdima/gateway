@@ -39,6 +39,13 @@ export const ForgotPasswordForm = () => {
     },
   });
 
+  const submit = form.handleSubmit((data) =>
+    forgetPassword.mutateAsync({
+      ...data,
+      redirectTo: Linking.createURL(pathsConfig.setup.auth.updatePassword),
+    }),
+  );
+
   return (
     <View className="gap-6">
       <Controller
@@ -57,6 +64,8 @@ export const ForgotPasswordForm = () => {
               spellCheck={false}
               maxLength={254}
               editable={!form.formState.isSubmitting}
+              returnKeyType="go"
+              onSubmitEditing={submit}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
@@ -66,14 +75,7 @@ export const ForgotPasswordForm = () => {
       <Button
         className="w-full"
         size="lg"
-        onPress={form.handleSubmit((data) =>
-          forgetPassword.mutateAsync({
-            ...data,
-            redirectTo: Linking.createURL(
-              pathsConfig.setup.auth.updatePassword,
-            ),
-          }),
-        )}
+        onPress={submit}
         disabled={form.formState.isSubmitting}
       >
         {form.formState.isSubmitting ? (

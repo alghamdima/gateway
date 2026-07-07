@@ -9,6 +9,9 @@ node_modules
 # testing
 coverage
 coverage.json
+.playwright
+playwright-report
+test-results
 
 # next.js
 .next/
@@ -28,6 +31,7 @@ apps/*/ios
 apps/*/android
 *.ipa
 *.apk
+*.app
 
 # wxt
 .wxt

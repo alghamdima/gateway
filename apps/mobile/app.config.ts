@@ -72,6 +72,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           enableProguardInReleaseBuilds: true,
           extraProguardRules: "-keep public class com.horcrux.svg.** {*;}",
           allowBackup: false,
+          usesCleartextTraffic:
+            process.env.EXPO_PUBLIC_SITE_URL?.startsWith("http://") ?? false,
         },
         ios: {
           /* https://github.com/react-native-google-signin/google-signin/issues/1517 */

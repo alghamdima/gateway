@@ -1,4 +1,4 @@
-name: CI / Publish web
+name: CI / Publish / Web
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
     uses: ./.github/workflows/tests.yml
 
   publish:
-    name: 🚀 Publish web
+    name: 🚀 Publish
     runs-on: ubuntu-latest
     environment: Production
     needs: [tests]
@@ -20,12 +20,22 @@ jobs:
 
     steps:
       - name: ✅ Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: 🔨 Setup
         uses: ./tooling/github/setup
 
+      - name: 💾 Cache Vercel CLI
+        uses: actions/cache@v6
+        id: vercel-cli-cache
+        with:
+          path: ~/.local/share/pnpm/global
+          key: ${{ runner.os }}-pnpm-global-vercel
+          restore-keys: |
+            ${{ runner.os }}-pnpm-global-vercel-
+
       - name: 🔼 Install Vercel CLI
+        if: steps.vercel-cli-cache.outputs.cache-hit != 'true'
         run: pnpm install --global vercel@latest
 
       - name: 💪 Pull environment information

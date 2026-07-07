@@ -13,6 +13,7 @@ interface SettingsTileProps {
   readonly destructive?: boolean;
   readonly loading?: boolean;
   readonly disabled?: boolean;
+  readonly testID?: string;
 }
 
 export const SettingsTile = ({
@@ -22,6 +23,7 @@ export const SettingsTile = ({
   destructive,
   loading = false,
   disabled = false,
+  testID,
 }: SettingsTileProps) => {
   const textClassName = useMemo(
     () =>
@@ -32,6 +34,7 @@ export const SettingsTile = ({
   );
   return (
     <Pressable
+      testID={testID}
       hitSlop={4}
       className={cn(
         "bg-background active:bg-accent dark:active:bg-accent/50 flex-row items-center justify-between gap-4 px-6 py-3.5 transition-colors",

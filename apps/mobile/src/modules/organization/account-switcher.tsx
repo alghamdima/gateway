@@ -76,6 +76,7 @@ export const AccountSwitcher = () => {
       <DropdownMenu onOpenChange={setOpen} className="flex-1">
         <DropdownMenuTrigger asChild>
           <Button
+            testID="user-menu"
             variant="ghost"
             className={cn("h-14 flex-row items-center gap-3 self-start px-2", {
               "bg-accent": open,

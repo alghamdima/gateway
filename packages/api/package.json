@@ -26,7 +26,7 @@
     "@workspace/monitoring-web": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/storage": "workspace:*",
-    "ai": "7.0.2",
+    "ai": "7.0.14",
     "envin": "catalog:",
     "hono": "4.12.25",
     "hono-status-monitor": "1.0.8",

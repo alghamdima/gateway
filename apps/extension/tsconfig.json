@@ -3,6 +3,7 @@
   "compilerOptions": {
     "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "preserve",
+    "types": ["node"],
     "paths": {
       "~/*": ["./src/*"]
     }
@@ -11,6 +12,8 @@
     "../../packages/ui/shared/src/typings/*.d.ts",
     ".wxt/wxt.d.ts",
     "src/**/*",
+    "e2e/**/*.ts",
+    "playwright.config.ts",
     "*.ts",
     "*.js"
   ],

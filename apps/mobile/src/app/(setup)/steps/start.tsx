@@ -28,7 +28,12 @@ export default function StartStep() {
         </View>
       </ScrollView>
 
-      <Button className="mt-auto" size="lg" onPress={() => goNext()}>
+      <Button
+        className="mt-auto"
+        size="lg"
+        testID="setup-step-continue"
+        onPress={() => goNext()}
+      >
         <Text>{t("continue")}</Text>
       </Button>
     </>

@@ -10,10 +10,11 @@
     "dev": "expo start --clear",
     "dev:android": "expo start --android",
     "dev:ios": "expo start --ios",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "test:e2e": "maestro test e2e"
   },
   "dependencies": {
-    "@ai-sdk/react": "4.0.2",
+    "@ai-sdk/react": "4.0.15",
     "@dev-plugins/react-navigation": "~0.4.0",
     "@dev-plugins/react-query": "~0.4.0",
     "@expo-google-fonts/geist": "0.4.1",
