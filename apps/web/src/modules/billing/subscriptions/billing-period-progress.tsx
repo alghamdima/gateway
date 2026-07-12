@@ -4,6 +4,7 @@ import localizedFormat from "dayjs/plugin/localizedFormat";
 
 import { getBillingPeriod } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
+import { Progress } from "@workspace/ui-web/progress";
 
 import type { Subscription } from "@workspace/billing";
 
@@ -32,12 +33,7 @@ export const BillingPeriodProgress = ({
           {t("daysRemaining", { count: daysRemaining })}
         </span>
       </div>
-      <div className="bg-primary/20 relative h-2 w-full overflow-hidden rounded-full">
-        <div
-          className="bg-primary h-full transition-all duration-300 ease-in-out"
-          style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
-        />
-      </div>
+      <Progress value={Math.min(Math.max(progress, 0), 100)} />
       <div className="flex items-center justify-between gap-2">
         <span className="text-muted-foreground text-xs">
           {dayjs(startsAt).format("Do MMM")}
