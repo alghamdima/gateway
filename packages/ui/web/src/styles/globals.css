@@ -3,6 +3,10 @@
 @plugin "@tailwindcss/typography";
 
 @layer base {
+  body {
+    position: relative;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }

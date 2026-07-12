@@ -92,16 +92,7 @@ const ModalTrigger = ({
     return <DialogTrigger {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerTrigger
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerTrigger {...props} {...drawer} />;
 };
 
 const ModalClose = ({
@@ -115,16 +106,7 @@ const ModalClose = ({
     return <DialogClose {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerClose
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerClose {...props} {...drawer} />;
 };
 
 const ModalContent = ({
@@ -138,16 +120,7 @@ const ModalContent = ({
     return <DialogContent {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerContent
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerContent {...props} {...drawer} />;
 };
 
 const ModalDescription = ({
@@ -161,16 +134,7 @@ const ModalDescription = ({
     return <DialogDescription {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerDescription
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerDescription {...props} {...drawer} />;
 };
 
 const ModalHeader = ({
@@ -184,16 +148,7 @@ const ModalHeader = ({
     return <DialogHeader {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerHeader
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerHeader {...props} {...drawer} />;
 };
 
 const ModalTitle = ({
@@ -207,16 +162,7 @@ const ModalTitle = ({
     return <DialogTitle {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerTitle
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerTitle {...props} {...drawer} />;
 };
 
 const ModalBody = ({
@@ -237,16 +183,7 @@ const ModalFooter = ({
     return <DialogFooter {...props} {...dialog} />;
   }
 
-  return (
-    <DrawerFooter
-      {...props}
-      {...drawer}
-      {...((props.render ?? drawer?.render) && {
-        children: props.render ?? drawer?.render,
-        asChild: true,
-      })}
-    />
-  );
+  return <DrawerFooter {...props} {...drawer} />;
 };
 
 export {

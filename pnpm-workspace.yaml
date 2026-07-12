@@ -32,9 +32,9 @@ catalogs:
     react: 19.2.3
     react-dom: 19.2.3
   turbo:
-    "@turbo/gen": 2.10.3
-    turbo: 2.10.3
-    eslint-plugin-turbo: 2.10.3
+    "@turbo/gen": 2.10.4
+    turbo: 2.10.4
+    eslint-plugin-turbo: 2.10.4
 
 allowBuilds:
   "@sentry/cli": true

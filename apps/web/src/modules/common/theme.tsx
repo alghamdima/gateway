@@ -95,7 +95,7 @@ const ThemeControlsProvider = ({ render }: { render: React.ReactElement }) => {
 
   return (
     <Drawer>
-      <DrawerTrigger asChild>{render}</DrawerTrigger>
+      <DrawerTrigger render={render} />
       <DrawerContent className="p-6 pt-0">
         <div className="space-y-4 pt-4">
           <Customizer />

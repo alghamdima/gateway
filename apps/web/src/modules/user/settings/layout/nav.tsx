@@ -57,28 +57,32 @@ export const SettingsNav = memo(({ links }: SettingsNavProps) => {
 
   return (
     <Drawer>
-      <DrawerTrigger asChild>
-        <Button variant="outline" size="icon">
-          <Icons.Menu className="size-5" />
-        </Button>
-      </DrawerTrigger>
+      <DrawerTrigger
+        render={
+          <Button variant="outline" size="icon">
+            <Icons.Menu className="size-5" />
+          </Button>
+        }
+      />
       <DrawerContent>
         <ul className="flex flex-col p-6">
           {links.map((link) => (
             <li key={link.href}>
-              <DrawerClose asChild>
-                <TurboLink
-                  href={link.href}
-                  className={cn(
-                    "text-muted-foreground block rounded-md py-2.5",
-                    {
-                      "text-foreground font-medium":
-                        normalizedPathname === link.href,
-                    },
-                  )}
-                >
-                  {link.label}
-                </TurboLink>
+              <DrawerClose
+                render={
+                  <TurboLink
+                    href={link.href}
+                    className={cn(
+                      "text-muted-foreground block rounded-md py-2.5",
+                      {
+                        "text-foreground font-medium":
+                          normalizedPathname === link.href,
+                      },
+                    )}
+                  />
+                }
+              >
+                {link.label}
               </DrawerClose>
             </li>
           ))}
