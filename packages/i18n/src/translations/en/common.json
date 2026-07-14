@@ -213,6 +213,14 @@
       "system": "System",
       "light": "Light",
       "dark": "Dark"
+    },
+    "radius": {
+      "label": "Radius",
+      "none": "None",
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large",
+      "full": "Full"
     }
   },
   "name": "Name",

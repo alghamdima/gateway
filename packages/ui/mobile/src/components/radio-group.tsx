@@ -20,13 +20,13 @@ function RadioGroupItem({
   return (
     <RadioGroupPrimitive.Item
       className={cn(
-        "border-input dark:bg-input/30 aspect-square size-4 shrink-0 items-center justify-center rounded-full border shadow-sm shadow-black/5",
+        "border-input dark:bg-input/30 aspect-square size-4 shrink-0 items-center justify-center rounded-xl border shadow-sm shadow-black/5",
         props.disabled && "opacity-50",
         className,
       )}
       {...props}
     >
-      <RadioGroupPrimitive.Indicator className="bg-primary size-2 rounded-full" />
+      <RadioGroupPrimitive.Indicator className="bg-primary size-2 rounded-xl" />
     </RadioGroupPrimitive.Item>
   );
 }

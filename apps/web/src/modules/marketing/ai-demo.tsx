@@ -126,7 +126,7 @@ export const AIDemo = () => {
         />
 
         <Button
-          className="absolute right-2 bottom-2 size-8 rounded-full"
+          className="absolute right-2 bottom-2 size-8 rounded-xl"
           size="icon"
           type="submit"
           disabled={isLoading}

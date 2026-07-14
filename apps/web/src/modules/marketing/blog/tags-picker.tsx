@@ -21,7 +21,7 @@ export const TagsPicker = () => {
           key={tag}
           variant={tag === activeTag ? "default" : "outline"}
           size="sm"
-          className={cn("rounded-full px-4", {
+          className={cn("rounded-xl px-4", {
             "border-primary border": tag === activeTag,
           })}
           onClick={() =>

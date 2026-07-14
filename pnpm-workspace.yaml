@@ -32,9 +32,9 @@ catalogs:
     react: 19.2.3
     react-dom: 19.2.3
   turbo:
-    "@turbo/gen": 2.10.4
-    turbo: 2.10.4
-    eslint-plugin-turbo: 2.10.4
+    "@turbo/gen": 2.10.5
+    turbo: 2.10.5
+    eslint-plugin-turbo: 2.10.5
 
 allowBuilds:
   "@sentry/cli": true
@@ -51,3 +51,14 @@ allowBuilds:
 
 patchedDependencies:
   react-native-ios-utilities@5.2.0: patches/react-native-ios-utilities@5.2.0.patch
+
+minimumReleaseAgeExclude:
+  - "@turbo/darwin-64@2.10.5"
+  - "@turbo/darwin-arm64@2.10.5"
+  - "@turbo/gen@2.10.5"
+  - "@turbo/linux-64@2.10.5"
+  - "@turbo/linux-arm64@2.10.5"
+  - "@turbo/windows-64@2.10.5"
+  - "@turbo/windows-arm64@2.10.5"
+  - eslint-plugin-turbo@2.10.5
+  - turbo@2.10.5

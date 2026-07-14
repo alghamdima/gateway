@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import { ThemeMode, cn } from "@workspace/ui";
+import { ThemeMode, ThemeRadius, cn, THEME_RADIUS_VALUES } from "@workspace/ui";
 
 import "~/assets/styles/globals.css";
 import { Providers } from "~/lib/providers/providers";
@@ -43,6 +43,12 @@ export const Layout = ({
           id="main"
           className="bg-background text-foreground flex min-h-screen w-full min-w-92 flex-col font-sans text-base"
           data-theme={theme.color}
+          style={
+            {
+              "--radius":
+                THEME_RADIUS_VALUES[theme.radius ?? ThemeRadius.MEDIUM],
+            } as React.CSSProperties
+          }
         >
           <ErrorBoundary fallback={errorFallback}>
             <Suspense fallback={loadingFallback}>

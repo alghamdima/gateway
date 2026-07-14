@@ -6,12 +6,12 @@ import { View } from "react-native";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import {
-  Slider,
-  SliderList,
-  SliderListItem,
-  SliderPaginationDots,
-  SliderPaginationDot,
-} from "@workspace/ui-mobile/slider";
+  Carousel,
+  CarouselList,
+  CarouselListItem,
+  CarouselPaginationDots,
+  CarouselPaginationDot,
+} from "@workspace/ui-mobile/carousel";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -46,11 +46,11 @@ const WelcomePage = () => {
     <View className="bg-background flex-1 px-6 pt-2 pb-4">
       <SafeAreaView className="bg-background flex-1 gap-12">
         <View className="flex-1 gap-8 pt-2">
-          <Slider threshold={ITEM_WIDTH}>
-            <SliderList
+          <Carousel threshold={ITEM_WIDTH}>
+            <CarouselList
               data={images}
               renderItem={({ item, index }) => (
-                <SliderListItem
+                <CarouselListItem
                   className="flex-1 items-center justify-center"
                   style={{ width: ITEM_WIDTH }}
                   index={index}
@@ -60,15 +60,15 @@ const WelcomePage = () => {
                     contentFit="contain"
                     style={{ flex: 1, width: "100%" }}
                   />
-                </SliderListItem>
+                </CarouselListItem>
               )}
             />
-            <SliderPaginationDots>
+            <CarouselPaginationDots>
               {images.map((_, index) => (
-                <SliderPaginationDot key={index} index={index} />
+                <CarouselPaginationDot key={index} index={index} />
               ))}
-            </SliderPaginationDots>
-          </Slider>
+            </CarouselPaginationDots>
+          </Carousel>
 
           <View className="mx-auto mt-auto max-w-xl gap-3">
             <Text className="font-sans-bold text-center text-3xl tracking-tighter sm:text-4xl">

@@ -5,6 +5,8 @@ import { memo, useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { ThemeRadius, THEME_RADIUS_VALUES } from "@workspace/ui";
+
 import { appConfig } from "~/config/app";
 
 import type { ThemeConfig } from "@workspace/ui";
@@ -34,6 +36,13 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
   useEffect(() => {
     document.body.dataset.theme = config.color;
   }, [config.color]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--radius",
+      THEME_RADIUS_VALUES[config.radius ?? ThemeRadius.MEDIUM],
+    );
+  }, [config.radius]);
 
   return (
     <NextThemeProvider

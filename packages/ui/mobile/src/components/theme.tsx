@@ -3,11 +3,12 @@ import { memo } from "react";
 import { FlatList, View } from "react-native";
 
 import { useTranslation } from "@workspace/i18n";
-import { cn, ThemeColor, ThemeMode, themes } from "@workspace/ui";
+import { cn, ThemeColor, ThemeMode, ThemeRadius, themes } from "@workspace/ui";
 
 import { Button } from "./button";
 import { Icons } from "./icons";
 import { Label } from "./label";
+import { Slider } from "./slider";
 import { Text } from "./text";
 
 import type { ThemeConfig } from "@workspace/ui";
@@ -24,9 +25,19 @@ export const MODE_ICONS = {
   [ThemeMode.SYSTEM]: Icons.SunMoon,
 } as const;
 
+const getRadiusIndex = (radius: ThemeRadius) => {
+  const index = Object.values(ThemeRadius).indexOf(radius);
+
+  return index === -1
+    ? Object.values(ThemeRadius).indexOf(ThemeRadius.MEDIUM)
+    : index;
+};
+
 export const ThemeCustomizer = memo<ThemeCustomizerProps>(
   ({ config, onChange, resolvedTheme }) => {
     const { t } = useTranslation("common");
+    const radius = config.radius ?? ThemeRadius.MEDIUM;
+    const radiusIndex = getRadiusIndex(radius);
 
     return (
       <View className="mt-2 flex-1 items-center gap-4">
@@ -112,6 +123,26 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
                 </Button>
               );
             }}
+          />
+        </View>
+        <View className="w-full">
+          <Label nativeID="radius" className="text-xs">
+            {t("theme.radius.label")}
+          </Label>
+          <Slider
+            minimumValue={0}
+            maximumValue={Object.values(ThemeRadius).length - 1}
+            step={1}
+            value={radiusIndex}
+            onValueChange={(index) => {
+              const nextRadius = Object.values(ThemeRadius)[Math.round(index)];
+
+              if (nextRadius) {
+                onChange({ ...config, radius: nextRadius });
+              }
+            }}
+            minimumTrackTintColorClassName="accent-primary"
+            maximumTrackTintColorClassName="accent-primary/30"
           />
         </View>
       </View>

@@ -7,11 +7,22 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { captureException } from "@workspace/monitoring-mobile";
 import { logger } from "@workspace/shared/logger";
-import { ThemeMode, themes } from "@workspace/ui";
+import {
+  THEME_RADIUS_VALUES,
+  ThemeMode,
+  ThemeRadius,
+  themes,
+} from "@workspace/ui";
 
 import { appConfig } from "~/config/app";
 
 import type { ColorVariable, ThemeConfig } from "@workspace/ui";
+
+const REM_BASE = 16;
+
+const getPixelFromRem = (value: string) => {
+  return parseFloat(value) * REM_BASE;
+};
 
 const useThemeConfig = create<{
   config: ThemeConfig;
@@ -55,9 +66,15 @@ export const useTheme = () => {
       Uniwind.setTheme(config.mode);
 
       const colors = themes[config.color][resolvedTheme];
-      Uniwind.updateCSSVariables(
-        resolvedTheme,
-        Object.entries(colors).reduce(
+      const radius = getPixelFromRem(
+        THEME_RADIUS_VALUES[config.radius ?? ThemeRadius.MEDIUM],
+      );
+
+      Uniwind.updateCSSVariables(ThemeMode.LIGHT, { "--radius": radius });
+      Uniwind.updateCSSVariables(ThemeMode.DARK, { "--radius": radius });
+
+      Uniwind.updateCSSVariables(resolvedTheme, {
+        ...Object.entries(colors).reduce(
           (acc, [key, value]: [string, ColorVariable]) => {
             const [l, c, h, a] = value;
             acc[`--${key}`] =
@@ -68,7 +85,8 @@ export const useTheme = () => {
           },
           {} as Record<string, string>,
         ),
-      );
+        "--radius": radius,
+      });
     } catch (error) {
       logger.error(error);
       captureException(error);

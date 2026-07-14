@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
+import { useCallback } from "react";
 
 import { useTranslation } from "@workspace/i18n";
 import { useBreakpoint } from "@workspace/ui-web";
@@ -12,6 +13,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@workspace/ui-web/popover";
+import { useThemeModeShortcut } from "@workspace/ui-web/theme";
 import { ThemeCustomizer } from "@workspace/ui-web/theme";
 
 import { appConfig } from "~/config/app";
@@ -86,7 +88,7 @@ const ThemeControlsProvider = ({ render }: { render: React.ReactElement }) => {
     return (
       <Popover>
         <PopoverTrigger render={render} />
-        <PopoverContent align="start" className="w-88 rounded-lg p-6">
+        <PopoverContent align="end" className="w-88 rounded-lg p-6">
           <Customizer />
         </PopoverContent>
       </Popover>
@@ -106,6 +108,25 @@ const ThemeControlsProvider = ({ render }: { render: React.ReactElement }) => {
 };
 
 const ThemeControls = () => {
+  const { config, setConfig } = useThemeConfig();
+  const { setTheme, theme } = useTheme();
+
+  const onChange = useCallback(
+    (config: ThemeConfig) => {
+      setConfig(config);
+      setTheme(config.mode);
+    },
+    [setConfig, setTheme],
+  );
+
+  useThemeModeShortcut(
+    {
+      ...config,
+      mode: (theme as ThemeMode | undefined) ?? appConfig.theme.mode,
+    },
+    onChange,
+  );
+
   return <ThemeControlsProvider render={<Trigger />} />;
 };
 

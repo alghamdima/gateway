@@ -31,7 +31,7 @@ export const SectionBadge = (props: ComponentProps<"div">) => {
     <div
       {...props}
       className={cn(
-        "group text-foreground hover:bg-accent/50 focus:ring-ring inline-flex h-8 items-center rounded-full border px-3 py-0.5 text-xs font-medium shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none sm:text-sm",
+        "group text-foreground hover:bg-accent/50 focus:ring-ring inline-flex h-8 items-center rounded-xl border px-3 py-0.5 text-xs font-medium shadow-xs transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:outline-none sm:text-sm",
         props.className,
       )}
     />

@@ -167,7 +167,7 @@ export default function AI() {
 
         <Button
           size="icon"
-          className="absolute right-2 bottom-6 rounded-full"
+          className="absolute right-2 bottom-6 rounded-xl"
           disabled={isLoading}
           onPress={() => {
             Keyboard.dismiss();

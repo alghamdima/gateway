@@ -213,6 +213,14 @@
       "system": "Sistema",
       "light": "Claro",
       "dark": "Oscuro"
+    },
+    "radius": {
+      "label": "Radio",
+      "none": "Ninguno",
+      "small": "Pequeño",
+      "medium": "Mediano",
+      "large": "Grande",
+      "full": "Completo"
     }
   },
   "name": "Nombre",

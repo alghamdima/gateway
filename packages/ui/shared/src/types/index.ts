@@ -4,6 +4,22 @@ export const ThemeMode = {
   DARK: "dark",
 } as const;
 
+export const ThemeRadius = {
+  NONE: "none",
+  SMALL: "small",
+  MEDIUM: "medium",
+  LARGE: "large",
+  FULL: "full",
+} as const;
+
+export const THEME_RADIUS_VALUES = {
+  [ThemeRadius.NONE]: "0",
+  [ThemeRadius.SMALL]: "0.25rem",
+  [ThemeRadius.MEDIUM]: "0.65rem",
+  [ThemeRadius.LARGE]: "1rem",
+  [ThemeRadius.FULL]: "2rem",
+} satisfies Record<ThemeRadius, string>;
+
 export const ThemeColor = {
   ORANGE: "orange",
   ROSE: "rose",
@@ -26,6 +42,7 @@ export const DEFAULT_BREAKPOINTS = {
 
 export type ThemeColor = (typeof ThemeColor)[keyof typeof ThemeColor];
 export type ThemeMode = (typeof ThemeMode)[keyof typeof ThemeMode];
+export type ThemeRadius = (typeof ThemeRadius)[keyof typeof ThemeRadius];
 
 // OKLCH color variable (with optional opacity)
 export type ColorVariable =
@@ -35,6 +52,7 @@ export type ColorVariable =
 export interface ThemeConfig {
   mode: ThemeMode;
   color: ThemeColor;
+  radius: ThemeRadius;
 }
 
 export interface ThemeColorsVariables {

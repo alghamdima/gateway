@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
@@ -9,11 +9,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui-web/popover";
-import { ThemeCustomizer } from "@workspace/ui-web/theme";
+import { ThemeCustomizer, useThemeModeShortcut } from "@workspace/ui-web/theme";
 
 import { appConfig } from "~/config/app";
 import { StorageKey, useStorage } from "~/lib/storage";
 import { useElementById } from "~/modules/common/hooks/use-element-by-id";
+
+import type { ThemeConfig } from "@workspace/ui";
 
 const Customizer = () => {
   const { t } = useTranslation("common");
@@ -79,6 +81,16 @@ const Status = ({
 
 export const ThemeControls = () => {
   const container = useElementById("main");
+  const { data, set } = useStorage(StorageKey.THEME);
+
+  const onChange = useCallback(
+    (config: ThemeConfig) => {
+      set(config);
+    },
+    [set],
+  );
+
+  useThemeModeShortcut(data, onChange);
 
   return (
     <Popover>

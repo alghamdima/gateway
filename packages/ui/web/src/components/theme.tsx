@@ -1,14 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ThemeColor, ThemeMode, cn } from "@workspace/ui";
+import { ThemeColor, ThemeMode, ThemeRadius, cn } from "@workspace/ui";
 
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";
 import { Label } from "#components/label";
+import { Slider } from "#components/slider";
+import { useThemeKeyboardShortcut } from "#hooks/use-theme-keyboard-shortcut";
 
 import type { ThemeConfig } from "@workspace/ui";
 
@@ -18,15 +20,53 @@ interface ThemeCustomizerProps {
   readonly onChange: (config: ThemeConfig) => void;
 }
 
+const getResolvedThemeMode = (mode: ThemeMode) => {
+  if (mode === ThemeMode.SYSTEM) {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? ThemeMode.DARK
+      : ThemeMode.LIGHT;
+  }
+
+  return mode;
+};
+
+export const useThemeModeShortcut = (
+  config: ThemeConfig,
+  onChange: (config: ThemeConfig) => void,
+) => {
+  const toggleMode = useCallback(() => {
+    const resolvedMode = getResolvedThemeMode(config.mode);
+
+    onChange({
+      ...config,
+      mode: resolvedMode === ThemeMode.DARK ? ThemeMode.LIGHT : ThemeMode.DARK,
+    });
+  }, [config, onChange]);
+
+  useThemeKeyboardShortcut(toggleMode);
+};
+
 const MODE_ICONS = {
   [ThemeMode.LIGHT]: Icons.Sun,
   [ThemeMode.DARK]: Icons.Moon,
   [ThemeMode.SYSTEM]: Icons.SunMoon,
 } as const;
 
+const getRadiusIndex = (radius: ThemeRadius | undefined) => {
+  const index = Object.values(ThemeRadius).indexOf(
+    radius ?? ThemeRadius.MEDIUM,
+  );
+
+  return index === -1
+    ? Object.values(ThemeRadius).indexOf(ThemeRadius.MEDIUM)
+    : index;
+};
+
 export const ThemeCustomizer = memo<ThemeCustomizerProps>(
   ({ config, onChange }) => {
     const { t } = useTranslation("common");
+    const radius = config.radius ?? ThemeRadius.MEDIUM;
+    const radiusIndex = getRadiusIndex(radius);
 
     return (
       <div className="flex flex-1 flex-col items-center space-y-4 md:space-y-6">
@@ -79,6 +119,23 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
               );
             })}
           </div>
+        </div>
+        <div className="w-full space-y-3">
+          <Label className="text-xs">{t("theme.radius.label")}</Label>
+          <Slider
+            min={0}
+            max={Object.values(ThemeRadius).length - 1}
+            step={1}
+            value={[radiusIndex]}
+            onValueChange={(value) => {
+              const nextIndex = Array.isArray(value) ? value[0] : value;
+              const nextRadius = Object.values(ThemeRadius)[Number(nextIndex)];
+
+              if (nextRadius) {
+                onChange({ ...config, radius: nextRadius });
+              }
+            }}
+          />
         </div>
       </div>
     );

@@ -37,7 +37,7 @@ const AnonymousUser = () => {
           variant: "outline",
           size: "icon",
         }),
-        "rounded-full",
+        "rounded-xl",
       )}
       target="_blank"
     >
