@@ -222,6 +222,9 @@ importers:
       '@expo-google-fonts/geist-mono':
         specifier: 0.4.1
         version: 0.4.1
+      '@expo-google-fonts/source-serif-4':
+        specifier: 0.4.1
+        version: 0.4.1
       '@expo/dom-webview':
         specifier: 57.0.0
         version: 57.0.0(expo@57.0.2)(react-native@0.86.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
@@ -3498,6 +3501,9 @@ packages:
 
   '@expo-google-fonts/material-symbols@0.4.38':
     resolution: {integrity: sha512-IJkBtN1o8u9BW5fvSii1MyHPQ7Q0HxbWcVBvOrOzgMLpVtZw7R2w94wBTVR7kZwv3w1JNTESMmLA5Sqn1+Z36A==}
+
+  '@expo-google-fonts/source-serif-4@0.4.1':
+    resolution: {integrity: sha512-Ej4UXDjW1kwYPHG8YLq6fK1bqnJGb3K35J3S5atSL0ScKFAFLKvndxoTWeCls7mybtlS9x99hzwDeXCBkiI3rA==}
 
   '@expo/cli@57.0.4':
     resolution: {integrity: sha512-7d+YW9PdGqgNI4dh9FTv+ZNE2xu1jV8xREDgl/7jiKNcOKdgby6ZAXufZX7iRotyxyu8fwjzETKMg7MkmYLJ8A==}
@@ -15595,6 +15601,8 @@ snapshots:
   '@expo-google-fonts/geist@0.4.1': {}
 
   '@expo-google-fonts/material-symbols@0.4.38': {}
+
+  '@expo-google-fonts/source-serif-4@0.4.1': {}
 
   '@expo/cli@57.0.4(@expo/dom-webview@57.0.0)(@expo/metro-runtime@57.0.3)(expo-constants@57.0.3)(expo-font@57.0.0)(expo-router@57.0.3)(expo@57.0.2)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)':
     dependencies:

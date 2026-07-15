@@ -20,6 +20,12 @@ export const THEME_RADIUS_VALUES = {
   [ThemeRadius.FULL]: "2rem",
 } satisfies Record<ThemeRadius, string>;
 
+export const ThemeFont = {
+  SANS: "sans",
+  SERIF: "serif",
+  MONO: "mono",
+} as const;
+
 export const ThemeColor = {
   ORANGE: "orange",
   ROSE: "rose",
@@ -41,6 +47,7 @@ export const DEFAULT_BREAKPOINTS = {
 } as const;
 
 export type ThemeColor = (typeof ThemeColor)[keyof typeof ThemeColor];
+export type ThemeFont = (typeof ThemeFont)[keyof typeof ThemeFont];
 export type ThemeMode = (typeof ThemeMode)[keyof typeof ThemeMode];
 export type ThemeRadius = (typeof ThemeRadius)[keyof typeof ThemeRadius];
 
@@ -53,6 +60,7 @@ export interface ThemeConfig {
   mode: ThemeMode;
   color: ThemeColor;
   radius: ThemeRadius;
+  font: ThemeFont;
 }
 
 export interface ThemeColorsVariables {

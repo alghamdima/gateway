@@ -7,6 +7,12 @@ import {
   useFonts,
 } from "@expo-google-fonts/geist";
 import { GeistMono_400Regular } from "@expo-google-fonts/geist-mono";
+import {
+  SourceSerif4_400Regular,
+  SourceSerif4_500Medium,
+  SourceSerif4_600SemiBold,
+  SourceSerif4_700Bold,
+} from "@expo-google-fonts/source-serif-4";
 import { router, Stack, useNavigationContainerRef } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { View } from "react-native";
@@ -75,6 +81,10 @@ const RootLayout = () => {
     Geist_500Medium,
     Geist_600SemiBold,
     Geist_700Bold,
+    SourceSerif4_400Regular,
+    SourceSerif4_500Medium,
+    SourceSerif4_600SemiBold,
+    SourceSerif4_700Bold,
   });
 
   const authLoaded = useSetupAuth();

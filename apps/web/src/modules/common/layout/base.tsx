@@ -1,4 +1,4 @@
-import { Geist_Mono, Geist } from "next/font/google";
+import { Geist_Mono, Geist, Source_Serif_4 } from "next/font/google";
 
 import { cn } from "@workspace/ui";
 
@@ -8,6 +8,13 @@ const sans = Geist({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-sans",
+});
+
+const serif = Source_Serif_4({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-serif",
+  weight: ["400", "500", "600", "700"],
 });
 
 const mono = Geist_Mono({
@@ -26,7 +33,7 @@ export const BaseLayout = ({ children, locale }: BaseLayoutProps) => {
   return (
     <html
       lang={locale}
-      className={cn(sans.variable, mono.variable)}
+      className={cn(sans.variable, serif.variable, mono.variable)}
       data-scroll-behavior="smooth"
     >
       <body

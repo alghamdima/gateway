@@ -4,7 +4,13 @@ import * as React from "react";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ThemeColor, ThemeMode, ThemeRadius, cn } from "@workspace/ui";
+import {
+  ThemeColor,
+  ThemeFont,
+  ThemeMode,
+  ThemeRadius,
+  cn,
+} from "@workspace/ui";
 
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";
@@ -136,6 +142,35 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
               }
             }}
           />
+        </div>
+        <div className="w-full space-y-1.5">
+          <Label className="text-xs">{t("theme.font.label")}</Label>
+          <div className="flex gap-2">
+            {Object.values(ThemeFont).map((font) => {
+              const isActive = config.font === font;
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  key={font}
+                  onClick={() => onChange({ ...config, font })}
+                  className={cn(
+                    "flex-1 gap-2 text-xs capitalize",
+                    isActive && "border-primary dark:border-primary border-2",
+                  )}
+                  style={{
+                    fontFamily:
+                      font === ThemeFont.SANS
+                        ? "Geist, sans-serif"
+                        : `var(--font-${font})`,
+                  }}
+                >
+                  <span className="text-base leading-none">{"Ag"}</span>
+                  {t(`theme.font.${font}`)}
+                </Button>
+              );
+            })}
+          </div>
         </div>
       </div>
     );

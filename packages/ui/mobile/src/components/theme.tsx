@@ -1,9 +1,17 @@
 import { oklch, formatHex } from "culori";
 import { memo } from "react";
 import { FlatList, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 
 import { useTranslation } from "@workspace/i18n";
-import { cn, ThemeColor, ThemeMode, ThemeRadius, themes } from "@workspace/ui";
+import {
+  cn,
+  ThemeColor,
+  ThemeFont,
+  ThemeMode,
+  ThemeRadius,
+  themes,
+} from "@workspace/ui";
 
 import { Button } from "./button";
 import { Icons } from "./icons";
@@ -144,6 +152,39 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
             minimumTrackTintColorClassName="accent-primary"
             maximumTrackTintColorClassName="accent-primary/30"
           />
+        </View>
+        <View className="w-full gap-1.5">
+          <Label nativeID="font" className="text-xs">
+            {t("theme.font.label")}
+          </Label>
+          <View className="flex-row gap-2">
+            {Object.values(ThemeFont).map((item) => {
+              const fontFamily =
+                useCSSVariable(`--font-${item}`)?.toString() ?? "";
+              const isActive = config.font === item;
+
+              return (
+                <Button
+                  variant="outline"
+                  key={item}
+                  onPress={() => onChange({ ...config, font: item })}
+                  hitSlop={2}
+                  className={cn(
+                    "h-auto grow flex-row items-center justify-center gap-2 px-2 py-2 capitalize",
+                    isActive && "border-primary dark:border-primary border-2",
+                  )}
+                >
+                  <Text
+                    className="translate-y-0.5 text-lg leading-none"
+                    style={{ fontFamily }}
+                  >
+                    {"Ag"}
+                  </Text>
+                  <Text className="capitalize">{t(`theme.font.${item}`)}</Text>
+                </Button>
+              );
+            })}
+          </View>
         </View>
       </View>
     );

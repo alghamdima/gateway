@@ -47,6 +47,7 @@ export const Layout = ({
             {
               "--radius":
                 THEME_RADIUS_VALUES[theme.radius ?? ThemeRadius.MEDIUM],
+              "--font-sans": `var(--font-${theme.font})`,
             } as React.CSSProperties
           }
         >

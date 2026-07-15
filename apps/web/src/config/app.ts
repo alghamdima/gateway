@@ -1,4 +1,4 @@
-import { ThemeRadius } from "@workspace/ui";
+import { ThemeFont, ThemeRadius } from "@workspace/ui";
 
 import env from "../../env.config";
 
@@ -10,5 +10,6 @@ export const appConfig = {
     mode: env.NEXT_PUBLIC_THEME_MODE,
     color: env.NEXT_PUBLIC_THEME_COLOR,
     radius: ThemeRadius.MEDIUM,
+    font: ThemeFont.SANS,
   },
 } as const;

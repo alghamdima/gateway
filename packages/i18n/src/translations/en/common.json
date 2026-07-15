@@ -221,6 +221,12 @@
       "medium": "Medium",
       "large": "Large",
       "full": "Full"
+    },
+    "font": {
+      "label": "Font",
+      "sans": "Sans",
+      "serif": "Serif",
+      "mono": "Mono"
     }
   },
   "name": "Name",

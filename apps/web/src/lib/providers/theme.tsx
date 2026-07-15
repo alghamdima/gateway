@@ -5,7 +5,7 @@ import { memo, useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { ThemeRadius, THEME_RADIUS_VALUES } from "@workspace/ui";
+import { ThemeFont, ThemeRadius, THEME_RADIUS_VALUES } from "@workspace/ui";
 
 import { appConfig } from "~/config/app";
 
@@ -43,6 +43,17 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
       THEME_RADIUS_VALUES[config.radius ?? ThemeRadius.MEDIUM],
     );
   }, [config.radius]);
+
+  useEffect(() => {
+    if (config.font === ThemeFont.SANS) {
+      document.documentElement.style.removeProperty("--font-sans");
+    }
+
+    document.documentElement.style.setProperty(
+      "--font-sans",
+      `var(--font-${config.font})`,
+    );
+  }, [config.font]);
 
   return (
     <NextThemeProvider

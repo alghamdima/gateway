@@ -9,6 +9,7 @@ import { captureException } from "@workspace/monitoring-mobile";
 import { logger } from "@workspace/shared/logger";
 import {
   THEME_RADIUS_VALUES,
+  ThemeFont,
   ThemeMode,
   ThemeRadius,
   themes,
@@ -19,6 +20,27 @@ import { appConfig } from "~/config/app";
 import type { ColorVariable, ThemeConfig } from "@workspace/ui";
 
 const REM_BASE = 16;
+
+const FONTS = {
+  [ThemeFont.SANS]: {
+    regular: "Geist_400Regular",
+    medium: "Geist_500Medium",
+    semibold: "Geist_600SemiBold",
+    bold: "Geist_700Bold",
+  },
+  [ThemeFont.SERIF]: {
+    regular: "SourceSerif4_400Regular",
+    medium: "SourceSerif4_500Medium",
+    semibold: "SourceSerif4_600SemiBold",
+    bold: "SourceSerif4_700Bold",
+  },
+  [ThemeFont.MONO]: {
+    regular: "GeistMono_400Regular",
+    medium: "GeistMono_400Regular",
+    semibold: "GeistMono_400Regular",
+    bold: "GeistMono_400Regular",
+  },
+};
 
 const getPixelFromRem = (value: string) => {
   return parseFloat(value) * REM_BASE;
@@ -69,9 +91,18 @@ export const useTheme = () => {
       const radius = getPixelFromRem(
         THEME_RADIUS_VALUES[config.radius ?? ThemeRadius.MEDIUM],
       );
+      const sharedVariables = {
+        "--radius": radius,
+        "--font-sans": FONTS[config.font].regular,
+        "--font-sans-medium": FONTS[config.font].medium,
+        "--font-sans-semibold": FONTS[config.font].semibold,
+        "--font-sans-bold": FONTS[config.font].bold,
+        "--font-serif": FONTS[ThemeFont.SERIF].regular,
+        "--font-mono": FONTS[ThemeFont.MONO].regular,
+      };
 
-      Uniwind.updateCSSVariables(ThemeMode.LIGHT, { "--radius": radius });
-      Uniwind.updateCSSVariables(ThemeMode.DARK, { "--radius": radius });
+      Uniwind.updateCSSVariables(ThemeMode.LIGHT, sharedVariables);
+      Uniwind.updateCSSVariables(ThemeMode.DARK, sharedVariables);
 
       Uniwind.updateCSSVariables(resolvedTheme, {
         ...Object.entries(colors).reduce(
@@ -85,7 +116,7 @@ export const useTheme = () => {
           },
           {} as Record<string, string>,
         ),
-        "--radius": radius,
+        ...sharedVariables,
       });
     } catch (error) {
       logger.error(error);
