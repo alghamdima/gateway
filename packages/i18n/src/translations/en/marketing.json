@@ -256,5 +256,29 @@
     "title": "This app can be yours.",
     "description": "Customize, deploy and start earning $$$. In minutes.",
     "link": "Get TurboStarter"
+  },
+  "waitlist": {
+    "label": "Waitlist",
+    "description": "Collect emails before official launch",
+    "title": "Get notified when we're launching",
+    "subtitle": "Drive interest, collect emails, and build momentum ahead of your launch",
+    "proof": "You're not alone, <highlight>1,500+</highlight> people joined!",
+    "submit": "Notify me",
+    "success": {
+      "title": "You're on the list!",
+      "description": "We'll notify you when we launch.",
+      "cta": "See ya!"
+    }
+  },
+  "newsletter": {
+    "label": "Newsletter",
+    "title": "Never miss an update",
+    "subtitle": "Product updates, launch tips, and practical advice - straight to your inbox",
+    "submit": "Subscribe",
+    "success": {
+      "title": "You're subscribed!",
+      "description": "Thanks for joining. We'll keep you posted.",
+      "cta": "You're in!"
+    }
   }
 }

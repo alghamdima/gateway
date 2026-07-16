@@ -265,5 +265,29 @@
     "title": "Esta aplicación puede ser tuya.",
     "description": "Personaliza, despliega y empieza a ganar $$$ en minutos.",
     "link": "Obtén TurboStarter"
+  },
+  "waitlist": {
+    "label": "Lista de espera",
+    "description": "Recopila emails antes del lanzamiento oficial",
+    "title": "Recibe una notificación cuando lancemos",
+    "subtitle": "Conduce interés, recopila emails y construye impulso antes de tu lanzamiento",
+    "proof": "No estás solo, <highlight>1,500+</highlight> personas se han unido!",
+    "submit": "Avísame",
+    "success": {
+      "title": "¡Estás en la lista!",
+      "description": "Te avisaremos cuando lancemos.",
+      "cta": "¡Nos vemos!"
+    }
+  },
+  "newsletter": {
+    "label": "Newsletter",
+    "title": "Mantente al día",
+    "subtitle": "Actualizaciones del producto, consejos de lanzamiento y consejos prácticos — directo a tu bandeja de entrada",
+    "submit": "Suscribirse",
+    "success": {
+      "title": "¡Estás suscrito!",
+      "description": "Gracias por unirte. Te mantendremos informado.",
+      "cta": "¡Listo!"
+    }
   }
 }

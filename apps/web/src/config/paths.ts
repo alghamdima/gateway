@@ -26,6 +26,7 @@ const pathsConfig = {
   marketing: {
     pricing: "/pricing",
     contact: "/contact",
+    waitlist: "/waitlist",
     blog: {
       index: BLOG_PREFIX,
       post: (slug: string) => `${BLOG_PREFIX}/${slug}`,

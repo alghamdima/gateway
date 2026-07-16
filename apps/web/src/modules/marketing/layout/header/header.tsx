@@ -74,6 +74,12 @@ const links = [
         href: "#",
         icon: Icons.Webhook,
       },
+      {
+        title: "marketing:waitlist.label",
+        description: "marketing:waitlist.description",
+        href: pathsConfig.marketing.waitlist,
+        icon: Icons.ClockFading,
+      },
     ],
   },
   {
