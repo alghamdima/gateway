@@ -36,6 +36,10 @@ describe("HttpException", () => {
 describe("getStatusCode", () => {
   it.each([
     [{ status: 404 }, 404],
+    [{ status: "FORBIDDEN", statusCode: 403 }, 403],
+    [{ status: "FORBIDDEN" }, HttpStatusCode.INTERNAL_SERVER_ERROR],
+    [{ status: 999 }, HttpStatusCode.INTERNAL_SERVER_ERROR],
+    [{ statusCode: 100 }, HttpStatusCode.INTERNAL_SERVER_ERROR],
     [{ message: "error" }, HttpStatusCode.INTERNAL_SERVER_ERROR],
     ["error", HttpStatusCode.INTERNAL_SERVER_ERROR],
     [null, HttpStatusCode.INTERNAL_SERVER_ERROR],

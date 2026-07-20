@@ -19,9 +19,25 @@ export class HttpException extends Error {
   }
 }
 
+const isValidHttpStatus = (status: number): boolean =>
+  Number.isInteger(status) && status >= 200 && status <= 599;
+
 export const getStatusCode = (e: unknown) => {
-  if (typeof e === "object" && e && "status" in e) {
-    return Number(e.status);
+  if (typeof e === "object" && e !== null) {
+    if (
+      "statusCode" in e &&
+      typeof e.statusCode === "number" &&
+      isValidHttpStatus(e.statusCode)
+    ) {
+      return e.statusCode;
+    }
+
+    if ("status" in e) {
+      const status = Number(e.status);
+      if (isValidHttpStatus(status)) {
+        return status;
+      }
+    }
   }
 
   return HttpStatusCode.INTERNAL_SERVER_ERROR;
