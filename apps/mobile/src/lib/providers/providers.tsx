@@ -18,6 +18,7 @@ import { Verification } from "~/modules/auth/verification";
 
 import { AnalyticsProvider } from "./analytics";
 import { MonitoringProvider } from "./monitoring";
+import { NotificationsProvider } from "./notifications";
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
@@ -39,11 +40,13 @@ export const Providers = memo<ProvidersProps>(({ children }) => {
                 <BottomSheetModalProvider>
                   <MonitoringProvider>
                     <AnalyticsProvider>
-                      <BillingProvider>
-                        {children}
-                        <Verification />
-                        <PortalHost />
-                      </BillingProvider>
+                      <NotificationsProvider>
+                        <BillingProvider>
+                          {children}
+                          <Verification />
+                          <PortalHost />
+                        </BillingProvider>
+                      </NotificationsProvider>
                     </AnalyticsProvider>
                   </MonitoringProvider>
                 </BottomSheetModalProvider>

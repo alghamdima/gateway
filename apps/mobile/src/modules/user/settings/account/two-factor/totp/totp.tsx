@@ -1,5 +1,5 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 import QRCode from "react-qr-code";
@@ -27,7 +27,7 @@ import {
 import { Spin } from "@workspace/ui-mobile/spin";
 import { Text } from "@workspace/ui-mobile/text";
 
-import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
+import { useCopy } from "~/modules/common/hooks/use-copy";
 import { useTheme } from "~/modules/common/hooks/use-theme";
 
 import { BackupCodesSheet } from "../backup-codes/backup-codes";
@@ -156,31 +156,19 @@ export const TotpSheet = ({ ref: passedRef }: TotpSheetProps) => {
 
 const Secret = () => {
   const { uri } = useTotp();
-  const [, copy] = useCopyToClipboard();
-  const [showCheck, setShowCheck] = useState(false);
+  const { copied, copy } = useCopy();
+
   const secret = useMemo(() => {
     return uri ? new URL(uri).searchParams.get("secret") : null;
   }, [uri]);
-
-  const handleCopy = async () => {
-    const success = await copy(secret ?? "");
-    if (!success) {
-      return;
-    }
-
-    setShowCheck(true);
-    setTimeout(() => {
-      setShowCheck(false);
-    }, 2000);
-  };
 
   return (
     <View className="flex-row flex-wrap items-center gap-2 px-5">
       <Text>
         <Text className="text-muted-foreground text-center">{secret}</Text>
 
-        <Text onPress={handleCopy} className="pl-2.5">
-          {showCheck ? (
+        <Text onPress={() => copy(secret ?? "")} className="pl-2.5">
+          {copied ? (
             <Icons.Check className="text-foreground" size={12} />
           ) : (
             <Icons.Copy className="text-foreground" size={12} />

@@ -23,7 +23,7 @@ import { SettingsTile } from "~/modules/common/settings-tile";
 
 import type { ThemeConfig } from "@workspace/ui";
 
-export const ThemeSettings = () => {
+export const ThemeSettings = ({ children }: { children?: React.ReactNode }) => {
   const { t } = useTranslation("common");
   const { config, setConfig, resolvedTheme } = useTheme();
 
@@ -34,17 +34,22 @@ export const ThemeSettings = () => {
   return (
     <BottomSheet>
       <BottomSheetOpenTrigger asChild>
-        <SettingsTile icon={MODE_ICONS[config.mode]}>
-          <Text>{t("theme.title")}</Text>
+        {children ?? (
+          <SettingsTile icon={MODE_ICONS[config.mode]}>
+            <Text>{t("theme.title")}</Text>
 
-          <View
-            className={cn(
-              "bg-primary flex size-4.5 shrink-0 items-center justify-center rounded-full",
-            )}
-          />
-        </SettingsTile>
+            <View
+              className={cn(
+                "bg-primary flex size-4.5 shrink-0 items-center justify-center rounded-full",
+              )}
+            />
+          </SettingsTile>
+        )}
       </BottomSheetOpenTrigger>
-      <BottomSheetContent name="theme-settings">
+      <BottomSheetContent
+        name="theme-settings"
+        enableContentPanningGesture={false}
+      >
         <BottomSheetView>
           <View className="flex-row items-start">
             <BottomSheetHeader>

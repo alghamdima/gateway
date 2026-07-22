@@ -13,7 +13,7 @@ import {
   ModalClose,
 } from "@workspace/ui-web/modal";
 
-import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
+import { useCopy } from "~/modules/common/hooks/use-copy";
 
 import { RequirePassword } from "../../require-password";
 import { useTwoFactor } from "../use-two-factor";
@@ -85,30 +85,16 @@ export const BackupCodesModal = ({
 
 const Copy = () => {
   const { t } = useTranslation("common");
-  const [_, copy] = useCopyToClipboard();
-  const [showCheck, setShowCheck] = useState(false);
-
+  const { copied, copy } = useCopy();
   const { codes } = useBackupCodes();
-
-  const handleCopy = async () => {
-    const success = await copy(codes.join("\n"));
-    if (!success) {
-      return;
-    }
-
-    setShowCheck(true);
-    setTimeout(() => {
-      setShowCheck(false);
-    }, 2000);
-  };
 
   return (
     <Button
       variant="ghost"
       className="h-auto gap-1.5 px-3 py-1.5"
-      onClick={handleCopy}
+      onClick={() => copy(codes.join("\n"))}
     >
-      {showCheck ? (
+      {copied ? (
         <Icons.Check className="size-4" />
       ) : (
         <Icons.Copy className="size-4" />

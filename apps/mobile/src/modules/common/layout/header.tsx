@@ -6,6 +6,7 @@ import { Icons } from "@workspace/ui-mobile/icons";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { AccountSwitcher } from "~/modules/organization/account-switcher";
+import { ThemeSettings } from "~/modules/user/settings/theme";
 
 interface BaseHeaderProps {
   readonly onBack?: () => void;
@@ -63,9 +64,11 @@ export const UserHeader = () => {
       }}
     >
       <AccountSwitcher />
-      <Button size="icon" variant="ghost">
-        <Icons.Bell size={20} className="text-muted-foreground" />
-      </Button>
+      <ThemeSettings>
+        <Button size="icon" variant="ghost">
+          <Icons.PaintBucket size={20} className="text-primary" />
+        </Button>
+      </ThemeSettings>
     </View>
   );
 };

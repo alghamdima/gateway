@@ -24,7 +24,7 @@ import {
   ModalClose,
 } from "@workspace/ui-web/modal";
 
-import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
+import { useCopy } from "~/modules/common/hooks/use-copy";
 
 import { RequirePassword } from "../../require-password";
 import { BackupCodesModal } from "../backup-codes/backup-codes";
@@ -152,25 +152,11 @@ export const TotpModal = ({ open, onOpenChange }: TotpModalProps) => {
 
 const Secret = () => {
   const { uri } = useTotp();
-  const [showCheck, setShowCheck] = useState(false);
-
-  const [, copy] = useCopyToClipboard();
+  const { copied, copy } = useCopy();
 
   const secret = useMemo(() => {
     return uri ? new URL(uri).searchParams.get("secret") : null;
   }, [uri]);
-
-  const handleCopy = async () => {
-    const success = await copy(secret ?? "");
-    if (!success) {
-      return;
-    }
-
-    setShowCheck(true);
-    setTimeout(() => {
-      setShowCheck(false);
-    }, 2000);
-  };
 
   if (!secret) {
     return null;
@@ -186,9 +172,9 @@ const Secret = () => {
         size="icon"
         className="ml-1 size-6"
         type="button"
-        onClick={handleCopy}
+        onClick={() => copy(secret ?? "")}
       >
-        {showCheck ? (
+        {copied ? (
           <Icons.Check className="size-3" />
         ) : (
           <Icons.Copy className="size-3" />

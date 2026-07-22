@@ -1,3 +1,4 @@
+import { useGlobalSearchParams, usePathname } from "expo-router";
 import PostHog, { PostHogProvider } from "posthog-react-native";
 import { useEffect } from "react";
 
@@ -25,7 +26,13 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
   const client = getClient();
 
   return (
-    <PostHogProvider client={client} autocapture>
+    <PostHogProvider
+      client={client}
+      autocapture={{
+        captureScreens: false,
+        captureTouches: true,
+      }}
+    >
       {children}
     </PostHogProvider>
   );
@@ -34,6 +41,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
 const Setup = () => {
   const client = getClient();
   const granted = useTrackingPermissions();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
 
   useEffect(() => {
     if (granted) {
@@ -42,6 +51,10 @@ const Setup = () => {
       void client.optOut();
     }
   }, [granted, client]);
+
+  useEffect(() => {
+    void client.screen(pathname, params);
+  }, [pathname, params, client]);
 
   return null;
 };

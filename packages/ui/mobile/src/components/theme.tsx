@@ -1,6 +1,6 @@
 import { oklch, formatHex } from "culori";
 import { memo } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, Platform, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
 import { useTranslation } from "@workspace/i18n";
@@ -149,8 +149,14 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
                 onChange({ ...config, radius: nextRadius });
               }
             }}
+            className={cn({
+              "-mx-4 mt-1": Platform.OS === "android",
+            })}
             minimumTrackTintColorClassName="accent-primary"
             maximumTrackTintColorClassName="accent-primary/30"
+            {...(Platform.OS === "android" && {
+              thumbTintColorClassName: "accent-primary",
+            })}
           />
         </View>
         <View className="w-full gap-1.5">
@@ -170,14 +176,11 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
                   onPress={() => onChange({ ...config, font: item })}
                   hitSlop={2}
                   className={cn(
-                    "h-auto grow flex-row items-center justify-center gap-2 px-2 py-2 capitalize",
+                    "h-auto grow flex-row items-center justify-center gap-2 px-2 py-1 capitalize",
                     isActive && "border-primary dark:border-primary border-2",
                   )}
                 >
-                  <Text
-                    className="translate-y-0.5 text-lg leading-none"
-                    style={{ fontFamily }}
-                  >
+                  <Text className="text-lg" style={{ fontFamily }}>
                     {"Ag"}
                   </Text>
                   <Text className="capitalize">{t(`theme.font.${item}`)}</Text>

@@ -41,7 +41,7 @@ const alertTextVariants = cva("text-sm", {
   },
 });
 
-const alertDescriptionVariants = cva("ml-0.5 pb-1.5 pl-6 text-sm", {
+const alertDescriptionVariants = cva("ml-0.5 pb-0.5 pl-6 text-sm", {
   variants: {
     variant: {
       default: "text-muted-foreground",

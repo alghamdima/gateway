@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { View, Alert, Share } from "react-native";
 
 import { useTranslation } from "@workspace/i18n";
@@ -17,7 +16,7 @@ import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Text } from "@workspace/ui-mobile/text";
 
-import { useCopyToClipboard } from "~/modules/common/hooks/use-copy-to-clipboard";
+import { useCopy } from "~/modules/common/hooks/use-copy";
 
 import { RequirePassword } from "../require-password";
 import { useTwoFactor } from "../use-two-factor";
@@ -85,30 +84,16 @@ export const BackupCodesSheet = ({ ref: passedRef }: BackupCodesSheetProps) => {
 
 const Copy = () => {
   const { t } = useTranslation("common");
-  const [_, copy] = useCopyToClipboard();
-  const [showCheck, setShowCheck] = useState(false);
-
   const { codes } = useBackupCodes();
-
-  const handleCopy = async () => {
-    const success = await copy(codes.join("\n"));
-    if (!success) {
-      return;
-    }
-
-    setShowCheck(true);
-    setTimeout(() => {
-      setShowCheck(false);
-    }, 2000);
-  };
+  const { copied, copy } = useCopy();
 
   return (
     <Button
       variant="ghost"
       className="h-auto flex-row gap-2 px-3 py-1.5"
-      onPress={handleCopy}
+      onPress={() => void copy(codes.join("\n"))}
     >
-      {showCheck ? (
+      {copied ? (
         <Icons.Check size={16} className="text-foreground" />
       ) : (
         <Icons.Copy size={16} className="text-foreground" />

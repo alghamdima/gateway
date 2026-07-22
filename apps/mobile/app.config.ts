@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.5.1",
+  version: "1.6.0",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",
@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: "com.turbostarter.core",
+    googleServicesFile: "./google-services.json",
     adaptiveIcon: {
       monochromeImage: "./public/images/icon/android/monochrome.png",
       foregroundImage: "./public/images/icon/android/adaptive.png",
@@ -59,6 +60,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-image",
     "expo-secure-store",
     "expo-image-picker",
+    [
+      "expo-notifications",
+      {
+        icon: "./public/images/icon/android/notification.png",
+        defaultChannel: "default",
+        color: "#0D121C",
+      },
+    ],
     "expo-web-browser",
     "expo-apple-authentication",
     "@react-native-google-signin/google-signin",
@@ -69,7 +78,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         android: {
           /* https://github.com/expo/expo/issues/15761 */
-          enableProguardInReleaseBuilds: true,
+          enableMinifyInReleaseBuilds: true,
           extraProguardRules: "-keep public class com.horcrux.svg.** {*;}",
           allowBackup: false,
           usesCleartextTraffic:

@@ -30,6 +30,7 @@ import {
   Download,
   Bell,
   BadgeCheck,
+  PaintBucket,
   BadgeX,
   ThumbsUp,
   Lock,
@@ -37,6 +38,7 @@ import {
   ChevronLeft,
   X,
   UserRoundPlus,
+  Ban,
   ListFilter,
   Copy,
   Languages,
@@ -121,11 +123,13 @@ const icons = {
   Copy,
   TrendingUp,
   UsersRound,
+  Ban,
   UserRoundPlus,
   ArrowUpRight,
   MonitorSmartphone,
   WalletCards,
   Code,
+  PaintBucket,
 };
 
 const Icons = {} as {

@@ -94,7 +94,7 @@ export default function RequiredStep() {
                                 `${appConfig.url}/legal/privacy-policy`,
                               )
                             }
-                            className="font-sans-medium text-primary text-sm underline hover:no-underline"
+                            className="font-sans-medium text-primary text-sm underline active:no-underline"
                           />
                         ),
                       }}

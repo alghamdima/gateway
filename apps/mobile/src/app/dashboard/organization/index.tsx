@@ -3,9 +3,9 @@ import { View } from "react-native";
 import { BuiltWith } from "@workspace/ui-mobile/built-with";
 
 import { ScrollView } from "~/modules/common/styled";
-import { AreaChart } from "~/modules/home/charts/area";
-import { BarChart } from "~/modules/home/charts/bar";
-import { PieChart } from "~/modules/home/charts/pie";
+import { AreaChart } from "~/modules/organization/home/charts/area";
+import { BarChart } from "~/modules/organization/home/charts/bar";
+import { PieChart } from "~/modules/organization/home/charts/pie";
 
 export default function Home() {
   return (
