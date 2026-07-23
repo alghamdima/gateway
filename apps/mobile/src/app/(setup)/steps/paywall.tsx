@@ -53,7 +53,7 @@ export default function PaywallStep() {
 
   const data = [
     {
-      label: t("status"),
+      label: t("common:status"),
       value: t(`setup.steps.step.paywall.state.status.${info.status}`),
     },
     {

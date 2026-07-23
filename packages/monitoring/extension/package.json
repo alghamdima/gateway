@@ -11,11 +11,11 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
-    "@sentry/browser": "10.50.0",
+    "@sentry/browser": "10.67.0",
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-js": "1.395.0",
+    "posthog-js": "1.406.2",
     "uuid": "14.0.0"
   },
   "devDependencies": {

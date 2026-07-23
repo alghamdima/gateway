@@ -18,8 +18,8 @@ catalog:
   react-native: 0.86.0
   tailwindcss: 4.2.4
   typescript: 6.0.3
-  vitest: 4.1.5
-  "@vitest/coverage-v8": 4.1.5
+  vitest: 4.1.10
+  "@vitest/coverage-v8": 4.1.10
   zod: 4.3.6
   zustand: 5.0.12
 
@@ -51,14 +51,3 @@ allowBuilds:
 
 patchedDependencies:
   react-native-ios-utilities@5.2.0: patches/react-native-ios-utilities@5.2.0.patch
-
-minimumReleaseAgeExclude:
-  - "@turbo/darwin-64@2.10.5"
-  - "@turbo/darwin-arm64@2.10.5"
-  - "@turbo/gen@2.10.5"
-  - "@turbo/linux-64@2.10.5"
-  - "@turbo/linux-arm64@2.10.5"
-  - "@turbo/windows-64@2.10.5"
-  - "@turbo/windows-arm64@2.10.5"
-  - eslint-plugin-turbo@2.10.5
-  - turbo@2.10.5

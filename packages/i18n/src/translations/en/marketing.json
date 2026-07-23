@@ -189,6 +189,10 @@
     "title": "API Reference",
     "description": "Build integrations with our API"
   },
+  "mcp": {
+    "title": "MCP Server",
+    "description": "Connect to your favorite LLM"
+  },
   "roadmap": {
     "title": "Roadmap",
     "description": "See what's coming next"
@@ -280,5 +284,9 @@
       "description": "Thanks for joining. We'll keep you posted.",
       "cta": "You're in!"
     }
+  },
+  "status": {
+    "operational": "All systems operational",
+    "degraded": "Systems degraded"
   }
 }

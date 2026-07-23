@@ -71,8 +71,14 @@ const links = [
       {
         title: "marketing:api.title",
         description: "marketing:api.description",
-        href: "#",
+        href: "https://www.turbostarter.dev/docs/web/api/openapi",
         icon: Icons.Webhook,
+      },
+      {
+        title: "marketing:mcp.title",
+        description: "marketing:mcp.description",
+        href: "https://www.turbostarter.dev/docs/web/installation/mcp",
+        icon: Icons.Plug,
       },
       {
         title: "marketing:waitlist.label",

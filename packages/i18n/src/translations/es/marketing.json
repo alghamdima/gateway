@@ -196,7 +196,10 @@
     "title": "Referencia de API",
     "description": "Crea integraciones con nuestra API"
   },
-
+  "mcp": {
+    "title": "Servidor MCP",
+    "description": "Conecta a tu LLM favorito"
+  },
   "roadmap": {
     "title": "Hoja de ruta",
     "description": "Descubre lo que viene después"
@@ -289,5 +292,9 @@
       "description": "Gracias por unirte. Te mantendremos informado.",
       "cta": "¡Listo!"
     }
+  },
+  "status": {
+    "operational": "Todos los sistemas en funcionamiento",
+    "degraded": "Sistemas degradados"
   }
 }

@@ -7,6 +7,7 @@ import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
 import { I18nControls } from "~/modules/common/i18n/controls";
 import { TurboLink } from "~/modules/common/turbo-link";
+import { StatusIndicator } from "~/modules/marketing/layout/status-indicator";
 
 const socials = [
   {
@@ -177,11 +178,14 @@ export const Footer = async () => {
         </div>
         <div className="mt-8 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p className="text-muted-foreground text-sm">
-              {/* oxlint-disable-next-line i18next/no-literal-string */}
-              &copy; {new Date().getFullYear()} {appConfig.name}.{" "}
-              {t("legal.copyright")}.
-            </p>
+            <div className="flex flex-col items-center gap-2 sm:items-start">
+              <p className="text-muted-foreground text-sm">
+                {/* oxlint-disable-next-line i18next/no-literal-string */}
+                &copy; {new Date().getFullYear()} {appConfig.name}.{" "}
+                {t("legal.copyright")}.
+              </p>
+              <StatusIndicator />
+            </div>
 
             <BuiltWith />
           </div>
