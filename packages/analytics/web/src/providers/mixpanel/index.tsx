@@ -9,19 +9,36 @@ import { env } from "./env";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
+let initialized = false;
+
 const init = () => {
+  if (initialized) {
+    return;
+  }
+
   mixpanel.init(env.NEXT_PUBLIC_MIXPANEL_TOKEN, {
     debug: env.NODE_ENV === NodeEnv.DEVELOPMENT,
     autocapture: true,
     persistence: "localStorage",
+    opt_out_tracking_by_default: true,
   });
+  initialized = true;
 };
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     useEffect(() => {
+      if (!enabled) {
+        if (initialized) {
+          mixpanel.opt_out_tracking();
+        }
+        return;
+      }
+
       init();
-    }, []);
+      mixpanel.opt_in_tracking();
+    }, [enabled]);
+
     return children;
   },
   track: (event, properties) => {

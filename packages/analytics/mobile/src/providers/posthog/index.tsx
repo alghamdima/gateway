@@ -38,31 +38,42 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const Setup = () => {
+const Setup = ({ enabled }: { enabled: boolean }) => {
   const client = getClient();
   const granted = useTrackingPermissions();
   const pathname = usePathname();
   const params = useGlobalSearchParams();
+  const isActive = enabled && granted;
 
   useEffect(() => {
-    if (granted) {
+    if (isActive) {
       void client.optIn();
     } else {
       void client.optOut();
     }
-  }, [granted, client]);
+  }, [isActive, client]);
 
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
     void client.screen(pathname, params);
-  }, [pathname, params, client]);
+  }, [pathname, params, client, isActive]);
 
   return null;
 };
 
-const ProviderComponent = ({ children }: { children: React.ReactNode }) => {
+const ProviderComponent = ({
+  children,
+  enabled = true,
+}: {
+  children: React.ReactNode;
+  enabled?: boolean;
+}) => {
   return (
     <Wrapper>
-      <Setup />
+      <Setup enabled={enabled} />
       {children}
     </Wrapper>
   );

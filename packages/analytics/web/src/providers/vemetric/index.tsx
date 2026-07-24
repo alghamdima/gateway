@@ -5,15 +5,17 @@ import { env } from "./env";
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     return (
       <>
-        <VemetricScript
-          token={env.NEXT_PUBLIC_VEMETRIC_PROJECT_TOKEN}
-          trackPageViews
-          trackOutboundLinks
-          trackDataAttributes
-        />
+        {enabled ? (
+          <VemetricScript
+            token={env.NEXT_PUBLIC_VEMETRIC_PROJECT_TOKEN}
+            trackPageViews
+            trackOutboundLinks
+            trackDataAttributes
+          />
+        ) : null}
         {children}
       </>
     );

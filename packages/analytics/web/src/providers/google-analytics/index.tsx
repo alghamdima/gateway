@@ -14,29 +14,31 @@ function gtag(...args: unknown[]) {
 }
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     return (
       <>
         {children}
-        <script
-          async
-          src={`https://www.googletagmanager.com/gtag/js?id=${env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID}`}
-          onLoad={() => {
-            if (typeof window === "undefined") {
-              return;
-            }
+        {enabled ? (
+          <script
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID}`}
+            onLoad={() => {
+              if (typeof window === "undefined") {
+                return;
+              }
 
-            window.dataLayer = window.dataLayer ?? [];
+              window.dataLayer = window.dataLayer ?? [];
 
-            window.gtag = gtag;
+              window.gtag = gtag;
 
-            window.gtag("js", new Date());
-            window.gtag(
-              "config",
-              env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID,
-            );
-          }}
-        />
+              window.gtag("js", new Date());
+              window.gtag(
+                "config",
+                env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID,
+              );
+            }}
+          />
+        ) : null}
       </>
     );
   },

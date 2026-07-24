@@ -1,5 +1,6 @@
 "use client";
 
+import { useConsentManager } from "@c15t/nextjs";
 import { useEffect } from "react";
 
 import { identify, Provider, reset } from "@workspace/analytics-web";
@@ -12,10 +13,16 @@ export const AnalyticsProvider = ({
   children: React.ReactNode;
 }) => {
   const session = authClient.useSession();
+  const { has } = useConsentManager();
+  const enabled = has("measurement");
 
   useEffect(() => {
     if (session.isPending) {
       return;
+    }
+
+    if (!enabled) {
+      return reset();
     }
 
     if (session.data?.user) {
@@ -24,7 +31,7 @@ export const AnalyticsProvider = ({
     } else {
       reset();
     }
-  }, [session]);
+  }, [session, enabled]);
 
-  return <Provider>{children}</Provider>;
+  return <Provider enabled={enabled}>{children}</Provider>;
 };

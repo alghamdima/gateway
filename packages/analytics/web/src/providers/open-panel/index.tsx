@@ -5,16 +5,18 @@ import { env } from "./env";
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     return (
       <>
         {children}
-        <OpenPanelComponent
-          clientId={env.NEXT_PUBLIC_OPEN_PANEL_CLIENT_ID}
-          trackScreenViews
-          trackAttributes
-          trackOutgoingLinks
-        />
+        {enabled ? (
+          <OpenPanelComponent
+            clientId={env.NEXT_PUBLIC_OPEN_PANEL_CLIENT_ID}
+            trackScreenViews
+            trackAttributes
+            trackOutgoingLinks
+          />
+        ) : null}
       </>
     );
   },

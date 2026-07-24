@@ -17,17 +17,20 @@ const mixpanel = new Mixpanel(
 void mixpanel.init();
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     const granted = useTrackingPermissions();
+    const isActive = enabled && granted;
 
     useEffect(() => {
       void (async () => {
         const optedOut = await mixpanel.hasOptedOutTracking();
-        if (granted && optedOut) {
+        if (isActive && optedOut) {
           mixpanel.optInTracking();
+        } else if (!isActive && !optedOut) {
+          mixpanel.optOutTracking();
         }
       })();
-    }, [granted]);
+    }, [isActive]);
 
     return <>{children}</>;
   },

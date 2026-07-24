@@ -16,7 +16,7 @@ catalog:
   dayjs: 1.11.20
   react-hook-form: 7.74.0
   react-native: 0.86.0
-  tailwindcss: 4.2.4
+  tailwindcss: 4.3.3
   typescript: 6.0.3
   vitest: 4.1.10
   "@vitest/coverage-v8": 4.1.10
@@ -51,3 +51,6 @@ allowBuilds:
 
 patchedDependencies:
   react-native-ios-utilities@5.2.0: patches/react-native-ios-utilities@5.2.0.patch
+
+minimumReleaseAgeExclude:
+  - postcss@8.5.23

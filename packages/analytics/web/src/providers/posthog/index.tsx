@@ -5,7 +5,7 @@ import { posthog } from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { useEffect } from "react";
 
-import { initPostHog, schedulePostHogInit } from "./client";
+import { initPostHog, onPostHogReady, schedulePostHogInit } from "./client";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
@@ -17,15 +17,25 @@ const PageView = dynamic(
 );
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     useEffect(() => {
+      if (!enabled) {
+        if (posthog.__loaded) {
+          posthog.opt_out_capturing();
+        }
+        return;
+      }
+
       schedulePostHogInit();
-    }, []);
+      onPostHogReady(() => {
+        posthog.opt_in_capturing();
+      });
+    }, [enabled]);
 
     return (
       <PostHogProvider client={posthog}>
         {children}
-        <PageView />
+        {enabled ? <PageView /> : null}
       </PostHogProvider>
     );
   },

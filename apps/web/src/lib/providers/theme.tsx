@@ -34,7 +34,7 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
   const config = useThemeConfig((s) => s.config);
 
   useEffect(() => {
-    document.body.dataset.theme = config.color;
+    document.documentElement.dataset.theme = config.color;
   }, [config.color]);
 
   useEffect(() => {

@@ -54,13 +54,13 @@ const generateThemeCSS = () => {
   const themeCss = themeEntries
     .map(([themeName, { light, dark }]) =>
       [
-        `${indent(2)}[data-theme="${themeName}"] {`,
-        generateCSSVariables(light, 3),
+        `${indent(1)}:is(:root[data-theme="${themeName}"], [data-theme="${themeName}"]) {`,
+        generateCSSVariables(light, 2),
         "",
-        `${indent(3)}@variant dark {`,
-        generateCSSVariables(dark, 4),
-        `${indent(3)}}`,
+        `${indent(2)}@variant dark {`,
+        generateCSSVariables(dark, 3),
         `${indent(2)}}`,
+        `${indent(1)}}`,
       ].join("\n"),
     )
     .join("\n\n");
@@ -70,9 +70,9 @@ const generateThemeCSS = () => {
     "@layer theme {",
     `${indent(1)}:root {`,
     defaultThemeCss,
+    `${indent(1)}}`,
     "",
     themeCss,
-    `${indent(1)}}`,
     "}",
   ].join("\n");
 };

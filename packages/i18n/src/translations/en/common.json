@@ -2,6 +2,8 @@
   "legal": {
     "label": "Legal",
     "privacy": "Privacy policy",
+    "cookies": "Cookie preferences",
+    "cookiePolicy": "Cookie policy",
     "terms": "Terms and Conditions",
     "copyright": "All rights reserved"
   },

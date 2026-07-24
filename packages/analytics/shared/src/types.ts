@@ -13,7 +13,12 @@ type IdentifyFunction = (
 ) => void;
 
 export interface AnalyticsProviderClientStrategy {
-  Provider: ({ children }: { children: ReactNode }) => ReactNode;
+  Provider: ({
+    children,
+  }: {
+    children: ReactNode;
+    enabled?: boolean;
+  }) => ReactNode;
   track: TrackFunction;
   identify: IdentifyFunction;
   reset: () => void;

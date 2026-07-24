@@ -35,11 +35,11 @@ export const BaseLayout = ({ children, locale }: BaseLayoutProps) => {
       lang={locale}
       className={cn(sans.variable, serif.variable, mono.variable)}
       data-scroll-behavior="smooth"
+      data-theme={appConfig.theme.color}
     >
       <body
         suppressHydrationWarning
         className="bg-background text-foreground flex min-h-screen flex-col font-sans antialiased"
-        data-theme={appConfig.theme.color}
       >
         {children}
       </body>

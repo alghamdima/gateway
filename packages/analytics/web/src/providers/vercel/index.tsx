@@ -4,11 +4,11 @@ import { Analytics } from "@vercel/analytics/react";
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     return (
       <>
         {children}
-        <Analytics />
+        {enabled ? <Analytics /> : null}
       </>
     );
   },

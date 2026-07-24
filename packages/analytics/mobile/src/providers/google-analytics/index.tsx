@@ -20,21 +20,22 @@ const setup = async () => {
   });
 };
 
-const useSetup = () => {
+const useSetup = (enabled: boolean) => {
   const granted = useTrackingPermissions();
   const pathname = usePathname();
   const params = useGlobalSearchParams();
+  const isActive = enabled && granted;
 
   useEffect(() => {
-    if (!granted) {
+    if (!isActive) {
       return;
     }
 
     void setup();
-  }, [granted]);
+  }, [isActive]);
 
   useEffect(() => {
-    if (!granted) {
+    if (!isActive) {
       return;
     }
 
@@ -43,12 +44,12 @@ const useSetup = () => {
       screen_class: pathname,
       params,
     });
-  }, [pathname, params, granted]);
+  }, [pathname, params, isActive]);
 };
 
 export const strategy = {
-  Provider: ({ children }) => {
-    useSetup();
+  Provider: ({ children, enabled = true }) => {
+    useSetup(enabled);
 
     return children;
   },

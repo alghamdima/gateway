@@ -7,6 +7,7 @@ import { appConfig } from "~/config/app";
 import { QueryClientProvider } from "~/lib/query/client";
 
 import { AnalyticsProvider } from "./analytics";
+import { ConsentProvider } from "./consent";
 import { MonitoringProvider } from "./monitoring";
 import { MotionProvider } from "./motion";
 import { ThemeProvider } from "./theme";
@@ -21,13 +22,15 @@ export const Providers = memo<ProvidersProps>(({ children, locale }) => {
     <I18nProvider locale={locale} defaultLocale={appConfig.locale}>
       <QueryClientProvider>
         <NuqsAdapter>
-          <AnalyticsProvider>
-            <MonitoringProvider>
-              <ThemeProvider>
-                <MotionProvider>{children}</MotionProvider>
-              </ThemeProvider>
-            </MonitoringProvider>
-          </AnalyticsProvider>
+          <ConsentProvider locale={locale}>
+            <AnalyticsProvider>
+              <MonitoringProvider>
+                <ThemeProvider>
+                  <MotionProvider>{children}</MotionProvider>
+                </ThemeProvider>
+              </MonitoringProvider>
+            </AnalyticsProvider>
+          </ConsentProvider>
         </NuqsAdapter>
       </QueryClientProvider>
     </I18nProvider>

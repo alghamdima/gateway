@@ -48,15 +48,17 @@ const getStoredIdentity = () => {
 };
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     return (
       <>
         {children}
-        <script
-          defer
-          data-domain={env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
-          src={`${env.NEXT_PUBLIC_PLAUSIBLE_HOST}/js/script.js`}
-        />
+        {enabled ? (
+          <script
+            defer
+            data-domain={env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
+            src={`${env.NEXT_PUBLIC_PLAUSIBLE_HOST}/js/script.js`}
+          />
+        ) : null}
       </>
     );
   },

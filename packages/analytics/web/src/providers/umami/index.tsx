@@ -15,15 +15,17 @@ declare global {
 }
 
 export const strategy = {
-  Provider: ({ children }) => {
+  Provider: ({ children, enabled = true }) => {
     return (
       <>
         {children}
-        <script
-          async
-          src={`${env.NEXT_PUBLIC_UMAMI_HOST}/script.js`}
-          data-website-id={env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
-        ></script>
+        {enabled ? (
+          <script
+            async
+            src={`${env.NEXT_PUBLIC_UMAMI_HOST}/script.js`}
+            data-website-id={env.NEXT_PUBLIC_UMAMI_WEBSITE_ID}
+          ></script>
+        ) : null}
       </>
     );
   },
