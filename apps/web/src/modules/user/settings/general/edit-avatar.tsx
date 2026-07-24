@@ -3,9 +3,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { memo } from "react";
-import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
+import { toast } from "@workspace/ui-web/toast";
 
 import {
   AvatarForm,
@@ -48,7 +48,10 @@ export const EditAvatar = memo<EditAvatarProps>((props) => {
           <div className="relative float-right">
             <AvatarFormInput
               onUpload={() => {
-                toast.success(t("account.avatar.update.success"));
+                toast.add({
+                  title: t("account.avatar.update.success"),
+                  type: "success",
+                });
                 router.refresh();
               }}
             >
@@ -57,7 +60,10 @@ export const EditAvatar = memo<EditAvatarProps>((props) => {
 
             <AvatarFormRemoveButton
               onRemove={() => {
-                toast.success(t("account.avatar.remove.success"));
+                toast.add({
+                  title: t("account.avatar.remove.success"),
+                  type: "success",
+                });
                 router.refresh();
               }}
             />

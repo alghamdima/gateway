@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import React, { useMemo } from "react";
-import { toast } from "sonner";
 
 import { toMemberRole } from "@workspace/auth";
 import {
@@ -13,6 +12,7 @@ import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Button, buttonVariants } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
@@ -57,7 +57,7 @@ export const PortalLink = ({
     ...billing.mutations.portal.get,
     onSuccess: (data) => {
       if (!data.url) {
-        return toast.error(t("error.portal"));
+        return toast.add({ title: t("error.portal"), type: "error" });
       }
       return router.push(data.url);
     },

@@ -2,7 +2,6 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import * as z from "zod";
 
 import { useTranslation } from "@workspace/i18n";
@@ -11,6 +10,7 @@ import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { toast } from "@workspace/ui-web/toast";
 
 import { useWaitlistStore } from "./store";
 
@@ -60,7 +60,7 @@ export function WaitlistForm() {
      *
      * ```ts
      * const { error } = await joinWaitlist(data);
-     * if (error) return toast.error(error);
+     * if (error) return toast.add({ title: error, type: "error" });
      * ```
      *
      * --- Option 2: Hono API route ---
@@ -71,7 +71,7 @@ export function WaitlistForm() {
      * import { api } from "~/lib/api/client";
      *
      * const { error } = await handle(api.waitlist.$post)({ json: data });
-     * if (error) return toast.error(error);
+     * if (error) return toast.add({ title: error, type: "error" });
      * ```
      *
      * --- Option 3: Third-party provider ---
@@ -98,8 +98,10 @@ export function WaitlistForm() {
      * Remove the artificial delay above once real persistence is wired up.
      */
 
-    toast.success(t("waitlist.success.title"), {
+    toast.add({
+      title: t("waitlist.success.title"),
       description: t("waitlist.success.description"),
+      type: "success",
     });
 
     setEmail(data.email);

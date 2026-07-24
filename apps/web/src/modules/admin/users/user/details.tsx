@@ -3,7 +3,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { updateUserSchema, UserRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -18,6 +17,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@workspace/ui-web/select";
+import { toast } from "@workspace/ui-web/toast";
 
 import {
   DetailsList,
@@ -42,7 +42,10 @@ const Role = ({ id }: { id: string }) => {
     ...admin.mutations.users.update,
     onSuccess: async () => {
       await queryClient.invalidateQueries(admin.queries.users.get({ id }));
-      toast.success(t("users.user.details.role.update.success"));
+      toast.add({
+        title: t("users.user.details.role.update.success"),
+        type: "success",
+      });
     },
   });
 
@@ -119,7 +122,10 @@ const Name = ({ id }: { id: string }) => {
     ...admin.mutations.users.update,
     onSuccess: async () => {
       await queryClient.invalidateQueries(admin.queries.users.get({ id }));
-      toast.success(t("users.user.details.name.update.success"));
+      toast.add({
+        title: t("users.user.details.name.update.success"),
+        type: "success",
+      });
     },
   });
 

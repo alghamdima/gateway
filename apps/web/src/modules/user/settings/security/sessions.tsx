@@ -2,13 +2,13 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
 import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -46,7 +46,10 @@ export const Sessions = () => {
   const revoke = useMutation({
     ...auth.mutations.sessions.revoke,
     onSuccess: async (_, token) => {
-      toast.success(t("account.sessions.revoke.success"));
+      toast.add({
+        title: t("account.sessions.revoke.success"),
+        type: "success",
+      });
       await refetch();
       if (token === currentSession.data?.session.token) {
         await signOut.mutateAsync(undefined);

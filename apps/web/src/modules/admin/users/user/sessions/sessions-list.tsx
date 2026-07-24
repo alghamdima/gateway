@@ -1,12 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 
@@ -28,7 +28,10 @@ export const SessionsList = ({ id }: SessionsListProps) => {
       await queryClient.invalidateQueries(
         admin.queries.users.getSessions({ id }),
       );
-      toast.success(t("account.sessions.revoke.success"));
+      toast.add({
+        title: t("account.sessions.revoke.success"),
+        type: "success",
+      });
     },
   });
 
@@ -38,7 +41,10 @@ export const SessionsList = ({ id }: SessionsListProps) => {
       await queryClient.invalidateQueries(
         admin.queries.users.getSessions({ id }),
       );
-      toast.success(t("users.user.sessions.revokeAll.success"));
+      toast.add({
+        title: t("users.user.sessions.revokeAll.success"),
+        type: "success",
+      });
     },
   });
 

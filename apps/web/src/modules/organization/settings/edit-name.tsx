@@ -3,7 +3,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { MemberRole, updateOrganizationSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -11,6 +10,7 @@ import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
 import {
@@ -59,7 +59,7 @@ export const EditName = ({ organizationId }: { organizationId: string }) => {
             ]
           : []),
       ]);
-      toast.success(t("name.edit.success"));
+      toast.add({ title: t("name.edit.success"), type: "success" });
     },
   });
 

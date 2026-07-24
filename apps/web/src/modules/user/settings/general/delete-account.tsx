@@ -3,7 +3,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { toast } from "sonner";
 
 import { isSubscriptionActive } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
@@ -20,6 +19,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -167,7 +167,10 @@ const ConfirmModal = ({
   const deleteAccount = useMutation({
     ...user.mutations.delete.user,
     onSuccess: () => {
-      toast.success(t("account.delete.confirmation.success"));
+      toast.add({
+        title: t("account.delete.confirmation.success"),
+        type: "success",
+      });
     },
   });
 
@@ -176,7 +179,10 @@ const ConfirmModal = ({
     onSuccess: async () => {
       await session.refetch();
       router.replace(pathsConfig.index);
-      toast.success(t("account.delete.anonymous.confirmation.success"));
+      toast.add({
+        title: t("account.delete.anonymous.confirmation.success"),
+        type: "success",
+      });
     },
   });
 

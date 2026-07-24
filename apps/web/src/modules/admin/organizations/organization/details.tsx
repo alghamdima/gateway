@@ -4,7 +4,6 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { updateOrganizationSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -17,6 +16,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@workspace/ui-web/input-group";
+import { toast } from "@workspace/ui-web/toast";
 
 import {
   DetailsList,
@@ -39,9 +39,10 @@ const Name = ({ id }: { id: string }) => {
       await queryClient.invalidateQueries(
         admin.queries.organizations.get({ id }),
       );
-      toast.success(
-        t("organizations.organization.details.name.update.success"),
-      );
+      toast.add({
+        title: t("organizations.organization.details.name.update.success"),
+        type: "success",
+      });
     },
   });
 
@@ -113,9 +114,10 @@ const Slug = ({ id }: { id: string }) => {
       await queryClient.invalidateQueries(
         admin.queries.organizations.get({ id }),
       );
-      toast.success(
-        t("organizations.organization.details.slug.update.success"),
-      );
+      toast.add({
+        title: t("organizations.organization.details.slug.update.success"),
+        type: "success",
+      });
     },
   });
 

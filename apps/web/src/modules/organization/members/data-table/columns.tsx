@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import {
   getAllRolesAtOrBelow,
@@ -23,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -111,7 +111,7 @@ const Actions = ({ member }: { member: Member }) => {
           id: member.organizationId,
         }),
       );
-      toast.success(t("members.remove.success"));
+      toast.add({ title: t("members.remove.success"), type: "success" });
     },
   });
 
@@ -120,7 +120,7 @@ const Actions = ({ member }: { member: Member }) => {
     onSuccess: () => {
       void refetch();
       router.replace(pathsConfig.dashboard.user.index);
-      toast.success(t("leave.success"));
+      toast.add({ title: t("leave.success"), type: "success" });
     },
   });
 

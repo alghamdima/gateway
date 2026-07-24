@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { toast } from "sonner";
 
 import { Permissions, toMemberRole, type User } from "@workspace/auth";
 import {
@@ -10,6 +9,7 @@ import {
   getLowerPlans,
 } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
+import { toast } from "@workspace/ui-web/toast";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
@@ -50,7 +50,7 @@ export const usePlan = ({
     ...billing.mutations.checkout.create,
     onSuccess: (data) => {
       if (!data.url) {
-        return toast.error(t("error.checkout"));
+        return toast.add({ title: t("error.checkout"), type: "error" });
       }
       return router.push(data.url);
     },
@@ -60,7 +60,7 @@ export const usePlan = ({
     ...billing.mutations.portal.get,
     onSuccess: (data) => {
       if (!data.url) {
-        return toast.error(t("error.portal"));
+        return toast.add({ title: t("error.portal"), type: "error" });
       }
       return router.push(data.url);
     },

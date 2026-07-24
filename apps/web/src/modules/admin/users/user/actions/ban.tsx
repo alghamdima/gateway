@@ -7,7 +7,6 @@ import {
 } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { banUserSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -39,6 +38,7 @@ import {
 } from "@workspace/ui-web/popover";
 import { ScrollArea, ScrollBar } from "@workspace/ui-web/scroll-area";
 import { Textarea } from "@workspace/ui-web/textarea";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 
@@ -72,7 +72,7 @@ const Unban = ({
       await queryClient.invalidateQueries(
         admin.queries.users.get({ id: userId }),
       );
-      toast.success(t("users.user.unban.success"));
+      toast.add({ title: t("users.user.unban.success"), type: "success" });
     },
   });
 
@@ -140,7 +140,7 @@ const BanModal = ({
     ...admin.mutations.users.ban,
     onSuccess: async () => {
       await queryClient.invalidateQueries(admin.queries.users.get({ id }));
-      toast.success(t("users.user.ban.success"));
+      toast.add({ title: t("users.user.ban.success"), type: "success" });
     },
   });
 

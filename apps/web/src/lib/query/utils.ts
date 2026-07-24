@@ -2,9 +2,9 @@ import {
   QueryClient,
   defaultShouldDehydrateQuery,
 } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { logger } from "@workspace/shared/logger";
+import { toast } from "@workspace/ui-web/toast";
 
 export const createQueryClient = () =>
   new QueryClient({
@@ -26,7 +26,7 @@ export const createQueryClient = () =>
           }
 
           logger.error(error);
-          toast.error(error.message);
+          toast.add({ title: error.message, type: "error" });
         },
       },
     },

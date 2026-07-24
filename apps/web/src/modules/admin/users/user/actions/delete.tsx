@@ -1,6 +1,5 @@
 import { useMutation, useMutationState, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
@@ -15,6 +14,7 @@ import {
   ModalFooter,
   ModalClose,
 } from "@workspace/ui-web/modal";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 
@@ -70,7 +70,7 @@ const ConfirmModal = ({
   const deleteUser = useMutation({
     ...admin.mutations.users.delete,
     onSuccess: () => {
-      toast.success(t("users.user.delete.success"));
+      toast.add({ title: t("users.user.delete.success"), type: "success" });
       router.back();
     },
   });

@@ -4,7 +4,6 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useMutationState } from "@tanstack/react-query";
 import { createContext, useContext, useMemo, useState } from "react";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
-import { toast } from "sonner";
 import * as z from "zod";
 
 import { handle } from "@workspace/api/utils";
@@ -13,6 +12,7 @@ import { cn } from "@workspace/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
 
@@ -193,7 +193,7 @@ const AvatarFormInput = ({
     ...mutations.upload,
     onError: (error) => {
       setPreviewUrl(image ?? null);
-      toast.error(error.message || t("error.general"));
+      toast.add({ title: error.message || t("error.general"), type: "error" });
     },
     onSuccess: async ({ publicUrl, oldImage }) => {
       await new Promise((resolve) => {

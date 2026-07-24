@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -18,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -73,7 +73,7 @@ export const MemberActions = ({ member }: { member: Member }) => {
           id: member.userId,
         }),
       );
-      toast.success(t("members.remove.success"));
+      toast.add({ title: t("members.remove.success"), type: "success" });
     },
   });
 

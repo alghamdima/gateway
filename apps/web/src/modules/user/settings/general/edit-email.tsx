@@ -4,7 +4,6 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { memo } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { emailSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -13,6 +12,7 @@ import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { auth } from "~/modules/auth/lib/api";
@@ -43,14 +43,17 @@ export const EditEmail = memo<EditEmailProps>((props) => {
   const sendVerification = useMutation({
     ...auth.mutations.email.sendVerification,
     onSuccess: () => {
-      toast.success(t("account.email.confirm.email.sent"));
+      toast.add({
+        title: t("account.email.confirm.email.sent"),
+        type: "success",
+      });
     },
   });
 
   const changeEmail = useMutation({
     ...auth.mutations.email.change,
     onSuccess: () => {
-      toast.success(t("account.email.change.success"));
+      toast.add({ title: t("account.email.change.success"), type: "success" });
     },
   });
 

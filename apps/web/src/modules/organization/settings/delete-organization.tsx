@@ -3,7 +3,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { toast } from "sonner";
 
 import { MemberRole } from "@workspace/auth";
 import { isSubscriptionActive } from "@workspace/billing";
@@ -21,6 +20,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -156,7 +156,7 @@ const ConfirmModal = ({
   const deleteOrganization = useMutation({
     ...organization.mutations.delete,
     onSuccess: () => {
-      toast.success(t("delete.success"));
+      toast.add({ title: t("delete.success"), type: "success" });
       router.replace(pathsConfig.dashboard.user.index);
     },
   });

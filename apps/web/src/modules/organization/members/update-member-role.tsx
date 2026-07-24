@@ -4,7 +4,6 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import {
   getAllRolesAtOrBelow,
@@ -38,6 +37,7 @@ import {
   SelectContent,
   SelectTrigger,
 } from "@workspace/ui-web/select";
+import { toast } from "@workspace/ui-web/toast";
 
 import { organization } from "~/modules/organization/lib/api";
 
@@ -85,7 +85,7 @@ export const UpdateMemberRoleModal = ({
       await queryClient.invalidateQueries(
         organization.queries.members.getAll({ id: member.organizationId }),
       );
-      toast.success(t("members.update.role.success"));
+      toast.add({ title: t("members.update.role.success"), type: "success" });
       onOpenChange(false);
       form.reset();
     },

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { isKey, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
@@ -17,6 +16,7 @@ import {
   ModalTrigger,
 } from "@workspace/ui-web/modal";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
 import { auth } from "~/modules/auth/lib/api";
@@ -47,7 +47,7 @@ export const Passkeys = () => {
     ...auth.mutations.passkeys.add,
     onSuccess: async (_, __) => {
       await queryClient.invalidateQueries(auth.queries.passkeys.getAll);
-      toast.success(t("account.passkeys.add.success"));
+      toast.add({ title: t("account.passkeys.add.success"), type: "success" });
     },
   });
 
@@ -55,7 +55,10 @@ export const Passkeys = () => {
     ...auth.mutations.passkeys.delete,
     onSuccess: async (_, __) => {
       await queryClient.invalidateQueries(auth.queries.passkeys.getAll);
-      toast.success(t("account.passkeys.remove.success"));
+      toast.add({
+        title: t("account.passkeys.remove.success"),
+        type: "success",
+      });
     },
   });
 

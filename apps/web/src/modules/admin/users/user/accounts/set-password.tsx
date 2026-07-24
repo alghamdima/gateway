@@ -2,7 +2,6 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { passwordSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -26,6 +25,7 @@ import {
   ModalTrigger,
   ModalBody,
 } from "@workspace/ui-web/modal";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 
@@ -59,7 +59,10 @@ export const SetPasswordModal = ({
   const setPassword = useMutation({
     ...admin.mutations.users.setPassword,
     onSuccess: () => {
-      toast.success(t("users.user.accounts.password.update.success"));
+      toast.add({
+        title: t("users.user.accounts.password.update.success"),
+        type: "success",
+      });
       onOpenChange(false);
       form.reset();
     },

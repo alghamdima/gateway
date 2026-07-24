@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
-import { toast } from "sonner";
 
 import { SocialProvider } from "@workspace/auth";
 import { isKey, useTranslation } from "@workspace/i18n";
@@ -15,6 +14,7 @@ import {
   DropdownMenuSeparator,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 import { SetPasswordModal } from "~/modules/admin/users/user/accounts/set-password";
@@ -60,7 +60,10 @@ export const AccountActions = ({
           id: account.userId,
         }),
       );
-      toast.success(t("users.user.accounts.delete.success"));
+      toast.add({
+        title: t("users.user.accounts.delete.success"),
+        type: "success",
+      });
     },
   });
 

@@ -3,7 +3,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import * as z from "zod";
 
 import {
@@ -24,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui-web/select";
+import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
 import {
@@ -79,7 +79,10 @@ export const InviteMember = ({ organizationId }: InviteMemberProps) => {
 
     const successCount = data.invites.length - failedInvites.length;
     if (successCount > 0) {
-      toast.success(t("members.invite.success", { count: successCount }));
+      toast.add({
+        title: t("members.invite.success", { count: successCount }),
+        type: "success",
+      });
     }
 
     if (failedInvites.length > 0) {

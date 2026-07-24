@@ -5,7 +5,6 @@ import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { handle } from "@workspace/api/utils";
 import { InvitationStatus } from "@workspace/auth";
@@ -22,6 +21,7 @@ import {
   ModalTrigger,
 } from "@workspace/ui-web/modal";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
@@ -99,11 +99,12 @@ const UserOrganizationInvitationsListModalItem = ({
     ...organization.mutations.invitations.accept,
     onSuccess: async () => {
       await queryClient.invalidateQueries(user.queries.invitations.getAll);
-      toast.success(
-        t("invitations.accept.success", "", {
+      toast.add({
+        title: t("invitations.accept.success", "", {
           organization: data?.organization?.name ?? "",
         }),
-      );
+        type: "success",
+      });
       await refetch();
       onSuccess?.();
     },
@@ -112,11 +113,12 @@ const UserOrganizationInvitationsListModalItem = ({
     ...organization.mutations.invitations.reject,
     onSuccess: async () => {
       await queryClient.invalidateQueries(user.queries.invitations.getAll);
-      toast.success(
-        t("invitations.reject.success", "", {
+      toast.add({
+        title: t("invitations.reject.success", "", {
           organization: data?.organization?.name ?? "",
         }),
-      );
+        type: "success",
+      });
       onSuccess?.();
     },
   });

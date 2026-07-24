@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
+import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
 import {
@@ -70,7 +70,7 @@ export const EditLogo = ({ organizationId }: { organizationId: string }) => {
           <div className="relative float-right">
             <AvatarFormInput
               onUpload={async () => {
-                toast.success(t("logo.update.success"));
+                toast.add({ title: t("logo.update.success"), type: "success" });
                 await Promise.all([
                   queryClient.invalidateQueries(
                     organization.queries.get({ id: activeOrganization.id }),
@@ -94,7 +94,10 @@ export const EditLogo = ({ organizationId }: { organizationId: string }) => {
             {hasUpdatePermission && (
               <AvatarFormRemoveButton
                 onRemove={async () => {
-                  toast.success(t("logo.remove.success"));
+                  toast.add({
+                    title: t("logo.remove.success"),
+                    type: "success",
+                  });
                   await Promise.all([
                     queryClient.invalidateQueries(
                       organization.queries.get({ id: activeOrganization.id }),

@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { toast } from "sonner";
 
 import {
   getAllRolesAtOrBelow,
@@ -21,6 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
 import { organization } from "~/modules/organization/lib/api";
@@ -43,7 +43,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
           id: invitation.organizationId,
         }),
       );
-      toast.success(t("invitations.resend.success"));
+      toast.add({ title: t("invitations.resend.success"), type: "success" });
     },
   });
 
@@ -55,7 +55,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
           id: invitation.organizationId,
         }),
       );
-      toast.success(t("invitations.cancel.success"));
+      toast.add({ title: t("invitations.cancel.success"), type: "success" });
     },
   });
 

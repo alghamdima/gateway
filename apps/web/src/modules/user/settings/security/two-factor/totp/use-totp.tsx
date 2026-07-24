@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { create } from "zustand";
 
 import { useTranslation } from "@workspace/i18n";
+import { toast } from "@workspace/ui-web/toast";
 
 import { auth } from "~/modules/auth/lib/api";
 
@@ -34,7 +34,10 @@ export const useTotp = () => {
   const verify = useMutation({
     ...auth.mutations.twoFactor.totp.verify,
     onSuccess: (_, __) => {
-      toast.success(t("account.twoFactor.totp.success"));
+      toast.add({
+        title: t("account.twoFactor.totp.success"),
+        type: "success",
+      });
     },
   });
 

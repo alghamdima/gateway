@@ -2,7 +2,6 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
@@ -11,6 +10,7 @@ import { Field, FieldLabel, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import { Textarea } from "@workspace/ui-web/textarea";
+import { toast } from "@workspace/ui-web/toast";
 
 import { sendContactForm } from "./actions";
 import { contactFormSchema, MAX_MESSAGE_LENGTH } from "./utils/schema";
@@ -32,11 +32,13 @@ export function ContactForm() {
     const { error } = await sendContactForm(data);
 
     if (error) {
-      return toast.error(error);
+      return toast.add({ title: error, type: "error" });
     }
 
-    toast.success(t("contact.form.success.title"), {
+    toast.add({
+      title: t("contact.form.success.title"),
       description: t("contact.form.success.description"),
+      type: "success",
     });
 
     form.reset();

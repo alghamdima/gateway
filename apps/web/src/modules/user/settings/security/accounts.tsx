@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n";
 import { capitalize } from "@workspace/shared/utils";
@@ -18,6 +17,7 @@ import {
   ModalClose,
 } from "@workspace/ui-web/modal";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { toast } from "@workspace/ui-web/toast";
 
 import { authConfig } from "~/config/auth";
 import { pathsConfig } from "~/config/paths";
@@ -57,11 +57,12 @@ export const Accounts = () => {
     ...auth.mutations.accounts.connect,
     onSuccess: async (_, { provider }) => {
       await queryClient.invalidateQueries(auth.queries.accounts.getAll);
-      toast.success(
-        t("account.accounts.connect.success", {
+      toast.add({
+        title: t("account.accounts.connect.success", {
           provider: capitalize(provider as string),
         }),
-      );
+        type: "success",
+      });
     },
   });
 
@@ -69,11 +70,12 @@ export const Accounts = () => {
     ...auth.mutations.accounts.disconnect,
     onSuccess: async (_, { providerId }) => {
       await queryClient.invalidateQueries(auth.queries.accounts.getAll);
-      toast.success(
-        t("account.accounts.disconnect.success", {
+      toast.add({
+        title: t("account.accounts.disconnect.success", {
           provider: capitalize(providerId),
         }),
-      );
+        type: "success",
+      });
     },
   });
 

@@ -5,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { memo } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { updateUserSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -13,6 +12,7 @@ import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { toast } from "@workspace/ui-web/toast";
 
 import {
   SettingsCard,
@@ -45,7 +45,7 @@ export const EditName = memo<EditNameProps>((props) => {
   const updateUser = useMutation({
     ...user.mutations.update,
     onSuccess: () => {
-      toast.success(t("account.name.edit.success"));
+      toast.add({ title: t("account.name.edit.success"), type: "success" });
       router.refresh();
     },
   });

@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 import { MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -18,6 +17,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -97,7 +97,7 @@ const ConfirmLeaveModal = ({
     ...organization.mutations.leave,
     onSuccess: async () => {
       await refetch();
-      toast.success(t("leave.success"));
+      toast.add({ title: t("leave.success"), type: "success" });
       router.replace(pathsConfig.dashboard.user.index);
     },
   });

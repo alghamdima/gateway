@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { toast } from "sonner";
 
 import { InvitationStatus, MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -16,6 +15,7 @@ import {
   DropdownMenuItem,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 
@@ -38,7 +38,7 @@ export const InvitationActions = ({
           id: invitation.organizationId,
         }),
       );
-      toast.success(t("invitations.cancel.success"));
+      toast.add({ title: t("invitations.cancel.success"), type: "success" });
     },
   });
 

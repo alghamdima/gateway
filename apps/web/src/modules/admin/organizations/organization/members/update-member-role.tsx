@@ -4,7 +4,6 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { MemberRole, updateMemberSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
@@ -34,6 +33,7 @@ import {
   SelectContent,
   SelectTrigger,
 } from "@workspace/ui-web/select";
+import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
 
@@ -78,7 +78,7 @@ export const UpdateMemberRoleModal = ({
           id: member.userId,
         }),
       );
-      toast.success(t("members.update.role.success"));
+      toast.add({ title: t("members.update.role.success"), type: "success" });
       onOpenChange(false);
       form.reset();
     },

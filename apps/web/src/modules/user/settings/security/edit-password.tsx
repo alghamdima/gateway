@@ -3,7 +3,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { changePasswordSchema } from "@workspace/auth";
 import { Trans, useTranslation } from "@workspace/i18n";
@@ -12,6 +11,7 @@ import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { PasswordInput } from "@workspace/ui-web/input";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -46,7 +46,10 @@ export const EditPassword = () => {
   const changePassword = useMutation({
     ...auth.mutations.password.change,
     onSuccess: () => {
-      toast.success(t("account.password.update.success"));
+      toast.add({
+        title: t("account.password.update.success"),
+        type: "success",
+      });
       form.reset();
     },
   });
