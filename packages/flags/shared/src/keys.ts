@@ -1,5 +1,5 @@
 export const Flag = {
-  DEMO: "DEMO",
+  DEMO: "demo",
 } as const;
 
 export type Flag = (typeof Flag)[keyof typeof Flag];
