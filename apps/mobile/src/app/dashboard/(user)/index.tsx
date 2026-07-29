@@ -1,7 +1,9 @@
 import { View } from "react-native";
 
 import { BuiltWith } from "@workspace/ui-mobile/built-with";
+import { Text } from "@workspace/ui-mobile/text";
 
+import { appConfig } from "~/config/app";
 import { ScrollView } from "~/modules/common/styled";
 import { UserOrganizationInvitationsBanner } from "~/modules/organization/invitations/user/user-organization-invitations";
 import { OrganizationPicker } from "~/modules/organization/organization-picker";
@@ -16,8 +18,13 @@ export default function Home() {
     >
       <UserOrganizationInvitationsBanner />
       <OrganizationPicker />
-      <View className="pt-4 pb-10">
+      <View className="items-center gap-1.5 pt-4 pb-10">
         <BuiltWith />
+        {appConfig.version ? (
+          <Text className="text-muted-foreground text-xs">
+            {`v${appConfig.version}`}
+          </Text>
+        ) : null}
       </View>
     </ScrollView>
   );

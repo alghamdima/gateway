@@ -1,6 +1,6 @@
 {
   "name": "web",
-  "version": "1.0.0",
+  "version": "1.8.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -25,6 +25,8 @@
     "@workspace/billing-web": "workspace:*",
     "@workspace/cms": "workspace:*",
     "@workspace/email": "workspace:*",
+    "@workspace/flags": "workspace:*",
+    "@workspace/flags-web": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/monitoring-web": "workspace:*",
     "@workspace/oxlint": "workspace:*",

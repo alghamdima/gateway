@@ -8,6 +8,7 @@ import { QueryClientProvider } from "~/lib/query/client";
 
 import { AnalyticsProvider } from "./analytics";
 import { ConsentProvider } from "./consent";
+import { FlagsProvider } from "./flags";
 import { MonitoringProvider } from "./monitoring";
 import { MotionProvider } from "./motion";
 import { ThemeProvider } from "./theme";
@@ -25,9 +26,11 @@ export const Providers = memo<ProvidersProps>(({ children, locale }) => {
           <ConsentProvider locale={locale}>
             <AnalyticsProvider>
               <MonitoringProvider>
-                <ThemeProvider>
-                  <MotionProvider>{children}</MotionProvider>
-                </ThemeProvider>
+                <FlagsProvider>
+                  <ThemeProvider>
+                    <MotionProvider>{children}</MotionProvider>
+                  </ThemeProvider>
+                </FlagsProvider>
               </MonitoringProvider>
             </AnalyticsProvider>
           </ConsentProvider>

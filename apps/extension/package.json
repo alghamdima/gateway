@@ -1,6 +1,6 @@
 {
   "name": "extension",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,6 +23,8 @@
     "@workspace/api": "workspace:*",
     "@workspace/auth": "workspace:*",
     "@workspace/billing": "workspace:*",
+    "@workspace/flags": "workspace:*",
+    "@workspace/flags-extension": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/monitoring-extension": "workspace:*",
     "@workspace/oxlint": "workspace:*",

@@ -288,5 +288,10 @@
   "status": {
     "operational": "All systems operational",
     "degraded": "Systems degraded"
+  },
+  "featureFlags": {
+    "demo": {
+      "banner": "Feature flag \"{{flag}}\" is enabled"
+    }
   }
 }

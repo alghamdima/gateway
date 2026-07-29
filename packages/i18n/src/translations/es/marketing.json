@@ -296,5 +296,10 @@
   "status": {
     "operational": "Todos los sistemas en funcionamiento",
     "degraded": "Sistemas degradados"
+  },
+  "featureFlags": {
+    "demo": {
+      "banner": "Feature flag \"{{flag}}\" está activado"
+    }
   }
 }

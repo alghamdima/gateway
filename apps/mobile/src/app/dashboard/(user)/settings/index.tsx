@@ -1,10 +1,13 @@
 import Constants from "expo-constants";
 import * as Linking from "expo-linking";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import * as StoreReview from "expo-store-review";
 import { Share, View } from "react-native";
 
+import { Flag, useBooleanFlagValue } from "@workspace/flags";
 import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
+import { badgeTextVariants, badgeVariants } from "@workspace/ui-mobile/badge";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Text } from "@workspace/ui-mobile/text";
 
@@ -91,7 +94,8 @@ const getSections = (session?: Session | null) =>
 
 export default function Settings() {
   const session = authClient.useSession();
-  const { t } = useTranslation("common");
+  const { t } = useTranslation(["common", "marketing"]);
+  const demo = useBooleanFlagValue(Flag.DEMO, false);
 
   const sections = getSections(session.data);
 
@@ -117,6 +121,20 @@ export default function Settings() {
             </View>
           ))}
         </View>
+
+        {demo ? (
+          <Link
+            href="https://www.turbostarter.dev/docs/mobile/flags/overview"
+            className={cn(
+              badgeVariants({ variant: "secondary" }),
+              "self-center",
+            )}
+          >
+            <Text className={cn(badgeTextVariants({ variant: "secondary" }))}>
+              {t("featureFlags.demo.banner", { flag: Flag.DEMO })}
+            </Text>
+          </Link>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

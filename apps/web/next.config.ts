@@ -10,6 +10,8 @@ const INTERNAL_PACKAGES = [
   "@workspace/cms",
   "@workspace/email",
   "@workspace/db",
+  "@workspace/flags",
+  "@workspace/flags-web",
   "@workspace/i18n",
   "@workspace/monitoring-web",
   "@workspace/shared",

@@ -30,18 +30,19 @@ Guide for AI agents working on the Turbostarter monorepo.
 
 ## Where to look first
 
-| Task              | Start here                                  |
-| ----------------- | ------------------------------------------- |
-| Auth logic        | `packages/auth/` → then app-specific usage  |
-| API endpoints     | `packages/api/src/modules/`                 |
-| Database schema   | `packages/db/src/schema/`                   |
-| UI components     | `packages/ui/web/` or `packages/ui/mobile/` |
-| Billing           | `packages/billing/{shared,web,mobile}/`     |
-| Translations      | `packages/i18n/src/translations/`           |
-| Email templates   | `packages/email/src/templates/`             |
-| Web pages         | `apps/web/src/app/[locale]/`                |
-| Mobile screens    | `apps/mobile/src/app/`                      |
-| Extension entries | `apps/extension/src/app/`                   |
+| Task              | Start here                                                           |
+| ----------------- | -------------------------------------------------------------------- |
+| Auth logic        | `packages/auth/` → then app-specific usage                           |
+| API endpoints     | `packages/api/src/modules/`                                          |
+| Database schema   | `packages/db/src/schema/`                                            |
+| UI components     | `packages/ui/web/` or `packages/ui/mobile/`                          |
+| Billing           | `packages/billing/{shared,web,mobile}/`                              |
+| Feature flags     | `packages/flags/` → `flags-web` / `flags-mobile` / `flags-extension` |
+| Translations      | `packages/i18n/src/translations/`                                    |
+| Email templates   | `packages/email/src/templates/`                                      |
+| Web pages         | `apps/web/src/app/[locale]/`                                         |
+| Mobile screens    | `apps/mobile/src/app/`                                               |
+| Extension entries | `apps/extension/src/app/`                                            |
 
 ## Project structure
 
@@ -55,6 +56,7 @@ packages/
   api/         @workspace/api       Hono modules (admin,ai,auth,billing,organization,storage)
   auth/        @workspace/auth      Better Auth server + clients (web.ts, mobile.ts)
   billing/     @workspace/billing   Shared + web (Stripe,LemonSqueezy,Polar) + mobile (RevenueCat,Superwall)
+  flags/       @workspace/flags     OpenFeature helpers + flags-web / flags-mobile / flags-extension
   cms/         @workspace/cms       MDX content (blog, legal)
   db/          @workspace/db        Drizzle schema, migrations, scripts
   email/       @workspace/email     React Email templates + providers

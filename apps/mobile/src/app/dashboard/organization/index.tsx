@@ -1,7 +1,9 @@
 import { View } from "react-native";
 
 import { BuiltWith } from "@workspace/ui-mobile/built-with";
+import { Text } from "@workspace/ui-mobile/text";
 
+import { appConfig } from "~/config/app";
 import { ScrollView } from "~/modules/common/styled";
 import { AreaChart } from "~/modules/organization/home/charts/area";
 import { BarChart } from "~/modules/organization/home/charts/bar";
@@ -18,8 +20,13 @@ export default function Home() {
       <PieChart />
       <AreaChart />
 
-      <View className="pt-4 pb-10">
+      <View className="items-center gap-1.5 pt-4 pb-10">
         <BuiltWith />
+        {appConfig.version ? (
+          <Text className="text-muted-foreground text-xs">
+            {`v${appConfig.version}`}
+          </Text>
+        ) : null}
       </View>
     </ScrollView>
   );

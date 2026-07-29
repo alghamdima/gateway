@@ -17,6 +17,7 @@ import { QueryClientProvider } from "~/lib/query";
 import { Verification } from "~/modules/auth/verification";
 
 import { AnalyticsProvider } from "./analytics";
+import { FlagsProvider } from "./flags";
 import { MonitoringProvider } from "./monitoring";
 import { NotificationsProvider } from "./notifications";
 
@@ -40,13 +41,15 @@ export const Providers = memo<ProvidersProps>(({ children }) => {
                 <BottomSheetModalProvider>
                   <MonitoringProvider>
                     <AnalyticsProvider>
-                      <NotificationsProvider>
-                        <BillingProvider>
-                          {children}
-                          <Verification />
-                          <PortalHost />
-                        </BillingProvider>
-                      </NotificationsProvider>
+                      <FlagsProvider>
+                        <NotificationsProvider>
+                          <BillingProvider>
+                            {children}
+                            <Verification />
+                            <PortalHost />
+                          </BillingProvider>
+                        </NotificationsProvider>
+                      </FlagsProvider>
                     </AnalyticsProvider>
                   </MonitoringProvider>
                 </BottomSheetModalProvider>

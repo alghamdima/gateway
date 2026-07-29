@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "type": "module",
   "main": "expo-router/entry",
@@ -35,6 +35,8 @@
     "@workspace/billing-mobile": "workspace:*",
     "@workspace/cms": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/flags": "workspace:*",
+    "@workspace/flags-mobile": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/monitoring-mobile": "workspace:*",
     "@workspace/oxlint": "workspace:*",

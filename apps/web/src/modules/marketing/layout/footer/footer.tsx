@@ -87,7 +87,12 @@ export const Footer = async () => {
               <StatusIndicator />
             </div>
 
-            <BuiltWith />
+            <div className="flex flex-col items-center gap-1 sm:items-end">
+              <BuiltWith />
+              <p className="text-muted-foreground text-xs sm:pr-0.5">
+                {`v${appConfig.version}`}
+              </p>
+            </div>
           </div>
         </div>
       </div>
