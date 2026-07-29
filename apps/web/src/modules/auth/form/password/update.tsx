@@ -2,7 +2,6 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { memo } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -41,7 +40,7 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
   });
 
   return (
-    <motion.form
+    <form
       id="update-password-form"
       onSubmit={onPromise(
         form.handleSubmit((data) =>
@@ -52,7 +51,6 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
         ),
       )}
       className="space-y-6"
-      exit={{ opacity: 0 }}
     >
       <Controller
         name="password"
@@ -87,7 +85,7 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
           t("account.password.update.cta")
         )}
       </Button>
-    </motion.form>
+    </form>
   );
 });
 

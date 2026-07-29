@@ -29,10 +29,10 @@ function DrawerContent({
       <DrawerPrimitive.Backdrop
         data-slot="drawer-overlay"
         className={cn(
-          "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-50 bg-black/10 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-xs supports-[-webkit-touch-callout:none]:absolute",
+          "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-50 overscroll-contain bg-black/10 opacity-[calc(1-var(--drawer-swipe-progress,0))] transition-opacity duration-300 data-ending-style:opacity-0 data-starting-style:opacity-0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-xs supports-[-webkit-touch-callout:none]:absolute",
         )}
       />
-      <DrawerPrimitive.Viewport className="fixed inset-0 z-50">
+      <DrawerPrimitive.Viewport className="fixed inset-0 z-50 overscroll-contain">
         <DrawerPrimitive.Popup
           data-slot="drawer-content"
           className={cn(
@@ -46,7 +46,7 @@ function DrawerContent({
             aria-hidden="true"
             className="bg-muted mx-auto mt-4 h-2 w-[100px] shrink-0 rounded-full"
           />
-          <DrawerPrimitive.Content className="flex flex-col overflow-auto">
+          <DrawerPrimitive.Content className="flex flex-col overflow-auto overscroll-contain">
             {children}
           </DrawerPrimitive.Content>
         </DrawerPrimitive.Popup>
