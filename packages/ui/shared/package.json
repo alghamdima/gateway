@@ -10,7 +10,7 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "build": "pnpm dlx tsx ./src/styles/themes/build.ts"
+    "build": "tsx ./src/styles/themes/build.ts"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",
@@ -22,6 +22,7 @@
     "@workspace/tsconfig": "workspace:*",
     "react": "catalog:react19",
     "tailwind-merge": "3.5.0",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }
