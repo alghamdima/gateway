@@ -36,6 +36,7 @@ export const BaseLayout = ({ children, locale }: BaseLayoutProps) => {
       className={cn(sans.variable, serif.variable, mono.variable)}
       data-scroll-behavior="smooth"
       data-theme={appConfig.theme.color}
+      suppressHydrationWarning
     >
       <body
         suppressHydrationWarning

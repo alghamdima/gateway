@@ -1,9 +1,9 @@
 import Image from "next/image";
 
-import { getTranslation } from "@workspace/i18n/server";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 export default async function AuthLayout({

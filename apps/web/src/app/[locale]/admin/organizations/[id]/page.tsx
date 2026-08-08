@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 
 import { getOrganizationResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
-import { getTranslation } from "@workspace/i18n/server";
 
 import { api } from "~/lib/api/server";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { getQueryClient } from "~/lib/query/server";
 import { admin } from "~/modules/admin/lib/api";
@@ -21,7 +21,7 @@ export const generateMetadata = async ({
 }: {
   params: Promise<{ id: string; locale: string }>;
 }) => {
-  const id = (await params).id;
+  const { id } = await params;
   const organization = await handle(api.admin.organizations[":id"].$get, {
     schema: getOrganizationResponseSchema,
   })({

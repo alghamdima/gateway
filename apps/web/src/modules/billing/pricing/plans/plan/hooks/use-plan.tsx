@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
-import { Permissions, toMemberRole, type User } from "@workspace/auth";
+import { Permissions, toMemberRole } from "@workspace/auth";
 import {
   BillingReference,
   getHigherPlans,
@@ -20,15 +20,11 @@ import { organization } from "~/modules/organization/lib/api";
 
 import type { BillingConfigPlan } from "@workspace/billing";
 
-export const usePlan = ({
-  plan,
-  user,
-}: {
-  plan: BillingConfigPlan;
-  user: User | null;
-}) => {
+export const usePlan = ({ plan }: { plan: BillingConfigPlan }) => {
   const { t } = useTranslation("billing");
   const controls = usePricingControls((c) => c.controls);
+  const { data: session } = authClient.useSession();
+  const user = session?.user ?? null;
   const member = useQuery({
     ...organization.queries.members.getByUserId({
       organizationId: controls.referenceId ?? "",

@@ -1,7 +1,7 @@
-import { getTranslation } from "@workspace/i18n/server";
 import { cn } from "@workspace/ui";
 import { buttonVariants } from "@workspace/ui-web/button";
 
+import { getTranslation } from "~/lib/i18n";
 import { CtaButton } from "~/modules/marketing/layout/cta-button";
 import { Section } from "~/modules/marketing/layout/section";
 

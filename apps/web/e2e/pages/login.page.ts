@@ -2,6 +2,8 @@ import { expect, type Page } from "@playwright/test";
 
 import { pathsConfig } from "~/config/paths";
 
+import { installConsentBannerHandler } from "../helpers/consent";
+
 const LOGIN_TABS = {
   password: "Password",
   magicLink: "Magic link",
@@ -12,6 +14,7 @@ export class LoginPage {
   constructor(private readonly page: Page) {}
 
   async goto() {
+    await installConsentBannerHandler(this.page);
     await this.page.goto(pathsConfig.auth.login);
     await expect(this.page).toHaveURL(/\/auth\/login/);
   }

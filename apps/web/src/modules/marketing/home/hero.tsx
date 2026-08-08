@@ -1,9 +1,9 @@
-import { getTranslation } from "@workspace/i18n/server";
 import { buttonVariants } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import { Marquee } from "@workspace/ui-web/marquee";
 
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { ThemedImage } from "~/modules/common/themed-image";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { CtaButton } from "~/modules/marketing/layout/cta-button";

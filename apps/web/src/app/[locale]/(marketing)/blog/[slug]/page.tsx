@@ -3,12 +3,15 @@ import duration from "dayjs/plugin/duration";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
-import { getContentItemBySlug, getContentItems } from "@workspace/cms";
-import { CollectionType } from "@workspace/cms";
-import { getTranslation } from "@workspace/i18n/server";
+import {
+  CollectionType,
+  getContentItemBySlug,
+  getContentItems,
+} from "@workspace/cms";
 import { badgeVariants } from "@workspace/ui-web/badge";
 
 import { BLOG_PREFIX } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { Mdx } from "~/modules/common/mdx";
 import { TurboLink } from "~/modules/common/turbo-link";
@@ -26,16 +29,18 @@ export default async function Page({
 }: {
   params: Promise<{ slug: string; locale: string }>;
 }) {
-  const { t } = await getTranslation({ ns: "marketing" });
+  const { slug, locale } = await params;
   const item = getContentItemBySlug({
     collection: CollectionType.BLOG,
-    slug: (await params).slug,
-    locale: (await params).locale,
+    slug,
+    locale,
   });
 
   if (!item) {
     return notFound();
   }
+
+  const { t } = await getTranslation({ ns: "marketing", locale });
 
   return (
     <Section>
@@ -104,10 +109,11 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string; locale: string }>;
 }) {
+  const { slug, locale } = await params;
   const item = getContentItemBySlug({
     collection: CollectionType.BLOG,
-    slug: (await params).slug,
-    locale: (await params).locale,
+    slug,
+    locale,
   });
 
   if (!item) {

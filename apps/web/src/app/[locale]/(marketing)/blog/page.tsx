@@ -3,7 +3,6 @@ import duration from "dayjs/plugin/duration";
 import Image from "next/image";
 
 import { CollectionType, ContentStatus, getContentItems } from "@workspace/cms";
-import { getTranslation } from "@workspace/i18n/server";
 import { SortOrder } from "@workspace/shared/constants";
 import { Badge } from "@workspace/ui-web/badge";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@workspace/ui-web/card";
 
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { TagsPicker } from "~/modules/marketing/blog/tags-picker";
@@ -45,7 +45,7 @@ export default async function BlogPage({
   const tag = (await searchParams).tag;
   const locale = (await params).locale;
 
-  const { t } = await getTranslation({ ns: "marketing" });
+  const { t } = await getTranslation({ ns: "marketing", locale });
   const { items } = getContentItems({
     collection: CollectionType.BLOG,
     tags: tag ? [tag] : [],

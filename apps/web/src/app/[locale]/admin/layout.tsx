@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { hasAdminPermission } from "@workspace/auth";
 import { Icons } from "@workspace/ui-web/icons";
@@ -9,6 +10,7 @@ import { getSession } from "~/lib/auth/server";
 import { DashboardActionBar } from "~/modules/common/layout/dashboard/action-bar";
 import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
 import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
+import { DashboardSidebarSkeleton } from "~/modules/common/layout/dashboard/sidebar/skeleton";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 const menu = [
@@ -42,11 +44,25 @@ const menu = [
   },
 ];
 
-export default async function AdminLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <SidebarProvider>
+      <Suspense fallback={<DashboardSidebarSkeleton />}>
+        <AuthenticatedAdminSidebar />
+      </Suspense>
+      <SidebarInset>
+        <DashboardActionBar menu={menu} />
+        <DashboardInset>{children}</DashboardInset>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+async function AuthenticatedAdminSidebar() {
   const { user } = await getSession();
 
   if (!user) {
@@ -58,24 +74,18 @@ export default async function AdminLayout({
   }
 
   return (
-    <SidebarProvider>
-      <DashboardSidebar
-        user={user}
-        menu={menu}
-        header={
-          <TurboLink
-            href={pathsConfig.index}
-            className="flex items-center gap-3 p-2 transition-[padding] group-data-[collapsible=icon]:p-0.5"
-          >
-            <Icons.Logo className="text-primary h-8 transition-[width,height]" />
-            <Icons.LogoText className="text-foreground h-4 group-data-[collapsible=icon]:hidden" />
-          </TurboLink>
-        }
-      />
-      <SidebarInset>
-        <DashboardActionBar menu={menu} />
-        <DashboardInset>{children}</DashboardInset>
-      </SidebarInset>
-    </SidebarProvider>
+    <DashboardSidebar
+      user={user}
+      menu={menu}
+      header={
+        <TurboLink
+          href={pathsConfig.index}
+          className="flex items-center gap-3 p-2 transition-[padding] group-data-[collapsible=icon]:p-0.5"
+        >
+          <Icons.Logo className="text-primary h-8 transition-[width,height]" />
+          <Icons.LogoText className="text-foreground h-4 group-data-[collapsible=icon]:hidden" />
+        </TurboLink>
+      }
+    />
   );
 }

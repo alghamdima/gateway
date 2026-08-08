@@ -1,6 +1,5 @@
 import React from "react";
 
-import { getTranslation } from "@workspace/i18n/server";
 import { cn } from "@workspace/ui";
 import {
   Card,
@@ -10,6 +9,7 @@ import {
   CardTitle,
 } from "@workspace/ui-web/card";
 
+import { getTranslation } from "~/lib/i18n";
 import { ThemedImage } from "~/modules/common/themed-image";
 import {
   Section,

@@ -1,11 +1,9 @@
 import { parseAsArrayOf, parseAsInteger, parseAsString } from "nuqs/server";
 import { createSearchParamsCache } from "nuqs/server";
-import { Suspense } from "react";
 
 import { getCustomersResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
 import { pickBy } from "@workspace/shared/utils";
-import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
 
 import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";
@@ -48,18 +46,5 @@ export default async function CustomersPage(props: {
     },
   });
 
-  return (
-    <Suspense
-      fallback={
-        <DataTableSkeleton
-          columnCount={3}
-          filterCount={4}
-          cellWidths={["15rem", "10rem", "10rem"]}
-          shrinkZero
-        />
-      }
-    >
-      <CustomersDataTable promise={promise} perPage={perPage} />
-    </Suspense>
-  );
+  return <CustomersDataTable promise={promise} perPage={perPage} />;
 }

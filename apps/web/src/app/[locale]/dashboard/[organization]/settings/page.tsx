@@ -18,7 +18,6 @@ export default async function SettingsPage({
   params: Promise<{ organization: string }>;
 }) {
   const { organization } = await params;
-
   const activeOrganization = await getOrganization({ slug: organization });
 
   if (!activeOrganization) {

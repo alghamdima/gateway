@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 
-import { User } from "@workspace/auth";
 import {
   BillingModel,
   BillingReference,
   RecurringInterval,
   BillingType,
 } from "@workspace/billing";
+
+import { authClient } from "~/lib/auth/client";
 
 import { IntervalSelector } from "./interval-selector";
 import { ModelSelector } from "./model-selector";
@@ -37,15 +38,17 @@ export const usePricingControls = create<{
     set((state) => ({ controls: { ...state.controls, ...controls } })),
 }));
 
-export const PricingControls = ({ user }: { user: User | null }) => {
+export const PricingControls = () => {
   const { controls, setControls } = usePricingControls();
+  const { data } = authClient.useSession();
+  const userId = data?.user?.id;
 
   useEffect(() => {
-    if (controls.referenceType === BillingReference.USER && user?.id) {
-      setControls({ referenceId: user.id });
+    if (controls.referenceType === BillingReference.USER && userId) {
+      setControls({ referenceId: userId });
     }
 
-    if (!user?.id && controls.referenceId) {
+    if (!userId && controls.referenceId) {
       setControls({ referenceType: BillingReference.USER, referenceId: null });
     }
 
@@ -70,7 +73,7 @@ export const PricingControls = ({ user }: { user: User | null }) => {
     controls.referenceId,
     controls.type,
     controls.model,
-    user?.id,
+    userId,
     setControls,
   ]);
 

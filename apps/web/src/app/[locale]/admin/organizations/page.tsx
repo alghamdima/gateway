@@ -4,12 +4,10 @@ import {
   parseAsInteger,
   parseAsString,
 } from "nuqs/server";
-import { Suspense } from "react";
 
 import { getOrganizationsResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
 import { pickBy } from "@workspace/shared/utils";
-import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
 
 import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";
@@ -50,18 +48,5 @@ export default async function OrganizationsPage(props: {
     },
   });
 
-  return (
-    <Suspense
-      fallback={
-        <DataTableSkeleton
-          columnCount={3}
-          filterCount={3}
-          cellWidths={["15rem", "10rem", "10rem"]}
-          shrinkZero
-        />
-      }
-    >
-      <OrganizationsDataTable promise={promise} perPage={perPage} />
-    </Suspense>
-  );
+  return <OrganizationsDataTable promise={promise} perPage={perPage} />;
 }

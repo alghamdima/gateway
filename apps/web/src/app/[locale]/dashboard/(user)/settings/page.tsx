@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 
 import { Flag } from "@workspace/flags";
 import { getBooleanValue } from "@workspace/flags-web/server";
-import { getTranslation } from "@workspace/i18n/server";
 import { cn } from "@workspace/ui";
 import { badgeVariants } from "@workspace/ui-web/badge";
 
 import { pathsConfig } from "~/config/paths";
 import { getSession } from "~/lib/auth/server";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { DeleteAccount } from "~/modules/user/settings/general/delete-account";
 import { EditAvatar } from "~/modules/user/settings/general/edit-avatar";

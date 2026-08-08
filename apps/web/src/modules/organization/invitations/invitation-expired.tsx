@@ -1,7 +1,7 @@
-import { getTranslation } from "@workspace/i18n/server";
 import { buttonVariants } from "@workspace/ui-web/button";
 
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { TurboLink } from "~/modules/common/turbo-link";
 

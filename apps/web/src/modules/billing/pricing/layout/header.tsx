@@ -2,7 +2,6 @@
 
 import { memo } from "react";
 
-import { User } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 
 import { PricingControls } from "~/modules/billing/pricing/controls";
@@ -15,11 +14,7 @@ import {
 
 import { Discount } from "./discount";
 
-interface PricingHeaderProps {
-  readonly user: User | null;
-}
-
-export const PricingHeader = memo<PricingHeaderProps>(({ user }) => {
+export const PricingHeader = memo(() => {
   const { t } = useTranslation(["common", "billing"]);
 
   return (
@@ -31,7 +26,7 @@ export const PricingHeader = memo<PricingHeaderProps>(({ user }) => {
       </SectionDescription>
 
       <Discount />
-      <PricingControls user={user} />
+      <PricingControls />
     </SectionHeader>
   );
 });

@@ -1,10 +1,10 @@
 import * as z from "zod";
 
-import { getTranslation } from "@workspace/i18n/server";
 import { cn } from "@workspace/ui";
 
 import { API_PREFIX } from "~/config/paths";
 import { getBaseUrl } from "~/lib/api/utils";
+import { getTranslation } from "~/lib/i18n";
 
 const getIsOperational = async () => {
   try {

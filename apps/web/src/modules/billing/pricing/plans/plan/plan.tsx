@@ -22,13 +22,13 @@ import { Card } from "@workspace/ui-web/card";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
+import { authClient } from "~/lib/auth/client";
 import { billing } from "~/modules/billing/lib/api";
 import { usePricingControls } from "~/modules/billing/pricing/controls";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import { usePlan } from "./hooks/use-plan";
 
-import type { User } from "@workspace/auth";
 import type {
   BillingConfigPlan,
   BillingConfigVariant,
@@ -216,12 +216,13 @@ const Price = ({
 
 interface PlanProps {
   readonly plan: BillingConfigPlan;
-  readonly user: User | null;
 }
 
-export const Plan = memo<PlanProps>(({ plan, user }) => {
+export const Plan = memo<PlanProps>(({ plan }) => {
   const { t, i18n } = useTranslation(["common", "billing"]);
   const controls = usePricingControls((c) => c.controls);
+  const { data: session } = authClient.useSession();
+  const user = session?.user ?? null;
 
   const summary = useQuery({
     ...billing.queries.summary.get(controls.referenceId ?? ""),
@@ -239,7 +240,7 @@ export const Plan = memo<PlanProps>(({ plan, user }) => {
     canCreate,
     canUpdate,
     canDelete,
-  } = usePlan({ plan, user });
+  } = usePlan({ plan });
 
   const hasPlan = !getLowerPlans(plan.id).some((p) => p.id === activePlan);
 

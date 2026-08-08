@@ -1,9 +1,8 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { notFound } from "next/navigation";
 
-import { getTranslation } from "@workspace/i18n/server";
-
 import { getUser } from "~/lib/auth/server";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { getQueryClient } from "~/lib/query/server";
 import { admin } from "~/modules/admin/lib/api";
@@ -21,7 +20,7 @@ export const generateMetadata = async ({
 }: {
   params: Promise<{ id: string; locale: string }>;
 }) => {
-  const id = (await params).id;
+  const { id } = await params;
   const user = await getUser({ id });
 
   if (!user) {

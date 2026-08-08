@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
@@ -14,6 +15,7 @@ import { billing } from "~/modules/billing/lib/api";
 import { DashboardActionBar } from "~/modules/common/layout/dashboard/action-bar";
 import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
 import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
+import { DashboardSidebarSkeleton } from "~/modules/common/layout/dashboard/sidebar/skeleton";
 
 const menu = [
   {
@@ -64,11 +66,25 @@ const menu = [
   },
 ];
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  return (
+    <SidebarProvider>
+      <Suspense fallback={<DashboardSidebarSkeleton />}>
+        <AuthenticatedSidebar />
+      </Suspense>
+      <SidebarInset>
+        <DashboardActionBar menu={menu} />
+        <DashboardInset>{children}</DashboardInset>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+async function AuthenticatedSidebar() {
   const { user } = await getSession();
 
   if (!user) {
@@ -90,13 +106,7 @@ export default async function DashboardLayout({
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <SidebarProvider>
-        <DashboardSidebar user={user} menu={menu} />
-        <SidebarInset>
-          <DashboardActionBar menu={menu} />
-          <DashboardInset>{children}</DashboardInset>
-        </SidebarInset>
-      </SidebarProvider>
+      <DashboardSidebar user={user} menu={menu} />
     </HydrationBoundary>
   );
 }

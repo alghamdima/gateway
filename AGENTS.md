@@ -1,5 +1,15 @@
 # AGENTS.md
 
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root — prefer `apps/web/node_modules/next/dist/docs/` or the workspace hoist) before writing any Next.js code. Heed deprecation notices.
+
+This block is written for Next.js 16.3. Verify patterns against bundled docs when upgrading.
+
+<!-- END:nextjs-agent-rules -->
+
 Guide for AI agents working on the Turbostarter monorepo.
 
 ## Agent rules
@@ -101,7 +111,7 @@ Environment: create `.env` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `UR
 
 ## App-specific
 
-**Web:** RSC by default; `use client` only when needed; `Suspense` for client components; `nuqs` for URL state; `@workspace/ui-web`
+**Web:** RSC by default; `use client` only when needed; `Suspense` for client components; `nuqs` for URL state; `@workspace/ui-web`. Next.js 16.3: `proxy.ts` (not middleware); error boundaries use `retry` (not `reset`); TypeScript 7 via project-local `tsc`; locale via `next/root-params` (`~/lib/i18n`).
 
 **Mobile:** SafeAreaProvider; minimize hooks; memoize; `expo-image`; `@workspace/ui-mobile`
 

@@ -22,6 +22,8 @@ const INTERNAL_PACKAGES = [
 
 const config: NextConfig = {
   reactStrictMode: true,
+  /** Auto-memoize components via React Compiler (Rust path in Turbopack) */
+  reactCompiler: true,
   turbopack: {
     rules: {
       "*.svg": {
@@ -43,9 +45,18 @@ const config: NextConfig = {
   transpilePackages: INTERNAL_PACKAGES,
   experimental: {
     optimizePackageImports: INTERNAL_PACKAGES,
+    /** Keep soft navigations / Server Actions pending and retry on reconnect */
+    useOffline: true,
+    /** Faster React Compiler inside Turbopack (requires reactCompiler: true) */
+    turbopackRustReactCompiler: true,
+    /** Required when `[locale]` is the root layout (Next.js 16.3 pattern) */
+    globalNotFound: true,
   },
 
-  /** We already do linting and typechecking as separate tasks in CI */
+  /**
+   * Type checking runs as a separate CI task. When enabled, `next build`
+   * uses the project-local TypeScript CLI (supports TypeScript 7).
+   */
   typescript: { ignoreBuildErrors: true },
 };
 

@@ -1,28 +1,30 @@
+import "~/assets/styles/globals.css";
 import { notFound } from "next/navigation";
 
 import { config, isLocaleSupported } from "@workspace/i18n";
 
-import { getMetadata } from "~/lib/metadata";
+import { getLocale } from "~/lib/i18n";
+import { DEFAULT_METADATA, DEFAULT_VIEWPORT } from "~/lib/metadata";
 import { Providers } from "~/lib/providers/providers";
 import { ImpersonatingBanner } from "~/modules/admin/users/user/impersonating-banner";
 import { BaseLayout } from "~/modules/common/layout/base";
+import { OfflineBanner } from "~/modules/common/offline-banner";
 import { Toaster } from "~/modules/common/toast";
 import { BuyCtaDialog } from "~/modules/marketing/layout/buy-cta-dialog";
+
+export const viewport = DEFAULT_VIEWPORT;
+export const metadata = DEFAULT_METADATA;
 
 export function generateStaticParams() {
   return config.locales.map((locale) => ({ locale }));
 }
 
-export const generateMetadata = getMetadata();
-
-export default async function RootLayout({
+export default async function LocaleLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ locale: string }>;
 }) {
-  const locale = (await params).locale;
+  const locale = await getLocale();
 
   if (!isLocaleSupported(locale)) {
     return notFound();
@@ -31,6 +33,7 @@ export default async function RootLayout({
   return (
     <BaseLayout locale={locale}>
       <Providers locale={locale}>
+        <OfflineBanner />
         <ImpersonatingBanner />
         {children}
         <BuyCtaDialog />

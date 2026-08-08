@@ -1,7 +1,7 @@
 import { isKey } from "@workspace/i18n";
-import { getTranslation } from "@workspace/i18n/server";
 
 import { appConfig } from "~/config/app";
+import { getTranslation } from "~/lib/i18n";
 
 import type { TranslationKey } from "@workspace/i18n";
 import type { Metadata, Viewport } from "next";

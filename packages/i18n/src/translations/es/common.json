@@ -25,6 +25,9 @@
   "contactUs": "Contáctanos",
   "checkForUpdates": "Verificar actualizaciones",
   "tryAgain": "Intentar de nuevo",
+  "offline": {
+    "banner": "Sin conexión. Las solicitudes pendientes se reintentarán al reconectar."
+  },
   "reset": "Restablecer",
   "resources": "Recursos",
   "or": "O",

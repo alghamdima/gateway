@@ -7,10 +7,10 @@ import { captureException } from "@workspace/monitoring-web";
 
 export default function GlobalError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     captureException(error);
@@ -28,7 +28,7 @@ export default function GlobalError({
             {error.stack && <pre>{error.stack}</pre>}
           </details>
         )}
-        <button onClick={() => reset()}>Try again</button>
+        <button onClick={() => retry()}>Try again</button>
       </body>
     </html>
   );

@@ -1,5 +1,4 @@
 import { Trans } from "@workspace/i18n";
-import { getTranslation } from "@workspace/i18n/server";
 import {
   Avatar,
   AvatarFallback,
@@ -9,6 +8,7 @@ import {
 import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { WaitlistForm } from "~/modules/marketing/waitlist/form";

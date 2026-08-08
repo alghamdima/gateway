@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 
-import { getTranslation } from "@workspace/i18n/server";
 import {
   Tabs,
   TabsContent,
@@ -9,6 +8,7 @@ import {
 } from "@workspace/ui-web/tabs";
 
 import { getOrganization } from "~/lib/auth/server";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { InvitationsDataTable } from "~/modules/organization/invitations/data-table/invitations-data-table";
 import { MembersDataTable } from "~/modules/organization/members/data-table/members-data-table";
@@ -25,7 +25,6 @@ export default async function MembersPage({
   params: Promise<{ organization: string }>;
 }) {
   const { organization } = await params;
-
   const activeOrganization = await getOrganization({ slug: organization });
 
   if (!activeOrganization) {

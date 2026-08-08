@@ -11,10 +11,10 @@ import { TurboLink } from "~/modules/common/turbo-link";
 
 export default function Error({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   const { t } = useTranslation("common");
 
@@ -39,7 +39,7 @@ export default function Error({
       </div>
 
       <div className="flex items-center justify-center gap-4">
-        <Button onClick={reset}>{t("tryAgain")}</Button>
+        <Button onClick={retry}>{t("tryAgain")}</Button>
 
         <TurboLink
           href={pathsConfig.index}

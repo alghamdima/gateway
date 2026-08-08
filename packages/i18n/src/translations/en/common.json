@@ -64,6 +64,9 @@
   "slug": "Slug",
   "verified": "Verified",
   "tryAgain": "Try again",
+  "offline": {
+    "banner": "You're offline. Pending requests will retry when you reconnect."
+  },
   "checkForUpdates": "Check for updates",
   "unverified": "Unverified",
   "addNew": "Add new",

@@ -1,8 +1,8 @@
 import { getPathname } from "@workspace/i18n";
-import { getTranslation } from "@workspace/i18n/server";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 
 import type { MetadataRoute } from "next";
 

@@ -5,8 +5,8 @@ import {
   getContentItemBySlug,
   getContentItems,
 } from "@workspace/cms";
-import { getTranslation } from "@workspace/i18n/server";
 
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { Mdx } from "~/modules/common/mdx";
 import {
@@ -25,17 +25,18 @@ interface PageParams {
 }
 
 export default async function Page({ params }: PageParams) {
+  const { slug, locale } = await params;
   const item = getContentItemBySlug({
     collection: CollectionType.LEGAL,
-    slug: (await params).slug,
-    locale: (await params).locale,
+    slug,
+    locale,
   });
 
   if (!item) {
     return notFound();
   }
 
-  const { t } = await getTranslation({ ns: "common" });
+  const { t } = await getTranslation({ ns: "common", locale });
 
   return (
     <Section>
@@ -51,18 +52,18 @@ export default async function Page({ params }: PageParams) {
 
 export function generateStaticParams() {
   return getContentItems({ collection: CollectionType.LEGAL }).items.map(
-    ({ slug, locale }) => ({
+    ({ slug }) => ({
       slug,
-      locale,
     }),
   );
 }
 
 export async function generateMetadata({ params }: PageParams) {
+  const { slug, locale } = await params;
   const item = getContentItemBySlug({
     collection: CollectionType.LEGAL,
-    slug: (await params).slug,
-    locale: (await params).locale,
+    slug,
+    locale,
   });
 
   if (!item) {

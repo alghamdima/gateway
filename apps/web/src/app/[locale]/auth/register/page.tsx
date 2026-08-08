@@ -1,7 +1,7 @@
-import { getTranslation } from "@workspace/i18n/server";
 import { FieldSeparator } from "@workspace/ui-web/field";
 
 import { authConfig } from "~/config/auth";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { AnonymousLogin } from "~/modules/auth/form/anonymous";
 import { LoginCta } from "~/modules/auth/form/login/form";

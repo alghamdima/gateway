@@ -6,13 +6,11 @@ import {
   parseAsBoolean,
   parseAsStringEnum,
 } from "nuqs/server";
-import { Suspense } from "react";
 
 import { getUsersResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
 import { UserRole } from "@workspace/auth";
 import { pickBy } from "@workspace/shared/utils";
-import { DataTableSkeleton } from "@workspace/ui-web/data-table/data-table-skeleton";
 
 import { api } from "~/lib/api/server";
 import { getMetadata } from "~/lib/metadata";
@@ -55,18 +53,5 @@ export default async function UsersPage(props: {
     },
   });
 
-  return (
-    <Suspense
-      fallback={
-        <DataTableSkeleton
-          columnCount={6}
-          filterCount={3}
-          cellWidths={["15rem", "10rem", "5rem", "3rem", "3rem", "5rem"]}
-          shrinkZero
-        />
-      }
-    >
-      <UsersDataTable promise={promise} perPage={perPage} />
-    </Suspense>
-  );
+  return <UsersDataTable promise={promise} perPage={perPage} />;
 }

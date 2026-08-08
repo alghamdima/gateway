@@ -1,5 +1,4 @@
-import { getTranslation } from "@workspace/i18n/server";
-
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { UpdatePasswordForm } from "~/modules/auth/form/password/update";
 import { AuthHeader } from "~/modules/auth/layout/header";

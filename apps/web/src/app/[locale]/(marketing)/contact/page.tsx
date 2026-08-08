@@ -1,6 +1,4 @@
-import { getTranslation } from "@workspace/i18n/server";
-import { withI18n } from "@workspace/i18n/with-i18n";
-
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { ContactForm } from "~/modules/marketing/contact/contact-form";
 import {
@@ -16,7 +14,7 @@ export const generateMetadata = getMetadata({
   description: "marketing:contact.description",
 });
 
-const ContactPage = async () => {
+export default async function ContactPage() {
   const { t } = await getTranslation({ ns: "marketing" });
   return (
     <Section>
@@ -29,6 +27,4 @@ const ContactPage = async () => {
       <ContactForm />
     </Section>
   );
-};
-
-export default withI18n(ContactPage);
+}

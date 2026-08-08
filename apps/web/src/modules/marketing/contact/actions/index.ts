@@ -2,7 +2,8 @@
 
 import { EmailTemplate } from "@workspace/email";
 import { sendEmail } from "@workspace/email/server";
-import { getTranslation } from "@workspace/i18n/server";
+
+import { getTranslation } from "~/lib/i18n";
 
 import env from "../../../../../env.config";
 

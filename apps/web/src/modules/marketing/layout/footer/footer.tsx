@@ -1,9 +1,9 @@
-import { getTranslation } from "@workspace/i18n/server";
 import { BuiltWith } from "@workspace/ui-web/built-with";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
+import { getTranslation } from "~/lib/i18n";
 import { I18nControls } from "~/modules/common/i18n/controls";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { FooterNavigation } from "~/modules/marketing/layout/footer/navigation";

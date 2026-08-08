@@ -1,7 +1,6 @@
 import * as z from "zod";
 
 import { handle } from "@workspace/api/utils";
-import { getTranslation } from "@workspace/i18n/server";
 import { cn } from "@workspace/ui";
 import { buttonVariants } from "@workspace/ui-web/button";
 import {
@@ -14,6 +13,7 @@ import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api/server";
+import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { TurboLink } from "~/modules/common/turbo-link";
 

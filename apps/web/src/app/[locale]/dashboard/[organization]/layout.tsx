@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { getBillingSummaryResponseSchema } from "@workspace/api/schema";
 import { handle } from "@workspace/api/utils";
@@ -16,9 +17,18 @@ import { billing } from "~/modules/billing/lib/api";
 import { DashboardActionBar } from "~/modules/common/layout/dashboard/action-bar";
 import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
 import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
+import { DashboardSidebarSkeleton } from "~/modules/common/layout/dashboard/sidebar/skeleton";
 import { organization } from "~/modules/organization/lib/api";
 
-const menu = ({ slug, member }: { slug: string; member: Member | null }) => [
+import type { Menu } from "~/modules/common/layout/dashboard/sidebar/types";
+
+const menu = ({
+  slug,
+  member,
+}: {
+  slug: string;
+  member: Member | null;
+}): Menu => [
   {
     label: "platform",
     items: [
@@ -72,7 +82,7 @@ const menu = ({ slug, member }: { slug: string; member: Member | null }) => [
   },
 ];
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
   params,
 }: {
@@ -81,6 +91,22 @@ export default async function DashboardLayout({
     organization: string;
   }>;
 }) {
+  return (
+    <SidebarProvider>
+      <Suspense fallback={<DashboardSidebarSkeleton />}>
+        <AuthenticatedOrgSidebar params={params} />
+      </Suspense>
+      <SidebarInset>
+        <Suspense fallback={<div className="h-14 border-b" />}>
+          <AuthenticatedOrgActionBar params={params} />
+        </Suspense>
+        <DashboardInset>{children}</DashboardInset>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+async function getWorkspace(params: Promise<{ organization: string }>) {
   const { user } = await getSession();
 
   if (!user) {
@@ -93,6 +119,24 @@ export default async function DashboardLayout({
   if (!activeOrganization) {
     return redirect(pathsConfig.dashboard.user.index);
   }
+
+  const items = menu({
+    slug: organizationSlug,
+    member:
+      activeOrganization.members.find((member) => member.userId === user.id) ??
+      null,
+  });
+
+  return { user, activeOrganization, organizationSlug, items };
+}
+
+async function AuthenticatedOrgSidebar({
+  params,
+}: {
+  params: Promise<{ organization: string }>;
+}) {
+  const { user, activeOrganization, organizationSlug, items } =
+    await getWorkspace(params);
 
   const queryClient = getQueryClient();
   queryClient.setQueryData(
@@ -113,22 +157,18 @@ export default async function DashboardLayout({
       }),
   });
 
-  const items = menu({
-    slug: organizationSlug,
-    member:
-      activeOrganization.members.find((member) => member.userId === user.id) ??
-      null,
-  });
-
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <SidebarProvider>
-        <DashboardSidebar user={user} menu={items} />
-        <SidebarInset>
-          <DashboardActionBar menu={items} />
-          <DashboardInset>{children}</DashboardInset>
-        </SidebarInset>
-      </SidebarProvider>
+      <DashboardSidebar user={user} menu={items} />
     </HydrationBoundary>
   );
+}
+
+async function AuthenticatedOrgActionBar({
+  params,
+}: {
+  params: Promise<{ organization: string }>;
+}) {
+  const { items } = await getWorkspace(params);
+  return <DashboardActionBar menu={items} />;
 }
