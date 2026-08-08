@@ -18,7 +18,7 @@
     "@workspace/flags": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-react-native": "4.52.0",
+    "posthog-react-native": "4.62.0",
     "zod": "catalog:"
   },
   "devDependencies": {

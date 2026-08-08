@@ -1424,6 +1424,7 @@ const Core = async () => {
       href="https://www.turbostarter.dev"
       target="_blank"
       rel="noopener noreferrer"
+      aria-label={t("features.feature.core.title")}
     >
       <Wrapper>
         <CardHeader>
@@ -1455,6 +1456,7 @@ const AI = async () => {
       href="https://ai.turbostarter.dev"
       target="_blank"
       rel="noopener noreferrer"
+      aria-label={t("features.feature.ai.title")}
     >
       <Wrapper>
         <CardHeader>

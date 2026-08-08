@@ -30,7 +30,7 @@
     "@workspace/oxlint": "workspace:*",
     "cross-env": "10.1.0",
     "dotenv-cli": "11.0.0",
-    "lefthook": "2.1.6",
+    "lefthook": "2.1.10",
     "turbo": "catalog:turbo",
     "typescript": "catalog:",
     "vitest": "catalog:"

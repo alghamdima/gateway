@@ -19,6 +19,8 @@ export default defineConfig({
     "react/jsx-props-no-spreading": "off",
     "react/jsx-max-depth": "off",
     "react/no-multi-comp": "off",
+    "react/no-unstable-nested-components": "off",
+    "react/no-object-type-as-default-prop": "off",
 
     "react_perf/jsx-no-jsx-as-prop": "off",
     "react_perf/jsx-no-new-object-as-prop": "off",
@@ -28,5 +30,6 @@ export default defineConfig({
     "jsx-a11y/prefer-tag-over-role": "off",
     "jsx-a11y/click-events-have-key-events": "off",
     "jsx-a11y/no-autofocus": "off",
+    "jsx-a11y/no-noninteractive-element-interactions": "off",
   },
 });

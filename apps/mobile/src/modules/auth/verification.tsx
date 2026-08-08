@@ -51,6 +51,16 @@ const useVerificationMutations = ({
   };
 };
 
+const resetParams = () => {
+  router.setParams({
+    token: undefined,
+    type: undefined,
+    redirectTo: undefined,
+    callbackURL: undefined,
+    errorCallbackURL: undefined,
+  });
+};
+
 const VerificationController = ({
   token,
   type,
@@ -64,16 +74,6 @@ const VerificationController = ({
   redirectTo?: Href;
   errorCallbackURL?: Href;
 }) => {
-  const resetParams = () => {
-    router.setParams({
-      token: undefined,
-      type: undefined,
-      redirectTo: undefined,
-      callbackURL: undefined,
-      errorCallbackURL: undefined,
-    });
-  };
-
   const mutations = useVerificationMutations({
     onSuccess: () => {
       router.navigate(redirectTo ?? callbackURL ?? pathsConfig.index);

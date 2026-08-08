@@ -23,8 +23,8 @@
     "@workspace/flags": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-js": "1.406.2",
-    "posthog-node": "5.46.0",
+    "posthog-js": "1.414.0",
+    "posthog-node": "5.48.1",
     "zod": "catalog:"
   },
   "devDependencies": {

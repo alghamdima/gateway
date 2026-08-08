@@ -18,10 +18,10 @@
     "@vercel/analytics": "2.0.1",
     "@workspace/analytics": "workspace:*",
     "@workspace/shared": "workspace:*",
-    "mixpanel": "0.21.0",
-    "mixpanel-browser": "2.78.0",
-    "posthog-js": "1.406.2",
-    "posthog-node": "5.46.0",
+    "mixpanel": "0.23.0",
+    "mixpanel-browser": "2.81.0",
+    "posthog-js": "1.414.0",
+    "posthog-node": "5.48.1",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -14,7 +14,7 @@
     "test:e2e": "maestro test e2e"
   },
   "dependencies": {
-    "@ai-sdk/react": "4.0.15",
+    "@ai-sdk/react": "4.0.60",
     "@dev-plugins/react-navigation": "~0.4.0",
     "@dev-plugins/react-query": "~0.4.0",
     "@expo-google-fonts/geist": "0.4.1",

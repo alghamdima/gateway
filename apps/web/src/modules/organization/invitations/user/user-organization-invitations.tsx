@@ -54,7 +54,13 @@ export const UserOrganizationInvitationsBanner = () => {
     <UserOrganizationInvitationsListModal
       invitations={pendingInvitations}
       render={
-        <button className="ring-offset-background focus-visible:ring-ring w-full cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
+        <button
+          type="button"
+          aria-label={t("invitations.user.banner.title", {
+            count: pendingInvitations.length,
+          })}
+          className="ring-offset-background focus-visible:ring-ring w-full cursor-pointer rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        >
           <Alert
             variant="primary"
             className="hover:bg-primary/10 flex flex-wrap items-center justify-between gap-4 transition-colors"

@@ -4,6 +4,27 @@ import { useMemo } from "react";
 
 import { MOBILE_STORE_LINKS, MobileStore } from "@workspace/billing";
 
+const linkToPortal = async ({
+  store,
+  variantId,
+}: {
+  store: string;
+  variantId?: string;
+}) => {
+  if (!Object.values(MobileStore).includes(store)) {
+    throw new Error(`Invalid store: ${store}`);
+  }
+
+  const url = MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS];
+
+  if (store === MobileStore.PLAY_STORE && variantId) {
+    await Linking.openURL(`${url}?sku=${encodeURIComponent(variantId)}`);
+    return;
+  }
+
+  await Linking.openURL(url);
+};
+
 export const useCustomer = () => {
   const user = useUser();
 
@@ -22,27 +43,6 @@ export const useCustomer = () => {
 
   const reset = () => {
     void user.signOut();
-  };
-
-  const linkToPortal = async ({
-    store,
-    variantId,
-  }: {
-    store: string;
-    variantId?: string;
-  }) => {
-    if (!Object.values(MobileStore).includes(store)) {
-      throw new Error(`Invalid store: ${store}`);
-    }
-
-    const url = MOBILE_STORE_LINKS[store as keyof typeof MOBILE_STORE_LINKS];
-
-    if (store === MobileStore.PLAY_STORE && variantId) {
-      await Linking.openURL(`${url}?sku=${encodeURIComponent(variantId)}`);
-      return;
-    }
-
-    await Linking.openURL(url);
   };
 
   return {

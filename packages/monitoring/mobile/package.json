@@ -11,11 +11,11 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules"
   },
   "dependencies": {
-    "@sentry/react-native": "8.19.0",
+    "@sentry/react-native": "8.22.0",
     "@workspace/monitoring": "workspace:*",
     "@workspace/shared": "workspace:*",
     "envin": "catalog:",
-    "posthog-react-native": "4.52.0"
+    "posthog-react-native": "4.62.0"
   },
   "devDependencies": {
     "@types/node": "catalog:node24",
