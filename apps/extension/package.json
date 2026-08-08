@@ -18,7 +18,7 @@
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
-    "@webext-core/messaging": "2.3.0",
+    "@webext-core/messaging": "4.0.0",
     "@workspace/analytics-extension": "workspace:*",
     "@workspace/api": "workspace:*",
     "@workspace/auth": "workspace:*",
