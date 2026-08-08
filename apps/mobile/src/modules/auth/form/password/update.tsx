@@ -11,9 +11,8 @@ import { updatePasswordSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
-import { Icons } from "@workspace/ui-mobile/icons";
 import { Input } from "@workspace/ui-mobile/input";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -80,9 +79,7 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
         disabled={form.formState.isSubmitting}
       >
         {form.formState.isSubmitting ? (
-          <Spin>
-            <Icons.Loader2 className="text-primary-foreground" />
-          </Spin>
+          <Spinner className="text-primary-foreground" />
         ) : (
           <Text>{t("account.password.update.cta")}</Text>
         )}

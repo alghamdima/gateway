@@ -11,6 +11,7 @@ import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";
@@ -108,7 +109,7 @@ export const ForgotPasswordForm = () => {
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="animate-spin" />
+              <Spinner />
             ) : (
               t("account.password.forgot.cta")
             )}

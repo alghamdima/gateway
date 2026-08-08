@@ -8,6 +8,7 @@ import { useTranslation } from "@workspace/i18n";
 import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -64,7 +65,7 @@ const SocialProvider = ({
       onClick={onClick}
     >
       {isSubmitting ? (
-        <Icons.Loader2 className="animate-spin" />
+        <Spinner />
       ) : (
         <>
           <Icon className="size-5 dark:brightness-125" />

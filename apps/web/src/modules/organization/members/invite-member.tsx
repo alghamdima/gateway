@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui-web/select";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
@@ -246,7 +247,7 @@ export const InviteMember = ({ organizationId }: InviteMemberProps) => {
               size="sm"
             >
               {form.formState.isSubmitting ? (
-                <Icons.Loader2 className="size-4 animate-spin" />
+                <Spinner className="size-4" />
               ) : (
                 t("invite")
               )}

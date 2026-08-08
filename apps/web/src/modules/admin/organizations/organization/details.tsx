@@ -9,13 +9,13 @@ import { updateOrganizationSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { useDebounceCallback } from "@workspace/shared/hooks";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@workspace/ui-web/input-group";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import {
@@ -79,9 +79,7 @@ const Name = ({ id }: { id: string }) => {
               <FieldLabel htmlFor="admin-organization-name">
                 {t("name")}
               </FieldLabel>
-              {form.formState.isSubmitting && (
-                <Icons.Loader2 className="size-3 animate-spin" />
-              )}
+              {form.formState.isSubmitting && <Spinner className="size-3" />}
             </div>
             <Input
               {...field}
@@ -154,9 +152,7 @@ const Slug = ({ id }: { id: string }) => {
               <FieldLabel htmlFor="admin-organization-slug">
                 {t("slug")}
               </FieldLabel>
-              {form.formState.isSubmitting && (
-                <Icons.Loader2 className="size-3 animate-spin" />
-              )}
+              {form.formState.isSubmitting && <Spinner className="size-3" />}
             </div>
             <InputGroup>
               <InputGroupInput

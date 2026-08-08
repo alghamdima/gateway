@@ -6,7 +6,7 @@ import { useTranslation } from "@workspace/i18n";
 import { capitalize } from "@workspace/shared/utils";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { authConfig } from "~/config/auth";
@@ -79,9 +79,7 @@ export default function AccountsScreen() {
 
       {isLoading ? (
         <View className="p-6">
-          <Spin>
-            <Icons.Loader2 className="text-foreground mx-auto size-6" />
-          </Spin>
+          <Spinner className="text-foreground mx-auto size-6" />
         </View>
       ) : (
         <>
@@ -118,9 +116,7 @@ export default function AccountsScreen() {
                     >
                       {disconnect.isPending &&
                       disconnect.variables.providerId === provider ? (
-                        <Spin>
-                          <Icons.Loader2 className="text-foreground size-5" />
-                        </Spin>
+                        <Spinner className="text-foreground size-5" />
                       ) : (
                         <Icons.Trash className="text-foreground" size={20} />
                       )}
@@ -157,9 +153,7 @@ export default function AccountsScreen() {
                     >
                       {connect.isPending &&
                       connect.variables.provider === provider ? (
-                        <Spin>
-                          <Icons.Loader2 className="size-5" />
-                        </Spin>
+                        <Spinner className="size-5" />
                       ) : (
                         <Icon className="text-foreground size-5" />
                       )}

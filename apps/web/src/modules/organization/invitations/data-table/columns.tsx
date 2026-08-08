@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
@@ -97,9 +98,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
                 key={`resend-${invitation.id}`}
               >
                 {t("resend")}
-                {isPending && (
-                  <Icons.Loader2 className="ml-auto animate-spin text-current" />
-                )}
+                {isPending && <Spinner className="ml-auto text-current" />}
               </DropdownMenuItem>
             );
           })(),
@@ -124,9 +123,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
                 key={`cancel-${invitation.id}`}
               >
                 {t("cancel")}
-                {isPending && (
-                  <Icons.Loader2 className="ml-auto animate-spin text-current" />
-                )}
+                {isPending && <Spinner className="ml-auto text-current" />}
               </DropdownMenuItem>
             );
           })(),

@@ -7,8 +7,8 @@ import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Card, CardContent } from "@workspace/ui-web/card";
 import { Field, FieldLabel, FieldError } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { Textarea } from "@workspace/ui-web/textarea";
 import { toast } from "@workspace/ui-web/toast";
 
@@ -135,7 +135,7 @@ export function ContactForm() {
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="size-5 animate-spin" />
+              <Spinner className="size-5" />
             ) : (
               t("contact.form.submit")
             )}

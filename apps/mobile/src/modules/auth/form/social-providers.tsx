@@ -14,7 +14,7 @@ import { Trans, useTranslation } from "@workspace/i18n";
 import { Badge } from "@workspace/ui-mobile/badge";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { authConfig } from "~/config/auth";
@@ -70,9 +70,7 @@ const SocialProvider = ({
       disabled={isSubmitting}
     >
       {isSubmitting ? (
-        <Spin>
-          <Icons.Loader2 className="text-foreground size-5" />
-        </Spin>
+        <Spinner className="text-foreground size-5" />
       ) : (
         <>
           <View className="size-5">

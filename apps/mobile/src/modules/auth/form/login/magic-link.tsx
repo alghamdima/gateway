@@ -8,9 +8,8 @@ import { generateName, magicLinkLoginSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
-import { Icons } from "@workspace/ui-mobile/icons";
 import { Input } from "@workspace/ui-mobile/input";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -86,9 +85,7 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground size-5" />
-            </Spin>
+            <Spinner className="text-primary-foreground size-5" />
           ) : (
             <Text>{t("login.magicLink.cta")}</Text>
           )}

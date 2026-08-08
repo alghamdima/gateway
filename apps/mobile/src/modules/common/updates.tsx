@@ -19,9 +19,8 @@ import { scheduleOnRN } from "react-native-worklets";
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Button } from "@workspace/ui-mobile/button";
-import { Icons } from "@workspace/ui-mobile/icons";
 import { Progress } from "@workspace/ui-mobile/progress";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { BlurView, GlassView } from "./styled";
@@ -125,9 +124,7 @@ const Installing = () => {
           <Text className="font-sans-medium text-lg leading-tight">
             {t("update.installing.title")}
           </Text>
-          <Spin>
-            <Icons.Loader2 className="text-primary" size={16} />
-          </Spin>
+          <Spinner className="text-primary" size={16} />
         </View>
         <Text className="text-muted-foreground text-sm">
           {t("update.installing.description")}

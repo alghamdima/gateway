@@ -14,7 +14,6 @@ import {
   FieldError,
   FieldLabel,
 } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalTrigger,
@@ -33,6 +32,7 @@ import {
   SelectContent,
   SelectTrigger,
 } from "@workspace/ui-web/select";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
@@ -181,11 +181,7 @@ export const UpdateMemberRoleModal = ({
             form="admin-update-member-role-form"
             disabled={form.formState.isSubmitting}
           >
-            {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("update")
-            )}
+            {form.formState.isSubmitting ? <Spinner /> : t("update")}
           </Button>
         </ModalFooter>
       </ModalContent>

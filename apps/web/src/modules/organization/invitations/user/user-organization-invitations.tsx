@@ -21,6 +21,7 @@ import {
   ModalTrigger,
 } from "@workspace/ui-web/modal";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
@@ -147,11 +148,7 @@ const UserOrganizationInvitationsListModalItem = ({
           }
           disabled={rejectInvitation.isPending || acceptInvitation.isPending}
         >
-          {rejectInvitation.isPending ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            <Icons.X />
-          )}
+          {rejectInvitation.isPending ? <Spinner /> : <Icons.X />}
           {t("reject")}
         </Button>
 
@@ -162,11 +159,7 @@ const UserOrganizationInvitationsListModalItem = ({
           }
           disabled={rejectInvitation.isPending || acceptInvitation.isPending}
         >
-          {acceptInvitation.isPending ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            <Icons.Check />
-          )}
+          {acceptInvitation.isPending ? <Spinner /> : <Icons.Check />}
           {t("accept")}
         </Button>
       </div>

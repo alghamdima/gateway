@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -149,9 +150,7 @@ const Actions = ({ member }: { member: Member }) => {
                   key={`leave-${member.id}`}
                 >
                   {t("common:leave")}
-                  {isPending && (
-                    <Icons.Loader2 className="ml-auto animate-spin text-current" />
-                  )}
+                  {isPending && <Spinner className="ml-auto text-current" />}
                 </DropdownMenuItem>
               );
             })()
@@ -174,9 +173,7 @@ const Actions = ({ member }: { member: Member }) => {
                   key={`remove-${member.id}`}
                 >
                   {t("common:remove")}
-                  {isPending && (
-                    <Icons.Loader2 className="ml-auto animate-spin text-current" />
-                  )}
+                  {isPending && <Spinner className="ml-auto text-current" />}
                 </DropdownMenuItem>
               );
             })()

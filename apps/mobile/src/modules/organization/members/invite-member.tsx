@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui-mobile/select";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
@@ -225,12 +225,7 @@ export const InviteMemberBottomSheet = ({
               disabled={form.formState.isSubmitting}
             >
               {form.formState.isSubmitting ? (
-                <Spin>
-                  <Icons.Loader2
-                    size={16}
-                    className="text-primary-foreground"
-                  />
-                </Spin>
+                <Spinner className="text-primary-foreground" size={16} />
               ) : (
                 <Text>{t("invite")}</Text>
               )}

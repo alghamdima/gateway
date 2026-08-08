@@ -9,14 +9,13 @@ import { emailOtpLoginSchema, magicLinkLoginSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
-import { Icons } from "@workspace/ui-mobile/icons";
 import { Input } from "@workspace/ui-mobile/input";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@workspace/ui-mobile/input-otp";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -122,9 +121,7 @@ export const EmailOtpLoginForm = memo<EmailOtpLoginFormProps>(
             disabled={isRequestSubmitting}
           >
             {isRequestSubmitting ? (
-              <Spin>
-                <Icons.Loader2 className="text-primary-foreground size-5" />
-              </Spin>
+              <Spinner className="text-primary-foreground size-5" />
             ) : (
               <Text>{t("login.emailOtp.cta")}</Text>
             )}
@@ -179,9 +176,7 @@ export const EmailOtpLoginForm = memo<EmailOtpLoginFormProps>(
           disabled={isVerifySubmitting}
         >
           {isVerifySubmitting ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground size-5" />
-            </Spin>
+            <Spinner className="text-primary-foreground size-5" />
           ) : (
             <Text>{t("login.cta")}</Text>
           )}

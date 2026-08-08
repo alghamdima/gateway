@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui-web/dropdown-menu";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -109,9 +110,7 @@ export const MemberActions = ({ member }: { member: Member }) => {
                 key={`remove-${member.id}`}
               >
                 {t("remove")}
-                {isPending && (
-                  <Icons.Loader2 className="ml-auto animate-spin text-current" />
-                )}
+                {isPending && <Spinner className="ml-auto text-current" />}
               </DropdownMenuItem>
             );
           })()}

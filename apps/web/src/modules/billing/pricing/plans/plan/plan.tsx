@@ -20,6 +20,7 @@ import { Badge } from "@workspace/ui-web/badge";
 import { Button, buttonVariants } from "@workspace/ui-web/button";
 import { Card } from "@workspace/ui-web/card";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -322,7 +323,7 @@ export const Plan = memo<PlanProps>(({ plan }) => {
                 disabled={!canCreate || isPending}
               >
                 {isPending ? (
-                  <Icons.Loader2 className="animate-spin" />
+                  <Spinner />
                 ) : (
                   t("trial.period", { period: variant.trialDays })
                 )}
@@ -373,7 +374,7 @@ export const Plan = memo<PlanProps>(({ plan }) => {
                 }
               >
                 {isPending ? (
-                  <Icons.Loader2 className="animate-spin" />
+                  <Spinner />
                 ) : variant.model === BillingModel.RECURRING && hasPlan ? (
                   t("manage")
                 ) : variant.model === BillingModel.RECURRING ? (

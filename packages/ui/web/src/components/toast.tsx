@@ -7,6 +7,7 @@ import { cn } from "@workspace/ui";
 
 import { Button } from "#components/button";
 import { Icons } from "#components/icons";
+import { Spinner } from "#components/spinner";
 
 const toast = ToastPrimitive.createToastManager();
 
@@ -151,7 +152,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
   }
 
   if (type === "loading") {
-    icon = <Icons.Loader2 className="animate-spin" aria-hidden="true" />;
+    icon = <Spinner aria-hidden="true" />;
   }
 
   if (!icon) {

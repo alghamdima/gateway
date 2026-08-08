@@ -9,7 +9,7 @@ import { Badge } from "@workspace/ui-mobile/badge";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Skeleton } from "@workspace/ui-mobile/skeleton";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -91,9 +91,7 @@ export default function Sessions() {
                 onPress={() => revoke.mutate(item.token)}
               >
                 {revoke.isPending && revoke.variables === item.token ? (
-                  <Spin>
-                    <Icons.Loader2 size={16} className="text-foreground" />
-                  </Spin>
+                  <Spinner className="text-foreground" size={16} />
                 ) : (
                   <Icons.Trash className="text-foreground" size={16} />
                 )}

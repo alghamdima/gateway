@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { MemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import { Icons } from "@workspace/ui-web/icons";
 import {
   Modal,
   ModalClose,
@@ -17,6 +16,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -125,11 +125,7 @@ const ConfirmLeaveModal = ({
             variant="destructive"
             disabled={leaveOrganization.isPending}
           >
-            {leaveOrganization.isPending ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("common:leave")
-            )}
+            {leaveOrganization.isPending ? <Spinner /> : t("common:leave")}
           </Button>
         </ModalFooter>
       </ModalContent>

@@ -7,8 +7,7 @@ import { toMemberRole } from "@workspace/auth";
 import { BillingReference } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 import { Button, buttonTextVariants } from "@workspace/ui-mobile/button";
-import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
@@ -68,12 +67,10 @@ export const WebPortalLink = ({
       disabled={getPortal.isPending || !canOpenPortal || props.disabled}
     >
       {getPortal.isPending ? (
-        <Spin>
-          <Icons.Loader2
-            size={20}
-            className={buttonTextVariants({ variant: props.variant })}
-          />
-        </Spin>
+        <Spinner
+          className={buttonTextVariants({ variant: props.variant })}
+          size={20}
+        />
       ) : (
         children
       )}

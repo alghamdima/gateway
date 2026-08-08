@@ -8,7 +8,6 @@ import { passwordSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { PasswordInput } from "@workspace/ui-web/input";
 import {
   Modal,
@@ -21,6 +20,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { onPromise } from "~/utils";
 
@@ -139,7 +139,7 @@ export const RequirePassword = memo<RequirePasswordProps>(
               disabled={form.formState.isSubmitting}
             >
               {form.formState.isSubmitting ? (
-                <Icons.Loader2 className="size-4 animate-spin" />
+                <Spinner className="size-4" />
               ) : (
                 (cta ?? t("continue"))
               )}

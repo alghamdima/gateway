@@ -20,6 +20,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -184,11 +185,7 @@ const ConfirmModal = ({
             variant="destructive"
             disabled={deleteOrganization.isPending}
           >
-            {deleteOrganization.isPending ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("common:delete")
-            )}
+            {deleteOrganization.isPending ? <Spinner /> : t("common:delete")}
           </Button>
         </ModalFooter>
       </ModalContent>

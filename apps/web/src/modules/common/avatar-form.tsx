@@ -12,6 +12,7 @@ import { cn } from "@workspace/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
@@ -313,7 +314,7 @@ const AvatarFormPreview = ({
       {previewUrl && <AvatarImage src={previewUrl} />}
       {mutationStatues.some((status) => status === "pending") && (
         <div className="bg-background/60 absolute inset-0 flex items-center justify-center rounded-full backdrop-blur-sm">
-          <Icons.Loader2 className="text-muted-foreground size-7 animate-spin" />
+          <Spinner className="text-muted-foreground size-7" />
         </div>
       )}
       <AvatarFallback>

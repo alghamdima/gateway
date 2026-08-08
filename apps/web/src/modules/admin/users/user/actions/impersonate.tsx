@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { admin } from "~/modules/admin/lib/api";
@@ -30,11 +31,7 @@ export const Impersonate = ({ id }: ImpersonateProps) => {
       onClick={() => impersonate.mutate({ userId: id })}
       disabled={isPending}
     >
-      {isPending ? (
-        <Icons.Loader2 className="animate-spin" />
-      ) : (
-        <Icons.VenetianMask />
-      )}
+      {isPending ? <Spinner /> : <Icons.VenetianMask />}
       {t("impersonate")}
     </Button>
   );

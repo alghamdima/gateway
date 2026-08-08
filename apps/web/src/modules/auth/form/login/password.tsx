@@ -10,8 +10,8 @@ import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Checkbox } from "@workspace/ui-web/checkbox";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { Input, PasswordInput } from "@workspace/ui-web/input";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";
@@ -155,11 +155,7 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
           size="lg"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            t("login.cta")
-          )}
+          {form.formState.isSubmitting ? <Spinner /> : t("login.cta")}
         </Button>
       </form>
     );

@@ -10,8 +10,8 @@ import { updatePasswordSchema } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { PasswordInput } from "@workspace/ui-web/input";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { onPromise } from "~/utils";
@@ -80,7 +80,7 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
         disabled={form.formState.isSubmitting}
       >
         {form.formState.isSubmitting ? (
-          <Icons.Loader2 className="animate-spin" />
+          <Spinner />
         ) : (
           t("account.password.update.cta")
         )}

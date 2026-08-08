@@ -13,7 +13,7 @@ import {
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Skeleton } from "@workspace/ui-mobile/skeleton";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -78,9 +78,7 @@ export const OrganizationPicker = () => {
               {setActiveOrganization.isPending &&
               setActiveOrganization.variables?.organizationId ===
                 organization.id ? (
-                <Spin>
-                  <Icons.Loader2 className="text-muted-foreground" size={20} />
-                </Spin>
+                <Spinner className="text-muted-foreground" size={20} />
               ) : (
                 <Icons.ChevronRight
                   className="text-muted-foreground"

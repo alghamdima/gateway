@@ -14,7 +14,7 @@ import {
 } from "@workspace/ui-mobile/avatar";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 
 import { api } from "~/lib/api";
 import { useImagePicker } from "~/modules/common/hooks/use-image-picker";
@@ -284,9 +284,7 @@ const AvatarFormPreview = ({
           <>
             <View className="bg-background absolute inset-0 rounded-full opacity-50" />
             <View className="absolute inset-0 items-center justify-center rounded-full">
-              <Spin>
-                <Icons.Loader2 className="text-muted-foreground" size={28} />
-              </Spin>
+              <Spinner className="text-muted-foreground" size={28} />
             </View>
           </>
         )}

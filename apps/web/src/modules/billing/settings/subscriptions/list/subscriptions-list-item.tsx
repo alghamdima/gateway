@@ -12,6 +12,7 @@ import {
 import { isKey, useTranslation } from "@workspace/i18n";
 import { Badge } from "@workspace/ui-web/badge";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { FeaturesList } from "~/modules/billing/features-list";
 import { billing } from "~/modules/billing/lib/api";
@@ -54,7 +55,7 @@ const Usage = ({
     <div className="flex w-full items-center justify-between gap-2 rounded-lg text-sm">
       <span>{t("usage")}</span>
       {usage.isLoading ? (
-        <Icons.Loader2 className="size-4 animate-spin" />
+        <Spinner className="size-4" />
       ) : (
         <span>
           {value}{" "}

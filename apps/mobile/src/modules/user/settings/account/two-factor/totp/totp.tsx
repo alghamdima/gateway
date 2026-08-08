@@ -24,7 +24,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@workspace/ui-mobile/input-otp";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { useCopy } from "~/modules/common/hooks/use-copy";
@@ -133,12 +133,7 @@ export const TotpSheet = ({ ref: passedRef }: TotpSheetProps) => {
                     onPress={form.handleSubmit(onSubmit)}
                   >
                     {form.formState.isSubmitting ? (
-                      <Spin>
-                        <Icons.Loader2
-                          className="text-primary-foreground"
-                          size={16}
-                        />
-                      </Spin>
+                      <Spinner className="text-primary-foreground" size={16} />
                     ) : (
                       <Text>{t("continue")}</Text>
                     )}

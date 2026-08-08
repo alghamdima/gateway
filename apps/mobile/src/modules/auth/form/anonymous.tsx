@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -40,9 +40,7 @@ export const AnonymousLogin = ({
       onPress={() => signIn.mutate(undefined)}
     >
       {signIn.isPending ? (
-        <Spin>
-          <Icons.Loader2 className="text-foreground size-5" />
-        </Spin>
+        <Spinner className="text-foreground size-5" />
       ) : (
         <>
           <Icons.UserRound className="text-foreground" size={16} />

@@ -6,6 +6,7 @@ import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
@@ -63,7 +64,7 @@ export const SessionsList = ({ id }: SessionsListProps) => {
             disabled={revokeAll.isPending && revokeAll.variables.userId === id}
           >
             {revokeAll.isPending && revokeAll.variables.userId === id ? (
-              <Icons.Loader2 className="size-4 animate-spin" />
+              <Spinner className="size-4" />
             ) : (
               <Icons.Trash className="size-4" />
             )}
@@ -111,7 +112,7 @@ export const SessionsList = ({ id }: SessionsListProps) => {
                   </span>
                   {revoke.isPending &&
                   revoke.variables.sessionToken === session.token ? (
-                    <Icons.Loader2 className="size-4 animate-spin" />
+                    <Spinner className="size-4" />
                   ) : (
                     <Icons.Trash className="size-4" />
                   )}

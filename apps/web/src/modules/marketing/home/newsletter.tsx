@@ -11,6 +11,7 @@ import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError } from "@workspace/ui-web/field";
 import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import {
   Section,
@@ -135,10 +136,10 @@ export function Newsletter() {
                 >
                   {t("newsletter.submit")}
                 </span>
-                <Icons.Loader2
+                <Spinner
                   aria-hidden={!form.formState.isSubmitting}
                   className={cn(
-                    "absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 animate-spin transition-opacity",
+                    "absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 transition-opacity",
                     !form.formState.isSubmitting && "opacity-0",
                   )}
                 />

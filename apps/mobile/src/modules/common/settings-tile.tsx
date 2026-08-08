@@ -3,7 +3,7 @@ import { Pressable } from "react-native";
 
 import { cn } from "@workspace/ui";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { TextClassContext } from "@workspace/ui-mobile/text";
 
 interface SettingsTileProps {
@@ -57,13 +57,7 @@ export const SettingsTile = ({
       </TextClassContext.Provider>
 
       {loading ? (
-        <Spin>
-          <Icons.Loader2
-            className="text-muted-foreground"
-            width={20}
-            height={20}
-          />
-        </Spin>
+        <Spinner className="text-muted-foreground" size={20} />
       ) : (
         <Icons.ChevronRight
           className="text-muted-foreground"

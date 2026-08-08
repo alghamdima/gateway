@@ -12,7 +12,6 @@ import {
   FieldError,
   FieldLabel,
 } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import {
   Modal,
@@ -25,6 +24,7 @@ import {
   ModalTrigger,
   ModalBody,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 
@@ -125,11 +125,7 @@ export const CreateOrganizationModal = ({
             form="create-organization-form"
             disabled={form.formState.isSubmitting}
           >
-            {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("create.cta")
-            )}
+            {form.formState.isSubmitting ? <Spinner /> : t("create.cta")}
           </Button>
         </ModalFooter>
       </ModalContent>

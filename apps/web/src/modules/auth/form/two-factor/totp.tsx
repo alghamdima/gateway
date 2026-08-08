@@ -11,12 +11,12 @@ import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Checkbox } from "@workspace/ui-web/checkbox";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@workspace/ui-web/input-otp";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 
@@ -110,11 +110,7 @@ const TotpForm = memo<FormProps>(
           size="lg"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            t("verify")
-          )}
+          {form.formState.isSubmitting ? <Spinner /> : t("verify")}
         </Button>
       </form>
     );

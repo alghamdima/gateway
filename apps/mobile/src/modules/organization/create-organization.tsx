@@ -24,9 +24,8 @@ import {
   FieldError,
   FieldLabel,
 } from "@workspace/ui-mobile/field";
-import { Icons } from "@workspace/ui-mobile/icons";
 import { Input } from "@workspace/ui-mobile/input";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -129,12 +128,7 @@ export const CreateOrganizationBottomSheet = ({
               disabled={form.formState.isSubmitting}
             >
               {form.formState.isSubmitting ? (
-                <Spin>
-                  <Icons.Loader2
-                    className="text-primary-foreground"
-                    size={16}
-                  />
-                </Spin>
+                <Spinner className="text-primary-foreground" size={16} />
               ) : (
                 <Text>{t("create.cta")}</Text>
               )}

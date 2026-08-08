@@ -9,7 +9,7 @@ import { View } from "react-native";
 import { Trans, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -104,9 +104,7 @@ export const Invitation = (props: InvitationProps) => {
           }
         >
           {rejectInvitation.isPending ? (
-            <Spin>
-              <Icons.Loader2 className="text-foreground" size={16} />
-            </Spin>
+            <Spinner className="text-foreground" size={16} />
           ) : (
             <Icons.X className="text-foreground" size={16} />
           )}
@@ -121,9 +119,7 @@ export const Invitation = (props: InvitationProps) => {
           disabled={rejectInvitation.isPending || acceptInvitation.isPending}
         >
           {acceptInvitation.isPending ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground" size={16} />
-            </Spin>
+            <Spinner className="text-primary-foreground" size={16} />
           ) : (
             <Icons.Check className="text-primary-foreground" size={16} />
           )}

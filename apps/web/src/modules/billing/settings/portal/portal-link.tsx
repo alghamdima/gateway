@@ -11,7 +11,7 @@ import {
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
 import { Button, buttonVariants } from "@workspace/ui-web/button";
-import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { appConfig } from "~/config/app";
@@ -122,11 +122,7 @@ export const PortalLink = ({
       }
       disabled={getPortal.isPending || !canOpenPortal || props.disabled}
     >
-      {getPortal.isPending ? (
-        <Icons.Loader2 className="size-5 animate-spin" />
-      ) : (
-        children
-      )}
+      {getPortal.isPending ? <Spinner className="size-5" /> : children}
     </Button>
   );
 };

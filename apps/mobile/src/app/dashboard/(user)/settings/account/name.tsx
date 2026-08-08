@@ -13,9 +13,8 @@ import {
   FieldError,
   FieldLabel,
 } from "@workspace/ui-mobile/field";
-import { Icons } from "@workspace/ui-mobile/icons";
 import { Input } from "@workspace/ui-mobile/input";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
@@ -73,9 +72,7 @@ const EditName = () => {
           disabled={form.formState.isSubmitting}
         >
           {form.formState.isSubmitting ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground" />
-            </Spin>
+            <Spinner className="text-primary-foreground" />
           ) : (
             <Text>{t("save")}</Text>
           )}

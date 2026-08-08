@@ -16,6 +16,7 @@ import {
   ModalTrigger,
 } from "@workspace/ui-web/modal";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { authClient } from "~/lib/auth/client";
@@ -116,7 +117,7 @@ export const Passkeys = () => {
                         </span>
                         {remove.isPending &&
                         remove.variables.id === passkey.id ? (
-                          <Icons.Loader2 className="size-4 animate-spin" />
+                          <Spinner className="size-4" />
                         ) : (
                           <Icons.Trash className="size-4" />
                         )}
@@ -137,7 +138,7 @@ export const Passkeys = () => {
             onClick={() => add.mutate()}
           >
             {add.isPending ? (
-              <Icons.Loader2 className="size-4 animate-spin" />
+              <Spinner className="size-4" />
             ) : (
               <>
                 <Icons.Plus className="size-4" />

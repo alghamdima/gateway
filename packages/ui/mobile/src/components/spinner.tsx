@@ -8,7 +8,11 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 
-export const Spin = ({ children }: { children: React.ReactNode }) => {
+import { useTranslation } from "@workspace/i18n";
+
+import { Icons } from "./icons";
+
+function Spin({ children }: { children: React.ReactNode }) {
   const rotation = useSharedValue(0);
   const animatedStyles = useAnimatedStyle(() => {
     return {
@@ -44,4 +48,15 @@ export const Spin = ({ children }: { children: React.ReactNode }) => {
       {children}
     </Animated.View>
   );
-};
+}
+
+function Spinner(props: React.ComponentProps<typeof Icons.Loader>) {
+  const { t } = useTranslation("common");
+  return (
+    <Spin>
+      <Icons.Loader2 aria-label={t("loading")} size={18} {...props} />
+    </Spin>
+  );
+}
+
+export { Spin, Spinner };

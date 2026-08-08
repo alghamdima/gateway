@@ -17,6 +17,7 @@ import {
   ModalClose,
 } from "@workspace/ui-web/modal";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { authConfig } from "~/config/auth";
@@ -135,7 +136,7 @@ export const Accounts = () => {
                         </span>
                         {disconnect.isPending &&
                         disconnect.variables.providerId === provider ? (
-                          <Icons.Loader2 className="size-4 animate-spin" />
+                          <Spinner className="size-4" />
                         ) : (
                           <Icons.Trash className="size-4" />
                         )}
@@ -177,7 +178,7 @@ export const Accounts = () => {
                   >
                     {connect.isPending &&
                     connect.variables.provider === provider ? (
-                      <Icons.Loader2 className="size-6 animate-spin" />
+                      <Spinner className="size-6" />
                     ) : (
                       <Icon className="size-6" />
                     )}

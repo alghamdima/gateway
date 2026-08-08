@@ -14,6 +14,7 @@ import {
   ModalFooter,
   ModalClose,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
@@ -43,11 +44,7 @@ export const Delete = ({ id }: DeleteProps) => {
       organizationId={id}
       render={
         <Button variant="destructive" disabled={isPending}>
-          {isPending ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            <Icons.Trash />
-          )}
+          {isPending ? <Spinner /> : <Icons.Trash />}
           {t("delete")}
         </Button>
       }
@@ -115,11 +112,7 @@ const ConfirmModal = ({
             variant="destructive"
             disabled={isPending}
           >
-            {isPending ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("delete")
-            )}
+            {isPending ? <Spinner /> : t("delete")}
           </Button>
         </ModalFooter>
       </ModalContent>

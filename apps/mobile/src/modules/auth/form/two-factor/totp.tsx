@@ -10,13 +10,12 @@ import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-mobile/button";
 import { Checkbox } from "@workspace/ui-mobile/checkbox";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-mobile/field";
-import { Icons } from "@workspace/ui-mobile/icons";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@workspace/ui-mobile/input-otp";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { pathsConfig } from "~/config/paths";
@@ -96,9 +95,7 @@ const TotpForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
         onPress={submit}
       >
         {form.formState.isSubmitting ? (
-          <Spin>
-            <Icons.Loader2 className="text-primary-foreground" />
-          </Spin>
+          <Spinner className="text-primary-foreground" />
         ) : (
           <Text>{t("verify")}</Text>
         )}

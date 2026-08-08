@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 
@@ -38,7 +39,7 @@ export const AnonymousLogin = ({
       onClick={() => signIn.mutate(undefined)}
     >
       {signIn.isPending ? (
-        <Icons.Loader2 className="animate-spin" />
+        <Spinner />
       ) : (
         <>
           <Icons.UserRound className="size-4" />

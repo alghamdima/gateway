@@ -6,7 +6,7 @@ import { useEffect } from "react";
 
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
-import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -60,11 +60,7 @@ export const ImpersonatingBanner = () => {
         size="sm"
         className="h-6 px-2 text-xs"
       >
-        {stop.isPending ? (
-          <Icons.Loader2 className="size-3 animate-spin" />
-        ) : (
-          "End"
-        )}
+        {stop.isPending ? <Spinner className="size-3" /> : "End"}
       </Button>
     </div>
   );

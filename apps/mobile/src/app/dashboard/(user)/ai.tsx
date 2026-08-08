@@ -13,7 +13,7 @@ import { logger } from "@workspace/shared/logger";
 import { cn } from "@workspace/ui";
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spin } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 import { Textarea } from "@workspace/ui-mobile/textarea";
 

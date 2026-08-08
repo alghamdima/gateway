@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui-web/popover";
 import { ScrollArea, ScrollBar } from "@workspace/ui-web/scroll-area";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { Textarea } from "@workspace/ui-web/textarea";
 import { toast } from "@workspace/ui-web/toast";
 
@@ -85,7 +86,7 @@ const Unban = ({
       onClick={() => unban.mutate({ userId })}
       {...props}
     >
-      {isPending ? <Icons.Loader2 className="animate-spin" /> : <Icons.Undo2 />}
+      {isPending ? <Spinner /> : <Icons.Undo2 />}
       {t("unban")}
     </Button>
   );
@@ -111,7 +112,7 @@ const BanTrigger = ({
 
   return (
     <Button variant="outline" disabled={isPending} {...props}>
-      {isPending ? <Icons.Loader2 className="animate-spin" /> : <Icons.Ban />}
+      {isPending ? <Spinner /> : <Icons.Ban />}
       {t("ban")}
     </Button>
   );
@@ -396,7 +397,7 @@ const BanModal = ({
             render={<Button variant="outline">{t("cancel")}</Button>}
           />
           <Button type="submit" form="ban-user-form" disabled={isPending}>
-            {isPending ? <Icons.Loader2 className="animate-spin" /> : t("ban")}
+            {isPending ? <Spinner /> : t("ban")}
           </Button>
         </ModalFooter>
       </ModalContent>

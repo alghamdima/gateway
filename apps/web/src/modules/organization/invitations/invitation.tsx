@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { Trans, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { AuthHeader } from "~/modules/auth/layout/header";
@@ -86,11 +87,7 @@ export const Invitation = (props: InvitationProps) => {
             rejectInvitation.mutate({ invitationId: props.invitation.id })
           }
         >
-          {rejectInvitation.isPending ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            <Icons.X />
-          )}
+          {rejectInvitation.isPending ? <Spinner /> : <Icons.X />}
           {t("reject")}
         </Button>
 
@@ -100,11 +97,7 @@ export const Invitation = (props: InvitationProps) => {
           }
           disabled={rejectInvitation.isPending || acceptInvitation.isPending}
         >
-          {acceptInvitation.isPending ? (
-            <Icons.Loader2 className="animate-spin" />
-          ) : (
-            <Icons.Check />
-          )}
+          {acceptInvitation.isPending ? <Spinner /> : <Icons.Check />}
           {t("accept")}
         </Button>
       </div>

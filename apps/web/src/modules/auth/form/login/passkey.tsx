@@ -9,6 +9,7 @@ import { useTranslation } from "@workspace/i18n";
 import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
@@ -50,7 +51,7 @@ export const PasskeyLogin = ({
       disabled={signIn.isPending}
     >
       {signIn.isPending ? (
-        <Icons.Loader2 className="size-4 animate-spin" />
+        <Spinner className="size-4" />
       ) : (
         <>
           <Icons.Key className="size-4" />

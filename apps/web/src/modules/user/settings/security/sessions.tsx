@@ -8,6 +8,7 @@ import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -107,7 +108,7 @@ export const Sessions = () => {
                       {t("account.sessions.revoke.cta")}
                     </span>
                     {revoke.isPending && revoke.variables === session.token ? (
-                      <Icons.Loader2 className="size-4 animate-spin" />
+                      <Spinner className="size-4" />
                     ) : (
                       <Icons.Trash className="size-4" />
                     )}

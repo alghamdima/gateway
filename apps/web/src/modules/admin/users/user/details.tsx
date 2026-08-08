@@ -8,7 +8,6 @@ import { updateUserSchema, UserRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
 import { useDebounceCallback } from "@workspace/shared/hooks";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import {
   Select,
@@ -17,6 +16,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@workspace/ui-web/select";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import {
@@ -63,9 +63,7 @@ const Role = ({ id }: { id: string }) => {
           <Field data-invalid={fieldState.invalid}>
             <div className="flex items-center gap-1.5">
               <FieldLabel htmlFor="admin-user-role">{t("role")}</FieldLabel>
-              {form.formState.isSubmitting && (
-                <Icons.Loader2 className="size-3 animate-spin" />
-              )}
+              {form.formState.isSubmitting && <Spinner className="size-3" />}
             </div>
             <div>
               <Select
@@ -152,9 +150,7 @@ const Name = ({ id }: { id: string }) => {
           <Field data-invalid={fieldState.invalid}>
             <div className="flex items-center gap-1.5">
               <FieldLabel htmlFor="admin-user-name">{t("name")}</FieldLabel>
-              {form.formState.isSubmitting && (
-                <Icons.Loader2 className="size-3 animate-spin" />
-              )}
+              {form.formState.isSubmitting && <Spinner className="size-3" />}
             </div>
             <Input
               {...field}

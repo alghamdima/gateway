@@ -26,7 +26,7 @@ import {
 import { Button } from "@workspace/ui-mobile/button";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Skeleton } from "@workspace/ui-mobile/skeleton";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { api } from "~/lib/api";
@@ -147,9 +147,7 @@ const UserOrganizationInvitationsListModalItem = ({
           className="grow"
         >
           {rejectInvitation.isPending ? (
-            <Spin>
-              <Icons.Loader2 className="text-foreground" size={16} />
-            </Spin>
+            <Spinner className="text-foreground" size={16} />
           ) : (
             <Icons.X size={16} className="text-foreground" />
           )}
@@ -165,9 +163,7 @@ const UserOrganizationInvitationsListModalItem = ({
           className="grow"
         >
           {acceptInvitation.isPending ? (
-            <Spin>
-              <Icons.Loader2 className="text-primary-foreground" size={16} />
-            </Spin>
+            <Spinner className="text-primary-foreground" size={16} />
           ) : (
             <Icons.Check size={16} className="text-primary-foreground" />
           )}

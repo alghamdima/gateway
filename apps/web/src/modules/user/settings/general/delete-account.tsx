@@ -19,6 +19,7 @@ import {
   ModalTitle,
   ModalTrigger,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -198,7 +199,7 @@ const ConfirmModal = ({
         disabled={deleteAnonymousAccount.isPending}
       >
         {deleteAnonymousAccount.isPending ? (
-          <Icons.Loader2 className="animate-spin" />
+          <Spinner />
         ) : (
           t("account.delete.cta")
         )}
@@ -214,7 +215,7 @@ const ConfirmModal = ({
         disabled={deleteAccount.isPending}
       >
         {deleteAccount.isPending ? (
-          <Icons.Loader2 className="animate-spin" />
+          <Spinner />
         ) : (
           t("account.delete.confirmation.cta")
         )}

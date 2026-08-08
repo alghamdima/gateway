@@ -2,8 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useCustomer } from "@workspace/billing-mobile";
 import { Button, buttonTextVariants } from "@workspace/ui-mobile/button";
-import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 
 export const NativePortalLink = ({
   children,
@@ -27,12 +26,10 @@ export const NativePortalLink = ({
       disabled={link.isPending || props.disabled}
     >
       {link.isPending ? (
-        <Spin>
-          <Icons.Loader2
-            size={20}
-            className={buttonTextVariants({ variant: props.variant })}
-          />
-        </Spin>
+        <Spinner
+          className={buttonTextVariants({ variant: props.variant })}
+          size={20}
+        />
       ) : (
         children
       )}

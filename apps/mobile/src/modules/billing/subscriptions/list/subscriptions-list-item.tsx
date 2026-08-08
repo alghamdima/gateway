@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@workspace/ui-mobile/card";
 import { Icons } from "@workspace/ui-mobile/icons";
-import { Spin } from "@workspace/ui-mobile/spin";
+import { Spinner } from "@workspace/ui-mobile/spinner";
 import { Text } from "@workspace/ui-mobile/text";
 
 import { FeaturesList } from "~/modules/billing/features-list";
@@ -69,9 +69,7 @@ const Usage = ({
     <View className="w-full flex-row items-center justify-between gap-2 rounded-lg">
       <Text className="text-sm">{t("usage")}</Text>
       {usage.isLoading ? (
-        <Spin>
-          <Icons.Loader2 size={16} className="text-foreground" />
-        </Spin>
+        <Spinner className="text-foreground" size={16} />
       ) : (
         <Text className="text-sm">
           {value}{" "}

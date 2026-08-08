@@ -23,6 +23,7 @@ import {
   ModalFooter,
   ModalClose,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 
 import { useCopy } from "~/modules/common/hooks/use-copy";
 
@@ -123,7 +124,7 @@ export const TotpModal = ({ open, onOpenChange }: TotpModalProps) => {
                 />
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? (
-                    <Icons.Loader2 className="size-4 animate-spin" />
+                    <Spinner className="size-4" />
                   ) : (
                     t("continue")
                   )}

@@ -8,9 +8,9 @@ import { changePasswordSchema } from "@workspace/auth";
 import { Trans, useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import { Field, FieldError, FieldLabel } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { PasswordInput } from "@workspace/ui-web/input";
 import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
@@ -169,7 +169,7 @@ export const EditPassword = () => {
             disabled={form.formState.isSubmitting}
           >
             {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="size-4 animate-spin" />
+              <Spinner className="size-4" />
             ) : (
               t("save")
             )}

@@ -12,7 +12,6 @@ import {
   FieldError,
   FieldLabel,
 } from "@workspace/ui-web/field";
-import { Icons } from "@workspace/ui-web/icons";
 import { PasswordInput } from "@workspace/ui-web/input";
 import {
   Modal,
@@ -25,6 +24,7 @@ import {
   ModalTrigger,
   ModalBody,
 } from "@workspace/ui-web/modal";
+import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
@@ -142,11 +142,7 @@ export const SetPasswordModal = ({
             form="admin-set-password-form"
             disabled={form.formState.isSubmitting}
           >
-            {form.formState.isSubmitting ? (
-              <Icons.Loader2 className="animate-spin" />
-            ) : (
-              t("update")
-            )}
+            {form.formState.isSubmitting ? <Spinner /> : t("update")}
           </Button>
         </ModalFooter>
       </ModalContent>
