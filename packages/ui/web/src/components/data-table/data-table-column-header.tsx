@@ -12,22 +12,25 @@ import {
 } from "#components/dropdown-menu";
 import { Icons } from "#components/icons";
 
-import type { Column } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { Column, RowData } from "@tanstack/react-table";
 
 interface DataTableColumnHeaderProps<
-  TData,
-  TValue,
+  TData extends RowData,
+  TValue = unknown,
 > extends React.ComponentProps<typeof DropdownMenuTrigger> {
-  column: Column<TData, TValue>;
+  column: Column<DataTableFeatures, TData, TValue>;
   title: string;
 }
 
-export function DataTableColumnHeader<TData, TValue>({
+export function DataTableColumnHeader<TData extends RowData, TValue = unknown>({
   column,
   title,
   className,
   ...props
 }: DataTableColumnHeaderProps<TData, TValue>) {
+  "use no memo";
+
   const { t } = useTranslation("common");
 
   if (!column.getCanSort() && !column.getCanHide()) {

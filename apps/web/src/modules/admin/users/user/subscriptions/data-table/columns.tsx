@@ -5,8 +5,9 @@ import { DataTableColumnHeader } from "@workspace/ui-web/data-table/data-table-c
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Subscription } from "@workspace/billing";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
-export const useColumns = (): ColumnDef<Subscription>[] => {
+export const useColumns = (): ColumnDef<DataTableFeatures, Subscription>[] => {
   const { t, i18n } = useTranslation(["common", "billing"]);
 
   return [
@@ -40,7 +41,7 @@ export const useColumns = (): ColumnDef<Subscription>[] => {
         );
       },
       meta: {
-        label: t("plan"),
+        label: t("common:plan"),
       },
       enableSorting: false,
     },

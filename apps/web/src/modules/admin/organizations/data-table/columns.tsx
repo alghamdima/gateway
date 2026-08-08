@@ -9,12 +9,13 @@ import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { GetOrganizationsResponse } from "@workspace/api/schema";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 type Row = GetOrganizationsResponse["data"][number];
 
 export const useColumns = (options?: {
   max?: { members: number };
-}): ColumnDef<Row>[] => {
+}): ColumnDef<DataTableFeatures, Row>[] => {
   const { t, i18n } = useTranslation("common");
 
   return [

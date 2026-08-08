@@ -13,8 +13,10 @@ import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { GetUserInvitationsResponse } from "@workspace/api/schema";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 export const useColumns = (): ColumnDef<
+  DataTableFeatures,
   GetUserInvitationsResponse["data"][number]
 >[] => {
   const { t, i18n } = useTranslation("common");

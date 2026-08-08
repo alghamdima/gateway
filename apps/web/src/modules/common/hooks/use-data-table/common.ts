@@ -3,7 +3,12 @@ import * as z from "zod";
 
 import { sortSchema } from "@workspace/shared/schema";
 
-import type { ColumnDef, ColumnFiltersState } from "@tanstack/react-table";
+import type {
+  ColumnDef,
+  ColumnFiltersState,
+  RowData,
+} from "@tanstack/react-table";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 const PAGE_KEY = "page";
 const PER_PAGE_KEY = "perPage";
@@ -16,14 +21,14 @@ interface CommonProps {
   debounceMs?: number;
 }
 
-const getFiltersFromColumnFilters = <TData>({
+const getFiltersFromColumnFilters = <TData extends RowData>({
   columnFilters,
   previousColumnFilters,
   filterableColumns,
 }: {
   columnFilters: ColumnFiltersState;
   previousColumnFilters?: ColumnFiltersState;
-  filterableColumns: ColumnDef<TData>[];
+  filterableColumns: ColumnDef<DataTableFeatures, TData>[];
 }) => {
   const filterUpdates = columnFilters.reduce<
     Record<string, string | string[] | null>

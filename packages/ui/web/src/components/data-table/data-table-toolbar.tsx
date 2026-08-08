@@ -16,20 +16,37 @@ import { DataTableSliderFilter } from "./data-table-slider-filter";
 import { DataTableViewOptions } from "./data-table-view-options";
 
 import type { Icon } from "#components/icons";
-import type { Column, Table } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { Column, ReactTable, RowData } from "@tanstack/react-table";
 
-interface DataTableToolbarProps<TData> extends React.ComponentProps<"div"> {
-  table: Table<TData>;
+interface DataTableToolbarProps<
+  TData extends RowData,
+> extends React.ComponentProps<"div"> {
+  table: ReactTable<DataTableFeatures, TData>;
 }
 
-export function DataTableToolbar<TData>({
+function getTextFilterValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (Array.isArray(value)) {
+    const [first] = value;
+    if (typeof first === "string" || typeof first === "number") {
+      return String(first);
+    }
+  }
+  return "";
+}
+
+export function DataTableToolbar<TData extends RowData>({
   table,
   children,
   className,
   ...props
 }: DataTableToolbarProps<TData>) {
+  "use no memo";
+
   const { t } = useTranslation("common");
-  const isFiltered = table.getState().columnFilters.length > 0;
+  const isFiltered = table.state.columnFilters.length > 0;
 
   const columns = React.useMemo(
     () => table.getAllColumns().filter((column) => column.getCanFilter()),
@@ -71,8 +88,8 @@ export function DataTableToolbar<TData>({
     </div>
   );
 }
-interface DataTableToolbarFilterProps<TData> {
-  column: Column<TData>;
+interface DataTableToolbarFilterProps<TData extends RowData> {
+  column: Column<DataTableFeatures, TData>;
 }
 
 const optionSchema = z
@@ -139,86 +156,74 @@ function parseMeta(meta: unknown): {
   };
 }
 
-function DataTableToolbarFilter<TData>({
+function DataTableToolbarFilter<TData extends RowData>({
   column,
 }: DataTableToolbarFilterProps<TData>) {
-  {
-    const onFilterRender = React.useCallback(() => {
-      const { variant, label, placeholder, unit, options } = parseMeta(
-        column.columnDef.meta,
+  "use no memo";
+
+  const { variant, label, placeholder, unit, options } = parseMeta(
+    column.columnDef.meta,
+  );
+
+  if (!variant) return null;
+
+  switch (variant) {
+    case "text":
+      return (
+        <Input
+          placeholder={placeholder ?? label}
+          value={getTextFilterValue(column.getFilterValue())}
+          onChange={(event) => column.setFilterValue(event.target.value)}
+          className="h-9 w-52 lg:w-72"
+        />
       );
 
-      if (!variant) return null;
+    case "number":
+      return (
+        <div className="relative">
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder={placeholder ?? label}
+            value={getTextFilterValue(column.getFilterValue())}
+            onChange={(event) => column.setFilterValue(event.target.value)}
+            className={cn("h-8 w-[120px]", unit ? "pr-8" : undefined)}
+          />
+          {unit && (
+            <span className="bg-accent text-muted-foreground absolute top-0 right-0 bottom-0 flex items-center rounded-r-md px-2 text-sm">
+              {unit}
+            </span>
+          )}
+        </div>
+      );
 
-      switch (variant) {
-        case "text":
-          return (
-            <Input
-              placeholder={placeholder ?? label}
-              value={(() => {
-                const value: unknown = column.getFilterValue();
-                return typeof value === "string" ? value : "";
-              })()}
-              onChange={(event) => column.setFilterValue(event.target.value)}
-              className="h-9 w-52 lg:w-72"
-            />
-          );
+    case "range":
+      return (
+        <DataTableSliderFilter column={column} title={label ?? column.id} />
+      );
 
-        case "number":
-          return (
-            <div className="relative">
-              <Input
-                type="number"
-                inputMode="numeric"
-                placeholder={placeholder ?? label}
-                value={(() => {
-                  const value: unknown = column.getFilterValue();
-                  return typeof value === "number" || typeof value === "string"
-                    ? String(value)
-                    : "";
-                })()}
-                onChange={(event) => column.setFilterValue(event.target.value)}
-                className={cn("h-8 w-[120px]", unit ? "pr-8" : undefined)}
-              />
-              {unit && (
-                <span className="bg-accent text-muted-foreground absolute top-0 right-0 bottom-0 flex items-center rounded-r-md px-2 text-sm">
-                  {unit}
-                </span>
-              )}
-            </div>
-          );
+    case "date":
+    case "dateRange":
+      return (
+        <DataTableDateFilter
+          column={column}
+          title={label ?? column.id}
+          multiple={variant === "dateRange"}
+        />
+      );
 
-        case "range":
-          return (
-            <DataTableSliderFilter column={column} title={label ?? column.id} />
-          );
+    case "select":
+    case "multiSelect":
+      return (
+        <DataTableFacetedFilter
+          column={column}
+          title={label ?? column.id}
+          options={options}
+          multiple={variant === "multiSelect"}
+        />
+      );
 
-        case "date":
-        case "dateRange":
-          return (
-            <DataTableDateFilter
-              column={column}
-              title={label ?? column.id}
-              multiple={variant === "dateRange"}
-            />
-          );
-
-        case "select":
-        case "multiSelect":
-          return (
-            <DataTableFacetedFilter
-              column={column}
-              title={label ?? column.id}
-              options={options}
-              multiple={variant === "multiSelect"}
-            />
-          );
-
-        default:
-          return null;
-      }
-    }, [column]);
-
-    return onFilterRender();
+    default:
+      return null;
   }
 }

@@ -10,7 +10,8 @@ import { Icons } from "#components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 import { Separator } from "#components/separator";
 
-import type { Column } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { Column, RowData } from "@tanstack/react-table";
 import type { DateRange } from "react-day-picker";
 
 type DateSelection = Date[] | DateRange;
@@ -48,17 +49,19 @@ function parseColumnFilterValue(value: unknown) {
   return [];
 }
 
-interface DataTableDateFilterProps<TData> {
-  column: Column<TData>;
+interface DataTableDateFilterProps<TData extends RowData> {
+  column: Column<DataTableFeatures, TData>;
   title?: string;
   multiple?: boolean;
 }
 
-export function DataTableDateFilter<TData>({
+export function DataTableDateFilter<TData extends RowData>({
   column,
   title,
   multiple,
 }: DataTableDateFilterProps<TData>) {
+  "use no memo";
+
   const { i18n, t } = useTranslation("common");
   const columnFilterValue = column.getFilterValue();
 

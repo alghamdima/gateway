@@ -22,6 +22,7 @@ import { admin } from "~/modules/admin/lib/api";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Invitation } from "@workspace/auth";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 export const InvitationActions = ({
   invitation,
@@ -81,7 +82,7 @@ export const InvitationActions = ({
   );
 };
 
-export const useColumns = (): ColumnDef<Invitation>[] => {
+export const useColumns = (): ColumnDef<DataTableFeatures, Invitation>[] => {
   const { t, i18n } = useTranslation("common");
 
   return [

@@ -30,6 +30,7 @@ import { useActiveOrganization } from "../../hooks/use-active-organization";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Invitation } from "@workspace/auth";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 const Actions = ({ invitation }: { invitation: Invitation }) => {
   const { t } = useTranslation(["common", "organization"]);
@@ -152,7 +153,7 @@ const Actions = ({ invitation }: { invitation: Invitation }) => {
   );
 };
 
-export const useColumns = (): ColumnDef<Invitation>[] => {
+export const useColumns = (): ColumnDef<DataTableFeatures, Invitation>[] => {
   const { t, i18n } = useTranslation("common");
 
   return [

@@ -11,8 +11,9 @@ import { TurboLink } from "~/modules/common/turbo-link";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { User } from "@workspace/auth";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
-export const useColumns = (): ColumnDef<User>[] => {
+export const useColumns = (): ColumnDef<DataTableFeatures, User>[] => {
   const { t, i18n } = useTranslation("common");
   const { data: session } = authClient.useSession();
 

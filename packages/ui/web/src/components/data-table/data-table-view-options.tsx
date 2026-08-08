@@ -17,15 +17,18 @@ import {
 import { Icons } from "#components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 
-import type { Table } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { ReactTable, RowData } from "@tanstack/react-table";
 
-interface DataTableViewOptionsProps<TData> {
-  table: Table<TData>;
+interface DataTableViewOptionsProps<TData extends RowData> {
+  table: ReactTable<DataTableFeatures, TData>;
 }
 
-export function DataTableViewOptions<TData>({
+export function DataTableViewOptions<TData extends RowData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
+  "use no memo";
+
   const { t } = useTranslation("common");
   const columns = React.useMemo(
     () =>
@@ -71,11 +74,7 @@ export function DataTableViewOptions<TData>({
                   }
                 >
                   <span className="truncate">
-                    {column.columnDef.meta &&
-                    "label" in column.columnDef.meta &&
-                    typeof column.columnDef.meta.label === "string"
-                      ? column.columnDef.meta.label
-                      : column.id}
+                    {column.columnDef.meta?.label ?? column.id}
                   </span>
                   <Icons.Check
                     className={cn(

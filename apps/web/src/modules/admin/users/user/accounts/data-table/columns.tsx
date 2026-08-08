@@ -23,6 +23,7 @@ import { SocialIcons } from "~/modules/auth/form/social-providers";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { GetUserAccountsResponse } from "@workspace/api/schema";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 const useSetPasswordAction = (userId: string) => {
   const { t } = useTranslation("auth");
@@ -125,6 +126,7 @@ export const AccountActions = ({
 };
 
 export const useColumns = (): ColumnDef<
+  DataTableFeatures,
   GetUserAccountsResponse["data"][number]
 >[] => {
   const { t, i18n } = useTranslation("common");

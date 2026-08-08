@@ -13,7 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 import { Separator } from "#components/separator";
 import { Slider } from "#components/slider";
 
-import type { Column } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { Column, RowData } from "@tanstack/react-table";
 
 interface Range {
   min: number;
@@ -46,32 +47,24 @@ function parseValuesAsNumbers(value: unknown): RangeValue | undefined {
   return undefined;
 }
 
-interface DataTableSliderFilterProps<TData> {
-  column: Column<TData>;
+interface DataTableSliderFilterProps<TData extends RowData> {
+  column: Column<DataTableFeatures, TData>;
   title?: string;
 }
 
-export function DataTableSliderFilter<TData>({
+export function DataTableSliderFilter<TData extends RowData>({
   column,
   title,
 }: DataTableSliderFilterProps<TData>) {
+  "use no memo";
+
   const { t } = useTranslation("common");
   const id = React.useId();
 
   const columnFilterValue = parseValuesAsNumbers(column.getFilterValue());
 
-  const defaultRange =
-    column.columnDef.meta &&
-    "range" in column.columnDef.meta &&
-    typeof column.columnDef.meta.range === "object"
-      ? column.columnDef.meta.range
-      : undefined;
-  const unit =
-    column.columnDef.meta &&
-    "unit" in column.columnDef.meta &&
-    typeof column.columnDef.meta.unit === "string"
-      ? column.columnDef.meta.unit
-      : undefined;
+  const defaultRange = column.columnDef.meta?.range;
+  const unit = column.columnDef.meta?.unit;
 
   const { min, max, step } = React.useMemo<Range & { step: number }>(() => {
     let minValue = 0;

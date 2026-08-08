@@ -1,17 +1,12 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  getFacetedUniqueValues,
-  getFacetedRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  getCoreRowModel,
-  useReactTable,
-  getFacetedMinMaxValues,
-} from "@tanstack/react-table";
+import { useTable } from "@tanstack/react-table";
 import { useCallback, useMemo, useState } from "react";
 
 import { useDebounceCallback } from "@workspace/shared/hooks";
+import {
+  features,
+  type DataTableFeatures,
+} from "@workspace/ui-web/data-table/data-table-features";
 
 import { DEBOUNCE_MS, getFiltersFromColumnFilters } from "./common";
 
@@ -19,22 +14,26 @@ import type { CommonProps } from "./common";
 import type { QueryKey, UseQueryOptions } from "@tanstack/react-query";
 import type {
   ColumnFiltersState,
+  ColumnVisibilityState,
   PaginationState,
+  RowData,
   RowSelectionState,
   SortingState,
+  TableOptions,
   Updater,
-  VisibilityState,
 } from "@tanstack/react-table";
-import type { TableOptions } from "@tanstack/react-table";
 
 export interface UseLocalDataTableProps<
-  TData,
+  TData extends RowData,
   TQueryFnData extends { data?: TData[]; total?: number },
   TQueryKey extends QueryKey,
 >
   extends
     CommonProps,
-    Omit<TableOptions<TData>, "data" | "state" | "getCoreRowModel"> {
+    Omit<
+      TableOptions<DataTableFeatures, TData>,
+      "data" | "state" | "features"
+    > {
   persistance: "local";
   query: (params: {
     page: number;
@@ -45,7 +44,7 @@ export interface UseLocalDataTableProps<
 }
 
 export function useLocalDataTable<
-  TData,
+  TData extends RowData,
   TQueryFnData extends { data?: TData[]; total?: number },
   TQueryKey extends QueryKey,
 >(props: UseLocalDataTableProps<TData, TQueryFnData, TQueryKey>) {
@@ -67,9 +66,8 @@ export function useLocalDataTable<
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
     props.initialState?.columnFilters ?? [],
   );
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    props.initialState?.columnVisibility ?? {},
-  );
+  const [columnVisibility, setColumnVisibility] =
+    useState<ColumnVisibilityState>(props.initialState?.columnVisibility ?? {});
 
   const filterableColumns = useMemo(() => {
     return props.columns.filter((column) => column.enableColumnFilter);
@@ -158,7 +156,8 @@ export function useLocalDataTable<
     return Math.ceil((query.data?.total ?? 0) / perPage);
   }, [query.data?.total, perPage]);
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: query.data?.data ?? [],
     pageCount,
     state: {
@@ -174,13 +173,6 @@ export function useLocalDataTable<
     onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,

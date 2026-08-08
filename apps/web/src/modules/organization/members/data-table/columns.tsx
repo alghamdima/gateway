@@ -34,6 +34,7 @@ import { UpdateMemberRoleModal } from "../update-member-role";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Member } from "@workspace/auth";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 const useUpdateMemberRoleAction = (member: Member) => {
   const { t } = useTranslation("auth");
@@ -205,7 +206,7 @@ const Actions = ({ member }: { member: Member }) => {
   );
 };
 
-export const useColumns = (): ColumnDef<Member>[] => {
+export const useColumns = (): ColumnDef<DataTableFeatures, Member>[] => {
   const { t, i18n } = useTranslation("common");
   const { data: session } = authClient.useSession();
 

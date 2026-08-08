@@ -12,6 +12,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { GetCustomersResponse } from "@workspace/api/schema";
 import type { User } from "@workspace/auth";
 import type { Organization } from "@workspace/auth";
+import type { DataTableFeatures } from "@workspace/ui-web/data-table/data-table-features";
 
 type CustomerRow = GetCustomersResponse["data"][number] & {
   user: Pick<User, "name" | "image"> | null;
@@ -21,7 +22,7 @@ type CustomerRow = GetCustomersResponse["data"][number] & {
 export const useColumns = (options?: {
   max?: { subscriptions: number; orders: number };
   options?: { provider: string[] };
-}): ColumnDef<CustomerRow>[] => {
+}): ColumnDef<DataTableFeatures, CustomerRow>[] => {
   const { t, i18n } = useTranslation(["common", "billing"]);
   const { data: session } = authClient.useSession();
 

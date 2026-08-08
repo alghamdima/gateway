@@ -21,7 +21,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "#components/popover";
 import { Separator } from "#components/separator";
 
 import type { Icon } from "#components/icons";
-import type { Column } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { Column, RowData } from "@tanstack/react-table";
 
 interface Option {
   label: string;
@@ -30,23 +31,28 @@ interface Option {
   icon?: Icon;
 }
 
-interface DataTableFacetedFilterProps<TData, TValue> {
-  column?: Column<TData, TValue>;
+interface DataTableFacetedFilterProps<TData extends RowData, TValue = unknown> {
+  column: Column<DataTableFeatures, TData, TValue>;
   title?: string;
   options: Option[];
   multiple?: boolean;
 }
 
-export function DataTableFacetedFilter<TData, TValue>({
+export function DataTableFacetedFilter<
+  TData extends RowData,
+  TValue = unknown,
+>({
   column,
   title,
   options,
   multiple,
 }: DataTableFacetedFilterProps<TData, TValue>) {
+  "use no memo";
+
   const { t } = useTranslation("common");
   const [open, setOpen] = React.useState(false);
 
-  const columnFilterValue = column?.getFilterValue();
+  const columnFilterValue = column.getFilterValue();
 
   const selectedValues = React.useMemo(
     () => new Set(Array.isArray(columnFilterValue) ? columnFilterValue : []),
@@ -55,8 +61,6 @@ export function DataTableFacetedFilter<TData, TValue>({
 
   const onItemSelect = React.useCallback(
     (option: Option, isSelected: boolean) => {
-      if (!column) return;
-
       if (multiple) {
         const newSelectedValues = new Set(selectedValues);
         if (isSelected) {
@@ -77,7 +81,7 @@ export function DataTableFacetedFilter<TData, TValue>({
   const onReset = React.useCallback(
     (event?: React.MouseEvent) => {
       event?.stopPropagation();
-      column?.setFilterValue(undefined);
+      column.setFilterValue(undefined);
     },
     [column],
   );

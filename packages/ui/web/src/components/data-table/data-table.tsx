@@ -1,4 +1,4 @@
-import { flexRender } from "@tanstack/react-table";
+import { FlexRender } from "@tanstack/react-table";
 
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
@@ -14,14 +14,17 @@ import {
 
 import { DataTablePagination } from "./data-table-pagination";
 
-import type { Table as TanstackTable } from "@tanstack/react-table";
+import type { DataTableFeatures } from "./data-table-features";
+import type { ReactTable, RowData } from "@tanstack/react-table";
 import type * as React from "react";
 
-interface DataTableProps<TData> extends React.ComponentProps<"div"> {
-  table: TanstackTable<TData>;
+interface DataTableProps<
+  TData extends RowData,
+> extends React.ComponentProps<"div"> {
+  table: ReactTable<DataTableFeatures, TData>;
 }
 
-export function DataTable<TData>({
+export function DataTable<TData extends RowData>({
   table,
   children,
   className,
@@ -41,12 +44,9 @@ export function DataTable<TData>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id} colSpan={header.colSpan}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                    {header.isPlaceholder ? null : (
+                      <FlexRender header={header} />
+                    )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -61,10 +61,7 @@ export function DataTable<TData>({
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
+                      <FlexRender cell={cell} />
                     </TableCell>
                   ))}
                 </TableRow>

@@ -1,12 +1,13 @@
 import {
-  getFacetedUniqueValues,
-  getFacetedRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  getCoreRowModel,
-  useReactTable,
-  getFacetedMinMaxValues,
+  useTable,
+  type ColumnFiltersState,
+  type ColumnVisibilityState,
+  type PaginationState,
+  type RowData,
+  type RowSelectionState,
+  type SortingState,
+  type TableOptions,
+  type Updater,
 } from "@tanstack/react-table";
 import {
   parseAsArrayOf,
@@ -18,32 +19,29 @@ import {
 import { useCallback, useMemo, useState } from "react";
 
 import { useDebounceCallback } from "@workspace/shared/hooks";
+import {
+  features,
+  type DataTableFeatures,
+} from "@workspace/ui-web/data-table/data-table-features";
 
 import {
   ARRAY_SEPARATOR,
   DEBOUNCE_MS,
   getFiltersFromColumnFilters,
+  getSortingStateParser,
   PAGE_KEY,
   PER_PAGE_KEY,
   SORT_KEY,
   THROTTLE_MS,
+  type CommonProps,
 } from "./common";
-import { getSortingStateParser } from "./common";
 
-import type { CommonProps } from "./common";
-import type {
-  ColumnFiltersState,
-  PaginationState,
-  RowSelectionState,
-  SortingState,
-  Updater,
-  VisibilityState,
-} from "@tanstack/react-table";
-import type { TableOptions } from "@tanstack/react-table";
 import type { Parser, UseQueryStateOptions } from "nuqs";
 
-export interface UseSearchParamsDataTableProps<TData>
-  extends CommonProps, Omit<TableOptions<TData>, "state" | "getCoreRowModel"> {
+export interface UseSearchParamsDataTableProps<TData extends RowData>
+  extends
+    CommonProps,
+    Omit<TableOptions<DataTableFeatures, TData>, "state" | "features"> {
   persistance: "searchParams";
   history?: "push" | "replace";
   throttleMs?: number;
@@ -54,7 +52,7 @@ export interface UseSearchParamsDataTableProps<TData>
   startTransition?: React.TransitionStartFunction;
 }
 
-export function useSearchParamsDataTable<TData>(
+export function useSearchParamsDataTable<TData extends RowData>(
   props: UseSearchParamsDataTableProps<TData>,
 ) {
   const {
@@ -97,9 +95,8 @@ export function useSearchParamsDataTable<TData>(
     initialState?.rowSelection ?? {},
   );
 
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
-    initialState?.columnVisibility ?? {},
-  );
+  const [columnVisibility, setColumnVisibility] =
+    useState<ColumnVisibilityState>(initialState?.columnVisibility ?? {});
 
   const [page, setPage] = useQueryState(
     PAGE_KEY,
@@ -226,7 +223,8 @@ export function useSearchParamsDataTable<TData>(
     [debouncedSetFilters, filterableColumns],
   );
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     columns,
     initialState,
     state: {
@@ -242,13 +240,6 @@ export function useSearchParamsDataTable<TData>(
     onColumnFiltersChange,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
