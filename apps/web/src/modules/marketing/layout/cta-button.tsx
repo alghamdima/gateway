@@ -5,26 +5,31 @@ import { cn } from "@workspace/ui";
 import { buttonVariants } from "@workspace/ui-web/button";
 
 import { pathsConfig } from "~/config/paths";
-import { authClient } from "~/lib/auth/client";
+import { authClient, type Session } from "~/lib/auth/client";
 import { TurboLink } from "~/modules/common/turbo-link";
 
-export const CtaButton = (
-  props: Omit<React.ComponentProps<typeof TurboLink>, "href">,
-) => {
+export const CtaButton = ({
+  initialSession,
+  ...props
+}: Omit<React.ComponentProps<typeof TurboLink>, "href"> & {
+  initialSession: Session | null;
+}) => {
   const { t } = useTranslation(["common", "marketing"]);
-  const { data } = authClient.useSession();
+  authClient.hydrateSession(initialSession);
+  const { data, isPending, isRefetching } = authClient.useSession();
+  const session = isPending && !isRefetching ? initialSession : data;
 
   return (
     <TurboLink
       {...props}
       href={
-        data?.session
+        session?.session
           ? pathsConfig.dashboard.user.index
           : pathsConfig.auth.login
       }
       className={cn(buttonVariants(), props.className)}
     >
-      {!data?.session ? t("cta.button") : t("dashboard")}
+      {session?.session ? t("dashboard") : t("cta.button")}
     </TurboLink>
   );
 };

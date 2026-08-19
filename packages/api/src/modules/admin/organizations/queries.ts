@@ -99,7 +99,7 @@ export const getOrganizations = async (input: GetOrganizationsInput) => {
       .limit(1)
       .then((res) => res[0]?.members ?? 0);
 
-    const data = results.map(({ total: _, ...rest }) => rest);
+    const data = results.map(({ total: _total, ...rest }) => rest);
     const total = results[0]?.total ?? 0;
 
     return {

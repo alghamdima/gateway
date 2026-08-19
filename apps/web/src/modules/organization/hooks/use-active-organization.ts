@@ -54,14 +54,9 @@ export const useActiveOrganization = () => {
     DEBOUNCE_SET_ACTIVE_MS,
   );
 
-  const activeMember = useMemo(() => {
-    const data =
-      member ??
-      activeOrganization.data?.members.find(
-        (member) => member.userId === userId,
-      );
-    return data ? { ...data, role: data.role as MemberRole } : null;
-  }, [member, activeOrganization.data, userId]);
+  const activeMember = member
+    ? { ...member, role: member.role as MemberRole }
+    : null;
 
   const sessionActiveOrganizationId =
     session.data?.session.activeOrganizationId ?? null;

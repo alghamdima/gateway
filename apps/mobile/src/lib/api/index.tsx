@@ -11,8 +11,8 @@ import { getBaseUrl } from "./utils";
 import type { AppRouter } from "@workspace/api";
 
 export const { api } = hc<AppRouter>(getBaseUrl(), {
-  headers: () => ({
-    cookie: `${config.cookie}=${useI18nConfig.getState().config.locale};${authClient.getCookie()}`,
+  headers: async () => ({
+    cookie: `${config.cookie}=${useI18nConfig.getState().config.locale};${await authClient.getCookie()}`,
     "x-client-platform": Platform.MOBILE,
   }),
   init: {

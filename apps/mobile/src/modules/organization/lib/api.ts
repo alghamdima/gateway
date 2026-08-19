@@ -24,7 +24,7 @@ const queries = {
     queryOptions({
       queryKey: [KEY, params],
       queryFn: () =>
-        authClient.organization.getFullOrganization({
+        authClient.organization.getOrganization({
           query:
             "id" in params
               ? { organizationId: params.id }

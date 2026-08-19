@@ -63,11 +63,13 @@ export default function AdminLayout({
 }
 
 async function AuthenticatedAdminSidebar() {
-  const { user } = await getSession();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     return redirect(pathsConfig.auth.login);
   }
+
+  const { user } = session;
 
   if (!hasAdminPermission(user)) {
     return redirect(pathsConfig.dashboard.user.index);

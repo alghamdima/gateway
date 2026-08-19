@@ -11,7 +11,11 @@ import { SidebarInset, SidebarProvider } from "@workspace/ui-web/sidebar";
 import { pathsConfig } from "~/config/paths";
 import { api } from "~/lib/api/server";
 import { authClient } from "~/lib/auth/client";
-import { getOrganization, getSession } from "~/lib/auth/server";
+import {
+  getMemberByUserId,
+  getOrganization,
+  getSession,
+} from "~/lib/auth/server";
 import { getQueryClient } from "~/lib/query/server";
 import { billing } from "~/modules/billing/lib/api";
 import { DashboardActionBar } from "~/modules/common/layout/dashboard/action-bar";
@@ -107,11 +111,13 @@ export default function DashboardLayout({
 }
 
 async function getWorkspace(params: Promise<{ organization: string }>) {
-  const { user } = await getSession();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     return redirect(pathsConfig.auth.login);
   }
+
+  const { user } = session;
 
   const organizationSlug = (await params).organization;
   const activeOrganization = await getOrganization({ slug: organizationSlug });
@@ -122,9 +128,10 @@ async function getWorkspace(params: Promise<{ organization: string }>) {
 
   const items = menu({
     slug: organizationSlug,
-    member:
-      activeOrganization.members.find((member) => member.userId === user.id) ??
-      null,
+    member: await getMemberByUserId({
+      organizationId: activeOrganization.id,
+      userId: user.id,
+    }),
   });
 
   return { user, activeOrganization, organizationSlug, items };

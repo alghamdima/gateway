@@ -26,9 +26,9 @@ export default async function JoinPage({
     return notFound();
   }
 
-  const { user } = await getSession();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     const searchParams = new URLSearchParams();
     searchParams.set("invitationId", invitationId);
     if (email) searchParams.set("email", email);
@@ -55,7 +55,7 @@ export default async function JoinPage({
     return <Invitation invitation={invitation} organization={organization} />;
   }
 
-  if (email && user.email !== email) {
+  if (email && session.user.email !== email) {
     return (
       <InvitationEmailMismatch invitationId={invitationId} email={email} />
     );

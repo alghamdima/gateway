@@ -1,5 +1,5 @@
 import * as Notifications from "expo-notifications";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
 
 import { logger } from "@workspace/shared/logger";
@@ -12,7 +12,7 @@ export const useNotificationsPermissions = () => {
   );
   const [isLoading, setIsLoading] = useState(false);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const permission = await Notifications.getPermissionsAsync();
       setStatus(permission.status);
@@ -21,18 +21,34 @@ export const useNotificationsPermissions = () => {
       logger.error("Failed to get notification permissions:", error);
       throw error;
     }
-  };
+  }, []);
 
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+
+    const syncStatus = async () => {
+      try {
+        const permission = await Notifications.getPermissionsAsync();
+        if (!cancelled) {
+          setStatus(permission.status);
+        }
+      } catch (error) {
+        logger.error("Failed to get notification permissions:", error);
+      }
+    };
+
+    void syncStatus();
 
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        void refresh();
+        void syncStatus();
       }
     });
 
-    return () => subscription.remove();
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
   }, []);
 
   const request = async () => {

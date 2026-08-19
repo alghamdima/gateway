@@ -255,11 +255,13 @@ const ERROR_MESSAGES = {
   ANONYMOUS_USERS_CANNOT_SIGN_IN_AGAIN_ANONYMOUSLY:
     "auth:error.anonymous.cannotSignInAgain",
   OTP_NOT_ENABLED: "auth:error.otp.notEnabled",
+  OTP_NOT_CONFIGURED: "auth:error.otp.notConfigured",
   OTP_HAS_EXPIRED: "auth:error.otp.expired",
   OTP_EXPIRED: "auth:error.otp.expired",
   INVALID_OTP: "auth:error.code.invalid",
   TOO_MANY_ATTEMPTS: "auth:error.code.tooManyAttempts",
   TOTP_NOT_ENABLED: "auth:error.totp.notEnabled",
+  TOTP_NOT_CONFIGURED: "auth:error.totp.notConfigured",
   TWO_FACTOR_NOT_ENABLED: "auth:error.twoFactor.notEnabled",
   ACCOUNT_TEMPORARILY_LOCKED: "auth:error.twoFactor.accountTemporarilyLocked",
   BACKUP_CODES_NOT_ENABLED: "auth:error.backupCodes.notEnabled",

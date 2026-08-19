@@ -43,7 +43,8 @@ export const MembersListItem = ({ member }: { member: Member }) => {
   const organizations = authClient.useListOrganizations();
   const activeMember = authClient.useActiveMember();
 
-  const updateMemberRoleSheet = useBottomSheet();
+  const { ref: updateMemberRoleRef, open: openUpdateMemberRole } =
+    useBottomSheet();
 
   const me = member.userId === session.data?.user.id;
 
@@ -115,7 +116,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
             key="update-role"
             textValue={t("updateRole")}
             onSelect={() => {
-              updateMemberRoleSheet.open();
+              openUpdateMemberRole();
             }}
           >
             <ContextMenuItemIcon
@@ -233,10 +234,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
           ))}
         </ContextMenuContent>
       </ContextMenu>
-      <UpdateMemberRoleBottomSheet
-        member={member}
-        ref={updateMemberRoleSheet.ref}
-      />
+      <UpdateMemberRoleBottomSheet member={member} ref={updateMemberRoleRef} />
     </>
   );
 };

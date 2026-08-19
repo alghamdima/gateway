@@ -31,7 +31,7 @@ export default async function BillingPage({
 }) {
   const { organization } = await params;
   const activeOrganization = await getOrganization({ slug: organization });
-  const { user } = await getSession();
+  const session = await getSession();
 
   if (!activeOrganization) {
     return notFound();
@@ -39,7 +39,7 @@ export default async function BillingPage({
 
   const member = await getMemberByUserId({
     organizationId: activeOrganization.id,
-    userId: user?.id ?? "",
+    userId: session?.user?.id ?? "",
   });
   const canRead = authClient.organization.checkRolePermission({
     permissions: {

@@ -69,11 +69,14 @@ export const Accounts = () => {
 
   const disconnect = useMutation({
     ...auth.mutations.accounts.disconnect,
-    onSuccess: async (_, { providerId }) => {
+    onSuccess: async (_, { accountId }) => {
       await queryClient.invalidateQueries(auth.queries.accounts.getAll);
+      const provider = accounts.find(
+        (account) => account.id === accountId,
+      )?.providerId;
       toast.add({
         title: t("account.accounts.disconnect.success", {
-          provider: capitalize(providerId),
+          provider: capitalize(provider ?? ""),
         }),
         type: "success",
       });
@@ -100,7 +103,7 @@ export const Accounts = () => {
 
               return (
                 <li
-                  key={social.accountId}
+                  key={social.id}
                   className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
                 >
                   <Icon className="size-8" />
@@ -121,7 +124,7 @@ export const Accounts = () => {
                   <ConfirmModal
                     provider={provider}
                     onConfirm={() =>
-                      disconnect.mutate({ providerId: provider })
+                      disconnect.mutate({ accountId: social.id })
                     }
                     render={
                       <Button
@@ -135,7 +138,7 @@ export const Accounts = () => {
                           })}
                         </span>
                         {disconnect.isPending &&
-                        disconnect.variables.providerId === provider ? (
+                        disconnect.variables.accountId === social.id ? (
                           <Spinner className="size-4" />
                         ) : (
                           <Icons.Trash className="size-4" />

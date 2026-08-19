@@ -33,6 +33,10 @@ export default function TwoFactor() {
     async (data: PasswordPayload) => {
       const response = await enable.mutateAsync(data);
 
+      if (response.method !== "totp") {
+        return;
+      }
+
       setUri(response.totpURI);
       setCodes(response.backupCodes);
       totpSheetRef.current?.present();

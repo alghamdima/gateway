@@ -97,7 +97,7 @@ const VerificationController = ({
         token,
       });
     }
-  }, [token, isPending, mutate, callbackURL, errorCallbackURL]);
+  }, [token, isPending, mutate]);
 
   if (isPending) {
     return <Spinner />;

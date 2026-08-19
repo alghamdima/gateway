@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import * as Linking from "expo-linking";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { View } from "react-native";
 import * as z from "zod";
 
@@ -31,7 +31,8 @@ export default function RequiredStep() {
     },
   });
 
-  const values = form.watch();
+  const dataAccepted = useWatch({ control: form.control, name: "data" });
+  const privacyAccepted = useWatch({ control: form.control, name: "privacy" });
 
   return (
     <>
@@ -112,7 +113,7 @@ export default function RequiredStep() {
         size="lg"
         testID="setup-step-continue"
         onPress={() => goNext()}
-        disabled={Object.values(values).some((value) => !value)}
+        disabled={!dataAccepted || !privacyAccepted}
       >
         <Text>{t("continue")}</Text>
       </Button>

@@ -46,7 +46,7 @@ export const Passkeys = () => {
 
   const add = useMutation({
     ...auth.mutations.passkeys.add,
-    onSuccess: async (_, __) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries(auth.queries.passkeys.getAll);
       toast.add({ title: t("account.passkeys.add.success"), type: "success" });
     },
@@ -54,7 +54,7 @@ export const Passkeys = () => {
 
   const remove = useMutation({
     ...auth.mutations.passkeys.delete,
-    onSuccess: async (_, __) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries(auth.queries.passkeys.getAll);
       toast.add({
         title: t("account.passkeys.remove.success"),

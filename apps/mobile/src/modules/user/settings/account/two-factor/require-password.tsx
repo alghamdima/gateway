@@ -102,7 +102,9 @@ export const RequirePassword = memo<RequirePasswordProps>(
                 <Button
                   className="flex-1"
                   disabled={form.formState.isSubmitting}
-                  onPress={form.handleSubmit(handleSubmit)}
+                  onPress={() => {
+                    void form.handleSubmit(handleSubmit)();
+                  }}
                 >
                   {form.formState.isSubmitting ? (
                     <Spinner className="text-primary-foreground" size={16} />

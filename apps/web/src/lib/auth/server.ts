@@ -17,20 +17,15 @@ const getHeaders = async () => {
 };
 
 export const getSession = cache(async () => {
-  const data = await auth.api.getSession({
+  return auth.api.getSession({
     headers: await getHeaders(),
   });
-
-  return {
-    session: data?.session ?? null,
-    user: data?.user ?? null,
-  };
 });
 
 export const getOrganization = cache(
   async ({ id, slug }: { slug?: string; id?: string }) => {
     try {
-      return await auth.api.getFullOrganization({
+      return await auth.api.getOrganization({
         query: {
           organizationId: id,
           organizationSlug: slug,

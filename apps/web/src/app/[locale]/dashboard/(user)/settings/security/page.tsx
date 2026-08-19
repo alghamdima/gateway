@@ -17,11 +17,13 @@ export const generateMetadata = getMetadata({
 });
 
 export default async function SettingsPage() {
-  const { user } = await getSession();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     return redirect(pathsConfig.auth.login);
   }
+
+  const { user } = session;
 
   return (
     <>

@@ -61,6 +61,7 @@ const seedUser = async ({
     if (!alreadyExistingAccount) {
       const accountToInsert = {
         id: context.generateId({ model: "account" }).toString(),
+        issuer: "local:credential",
         accountId: context.generateId({ model: "account" }).toString(),
         providerId: "credential",
         password: SEED_PASSWORD_HASH,

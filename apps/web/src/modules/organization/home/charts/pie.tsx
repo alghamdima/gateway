@@ -94,18 +94,13 @@ export function PieChart() {
     i18n.language,
   );
   const [activeMonth, setActiveMonth] = React.useState(defaultMonth);
-
-  React.useEffect(() => {
-    setActiveMonth((current) =>
-      customersData.some((item) => item.month === current)
-        ? current
-        : defaultMonth,
-    );
-  }, [defaultMonth, customersData]);
+  const selectedMonth = customersData.some((item) => item.month === activeMonth)
+    ? activeMonth
+    : defaultMonth;
 
   const activeIndex = React.useMemo(
-    () => customersData.findIndex((item) => item.month === activeMonth),
-    [activeMonth, customersData],
+    () => customersData.findIndex((item) => item.month === selectedMonth),
+    [selectedMonth, customersData],
   );
 
   const renderPieShape = React.useCallback(
@@ -147,7 +142,7 @@ export function PieChart() {
         </div>
         <Select
           items={items}
-          value={activeMonth}
+          value={selectedMonth}
           onValueChange={(value) =>
             setActiveMonth(value ?? customersData[0]?.month ?? "")
           }

@@ -16,7 +16,7 @@ export const useTwoFactor = () => {
 
   const disable = useMutation({
     ...auth.mutations.twoFactor.disable,
-    onSuccess: (_, __) => {
+    onSuccess: () => {
       toast.add({
         title: t("account.twoFactor.disable.success"),
         type: "success",

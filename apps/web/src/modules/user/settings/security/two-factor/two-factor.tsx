@@ -38,6 +38,10 @@ export const TwoFactorAuthentication = () => {
     async (data: PasswordPayload) => {
       const response = await enable.mutateAsync(data);
 
+      if (response.method !== "totp") {
+        return;
+      }
+
       setUri(response.totpURI);
       setCodes(response.backupCodes);
       setTwoFactorOpen(false);

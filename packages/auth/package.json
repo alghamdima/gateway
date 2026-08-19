@@ -16,16 +16,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "1.6.29",
-    "@better-auth/expo": "1.6.29",
-    "@better-auth/passkey": "1.6.29",
+    "@better-auth/drizzle-adapter": "1.7.1",
+    "@better-auth/expo": "1.7.1",
+    "@better-auth/passkey": "1.7.1",
     "@workspace/billing": "workspace:*",
     "@workspace/billing-web": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/email": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/shared": "workspace:*",
-    "better-auth": "1.6.29",
+    "better-auth": "1.7.1",
     "envin": "catalog:",
     "zod": "catalog:"
   },

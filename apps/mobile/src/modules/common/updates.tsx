@@ -27,6 +27,8 @@ import { BlurView, GlassView } from "./styled";
 
 import type { ViewProps } from "react-native";
 
+const panGesture = () => Gesture.Pan();
+
 const UpdatesContext = createContext<{
   visible: boolean;
   setVisible: (visible: boolean) => void;
@@ -194,36 +196,36 @@ const Content = () => {
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateY: withSpring(positionY.value) }],
+      transform: [{ translateY: withSpring(positionY.get()) }],
     };
   });
 
-  const pan = Gesture.Pan()
+  const pan = panGesture()
     .onBegin(() => {
-      startY.value = positionY.value;
+      startY.set(positionY.get());
     })
     .onChange((event) => {
-      const next = startY.value + event.translationY;
-      positionY.value = Math.min(0, next);
+      const next = startY.get() + event.translationY;
+      positionY.set(Math.min(0, next));
     })
     .onFinalize((event) => {
-      const threshold = Math.max(64, (height.value + offset) * 0.4);
+      const threshold = Math.max(64, (height.get() + offset) * 0.4);
       const shouldDismiss =
-        positionY.value < -threshold || event.velocityY < -500;
+        positionY.get() < -threshold || event.velocityY < -500;
       if (shouldDismiss) {
-        positionY.value = withSpring(-(height.value + offset));
+        positionY.set(withSpring(-(height.get() + offset)));
         scheduleOnRN(setVisible, false);
       } else {
-        positionY.value = withSpring(0);
+        positionY.set(withSpring(0));
       }
     });
 
   useEffect(() => {
     if (visible) {
-      positionY.value = withSpring(0);
+      positionY.set(withSpring(0));
     } else {
-      positionY.value = withSpring(
-        height.value > 0 ? -(height.value + offset) : -1000,
+      positionY.set(
+        withSpring(height.get() > 0 ? -(height.get() + offset) : -1000),
       );
     }
   }, [visible, positionY, offset, height]);
@@ -238,9 +240,9 @@ const Content = () => {
         <Wrapper
           onLayout={(e) => {
             const h = e.nativeEvent.layout.height;
-            height.value = h;
+            height.set(h);
             if (!visible) {
-              positionY.value = -(h + offset);
+              positionY.set(-(h + offset));
             }
           }}
         >
@@ -259,13 +261,16 @@ const Content = () => {
 
 export const Updates = () => {
   const { isUpdateAvailable, isUpdatePending } = useUpdates();
-  const [visible, setVisible] = useState(isUpdateAvailable || isUpdatePending);
+  const hasUpdate = isUpdateAvailable || isUpdatePending;
+  const [visible, setVisible] = useState(hasUpdate);
+  const [wasAvailable, setWasAvailable] = useState(hasUpdate);
 
-  useEffect(() => {
-    if (isUpdateAvailable || isUpdatePending) {
+  if (hasUpdate !== wasAvailable) {
+    setWasAvailable(hasUpdate);
+    if (hasUpdate) {
       setVisible(true);
     }
-  }, [isUpdateAvailable, isUpdatePending]);
+  }
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {

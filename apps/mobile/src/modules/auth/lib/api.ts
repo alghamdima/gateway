@@ -109,6 +109,7 @@ const mutations = {
       mutationFn: (params: Parameters<typeof authClient.twoFactor.enable>[0]) =>
         authClient.twoFactor.enable({
           ...params,
+          method: "totp",
           fetchOptions: { throw: true },
         }),
     }),

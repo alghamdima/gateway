@@ -130,7 +130,9 @@ export const TotpSheet = ({ ref: passedRef }: TotpSheetProps) => {
                   <Button
                     className="flex-1"
                     disabled={form.formState.isSubmitting}
-                    onPress={form.handleSubmit(onSubmit)}
+                    onPress={() => {
+                      void form.handleSubmit(onSubmit)();
+                    }}
                   >
                     {form.formState.isSubmitting ? (
                       <Spinner className="text-primary-foreground" size={16} />

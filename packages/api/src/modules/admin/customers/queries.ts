@@ -149,7 +149,7 @@ export const getCustomers = async (input: GetCustomersInput) => {
       .orderBy(sql`provider ASC`)
       .then((res) => res.map((r) => r.provider));
 
-    const data = results.map(({ total: _, ...rest }) => rest);
+    const data = results.map(({ total: _total, ...rest }) => rest);
     const total = results[0]?.total ?? 0;
 
     return {

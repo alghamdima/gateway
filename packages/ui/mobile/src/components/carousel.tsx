@@ -31,6 +31,8 @@ const CarouselContext = createContext<CarouselContextType>({
   onScroll: () => null,
 });
 
+const nativeGesture = () => Gesture.Native();
+
 const Carousel = ({
   className,
   threshold = Dimensions.get("window").width,
@@ -40,7 +42,7 @@ const Carousel = ({
 
   const onScroll = useAnimatedScrollHandler({
     onScroll: ({ contentOffset: { x } }) => {
-      scrollX.value = x;
+      scrollX.set(x);
     },
   });
 
@@ -57,7 +59,7 @@ const CarouselList = <ItemT,>(
   },
 ) => {
   const { onScroll, threshold } = useContext(CarouselContext);
-  const native = Gesture.Native();
+  const native = nativeGesture();
 
   return (
     <GestureDetector gesture={native}>
@@ -86,7 +88,7 @@ const CarouselListItem = ({
   const { scrollX, threshold } = useContext(CarouselContext);
   const opacity = useAnimatedStyle(() => ({
     opacity: interpolate(
-      scrollX?.value ?? 0,
+      scrollX?.get() ?? 0,
       [(index - 1) * threshold, index * threshold, (index + 1) * threshold],
       [0, 1, 0],
       Extrapolation.CLAMP,
@@ -109,12 +111,12 @@ const CarouselPaginationDot = ({
 
   const animatedDot = useAnimatedStyle(() => ({
     opacity: interpolate(
-      scrollX?.value ?? 0,
+      scrollX?.get() ?? 0,
       [(index - 1) * threshold, index * threshold, (index + 1) * threshold],
       [0.7, 1, 0.7],
     ),
     width: interpolate(
-      scrollX?.value ?? 0,
+      scrollX?.get() ?? 0,
       [(index - 1) * threshold, index * threshold, (index + 1) * threshold],
       [11, 28, 11],
       Extrapolation.CLAMP,

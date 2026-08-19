@@ -44,7 +44,7 @@ export const CreateOrganizationBottomSheet = ({
   ref?: React.RefObject<BottomSheetContentRef | null>;
 }) => {
   const { t } = useTranslation(["common", "organization"]);
-  const sheet = useBottomSheet();
+  const { ref: sheetRef, close } = useBottomSheet();
 
   const activeOrganization = authClient.useActiveOrganization();
   const activeMember = authClient.useActiveMember();
@@ -79,7 +79,7 @@ export const CreateOrganizationBottomSheet = ({
     await setActive.mutateAsync({ organizationId: organization.id });
 
     ref?.current?.dismiss();
-    sheet.close();
+    close();
     router.replace(pathsConfig.dashboard.organization.index);
   };
 
@@ -88,7 +88,7 @@ export const CreateOrganizationBottomSheet = ({
       {children && (
         <BottomSheetOpenTrigger asChild>{children}</BottomSheetOpenTrigger>
       )}
-      <BottomSheetContent ref={ref ?? sheet.ref} name="create-organization">
+      <BottomSheetContent ref={ref ?? sheetRef} name="create-organization">
         <BottomSheetScrollView>
           <BottomSheetHeader>
             <BottomSheetTitle>{t("create.title")}</BottomSheetTitle>
@@ -124,7 +124,9 @@ export const CreateOrganizationBottomSheet = ({
               </Button>
             </BottomSheetCloseTrigger>
             <Button
-              onPress={form.handleSubmit(onSubmit)}
+              onPress={() => {
+                void form.handleSubmit(onSubmit)();
+              }}
               disabled={form.formState.isSubmitting}
             >
               {form.formState.isSubmitting ? (

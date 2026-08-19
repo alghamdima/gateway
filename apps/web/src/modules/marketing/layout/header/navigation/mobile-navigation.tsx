@@ -25,8 +25,14 @@ import { Hamburger } from "./hamburger";
 import { Item } from "./navigation";
 
 import type { NavigationProps } from "./types";
+import type { Session } from "~/lib/auth/client";
 
-export const MobileNavigation = ({ links }: NavigationProps) => {
+export const MobileNavigation = ({
+  links,
+  initialSession,
+}: NavigationProps & {
+  initialSession: Session | null;
+}) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
@@ -96,7 +102,7 @@ export const MobileNavigation = ({ links }: NavigationProps) => {
           >
             {t("marketing:contact.cta")}
           </TurboLink>
-          <CtaButton />
+          <CtaButton initialSession={initialSession} />
         </div>
       </SheetContent>
     </Sheet>

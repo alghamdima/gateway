@@ -85,11 +85,13 @@ export default function DashboardLayout({
 }
 
 async function AuthenticatedSidebar() {
-  const { user } = await getSession();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     return redirect(pathsConfig.auth.login);
   }
+
+  const { user } = session;
 
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({

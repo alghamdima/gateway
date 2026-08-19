@@ -41,6 +41,34 @@ const getRadiusIndex = (radius: ThemeRadius) => {
     : index;
 };
 
+interface ThemeFontOptionProps {
+  readonly font: ThemeFont;
+  readonly isActive: boolean;
+  readonly onPress: () => void;
+}
+
+const ThemeFontOption = ({ font, isActive, onPress }: ThemeFontOptionProps) => {
+  const { t } = useTranslation("common");
+  const fontFamily = useCSSVariable(`--font-${font}`)?.toString() ?? "";
+
+  return (
+    <Button
+      variant="outline"
+      onPress={onPress}
+      hitSlop={2}
+      className={cn(
+        "h-auto grow flex-row items-center justify-center gap-2 px-2 py-1 capitalize",
+        isActive && "border-primary dark:border-primary border-2",
+      )}
+    >
+      <Text className="text-lg" style={{ fontFamily }}>
+        {"Ag"}
+      </Text>
+      <Text className="capitalize">{t(`theme.font.${font}`)}</Text>
+    </Button>
+  );
+};
+
 export const ThemeCustomizer = memo<ThemeCustomizerProps>(
   ({ config, onChange, resolvedTheme }) => {
     const { t } = useTranslation("common");
@@ -164,29 +192,14 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
             {t("theme.font.label")}
           </Label>
           <View className="flex-row gap-2">
-            {Object.values(ThemeFont).map((item) => {
-              const fontFamily =
-                useCSSVariable(`--font-${item}`)?.toString() ?? "";
-              const isActive = config.font === item;
-
-              return (
-                <Button
-                  variant="outline"
-                  key={item}
-                  onPress={() => onChange({ ...config, font: item })}
-                  hitSlop={2}
-                  className={cn(
-                    "h-auto grow flex-row items-center justify-center gap-2 px-2 py-1 capitalize",
-                    isActive && "border-primary dark:border-primary border-2",
-                  )}
-                >
-                  <Text className="text-lg" style={{ fontFamily }}>
-                    {"Ag"}
-                  </Text>
-                  <Text className="capitalize">{t(`theme.font.${item}`)}</Text>
-                </Button>
-              );
-            })}
+            {Object.values(ThemeFont).map((item) => (
+              <ThemeFontOption
+                key={item}
+                font={item}
+                isActive={config.font === item}
+                onPress={() => onChange({ ...config, font: item })}
+              />
+            ))}
           </View>
         </View>
       </View>

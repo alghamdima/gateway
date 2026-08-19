@@ -11,6 +11,8 @@ import { CtaButton } from "~/modules/marketing/layout/cta-button";
 import { MobileNavigation } from "./navigation/mobile-navigation";
 import { Navigation } from "./navigation/navigation";
 
+import type { Session } from "~/lib/auth/client";
+
 const links = [
   {
     label: "product",
@@ -98,7 +100,11 @@ const links = [
   },
 ] as const;
 
-export const Header = () => {
+export const Header = ({
+  initialSession,
+}: {
+  initialSession: Session | null;
+}) => {
   const { t } = useTranslation("common");
   return (
     <header className="bg-background/80 sticky inset-0 top-(--banner-height,0px) z-40 w-full py-3 backdrop-blur-sm">
@@ -116,8 +122,11 @@ export const Header = () => {
 
         <div className="flex items-center justify-center lg:gap-2">
           <ThemeControls />
-          <CtaButton className="hidden lg:inline-flex" />
-          <MobileNavigation links={links} />
+          <CtaButton
+            className="hidden lg:inline-flex"
+            initialSession={initialSession}
+          />
+          <MobileNavigation links={links} initialSession={initialSession} />
         </div>
       </div>
     </header>

@@ -1,36 +1,23 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 import { DEFAULT_BREAKPOINTS } from "@workspace/ui";
 
 export const useMediaQuery = (query: string) => {
-  const [matches, setMatches] = useState(false);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const media = window.matchMedia(query);
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    [query],
+  );
 
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    if (media.matches !== matches) {
-      setMatches(media.matches);
-    }
+  const getSnapshot = useCallback(
+    () => window.matchMedia(query).matches,
+    [query],
+  );
 
-    const listener = () => {
-      setMatches(media.matches);
-    };
-
-    if (typeof media.addEventListener === "function") {
-      media.addEventListener("change", listener);
-    } else {
-      media.addListener(listener);
-    }
-
-    return () => {
-      if (typeof media.removeEventListener === "function") {
-        media.removeEventListener("change", listener);
-      } else {
-        media.removeListener(listener);
-      }
-    };
-  }, [matches, query]);
-
-  return matches;
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 };
 
 export const useBreakpoint = (

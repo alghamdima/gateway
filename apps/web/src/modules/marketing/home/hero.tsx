@@ -3,6 +3,7 @@ import { Icons } from "@workspace/ui-web/icons";
 import { Marquee } from "@workspace/ui-web/marquee";
 
 import { pathsConfig } from "~/config/paths";
+import { getSession } from "~/lib/auth/server";
 import { getTranslation } from "~/lib/i18n";
 import { ThemedImage } from "~/modules/common/themed-image";
 import { TurboLink } from "~/modules/common/turbo-link";
@@ -11,6 +12,7 @@ import { Section, SectionBadge } from "~/modules/marketing/layout/section";
 
 export const Hero = async () => {
   const { t } = await getTranslation();
+  const session = await getSession();
 
   return (
     <Section id="hero" className="gap-6 sm:gap-6 md:gap-6 lg:gap-6">
@@ -37,7 +39,7 @@ export const Hero = async () => {
         {t("product.description")}
       </p>
       <div className="animate-fade-in mx-auto flex w-full -translate-y-4 flex-col gap-2 opacity-[0.001] ease-in-out [--animation-delay:600ms] sm:w-auto sm:flex-row sm:gap-3">
-        <CtaButton />
+        <CtaButton initialSession={session} />
 
         <TurboLink
           href={pathsConfig.marketing.contact}

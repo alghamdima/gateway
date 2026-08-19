@@ -1,12 +1,14 @@
 import { cn } from "@workspace/ui";
 import { buttonVariants } from "@workspace/ui-web/button";
 
+import { getSession } from "~/lib/auth/server";
 import { getTranslation } from "~/lib/i18n";
 import { CtaButton } from "~/modules/marketing/layout/cta-button";
 import { Section } from "~/modules/marketing/layout/section";
 
 export const Banner = async () => {
   const { t } = await getTranslation({ ns: "marketing" });
+  const session = await getSession();
   return (
     <Section
       id="banner"
@@ -15,7 +17,10 @@ export const Banner = async () => {
       <h3 className="text-3xl leading-[0.95] font-semibold tracking-tighter text-balance md:text-4xl lg:text-5xl">
         {t("cta.question")}
       </h3>
-      <CtaButton className={cn(buttonVariants({ variant: "secondary" }))} />
+      <CtaButton
+        className={cn(buttonVariants({ variant: "secondary" }))}
+        initialSession={session}
+      />
     </Section>
   );
 };

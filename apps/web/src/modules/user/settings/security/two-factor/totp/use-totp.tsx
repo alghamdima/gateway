@@ -33,7 +33,7 @@ export const useTotp = () => {
 
   const verify = useMutation({
     ...auth.mutations.twoFactor.totp.verify,
-    onSuccess: (_, __) => {
+    onSuccess: () => {
       toast.add({
         title: t("account.twoFactor.totp.success"),
         type: "success",

@@ -57,7 +57,8 @@ export const AccountSwitcher = () => {
     })),
   );
 
-  const createOrganizationBottomSheet = useBottomSheet();
+  const { ref: createOrganizationRef, open: openCreateOrganization } =
+    useBottomSheet();
   const setActiveOrganization = useMutation({
     ...organization.mutations.setActive,
     onSuccess: async (_, variables) => {
@@ -205,7 +206,7 @@ export const AccountSwitcher = () => {
           )}
 
           <DropdownMenuSeparator />
-          <DropdownMenuItem onPress={createOrganizationBottomSheet.open}>
+          <DropdownMenuItem onPress={openCreateOrganization}>
             <View className="border-border flex size-6 items-center justify-center rounded-md border bg-transparent">
               <Icons.Plus size={16} className="text-muted-foreground" />
             </View>
@@ -215,7 +216,7 @@ export const AccountSwitcher = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <CreateOrganizationBottomSheet ref={createOrganizationBottomSheet.ref} />
+      <CreateOrganizationBottomSheet ref={createOrganizationRef} />
       {setActiveOrganization.isPending && <Spinner />}
     </>
   );

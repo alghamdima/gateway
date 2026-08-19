@@ -50,7 +50,7 @@ export default function AccountsScreen() {
     },
   });
 
-  const handleDisconnect = (provider: SocialProvider) => {
+  const handleDisconnect = (provider: SocialProvider, accountId: string) => {
     Alert.alert(
       t("account.accounts.disconnect.cta", {
         provider: capitalize(provider),
@@ -65,7 +65,7 @@ export default function AccountsScreen() {
         },
         {
           text: t("continue"),
-          onPress: () => disconnect.mutate({ providerId: provider }),
+          onPress: () => disconnect.mutate({ accountId }),
         },
       ],
     );
@@ -91,7 +91,7 @@ export default function AccountsScreen() {
 
                 return (
                   <View
-                    key={social.accountId}
+                    key={social.id}
                     className="border-border flex-row items-center border-b p-4 last:border-b-0"
                   >
                     <Icon className="text-foreground size-8" />
@@ -112,10 +112,10 @@ export default function AccountsScreen() {
                       variant="ghost"
                       size="icon"
                       disabled={accounts.length === 1 || disconnect.isPending}
-                      onPress={() => handleDisconnect(provider)}
+                      onPress={() => handleDisconnect(provider, social.id)}
                     >
                       {disconnect.isPending &&
-                      disconnect.variables.providerId === provider ? (
+                      disconnect.variables.accountId === social.id ? (
                         <Spinner className="text-foreground size-5" />
                       ) : (
                         <Icons.Trash className="text-foreground" size={20} />

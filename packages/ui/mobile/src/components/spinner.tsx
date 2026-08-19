@@ -18,20 +18,22 @@ function Spin({ children }: { children: React.ReactNode }) {
     return {
       transform: [
         {
-          rotateZ: `${rotation.value}deg`,
+          rotateZ: `${rotation.get()}deg`,
         },
       ],
     };
   }, [rotation]);
 
   useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, {
-        duration: 1000,
-        easing: Easing.linear,
-      }),
-      -1,
-      false,
+    rotation.set(
+      withRepeat(
+        withTiming(360, {
+          duration: 1000,
+          easing: Easing.linear,
+        }),
+        -1,
+        false,
+      ),
     );
     return () => cancelAnimation(rotation);
   }, [rotation]);

@@ -51,7 +51,7 @@ export default async function AdminPage() {
             >
               <CardHeader className="w-full">
                 <div className="flex w-full items-center justify-between gap-3">
-                  <CardTitle className="text-foreground truncate">
+                  <CardTitle className="text-foreground truncate leading-tight">
                     {t(`common:${key}`)}
                   </CardTitle>
                   <Icons.ChevronRight className="mt-0.5 size-4" />

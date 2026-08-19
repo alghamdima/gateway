@@ -216,6 +216,9 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "turbostarter",
+    database: {
+      joins: true,
+    },
     cookies: {
       state: {
         attributes: {

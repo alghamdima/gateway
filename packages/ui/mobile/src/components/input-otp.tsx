@@ -67,18 +67,20 @@ function FakeCaret() {
   const foregroundColor = useCSSVariable("--foreground");
 
   useEffect(() => {
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0, { duration: 500 }),
-        withTiming(1, { duration: 500 }),
+    opacity.set(
+      withRepeat(
+        withSequence(
+          withTiming(0, { duration: 500 }),
+          withTiming(1, { duration: 500 }),
+        ),
+        -1,
+        true,
       ),
-      -1,
-      true,
     );
   }, [opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+    opacity: opacity.get(),
   }));
 
   const baseStyle = {

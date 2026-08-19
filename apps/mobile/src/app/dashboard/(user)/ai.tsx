@@ -50,8 +50,8 @@ export default function AI() {
     transport: new DefaultChatTransport({
       fetch: expoFetch as unknown as typeof globalThis.fetch,
       api: api.ai.chat.$url().toString(),
-      headers: () => ({
-        cookie: `${config.cookie}=${useI18nConfig.getState().config.locale};${authClient.getCookie()}`,
+      headers: async () => ({
+        cookie: `${config.cookie}=${useI18nConfig.getState().config.locale};${await authClient.getCookie()}`,
         "x-client-platform": Platform.MOBILE,
         origin: Linking.createURL(""),
       }),

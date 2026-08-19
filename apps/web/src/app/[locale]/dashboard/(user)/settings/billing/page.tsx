@@ -19,11 +19,13 @@ export const generateMetadata = getMetadata({
 });
 
 export default async function BillingPage() {
-  const { user } = await getSession();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session?.user) {
     return redirect(pathsConfig.auth.login);
   }
+
+  const { user } = session;
 
   const summary = await handle(api.billing.summary.$get, {
     schema: getBillingSummaryResponseSchema,

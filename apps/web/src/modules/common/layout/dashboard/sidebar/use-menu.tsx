@@ -1,5 +1,5 @@
 import { useParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { ROOT_MENU_HREF } from "./types";
 
@@ -35,14 +35,6 @@ const findNodeByHref = (menu: Menu, href: string) => {
 };
 
 export const useMenu = (menu: Menu) => {
-  const [history, setHistory] = useState<{
-    previous: string;
-    next: string | null;
-  }>({
-    previous: ROOT_MENU_HREF,
-    next: null,
-  });
-  const [currentHref, setCurrentHref] = useState(ROOT_MENU_HREF);
   const pathname = usePathname();
   const params = useParams();
 
@@ -60,6 +52,34 @@ export const useMenu = (menu: Menu) => {
     (href: string) => findNodeByHref(menu, href)?.parentHref ?? null,
     [menu],
   );
+
+  const itemForPath = findItemByHref(normalizedPathname);
+  const parentHrefForPath = findParentByHref(normalizedPathname);
+  const parentItemForPath = parentHrefForPath
+    ? findItemByHref(parentHrefForPath)
+    : null;
+  const hrefFromPath =
+    (itemForPath?.menu ? itemForPath.href : parentItemForPath?.href) ??
+    ROOT_MENU_HREF;
+
+  const [history, setHistory] = useState<{
+    previous: string;
+    next: string | null;
+  }>({
+    previous: parentHrefForPath ?? ROOT_MENU_HREF,
+    next: itemForPath?.href ?? null,
+  });
+  const [currentHref, setCurrentHref] = useState(hrefFromPath);
+  const [prevPathname, setPrevPathname] = useState(normalizedPathname);
+
+  if (normalizedPathname !== prevPathname) {
+    setPrevPathname(normalizedPathname);
+    setHistory({
+      previous: parentHrefForPath ?? ROOT_MENU_HREF,
+      next: itemForPath?.href ?? null,
+    });
+    setCurrentHref(hrefFromPath);
+  }
 
   const onBack = useCallback(() => {
     const parent = findParentByHref(currentHref) ?? ROOT_MENU_HREF;
@@ -104,20 +124,6 @@ export const useMenu = (menu: Menu) => {
     },
     [normalizedPathname],
   );
-
-  useEffect(() => {
-    const item = findItemByHref(normalizedPathname);
-    const parentHref = findParentByHref(normalizedPathname);
-    const parentItem = parentHref ? findItemByHref(parentHref) : null;
-
-    setHistory({
-      previous: parentHref ?? ROOT_MENU_HREF,
-      next: item?.href ?? null,
-    });
-    setCurrentHref(
-      (item?.menu ? item.href : parentItem?.href) ?? ROOT_MENU_HREF,
-    );
-  }, [normalizedPathname, findItemByHref, findParentByHref]);
 
   return {
     isActive,
