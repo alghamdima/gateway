@@ -30,10 +30,11 @@ const svgJsxTransformPlugin = (): Plugin => ({
 export default defineConfig({
   manifest: async () => {
     const { appConfig } = await import("./src/config/app");
+    const site = URL.canParse(appConfig.url) ? new URL(appConfig.url) : null;
     return {
       name: appConfig.name,
-      permissions: ["storage", "cookies", "sidePanel"],
-      host_permissions: ["<all_urls>"],
+      permissions: ["storage", "cookies"],
+      host_permissions: site ? [`${site.protocol}//${site.hostname}/*`] : [],
       browser_specific_settings: {
         gecko: {
           strict_min_version: "140.0",
@@ -78,7 +79,7 @@ export default defineConfig({
     define: {
       "process.env": Object.fromEntries(
         Object.entries(import.meta.env).filter(
-          ([key]) => key.toLowerCase() !== "path",
+          ([key]) => key.startsWith("VITE_") || key === "NODE_ENV",
         ),
       ),
     },
