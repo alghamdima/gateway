@@ -1551,6 +1551,9 @@ importers:
       class-variance-authority:
         specifier: 0.7.1
         version: 0.7.1
+      cn:
+        specifier: 0.2.4
+        version: 0.2.4
       postcss:
         specifier: 8.5.23
         version: 8.5.23
@@ -1567,9 +1570,6 @@ importers:
       react:
         specifier: catalog:react19
         version: 19.2.8
-      tailwind-merge:
-        specifier: 3.5.0
-        version: 3.5.0
       tsx:
         specifier: 'catalog:'
         version: 4.23.11
@@ -7322,6 +7322,11 @@ packages:
     peerDependencies:
       react: ^18 || ^19 || ^19.0.0-rc
       react-dom: ^18 || ^19 || ^19.0.0-rc
+
+  cn@0.2.4:
+    resolution: {integrity: sha512-SzQvoh5FwizWtQg9+JueKdjWhlfCZMdu5DqNHm9q1wUlRVmKb9WXlepR9bTTbPwzEOyX1ujJ6lcCppmn3bNUCg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   code-block-writer@13.0.3:
     resolution: {integrity: sha512-Oofo0pq3IKnsFtuHqSF7TqBfr71aeyZDVJ0HpmqB7FBM2qEigL0iPONSCZSO9pE9dZTAxANe5XHG9Uy0YMv8cg==}
@@ -18666,6 +18671,8 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
+
+  cn@0.2.4: {}
 
   code-block-writer@13.0.3: {}
 
