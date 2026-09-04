@@ -218,7 +218,8 @@
       "realWorld": "Describe un caso real de IA"
     },
     "placeholder": "Haz una pregunta...",
-    "cta": "Enviar"
+    "cta": "Enviar",
+    "thinking": "Pensando..."
   },
   "setup": {
     "steps": {

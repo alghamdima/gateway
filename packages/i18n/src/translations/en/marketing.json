@@ -210,7 +210,8 @@
       "realWorld": "Describe a real-world AI case"
     },
     "placeholder": "Ask a question...",
-    "cta": "Submit"
+    "cta": "Submit",
+    "thinking": "Thinking..."
   },
   "setup": {
     "steps": {

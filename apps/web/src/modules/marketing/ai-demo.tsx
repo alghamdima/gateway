@@ -6,11 +6,25 @@ import { useState } from "react";
 import { Streamdown } from "streamdown";
 
 import { useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
+import { Bubble, BubbleContent } from "@workspace/ui-web/bubble";
 import { Button } from "@workspace/ui-web/button";
 import { Icons } from "@workspace/ui-web/icons";
-import { ScrollArea } from "@workspace/ui-web/scroll-area";
-import { Textarea } from "@workspace/ui-web/textarea";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from "@workspace/ui-web/input-group";
+import { Marker, MarkerContent } from "@workspace/ui-web/marker";
+import { Message, MessageContent } from "@workspace/ui-web/message";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@workspace/ui-web/message-scroller";
 
 import { api } from "~/lib/api/client";
 
@@ -49,52 +63,81 @@ export const AIDemo = () => {
   );
 
   const isLoading = ["submitted", "streaming"].includes(status);
+  const isEmpty = !messagesToDisplay.length && !isLoading;
+
+  const submit = (text: string) => {
+    const value = text.trim();
+    if (!value || isLoading) return;
+    void sendMessage({ text: value });
+    setInput("");
+  };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      void sendMessage({ text: input });
-      setInput("");
+      submit(input);
     }
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl grow flex-col items-center justify-between gap-4 self-stretch">
-      <ScrollArea className="w-full grow">
-        <div className="flex flex-col gap-4 lg:gap-6">
-          {messagesToDisplay.map((message) => (
-            <article
-              key={message.id}
-              className={cn("max-w-full", {
-                "bg-muted max-w-4/5 self-end rounded-lg px-4 py-2.5":
-                  message.role === "user",
-              })}
-            >
-              {message.parts.map((part, i) => {
-                switch (part.type) {
-                  case "text":
-                    return message.role === "assistant" ? (
-                      <Streamdown key={`${message.id}-${i}`}>
-                        {part.text}
-                      </Streamdown>
-                    ) : (
-                      <div key={`${message.id}-${i}`}>{part.text}</div>
-                    );
-                }
-              })}
-            </article>
-          ))}
-          {isLoading && (
-            <Icons.Loader className="text-muted-foreground size-5 animate-spin" />
-          )}
-        </div>
-      </ScrollArea>
+    <div className="mx-auto flex h-[calc(100svh-var(--banner-height,0px)-7.5rem)] w-full max-w-2xl flex-col gap-4 self-stretch">
+      <MessageScrollerProvider autoScroll>
+        <MessageScroller>
+          <MessageScrollerViewport>
+            <MessageScrollerContent className="gap-4 py-2">
+              {messagesToDisplay.map((message) => {
+                const isUser = message.role === "user";
 
-      {!messagesToDisplay.length && !isLoading && (
+                return (
+                  <MessageScrollerItem
+                    key={message.id}
+                    messageId={message.id}
+                    scrollAnchor={isUser}
+                  >
+                    <Message align={isUser ? "end" : "start"}>
+                      <MessageContent>
+                        <Bubble variant={isUser ? "muted" : "ghost"}>
+                          <BubbleContent>
+                            {message.parts.map((part, i) => {
+                              if (part.type !== "text") return null;
+
+                              return isUser ? (
+                                <span key={`${message.id}-${i}`}>
+                                  {part.text}
+                                </span>
+                              ) : (
+                                <Streamdown key={`${message.id}-${i}`}>
+                                  {part.text}
+                                </Streamdown>
+                              );
+                            })}
+                          </BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                );
+              })}
+              {isLoading && (
+                <MessageScrollerItem messageId="status">
+                  <Marker role="status">
+                    <MarkerContent className="shimmer text-base">
+                      {t("ai.thinking")}
+                    </MarkerContent>
+                  </Marker>
+                </MessageScrollerItem>
+              )}
+            </MessageScrollerContent>
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
+
+      {isEmpty && (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {EXAMPLES.map((example) => (
             <Button
-              onClick={() => sendMessage({ text: t(example.prompt) })}
+              onClick={() => submit(t(example.prompt))}
               key={example.prompt}
               variant="outline"
               className="text-muted-foreground h-auto grow flex-col items-start gap-2 py-3 text-left whitespace-normal"
@@ -107,33 +150,35 @@ export const AIDemo = () => {
       )}
 
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void sendMessage({ text: input });
-          setInput("");
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit(input);
         }}
-        className="bg-background sticky bottom-4 w-full md:bottom-6"
+        className="bg-background w-full"
       >
-        <Textarea
-          placeholder={t("ai.placeholder")}
-          className="min-h-24 resize-none text-base"
-          rows={3}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          value={input}
-          autoFocus
-          onChange={(e) => setInput(e.currentTarget.value)}
-        />
-
-        <Button
-          className="absolute right-2 bottom-2 size-8 rounded-xl"
-          size="icon"
-          type="submit"
-          disabled={isLoading}
-          aria-label={t("ai.cta")}
-        >
-          <Icons.ArrowUp className="size-5" />
-        </Button>
+        <InputGroup>
+          <InputGroupTextarea
+            placeholder={t("ai.placeholder")}
+            className="min-h-12 text-base"
+            rows={3}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            value={input}
+            autoFocus
+            onChange={(event) => setInput(event.currentTarget.value)}
+          />
+          <InputGroupAddon align="block-end" className="justify-end">
+            <InputGroupButton
+              type="submit"
+              variant="default"
+              size="icon-sm"
+              disabled={isLoading || !input.trim()}
+              aria-label={t("ai.cta")}
+            >
+              <Icons.ArrowUp className="size-5" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </form>
     </div>
   );
