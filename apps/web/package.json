@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.60",
-    "@c15t/nextjs": "2.1.0",
-    "@c15t/translations": "2.1.0",
+    "@c15t/nextjs": "2.2.1",
+    "@c15t/translations": "2.2.1",
     "@hookform/resolvers": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
