@@ -262,6 +262,7 @@ const ERROR_MESSAGES = {
   TOO_MANY_ATTEMPTS: "auth:error.code.tooManyAttempts",
   TOTP_NOT_ENABLED: "auth:error.totp.notEnabled",
   TOTP_NOT_CONFIGURED: "auth:error.totp.notConfigured",
+  TOTP_ALREADY_ENABLED: "auth:error.totp.alreadyEnabled",
   TWO_FACTOR_NOT_ENABLED: "auth:error.twoFactor.notEnabled",
   ACCOUNT_TEMPORARILY_LOCKED: "auth:error.twoFactor.accountTemporarilyLocked",
   BACKUP_CODES_NOT_ENABLED: "auth:error.backupCodes.notEnabled",

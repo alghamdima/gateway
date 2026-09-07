@@ -11,21 +11,21 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "db:generate": "cross-env SKIP_ENV_VALIDATION=1 pnpm dlx auth generate --config src/server.ts --output ../db/src/schema/auth.ts --y",
+    "db:generate": "cross-env SKIP_ENV_VALIDATION=1 pnpm dlx auth@1.7.3 generate --config src/server.ts --output ../db/src/schema/auth.ts --y",
     "db:seed": "cross-env SKIP_ENV_VALIDATION=1 tsx ./src/scripts/seed.ts",
     "test": "vitest run"
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "1.7.1",
-    "@better-auth/expo": "1.7.1",
-    "@better-auth/passkey": "1.7.1",
+    "@better-auth/drizzle-adapter": "1.7.3",
+    "@better-auth/expo": "1.7.3",
+    "@better-auth/passkey": "1.7.3",
     "@workspace/billing": "workspace:*",
     "@workspace/billing-web": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/email": "workspace:*",
     "@workspace/i18n": "workspace:*",
     "@workspace/shared": "workspace:*",
-    "better-auth": "1.7.1",
+    "better-auth": "1.7.3",
     "envin": "catalog:",
     "zod": "catalog:"
   },
