@@ -15,15 +15,9 @@ import * as z from "zod";
 import { logger } from "@workspace/shared/logger";
 
 import { getInitOptions, config } from "../config";
-import { loadTranslation, makeZodI18nMap } from "../utils";
+import { getValidationLocale, loadTranslation } from "../utils";
 
-import type {
-  i18n,
-  FlatNamespace,
-  Namespace,
-  KeyPrefix,
-  TFunction,
-} from "i18next";
+import type { i18n, FlatNamespace, Namespace, KeyPrefix } from "i18next";
 import type { FallbackNs, UseTranslationOptions } from "react-i18next";
 
 let client: i18n | null = null;
@@ -96,6 +90,7 @@ export const initializeI18nClient = async ({
     logger.debug(`Max iterations reached: ${MAX_ITERATIONS}`);
 
     client = i18n;
+    z.config(getValidationLocale(i18n.language)());
     return client;
   }
 
@@ -110,6 +105,7 @@ export const initializeI18nClient = async ({
   }
 
   client = i18n;
+  z.config(getValidationLocale(i18n.language)());
   return client;
 };
 
@@ -134,13 +130,9 @@ export const getI18n = async ({
     return initializeI18nClient({ locale, defaultLocale, ns });
   }
 
-  const t = client.getFixedT<Namespace>(client.language, ns);
-
   await client.changeLanguage(locale);
   dayjs.locale(locale);
-  z.config({
-    localeError: makeZodI18nMap({ t: t as TFunction }),
-  });
+  z.config(getValidationLocale(locale ?? client.language)());
 
   if (ns) {
     await client.loadNamespaces(ns);
@@ -172,19 +164,15 @@ export const I18nProvider = ({
   useEffect(() => {
     if (i18nClient) {
       void i18nClient.changeLanguage(locale);
+      z.config(getValidationLocale(locale)());
     }
-  }, [locale]);
+  }, [locale, i18nClient]);
 
   if (!i18nClient) {
     return null;
   }
 
-  const t = i18nClient.getFixedT<Namespace>(i18nClient.language, ns);
-
-  z.config({
-    localeError: makeZodI18nMap({ t: t as TFunction }),
-  });
-
+  z.config(getValidationLocale(i18nClient.language)());
   dayjs.locale(locale);
 
   return <I18nextProvider i18n={i18nClient}>{children}</I18nextProvider>;

@@ -18,6 +18,7 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.3",
     "@better-auth/expo": "1.7.3",
+    "@better-auth/i18n": "1.7.3",
     "@better-auth/passkey": "1.7.3",
     "@workspace/billing": "workspace:*",
     "@workspace/billing-web": "workspace:*",

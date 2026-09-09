@@ -27,7 +27,8 @@ interface AvatarFormProps {
   readonly update: (image: string | null) => Promise<unknown>;
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
@@ -98,6 +99,14 @@ const mutations = {
 } as const;
 
 const useAvatarFormSchema = () => {
+  const { t, i18n } = useTranslation("common");
+  const types = new Intl.ListFormat(i18n.language, {
+    style: "long",
+    type: "conjunction",
+  }).format(
+    [...ACCEPTED_IMAGE_TYPES].map((type) => type.replace("image/", ".")),
+  );
+
   const assetSchema = z.object({
     uri: z.string().min(1),
     mimeType: z.string().optional(),
@@ -109,13 +118,13 @@ const useAvatarFormSchema = () => {
   return z.object({
     avatar: assetSchema
       .refine((file) => (file.fileSize ?? MAX_FILE_SIZE) <= MAX_FILE_SIZE, {
-        message: "error.tooBig.file.inclusive",
+        message: t("error.file.size", { size: `${MAX_FILE_SIZE_MB} MB` }),
         path: ["avatar"],
       })
       .refine(
         (file) => !file.mimeType || ACCEPTED_IMAGE_TYPES.has(file.mimeType),
         {
-          message: "error.file.type",
+          message: t("error.file.type", { types }),
           path: ["avatar"],
         },
       ),
@@ -165,7 +174,7 @@ const AvatarFormUploadButton = ({
   disabled,
   ...props
 }: React.ComponentProps<typeof Button> & { onUpload?: () => void }) => {
-  const { t } = useTranslation(["common", "validation"]);
+  const { t } = useTranslation("common");
   const { pick } = useImagePicker();
   const { image, setPreviewUrl, id, update } = useAvatarFormContext();
   const avatarSchema = useAvatarFormSchema();
@@ -177,10 +186,7 @@ const AvatarFormUploadButton = ({
     ...mutations.upload,
     onError: (error) => {
       setPreviewUrl(image ?? null);
-      Alert.alert(
-        t("common:error.title"),
-        error.message || t("common:error.general"),
-      );
+      Alert.alert(t("error.title"), error.message || t("error.general"));
     },
     onSuccess: async ({ publicUrl, oldImage }) => {
       clearErrors();
@@ -216,7 +222,7 @@ const AvatarFormUploadButton = ({
       const firstIssue = result.error.issues[0];
       const firstMsg = firstIssue?.message ?? "";
       setError("avatar", { message: firstMsg });
-      Alert.alert(t("common:error.title"), firstMsg);
+      Alert.alert(t("error.title"), firstMsg);
       return;
     }
 

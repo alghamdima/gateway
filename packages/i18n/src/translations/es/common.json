@@ -254,7 +254,12 @@
     "notFound": "¡No encontrado!",
     "resourceDoesNotExist": "El recurso que estás buscando no existe.",
     "unauthorized": "¡Necesitas iniciar sesión para acceder a esta función!",
-    "forbidden": "¡No tienes permiso para acceder a esta función!"
+    "forbidden": "¡No tienes permiso para acceder a esta función!",
+    "file": {
+      "image": "Por favor selecciona un archivo de imagen.",
+      "size": "El tamaño del archivo debe ser menor a {{size}}.",
+      "type": "Solo se aceptan archivos {{types}}."
+    }
   },
   "goBackHome": "Volver al inicio"
 }

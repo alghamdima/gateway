@@ -26,7 +26,7 @@ import { organization } from "~/modules/organization/lib/api";
 import { useActiveOrganization } from "../hooks/use-active-organization";
 
 export const EditLogo = ({ organizationId }: { organizationId: string }) => {
-  const { t } = useTranslation(["common", "validation", "organization"]);
+  const { t } = useTranslation(["common", "organization"]);
   const { activeMember } = useActiveOrganization();
 
   const queryClient = useQueryClient();

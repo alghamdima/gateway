@@ -1,3 +1,5 @@
+import * as z from "zod";
+
 import { logger } from "@workspace/shared/logger";
 
 import { config } from "../config";
@@ -34,6 +36,9 @@ export const isLocaleSupported = (
   locale: string,
 ): locale is (typeof config.locales)[number] => config.locales.includes(locale);
 
+export const getValidationLocale = (locale?: string) =>
+  locale && isLocaleSupported(locale) ? z.locales[locale] : z.locales.en;
+
 export const getPathname = ({
   locale,
   path,
@@ -54,5 +59,3 @@ export const getPathname = ({
 
   return `/${locale}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 };
-
-export * from "./validation";

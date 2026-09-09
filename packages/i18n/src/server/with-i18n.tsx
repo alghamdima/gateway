@@ -3,7 +3,7 @@ import * as z from "zod";
 
 import { initializeServerI18n } from ".";
 import { env } from "../env";
-import { makeZodI18nMap } from "../utils";
+import { getValidationLocale } from "../utils";
 
 type LayoutOrPageComponent<Params> = React.ComponentType<Params>;
 
@@ -33,9 +33,7 @@ export function withI18n<Params extends object>(
       defaultLocale: env.DEFAULT_LOCALE,
     });
     dayjs.locale(i18n.language);
-    z.config({
-      localeError: makeZodI18nMap({ t: i18n.t }),
-    });
+    z.config(getValidationLocale(i18n.language)());
 
     return <Component {...props} />;
   };

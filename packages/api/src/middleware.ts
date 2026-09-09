@@ -4,15 +4,14 @@ import { createMiddleware } from "hono/factory";
 import { getAllRolesAtOrAbove, hasAdminPermission } from "@workspace/auth";
 import { MemberRole } from "@workspace/auth";
 import { auth } from "@workspace/auth/server";
-import { makeZodI18nMap } from "@workspace/i18n";
-import { getLocaleFromRequest, getTranslation } from "@workspace/i18n/server";
+import { getValidationLocale } from "@workspace/i18n";
+import { getLocaleFromRequest } from "@workspace/i18n/server";
 import { HttpStatusCode, NodeEnv } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
 import { env } from "./env";
 
 import type { Permissions, User } from "@workspace/auth";
-import type { TFunction } from "@workspace/i18n";
 import type { ValidationTargets } from "hono";
 import type { $ZodRawIssue, $ZodType } from "zod/v4/core";
 
@@ -200,26 +199,27 @@ export const validate = <
   target: Target,
   schema: T,
 ) =>
-  zValidator(target, schema, async (result, c) => {
+  zValidator(target, schema, (result, c) => {
     if (!result.success) {
-      const { t } = await getTranslation({
-        locale:
-          "locale" in c.var && typeof c.var.locale === "string"
-            ? c.var.locale
-            : getLocaleFromRequest(c.req.raw),
-      });
       const error = result.error.issues[0];
 
       if (!error) {
         throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY);
       }
 
-      const { message, code } = makeZodI18nMap({ t: t as TFunction })(
+      const locale =
+        "locale" in c.var && typeof c.var.locale === "string"
+          ? c.var.locale
+          : getLocaleFromRequest(c.req.raw);
+      const mapped = getValidationLocale(locale)().localeError(
         error as $ZodRawIssue,
       );
+      const message =
+        (typeof mapped === "string" ? mapped : mapped?.message) ??
+        error.message;
 
       throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY, {
-        code,
+        code: error.code,
         message,
       });
     }

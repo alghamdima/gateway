@@ -28,9 +28,11 @@ export const authRouter = new Hono().on(["GET", "POST"], "*", async (c) => {
       ? res.status
       : HttpStatusCode.INTERNAL_SERVER_ERROR,
     json
-      ? {
-          code: ERROR_MESSAGES[json.code],
-        }
+      ? json.code in ERROR_MESSAGES
+        ? {
+            code: ERROR_MESSAGES[json.code as keyof typeof ERROR_MESSAGES],
+          }
+        : json
       : undefined,
   );
 });

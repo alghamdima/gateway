@@ -31,7 +31,7 @@ interface EditAvatarProps {
 }
 
 export const EditAvatar = memo<EditAvatarProps>((props) => {
-  const { t } = useTranslation(["common", "validation", "auth"]);
+  const { t } = useTranslation(["common", "auth"]);
 
   const router = useRouter();
 

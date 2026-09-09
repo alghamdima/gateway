@@ -1,5 +1,6 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { expo } from "@better-auth/expo";
+import { i18n, locales, TranslationDictionary } from "@better-auth/i18n";
 import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
@@ -18,6 +19,7 @@ import * as schema from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { EmailTemplate } from "@workspace/email";
 import { sendEmail } from "@workspace/email/server";
+import { config, Locale } from "@workspace/i18n";
 import { getLocaleFromRequest } from "@workspace/i18n/server";
 import { NodeEnv } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
@@ -120,6 +122,15 @@ export const auth = betterAuth({
     user: hooks.user,
   },
   plugins: [
+    i18n({
+      detection: ["cookie", "header"],
+      translations: {
+        en: locales.en,
+        es: locales.es,
+      } satisfies Record<Locale, TranslationDictionary>,
+      localeCookie: config.cookie,
+      defaultLocale: config.defaultLocale,
+    }),
     magicLink({
       sendMagicLink: async ({ email, url }, ctx) =>
         sendEmail({

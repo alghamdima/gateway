@@ -15,7 +15,6 @@ export const config = {
     "auth",
     "billing",
     "marketing",
-    "validation",
   ],
   cookie: "locale",
 } as const;

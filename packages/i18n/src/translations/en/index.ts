@@ -6,5 +6,4 @@ export const en = {
   organization: () => import("./organization.json"),
   admin: () => import("./admin.json"),
   dashboard: () => import("./dashboard.json"),
-  validation: () => import("./validation.json"),
 } as const;

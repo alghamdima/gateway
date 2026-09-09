@@ -1,3 +1,4 @@
+import { BASE_ERROR_CODES } from "better-auth";
 import * as z from "zod";
 
 import type { AuthErrorCode } from "./server";
@@ -94,16 +95,8 @@ const ERROR_MESSAGES = {
   FAILED_TO_CREATE_VERIFICATION: "auth:error.failedToCreateVerification",
   FIELD_NOT_ALLOWED: "auth:error.fieldNotAllowed",
   ASYNC_VALIDATION_NOT_SUPPORTED: "auth:error.asyncValidationNotSupported",
-  VALIDATION_ERROR: "auth:error.validationError",
-  MISSING_FIELD: "auth:error.missingField",
   CROSS_SITE_NAVIGATION_LOGIN_BLOCKED:
     "auth:error.crossSiteNavigationLoginBlocked",
-  VERIFICATION_EMAIL_NOT_ENABLED: "auth:error.user.verificationEmailNotEnabled",
-  EMAIL_ALREADY_VERIFIED: "auth:error.user.emailAlreadyVerified",
-  EMAIL_MISMATCH: "auth:error.user.emailMismatch",
-  SESSION_NOT_FRESH: "auth:error.session.notFresh",
-  LINKED_ACCOUNT_ALREADY_EXISTS:
-    "auth:error.account.linkedAccountAlreadyExists",
   INVALID_ORIGIN: "auth:error.invalidOrigin",
   YOU_ARE_NOT_ALLOWED_TO_CHANGE_USERS_ROLE: "auth:error.user.cannotChangeRole",
   YOU_ARE_NOT_ALLOWED_TO_CREATE_USERS: "admin:error.cannotCreateUsers",
@@ -151,8 +144,6 @@ const ERROR_MESSAGES = {
     "organization:error.maximumNumberOfOrganizations",
   ORGANIZATION_ALREADY_EXISTS: "organization:error.alreadyExists",
   ORGANIZATION_NOT_FOUND: "organization:error.notFound",
-  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL:
-    "auth:error.user.alreadyExistsUseAnotherEmail",
   USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION: "organization:error.userNotMember",
   YOU_ARE_NOT_ALLOWED_TO_UPDATE_THIS_ORGANIZATION:
     "organization:error.cannotUpdate",
@@ -219,34 +210,11 @@ const ERROR_MESSAGES = {
     "organization:error.membershipLimitReached",
   YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION:
     "organization:error.invitation.notRecipient",
-  USER_NOT_FOUND: "auth:error.user.notFound",
-  USER_ALREADY_HAS_PASSWORD: "auth:error.user.alreadyHasPassword",
   AUTHENTICATION_FAILED: "auth:error.authenticationFailed",
-  FAILED_TO_CREATE_USER: "auth:error.account.creation",
-  FAILED_TO_CREATE_SESSION: "auth:error.session.creation",
+  ID_TOKEN_NOT_SUPPORTED: "auth:error.token.idNotSupported",
+  CHANGE_EMAIL_DISABLED: "auth:error.credentials.email.changeDisabled",
   UNABLE_TO_CREATE_SESSION: "auth:error.session.creation",
   COULD_NOT_CREATE_SESSION: "auth:error.session.creation",
-  FAILED_TO_UPDATE_USER: "auth:error.account.update",
-  FAILED_TO_GET_SESSION: "auth:error.session.retrieval",
-  INVALID_PASSWORD: "auth:error.credentials.password.invalid",
-  INVALID_EMAIL: "auth:error.credentials.email.invalid",
-  INVALID_EMAIL_OR_PASSWORD: "auth:error.credentials.invalidEmailOrPassword",
-  SOCIAL_ACCOUNT_ALREADY_LINKED: "auth:error.social.alreadyLinked",
-  PROVIDER_NOT_FOUND: "auth:error.social.providerNotFound",
-  INVALID_TOKEN: "auth:error.token.invalid",
-  ID_TOKEN_NOT_SUPPORTED: "auth:error.token.idNotSupported",
-  FAILED_TO_GET_USER_INFO: "auth:error.user.infoNotFound",
-  USER_EMAIL_NOT_FOUND: "auth:error.user.emailNotFound",
-  EMAIL_NOT_VERIFIED: "auth:error.credentials.email.notVerified",
-  PASSWORD_TOO_SHORT: "auth:error.credentials.password.tooShort",
-  PASSWORD_TOO_LONG: "auth:error.credentials.password.tooLong",
-  USER_ALREADY_EXISTS: "auth:error.user.alreadyExists",
-  EMAIL_CAN_NOT_BE_UPDATED: "auth:error.credentials.email.cannotUpdate",
-  CHANGE_EMAIL_DISABLED: "auth:error.credentials.email.changeDisabled",
-  CREDENTIAL_ACCOUNT_NOT_FOUND: "auth:error.credentials.notFound",
-  SESSION_EXPIRED: "auth:error.session.expired",
-  FAILED_TO_UNLINK_LAST_ACCOUNT: "auth:error.social.unlinkLastAccount",
-  ACCOUNT_NOT_FOUND: "auth:error.user.accountNotFound",
   CHALLENGE_NOT_FOUND: "auth:error.passkey.challengeNotFound",
   YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY: "auth:error.passkey.notAllowed",
   FAILED_TO_VERIFY_REGISTRATION: "auth:error.passkey.verificationFailed",
@@ -275,13 +243,10 @@ const ERROR_MESSAGES = {
   INVALID_ERROR_CALLBACK_URL: "auth:error.url.invalidErrorCallbackUrl",
   INVALID_NEW_USER_CALLBACK_URL: "auth:error.url.invalidNewUserCallbackUrl",
   CALLBACK_URL_REQUIRED: "auth:error.url.callbackUrlRequired",
-  ROLE_IS_ASSIGNED_TO_MEMBERS: "organization:error.ac.roleAssignedToMembers",
-  INVALID_USER: "auth:error.user.invalid",
-  TOKEN_EXPIRED: "auth:error.token.expired",
   METHOD_NOT_ALLOWED_DEFER_SESSION_REQUIRED:
     "auth:error.methodNotAllowedDeferSessionRequired",
   BODY_MUST_BE_AN_OBJECT: "auth:error.bodyMustBeAnObject",
-  PASSWORD_ALREADY_SET: "auth:error.credentials.password.alreadySet",
+  ROLE_IS_ASSIGNED_TO_MEMBERS: "organization:error.ac.roleAssignedToMembers",
   PREVIOUSLY_REGISTERED: "auth:error.user.previouslyRegistered",
   REGISTRATION_CANCELLED: "auth:error.user.registrationCancelled",
   AUTH_CANCELLED: "auth:error.authCancelled",
@@ -289,7 +254,11 @@ const ERROR_MESSAGES = {
   RESOLVED_USER_INVALID: "auth:error.user.invalid",
   RESOLVE_USER_REQUIRED: "auth:error.user.resolveRequired",
   SESSION_REQUIRED: "auth:error.session.required",
-} as const satisfies Record<AuthErrorCode, TranslationKey>;
+} as const satisfies Record<
+  Exclude<AuthErrorCode, keyof typeof BASE_ERROR_CODES>,
+  TranslationKey
+> &
+  Partial<Record<keyof typeof BASE_ERROR_CODES, TranslationKey>>;
 
 export type { AuthConfig, AuthErrorCode };
 

@@ -10,7 +10,7 @@ import { logger } from "@workspace/shared/logger";
 
 import { config, getInitOptions } from "../config";
 import { env } from "../env";
-import { loadTranslation, makeZodI18nMap } from "../utils";
+import { getValidationLocale, loadTranslation } from "../utils";
 
 import type { i18n, Namespace, TFunction } from "i18next";
 
@@ -174,9 +174,7 @@ export const getTranslation = async <T extends Namespace>({
     ns,
   ) as TFunction<T>;
 
-  z.config({
-    localeError: makeZodI18nMap({ t: t as TFunction }),
-  });
+  z.config(getValidationLocale(i18nextInstance.language)());
 
   return {
     t,

@@ -23,7 +23,8 @@ interface AvatarFormProps {
   readonly update: (image: string | null) => Promise<unknown>;
 }
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -105,30 +106,24 @@ const mutations = {
 };
 
 const useAvatarFormSchema = () => {
-  const { t, i18n } = useTranslation("validation");
+  const { t, i18n } = useTranslation("common");
+  const types = new Intl.ListFormat(i18n.language, {
+    style: "long",
+    type: "conjunction",
+  }).format(ACCEPTED_IMAGE_TYPES.map((type) => type.replace("image/", ".")));
 
   return z.object({
     avatar: z
       .custom<FileList>()
-      .refine(
-        (files) => files.length === 1,
-        t("error.file.maxCount", { count: 1 }),
-      )
+      .refine((files) => files.length === 1, t("error.file.image"))
       .transform((files) => files[0])
       .refine(
         (file) => (file?.size ?? 0) <= MAX_FILE_SIZE,
-        t("error.tooBig.file.inclusive", {
-          maximum: MAX_FILE_SIZE,
-        }),
+        t("error.file.size", { size: `${MAX_FILE_SIZE_MB} MB` }),
       )
       .refine(
         (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type ?? ""),
-        t("error.file.type", {
-          types: new Intl.ListFormat(i18n.language, {
-            style: "long",
-            type: "conjunction",
-          }).format(ACCEPTED_IMAGE_TYPES.map((t) => t.replace("image/", "."))),
-        }),
+        t("error.file.type", { types }),
       ),
   });
 };
