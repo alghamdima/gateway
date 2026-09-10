@@ -164,7 +164,9 @@ export const auth = betterAuth({
     }),
     passkey(),
     twoFactor(),
-    anonymous(),
+    anonymous({
+      emailDomainName: "turbostarter.dev",
+    }),
     admin(),
     organization({
       sendInvitationEmail: async (

@@ -13,17 +13,17 @@
     "dev": "dotenv -e ../../apps/web/.env.local -c -- email dev --port 3005 --dir src/templates"
   },
   "dependencies": {
-    "@react-email/ui": "6.9.3",
+    "@react-email/ui": "6.9.5",
     "@workspace/i18n": "workspace:*",
     "@workspace/ui": "workspace:*",
     "culori": "4.0.2",
-    "nodemailer": "9.0.1",
-    "react-email": "6.9.3",
+    "nodemailer": "9.1.1",
+    "react-email": "6.9.5",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/culori": "4.0.1",
-    "@types/nodemailer": "8.0.0",
+    "@types/nodemailer": "8.0.1",
     "@workspace/shared": "workspace:*",
     "@workspace/tsconfig": "workspace:*",
     "typescript": "catalog:"

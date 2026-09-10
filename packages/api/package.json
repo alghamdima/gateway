@@ -28,7 +28,7 @@
     "@workspace/storage": "workspace:*",
     "ai": "7.0.57",
     "envin": "catalog:",
-    "hono": "4.13.1",
+    "hono": "4.13.7",
     "hono-status-monitor": "1.0.8",
     "zod": "catalog:"
   },
