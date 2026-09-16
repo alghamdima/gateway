@@ -1,5 +1,6 @@
 import { defineCollection } from "@content-collections/core";
 import { compileMDX } from "@content-collections/mdx";
+import remarkGfm from "remark-gfm";
 import * as z from "zod";
 
 import { ContentStatus } from "../../types";
@@ -16,7 +17,9 @@ export const legal = defineCollection({
     content: z.string(),
   }),
   transform: async (document, context) => {
-    const mdx = await compileMDX(context, document);
+    const mdx = await compileMDX(context, document, {
+      remarkPlugins: [remarkGfm],
+    });
     const lastModifiedAt = await context.cache(
       document._meta.filePath,
       getLastModifiedAt,

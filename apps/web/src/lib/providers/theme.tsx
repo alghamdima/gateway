@@ -47,6 +47,7 @@ export const ThemeProvider = memo<ThemeProviderProps>(({ children }) => {
   useEffect(() => {
     if (config.font === ThemeFont.SANS) {
       document.documentElement.style.removeProperty("--font-sans");
+      return;
     }
 
     document.documentElement.style.setProperty(

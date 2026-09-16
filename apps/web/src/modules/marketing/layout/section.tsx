@@ -50,7 +50,7 @@ export const SectionTitle = ({
     <As
       {...props}
       className={cn(
-        "mt-4 max-w-4xl text-4xl leading-[0.95] font-semibold tracking-tighter text-balance md:text-5xl lg:text-6xl",
+        "mt-4 max-w-4xl text-4xl leading-none font-semibold tracking-tighter text-balance md:text-5xl lg:text-6xl",
         props.className,
       )}
     />

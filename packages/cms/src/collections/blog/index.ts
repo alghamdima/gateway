@@ -2,6 +2,7 @@ import { defineCollection } from "@content-collections/core";
 import { compileMDX } from "@content-collections/mdx";
 import rehypeShiki from "@shikijs/rehype";
 import readingTime from "reading-time";
+import remarkGfm from "remark-gfm";
 import * as z from "zod";
 
 import { ContentStatus, ContentTag } from "../../types";
@@ -22,6 +23,7 @@ export const blog = defineCollection({
   }),
   transform: async (document, context) => {
     const mdx = await compileMDX(context, document, {
+      remarkPlugins: [remarkGfm],
       rehypePlugins: [
         [
           rehypeShiki,

@@ -1128,6 +1128,9 @@ importers:
       reading-time:
         specifier: 1.5.0
         version: 1.5.0
+      remark-gfm:
+        specifier: 4.0.1
+        version: 4.0.1(supports-color@8.1.1)
     devDependencies:
       '@content-collections/cli':
         specifier: 0.1.9
@@ -1780,9 +1783,6 @@ importers:
         specifier: 4.14.1
         version: 4.14.1(supports-color@8.1.1)(typescript@7.0.2)
     devDependencies:
-      '@tailwindcss/typography':
-        specifier: 0.5.20
-        version: 0.5.20(tailwindcss@4.3.3)
       '@workspace/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/typescript
@@ -6180,10 +6180,6 @@ packages:
   '@tailwindcss/postcss@4.3.3':
     resolution: {integrity: sha512-JTSZZGQi1AyKirbLN3azmjVzef92tcX7h+iSqPdaeStyFpGpDlKvvpxeOE8njhbUanbRwr3z8DyzhICWnMtQeg==}
 
-  '@tailwindcss/typography@0.5.20':
-    resolution: {integrity: sha512-hwbzQuNUfcPvbegQFatVPl/MY/tcM9KLl963hQ5laJKPh81TEZ1+dNG9PirGvcaDBkp+BCshExAyKVPW91dozw==}
-    peerDependencies:
-      tailwindcss: '>=3.0.0 || >=4.0.0 || insiders'
 
   '@tailwindcss/vite@4.3.3':
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
@@ -17474,10 +17470,6 @@ snapshots:
       postcss: 8.5.28
       tailwindcss: 4.3.3
 
-  '@tailwindcss/typography@0.5.20(tailwindcss@4.3.3)':
-    dependencies:
-      postcss-selector-parser: 6.0.10
-      tailwindcss: 4.3.3
 
   '@tailwindcss/vite@4.3.3(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0))':
     dependencies:

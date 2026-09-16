@@ -106,9 +106,12 @@ export const AIDemo = () => {
                                   {part.text}
                                 </span>
                               ) : (
-                                <Streamdown key={`${message.id}-${i}`}>
-                                  {part.text}
-                                </Streamdown>
+                                <div
+                                  key={`${message.id}-${i}`}
+                                  className="typeset typeset-chat"
+                                >
+                                  <Streamdown>{part.text}</Streamdown>
+                                </div>
                               );
                             })}
                           </BubbleContent>

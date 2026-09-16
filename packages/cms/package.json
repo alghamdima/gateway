@@ -14,7 +14,8 @@
   "dependencies": {
     "@content-collections/core": "0.15.2",
     "@workspace/shared": "workspace:*",
-    "reading-time": "1.5.0"
+    "reading-time": "1.5.0",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@content-collections/cli": "0.1.9",
