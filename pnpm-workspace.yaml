@@ -10,9 +10,9 @@ packages:
 
 catalog:
   "@hookform/resolvers": 5.7.1
-  "@tanstack/react-query": 5.101.4
-  "@tanstack/react-query-devtools": 5.101.4
-  "@tanstack/react-table": 9.1.0
+  "@tanstack/react-query": 5.102.8
+  "@tanstack/react-query-devtools": 5.102.8
+  "@tanstack/react-table": 9.2.4
   envin: 1.2.0
   dayjs: 1.11.20
   react-hook-form: 7.84.0
@@ -34,9 +34,9 @@ catalogs:
     react: 19.2.8
     react-dom: 19.2.8
   turbo:
-    "@turbo/gen": 2.10.12
-    turbo: 2.10.12
-    eslint-plugin-turbo: 2.10.12
+    "@turbo/gen": 2.10.13
+    turbo: 2.10.13
+    eslint-plugin-turbo: 2.10.13
 
 overrides:
   esbuild: 0.28.1

@@ -94,7 +94,7 @@ async function AuthenticatedSidebar() {
   const { user } = session;
 
   const queryClient = getQueryClient();
-  await queryClient.prefetchQuery({
+  await queryClient.query({
     ...billing.queries.summary.get(user.id),
     queryFn: () =>
       handle(api.billing.summary.$get, {

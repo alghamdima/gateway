@@ -154,7 +154,7 @@ async function AuthenticatedOrgSidebar({
     organization.queries.get({ id: activeOrganization.id }).queryKey,
     activeOrganization,
   );
-  await queryClient.prefetchQuery({
+  await queryClient.query({
     ...billing.queries.summary.get(activeOrganization.id),
     queryFn: () =>
       handle(api.billing.summary.$get, {
