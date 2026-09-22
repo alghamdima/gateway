@@ -10,7 +10,8 @@ import {
 } from "@workspace/cms";
 import { badgeVariants } from "@workspace/ui-web/badge";
 
-import { BLOG_PREFIX } from "~/config/paths";
+import { appConfig } from "~/config/app";
+import { BLOG_PREFIX, pathsConfig } from "~/config/paths";
 import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { Mdx } from "~/modules/common/mdx";
@@ -41,9 +42,39 @@ export default async function Page({
   }
 
   const { t } = await getTranslation({ ns: "marketing", locale });
+  const pageUrl = new URL(
+    pathsConfig.marketing.blog.post(item.slug),
+    appConfig.url,
+  ).toString();
 
   return (
     <Section>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            headline: item.title,
+            description: item.description,
+            image: item.thumbnail,
+            publisher: {
+              "@type": "Organization",
+              name: appConfig.name,
+              logo: {
+                "@type": "ImageObject",
+                url: `${appConfig.url}/icon.svg`,
+              },
+            },
+            datePublished: item.publishedAt.toISOString(),
+            dateModified: item.lastModifiedAt,
+            mainEntityOfPage: {
+              "@type": "WebPage",
+              "@id": pageUrl,
+            },
+          }).replaceAll("<", "\\u003c"),
+        }}
+      />
       <SectionHeader className="max-w-3xl">
         <div className="mr-auto flex flex-wrap gap-1 md:gap-1.5">
           {item.tags.map((tag) => (
@@ -123,5 +154,15 @@ export async function generateMetadata({
   return getMetadata({
     title: item.title,
     description: item.description,
+    type: "article",
+    canonical: pathsConfig.marketing.blog.post(item.slug),
+    images: [
+      {
+        url: item.thumbnail,
+        width: 1200,
+        height: 800,
+        alt: item.title,
+      },
+    ],
   })({ params });
 }

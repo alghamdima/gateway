@@ -1,3 +1,4 @@
+import { billingConfigSchema, type BillingConfig } from "../../../config";
 import {
   BillingDiscountType,
   BillingModel,
@@ -6,9 +7,7 @@ import {
   RecurringInterval,
 } from "../../../types";
 
-import type { BillingConfig } from "../../../config";
-
-export const config: BillingConfig = {
+export const config = billingConfigSchema.parse({
   plans: [
     {
       id: BillingPlan.FREE,
@@ -26,18 +25,12 @@ export const config: BillingConfig = {
           id: "free-lifetime",
           type: BillingType.FLAT,
           cost: 0,
-          custom: false,
-          currency: "usd",
-          hidden: false,
           model: BillingModel.ONE_TIME,
         },
         {
           id: "free-monthly",
           type: BillingType.FLAT,
           cost: 0,
-          custom: false,
-          currency: "usd",
-          hidden: false,
           model: BillingModel.RECURRING,
           interval: RecurringInterval.MONTH,
         },
@@ -45,9 +38,6 @@ export const config: BillingConfig = {
           id: "free-yearly",
           type: BillingType.FLAT,
           cost: 0,
-          custom: false,
-          currency: "usd",
-          hidden: false,
           model: BillingModel.RECURRING,
           interval: RecurringInterval.YEAR,
         },
@@ -68,18 +58,12 @@ export const config: BillingConfig = {
           id: "premium-one-time",
           type: BillingType.FLAT,
           cost: 19900,
-          custom: false,
-          currency: "usd",
-          hidden: false,
           model: BillingModel.ONE_TIME,
         },
         {
           id: "premium-monthly",
           type: BillingType.FLAT,
           cost: 1900,
-          custom: false,
-          currency: "usd",
-          hidden: false,
           model: BillingModel.RECURRING,
           interval: RecurringInterval.MONTH,
           trialDays: 7,
@@ -88,9 +72,6 @@ export const config: BillingConfig = {
           id: "premium-yearly",
           type: BillingType.FLAT,
           cost: 19000, // Higher than monthly * 12 to test recurring discount
-          custom: false,
-          currency: "usd",
-          hidden: false,
           model: BillingModel.RECURRING,
           interval: RecurringInterval.YEAR,
           trialDays: 7,
@@ -172,6 +153,6 @@ export const config: BillingConfig = {
       appliesTo: ["premium-yearly"],
     },
   ],
-};
+}) satisfies BillingConfig;
 
 export const ACTIVE_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
