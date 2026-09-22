@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { router, useGlobalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import * as z from "zod";
 
 import { VerificationType } from "@workspace/auth";
 
@@ -13,6 +14,45 @@ import { auth } from "./lib/api";
 
 import type { Href } from "expo-router";
 import type { Path } from "~/config/paths";
+
+const verificationTypeSchema = z.enum([
+  VerificationType.MAGIC_LINK,
+  VerificationType.CONFIRM_EMAIL,
+  VerificationType.DELETE_ACCOUNT,
+]);
+
+const collectPaths = (value: unknown): string[] => {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value).flatMap(collectPaths);
+  }
+
+  return [];
+};
+
+const allowedPaths = new Set(collectPaths(pathsConfig));
+
+const toAllowedPath = (
+  value: string | string[] | undefined,
+): Path | undefined => {
+  const path = typeof value === "string" ? value : undefined;
+
+  if (!path || !path.startsWith("/") || path.startsWith("//")) {
+    return undefined;
+  }
+
+  const pathname = path.split("?")[0] ?? path;
+
+  return allowedPaths.has(pathname) ? (path as Path) : undefined;
+};
+
+const verificationParamsSchema = z.object({
+  token: z.string().min(1),
+  type: verificationTypeSchema,
+});
 
 const useVerificationMutations = ({
   onSuccess,
@@ -64,40 +104,37 @@ const resetParams = () => {
 const VerificationController = ({
   token,
   type,
-  callbackURL,
   redirectTo,
   errorCallbackURL,
 }: {
   token: string;
-  type: VerificationType;
-  callbackURL?: Href;
-  redirectTo?: Href;
-  errorCallbackURL?: Href;
+  type: z.infer<typeof verificationTypeSchema>;
+  redirectTo: Href;
+  errorCallbackURL: Href;
 }) => {
+  const attemptedToken = useRef<string | null>(null);
+
   const mutations = useVerificationMutations({
     onSuccess: () => {
-      router.navigate(redirectTo ?? callbackURL ?? pathsConfig.index);
+      router.navigate(redirectTo);
       resetParams();
     },
-    ...(errorCallbackURL
-      ? {
-          onError: () => {
-            router.navigate(errorCallbackURL);
-            resetParams();
-          },
-        }
-      : {}),
+    onError: () => {
+      router.navigate(errorCallbackURL);
+      resetParams();
+    },
   });
 
   const { mutate, isPending } = mutations[type];
 
   useEffect(() => {
-    if (token && !isPending) {
-      mutate({
-        token,
-      });
+    if (!token || attemptedToken.current === token) {
+      return;
     }
-  }, [token, isPending, mutate]);
+
+    attemptedToken.current = token;
+    mutate({ token });
+  }, [token, mutate]);
 
   if (isPending) {
     return <Spinner />;
@@ -121,17 +158,27 @@ export const Verification = () => {
     errorCallbackURL?: Path;
   }>();
 
-  if (!token || !type) {
+  const parsed = verificationParamsSchema.safeParse({
+    token,
+    type,
+  });
+
+  if (!parsed.success) {
     return null;
   }
 
   return (
     <VerificationController
-      token={token}
-      type={type}
-      callbackURL={callbackURL}
-      redirectTo={redirectTo}
-      errorCallbackURL={errorCallbackURL}
+      token={parsed.data.token}
+      type={parsed.data.type}
+      redirectTo={
+        toAllowedPath(redirectTo) ??
+        toAllowedPath(callbackURL) ??
+        pathsConfig.index
+      }
+      errorCallbackURL={
+        toAllowedPath(errorCallbackURL) ?? pathsConfig.setup.auth.error
+      }
     />
   );
 };

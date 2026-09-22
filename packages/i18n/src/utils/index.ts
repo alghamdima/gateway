@@ -6,7 +6,13 @@ import { config } from "../config";
 import { translations } from "../translations";
 
 import type { TranslationKey } from "../client";
-import type { DefaultNamespace, Namespace, TOptions, i18n } from "i18next";
+import type {
+  DefaultNamespace,
+  Namespace,
+  Resource,
+  TOptions,
+  i18n,
+} from "i18next";
 
 export const loadTranslation = async (
   locale: (typeof config.locales)[number],
@@ -35,6 +41,23 @@ export const isKey = <T extends Namespace = DefaultNamespace>(
 export const isLocaleSupported = (
   locale: string,
 ): locale is (typeof config.locales)[number] => config.locales.includes(locale);
+
+export const loadLocaleResources = async (
+  locale: string,
+): Promise<Resource> => {
+  const language = isLocaleSupported(locale) ? locale : config.defaultLocale;
+
+  const namespaces = await Promise.all(
+    config.namespaces.map(async (namespace) => {
+      const data = await loadTranslation(language, namespace);
+      return [namespace, data] as const;
+    }),
+  );
+
+  return {
+    [language]: Object.fromEntries(namespaces),
+  };
+};
 
 export const getValidationLocale = (locale?: string) =>
   locale && isLocaleSupported(locale) ? z.locales[locale] : z.locales.en;

@@ -6,7 +6,6 @@ import {
   canLeaveOrganization,
   getOrganizationsBlockingAccountDeletion,
 } from "@workspace/auth/server";
-
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 

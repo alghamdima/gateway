@@ -1,7 +1,6 @@
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { memo } from "react";
 
-import { I18nProvider } from "@workspace/i18n";
+import { I18nProvider, loadLocaleResources } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { QueryClientProvider } from "~/lib/query/client";
@@ -18,9 +17,15 @@ interface ProvidersProps {
   readonly locale: string;
 }
 
-export const Providers = memo<ProvidersProps>(({ children, locale }) => {
+export const Providers = async ({ children, locale }: ProvidersProps) => {
+  const resources = await loadLocaleResources(locale);
+
   return (
-    <I18nProvider locale={locale} defaultLocale={appConfig.locale}>
+    <I18nProvider
+      locale={locale}
+      defaultLocale={appConfig.locale}
+      resources={resources}
+    >
       <QueryClientProvider>
         <NuqsAdapter>
           <ConsentProvider locale={locale}>
@@ -38,6 +43,4 @@ export const Providers = memo<ProvidersProps>(({ children, locale }) => {
       </QueryClientProvider>
     </I18nProvider>
   );
-});
-
-Providers.displayName = "Providers";
+};

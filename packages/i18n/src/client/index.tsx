@@ -17,13 +17,31 @@ import { logger } from "@workspace/shared/logger";
 import { getInitOptions, config } from "../config";
 import { getValidationLocale, loadTranslation } from "../utils";
 
-import type { i18n, FlatNamespace, Namespace, KeyPrefix } from "i18next";
+import type {
+  i18n,
+  FlatNamespace,
+  Namespace,
+  KeyPrefix,
+  Resource,
+} from "i18next";
 import type { FallbackNs, UseTranslationOptions } from "react-i18next";
 
 let client: i18n | null = null;
 
 let iteration = 0;
 const MAX_ITERATIONS = 20;
+
+const createBackend = () =>
+  resourcesToBackend(
+    async (
+      language: (typeof config.locales)[number],
+      namespace: (typeof config.namespaces)[number],
+      callback,
+    ) => {
+      const data = await loadTranslation(language, namespace);
+      return callback(null, data);
+    },
+  );
 
 export const initializeI18nClient = async ({
   locale,
@@ -109,6 +127,32 @@ export const initializeI18nClient = async ({
   return client;
 };
 
+const createI18nClientFromResources = ({
+  locale,
+  defaultLocale,
+  ns,
+  resources,
+}: {
+  locale?: string;
+  defaultLocale?: string;
+  ns?: Namespace;
+  resources: Resource;
+}) => {
+  const instance = i18next.createInstance();
+
+  void instance
+    .use(initReactI18next)
+    .use(createBackend())
+    .init({
+      ...getInitOptions({ locale, defaultLocale, ns }),
+      resources,
+      partialBundledLanguages: true,
+      react: { useSuspense: false },
+    });
+
+  return instance;
+};
+
 export const useTranslation = <
   Ns extends FlatNamespace | FlatNamespace[] | undefined = undefined,
   KPrefix extends KeyPrefix<FallbackNs<Ns>> = undefined,
@@ -145,21 +189,42 @@ export const I18nProvider = ({
   locale,
   defaultLocale,
   ns,
+  resources,
 }: {
   children: React.ReactNode;
   locale?: string;
   defaultLocale?: string;
   ns?: Namespace;
+  resources?: Resource;
 }) => {
-  const [i18nClient, setI18nClient] = useState<i18n | null>(client);
+  const [i18nClient, setI18nClient] = useState<i18n | null>(() => {
+    if (client) {
+      return client;
+    }
+
+    if (!resources) {
+      return null;
+    }
+
+    client = createI18nClientFromResources({
+      locale,
+      defaultLocale,
+      ns,
+      resources,
+    });
+    z.config(getValidationLocale(client.language)());
+    return client;
+  });
 
   useEffect(() => {
+    if (i18nClient) {
+      return;
+    }
+
     void (async () => {
-      if (!client) {
-        setI18nClient(await getI18n({ locale, defaultLocale, ns }));
-      }
+      setI18nClient(await getI18n({ locale, defaultLocale, ns }));
     })();
-  }, [client]);
+  }, [i18nClient, locale, defaultLocale, ns]);
 
   useEffect(() => {
     if (i18nClient) {

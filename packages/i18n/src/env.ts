@@ -11,10 +11,10 @@ export const preset = {
   id: "i18n",
   clientPrefix: "NEXT_PUBLIC_",
   client: {
-    NEXT_PUBLIC_DEFAULT_LOCALE: z.string().optional().default(Locale.EN),
+    NEXT_PUBLIC_DEFAULT_LOCALE: z.enum(Locale).optional().default(Locale.EN),
   },
   server: {
-    DEFAULT_LOCALE: z.string().optional(),
+    DEFAULT_LOCALE: z.enum(Locale).optional(),
   },
 } as const satisfies Preset;
 

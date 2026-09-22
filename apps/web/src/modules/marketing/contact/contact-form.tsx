@@ -13,7 +13,11 @@ import { Textarea } from "@workspace/ui-web/textarea";
 import { toast } from "@workspace/ui-web/toast";
 
 import { sendContactForm } from "./actions";
-import { contactFormSchema, MAX_MESSAGE_LENGTH } from "./utils/schema";
+import {
+  contactFormSchema,
+  MAX_MESSAGE_LENGTH,
+  MAX_NAME_LENGTH,
+} from "./utils/schema";
 
 import type { ContactFormPayload } from "./utils/schema";
 
@@ -65,6 +69,7 @@ export function ContactForm() {
                   spellCheck={false}
                   aria-invalid={fieldState.invalid}
                   placeholder={t("contact.form.name.placeholder")}
+                  maxLength={MAX_NAME_LENGTH}
                   required
                 />
                 {fieldState.invalid && (
