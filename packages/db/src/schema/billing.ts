@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { pgEnum, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 
 import { generateId } from "@workspace/shared/utils";
 
@@ -68,7 +75,10 @@ export const subscription = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
   },
-  (t) => [unique().on(t.externalId, t.store)],
+  (t) => [
+    unique().on(t.externalId, t.store),
+    index("subscription_customerId_idx").on(t.customerId),
+  ],
 );
 
 export const order = pgTable(
@@ -89,7 +99,10 @@ export const order = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
   },
-  (t) => [unique().on(t.externalId, t.store)],
+  (t) => [
+    unique().on(t.externalId, t.store),
+    index("order_customerId_idx").on(t.customerId),
+  ],
 );
 
 export const customerRelations = relations(customer, ({ many }) => ({

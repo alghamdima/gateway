@@ -1,4 +1,7 @@
-import { billingConfigSchema, type BillingConfig } from "../../../config";
+import {
+  billingConfigSchema,
+  type BillingConfig,
+} from "../../../config/schema";
 import {
   BillingDiscountType,
   BillingModel,

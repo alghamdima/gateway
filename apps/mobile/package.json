@@ -95,6 +95,7 @@
   "devDependencies": {
     "@types/react": "catalog:react19",
     "@workspace/tsconfig": "workspace:*",
+    "@workspace/vitest-config": "workspace:*",
     "typescript": "catalog:"
   }
 }

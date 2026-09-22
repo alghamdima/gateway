@@ -24,8 +24,10 @@ export const getCustomersWithPurchasesByReferenceId = async (
   referenceId: string,
 ) =>
   db.query.customer.findMany({
+    limit: 20,
     with: {
       subscriptions: {
+        limit: 100,
         orderBy: (subscription, { asc, desc }) => [
           asc(
             sql`case when ${inArray(
@@ -37,6 +39,7 @@ export const getCustomersWithPurchasesByReferenceId = async (
         ],
       },
       orders: {
+        limit: 100,
         orderBy: (order, { asc, desc }) => [
           asc(
             sql`case

@@ -42,4 +42,8 @@ export const upsertSubscriptions = async (data: InsertSubscription[]) => {
 };
 
 export const getSubscriptionsByCustomerId = async (customerId: string) =>
-  db.select().from(subscription).where(eq(subscription.customerId, customerId));
+  db
+    .select()
+    .from(subscription)
+    .where(eq(subscription.customerId, customerId))
+    .limit(100);

@@ -64,7 +64,7 @@ apps/
 
 packages/
   api/         @workspace/api       Hono modules (admin,ai,auth,billing,organization,storage)
-  auth/        @workspace/auth      Better Auth server + clients (web.ts, mobile.ts)
+  auth/        @workspace/auth      Better Auth server + clients (src/client/{web,mobile}.ts)
   billing/     @workspace/billing   Shared + web (Stripe,LemonSqueezy,Polar) + mobile (RevenueCat,Superwall)
   flags/       @workspace/flags     OpenFeature helpers + flags-web / flags-mobile / flags-extension
   cms/         @workspace/cms       MDX content (blog, legal)
@@ -77,7 +77,7 @@ packages/
   monitoring/  @workspace/monitoring[-web|-mobile|-extension]
   ui/          @workspace/ui[-web|-mobile]
 
-tooling/       ESLint, Prettier, TypeScript configs
+tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 ```
 
 ## Commands

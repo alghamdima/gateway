@@ -7,12 +7,15 @@ import {
   getOrganizationsBlockingAccountDeletion,
 } from "@workspace/auth/server";
 
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException } from "@workspace/shared/utils";
+
 import { enforceAuth, enforceMembership, validate } from "../../middleware";
 import { getInvitationsInputSchema, getMembersInputSchema } from "../../schema";
 import { generateSlug } from "./queries/generate-slug";
 import { getInvitations } from "./queries/invitations";
 import { getMembers } from "./queries/members";
-import { getOrganization } from "./queries/organizations";
+import { getOrganizationForUser } from "./queries/organizations";
 
 export const organizationRouter = new Hono()
   .use(enforceAuth)
@@ -31,9 +34,23 @@ export const organizationRouter = new Hono()
       await getOrganizationsBlockingAccountDeletion({ userId: c.var.user.id }),
     ),
   )
-  .get("/:id", async (c) =>
-    c.json({ organization: await getOrganization({ id: c.req.param("id") }) }),
-  )
+  .get("/:id", async (c) => {
+    const id = c.req.param("id");
+    const organization = await getOrganizationForUser({
+      id,
+      userId: c.var.user.id,
+      email: c.var.user.email,
+      headers: c.req.raw.headers,
+    });
+
+    if (!organization) {
+      throw new HttpException(HttpStatusCode.FORBIDDEN, {
+        code: "error.forbidden",
+      });
+    }
+
+    return c.json({ organization });
+  })
   .get(
     "/:id/members",
     validate("query", getMembersInputSchema),
