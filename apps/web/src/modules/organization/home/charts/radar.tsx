@@ -62,7 +62,10 @@ export function RadarChart() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex grow items-center justify-center">
-        <ChartContainer config={chartConfig} className="h-full max-h-[300px]">
+        <ChartContainer
+          config={chartConfig}
+          className="mx-auto aspect-square h-full max-h-[300px] min-h-[250px]"
+        >
           <RechartsRadarChart data={chartData}>
             <ChartTooltip
               cursor={false}

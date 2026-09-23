@@ -15,13 +15,13 @@ export const generateMetadata = getMetadata({
 export default function OrganizationPage() {
   return (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-col flex-wrap gap-4 *:grow *:basis-80 lg:flex-row">
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:*:grow lg:*:basis-80">
         <BarChart />
         <PieChart />
         <ShapeChart />
       </div>
       <AreaChart />
-      <div className="flex flex-col flex-wrap gap-4 *:grow *:basis-80 lg:flex-row">
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:*:grow lg:*:basis-80">
         <RadialChart />
         <RadarChart />
       </div>
