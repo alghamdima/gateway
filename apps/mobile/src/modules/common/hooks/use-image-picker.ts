@@ -10,6 +10,7 @@ export const useImagePicker = () => {
         mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.6,
+        base64: true,
       });
 
       if (result.canceled) {

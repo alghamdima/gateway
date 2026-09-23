@@ -82,31 +82,28 @@ const mutations = {
       image,
       update,
     }: AvatarFormProps & { avatar?: ImagePickerAsset }) => {
-      if (!avatar) throw new Error("No file selected");
+      if (!avatar?.base64) throw new Error("No file selected");
 
-      const blob = await fetch(avatar.uri).then((r) => r.blob());
       const contentType = isImageContentType(avatar.mimeType)
         ? avatar.mimeType
-        : blob.type;
-
-      if (!isImageContentType(contentType)) {
-        throw new Error("Unsupported file type");
-      }
+        : ImageContentType.JPEG;
+      const body = Uint8Array.from(atob(avatar.base64), (c) =>
+        c.charCodeAt(0),
+      );
 
       const { uploadUrl, publicUrl } = await (scope === "user"
         ? handle(api.user.avatar.$post)({
-            json: { contentType, contentLength: blob.size },
+            json: { contentType, contentLength: body.byteLength },
           })
         : handle(api.organizations[":id"].logo.$post)({
             param: { id },
-            json: { contentType, contentLength: blob.size },
+            json: { contentType, contentLength: body.byteLength },
           }));
+
       const response = await fetch(uploadUrl, {
         method: "PUT",
-        body: blob,
-        headers: {
-          "Content-Type": contentType,
-        },
+        body,
+        headers: { "Content-Type": contentType },
       });
 
       if (!response.ok) {
@@ -130,13 +127,10 @@ const mutations = {
 } as const;
 
 const useAvatarFormSchema = () => {
-  const { t, i18n } = useTranslation("common");
-  const types = new Intl.ListFormat(i18n.language, {
-    style: "long",
-    type: "conjunction",
-  }).format(
-    Object.values(ImageContentType).map((type) => type.replace("image/", ".")),
-  );
+  const { t } = useTranslation("common");
+  const types = Object.values(ImageContentType)
+    .map((type) => type.replace("image/", "."))
+    .join(", ");
 
   const assetSchema = z.object({
     uri: z.string().min(1),
