@@ -7,7 +7,30 @@ import {
   isExternal,
   matchesPattern,
   mergeSearchParams,
+  toInternalPath,
 } from "../url";
+
+describe("toInternalPath", () => {
+  it.each([
+    [undefined, undefined],
+    ["", undefined],
+    ["/dashboard", "/dashboard"],
+    ["/dashboard?x=1#y", "/dashboard?x=1#y"],
+    ["/foo/../bar", "/bar"],
+    ["//evil.com", undefined],
+    ["/..//evil.com", undefined],
+    ["/a/../..//evil.com", undefined],
+    ["/%2e%2e//evil.com", undefined],
+    ["/\\evil.com", undefined],
+    ["javascript:alert(1)", undefined],
+    ["data:text/html,hi", undefined],
+    ["https://internal.invalid@evil.com", undefined],
+    ["https://internal.invalid.evil.com", undefined],
+    ["https://evil.com/path", undefined],
+  ])("should return %s for %j", (url, expected) => {
+    expect(toInternalPath(url)).toBe(expected);
+  });
+});
 
 describe("isExternal", () => {
   it.each([

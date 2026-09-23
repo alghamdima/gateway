@@ -61,22 +61,14 @@ export const getOrganizationsBlockingAccountDeletion = ({
       ),
     )
     .where(
-      and(
-        eq(
-          sql<number>`(
-            select count(*)
-            from ${member} as owners
-            where owners.organization_id = ${organization.id}
-              and owners.role = ${MemberRole.OWNER}
-          )`,
-          1,
-        ),
+      eq(
         sql<number>`(
           select count(*)
-          from ${member} as members
-          where members.organization_id = ${organization.id}
-            and members.user_id <> ${userId}
-        ) > 0`,
+          from ${member} as owners
+          where owners.organization_id = ${organization.id}
+            and owners.role = ${MemberRole.OWNER}
+        )`,
+        1,
       ),
     );
 };

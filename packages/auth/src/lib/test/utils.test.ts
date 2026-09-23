@@ -15,27 +15,34 @@ import type { User } from "../../types";
 const BASE_URL = "http://localhost:3000";
 
 describe("getUrl", () => {
-  it("should use x-url header if present", () => {
+  it("should use trusted x-url header if present", () => {
     const request = new Request(BASE_URL, {
-      headers: { "x-url": "https://custom-url.com/path" },
+      headers: { "x-url": "http://localhost:3000/path" },
     });
     const url = getUrl({ request });
-    expect(url.toString()).toBe("https://custom-url.com/path");
+    expect(url.toString()).toBe("http://localhost:3000/path");
   });
 
   it("should merge params from passed url into x-url", () => {
     const request = new Request(BASE_URL, {
-      headers: { "x-url": "https://custom.com?foo=bar" },
+      headers: { "x-url": "http://localhost:3000?foo=bar" },
     });
-    // mergeSearchParams with overwrite: false (default behavior for x-url branch)
     const url = getUrl({
       request,
       url: "https://ignored.com?baz=qux&foo=new",
     });
-    // Should preserve foo=bar from x-url, add baz=qux
     expect(url.searchParams.get("foo")).toBe("bar");
     expect(url.searchParams.get("baz")).toBe("qux");
-    expect(url.origin).toBe("https://custom.com");
+    expect(url.origin).toBe("http://localhost:3000");
+  });
+
+  it("should ignore untrusted x-url and fall back to request url", () => {
+    const request = new Request(BASE_URL, {
+      headers: { "x-url": "https://evil.com/phish" },
+    });
+    const url = getUrl({ request });
+    expect(url.origin).toBe(BASE_URL);
+    expect(url.hostname).toBe("localhost");
   });
 
   it("should use expo-origin header if present (mobile)", () => {
@@ -54,10 +61,30 @@ describe("getUrl", () => {
       request,
       url: "https://ignored.com?foo=bar",
     });
-    // Mobile branch uses mergeSearchParams with replace: true
     expect(url.searchParams.get("foo")).toBe("bar");
     expect(url.protocol).toBe("exp:");
     expect(url.host).toBe("host");
+  });
+
+  it("should ignore untrusted expo-origin and fall back to provided url", () => {
+    const request = new Request(BASE_URL, {
+      headers: { "expo-origin": "evil://phish" },
+    });
+    const url = getUrl({
+      request,
+      url: "http://localhost:3000/api/auth/magic-link/verify?token=abc",
+    });
+    expect(url.toString()).toBe(
+      "http://localhost:3000/api/auth/magic-link/verify?token=abc",
+    );
+  });
+
+  it("should use turbostarter scheme from x-url", () => {
+    const request = new Request(BASE_URL, {
+      headers: { "x-url": "turbostarter://setup/auth/join" },
+    });
+    const url = getUrl({ request });
+    expect(url.toString()).toBe("turbostarter://setup/auth/join");
   });
 
   it("should fallback to request url for web", () => {

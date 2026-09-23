@@ -2,6 +2,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { expo } from "@better-auth/expo";
 import { i18n, locales, TranslationDictionary } from "@better-auth/i18n";
 import { passkey } from "@better-auth/passkey";
+import { createAuthMiddleware } from "better-auth/api";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -21,12 +22,12 @@ import { EmailTemplate } from "@workspace/email";
 import { sendEmail } from "@workspace/email/server";
 import { config, Locale } from "@workspace/i18n";
 import { getLocaleFromRequest } from "@workspace/i18n/server";
-import { NodeEnv } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 import { hooks } from "./hooks";
-import { getUrl } from "./lib/utils";
+import { syncSubscriptionSeats } from "./lib/server";
+import { getUrl, trustedOrigins } from "./lib/utils";
 import { ac, roles } from "./rbac";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
@@ -54,7 +55,6 @@ export const auth = betterAuth({
             }).toString(),
           },
         }),
-      ...hooks.deleteUser,
     },
     changeEmail: {
       enabled: true,
@@ -75,15 +75,7 @@ export const auth = betterAuth({
         }),
     },
   },
-  trustedOrigins: [
-    "chrome-extension://",
-    "turbostarter://",
-    /* Needed only for Apple ID authentication */
-    "https://appleid.apple.com",
-    ...(env.NODE_ENV === NodeEnv.DEVELOPMENT
-      ? ["http://localhost*", "https://localhost*"]
-      : []),
-  ],
+  trustedOrigins,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
@@ -121,6 +113,18 @@ export const auth = betterAuth({
   }),
   databaseHooks: {
     user: hooks.user,
+  },
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/organization/leave") {
+        return;
+      }
+
+      const organizationId = ctx.body?.organizationId;
+      if (typeof organizationId === "string") {
+        await syncSubscriptionSeats(organizationId);
+      }
+    }),
   },
   plugins: [
     i18n({

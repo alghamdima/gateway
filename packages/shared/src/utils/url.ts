@@ -10,9 +10,13 @@ const toInternalPath = (url: string | undefined) => {
   try {
     const parsed = new URL(url, INTERNAL_BASE);
 
-    return parsed.origin === INTERNAL_BASE
-      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
-      : undefined;
+    if (parsed.origin !== INTERNAL_BASE) {
+      return undefined;
+    }
+
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+
+    return path.startsWith("//") ? undefined : path;
   } catch {
     return undefined;
   }

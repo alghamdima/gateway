@@ -30,13 +30,11 @@ jobs:
         id: vercel-cli-cache
         with:
           path: ~/.local/share/pnpm/global
-          key: ${{ runner.os }}-pnpm-global-vercel
-          restore-keys: |
-            ${{ runner.os }}-pnpm-global-vercel-
+          key: ${{ runner.os }}-pnpm-global-vercel-59.25.4
 
       - name: 🔼 Install Vercel CLI
         if: steps.vercel-cli-cache.outputs.cache-hit != 'true'
-        run: pnpm install --global vercel@latest
+        run: pnpm install --global vercel@59.25.4
 
       - name: 💪 Pull environment information
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}

@@ -44,11 +44,12 @@ jobs:
           retention-days: 7
 
       - name: 💨 Publish!
+        working-directory: apps/extension
         run: |
-          npx wxt submit \
-            --chrome-zip apps/extension/build/*-chrome.zip  \
-            --firefox-zip apps/extension/build/*-firefox.zip --firefox-sources-zip apps/extension/build/*-sources.zip \
-            --edge-zip apps/extension/build/*-chrome.zip
+          pnpm exec wxt submit \
+            --chrome-zip build/*-chrome.zip \
+            --firefox-zip build/*-firefox.zip --firefox-sources-zip build/*-sources.zip \
+            --edge-zip build/*-chrome.zip
         env:
           CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}

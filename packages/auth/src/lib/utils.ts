@@ -1,10 +1,39 @@
 import * as z from "zod";
 
-import { getOrigin, mergeSearchParams } from "@workspace/shared/utils";
+import {
+  getOrigin,
+  matchesPattern,
+  mergeSearchParams,
+} from "@workspace/shared/utils";
 
 import { MemberRole, UserRole } from "../types";
 
 import type { User } from "../types";
+
+export const trustedOrigins = [
+  "chrome-extension://",
+  "turbostarter://",
+  /* Needed only for Apple ID authentication */
+  "https://appleid.apple.com",
+  ...(process.env.NODE_ENV !== "production"
+    ? ["http://localhost*", "https://localhost*", "exp://"]
+    : []),
+];
+
+const isTrustedOrigin = (candidate: string, request?: Request) => {
+  try {
+    const _url = new URL(candidate);
+  } catch {
+    return false;
+  }
+
+  const origins = [
+    ...trustedOrigins,
+    ...(request?.url ? [new URL(request.url).origin] : []),
+  ];
+
+  return origins.some((origin) => matchesPattern(candidate, origin));
+};
 
 export const getUrl = ({
   request,
@@ -20,7 +49,7 @@ export const getUrl = ({
 
   let resultUrl: URL;
 
-  if (passedUrl) {
+  if (passedUrl && isTrustedOrigin(passedUrl, request)) {
     // Base on x-url; merge in params from provided `url` without overwriting existing keys
     resultUrl = new URL(passedUrl);
     if (url) {
@@ -30,7 +59,7 @@ export const getUrl = ({
       );
       mergeSearchParams(resultUrl, urlObj, { overwrite: false });
     }
-  } else if (expoOrigin) {
+  } else if (expoOrigin && isTrustedOrigin(expoOrigin, request)) {
     // For Expo/mobile, base on expo-origin; if `url` has a query, adopt it entirely
     resultUrl = new URL(expoOrigin);
     if (url) {

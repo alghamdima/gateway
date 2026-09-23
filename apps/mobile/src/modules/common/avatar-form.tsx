@@ -87,9 +87,7 @@ const mutations = {
       const contentType = isImageContentType(avatar.mimeType)
         ? avatar.mimeType
         : ImageContentType.JPEG;
-      const body = Uint8Array.from(atob(avatar.base64), (c) =>
-        c.charCodeAt(0),
-      );
+      const body = Uint8Array.from(atob(avatar.base64), (c) => c.charCodeAt(0));
 
       const { uploadUrl, publicUrl } = await (scope === "user"
         ? handle(api.user.avatar.$post)({
