@@ -6,48 +6,19 @@ import * as z from "zod";
 import { VerificationType } from "@workspace/auth";
 
 import { useSetupSteps } from "~/app/(setup)/steps/_layout";
-import { pathsConfig } from "~/config/paths";
+import { pathsConfig, toAllowedPath } from "~/config/paths";
 import { Spinner } from "~/modules/common/spinner";
 import { user } from "~/modules/user/lib/api";
 
 import { auth } from "./lib/api";
 
 import type { Href } from "expo-router";
-import type { Path } from "~/config/paths";
 
 const verificationTypeSchema = z.enum([
   VerificationType.MAGIC_LINK,
   VerificationType.CONFIRM_EMAIL,
   VerificationType.DELETE_ACCOUNT,
 ]);
-
-const collectPaths = (value: unknown): string[] => {
-  if (typeof value === "string") {
-    return [value];
-  }
-
-  if (value && typeof value === "object") {
-    return Object.values(value).flatMap(collectPaths);
-  }
-
-  return [];
-};
-
-const allowedPaths = new Set(collectPaths(pathsConfig));
-
-const toAllowedPath = (
-  value: string | string[] | undefined,
-): Path | undefined => {
-  const path = typeof value === "string" ? value : undefined;
-
-  if (!path || !path.startsWith("/") || path.startsWith("//")) {
-    return undefined;
-  }
-
-  const pathname = path.split("?")[0] ?? path;
-
-  return allowedPaths.has(pathname) ? (path as Path) : undefined;
-};
 
 const verificationParamsSchema = z.object({
   token: z.string().min(1),
@@ -153,9 +124,9 @@ export const Verification = () => {
   } = useGlobalSearchParams<{
     token?: string;
     type?: VerificationType;
-    callbackURL?: Path;
-    redirectTo?: Path;
-    errorCallbackURL?: Path;
+    callbackURL?: string;
+    redirectTo?: string;
+    errorCallbackURL?: string;
   }>();
 
   const parsed = verificationParamsSchema.safeParse({

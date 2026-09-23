@@ -4,6 +4,7 @@ import { memo, useState } from "react";
 
 import { SecondFactor } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
+import { toInternalPath } from "@workspace/shared/utils";
 import { FieldSeparator } from "@workspace/ui-web/field";
 
 import { authConfig } from "~/config/auth";
@@ -102,7 +103,9 @@ const Login = memo<LoginProps>(
             onTwoFactorRedirect={onTwoFactorRedirect}
           />
 
-          {authConfig.providers.anonymous && <AnonymousLogin />}
+          {authConfig.providers.anonymous && (
+            <AnonymousLogin redirectTo={toInternalPath(redirectTo)} />
+          )}
         </div>
 
         <RegisterCta />

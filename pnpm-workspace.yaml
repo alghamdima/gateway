@@ -36,9 +36,9 @@ catalogs:
     react: 19.2.8
     react-dom: 19.2.8
   turbo:
-    "@turbo/gen": 2.10.13
-    turbo: 2.10.13
-    eslint-plugin-turbo: 2.10.13
+    "@turbo/gen": 2.11.2
+    turbo: 2.11.2
+    eslint-plugin-turbo: 2.11.2
 
 overrides:
   esbuild: 0.28.1

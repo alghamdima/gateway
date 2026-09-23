@@ -1,5 +1,23 @@
 import { wildcardMatch } from "./wildcard-match";
 
+const INTERNAL_BASE = "https://internal.invalid";
+
+const toInternalPath = (url: string | undefined) => {
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(url, INTERNAL_BASE);
+
+    return parsed.origin === INTERNAL_BASE
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 const isExternal = (url: string) =>
   ["http", "https", "mailto", "tel", "//", "www"].some((protocol) =>
     url.startsWith(protocol),
@@ -83,4 +101,5 @@ export {
   getHost,
   mergeSearchParams,
   isExternal,
+  toInternalPath,
 };

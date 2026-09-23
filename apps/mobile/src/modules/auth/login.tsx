@@ -6,6 +6,7 @@ import { useTranslation } from "@workspace/i18n";
 import { FieldSeparator } from "@workspace/ui-mobile/field";
 
 import { authConfig } from "~/config/auth";
+import { toAllowedPath, type Path } from "~/config/paths";
 import { AnonymousLogin } from "~/modules/auth/form/anonymous";
 import { LOGIN_OPTIONS } from "~/modules/auth/form/login/constants";
 import { LoginForm } from "~/modules/auth/form/login/form";
@@ -16,7 +17,6 @@ import { AuthLayout } from "~/modules/auth/layout/base";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { InvitationDisclaimer } from "~/modules/auth/layout/invitation-disclaimer";
 
-import type { Path } from "~/config/paths";
 import type { LoginOption } from "~/modules/auth/form/login/constants";
 
 const LoginStep = {
@@ -97,7 +97,9 @@ const Login = memo<LoginProps>(
             email={email}
             onTwoFactorRedirect={onTwoFactorRedirect}
           />
-          {authConfig.providers.anonymous && <AnonymousLogin />}
+          {authConfig.providers.anonymous && (
+            <AnonymousLogin redirectTo={toAllowedPath(redirectTo)} />
+          )}
         </View>
 
         <RegisterCta />

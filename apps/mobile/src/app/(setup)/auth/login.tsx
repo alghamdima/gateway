@@ -1,19 +1,18 @@
 import { useGlobalSearchParams } from "expo-router";
 
+import { toAllowedPath } from "~/config/paths";
 import { LoginFlow } from "~/modules/auth/login";
-
-import type { Path } from "~/config/paths";
 
 const LoginPage = () => {
   const { redirectTo, invitationId, email } = useGlobalSearchParams<{
-    redirectTo?: Path;
+    redirectTo?: string;
     invitationId?: string;
     email?: string;
   }>();
 
   return (
     <LoginFlow
-      redirectTo={redirectTo}
+      redirectTo={toAllowedPath(redirectTo)}
       invitationId={invitationId}
       email={email}
     />

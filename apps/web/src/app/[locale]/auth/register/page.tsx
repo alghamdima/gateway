@@ -1,3 +1,4 @@
+import { toInternalPath } from "@workspace/shared/utils";
 import { FieldSeparator } from "@workspace/ui-web/field";
 
 import { authConfig } from "~/config/auth";
@@ -35,15 +36,17 @@ const Register = async ({
       {invitationId && <InvitationDisclaimer />}
       <SocialProviders
         providers={authConfig.providers.oAuth}
-        redirectTo={redirectTo}
+        redirectTo={toInternalPath(redirectTo)}
         context="signup"
       />
       {authConfig.providers.oAuth.length > 0 && (
         <FieldSeparator>{t("divider")}</FieldSeparator>
       )}
       <div className="flex flex-col gap-2">
-        <RegisterForm redirectTo={redirectTo} email={email} />
-        {authConfig.providers.anonymous && <AnonymousLogin />}
+        <RegisterForm redirectTo={toInternalPath(redirectTo)} email={email} />
+        {authConfig.providers.anonymous && (
+          <AnonymousLogin redirectTo={toInternalPath(redirectTo)} />
+        )}
       </div>
       <LoginCta />
     </>

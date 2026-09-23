@@ -1,5 +1,7 @@
 import { Href } from "expo-router";
 
+import { toInternalPath } from "@workspace/shared/utils";
+
 const STEPS_PREFIX = "/steps";
 const DASHBOARD_PREFIX = "/dashboard";
 const ORGANIZATION_DASHBOARD_PREFIX = "/dashboard/organization";
@@ -63,4 +65,39 @@ const pathsConfig = {
 
 type Path = Extract<Href, string>;
 
-export { pathsConfig, AUTH_PREFIX, STEPS_PREFIX, DASHBOARD_PREFIX, type Path };
+const collectPaths = (value: unknown): string[] => {
+  if (typeof value === "string") {
+    return [value];
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value).flatMap(collectPaths);
+  }
+
+  return [];
+};
+
+const allowedPaths = new Set(collectPaths(pathsConfig));
+
+const toAllowedPath = (
+  value: string | string[] | undefined,
+): Path | undefined => {
+  const path = toInternalPath(typeof value === "string" ? value : undefined);
+
+  if (!path) {
+    return undefined;
+  }
+
+  const pathname = path.split("?")[0] ?? path;
+
+  return allowedPaths.has(pathname) ? path : undefined;
+};
+
+export {
+  pathsConfig,
+  toAllowedPath,
+  AUTH_PREFIX,
+  STEPS_PREFIX,
+  DASHBOARD_PREFIX,
+  type Path,
+};
