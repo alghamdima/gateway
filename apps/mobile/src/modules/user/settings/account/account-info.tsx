@@ -41,6 +41,7 @@ export const AccountInfo = () => {
     <View className="items-center gap-4">
       <AvatarForm
         id={data.user.id}
+        scope="user"
         image={data.user.image}
         update={(image) => updateUser.mutateAsync({ image })}
       >

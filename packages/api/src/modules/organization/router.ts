@@ -8,8 +8,24 @@ import {
 } from "@workspace/auth/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
+import {
+  getDeleteUrl,
+  getPublicUrl,
+  getUploadUrl,
+  getObjectUrlSchema,
+} from "@workspace/storage/server";
 
-import { enforceAuth, enforceMembership, validate } from "../../middleware";
+import {
+  createAvatarPath,
+  isOwnedAvatarPath,
+  uploadAvatarSchema,
+} from "../../lib/avatar";
+import {
+  enforceAuth,
+  enforceMembership,
+  enforceOrganizationPermission,
+  validate,
+} from "../../middleware";
 import { getInvitationsInputSchema, getMembersInputSchema } from "../../schema";
 import { generateSlug } from "./queries/generate-slug";
 import { getInvitations } from "./queries/invitations";
@@ -50,6 +66,54 @@ export const organizationRouter = new Hono()
 
     return c.json({ organization });
   })
+  .post(
+    "/:id/logo",
+    (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("id"),
+        permissions: {
+          organization: ["update"],
+        },
+      })(c, next),
+    validate("json", uploadAvatarSchema),
+    async (c) => {
+      const { contentType, contentLength } = c.req.valid("json");
+      const path = createAvatarPath({
+        ownerId: c.req.param("id"),
+        contentType,
+      });
+
+      const [{ url: uploadUrl }, { url: publicUrl }] = await Promise.all([
+        getUploadUrl({ path, contentType, contentLength }),
+        getPublicUrl({ path }),
+      ]);
+
+      return c.json({ uploadUrl, publicUrl, path });
+    },
+  )
+  .delete(
+    "/:id/logo",
+    (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("id"),
+        permissions: {
+          organization: ["update"],
+        },
+      })(c, next),
+    validate("query", getObjectUrlSchema),
+    async (c) => {
+      const organizationId = c.req.param("id");
+      const { path } = c.req.valid("query");
+
+      if (!isOwnedAvatarPath({ path, ownerId: organizationId })) {
+        throw new HttpException(HttpStatusCode.FORBIDDEN, {
+          code: "error.forbidden",
+        });
+      }
+
+      return c.json(await getDeleteUrl({ path }));
+    },
+  )
   .get(
     "/:id/members",
     validate("query", getMembersInputSchema),

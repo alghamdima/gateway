@@ -1,13 +1,22 @@
 import * as z from "zod";
 
-import { env } from "../env";
+export const storagePathSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (path) =>
+      !path.includes("..") && !path.startsWith("/") && !path.includes("\\"),
+    { message: "Invalid path" },
+  );
 
 export const getObjectUrlSchema = z.object({
-  path: z.string(),
-  bucket: z
-    .string()
-    .optional()
-    .default(env.S3_BUCKET ?? ""),
+  path: storagePathSchema,
+});
+
+export const getUploadUrlSchema = getObjectUrlSchema.extend({
+  contentType: z.string().min(1).max(255),
+  contentLength: z.number().int().positive(),
 });
 
 export type GetObjectUrlInput = z.input<typeof getObjectUrlSchema>;
+export type GetUploadUrlInput = z.input<typeof getUploadUrlSchema>;

@@ -59,6 +59,7 @@ export const EditLogo = ({ organizationId }: { organizationId: string }) => {
       <SettingsCardHeader className="block">
         <AvatarForm
           id={activeOrganization.id}
+          scope="organization"
           image={activeOrganization.logo}
           update={(image) =>
             updateOrganization.mutateAsync({

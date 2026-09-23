@@ -1,5 +1,6 @@
 import { strategy } from "./providers";
 
-export const { getUploadUrl, getDeleteUrl, getPublicUrl, getSignedUrl } =
+export const { getUploadUrl, getSignedUrl, getPublicUrl, getDeleteUrl } =
   strategy;
+
 export * from "./lib/schema";

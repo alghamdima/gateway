@@ -57,6 +57,7 @@ export const OrganizationInfo = () => {
       <AvatarForm
         key={activeOrganization.data.id}
         id={activeOrganization.data.id}
+        scope="organization"
         image={activeOrganization.data.logo}
         update={(image) =>
           updateOrganization.mutateAsync({

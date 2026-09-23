@@ -3,11 +3,22 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useMutationState } from "@tanstack/react-query";
 import { createContext, useContext, useMemo, useState } from "react";
-import { FormProvider, useForm, useFormContext } from "react-hook-form";
+import {
+  FormProvider,
+  useForm,
+  useFormContext,
+  useFormState,
+} from "react-hook-form";
 import * as z from "zod";
 
+import {
+  getAvatarPath,
+  MAX_AVATAR_SIZE,
+  MAX_AVATAR_SIZE_MB,
+} from "@workspace/api/lib/avatar";
 import { handle } from "@workspace/api/utils";
 import { useTranslation } from "@workspace/i18n";
+import { ImageContentType } from "@workspace/shared/constants";
 import { cn } from "@workspace/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 import { Button } from "@workspace/ui-web/button";
@@ -17,20 +28,45 @@ import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
 
+type AvatarFormScope = "user" | "organization";
+
 interface AvatarFormProps {
   readonly id: string;
+  readonly scope: AvatarFormScope;
   readonly image?: string | null;
   readonly update: (image: string | null) => Promise<unknown>;
 }
 
-const MAX_FILE_SIZE_MB = 5;
-const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-];
+const isImageContentType = (
+  contentType?: unknown,
+): contentType is ImageContentType =>
+  z.enum(ImageContentType).safeParse(contentType).success;
+
+const deleteAvatar = async ({
+  scope,
+  id,
+  image,
+}: {
+  scope: AvatarFormScope;
+  id: string;
+  image: string | null | undefined;
+}) => {
+  const path = getAvatarPath({ avatar: image, ownerId: id });
+
+  if (!path) {
+    return;
+  }
+
+  try {
+    const { url } = await (scope === "user"
+      ? handle(api.user.avatar.$delete)({ query: { path } })
+      : handle(api.organizations[":id"].logo.$delete)({
+          param: { id },
+          query: { path },
+        }));
+    void fetch(url, { method: "DELETE" });
+  } catch {}
+};
 
 const mutations = {
   upload: {
@@ -38,32 +74,40 @@ const mutations = {
     mutationFn: async ({
       avatar,
       id,
+      scope,
       image,
       update,
     }: AvatarFormProps & { avatar?: File }) => {
-      const extension = avatar?.type.split("/").pop();
-      const uuid = crypto.randomUUID();
-      const path = `avatars/${id}-${uuid}.${extension}`;
+      if (!avatar) {
+        throw new Error("No file selected");
+      }
 
-      const { url: uploadUrl } = await handle(api.storage.upload.$get)({
-        query: { path },
-      });
+      const contentType = avatar.type;
+
+      if (!isImageContentType(contentType)) {
+        throw new Error("Unsupported file type");
+      }
+
+      const { uploadUrl, publicUrl } = await (scope === "user"
+        ? handle(api.user.avatar.$post)({
+            json: { contentType, contentLength: avatar.size },
+          })
+        : handle(api.organizations[":id"].logo.$post)({
+            param: { id },
+            json: { contentType, contentLength: avatar.size },
+          }));
 
       const response = await fetch(uploadUrl, {
         method: "PUT",
         body: avatar,
         headers: {
-          "Content-Type": avatar?.type ?? "",
+          "Content-Type": contentType,
         },
       });
 
       if (!response.ok) {
         throw new Error();
       }
-
-      const { url: publicUrl } = await handle(api.storage.public.$get)({
-        query: { path },
-      });
 
       try {
         await update(publicUrl);
@@ -80,21 +124,14 @@ const mutations = {
   },
   remove: {
     mutationKey: ["avatar", "remove"],
-    mutationFn: async ({ image, update }: Omit<AvatarFormProps, "id">) => {
-      const path = image?.split("/").pop();
-      if (!path) {
+    mutationFn: async ({ id, scope, image, update }: AvatarFormProps) => {
+      if (!image) {
         return;
       }
 
-      const { url: deleteUrl } = await handle(api.storage.delete.$get)({
-        query: { path: `avatars/${path}` },
-      });
-
       try {
         await update(null);
-        void fetch(deleteUrl, {
-          method: "DELETE",
-        });
+        void deleteAvatar({ scope, id, image });
       } catch (error) {
         throw new Error(
           error instanceof Error ? error.message : "Something went wrong",
@@ -110,7 +147,9 @@ const useAvatarFormSchema = () => {
   const types = new Intl.ListFormat(i18n.language, {
     style: "long",
     type: "conjunction",
-  }).format(ACCEPTED_IMAGE_TYPES.map((type) => type.replace("image/", ".")));
+  }).format(
+    Object.values(ImageContentType).map((type) => type.replace("image/", ".")),
+  );
 
   return z.object({
     avatar: z
@@ -118,11 +157,11 @@ const useAvatarFormSchema = () => {
       .refine((files) => files.length === 1, t("error.file.image"))
       .transform((files) => files[0])
       .refine(
-        (file) => (file?.size ?? 0) <= MAX_FILE_SIZE,
-        t("error.file.size", { size: `${MAX_FILE_SIZE_MB} MB` }),
+        (file) => (file?.size ?? 0) <= MAX_AVATAR_SIZE,
+        t("error.file.size", { size: `${MAX_AVATAR_SIZE_MB} MB` }),
       )
       .refine(
-        (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type ?? ""),
+        (file) => isImageContentType(file?.type),
         t("error.file.type", { types }),
       ),
   });
@@ -145,8 +184,8 @@ const useAvatarFormContext = () => {
 
 const AvatarForm = ({
   id,
+  scope,
   image,
-
   update,
   children,
 }: AvatarFormProps & {
@@ -160,8 +199,8 @@ const AvatarForm = ({
   });
 
   const value = useMemo(
-    () => ({ id, image, update, previewUrl, setPreviewUrl }),
-    [id, image, update, previewUrl, setPreviewUrl],
+    () => ({ id, scope, image, update, previewUrl, setPreviewUrl }),
+    [id, scope, image, update, previewUrl, setPreviewUrl],
   );
 
   return (
@@ -179,10 +218,10 @@ const AvatarFormInput = ({
   ...props
 }: React.ComponentProps<"input"> & { onUpload?: () => void }) => {
   const { t } = useTranslation("common");
-  const { image, setPreviewUrl, id, update } = useAvatarFormContext();
+  const { image, setPreviewUrl, id, scope, update } = useAvatarFormContext();
   const avatarSchema = useAvatarFormSchema();
 
-  const { register, handleSubmit, reset } =
+  const { register, handleSubmit, reset, setError } =
     useFormContext<z.infer<typeof avatarSchema>>();
 
   const upload = useMutation({
@@ -199,13 +238,7 @@ const AvatarFormInput = ({
       });
 
       if (oldImage) {
-        const oldPath = oldImage.split("/").pop();
-        if (oldPath) {
-          const { url: deleteUrl } = await handle(api.storage.delete.$get)({
-            query: { path: `avatars/${oldPath}` },
-          });
-          void fetch(deleteUrl, { method: "DELETE" });
-        }
+        await deleteAvatar({ scope, id, image: oldImage });
       }
 
       onUpload?.();
@@ -221,6 +254,7 @@ const AvatarFormInput = ({
     upload.mutate({
       ...data,
       id,
+      scope,
       image,
       update,
     });
@@ -248,20 +282,23 @@ const AvatarFormInput = ({
               return;
             }
 
-            const isValid = avatarSchema.safeParse({
+            const result = avatarSchema.safeParse({
               avatar: e.target.files,
             });
 
-            if (isValid.success) {
-              const url = URL.createObjectURL(file);
-              setPreviewUrl(url);
+            if (!result.success) {
+              setError("avatar", {
+                message: result.error.issues[0]?.message ?? t("error.general"),
+              });
+              return;
             }
 
+            setPreviewUrl(URL.createObjectURL(file));
             void handleSubmit(onSubmit)();
           },
         })}
         type="file"
-        accept={ACCEPTED_IMAGE_TYPES.join(",")}
+        accept={Object.values(ImageContentType).join(",")}
         className="sr-only"
         aria-label={t("update")}
         onClick={(e) => "value" in e.target && (e.target.value = "")}
@@ -278,7 +315,7 @@ const AvatarFormPreview = ({
   ...props
 }: React.ComponentProps<typeof Avatar> & { fallback?: React.ReactNode }) => {
   const { previewUrl } = useAvatarFormContext();
-  const { formState } = useFormContext();
+  const { errors } = useFormState({ name: "avatar" });
 
   const mutationStatues = useMutationState({
     filters: {
@@ -291,7 +328,7 @@ const AvatarFormPreview = ({
   });
 
   const hasError =
-    formState.errors.avatar ??
+    Boolean(errors.avatar) ||
     mutationStatues.some((status) => status === "error");
 
   return (
@@ -325,7 +362,8 @@ const AvatarFormRemoveButton = ({
   ...props
 }: React.ComponentProps<typeof Button> & { onRemove?: () => void }) => {
   const { t } = useTranslation("common");
-  const { image, update, previewUrl, setPreviewUrl } = useAvatarFormContext();
+  const { image, update, previewUrl, setPreviewUrl, id, scope } =
+    useAvatarFormContext();
 
   const { clearErrors } = useFormContext();
   const [uploadStatus] = useMutationState({
@@ -358,6 +396,8 @@ const AvatarFormRemoveButton = ({
         onClick={() => {
           clearErrors();
           remove.mutate({
+            id,
+            scope,
             image,
             update,
           });
@@ -371,20 +411,22 @@ const AvatarFormRemoveButton = ({
   );
 };
 
-const AvatarFormErrorMessage = (props: React.ComponentProps<"span">) => {
+const AvatarFormErrorMessage = ({
+  className,
+  ...props
+}: React.ComponentProps<"span">) => {
   const _avatarSchema = useAvatarFormSchema();
-  const { formState } = useFormContext<z.infer<typeof _avatarSchema>>();
+  const { errors } = useFormState<z.infer<typeof _avatarSchema>>({
+    name: "avatar",
+  });
 
-  if (!formState.errors.avatar) {
+  if (!errors.avatar) {
     return null;
   }
 
   return (
-    <span
-      className={cn("text-destructive text-xs", props.className)}
-      {...props}
-    >
-      {formState.errors.avatar.message}
+    <span className={cn("text-destructive text-sm", className)} {...props}>
+      {errors.avatar.message}
     </span>
   );
 };

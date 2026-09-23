@@ -42,6 +42,7 @@ export const EditAvatar = memo<EditAvatarProps>((props) => {
       <SettingsCardHeader className="block">
         <AvatarForm
           id={props.user.id}
+          scope="user"
           image={props.user.image}
           update={(image) => updateUser.mutateAsync({ image })}
         >
