@@ -23,8 +23,8 @@ const searchParamsCache = createSearchParamsCache({
   sort: getSortingStateParser().withDefault([{ id: "name", desc: false }]),
   q: parseAsString,
   role: parseAsArrayOf(parseAsStringEnum<UserRole>(Object.values(UserRole))),
-  twoFactorEnabled: parseAsBoolean,
-  banned: parseAsBoolean,
+  twoFactorEnabled: parseAsArrayOf(parseAsBoolean),
+  banned: parseAsArrayOf(parseAsBoolean),
   createdAt: parseAsArrayOf(parseAsInteger),
 });
 

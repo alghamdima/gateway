@@ -18,14 +18,15 @@ import {
   sortQuerySchema,
   multiValueQuerySchema,
   rangeQuerySchema,
+  booleanQuerySchema,
 } from "./shared";
 
 export const getUsersInputSchema = offsetPaginationSchema.extend({
   sort: sortQuerySchema.optional(),
   q: z.string().optional(),
   role: multiValueQuerySchema(z.enum(UserRole)).optional(),
-  twoFactorEnabled: multiValueQuerySchema(z.coerce.boolean()).optional(),
-  banned: multiValueQuerySchema(z.coerce.boolean()).optional(),
+  twoFactorEnabled: multiValueQuerySchema(booleanQuerySchema).optional(),
+  banned: multiValueQuerySchema(booleanQuerySchema).optional(),
   createdAt: rangeQuerySchema.optional(),
 });
 

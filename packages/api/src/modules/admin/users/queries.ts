@@ -9,6 +9,7 @@ import {
   getOrderByFromSort,
   ilike,
   inArray,
+  isNull,
   or,
 } from "@workspace/db";
 import {
@@ -47,9 +48,18 @@ export const getUsers = async (input: GetUsersInput) => {
       : undefined,
     input.role ? inArray(user.role, input.role) : undefined,
     input.twoFactorEnabled
-      ? inArray(user.twoFactorEnabled, input.twoFactorEnabled)
+      ? input.twoFactorEnabled.includes(false)
+        ? or(
+            inArray(user.twoFactorEnabled, input.twoFactorEnabled),
+            isNull(user.twoFactorEnabled),
+          )
+        : inArray(user.twoFactorEnabled, input.twoFactorEnabled)
       : undefined,
-    input.banned ? inArray(user.banned, input.banned) : undefined,
+    input.banned
+      ? input.banned.includes(false)
+        ? or(inArray(user.banned, input.banned), isNull(user.banned))
+        : inArray(user.banned, input.banned)
+      : undefined,
     input.createdAt
       ? between(
           user.createdAt,

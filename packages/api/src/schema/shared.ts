@@ -12,3 +12,8 @@ export const sortQuerySchema = z
   );
 
 export const rangeQuerySchema = z.tuple([z.coerce.number(), z.coerce.number()]);
+
+export const booleanQuerySchema = z.union([
+  z.boolean(),
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+]);
