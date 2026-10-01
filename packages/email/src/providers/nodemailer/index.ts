@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { createTransport } from "nodemailer";
 
 import { env } from "./env";
 
@@ -8,7 +8,7 @@ const from = env.EMAIL_FROM;
 
 export const strategy = {
   send: async ({ to, subject, html, text }) => {
-    const transporter = nodemailer.createTransport({
+    const transporter = createTransport({
       host: env.NODEMAILER_HOST,
       port: env.NODEMAILER_PORT,
       auth: {
