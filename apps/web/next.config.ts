@@ -45,6 +45,10 @@ const config: NextConfig = {
   transpilePackages: INTERNAL_PACKAGES,
   experimental: {
     optimizePackageImports: INTERNAL_PACKAGES,
+    /** Security-related upgrade reminders during dev/build (Next.js 16.4+) */
+    agentUpgrade: "security",
+    /** Reclaim stale Turbopack disk/memory during long dev sessions */
+    turbopackGc: true,
     /** Keep soft navigations / Server Actions pending and retry on reconnect */
     useOffline: true,
     /** Faster React Compiler inside Turbopack (requires reactCompiler: true) */
