@@ -5,17 +5,6 @@ import { authClient } from "~/lib/auth";
 const KEY = "auth";
 
 const queries = {
-  sessions: {
-    getAll: queryOptions({
-      queryKey: [KEY, "sessions"],
-      queryFn: () =>
-        authClient.listSessions({
-          fetchOptions: {
-            throw: true,
-          },
-        }),
-    }),
-  },
   accounts: {
     getAll: queryOptions({
       queryKey: [KEY, "accounts"],
@@ -187,12 +176,6 @@ const mutations = {
       mutationKey: [KEY, "accounts", "disconnect"],
       mutationFn: (params: Parameters<typeof authClient.unlinkAccount>[0]) =>
         authClient.unlinkAccount(params),
-    }),
-  },
-  sessions: {
-    revoke: mutationOptions({
-      mutationKey: [KEY, "sessions", "revoke"],
-      mutationFn: (token: string) => authClient.revokeSession({ token }),
     }),
   },
 };

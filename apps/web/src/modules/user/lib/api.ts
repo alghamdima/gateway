@@ -1,10 +1,20 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 
+import { handle } from "@workspace/api/utils";
+
+import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
 
 const KEY = "user";
 
 const queries = {
+  sessions: {
+    getAll: (userId: string | undefined) =>
+      queryOptions({
+        queryKey: [KEY, "sessions", userId],
+        queryFn: () => handle(api.user.sessions.$get)(),
+      }),
+  },
   invitations: {
     getAll: queryOptions({
       queryKey: [KEY, "invitations"],
@@ -17,6 +27,13 @@ const queries = {
 };
 
 const mutations = {
+  sessions: {
+    revoke: mutationOptions({
+      mutationKey: [KEY, "sessions", "revoke"],
+      mutationFn: (id: string) =>
+        handle(api.user.sessions[":id"].revoke.$post)({ param: { id } }),
+    }),
+  },
   delete: {
     user: mutationOptions({
       mutationKey: [KEY, "delete"],

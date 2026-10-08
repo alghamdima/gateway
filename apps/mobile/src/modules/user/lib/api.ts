@@ -1,12 +1,22 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 
+import { handle } from "@workspace/api/utils";
+
 import { pathsConfig } from "~/config/paths";
+import { api } from "~/lib/api";
 import { authClient } from "~/lib/auth";
 
 const KEY = "user";
 
 const queries = {
+  sessions: {
+    getAll: (userId: string | undefined) =>
+      queryOptions({
+        queryKey: [KEY, "sessions", userId],
+        queryFn: () => handle(api.user.sessions.$get)(),
+      }),
+  },
   invitations: {
     getAll: queryOptions({
       queryKey: [KEY, "invitations"],
@@ -19,6 +29,13 @@ const queries = {
 };
 
 const mutations = {
+  sessions: {
+    revoke: mutationOptions({
+      mutationKey: [KEY, "sessions", "revoke"],
+      mutationFn: (id: string) =>
+        handle(api.user.sessions[":id"].revoke.$post)({ param: { id } }),
+    }),
+  },
   delete: {
     user: mutationOptions({
       mutationKey: [KEY, "delete"],

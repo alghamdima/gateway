@@ -22,6 +22,7 @@ import {
   SettingsCardFooter,
   SettingsCardContent,
 } from "~/modules/common/layout/dashboard/settings-card";
+import { user } from "~/modules/user/lib/api";
 
 export const Sessions = () => {
   const { t } = useTranslation(["common", "auth"]);
@@ -38,23 +39,26 @@ export const Sessions = () => {
   const {
     data: sessions,
     isLoading,
+    isFetching,
+    error,
     refetch,
   } = useQuery({
-    ...auth.queries.sessions.getAll,
+    ...user.queries.sessions.getAll(currentSession.data?.user.id),
     enabled: !!currentSession.data?.user.id,
   });
 
   const revoke = useMutation({
-    ...auth.mutations.sessions.revoke,
-    onSuccess: async (_, token) => {
+    ...user.mutations.sessions.revoke,
+    onSuccess: async (_, id) => {
       toast.add({
         title: t("account.sessions.revoke.success"),
         type: "success",
       });
-      await refetch();
-      if (token === currentSession.data?.session.token) {
+      if (id === currentSession.data?.session.id) {
         await signOut.mutateAsync(undefined);
+        return;
       }
+      await refetch();
     },
   });
 
@@ -68,8 +72,24 @@ export const Sessions = () => {
       </SettingsCardHeader>
 
       <SettingsCardContent>
-        {isLoading ? (
+        {currentSession.isPending || isLoading ? (
           <Skeleton className="h-24" />
+        ) : error && !sessions ? (
+          <div
+            role="alert"
+            className="flex flex-col items-center gap-3 rounded-md border border-dashed px-6 py-8"
+          >
+            <p className="text-destructive text-center tracking-tight">
+              {t("error.general")}
+            </p>
+            <Button
+              variant="outline"
+              disabled={isFetching}
+              onClick={() => void refetch()}
+            >
+              {t("tryAgain")}
+            </Button>
+          </div>
         ) : sessions && sessions.length > 0 ? (
           <ul className="overflow-hidden rounded-md border">
             {sessions.map((session) => {
@@ -85,7 +105,7 @@ export const Sessions = () => {
                       <span className="truncate text-sm font-medium capitalize">
                         {session.ipAddress}
                       </span>
-                      {session.token === currentSession.data?.session.token && (
+                      {session.id === currentSession.data?.session.id && (
                         <Badge variant="outline" className="mb-0.5">
                           {t("current")}
                         </Badge>
@@ -100,14 +120,14 @@ export const Sessions = () => {
                     variant="ghost"
                     size="icon"
                     disabled={
-                      revoke.isPending && revoke.variables === session.token
+                      revoke.isPending && revoke.variables === session.id
                     }
-                    onClick={() => revoke.mutate(session.token)}
+                    onClick={() => revoke.mutate(session.id)}
                   >
                     <span className="sr-only">
                       {t("account.sessions.revoke.cta")}
                     </span>
-                    {revoke.isPending && revoke.variables === session.token ? (
+                    {revoke.isPending && revoke.variables === session.id ? (
                       <Spinner className="size-4" />
                     ) : (
                       <Icons.Trash className="size-4" />

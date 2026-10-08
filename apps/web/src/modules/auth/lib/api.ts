@@ -5,17 +5,6 @@ import { authClient } from "~/lib/auth/client";
 const KEY = "auth";
 
 const queries = {
-  sessions: {
-    getAll: queryOptions({
-      queryKey: [KEY, "sessions"],
-      queryFn: () =>
-        authClient.listSessions({
-          fetchOptions: {
-            throw: true,
-          },
-        }),
-    }),
-  },
   accounts: {
     getAll: queryOptions({
       queryKey: [KEY, "accounts"],
@@ -171,12 +160,6 @@ const mutations = {
       mutationKey: [KEY, "email", "change"],
       mutationFn: (params: Parameters<typeof authClient.changeEmail>[0]) =>
         authClient.changeEmail(params),
-    }),
-  },
-  sessions: {
-    revoke: mutationOptions({
-      mutationKey: [KEY, "sessions", "revoke"],
-      mutationFn: (token: string) => authClient.revokeSession({ token }),
     }),
   },
   accounts: {

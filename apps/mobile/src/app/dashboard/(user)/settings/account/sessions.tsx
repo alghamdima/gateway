@@ -15,6 +15,7 @@ import { Text } from "@workspace/ui-mobile/text";
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth";
 import { auth } from "~/modules/auth/lib/api";
+import { user } from "~/modules/user/lib/api";
 
 export default function Sessions() {
   const { t } = useTranslation(["common", "auth"]);
@@ -29,24 +30,28 @@ export default function Sessions() {
   const {
     data: sessions,
     isLoading,
+    isFetching,
+    error,
     refetch,
     isRefetching,
   } = useQuery({
-    ...auth.queries.sessions.getAll,
+    ...user.queries.sessions.getAll(currentSession.data?.user.id),
     enabled: !!currentSession.data?.user.id,
   });
 
   const revoke = useMutation({
-    ...auth.mutations.sessions.revoke,
-    onSuccess: async (_, token) => {
+    ...user.mutations.sessions.revoke,
+    onSuccess: async (_, id) => {
       Alert.alert(t("account.sessions.revoke.success"));
-      await refetch();
-
-      if (token === currentSession.data?.session.token) {
+      if (id === currentSession.data?.session.id) {
         await signOut.mutateAsync(undefined);
+        return;
       }
+      await refetch();
     },
   });
+
+  const isInitialLoading = currentSession.isPending || isLoading;
 
   return (
     <View className="bg-background flex-1 gap-6 p-6">
@@ -56,9 +61,11 @@ export default function Sessions() {
       <View className="border-border flex-1 rounded-md border">
         <FlatList
           data={sessions}
+          keyExtractor={(item) => item.id}
           contentContainerClassName={cn({
             "flex-1": !sessions?.length,
-            "items-center justify-center": !sessions?.length && !isLoading,
+            "items-center justify-center":
+              !sessions?.length && !isInitialLoading,
           })}
           renderItem={({ item }) => (
             <View className="flex-row justify-between gap-3 px-4 py-3">
@@ -70,7 +77,7 @@ export default function Sessions() {
                   >
                     {item.ipAddress}
                   </Text>
-                  {item.token === currentSession.data?.session.token && (
+                  {item.id === currentSession.data?.session.id && (
                     <Badge variant="outline" className="mb-0.5">
                       <Text>{t("current")}</Text>
                     </Badge>
@@ -87,10 +94,10 @@ export default function Sessions() {
               <Button
                 size="icon"
                 variant="ghost"
-                disabled={revoke.isPending && revoke.variables === item.token}
-                onPress={() => revoke.mutate(item.token)}
+                disabled={revoke.isPending && revoke.variables === item.id}
+                onPress={() => revoke.mutate(item.id)}
               >
-                {revoke.isPending && revoke.variables === item.token ? (
+                {revoke.isPending && revoke.variables === item.id ? (
                   <Spinner className="text-foreground" size={16} />
                 ) : (
                   <Icons.Trash className="text-foreground" size={16} />
@@ -109,7 +116,7 @@ export default function Sessions() {
             />
           }
           ListEmptyComponent={
-            isLoading ? (
+            isInitialLoading ? (
               <View className="w-full items-start">
                 {Array.from({ length: 15 }).map((_, index, arr) => (
                   <Fragment key={index}>
@@ -126,8 +133,19 @@ export default function Sessions() {
                   </Fragment>
                 ))}
               </View>
+            ) : error && !sessions ? (
+              <View className="items-center gap-3 p-6">
+                <Text className="text-center">{t("error.general")}</Text>
+                <Button
+                  variant="outline"
+                  disabled={isFetching}
+                  onPress={() => void refetch()}
+                >
+                  <Text>{t("tryAgain")}</Text>
+                </Button>
+              </View>
             ) : (
-              <Text>{t("noResults")}</Text>
+              <Text>{t("account.sessions.noSessions")}</Text>
             )
           }
         />
