@@ -8,6 +8,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "#components/dropdown-menu";
 import { Icons } from "#components/icons";
@@ -85,6 +86,9 @@ export function DataTableColumnHeader<TData extends RowData, TValue = unknown>({
               </DropdownMenuItem>
             )}
           </>
+        )}
+        {column.getCanSort() && column.getCanHide() && (
+          <DropdownMenuSeparator />
         )}
         {column.getCanHide() && (
           <DropdownMenuCheckboxItem
