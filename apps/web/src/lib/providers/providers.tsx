@@ -21,14 +21,14 @@ export const Providers = async ({ children, locale }: ProvidersProps) => {
   const resources = await loadLocaleResources(locale);
 
   return (
-    <I18nProvider
-      locale={locale}
-      defaultLocale={appConfig.locale}
-      resources={resources}
-    >
-      <QueryClientProvider>
-        <NuqsAdapter>
-          <ConsentProvider locale={locale}>
+    <ConsentProvider locale={locale}>
+      <I18nProvider
+        locale={locale}
+        defaultLocale={appConfig.locale}
+        resources={resources}
+      >
+        <QueryClientProvider>
+          <NuqsAdapter>
             <AnalyticsProvider>
               <MonitoringProvider>
                 <FlagsProvider>
@@ -38,9 +38,9 @@ export const Providers = async ({ children, locale }: ProvidersProps) => {
                 </FlagsProvider>
               </MonitoringProvider>
             </AnalyticsProvider>
-          </ConsentProvider>
-        </NuqsAdapter>
-      </QueryClientProvider>
-    </I18nProvider>
+          </NuqsAdapter>
+        </QueryClientProvider>
+      </I18nProvider>
+    </ConsentProvider>
   );
 };

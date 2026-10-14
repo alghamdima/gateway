@@ -1,5 +1,4 @@
 @import "@workspace/ui-web/globals.css";
-@import "@c15t/nextjs/styles.css";
 
 @source "../../../../../packages/ui";
 @source "../../../../../node_modules/streamdown/dist/*.js";

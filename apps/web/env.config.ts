@@ -48,7 +48,7 @@ export default defineEnv({
       .optional()
       .default(ThemeColor.ORANGE),
 
-    NEXT_PUBLIC_C15T_URL: z.url().optional(),
+    NEXT_PUBLIC_C15T_BACKEND_URL: z.url().optional(),
   },
   /**
    * Destructure all variables from `process.env` to make sure they aren't tree-shaken away.
@@ -60,7 +60,7 @@ export default defineEnv({
     NEXT_PUBLIC_DEFAULT_LOCALE: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,
     NEXT_PUBLIC_THEME_MODE: process.env.NEXT_PUBLIC_THEME_MODE,
     NEXT_PUBLIC_THEME_COLOR: process.env.NEXT_PUBLIC_THEME_COLOR,
-    NEXT_PUBLIC_C15T_URL: process.env.NEXT_PUBLIC_C15T_URL,
+    NEXT_PUBLIC_C15T_BACKEND_URL: process.env.NEXT_PUBLIC_C15T_BACKEND_URL,
 
     NEXT_PUBLIC_AUTH_PASSWORD: process.env.NEXT_PUBLIC_AUTH_PASSWORD,
     NEXT_PUBLIC_AUTH_MAGIC_LINK: process.env.NEXT_PUBLIC_AUTH_MAGIC_LINK,

@@ -1,3 +1,5 @@
+import { withConsentManifest } from "@c15t/nextjs/build";
+
 import type { NextConfig } from "next";
 import "./env.config";
 
@@ -64,4 +66,4 @@ const config: NextConfig = {
   typescript: { ignoreBuildErrors: true },
 };
 
-export default config;
+export default withConsentManifest(config);
