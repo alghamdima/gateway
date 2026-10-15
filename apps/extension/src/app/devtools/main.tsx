@@ -6,7 +6,7 @@ import { Main } from "~/modules/common/main";
 
 import env from "../../../env.config";
 
-browser.devtools.panels.create(
+void browser.devtools.panels.create(
   env.VITE_PRODUCT_NAME,
   "icons/128.png",
   "devtools.html",

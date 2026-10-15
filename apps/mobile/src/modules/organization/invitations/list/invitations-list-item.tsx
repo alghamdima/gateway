@@ -1,3 +1,5 @@
+import CloseIcon from "@expo/material-symbols/close.xml";
+import SendIcon from "@expo/material-symbols/send.xml";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { Alert, Pressable, View } from "react-native";
@@ -8,12 +10,7 @@ import { cn } from "@workspace/ui";
 import { Badge } from "@workspace/ui-mobile/badge";
 import {
   ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuItemTitle,
-  ContextMenuItemIcon,
-  ContextMenuGroup,
+  type ContextMenuSection,
 } from "@workspace/ui-mobile/context-menu";
 import { Skeleton } from "@workspace/ui-mobile/skeleton";
 import { Text } from "@workspace/ui-mobile/text";
@@ -87,65 +84,49 @@ export const InvitationListItem = ({
     cancelInvitation.isPending &&
     cancelInvitation.variables.invitationId === invitation.id;
 
-  const groups = [
-    hasInvitePermission
-      ? [
-          <ContextMenuItem
-            onSelect={() => resendInvitation.mutate(invitation)}
-            disabled={isResendPending}
-            key={`resend-${invitation.id}`}
-            textValue={t("resend")}
-          >
-            <ContextMenuItemIcon
-              ios={{
-                name: "arrow.clockwise",
-              }}
-              androidIconName="ic_menu_send"
-            />
-            <ContextMenuItemTitle>
-              <Text>{t("resend")}</Text>
-            </ContextMenuItemTitle>
-          </ContextMenuItem>,
-        ]
-      : null,
-    hasCancelPermission
-      ? [
-          <ContextMenuItem
-            destructive
-            onSelect={() =>
-              cancelInvitation.mutate({
-                invitationId: invitation.id,
-              })
-            }
-            disabled={isCancelPending}
-            key={`cancel-${invitation.id}`}
-            textValue={t("cancel")}
-          >
-            <ContextMenuItemIcon
-              ios={{
-                name: "xmark",
-              }}
-              androidIconName="ic_menu_close_clear_cancel"
-            />
-            <ContextMenuItemTitle>
-              <Text>{t("cancel")}</Text>
-            </ContextMenuItemTitle>
-          </ContextMenuItem>,
-        ]
-      : null,
-  ].filter((group) => group?.filter(Boolean).length);
+  const sections: ContextMenuSection[] = [];
+
+  if (hasInvitePermission) {
+    sections.push([
+      {
+        title: t("resend"),
+        icon: { ios: "arrow.clockwise", android: SendIcon },
+        disabled: isResendPending,
+        onPress: () => resendInvitation.mutate(invitation),
+      },
+    ]);
+  }
+
+  if (hasCancelPermission) {
+    sections.push([
+      {
+        title: t("cancel"),
+        icon: { ios: "xmark", android: CloseIcon },
+        destructive: true,
+        disabled: isCancelPending,
+        onPress: () =>
+          cancelInvitation.mutate({
+            invitationId: invitation.id,
+          }),
+      },
+    ]);
+  }
+
+  const isMenuDisabled = isResendPending || isCancelPending;
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger disabled={isResendPending || isCancelPending}>
+    <ContextMenu
+      disabled={isMenuDisabled}
+      sections={sections}
+      trigger={
         <Pressable
           className={cn(
             "active:bg-accent dark:active:bg-accent/50 bg-background flex-row items-center gap-3 px-4 py-3",
             {
-              "opacity-50": isResendPending || isCancelPending,
+              "opacity-50": isMenuDisabled,
             },
           )}
-          disabled={isResendPending || isCancelPending}
+          disabled={isMenuDisabled}
         >
           <View className="flex-1">
             <Text
@@ -183,15 +164,8 @@ export const InvitationListItem = ({
             </Badge>
           </View>
         </Pressable>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        {groups.map((group, index) => (
-          <ContextMenuGroup key={`group-${index}`}>
-            {group?.flat()}
-          </ContextMenuGroup>
-        ))}
-      </ContextMenuContent>
-    </ContextMenu>
+      }
+    />
   );
 };
 

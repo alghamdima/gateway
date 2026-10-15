@@ -20,6 +20,8 @@
     "ui:add": "pnpm dlx @react-native-reusables/cli@latest add"
   },
   "dependencies": {
+    "@expo/material-symbols": "0.1.1",
+    "@expo/ui": "57.0.9",
     "@gorhom/bottom-sheet": "5.2.14",
     "@react-native-community/slider": "5.0.1",
     "@rn-primitives/avatar": "1.5.2",
@@ -46,8 +48,7 @@
     "react-native": "catalog:",
     "react-native-keyboard-controller": "1.21.9",
     "react-native-reanimated": "4.5.0",
-    "uniwind": "1.6.3",
-    "zeego": "3.0.6"
+    "uniwind": "1.6.3"
   },
   "devDependencies": {
     "@types/culori": "4.0.1",

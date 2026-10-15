@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.7.0",
+  version: "1.7.1",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",
@@ -85,6 +85,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
             process.env.EXPO_PUBLIC_SITE_URL?.startsWith("http://") ?? false,
         },
         ios: {
+          enableSceneSupport: true,
           /* https://github.com/react-native-google-signin/google-signin/issues/1517 */
           extraPods: [{ name: "AppCheckCore", version: "11.2.0" }],
         },

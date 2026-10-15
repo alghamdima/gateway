@@ -1,3 +1,6 @@
+import DeleteIcon from "@expo/material-symbols/delete.xml";
+import LogoutIcon from "@expo/material-symbols/logout.xml";
+import ManageAccountsIcon from "@expo/material-symbols/manage_accounts.xml";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Alert, Pressable, View } from "react-native";
@@ -18,12 +21,7 @@ import { Badge } from "@workspace/ui-mobile/badge";
 import { useBottomSheet } from "@workspace/ui-mobile/bottom-sheet";
 import {
   ContextMenu,
-  ContextMenuItem,
-  ContextMenuItemTitle,
-  ContextMenuItemIcon,
-  ContextMenuContent,
-  ContextMenuTrigger,
-  ContextMenuGroup,
+  type ContextMenuSection,
 } from "@workspace/ui-mobile/context-menu";
 import { Icons } from "@workspace/ui-mobile/icons";
 import { Skeleton } from "@workspace/ui-mobile/skeleton";
@@ -109,92 +107,68 @@ export const MembersListItem = ({ member }: { member: Member }) => {
     leaveOrganization.isPending &&
     leaveOrganization.variables.organizationId === member.organizationId;
 
-  const groups = [
-    hasUpdatePermission
-      ? [
-          <ContextMenuItem
-            key="update-role"
-            textValue={t("updateRole")}
-            onSelect={() => {
-              openUpdateMemberRole();
-            }}
-          >
-            <ContextMenuItemIcon
-              ios={{
-                name: "person.badge.key",
-              }}
-              androidIconName="ic_menu_edit"
-            />
-            <ContextMenuItemTitle>
-              <Text>{t("updateRole")}</Text>
-            </ContextMenuItemTitle>
-          </ContextMenuItem>,
-        ]
-      : null,
-    [
-      hasDeletePermission ? (
-        me ? (
-          <ContextMenuItem
-            key={`leave-${member.id}`}
-            textValue={t("common:leave")}
-            destructive
-            disabled={isLeavePending}
-            onSelect={() => {
+  const sections: ContextMenuSection[] = [];
+
+  if (hasUpdatePermission) {
+    sections.push([
+      {
+        title: t("updateRole"),
+        icon: { ios: "person.badge.key", android: ManageAccountsIcon },
+        onPress: () => {
+          openUpdateMemberRole();
+        },
+      },
+    ]);
+  }
+
+  if (hasDeletePermission) {
+    sections.push([
+      me
+        ? {
+            title: t("common:leave"),
+            icon: {
+              ios: "rectangle.portrait.and.arrow.right",
+              android: LogoutIcon,
+            },
+            destructive: true,
+            disabled: isLeavePending,
+            onPress: () => {
               leaveOrganization.mutate({
                 organizationId: member.organizationId,
               });
-            }}
-          >
-            <ContextMenuItemIcon
-              ios={{
-                name: "rectangle.portrait.and.arrow.right",
-              }}
-              androidIconName="ic_menu_close_clear_cancel"
-            />
-            <ContextMenuItemTitle>
-              <Text>{t("common:leave")}</Text>
-            </ContextMenuItemTitle>
-          </ContextMenuItem>
-        ) : (
-          <ContextMenuItem
-            key={`remove-${member.id}`}
-            textValue={t("common:remove")}
-            disabled={isRemovePending}
-            destructive
-            onSelect={() => {
+            },
+          }
+        : {
+            title: t("common:remove"),
+            icon: { ios: "trash", android: DeleteIcon },
+            destructive: true,
+            disabled: isRemovePending,
+            onPress: () => {
               removeMember.mutate({
                 memberIdOrEmail: member.id,
                 organizationId: member.organizationId,
               });
-            }}
-          >
-            <ContextMenuItemIcon
-              ios={{
-                name: "trash",
-              }}
-              androidIconName="ic_menu_delete"
-            />
-            <ContextMenuItemTitle>
-              <Text>{t("common:remove")}</Text>
-            </ContextMenuItemTitle>
-          </ContextMenuItem>
-        )
-      ) : null,
-    ],
-  ].filter((group) => group?.filter(Boolean).length);
+            },
+          },
+    ]);
+  }
+
+  const isMenuDisabled = isRemovePending || isLeavePending;
 
   return (
     <>
-      <ContextMenu>
-        <ContextMenuTrigger disabled={isRemovePending || isLeavePending}>
+      <ContextMenu
+        disabled={isMenuDisabled}
+        sections={sections}
+        trigger={
           <Pressable
             className={cn(
               "active:bg-accent dark:active:bg-accent/50 bg-background flex-row items-center gap-3 px-4 py-3 disabled:opacity-50",
               {
-                "opacity-50": isRemovePending || isLeavePending,
+                "opacity-50": isMenuDisabled,
               },
             )}
-            disabled={isRemovePending || isLeavePending}
+            disabled={isMenuDisabled}
           >
             <Avatar alt={member.user.name}>
               <AvatarImage source={{ uri: member.user.image }} />
@@ -225,15 +199,8 @@ export const MembersListItem = ({ member }: { member: Member }) => {
               <Text>{t(member.role)}</Text>
             </Badge>
           </Pressable>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          {groups.map((group, index) => (
-            <ContextMenuGroup key={`group-${index}`}>
-              {group?.flat()}
-            </ContextMenuGroup>
-          ))}
-        </ContextMenuContent>
-      </ContextMenu>
+        }
+      />
       <UpdateMemberRoleBottomSheet member={member} ref={updateMemberRoleRef} />
     </>
   );
