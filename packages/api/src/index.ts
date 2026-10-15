@@ -1,12 +1,10 @@
 import { Hono } from "hono";
-import { statusMonitor } from "hono-status-monitor";
 import { some } from "hono/combine";
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
 import { logger as loggerMiddleware } from "hono/logger";
 
 import { auth } from "@workspace/auth/server";
-import { db } from "@workspace/db/server";
 import { Platform } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { matchesPattern } from "@workspace/shared/utils";
@@ -18,20 +16,10 @@ import { authRouter } from "./modules/auth/router";
 import { billingRouter } from "./modules/billing/router";
 import { organizationRouter } from "./modules/organization/router";
 import { userRouter } from "./modules/user/router";
+import { monitor } from "./monitor";
 import { onError } from "./utils/on-error";
 
 import type { Context } from "hono";
-
-const monitor = statusMonitor({
-  healthCheck: async () => {
-    const start = performance.now();
-    await db.execute(`SELECT 1`);
-    return {
-      connected: true,
-      latencyMs: performance.now() - start,
-    };
-  },
-});
 
 const appRouter = new Hono()
   .basePath("/api")
