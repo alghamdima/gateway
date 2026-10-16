@@ -39,6 +39,7 @@ export const Invitation = (props: InvitationProps) => {
   const router = useRouter();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const listOrganizations = authClient.useListOrganizations();
 
   const queryClient = useQueryClient();
   const acceptInvitation = useMutation({
@@ -47,6 +48,7 @@ export const Invitation = (props: InvitationProps) => {
       await queryClient.invalidateQueries(
         user.queries.invitations.getAll(userId),
       );
+      await listOrganizations.refetch();
       router.replace(
         pathsConfig.dashboard.organization(props.organization.slug ?? "").index,
       );

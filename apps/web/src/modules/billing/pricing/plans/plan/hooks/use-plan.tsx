@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 
@@ -42,6 +42,7 @@ export const usePlan = ({ plan }: { plan: BillingConfigPlan }) => {
   );
 
   const router = useRouter();
+  const queryClient = useQueryClient();
   const checkout = useMutation({
     ...billing.mutations.checkout.create,
     onSuccess: (data) => {
@@ -54,9 +55,15 @@ export const usePlan = ({ plan }: { plan: BillingConfigPlan }) => {
 
   const getPortal = useMutation({
     ...billing.mutations.portal.get,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (!data.url) {
         return toast.add({ title: t("error.portal"), type: "error" });
+      }
+      const referenceId = controls.referenceId ?? user?.id;
+      if (referenceId) {
+        await queryClient.invalidateQueries(
+          billing.queries.summary.get(referenceId),
+        );
       }
       return router.push(data.url);
     },

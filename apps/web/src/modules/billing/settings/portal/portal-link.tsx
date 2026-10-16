@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import React, { useMemo } from "react";
 
@@ -38,6 +38,7 @@ export const PortalLink = ({
 }) => {
   const { t } = useTranslation("billing");
   const router = useRouter();
+  const queryClient = useQueryClient();
   const session = authClient.useSession();
 
   const organization = useQuery({
@@ -55,10 +56,13 @@ export const PortalLink = ({
 
   const getPortal = useMutation({
     ...billing.mutations.portal.get,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       if (!data.url) {
         return toast.add({ title: t("error.portal"), type: "error" });
       }
+      await queryClient.invalidateQueries(
+        billing.queries.summary.get(referenceId),
+      );
       return router.push(data.url);
     },
   });

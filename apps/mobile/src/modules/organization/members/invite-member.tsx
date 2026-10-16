@@ -1,5 +1,5 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 import * as z from "zod";
@@ -46,6 +46,7 @@ export const InviteMemberBottomSheet = ({
   const activeMember = authClient.useActiveMember();
 
   const { ref, close } = useBottomSheet();
+  const queryClient = useQueryClient();
 
   const schema = z.object({
     invites: z.array(inviteMemberSchema).min(1),
@@ -100,6 +101,12 @@ export const InviteMemberBottomSheet = ({
       form.reset({ invites: failedInvites });
     } else {
       form.reset(undefined, { keepDefaultValues: true });
+    }
+
+    if (successCount > 0) {
+      await queryClient.invalidateQueries(
+        organization.queries.invitations.getAll({ id: organizationId }),
+      );
     }
   };
 
