@@ -57,6 +57,11 @@ export const webhookHandler = async (
           id: event.data.id,
         });
         break;
+      case "order.paid":
+        await checkoutStatusChangeHandler({
+          id: event.data.id,
+        });
+        break;
     }
 
     return new Response(JSON.stringify({ received: true }), {
