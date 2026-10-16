@@ -174,6 +174,7 @@ export const auth = betterAuth({
     }),
     admin(),
     organization({
+      requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: async (
         { invitation, inviter, organization },
         request,
