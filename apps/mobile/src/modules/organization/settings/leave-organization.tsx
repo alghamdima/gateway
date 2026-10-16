@@ -15,6 +15,7 @@ import { organization } from "~/modules/organization/lib/api";
 
 export const LeaveOrganization = () => {
   const { t } = useTranslation(["common", "organization"]);
+  const session = authClient.useSession();
   const activeOrganization = authClient.useActiveOrganization();
   const listOrganizations = authClient.useListOrganizations();
   const activeMember = authClient.useActiveMember();
@@ -31,9 +32,13 @@ export const LeaveOrganization = () => {
   const leaveOrganization = useMutation({
     ...organization.mutations.leave,
     onSuccess: async () => {
-      await activeOrganization.refetch();
-      await listOrganizations.refetch();
-      await activeMember.refetch();
+      await authClient.organization.setActive({ organizationId: null });
+      await Promise.all([
+        session.refetch(),
+        activeOrganization.refetch(),
+        listOrganizations.refetch(),
+        activeMember.refetch(),
+      ]);
       router.replace(pathsConfig.dashboard.user.index);
     },
   });

@@ -39,6 +39,7 @@ export const MembersListItem = ({ member }: { member: Member }) => {
   const queryClient = useQueryClient();
   const session = authClient.useSession();
   const organizations = authClient.useListOrganizations();
+  const activeOrganization = authClient.useActiveOrganization();
   const activeMember = authClient.useActiveMember();
 
   const { ref: updateMemberRoleRef, open: openUpdateMemberRole } =
@@ -91,8 +92,14 @@ export const MembersListItem = ({ member }: { member: Member }) => {
 
   const leaveOrganization = useMutation({
     ...organization.mutations.leave,
-    onSuccess: () => {
-      void organizations.refetch();
+    onSuccess: async () => {
+      await authClient.organization.setActive({ organizationId: null });
+      await Promise.all([
+        session.refetch(),
+        activeOrganization.refetch(),
+        organizations.refetch(),
+        activeMember.refetch(),
+      ]);
       Alert.alert(t("leave.success"));
       router.replace(pathsConfig.dashboard.user.index);
     },

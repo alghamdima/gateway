@@ -18,12 +18,21 @@ import { organization } from "~/modules/organization/lib/api";
 
 export const DeleteOrganization = () => {
   const { t } = useTranslation(["common", "organization"]);
-  const { data: activeOrganization } = authClient.useActiveOrganization();
-  const { data: activeMember } = authClient.useActiveMember();
+  const session = authClient.useSession();
+  const activeOrganization = authClient.useActiveOrganization();
+  const listOrganizations = authClient.useListOrganizations();
+  const activeMember = authClient.useActiveMember();
 
   const deleteOrganization = useMutation({
     ...organization.mutations.delete,
-    onSuccess: () => {
+    onSuccess: async () => {
+      await authClient.organization.setActive({ organizationId: null });
+      await Promise.all([
+        session.refetch(),
+        activeOrganization.refetch(),
+        listOrganizations.refetch(),
+        activeMember.refetch(),
+      ]);
       router.replace(pathsConfig.dashboard.user.index);
     },
   });
@@ -32,12 +41,12 @@ export const DeleteOrganization = () => {
     permissions: {
       organization: ["delete"],
     },
-    role: toMemberRole(activeMember?.role),
+    role: toMemberRole(activeMember.data?.role),
   });
 
   const summary = useQuery({
-    ...billing.queries.summary.get(activeOrganization?.id ?? ""),
-    enabled: !!activeOrganization && hasDeletePermission,
+    ...billing.queries.summary.get(activeOrganization.data?.id ?? ""),
+    enabled: !!activeOrganization.data && hasDeletePermission,
   });
 
   const activeSubscriptions = useMemo(
@@ -48,7 +57,7 @@ export const DeleteOrganization = () => {
     [summary.data],
   );
 
-  if (!activeOrganization) {
+  if (!activeOrganization.data) {
     return null;
   }
 
@@ -81,7 +90,7 @@ export const DeleteOrganization = () => {
               style: "destructive",
               onPress: () =>
                 deleteOrganization.mutate({
-                  organizationId: activeOrganization.id,
+                  organizationId: activeOrganization.data?.id ?? "",
                 }),
             },
           ]);

@@ -79,6 +79,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         android: {
           /* https://github.com/expo/expo/issues/15761 */
           enableMinifyInReleaseBuilds: true,
+          buildArchs: ["arm64-v8a"],
           extraProguardRules: "-keep public class com.horcrux.svg.** {*;}",
           allowBackup: false,
           usesCleartextTraffic:
