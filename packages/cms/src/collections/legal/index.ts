@@ -6,9 +6,11 @@ import * as z from "zod";
 import { ContentStatus } from "../../types";
 import { getLastModifiedAt } from "../../utils";
 
+const contentDirectory = "src/collections/legal/content";
+
 export const legal = defineCollection({
   name: "legal",
-  directory: "src/collections/legal/content",
+  directory: contentDirectory,
   include: "**/*.mdx",
   schema: z.object({
     title: z.string(),
@@ -22,7 +24,7 @@ export const legal = defineCollection({
     });
     const lastModifiedAt = await context.cache(
       document._meta.filePath,
-      getLastModifiedAt,
+      (filePath) => getLastModifiedAt(filePath, contentDirectory),
     );
 
     return {

@@ -76,5 +76,10 @@ export const usersRouter = new Hono()
       ),
   )
   .delete("/:id/accounts/:accountId", async (c) =>
-    c.json(await deleteAccount({ id: c.req.param("accountId") })),
+    c.json(
+      await deleteAccount({
+        id: c.req.param("accountId"),
+        userId: c.req.param("id"),
+      }),
+    ),
   );
