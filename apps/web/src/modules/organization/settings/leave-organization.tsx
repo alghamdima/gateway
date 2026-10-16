@@ -38,6 +38,8 @@ export const LeaveOrganization = ({
 }) => {
   const { t } = useTranslation("organization");
   const { activeMember } = useActiveOrganization();
+  const session = authClient.useSession();
+  const userId = session.data?.user.id;
   const isOwner = activeMember?.role === MemberRole.OWNER;
 
   const { data: activeOrganization } = useQuery(
@@ -45,8 +47,8 @@ export const LeaveOrganization = ({
   );
 
   const { data: canLeave } = useQuery({
-    ...organization.queries.canLeave({ id: organizationId }),
-    enabled: isOwner,
+    ...organization.queries.canLeave({ id: organizationId, userId }),
+    enabled: isOwner && !!userId,
   });
 
   const canCurrentMemberLeave = !isOwner || canLeave?.allowed === true;

@@ -20,7 +20,7 @@ export const strategy = {
   Provider: ({ children, enabled = true }) => {
     useEffect(() => {
       if (!enabled) {
-        if (posthog.__loaded) {
+        if (posthog.__loaded && !posthog.has_opted_out_capturing()) {
           posthog.opt_out_capturing();
         }
         return;
@@ -28,7 +28,9 @@ export const strategy = {
 
       schedulePostHogInit();
       onPostHogReady(() => {
-        posthog.opt_in_capturing();
+        if (!posthog.has_opted_in_capturing()) {
+          posthog.opt_in_capturing();
+        }
       });
     }, [enabled]);
 

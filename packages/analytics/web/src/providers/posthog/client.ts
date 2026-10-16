@@ -9,8 +9,11 @@ const getInitOptions = () => ({
   api_host: env.NEXT_PUBLIC_POSTHOG_HOST,
   person_profiles: "always" as const,
   capture_pageview: false,
+  autocapture: false,
   disable_external_dependency_loading: true,
   disable_session_recording: true,
+  opt_out_capturing_by_default: true,
+  opt_out_persistence_by_default: true,
   loaded: () => {
     for (const callback of pendingReadyCallbacks) {
       callback();

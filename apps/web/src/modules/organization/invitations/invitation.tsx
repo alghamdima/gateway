@@ -11,6 +11,7 @@ import { Icons } from "@workspace/ui-web/icons";
 import { Spinner } from "@workspace/ui-web/spinner";
 
 import { pathsConfig } from "~/config/paths";
+import { authClient } from "~/lib/auth/client";
 import { AuthHeader } from "~/modules/auth/layout/header";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { organization } from "~/modules/organization/lib/api";
@@ -36,12 +37,16 @@ interface InvitationProps {
 export const Invitation = (props: InvitationProps) => {
   const { t } = useTranslation(["common", "organization"]);
   const router = useRouter();
+  const session = authClient.useSession();
+  const userId = session.data?.user.id;
 
   const queryClient = useQueryClient();
   const acceptInvitation = useMutation({
     ...organization.mutations.invitations.accept,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(user.queries.invitations.getAll);
+      await queryClient.invalidateQueries(
+        user.queries.invitations.getAll(userId),
+      );
       router.replace(
         pathsConfig.dashboard.organization(props.organization.slug ?? "").index,
       );
@@ -50,7 +55,9 @@ export const Invitation = (props: InvitationProps) => {
   const rejectInvitation = useMutation({
     ...organization.mutations.invitations.reject,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(user.queries.invitations.getAll);
+      await queryClient.invalidateQueries(
+        user.queries.invitations.getAll(userId),
+      );
       router.replace(pathsConfig.dashboard.user.index);
     },
   });

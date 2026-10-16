@@ -34,11 +34,11 @@ export const Passkeys = () => {
   const { t, i18n } = useTranslation(["auth", "common"]);
 
   const { data: session } = authClient.useSession();
-  const userId = session?.user.id ?? "";
+  const userId = session?.user.id;
 
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
-    ...auth.queries.passkeys.getAll,
+    ...auth.queries.passkeys.getAll(userId),
     enabled: !!userId,
   });
 
@@ -47,7 +47,7 @@ export const Passkeys = () => {
   const add = useMutation({
     ...auth.mutations.passkeys.add,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(auth.queries.passkeys.getAll);
+      await queryClient.invalidateQueries(auth.queries.passkeys.getAll(userId));
       toast.add({ title: t("account.passkeys.add.success"), type: "success" });
     },
   });
@@ -55,7 +55,7 @@ export const Passkeys = () => {
   const remove = useMutation({
     ...auth.mutations.passkeys.delete,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(auth.queries.passkeys.getAll);
+      await queryClient.invalidateQueries(auth.queries.passkeys.getAll(userId));
       toast.add({
         title: t("account.passkeys.remove.success"),
         type: "success",

@@ -21,11 +21,13 @@ export const LeaveOrganization = () => {
   const activeMember = authClient.useActiveMember();
   const isOwner = activeMember.data?.role === MemberRole.OWNER;
 
+  const userId = session.data?.user.id;
   const canLeave = useQuery({
     ...organization.queries.canLeave({
       id: activeOrganization.data?.id ?? "",
+      userId,
     }),
-    enabled: isOwner,
+    enabled: isOwner && !!userId,
   });
   const canCurrentMemberLeave = !isOwner || canLeave.data?.allowed === true;
 

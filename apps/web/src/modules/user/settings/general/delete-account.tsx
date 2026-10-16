@@ -48,9 +48,10 @@ export const DeleteAccount = ({ user }: DeleteAccountProps) => {
   const { t } = useTranslation("auth");
 
   const summary = useQuery(billing.queries.summary.get(user.id));
-  const organizations = useQuery(
-    organization.queries.getBlockingAccountDeletion,
-  );
+  const organizations = useQuery({
+    ...organization.queries.getBlockingAccountDeletion(user.id),
+    enabled: !!user.id,
+  });
 
   const activeSubscriptions = useMemo(
     () =>

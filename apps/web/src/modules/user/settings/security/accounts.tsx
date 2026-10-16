@@ -39,11 +39,12 @@ import type { SocialProvider } from "@workspace/auth";
 export const Accounts = () => {
   const { t, i18n } = useTranslation(["auth", "common"]);
   const { data: session } = authClient.useSession();
+  const userId = session?.user.id;
 
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
-    ...auth.queries.accounts.getAll,
-    enabled: !!session?.user.id,
+    ...auth.queries.accounts.getAll(userId),
+    enabled: !!userId,
   });
 
   const accounts = data ?? [];
@@ -57,7 +58,7 @@ export const Accounts = () => {
   const connect = useMutation({
     ...auth.mutations.accounts.connect,
     onSuccess: async (_, { provider }) => {
-      await queryClient.invalidateQueries(auth.queries.accounts.getAll);
+      await queryClient.invalidateQueries(auth.queries.accounts.getAll(userId));
       toast.add({
         title: t("account.accounts.connect.success", {
           provider: capitalize(provider as string),
@@ -70,7 +71,7 @@ export const Accounts = () => {
   const disconnect = useMutation({
     ...auth.mutations.accounts.disconnect,
     onSuccess: async (_, { accountId }) => {
-      await queryClient.invalidateQueries(auth.queries.accounts.getAll);
+      await queryClient.invalidateQueries(auth.queries.accounts.getAll(userId));
       const provider = accounts.find(
         (account) => account.id === accountId,
       )?.providerId;

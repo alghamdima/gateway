@@ -42,6 +42,8 @@ export const Invitation = (props: InvitationProps) => {
 
   const activeOrganization = authClient.useActiveOrganization();
   const activeMember = authClient.useActiveMember();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id;
 
   const queryClient = useQueryClient();
   const setActive = useMutation({
@@ -54,7 +56,9 @@ export const Invitation = (props: InvitationProps) => {
   const acceptInvitation = useMutation({
     ...organization.mutations.invitations.accept,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(user.queries.invitations.getAll);
+      await queryClient.invalidateQueries(
+        user.queries.invitations.getAll(userId),
+      );
       await setActive.mutateAsync({
         organizationId: props.invitation.organizationId,
       });
@@ -64,7 +68,9 @@ export const Invitation = (props: InvitationProps) => {
   const rejectInvitation = useMutation({
     ...organization.mutations.invitations.reject,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(user.queries.invitations.getAll);
+      await queryClient.invalidateQueries(
+        user.queries.invitations.getAll(userId),
+      );
 
       router.replace(pathsConfig.index);
     },

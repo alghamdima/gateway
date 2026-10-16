@@ -77,8 +77,9 @@ const Actions = ({ member }: { member: Member }) => {
   const { data: canLeave } = useQuery({
     ...organization.queries.canLeave({
       id: member.organizationId,
+      userId: session?.user.id,
     }),
-    enabled: me && member.role === MemberRole.OWNER,
+    enabled: me && member.role === MemberRole.OWNER && !!session?.user.id,
   });
 
   const hasDeletePermission =

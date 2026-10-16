@@ -30,9 +30,10 @@ import { onPromise } from "~/utils";
 export const EditPassword = () => {
   const { t } = useTranslation(["common", "auth"]);
   const session = authClient.useSession();
+  const userId = session.data?.user.id;
   const { data: accounts, isLoading } = useQuery({
-    ...auth.queries.accounts.getAll,
-    enabled: !!session.data?.user.id,
+    ...auth.queries.accounts.getAll(userId),
+    enabled: !!userId,
   });
 
   const form = useForm({

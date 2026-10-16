@@ -18,13 +18,14 @@ const queries = {
       }),
   },
   invitations: {
-    getAll: queryOptions({
-      queryKey: [KEY, "invitations"],
-      queryFn: () =>
-        authClient.organization.listUserInvitations({
-          fetchOptions: { throw: true },
-        }),
-    }),
+    getAll: (userId: string | undefined) =>
+      queryOptions({
+        queryKey: [KEY, "invitations", userId],
+        queryFn: () =>
+          authClient.organization.listUserInvitations({
+            fetchOptions: { throw: true },
+          }),
+      }),
   },
 };
 

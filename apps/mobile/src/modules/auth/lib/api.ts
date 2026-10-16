@@ -6,10 +6,12 @@ const KEY = "auth";
 
 const queries = {
   accounts: {
-    getAll: queryOptions({
-      queryKey: [KEY, "accounts"],
-      queryFn: () => authClient.listAccounts({ fetchOptions: { throw: true } }),
-    }),
+    getAll: (userId: string | undefined) =>
+      queryOptions({
+        queryKey: [KEY, "accounts", userId],
+        queryFn: () =>
+          authClient.listAccounts({ fetchOptions: { throw: true } }),
+      }),
   },
 };
 

@@ -21,11 +21,12 @@ export default function AccountsScreen() {
   const { t, i18n } = useTranslation(["auth", "common"]);
 
   const { data: session } = authClient.useSession();
+  const userId = session?.user.id;
 
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
-    ...auth.queries.accounts.getAll,
-    enabled: !!session?.user.id,
+    ...auth.queries.accounts.getAll(userId),
+    enabled: !!userId,
   });
 
   const accounts = data ?? [];
@@ -39,14 +40,14 @@ export default function AccountsScreen() {
   const connect = useMutation({
     ...auth.mutations.accounts.connect,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(auth.queries.accounts.getAll);
+      await queryClient.invalidateQueries(auth.queries.accounts.getAll(userId));
     },
   });
 
   const disconnect = useMutation({
     ...auth.mutations.accounts.disconnect,
     onSuccess: async () => {
-      await queryClient.invalidateQueries(auth.queries.accounts.getAll);
+      await queryClient.invalidateQueries(auth.queries.accounts.getAll(userId));
     },
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -26,9 +26,7 @@ export const PasskeyLogin = ({
   const router = useRouter();
   const { t } = useTranslation(["auth", "common"]);
 
-  const queryClient = useQueryClient();
-
-  const signIn = useMutation({
+  const { mutate: signInWithPasskey, isPending } = useMutation({
     ...auth.mutations.signIn.passkey,
     onSuccess: () => {
       router.replace(redirectTo);
@@ -36,21 +34,18 @@ export const PasskeyLogin = ({
   });
 
   useEffect(() => {
-    void queryClient
-      .getMutationCache()
-      .build(queryClient, auth.mutations.signIn.passkey)
-      .execute({ autoFill: true });
-  }, [queryClient]);
+    signInWithPasskey({ autoFill: true });
+  }, [signInWithPasskey]);
 
   return (
     <Button
       variant="outline"
       className="relative gap-2"
       size="lg"
-      onClick={() => signIn.mutate(undefined)}
-      disabled={signIn.isPending}
+      onClick={() => signInWithPasskey(undefined)}
+      disabled={isPending}
     >
-      {signIn.isPending ? (
+      {isPending ? (
         <Spinner className="size-4" />
       ) : (
         <>

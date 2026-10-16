@@ -40,8 +40,13 @@ import type { Invitation } from "@workspace/auth";
 
 export const UserOrganizationInvitationsBanner = memo(() => {
   const { t } = useTranslation(["organization", "common"]);
+  const session = authClient.useSession();
+  const userId = session.data?.user.id;
 
-  const { data } = useQuery(user.queries.invitations.getAll);
+  const { data } = useQuery({
+    ...user.queries.invitations.getAll(userId),
+    enabled: !!userId,
+  });
   const pendingInvitations = data?.filter(
     (invitation) =>
       invitation.status === InvitationStatus.PENDING &&
@@ -82,6 +87,8 @@ const UserOrganizationInvitationsListModalItem = ({
   const { t } = useTranslation(["common", "organization"]);
   const queryClient = useQueryClient();
   const { refetch } = authClient.useListOrganizations();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user.id;
 
   const { data, isLoading } = useQuery({
     queryKey: organization.queries.get({ id: invitation.organizationId })
@@ -101,7 +108,9 @@ const UserOrganizationInvitationsListModalItem = ({
           organization: data?.organization?.name ?? "",
         }),
       );
-      await queryClient.invalidateQueries(user.queries.invitations.getAll);
+      await queryClient.invalidateQueries(
+        user.queries.invitations.getAll(userId),
+      );
       await refetch();
       onSuccess?.();
     },
@@ -116,7 +125,9 @@ const UserOrganizationInvitationsListModalItem = ({
           organization: data?.organization?.name ?? "",
         }),
       );
-      await queryClient.invalidateQueries(user.queries.invitations.getAll);
+      await queryClient.invalidateQueries(
+        user.queries.invitations.getAll(userId),
+      );
       onSuccess?.();
     },
   });

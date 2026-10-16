@@ -23,9 +23,11 @@ export const DeleteAccount = () => {
   const summary = useQuery(
     billing.queries.summary.get(session.data?.user.id ?? ""),
   );
-  const organizations = useQuery(
-    organization.queries.getBlockingAccountDeletion,
-  );
+  const userId = session.data?.user.id;
+  const organizations = useQuery({
+    ...organization.queries.getBlockingAccountDeletion(userId),
+    enabled: !!userId,
+  });
 
   const activeSubscriptions = useMemo(
     () =>

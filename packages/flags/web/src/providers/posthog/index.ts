@@ -13,6 +13,12 @@ const ensurePostHog = () => {
 
   posthog.init(env.NEXT_PUBLIC_POSTHOG_KEY, {
     api_host: env.NEXT_PUBLIC_POSTHOG_HOST,
+    autocapture: false,
+    capture_pageview: false,
+    disable_external_dependency_loading: true,
+    disable_session_recording: true,
+    opt_out_capturing_by_default: true,
+    opt_out_persistence_by_default: true,
   });
 
   return posthog;

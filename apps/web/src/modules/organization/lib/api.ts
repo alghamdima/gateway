@@ -92,17 +92,18 @@ const queries = {
           }),
       }),
   },
-  canLeave: ({ id }: { id: string }) =>
+  canLeave: ({ id, userId }: { id: string; userId: string | undefined }) =>
     queryOptions({
-      queryKey: [KEY, "can-leave", id],
+      queryKey: [KEY, "can-leave", id, userId],
       queryFn: () =>
         handle(api.organizations[":id"]["can-leave"].$get)({ param: { id } }),
     }),
-  getBlockingAccountDeletion: queryOptions({
-    queryKey: [KEY, "blocking-account-deletion"],
-    queryFn: () =>
-      handle(api.organizations["blocking-account-deletion"].$get)({}),
-  }),
+  getBlockingAccountDeletion: (userId: string | undefined) =>
+    queryOptions({
+      queryKey: [KEY, "blocking-account-deletion", userId],
+      queryFn: () =>
+        handle(api.organizations["blocking-account-deletion"].$get)({}),
+    }),
 };
 
 const mutations = {

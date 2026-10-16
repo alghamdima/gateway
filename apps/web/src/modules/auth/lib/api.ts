@@ -6,17 +6,22 @@ const KEY = "auth";
 
 const queries = {
   accounts: {
-    getAll: queryOptions({
-      queryKey: [KEY, "accounts"],
-      queryFn: () => authClient.listAccounts({ fetchOptions: { throw: true } }),
-    }),
+    getAll: (userId: string | undefined) =>
+      queryOptions({
+        queryKey: [KEY, "accounts", userId],
+        queryFn: () =>
+          authClient.listAccounts({ fetchOptions: { throw: true } }),
+      }),
   },
   passkeys: {
-    getAll: queryOptions({
-      queryKey: [KEY, "passkeys"],
-      queryFn: () =>
-        authClient.passkey.listUserPasskeys({ fetchOptions: { throw: true } }),
-    }),
+    getAll: (userId: string | undefined) =>
+      queryOptions({
+        queryKey: [KEY, "passkeys", userId],
+        queryFn: () =>
+          authClient.passkey.listUserPasskeys({
+            fetchOptions: { throw: true },
+          }),
+      }),
   },
 };
 
@@ -50,8 +55,16 @@ const mutations = {
     }),
     passkey: mutationOptions({
       mutationKey: [KEY, "signIn", "passkey"],
-      mutationFn: (params?: Parameters<typeof authClient.signIn.passkey>[0]) =>
-        authClient.signIn.passkey(params),
+      mutationFn: async (
+        params?: Parameters<typeof authClient.signIn.passkey>[0],
+      ) => {
+        const response = await authClient.signIn.passkey(params);
+        if (response.error) {
+          const { message, statusText } = response.error;
+          throw new Error(typeof message === "string" ? message : statusText);
+        }
+        return response.data;
+      },
     }),
   },
   password: {

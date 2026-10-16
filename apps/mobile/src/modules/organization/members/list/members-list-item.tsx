@@ -51,8 +51,9 @@ export const MembersListItem = ({ member }: { member: Member }) => {
   const { data: canLeave } = useQuery({
     ...organization.queries.canLeave({
       id: member.organizationId,
+      userId: session.data?.user.id,
     }),
-    enabled: me && member.role === MemberRole.OWNER,
+    enabled: me && member.role === MemberRole.OWNER && !!session.data?.user.id,
   });
 
   const hasDeletePermission =
