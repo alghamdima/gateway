@@ -19,7 +19,7 @@ export default function StartStep() {
         showsVerticalScrollIndicator={false}
       >
         <View className="items-start gap-1">
-          <Text className="font-sans-bold text-3xl tracking-tight">
+          <Text className="text-3xl font-bold tracking-tight">
             {t("setup.steps.step.start.title")}
           </Text>
           <Text className="text-muted-foreground leading-snug">

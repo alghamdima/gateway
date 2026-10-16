@@ -71,7 +71,7 @@ const WelcomePage = () => {
           </Carousel>
 
           <View className="mx-auto mt-auto max-w-xl gap-3">
-            <Text className="font-sans-bold text-center text-3xl tracking-tighter sm:text-4xl">
+            <Text className="text-center text-3xl font-bold tracking-tighter sm:text-4xl">
               {t("product.title")}
             </Text>
 

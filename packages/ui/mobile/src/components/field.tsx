@@ -32,7 +32,7 @@ function FieldLegend({
   return (
     <Text
       className={cn(
-        "font-sans-medium",
+        "font-medium",
         {
           "text-base": variant === "legend",
           "text-sm": variant === "label",
@@ -118,7 +118,7 @@ function FieldTitle({
   return (
     <Text
       className={cn(
-        "font-sans-medium flex flex-row items-center gap-2 text-sm",
+        "flex flex-row items-center gap-2 text-sm font-medium",
         disabled && "opacity-50",
         className,
       )}

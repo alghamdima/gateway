@@ -74,7 +74,9 @@ export const InvitationsList = () => {
           refreshControl={
             <RefreshControl
               refreshing={invitations.isRefetching}
-              onRefresh={() => invitations.refetch()}
+              onRefresh={() => {
+                void invitations.refetch();
+              }}
               tintColorClassName="accent-primary"
               colorsClassName="accent-primary"
             />

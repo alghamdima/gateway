@@ -75,7 +75,7 @@ const Available = () => {
   return (
     <>
       <View className="gap-0.5">
-        <Text className="font-sans-medium text-lg leading-tight">
+        <Text className="text-lg leading-tight font-medium">
           {t("update.available.title")}
         </Text>
         <Text className="text-muted-foreground text-sm">
@@ -123,7 +123,7 @@ const Installing = () => {
     <>
       <View className="gap-0.5">
         <View className="flex-row items-center justify-between gap-2">
-          <Text className="font-sans-medium text-lg leading-tight">
+          <Text className="text-lg leading-tight font-medium">
             {t("update.installing.title")}
           </Text>
           <Spinner className="text-primary" size={16} />
@@ -149,7 +149,7 @@ const DownloadError = () => {
   return (
     <>
       <View className="gap-0.5">
-        <Text className="font-sans-medium text-lg leading-tight">
+        <Text className="text-lg leading-tight font-medium">
           {t("error.general")}
         </Text>
         <Text className="text-muted-foreground text-sm">

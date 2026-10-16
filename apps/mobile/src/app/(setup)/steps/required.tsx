@@ -43,7 +43,7 @@ export default function RequiredStep() {
       >
         <View className="items-start gap-6">
           <View className="items-start gap-1">
-            <Text className="font-sans-bold text-3xl tracking-tight">
+            <Text className="text-3xl font-bold tracking-tight">
               {t("setup.steps.step.required.title")}
             </Text>
             <Text className="text-muted-foreground leading-snug">
@@ -95,7 +95,7 @@ export default function RequiredStep() {
                                 `${appConfig.url}/legal/privacy-policy`,
                               )
                             }
-                            className="font-sans-medium text-primary text-sm underline active:no-underline"
+                            className="text-primary text-sm font-medium underline active:no-underline"
                           />
                         ),
                       }}

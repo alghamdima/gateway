@@ -71,7 +71,7 @@ export const MagicLinkLoginForm = memo<MagicLinkLoginFormProps>(
                 maxLength={254}
                 editable={!form.formState.isSubmitting}
                 returnKeyType="go"
-                onSubmitEditing={submit}
+                onSubmitEditing={() => void submit()}
               />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>

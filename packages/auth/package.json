@@ -33,6 +33,8 @@
   "devDependencies": {
     "@workspace/tsconfig": "workspace:*",
     "@workspace/vitest-config": "workspace:*",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -6,13 +6,7 @@
 @source "../../../../../packages/ui/mobile/";
 
 @theme {
-  --font-sans: "Geist_400Regular";
-  --font-sans-medium: "Geist_500Medium";
-  --font-sans-semibold: "Geist_600SemiBold";
-  --font-sans-bold: "Geist_700Bold";
-  --font-serif: "SourceSerif4_400Regular";
-  --font-serif-medium: "SourceSerif4_500Medium";
-  --font-serif-semibold: "SourceSerif4_600SemiBold";
-  --font-serif-bold: "SourceSerif4_700Bold";
-  --font-mono: "GeistMono_400Regular";
+  --font-sans: "Geist";
+  --font-serif: "Source Serif 4";
+  --font-mono: "Geist Mono";
 }

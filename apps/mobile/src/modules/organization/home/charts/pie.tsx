@@ -167,7 +167,7 @@ export function PieChart() {
         </PolarChart>
 
         <View className="absolute inset-0 items-center justify-center">
-          <Text className="font-sans-bold text-foreground -mt-3 text-3xl">
+          <Text className="text-foreground -mt-3 text-3xl font-bold">
             {customersData
               .find((data) => data.month === activeMonth)
               ?.customers.toLocaleString(i18n.language)}

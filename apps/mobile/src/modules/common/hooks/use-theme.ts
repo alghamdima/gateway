@@ -22,24 +22,9 @@ import type { ColorVariable, ThemeConfig } from "@workspace/ui";
 const REM_BASE = 16;
 
 const FONTS = {
-  [ThemeFont.SANS]: {
-    regular: "Geist_400Regular",
-    medium: "Geist_500Medium",
-    semibold: "Geist_600SemiBold",
-    bold: "Geist_700Bold",
-  },
-  [ThemeFont.SERIF]: {
-    regular: "SourceSerif4_400Regular",
-    medium: "SourceSerif4_500Medium",
-    semibold: "SourceSerif4_600SemiBold",
-    bold: "SourceSerif4_700Bold",
-  },
-  [ThemeFont.MONO]: {
-    regular: "GeistMono_400Regular",
-    medium: "GeistMono_400Regular",
-    semibold: "GeistMono_400Regular",
-    bold: "GeistMono_400Regular",
-  },
+  [ThemeFont.SANS]: "Geist",
+  [ThemeFont.SERIF]: "Source Serif 4",
+  [ThemeFont.MONO]: "Geist Mono",
 };
 
 const getPixelFromRem = (value: string) => {
@@ -93,12 +78,9 @@ export const useTheme = () => {
       );
       const sharedVariables = {
         "--radius": radius,
-        "--font-sans": FONTS[config.font].regular,
-        "--font-sans-medium": FONTS[config.font].medium,
-        "--font-sans-semibold": FONTS[config.font].semibold,
-        "--font-sans-bold": FONTS[config.font].bold,
-        "--font-serif": FONTS[ThemeFont.SERIF].regular,
-        "--font-mono": FONTS[ThemeFont.MONO].regular,
+        "--font-sans": FONTS[config.font],
+        "--font-serif": FONTS[ThemeFont.SERIF],
+        "--font-mono": FONTS[ThemeFont.MONO],
       };
 
       Uniwind.updateCSSVariables(ThemeMode.LIGHT, sharedVariables);

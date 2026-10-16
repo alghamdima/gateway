@@ -13,7 +13,7 @@ export default function NotFound() {
   return (
     <View className="bg-background flex flex-1 items-center justify-center gap-8 px-6">
       <View className="items-center justify-center gap-4">
-        <Text className="font-sans-bold text-center text-4xl">
+        <Text className="text-center text-4xl font-bold">
           {t("error.notFound")}
         </Text>
         <Text className="text-muted-foreground max-w-md text-center">

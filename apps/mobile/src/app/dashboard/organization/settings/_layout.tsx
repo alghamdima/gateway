@@ -1,9 +1,12 @@
 import { Stack } from "expo-router";
 
+export const unstable_settings = {
+  anchor: "index",
+};
+
 export default function SettingsLayout() {
   return (
     <Stack
-      initialRouteName="index"
       screenOptions={{
         animation: "fade",
         animationDuration: 200,

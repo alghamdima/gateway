@@ -58,7 +58,7 @@ const Setup = ({ enabled }: { enabled: boolean }) => {
       return;
     }
 
-    void client.screen(pathname, params);
+    void client.screen(pathname, params as Record<string, string>);
   }, [pathname, params, client, isActive]);
 
   return null;

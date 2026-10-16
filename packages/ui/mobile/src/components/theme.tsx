@@ -170,7 +170,7 @@ export const ThemeCustomizer = memo<ThemeCustomizerProps>(
             maximumValue={Object.values(ThemeRadius).length - 1}
             step={1}
             value={radiusIndex}
-            onValueChange={(index) => {
+            onValueChange={(index: number) => {
               const nextRadius = Object.values(ThemeRadius)[Math.round(index)];
 
               if (nextRadius) {

@@ -25,6 +25,8 @@
   "devDependencies": {
     "@types/negotiator": "0.6.4",
     "@workspace/tsconfig": "workspace:*",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
     "typescript": "catalog:"
   }
 }

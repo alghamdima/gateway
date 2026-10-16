@@ -37,7 +37,7 @@ export const InvitationEmailMismatch = ({
             i18nKey="invitations.emailMismatch.description"
             ns="organization"
             values={{ email }}
-            components={{ bold: <Text className="font-sans-medium text-sm" /> }}
+            components={{ bold: <Text className="text-sm font-medium" /> }}
           />
         }
       />

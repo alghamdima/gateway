@@ -52,7 +52,7 @@ export const AccountInfo = () => {
         </View>
       </AvatarForm>
       <View className="items-center px-6">
-        <Text className="font-sans-semibold text-lg">{data.user.name}</Text>
+        <Text className="text-lg font-semibold">{data.user.name}</Text>
         <Text className="text-muted-foreground text-center text-sm">
           {data.user.email}
         </Text>

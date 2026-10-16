@@ -3,6 +3,7 @@ import LogoutIcon from "@expo/material-symbols/logout.xml";
 import ManageAccountsIcon from "@expo/material-symbols/manage_accounts.xml";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 
 import {
@@ -161,53 +162,65 @@ export const MembersListItem = ({ member }: { member: Member }) => {
   }
 
   const isMenuDisabled = isRemovePending || isLeavePending;
+  const [rowWidth, setRowWidth] = useState<number>();
 
   return (
     <>
-      <ContextMenu
-        disabled={isMenuDisabled}
-        sections={sections}
-        trigger={
-          <Pressable
-            className={cn(
-              "active:bg-accent dark:active:bg-accent/50 bg-background flex-row items-center gap-3 px-4 py-3 disabled:opacity-50",
-              {
-                "opacity-50": isMenuDisabled,
-              },
-            )}
-            disabled={isMenuDisabled}
-          >
-            <Avatar alt={member.user.name}>
-              <AvatarImage source={{ uri: member.user.image }} />
-              <AvatarFallback>
-                <Icons.UserRound size={20} className="text-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <View className="flex-1">
-              <View className="flex-1 flex-row items-center gap-2">
+      <View
+        className="w-full"
+        onLayout={(event) => {
+          setRowWidth(event.nativeEvent.layout.width);
+        }}
+      >
+        <ContextMenu
+          disabled={isMenuDisabled}
+          sections={sections}
+          trigger={
+            <Pressable
+              style={rowWidth ? { width: rowWidth } : undefined}
+              className={cn(
+                "active:bg-accent dark:active:bg-accent/50 bg-background flex-row items-center gap-3 px-4 py-3 disabled:opacity-50",
+                {
+                  "opacity-50": isMenuDisabled,
+                },
+              )}
+              disabled={isMenuDisabled}
+            >
+              <Avatar alt={member.user.name}>
+                <AvatarImage source={{ uri: member.user.image }} />
+                <AvatarFallback>
+                  <Icons.UserRound size={20} className="text-foreground" />
+                </AvatarFallback>
+              </Avatar>
+              <View className="flex-1">
+                <View className="flex-1 flex-row items-center gap-2">
+                  <Text
+                    className="shrink text-sm leading-tight font-medium"
+                    numberOfLines={1}
+                  >
+                    {member.user.name}
+                  </Text>
+                  {me && (
+                    <Badge variant="outline">
+                      <Text>{t("you")}</Text>
+                    </Badge>
+                  )}
+                </View>
                 <Text
-                  className="font-sans-medium shrink text-sm leading-tight"
+                  className="text-muted-foreground text-sm"
                   numberOfLines={1}
                 >
-                  {member.user.name}
+                  {member.user.email}
                 </Text>
-                {me && (
-                  <Badge variant="outline">
-                    <Text>{t("you")}</Text>
-                  </Badge>
-                )}
               </View>
-              <Text className="text-muted-foreground text-sm" numberOfLines={1}>
-                {member.user.email}
-              </Text>
-            </View>
 
-            <Badge variant="outline" className="ml-auto">
-              <Text>{t(member.role)}</Text>
-            </Badge>
-          </Pressable>
-        }
-      />
+              <Badge variant="outline" className="ml-auto">
+                <Text>{t(member.role)}</Text>
+              </Badge>
+            </Pressable>
+          }
+        />
+      </View>
       <UpdateMemberRoleBottomSheet member={member} ref={updateMemberRoleRef} />
     </>
   );

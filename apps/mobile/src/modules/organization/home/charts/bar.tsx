@@ -116,7 +116,7 @@ export function BarChart() {
 
       <CardFooter className="flex-col items-start">
         <View className="flex-row items-center gap-2">
-          <Text className="font-sans-medium text-sm">
+          <Text className="text-sm font-medium">
             {t("trendingUp", { percentage: 22 })}
           </Text>
           <Icons.TrendingUp size={16} className="text-foreground" />

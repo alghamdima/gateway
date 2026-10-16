@@ -6,12 +6,15 @@ import { capitalize } from "@workspace/shared/utils";
 
 import { BaseHeader } from "~/modules/common/layout/header";
 
+export const unstable_settings = {
+  anchor: "index",
+};
+
 export default function GeneralLayout() {
   const { t, i18n } = useTranslation("common");
 
   return (
     <Stack
-      initialRouteName="index"
       screenOptions={({ route }) => {
         const name = route.name === "index" ? "organization" : route.name;
 

@@ -64,7 +64,7 @@ export const UpdatePasswordForm = memo<UpdatePasswordFormProps>(({ token }) => {
               autoComplete="new-password"
               onChangeText={field.onChange}
               returnKeyType="go"
-              onSubmitEditing={submit}
+              onSubmitEditing={() => void submit()}
               editable={!form.formState.isSubmitting}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

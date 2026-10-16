@@ -11,7 +11,7 @@ function Textarea({
   placeholderTextColorClassName,
   selectionColorClassName,
   ...props
-}: TextInputProps & React.RefAttributes<TextInput>) {
+}: TextInputProps) {
   return (
     <TextInput
       className={cn(

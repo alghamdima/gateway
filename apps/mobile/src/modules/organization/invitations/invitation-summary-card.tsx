@@ -40,7 +40,7 @@ export const InvitationSummaryCard = ({
       </Avatar>
 
       <View>
-        <Text className="font-sans-medium leading-tight" numberOfLines={1}>
+        <Text className="leading-tight font-medium" numberOfLines={1}>
           {organization.name}
         </Text>
         <Text className="text-muted-foreground text-sm">

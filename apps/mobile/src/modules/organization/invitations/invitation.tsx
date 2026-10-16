@@ -84,7 +84,7 @@ export const Invitation = (props: InvitationProps) => {
               inviterEmail: props.invitation.inviterEmail,
               organizationName: props.organization.name,
             }}
-            components={{ bold: <Text className="font-sans-medium text-sm" /> }}
+            components={{ bold: <Text className="text-sm font-medium" /> }}
           />
         }
       />
@@ -128,7 +128,7 @@ export const Invitation = (props: InvitationProps) => {
       </View>
       <Link
         href={pathsConfig.index}
-        className="text-muted-foreground font-sans-medium self-center text-sm underline underline-offset-4"
+        className="text-muted-foreground self-center text-sm font-medium underline underline-offset-4"
       >
         {t("invitations.invitation.skip")}
       </Link>

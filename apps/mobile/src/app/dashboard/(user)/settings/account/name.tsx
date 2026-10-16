@@ -41,7 +41,7 @@ const EditName = () => {
   return (
     <View className="bg-background flex-1 p-6">
       <View className="flex-1 gap-6">
-        <Text className="text-muted-foreground font-sans-medium text-base">
+        <Text className="text-muted-foreground text-base font-medium">
           {t("account.name.edit.description")}
         </Text>
 

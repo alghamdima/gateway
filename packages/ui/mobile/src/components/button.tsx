@@ -7,6 +7,7 @@ import { cn } from "@workspace/ui";
 import { TextClassContext } from "#components/text";
 
 import type { VariantProps } from "class-variance-authority";
+import type { BaseSyntheticEvent } from "react";
 
 const buttonVariants = cva(
   "group shrink-0 flex-row items-center justify-center gap-2 rounded-md shadow-none",
@@ -37,7 +38,7 @@ const buttonVariants = cva(
   },
 );
 
-const buttonTextVariants = cva("text-foreground font-sans-medium text-sm", {
+const buttonTextVariants = cva("text-foreground text-sm font-medium", {
   variants: {
     variant: {
       default: "text-primary-foreground",
@@ -61,14 +62,14 @@ const buttonTextVariants = cva("text-foreground font-sans-medium text-sm", {
   },
 });
 
-function Button({
-  className,
-  variant,
-  size,
-  ...props
-}: React.ComponentProps<typeof Pressable> &
-  React.RefAttributes<typeof Pressable> &
-  VariantProps<typeof buttonVariants>) {
+type ButtonProps = VariantProps<typeof buttonVariants> &
+  Omit<React.ComponentProps<typeof Pressable>, "onPress"> & {
+    onPress?:
+      | React.ComponentProps<typeof Pressable>["onPress"]
+      | ((event?: BaseSyntheticEvent) => unknown);
+  };
+
+function Button({ className, variant, size, onPress, ...props }: ButtonProps) {
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
@@ -78,6 +79,11 @@ function Button({
           className,
         )}
         role="button"
+        onPress={
+          onPress as
+            | React.ComponentProps<typeof Pressable>["onPress"]
+            | undefined
+        }
         {...props}
       />
     </TextClassContext.Provider>

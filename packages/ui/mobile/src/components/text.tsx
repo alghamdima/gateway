@@ -10,10 +10,9 @@ const Text = ({
   className,
   asChild = false,
   ...props
-}: React.ComponentProps<typeof RNText> &
-  React.RefAttributes<RNText> & {
-    asChild?: boolean;
-  }) => {
+}: React.ComponentProps<typeof RNText> & {
+  asChild?: boolean;
+}) => {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
   return (

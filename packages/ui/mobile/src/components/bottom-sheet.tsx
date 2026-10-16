@@ -9,7 +9,7 @@ import {
   createBottomSheetScrollableComponent,
 } from "@gorhom/bottom-sheet";
 import * as Slot from "@rn-primitives/slot";
-import { useTheme } from "expo-router/react-navigation";
+import { useTheme } from "expo-router";
 import * as React from "react";
 import { memo } from "react";
 import { Keyboard, Pressable, View } from "react-native";
@@ -304,7 +304,7 @@ function BottomSheetTitle({
       role="heading"
       aria-level={3}
       className={cn(
-        "font-sans-semibold text-xl leading-tight tracking-tight",
+        "text-xl leading-tight font-semibold tracking-tight",
         className,
       )}
       {...props}

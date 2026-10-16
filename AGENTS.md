@@ -113,7 +113,7 @@ Environment: create `.env` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `UR
 
 **Web:** RSC by default; `use client` only when needed; `Suspense` for client components; `nuqs` for URL state; `@workspace/ui-web`. Next.js 16.4: `proxy.ts` (not middleware); error boundaries use `retry` (not `reset`); TypeScript 7 via project-local `tsc`; locale via `next/root-params` (`~/lib/i18n`).
 
-**Mobile:** SafeAreaProvider; minimize hooks; memoize; `expo-image`; `@workspace/ui-mobile`
+**Mobile:** SafeAreaProvider; minimize hooks; memoize; `expo-image`; `@workspace/ui-mobile`. To run or check the app, use `npx @expo/agent-cli` from `apps/mobile` (`status`, `dev`, `smoke`) instead of raw Expo/EAS CLI; it is experimental and falls back to Expo CLI. `expo start` also prints an Expo Device Hub link for driving simulators/emulators from the browser.
 
 **Extension:** background for long tasks; content scripts for DOM; WXT messaging; `@workspace/ui-web`
 

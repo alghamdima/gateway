@@ -66,7 +66,6 @@ function Alert({
   iconClassName,
   ...props
 }: ViewProps &
-  React.RefAttributes<View> &
   VariantProps<typeof alertVariants> & {
     icon?: Icon;
     iconClassName?: string;
@@ -103,7 +102,7 @@ function AlertTitle({
   return (
     <Text
       className={cn(
-        "font-sans-medium ml-0.5 min-h-4 pl-6 leading-none tracking-tight",
+        "ml-0.5 min-h-4 pl-6 leading-none font-medium tracking-tight",
         className,
       )}
       {...props}

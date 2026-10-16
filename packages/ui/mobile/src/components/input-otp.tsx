@@ -55,7 +55,7 @@ function InputOTPSlot({
       {...props}
     >
       {char !== null && (
-        <Text className="text-foreground font-sans-medium text-xl">{char}</Text>
+        <Text className="text-foreground text-xl font-medium">{char}</Text>
       )}
       {hasFakeCaret && <FakeCaret />}
     </View>

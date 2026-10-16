@@ -86,7 +86,7 @@ export const OrganizationInfo = () => {
         </View>
       </AvatarForm>
       <View className="items-center gap-2.5">
-        <Text className="font-sans-semibold text-xl">
+        <Text className="text-xl font-semibold">
           {activeOrganization.data.name}
         </Text>
 

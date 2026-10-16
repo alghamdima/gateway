@@ -1,18 +1,4 @@
 import { useReactNavigationDevTools } from "@dev-plugins/react-navigation";
-import {
-  Geist_400Regular,
-  Geist_500Medium,
-  Geist_600SemiBold,
-  Geist_700Bold,
-  useFonts,
-} from "@expo-google-fonts/geist";
-import { GeistMono_400Regular } from "@expo-google-fonts/geist-mono";
-import {
-  SourceSerif4_400Regular,
-  SourceSerif4_500Medium,
-  SourceSerif4_600SemiBold,
-  SourceSerif4_700Bold,
-} from "@expo-google-fonts/source-serif-4";
 import { router, Stack, useNavigationContainerRef } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { View } from "react-native";
@@ -75,21 +61,7 @@ const useSetupAuth = () => {
 
 const RootLayout = () => {
   useTheme();
-  const [fontsLoaded] = useFonts({
-    GeistMono_400Regular,
-    Geist_400Regular,
-    Geist_500Medium,
-    Geist_600SemiBold,
-    Geist_700Bold,
-    SourceSerif4_400Regular,
-    SourceSerif4_500Medium,
-    SourceSerif4_600SemiBold,
-    SourceSerif4_700Bold,
-  });
-
-  const authLoaded = useSetupAuth();
-
-  const loaded = fontsLoaded && authLoaded;
+  const loaded = useSetupAuth();
 
   if (loaded) {
     SplashScreen.hide();
@@ -106,7 +78,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <View className="bg-background flex-1 items-center justify-center gap-8 px-6">
       <View className="flex flex-col items-center justify-center gap-4">
-        <Text className="font-sans-bold text-center text-4xl">
+        <Text className="text-center text-4xl font-bold">
           {t("error.general")}
         </Text>
         <Text className="text-muted-foreground text-center">

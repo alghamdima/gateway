@@ -8,7 +8,7 @@ import { TextClassContext, Text } from "./text";
 import type { TextRef, ViewRef } from "@rn-primitives/types";
 import type { ViewProps } from "react-native";
 
-function Card({ className, ...props }: ViewProps & React.RefAttributes<View>) {
+function Card({ className, ...props }: ViewProps) {
   return (
     <TextClassContext.Provider value="text-card-foreground">
       <View
@@ -37,7 +37,7 @@ function CardTitle({
       role="heading"
       aria-level={3}
       className={cn(
-        "font-sans-medium text-card-foreground text-lg leading-tight tracking-tight",
+        "text-card-foreground text-lg leading-tight font-medium tracking-tight",
         className,
       )}
       {...props}

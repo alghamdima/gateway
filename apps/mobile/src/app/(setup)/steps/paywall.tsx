@@ -84,7 +84,7 @@ export default function PaywallStep() {
         className="py-4"
       >
         <View className="items-start gap-1">
-          <Text className="font-sans-bold text-3xl tracking-tight">
+          <Text className="text-3xl font-bold tracking-tight">
             {t("setup.steps.step.paywall.title")}
           </Text>
           <Text className="text-muted-foreground leading-snug">
@@ -108,7 +108,7 @@ export default function PaywallStep() {
                 <Text className="text-muted-foreground text-sm">
                   {item.label}
                 </Text>
-                <Text className="font-sans-medium text-sm">{item.value}</Text>
+                <Text className="text-sm font-medium">{item.value}</Text>
               </View>
             ))}
           </CardContent>

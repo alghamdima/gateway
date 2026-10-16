@@ -66,7 +66,9 @@ export const MembersList = () => {
           refreshControl={
             <RefreshControl
               refreshing={members.isRefetching}
-              onRefresh={() => members.refetch()}
+              onRefresh={() => {
+                void members.refetch();
+              }}
               tintColorClassName="accent-primary"
               colorsClassName="accent-primary"
             />

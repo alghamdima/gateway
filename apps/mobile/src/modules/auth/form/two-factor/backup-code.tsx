@@ -56,7 +56,7 @@ const BackupCodeForm = memo<FormProps>(({ redirectTo = pathsConfig.index }) => {
               autoCapitalize="none"
               autoComplete="one-time-code"
               returnKeyType="go"
-              onSubmitEditing={submit}
+              onSubmitEditing={() => void submit()}
               editable={!form.formState.isSubmitting}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -103,7 +103,7 @@ const BackupCodeCta = memo<CtaProps>(({ onFactorChange }) => {
     <View className="flex items-center justify-center pt-2">
       <Text
         onPress={() => onFactorChange(SecondFactor.BACKUP_CODE)}
-        className="text-muted-foreground font-sans-medium cursor-pointer pl-2 text-sm underline underline-offset-4"
+        className="text-muted-foreground cursor-pointer pl-2 text-sm font-medium underline underline-offset-4"
       >
         {t("login.twoFactor.backupCode.cta")}
       </Text>

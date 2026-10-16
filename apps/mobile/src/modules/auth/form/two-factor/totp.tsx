@@ -110,7 +110,7 @@ const TotpCta = memo<CtaProps>(({ onFactorChange }) => {
     <View className="flex items-center justify-center pt-2">
       <Text
         onPress={() => onFactorChange(SecondFactor.TOTP)}
-        className="text-muted-foreground font-sans-medium cursor-pointer pl-2 text-sm underline underline-offset-4"
+        className="text-muted-foreground cursor-pointer pl-2 text-sm font-medium underline underline-offset-4"
       >
         {t("login.twoFactor.totp.cta")}
       </Text>

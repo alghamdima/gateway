@@ -71,7 +71,7 @@ export const BillingEmpty = ({
   return (
     <View className="bg-background flex-1 gap-4 px-6 py-4">
       <View className="gap-1">
-        <Text className="font-sans-semibold text-2xl tracking-tight">
+        <Text className="text-2xl font-semibold tracking-tight">
           {t("settings.yourPlan.title")}
         </Text>
         <Text className="text-muted-foreground text-sm">

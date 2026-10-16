@@ -15,7 +15,7 @@ const AuthError = () => {
   return (
     <View className="bg-background flex-1 flex-col items-center justify-center gap-4 px-8">
       <Icons.CircleX className="text-destructive" strokeWidth={1.2} size={80} />
-      <Text className="font-sans-semibold text-center text-2xl">
+      <Text className="text-center text-2xl font-semibold">
         {t("error.general")}
       </Text>
 

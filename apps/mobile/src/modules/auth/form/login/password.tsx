@@ -1,7 +1,7 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { memo, useRef } from "react";
+import { memo, useRef, type ComponentRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { View } from "react-native";
 
@@ -20,7 +20,6 @@ import { Link } from "~/modules/common/styled";
 import { auth } from "../../lib/api";
 
 import type { Href } from "expo-router";
-import type { TextInput } from "react-native";
 
 interface PasswordLoginFormProps {
   readonly redirectTo?: Href;
@@ -52,7 +51,7 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
     });
 
     const submit = form.handleSubmit((data) => signIn.mutateAsync(data));
-    const passwordRef = useRef<TextInput>(null);
+    const passwordRef = useRef<ComponentRef<typeof Input>>(null);
 
     return (
       <View className="gap-6">
@@ -104,7 +103,7 @@ export const PasswordLoginForm = memo<PasswordLoginFormProps>(
                 autoComplete="password"
                 onChangeText={field.onChange}
                 returnKeyType="go"
-                onSubmitEditing={submit}
+                onSubmitEditing={() => void submit()}
                 editable={!form.formState.isSubmitting}
               />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

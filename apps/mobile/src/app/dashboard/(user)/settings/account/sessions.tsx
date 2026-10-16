@@ -55,7 +55,7 @@ export default function Sessions() {
 
   return (
     <View className="bg-background flex-1 gap-6 p-6">
-      <Text className="text-muted-foreground font-sans-medium">
+      <Text className="text-muted-foreground font-medium">
         {t("account.sessions.description")}
       </Text>
       <View className="border-border flex-1 rounded-md border">
@@ -72,7 +72,7 @@ export default function Sessions() {
               <View className="flex-1">
                 <View className="shrink flex-row items-center gap-1">
                   <Text
-                    className="font-sans-medium shrink text-sm"
+                    className="shrink text-sm font-medium"
                     numberOfLines={1}
                   >
                     {item.ipAddress}
@@ -110,7 +110,9 @@ export default function Sessions() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={() => refetch()}
+              onRefresh={() => {
+                void refetch();
+              }}
               tintColorClassName="accent-primary"
               colorsClassName="accent-primary"
             />

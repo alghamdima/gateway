@@ -43,7 +43,7 @@ export const BaseHeader = ({ onBack, title }: BaseHeaderProps) => {
         )}
 
         {title && (
-          <Text className="font-sans-medium mt-0.5 leading-none">{title}</Text>
+          <Text className="mt-0.5 leading-none font-medium">{title}</Text>
         )}
       </View>
     </View>

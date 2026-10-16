@@ -3,7 +3,7 @@ import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider as NavigationThemeProvider,
-} from "expo-router/react-navigation";
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo } from "react";
 import { View } from "react-native";

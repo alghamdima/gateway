@@ -1,5 +1,4 @@
 import { Tabs } from "expo-router";
-import { Easing } from "react-native";
 
 import { useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
@@ -8,24 +7,20 @@ import { Icons } from "@workspace/ui-mobile/icons";
 import { UserHeader } from "~/modules/common/layout/header";
 import { TabBarLabel } from "~/modules/common/styled";
 
+export const unstable_settings = {
+  anchor: "index",
+};
+
 export default function OrganizationLayout() {
   const { t } = useTranslation("common");
 
   return (
     <Tabs
-      initialRouteName="index"
       screenOptions={{
         tabBarStyle: {
           paddingTop: 4,
         },
         animation: "fade",
-        transitionSpec: {
-          animation: "timing",
-          config: {
-            duration: 200,
-            easing: Easing.inOut(Easing.ease),
-          },
-        },
       }}
     >
       <Tabs.Screen

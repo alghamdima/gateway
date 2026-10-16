@@ -4,11 +4,14 @@ import { useTranslation } from "@workspace/i18n";
 
 import { BaseHeader } from "~/modules/common/layout/header";
 
+export const unstable_settings = {
+  anchor: "index",
+};
+
 export default function SettingsLayout() {
   const { t } = useTranslation("common");
   return (
     <Stack
-      initialRouteName="index"
       screenOptions={{
         animation: "fade",
         animationDuration: 200,

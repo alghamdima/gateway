@@ -103,7 +103,7 @@ const EditEmail = () => {
               </Button>
             )}
           </View>
-          <Text className="text-muted-foreground font-sans-medium text-base">
+          <Text className="text-muted-foreground text-base font-medium">
             {t("account.email.change.description")}
           </Text>
         </View>

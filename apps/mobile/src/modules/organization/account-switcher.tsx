@@ -116,7 +116,7 @@ export const AccountSwitcher = () => {
 
             <View className="shrink">
               <Text
-                className="font-sans-medium self-start text-base leading-tight"
+                className="self-start text-base leading-tight font-medium"
                 numberOfLines={1}
               >
                 {activeOrganization.data

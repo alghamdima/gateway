@@ -28,7 +28,7 @@ const badgeVariants = cva(
   },
 );
 
-const badgeTextVariants = cva("font-sans-medium text-xs", {
+const badgeTextVariants = cva("text-xs font-medium", {
   variants: {
     variant: {
       default: "text-primary-foreground",
@@ -43,10 +43,9 @@ const badgeTextVariants = cva("font-sans-medium text-xs", {
   },
 });
 
-type BadgeProps = ViewProps &
-  React.RefAttributes<View> & {
-    asChild?: boolean;
-  } & VariantProps<typeof badgeVariants>;
+type BadgeProps = ViewProps & {
+  asChild?: boolean;
+} & VariantProps<typeof badgeVariants>;
 
 function Badge({ className, variant, asChild, ...props }: BadgeProps) {
   const Component = asChild ? Slot.View : View;

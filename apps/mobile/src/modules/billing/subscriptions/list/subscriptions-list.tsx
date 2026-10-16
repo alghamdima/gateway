@@ -31,7 +31,7 @@ export const SubscriptionsList = ({
   return (
     <View className="gap-4">
       <View className="gap-1">
-        <Text className="font-sans-semibold text-2xl tracking-tight">
+        <Text className="text-2xl font-semibold tracking-tight">
           {t("subscriptions")}
         </Text>
         <Text className="text-muted-foreground text-sm">

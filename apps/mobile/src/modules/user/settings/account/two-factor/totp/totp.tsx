@@ -193,7 +193,7 @@ export const TotpTile = () => {
     <>
       <View className="border-border flex-row items-center justify-between gap-4 rounded-md border p-4">
         <View className="flex-1">
-          <Text className="font-sans-medium text-sm">
+          <Text className="text-sm font-medium">
             {t("account.twoFactor.totp.title")}
           </Text>
           <Text className="text-muted-foreground text-sm">

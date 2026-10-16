@@ -105,7 +105,7 @@ export const EmailOtpLoginForm = memo<EmailOtpLoginFormProps>(
                   maxLength={254}
                   editable={!isRequestSubmitting}
                   returnKeyType="go"
-                  onSubmitEditing={handleRequestSubmit}
+                  onSubmitEditing={() => void handleRequestSubmit()}
                 />
                 {fieldState.invalid && (
                   <FieldError errors={[fieldState.error]} />

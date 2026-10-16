@@ -52,7 +52,7 @@ export default function NotificationsSettings() {
         <View className="gap-4">
           <View className="flex-row items-start justify-between gap-8">
             <View className="flex-1">
-              <Text className="text-muted-foreground font-sans-medium text-base">
+              <Text className="text-muted-foreground text-base font-medium">
                 {t("notifications.description")}
               </Text>
             </View>
@@ -85,7 +85,7 @@ export default function NotificationsSettings() {
 
         <View className="gap-1">
           <View className="flex-row items-center justify-between">
-            <Text className="font-sans-medium">
+            <Text className="font-medium">
               {t("notifications.token.title")}
             </Text>
             <Button
@@ -131,7 +131,7 @@ export default function NotificationsSettings() {
               components={{
                 a: (
                   <Text
-                    className="font-sans-medium text-primary text-sm underline active:no-underline"
+                    className="text-primary text-sm font-medium underline active:no-underline"
                     onPress={() =>
                       Linking.openURL("https://expo.dev/notifications")
                     }
@@ -148,7 +148,7 @@ export default function NotificationsSettings() {
               components={{
                 a: (
                   <Text
-                    className="font-sans-medium text-primary text-sm underline active:no-underline"
+                    className="text-primary text-sm font-medium underline active:no-underline"
                     onPress={() =>
                       Linking.openURL(
                         "https://www.turbostarter.dev/docs/mobile/push-notifications",

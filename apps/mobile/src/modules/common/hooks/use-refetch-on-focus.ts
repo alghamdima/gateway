@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router/react-navigation";
+import { useFocusEffect } from "expo-router";
 import React from "react";
 
 export function useRefetchOnFocus<T>(refetch: () => Promise<T>) {

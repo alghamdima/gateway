@@ -9,12 +9,30 @@ const SPLASH = {
   },
 } as const;
 
+const FONTS = [
+  {
+    fontFamily: "Geist",
+    path: "./public/fonts/Geist-Variable.ttf",
+    weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
+  },
+  {
+    fontFamily: "Geist Mono",
+    path: "./public/fonts/GeistMono-Variable.ttf",
+    weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
+  },
+  {
+    fontFamily: "Source Serif 4",
+    path: "./public/fonts/SourceSerif4-Variable.ttf",
+    weights: [200, 300, 400, 500, 600, 700, 800, 900],
+  },
+] as const;
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "TurboStarter",
   slug: "turbostarter",
   scheme: "turbostarter",
-  version: "1.7.1",
+  version: "1.8.0",
   orientation: "portrait",
   icon: "./public/images/icon/ios.png",
   userInterfaceStyle: "automatic",
@@ -56,7 +74,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     "expo-router",
     "expo-status-bar",
-    "expo-font",
+    [
+      "expo-font",
+      {
+        android: {
+          fonts: FONTS.map(({ fontFamily, path, weights }) => ({
+            fontFamily,
+            path,
+            fontDefinitions: weights.map((weight) => ({ weight })),
+          })),
+        },
+        ios: {
+          fonts: FONTS.map(({ path }) => path),
+        },
+      },
+    ],
     "expo-image",
     "expo-secure-store",
     "expo-image-picker",
@@ -79,14 +111,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         android: {
           /* https://github.com/expo/expo/issues/15761 */
           enableMinifyInReleaseBuilds: true,
-          buildArchs: ["arm64-v8a"],
           extraProguardRules: "-keep public class com.horcrux.svg.** {*;}",
           allowBackup: false,
           usesCleartextTraffic:
             process.env.EXPO_PUBLIC_SITE_URL?.startsWith("http://") ?? false,
         },
         ios: {
-          enableSceneSupport: true,
           /* https://github.com/react-native-google-signin/google-signin/issues/1517 */
           extraPods: [{ name: "AppCheckCore", version: "11.2.0" }],
         },

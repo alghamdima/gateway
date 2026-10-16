@@ -1,7 +1,7 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef } from "react";
+import { useRef, type ComponentRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, View } from "react-native";
 
@@ -18,7 +18,6 @@ import { Link } from "~/modules/common/styled";
 
 import { auth } from "../lib/api";
 
-import type { TextInput } from "react-native";
 import type { Path } from "~/config/paths";
 
 interface RegisterFormProps {
@@ -65,7 +64,7 @@ export const RegisterForm = ({
       callbackURL: redirectTo,
     }),
   );
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<ComponentRef<typeof Input>>(null);
 
   return (
     <View className="gap-6">
@@ -107,7 +106,7 @@ export const RegisterForm = ({
               autoComplete="password"
               onChangeText={field.onChange}
               returnKeyType="go"
-              onSubmitEditing={submit}
+              onSubmitEditing={() => void submit()}
               editable={!form.formState.isSubmitting}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

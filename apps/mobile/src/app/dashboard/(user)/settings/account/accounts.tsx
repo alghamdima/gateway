@@ -73,7 +73,7 @@ export default function AccountsScreen() {
 
   return (
     <View className="bg-background flex-1 gap-6 p-6">
-      <Text className="text-muted-foreground font-sans-medium text-base">
+      <Text className="text-muted-foreground text-base font-medium">
         {t("account.accounts.description")}
       </Text>
 
@@ -96,7 +96,7 @@ export default function AccountsScreen() {
                   >
                     <Icon className="text-foreground size-8" />
                     <View className="ml-3 flex-1">
-                      <Text className="font-sans-medium capitalize">
+                      <Text className="font-medium capitalize">
                         {social.providerId}
                       </Text>
                       <Text className="text-muted-foreground text-xs">
@@ -129,7 +129,7 @@ export default function AccountsScreen() {
 
           {missing.length > 0 && (
             <View className="border-border gap-3 rounded-lg border border-dashed px-5 py-4">
-              <Text className="font-sans-medium text-sm">{t("addNew")}</Text>
+              <Text className="text-sm font-medium">{t("addNew")}</Text>
               <View className="bg-border h-px" />
               <View className="flex-row flex-wrap gap-2">
                 {missing.map((provider) => {

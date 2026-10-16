@@ -235,7 +235,7 @@ function DropdownMenuLabel({
   return (
     <DropdownMenuPrimitive.Label
       className={cn(
-        "text-foreground font-sans-medium px-2 py-2 text-xs sm:py-1.5",
+        "text-foreground px-2 py-2 text-xs font-medium sm:py-1.5",
         inset && "pl-8",
         className,
       )}
@@ -257,10 +257,7 @@ function DropdownMenuSeparator({
   );
 }
 
-function DropdownMenuShortcut({
-  className,
-  ...props
-}: TextProps & React.RefAttributes<Text>) {
+function DropdownMenuShortcut({ className, ...props }: TextProps) {
   return (
     <Text
       className={cn(
