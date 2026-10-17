@@ -13,7 +13,7 @@
     "lint:fix": "turbo build --filter=./packages/* && oxlint --fix",
     "lint:ws": "pnpm dlx sherif@latest -r packages-without-package-json",
     "services:logs": "docker compose logs -f",
-    "services:setup": "pnpm services:start && pnpm with-env turbo setup",
+    "services:setup": "pnpm services:start && pnpm with-env turbo run setup",
     "services:start": "docker compose up -d --wait",
     "services:status": "docker compose ps",
     "services:stop": "docker compose down",

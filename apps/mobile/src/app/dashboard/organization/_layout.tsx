@@ -1,11 +1,8 @@
-import { Tabs } from "expo-router";
+import { NativeTabs } from "expo-router/native-tabs";
 
 import { useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
-import { Icons } from "@workspace/ui-mobile/icons";
 
-import { UserHeader } from "~/modules/common/layout/header";
-import { TabBarLabel } from "~/modules/common/styled";
+import { useTabsTheme } from "~/modules/common/hooks/use-tabs-theme";
 
 export const unstable_settings = {
   anchor: "index",
@@ -13,66 +10,33 @@ export const unstable_settings = {
 
 export default function OrganizationLayout() {
   const { t } = useTranslation("common");
+  const theme = useTabsTheme();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarStyle: {
-          paddingTop: 4,
-        },
-        animation: "fade",
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          header: () => <UserHeader />,
-          title: t("home"),
-          tabBarIcon: ({ focused }) => (
-            <Icons.House
-              size={24}
-              className={cn("text-muted-foreground", {
-                "text-primary": focused,
-              })}
-            />
-          ),
-          tabBarLabel: TabBarLabel,
-        }}
-      />
+    <NativeTabs {...theme}>
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "house", selected: "house.fill" }}
+          md="home"
+        />
+        <NativeTabs.Trigger.Label>{t("home")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
 
-      <Tabs.Screen
-        name="settings"
-        options={{
-          headerShown: false,
-          title: t("settings"),
-          tabBarIcon: ({ focused }) => (
-            <Icons.Settings
-              size={24}
-              className={cn("text-muted-foreground", {
-                "text-primary": focused,
-              })}
-            />
-          ),
-          tabBarLabel: TabBarLabel,
-        }}
-      />
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "gearshape", selected: "gearshape.fill" }}
+          md="settings"
+        />
+        <NativeTabs.Trigger.Label>{t("settings")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
 
-      <Tabs.Screen
-        name="members"
-        options={{
-          headerShown: false,
-          title: t("members"),
-          tabBarIcon: ({ focused }) => (
-            <Icons.UsersRound
-              size={24}
-              className={cn("text-muted-foreground", {
-                "text-primary": focused,
-              })}
-            />
-          ),
-          tabBarLabel: TabBarLabel,
-        }}
-      />
-    </Tabs>
+      <NativeTabs.Trigger name="members" disableAutomaticContentInsets>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "person.2", selected: "person.2.fill" }}
+          md="group"
+        />
+        <NativeTabs.Trigger.Label>{t("members")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

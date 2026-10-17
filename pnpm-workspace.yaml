@@ -1,11 +1,6 @@
 nodeLinker: hoisted
 linkWorkspacePackages: true
 minimumReleaseAgeStrict: true
-minimumReleaseAgeExclude:
-  - expo
-  - "@expo/*"
-  - "expo-*"
-  - babel-preset-expo
 savePrefix: ""
 registries:
   default: https://registry.npmjs.org

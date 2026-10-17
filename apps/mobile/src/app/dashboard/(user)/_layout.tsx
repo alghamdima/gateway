@@ -1,11 +1,8 @@
-import { Tabs } from "expo-router";
+import { NativeTabs } from "expo-router/native-tabs";
 
 import { useTranslation } from "@workspace/i18n";
-import { cn } from "@workspace/ui";
-import { Icons } from "@workspace/ui-mobile/icons";
 
-import { UserHeader } from "~/modules/common/layout/header";
-import { TabBarLabel } from "~/modules/common/styled";
+import { useTabsTheme } from "~/modules/common/hooks/use-tabs-theme";
 
 export const unstable_settings = {
   anchor: "index",
@@ -13,65 +10,34 @@ export const unstable_settings = {
 
 export default function UserLayout() {
   const { t } = useTranslation("common");
+  const theme = useTabsTheme();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarStyle: {
-          paddingTop: 4,
-        },
-        animation: "fade",
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          header: () => <UserHeader />,
-          title: t("home"),
-          tabBarIcon: ({ focused }) => (
-            <Icons.House
-              size={24}
-              className={cn("text-muted-foreground", {
-                "text-primary": focused,
-              })}
-            />
-          ),
-          tabBarLabel: TabBarLabel,
-        }}
-      />
-      <Tabs.Screen
+    <NativeTabs {...theme}>
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "house", selected: "house.fill" }}
+          md="home"
+        />
+        <NativeTabs.Trigger.Label>{t("home")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger
         name="ai"
         activityEnabled
-        options={{
-          headerShown: false,
-          title: t("ai"),
-          tabBarIcon: ({ focused }) => (
-            <Icons.WandSparkles
-              size={24}
-              className={cn("text-muted-foreground", {
-                "text-primary": focused,
-              })}
-            />
-          ),
-          tabBarLabel: TabBarLabel,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          headerShown: false,
-          title: t("settings"),
-          tabBarIcon: ({ focused }) => (
-            <Icons.Settings
-              size={24}
-              className={cn("text-muted-foreground", {
-                "text-primary": focused,
-              })}
-            />
-          ),
-          tabBarLabel: TabBarLabel,
-        }}
-      />
-    </Tabs>
+        disableAutomaticContentInsets
+      >
+        <NativeTabs.Trigger.Icon sf="sparkles.2" md="auto_awesome" />
+        <NativeTabs.Trigger.Label>{t("ai")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "gearshape", selected: "gearshape.fill" }}
+          md="settings"
+        />
+        <NativeTabs.Trigger.Label>{t("settings")}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

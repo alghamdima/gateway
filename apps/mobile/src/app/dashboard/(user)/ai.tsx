@@ -5,7 +5,6 @@ import { fetch as expoFetch } from "expo/fetch";
 import { useState } from "react";
 import { View, FlatList, Keyboard } from "react-native";
 import Markdown from "react-native-marked";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { config, useTranslation } from "@workspace/i18n";
 import { Platform } from "@workspace/shared/constants";
@@ -20,7 +19,11 @@ import { Textarea } from "@workspace/ui-mobile/textarea";
 import { api } from "~/lib/api";
 import { authClient } from "~/lib/auth";
 import { useI18nConfig } from "~/lib/providers/i18n";
-import { KeyboardAvoidingView, ScrollView } from "~/modules/common/styled";
+import {
+  KeyboardAvoidingView,
+  ScrollView,
+  TabSafeAreaView,
+} from "~/modules/common/styled";
 
 const EXAMPLES = [
   {
@@ -44,7 +47,6 @@ const EXAMPLES = [
 export default function AI() {
   const { t } = useTranslation("marketing");
   const [input, setInput] = useState("");
-  const insets = useSafeAreaInsets();
 
   const { messages, error, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
@@ -74,111 +76,113 @@ export default function AI() {
   const isLoading = ["submitted", "streaming"].includes(status);
 
   return (
-    <KeyboardAvoidingView
-      behavior="padding"
-      style={{ paddingTop: insets.top }}
-      className="bg-background relative flex-1 px-6"
-    >
-      <ScrollView
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="flex pt-4 grow items-start justify-start gap-4 pb-8"
-        showsVerticalScrollIndicator={false}
-        bounces={false}
+    <TabSafeAreaView edges={{ top: true, bottom: true }}>
+      <KeyboardAvoidingView
+        behavior="padding"
+        automaticOffset
+        className="relative flex-1 px-6"
       >
-        {messagesToDisplay.map((message) => (
-          <View
-            key={message.id}
-            className={cn("max-w-full", {
-              "bg-muted max-w-4/5 self-end rounded-lg px-5 py-2.5":
-                message.role === "user",
-            })}
-          >
-            {message.parts.map((part, i) => {
-              switch (part.type) {
-                case "text":
-                  return message.role === "assistant" ? (
-                    <Markdown
-                      value={part.text.trim()}
-                      flatListProps={{
-                        scrollEnabled: false,
-                        style: {
-                          flexGrow: 0,
-                        },
-                      }}
-                      key={`${message.id}-${i}`}
-                    />
-                  ) : (
-                    <Text key={`${message.id}-${i}`}>{part.text}</Text>
-                  );
-              }
-            })}
-          </View>
-        ))}
-        {isLoading && (
-          <View className="mr-auto py-2.5">
-            <Spin>
-              <Icons.Loader className="text-muted-foreground" size={18} />
-            </Spin>
-          </View>
-        )}
-      </ScrollView>
-
-      {!messagesToDisplay.length && (
-        <FlatList
-          data={EXAMPLES}
-          contentContainerClassName="gap-2 mt-auto mb-3"
+        <ScrollView
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerClassName="flex pt-4 grow items-start justify-start gap-4 pb-8"
+          showsVerticalScrollIndicator={false}
           bounces={false}
-          renderItem={({ item }) => (
-            <Button
-              onPress={() => {
-                Keyboard.dismiss();
-                void sendMessage({ text: t(item.prompt) });
-              }}
-              key={item.prompt}
-              variant="outline"
-              className="h-auto grow flex-row justify-start gap-3 py-3 text-left"
-            >
-              <item.icon
-                className="text-muted-foreground shrink-0"
-                width={20}
-                height={20}
-              />
-              <Text className="text-muted-foreground">{t(item.prompt)}</Text>
-            </Button>
-          )}
-        />
-      )}
-
-      <View className="bg-background relative pb-4">
-        <Textarea
-          placeholder={t("ai.placeholder")}
-          value={input}
-          onSubmitEditing={(e) => {
-            e.preventDefault();
-            Keyboard.dismiss();
-            void sendMessage({ text: input });
-            setInput("");
-          }}
-          onChange={(e) => setInput(e.nativeEvent.text)}
-          className="min-h-24"
-        />
-
-        <Button
-          size="icon"
-          className="absolute right-2 bottom-6 rounded-xl"
-          disabled={isLoading}
-          onPress={() => {
-            Keyboard.dismiss();
-            void sendMessage({ text: input });
-            setInput("");
-          }}
-          accessibilityLabel={t("ai.cta")}
         >
-          <Icons.ArrowUp className="text-primary-foreground" />
-        </Button>
-      </View>
-    </KeyboardAvoidingView>
+          {messagesToDisplay.map((message) => (
+            <View
+              key={message.id}
+              className={cn("max-w-full", {
+                "bg-muted max-w-4/5 self-end rounded-lg px-5 py-2.5":
+                  message.role === "user",
+              })}
+            >
+              {message.parts.map((part, i) => {
+                switch (part.type) {
+                  case "text":
+                    return message.role === "assistant" ? (
+                      <Markdown
+                        value={part.text.trim()}
+                        flatListProps={{
+                          scrollEnabled: false,
+                          style: {
+                            flexGrow: 0,
+                          },
+                        }}
+                        key={`${message.id}-${i}`}
+                      />
+                    ) : (
+                      <Text key={`${message.id}-${i}`}>{part.text}</Text>
+                    );
+                }
+              })}
+            </View>
+          ))}
+          {isLoading && (
+            <View className="mr-auto py-2.5">
+              <Spin>
+                <Icons.Loader className="text-muted-foreground" size={18} />
+              </Spin>
+            </View>
+          )}
+        </ScrollView>
+
+        {!messagesToDisplay.length && (
+          <FlatList
+            data={EXAMPLES}
+            contentContainerClassName="gap-2 mt-auto mb-3"
+            bounces={false}
+            renderItem={({ item }) => (
+              <Button
+                onPress={() => {
+                  Keyboard.dismiss();
+                  void sendMessage({ text: t(item.prompt) });
+                }}
+                key={item.prompt}
+                variant="outline"
+                className="h-auto grow flex-row justify-start gap-3 py-3 text-left"
+              >
+                <item.icon
+                  className="text-muted-foreground shrink-0"
+                  width={20}
+                  height={20}
+                />
+                <Text className="text-muted-foreground">{t(item.prompt)}</Text>
+              </Button>
+            )}
+          />
+        )}
+
+        <View className="bg-background relative pb-4">
+          <Textarea
+            placeholder={t("ai.placeholder")}
+            value={input}
+            onSubmitEditing={(e) => {
+              e.preventDefault();
+              Keyboard.dismiss();
+              void sendMessage({ text: input });
+              setInput("");
+            }}
+            onChange={(e) => setInput(e.nativeEvent.text)}
+            className="min-h-24"
+          />
+
+          <Button
+            size="icon"
+            className="absolute right-2 bottom-6 rounded-xl"
+            disabled={isLoading}
+            onPress={() => {
+              Keyboard.dismiss();
+              void sendMessage({ text: input });
+              setInput("");
+            }}
+            accessibilityLabel={t("ai.cta")}
+          >
+            <Icons.ArrowUp className="text-primary-foreground" />
+          </Button>
+        </View>
+      </KeyboardAvoidingView>
+    </TabSafeAreaView>
   );
 }

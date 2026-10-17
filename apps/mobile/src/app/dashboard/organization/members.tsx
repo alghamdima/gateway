@@ -13,7 +13,7 @@ import {
 import { Text } from "@workspace/ui-mobile/text";
 
 import { authClient } from "~/lib/auth";
-import { SafeAreaView } from "~/modules/common/styled";
+import { TabSafeAreaView } from "~/modules/common/styled";
 import { InvitationsList } from "~/modules/organization/invitations/list/invitations-list";
 import { InviteMemberBottomSheet } from "~/modules/organization/members/invite-member";
 import { MembersList } from "~/modules/organization/members/list/members-list";
@@ -32,9 +32,9 @@ export default function Members() {
   });
 
   return (
-    <SafeAreaView
-      className="bg-background flex-1 gap-4 p-6"
-      edges={["top", "left", "right"]}
+    <TabSafeAreaView
+      className="gap-4 p-6"
+      edges={{ top: true, left: true, right: true, bottom: true }}
     >
       <Tabs value={tab} onValueChange={setTab} className="flex-1">
         <TabsList className="w-full">
@@ -60,6 +60,6 @@ export default function Members() {
           <Text>{t("invite")}</Text>
         </Button>
       </InviteMemberBottomSheet>
-    </SafeAreaView>
+    </TabSafeAreaView>
   );
 }

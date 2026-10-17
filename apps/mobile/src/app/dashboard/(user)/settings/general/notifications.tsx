@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
-import { Linking, ScrollView, View } from "react-native";
+import { Linking, View } from "react-native";
 
 import { Trans, useTranslation } from "@workspace/i18n";
 import { cn } from "@workspace/ui";
@@ -17,6 +17,7 @@ import { Text } from "@workspace/ui-mobile/text";
 import { useNotificationsPermissions } from "~/modules/common/hooks/notifications/use-notifications-permissions";
 import { usePushToken } from "~/modules/common/hooks/notifications/use-push-token";
 import { useCopy } from "~/modules/common/hooks/use-copy";
+import { ScrollView, TabSafeAreaView } from "~/modules/common/styled";
 
 export default function NotificationsSettings() {
   const { t } = useTranslation(["dashboard", "common"]);
@@ -42,7 +43,7 @@ export default function NotificationsSettings() {
   };
 
   return (
-    <View className="bg-background flex-1 p-6">
+    <TabSafeAreaView className="p-6" edges={{ bottom: true }}>
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -179,6 +180,6 @@ export default function NotificationsSettings() {
         <Icons.Bell className="text-primary-foreground" size={16} />
         <Text>{t("notifications.cta")}</Text>
       </Button>
-    </View>
+    </TabSafeAreaView>
   );
 }
