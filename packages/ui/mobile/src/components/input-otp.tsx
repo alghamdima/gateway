@@ -1,6 +1,6 @@
 import { OTPInput } from "input-otp-native";
 import React, { useEffect } from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   withRepeat,
@@ -11,6 +11,8 @@ import Animated, {
 import { useCSSVariable } from "uniwind";
 
 import { cn } from "@workspace/ui";
+
+import { Text } from "./text";
 
 import type { SlotProps } from "input-otp-native";
 

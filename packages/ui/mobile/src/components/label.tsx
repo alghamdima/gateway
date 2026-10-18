@@ -2,6 +2,8 @@ import * as LabelPrimitive from "@rn-primitives/label";
 
 import { cn } from "@workspace/ui";
 
+import { Text } from "./text";
+
 function Label({
   className,
   onPress,
@@ -23,13 +25,12 @@ function Label({
       onPressOut={onPressOut}
       disabled={disabled}
     >
-      <LabelPrimitive.Text
-        className={cn(
-          "text-foreground native:leading-tight text-sm font-medium",
-          className,
-        )}
-        {...props}
-      />
+      <Text
+        asChild
+        className={cn("native:leading-tight text-sm font-medium", className)}
+      >
+        <LabelPrimitive.Text {...props} />
+      </Text>
     </LabelPrimitive.Root>
   );
 }
