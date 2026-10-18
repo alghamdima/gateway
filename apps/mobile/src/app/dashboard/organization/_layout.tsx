@@ -17,7 +17,7 @@ export default function OrganizationLayout() {
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon
           sf={{ default: "house", selected: "house.fill" }}
-          md="home"
+          drawable="ic_menu_home"
         />
         <NativeTabs.Trigger.Label>{t("home")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
@@ -25,7 +25,7 @@ export default function OrganizationLayout() {
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Icon
           sf={{ default: "gearshape", selected: "gearshape.fill" }}
-          md="settings"
+          drawable="ic_settings"
         />
         <NativeTabs.Trigger.Label>{t("settings")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
@@ -33,7 +33,7 @@ export default function OrganizationLayout() {
       <NativeTabs.Trigger name="members" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Icon
           sf={{ default: "person.2", selected: "person.2.fill" }}
-          md="group"
+          drawable="ic_menu_friendslist"
         />
         <NativeTabs.Trigger.Label>{t("members")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>

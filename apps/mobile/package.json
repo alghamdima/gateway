@@ -21,6 +21,7 @@
     "@expo/material-symbols": "0.1.1",
     "@expo/metro-runtime": "~58.0.14",
     "@expo/ui": "~58.0.19",
+    "@expo/vector-icons": "^15.1.1",
     "@hookform/resolvers": "catalog:",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-google-signin/google-signin": "16.1.2",

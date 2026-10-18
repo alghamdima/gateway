@@ -17,7 +17,7 @@ export default function UserLayout() {
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Icon
           sf={{ default: "house", selected: "house.fill" }}
-          md="home"
+          drawable="ic_menu_home"
         />
         <NativeTabs.Trigger.Label>{t("home")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
@@ -27,14 +27,14 @@ export default function UserLayout() {
         activityEnabled
         disableAutomaticContentInsets
       >
-        <NativeTabs.Trigger.Icon sf="sparkles.2" md="auto_awesome" />
+        <NativeTabs.Trigger.Icon sf="sparkles.2" drawable="ic_menu_star" />
         <NativeTabs.Trigger.Label>{t("ai")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Icon
           sf={{ default: "gearshape", selected: "gearshape.fill" }}
-          md="settings"
+          drawable="ic_settings"
         />
         <NativeTabs.Trigger.Label>{t("settings")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
