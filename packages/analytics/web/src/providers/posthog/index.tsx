@@ -5,7 +5,12 @@ import { posthog } from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import { useEffect } from "react";
 
-import { initPostHog, onPostHogReady, schedulePostHogInit } from "./client";
+import {
+  initPostHog,
+  onPostHogReady,
+  resetPostHog,
+  schedulePostHogInit,
+} from "./client";
 
 import type { AnalyticsProviderClientStrategy } from "@workspace/analytics";
 
@@ -63,6 +68,6 @@ export const strategy = {
     }
 
     initPostHog();
-    posthog.reset();
+    resetPostHog();
   },
 } satisfies AnalyticsProviderClientStrategy;

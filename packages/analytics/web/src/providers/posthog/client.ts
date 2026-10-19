@@ -30,6 +30,23 @@ export const initPostHog = () => {
   posthog.init(env.NEXT_PUBLIC_POSTHOG_KEY, getInitOptions());
 };
 
+export const resetPostHog = () => {
+  if (!posthog.__loaded) {
+    return;
+  }
+
+  const hasOptedOut = posthog.has_opted_out_capturing();
+  const hasOptedIn = posthog.has_opted_in_capturing();
+
+  posthog.reset();
+
+  if (hasOptedOut) {
+    posthog.opt_out_capturing();
+  } else if (hasOptedIn) {
+    posthog.opt_in_capturing({ captureEventName: false });
+  }
+};
+
 export const schedulePostHogInit = () => {
   if (typeof window === "undefined" || initScheduled || posthog.__loaded) {
     return;
