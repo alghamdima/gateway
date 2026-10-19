@@ -3,13 +3,12 @@ import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 export const toSubscriptionStatus = (status: string): SubscriptionStatus => {
   switch (status) {
     case "active":
+    case "cancelled":
       return SubscriptionStatus.ACTIVE;
     case "on_trial":
       return SubscriptionStatus.TRIALING;
     case "past_due":
       return SubscriptionStatus.PAST_DUE;
-    case "cancelled":
-      return SubscriptionStatus.CANCELED;
     case "expired":
       return SubscriptionStatus.INCOMPLETE_EXPIRED;
     case "unpaid":

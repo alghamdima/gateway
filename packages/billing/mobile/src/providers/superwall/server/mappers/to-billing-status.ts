@@ -1,22 +1,37 @@
 import { SubscriptionStatus } from "@workspace/billing";
 
-export const toSubscriptionStatus = (
-  eventType: string,
-  periodType?: string | null,
-): SubscriptionStatus => {
-  if (eventType === "billing_issue") {
+import type { WebhookEvent } from "../schema/webhook-event";
+
+export const toSubscriptionStatus = ({
+  type,
+  data,
+}: WebhookEvent): SubscriptionStatus => {
+  if (type === "billing_issue") {
     return SubscriptionStatus.PAST_DUE;
   }
 
-  if (eventType === "subscription_paused") {
+  if (type === "subscription_paused") {
     return SubscriptionStatus.PAUSED;
   }
 
-  if (eventType === "cancellation" || eventType === "expiration") {
+  if (type === "expiration") {
     return SubscriptionStatus.CANCELED;
   }
 
-  if (periodType === "TRIAL") {
+  if (type === "cancellation") {
+    if (
+      data.cancelReason === "CUSTOMER_SUPPORT" ||
+      (data.expirationAt != null && data.expirationAt <= Date.now())
+    ) {
+      return SubscriptionStatus.CANCELED;
+    }
+
+    if (data.cancelReason === "BILLING_ERROR") {
+      return SubscriptionStatus.PAST_DUE;
+    }
+  }
+
+  if (data.periodType === "TRIAL") {
     return SubscriptionStatus.TRIALING;
   }
 

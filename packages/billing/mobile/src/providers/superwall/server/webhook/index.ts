@@ -85,7 +85,7 @@ export const webhookHandler = async (
   }
 
   if (originalTransactionId) {
-    const status = toSubscriptionStatus(event.type, event.data.periodType);
+    const status = toSubscriptionStatus(event);
 
     const periodStartsAt = dayjs(event.data.purchasedAt).toDate();
     const periodEndsAt = dayjs(event.data.expirationAt).toDate();
