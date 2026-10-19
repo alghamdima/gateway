@@ -1,7 +1,8 @@
 import dayjs from "dayjs";
 
-import { PaymentStatus } from "@workspace/billing";
+import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
+  getSubscriptionByExternalId,
   upsertCustomer,
   upsertOrder,
   upsertSubscription,
@@ -17,6 +18,8 @@ import { FAILED_PAYMENT_EVENTS, REVENUE_EVENTS } from "./constants";
 import { verifySignature } from "./verify";
 
 import type { WebhookCallbacks } from "../../../types";
+import type { WebhookEvent } from "../schema/webhook-event";
+import type { SelectSubscription } from "@workspace/db/schema";
 
 const getUserIdFromAttributes = (
   attrs: Record<string, unknown> | null | undefined,
@@ -37,6 +40,45 @@ const getUserIdFromAttributes = (
   }
 
   return null;
+};
+
+const getSubscriptionPeriod = (
+  event: WebhookEvent,
+  existing: SelectSubscription | null,
+) => {
+  const periodStartsAt = event.data.purchasedAt
+    ? dayjs(event.data.purchasedAt).toDate()
+    : existing?.periodStartsAt;
+  const periodEndsAt = event.data.expirationAt
+    ? dayjs(event.data.expirationAt).toDate()
+    : existing?.periodEndsAt;
+
+  if (!periodStartsAt || !periodEndsAt) {
+    return null;
+  }
+
+  return { periodStartsAt, periodEndsAt };
+};
+
+const isOutOfOrder = (
+  event: WebhookEvent,
+  existing: SelectSubscription | null,
+) => {
+  if (!existing || !event.data.expirationAt) {
+    return false;
+  }
+
+  const expirationAt = dayjs(event.data.expirationAt);
+
+  if (expirationAt.isBefore(existing.periodEndsAt)) {
+    return true;
+  }
+
+  return (
+    expirationAt.isSame(existing.periodEndsAt) &&
+    existing.status === SubscriptionStatus.CANCELED &&
+    event.type !== "uncancellation"
+  );
 };
 
 export const webhookHandler = async (
@@ -75,7 +117,10 @@ export const webhookHandler = async (
 
   const productId = event.data.productId;
   const store = event.data.store.toLowerCase();
-  const originalTransactionId = event.data.originalTransactionId;
+  const originalTransactionId =
+    event.type === "non_renewing_purchase"
+      ? null
+      : event.data.originalTransactionId;
   const transactionId = event.data.transactionId;
 
   if (!productId) {
@@ -87,39 +132,51 @@ export const webhookHandler = async (
   if (originalTransactionId) {
     const status = toSubscriptionStatus(event);
 
-    const periodStartsAt = dayjs(event.data.purchasedAt).toDate();
-    const periodEndsAt = dayjs(event.data.expirationAt).toDate();
-
-    await upsertSubscription({
-      customerId: customer.id,
+    const existingSubscription = await getSubscriptionByExternalId({
       externalId: originalTransactionId,
-      variantId: productId,
-      status,
       store,
-      periodStartsAt,
-      periodEndsAt,
-      ...(event.data.periodType === "TRIAL"
-        ? {
-            trialStartsAt: event.data.purchasedAt
-              ? dayjs(event.data.purchasedAt).toDate()
-              : null,
-            trialEndsAt: event.data.expirationAt
-              ? dayjs(event.data.expirationAt).toDate()
-              : null,
-          }
-        : {}),
     });
+    const period = getSubscriptionPeriod(event, existingSubscription);
 
-    logger.info(
-      `✅ Subscription ${originalTransactionId} upserted for customer ${customer.id} with status ${status}`,
-    );
-
-    if (event.type === "initial_purchase") {
-      await callbacks?.onSubscriptionCreated?.(originalTransactionId);
-    } else if (event.type === "cancellation" || event.type === "expiration") {
-      await callbacks?.onSubscriptionDeleted?.(originalTransactionId);
+    if (!period) {
+      logger.warn(
+        `⚠️ Skipping ${event.type} for subscription ${originalTransactionId}: missing billing period dates`,
+      );
+    } else if (isOutOfOrder(event, existingSubscription)) {
+      logger.info(
+        `ℹ️ Skipping out-of-order ${event.type} for subscription ${originalTransactionId}`,
+      );
     } else {
-      await callbacks?.onSubscriptionUpdated?.(originalTransactionId);
+      await upsertSubscription({
+        customerId: customer.id,
+        externalId: originalTransactionId,
+        variantId: productId,
+        status,
+        store,
+        ...period,
+        ...(event.data.periodType === "TRIAL"
+          ? {
+              trialStartsAt: event.data.purchasedAt
+                ? dayjs(event.data.purchasedAt).toDate()
+                : null,
+              trialEndsAt: event.data.expirationAt
+                ? dayjs(event.data.expirationAt).toDate()
+                : null,
+            }
+          : {}),
+      });
+
+      logger.info(
+        `✅ Subscription ${originalTransactionId} upserted for customer ${customer.id} with status ${status}`,
+      );
+
+      if (event.type === "initial_purchase") {
+        await callbacks?.onSubscriptionCreated?.(originalTransactionId);
+      } else if (event.type === "cancellation" || event.type === "expiration") {
+        await callbacks?.onSubscriptionDeleted?.(originalTransactionId);
+      } else {
+        await callbacks?.onSubscriptionUpdated?.(originalTransactionId);
+      }
     }
   }
 

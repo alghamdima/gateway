@@ -1,4 +1,4 @@
-import { buildConflictUpdateColumns, eq } from "@workspace/db";
+import { and, buildConflictUpdateColumns, eq } from "@workspace/db";
 import { subscription } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
@@ -39,6 +39,27 @@ export const upsertSubscriptions = async (data: InsertSubscription[]) => {
       set: subscriptionConflictUpdateSet,
     })
     .returning();
+};
+
+export const getSubscriptionByExternalId = async ({
+  externalId,
+  store,
+}: {
+  externalId: string;
+  store: string;
+}) => {
+  const [result] = await db
+    .select()
+    .from(subscription)
+    .where(
+      and(
+        eq(subscription.externalId, externalId),
+        eq(subscription.store, store),
+      ),
+    )
+    .limit(1);
+
+  return result ?? null;
 };
 
 export const getSubscriptionsByCustomerId = async (customerId: string) =>
