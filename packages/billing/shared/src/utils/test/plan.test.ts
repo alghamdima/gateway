@@ -244,6 +244,29 @@ describe("getActivePlan", () => {
     expect(result).toBe(BillingPlan.FREE);
   });
 
+  it("should ignore succeeded orders for recurring variants", () => {
+    const summary = {
+      subscriptions: [
+        {
+          id: "sub-1",
+          status: SubscriptionStatus.CANCELED,
+          variantId: "premium-monthly",
+        },
+      ],
+      orders: [
+        {
+          id: "order-1",
+          status: PaymentStatus.SUCCEEDED,
+          variantId: "premium-monthly",
+        },
+      ],
+    };
+
+    const result = getActivePlan(summary);
+
+    expect(result).toBe(BillingPlan.FREE);
+  });
+
   it("should return highest plan when multiple active plans exist", () => {
     const summary = {
       entitlements: [

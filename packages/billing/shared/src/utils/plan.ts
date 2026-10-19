@@ -1,5 +1,6 @@
 import { config } from "../config";
 import {
+  BillingModel,
   BillingPlan,
   BillingType,
   BillingReference,
@@ -7,11 +8,7 @@ import {
 } from "../types";
 import { isSubscriptionActive } from "./subscription";
 
-import type {
-  BillingModel,
-  RecurringInterval,
-  SubscriptionStatus,
-} from "../types";
+import type { RecurringInterval, SubscriptionStatus } from "../types";
 
 export const findPlanByVariantId = (variantId: string) => {
   const plan = config.plans.find((plan) =>
@@ -84,7 +81,11 @@ export const getActivePlan = <
 
   const succededOrders = data
     .flatMap((customer) => customer?.orders)
-    .filter((order) => order?.status === PaymentStatus.SUCCEEDED)
+    .filter(
+      (order) =>
+        order?.status === PaymentStatus.SUCCEEDED &&
+        findVariantById(order.variantId)?.model !== BillingModel.RECURRING,
+    )
     .map((order) => order?.variantId)
     .filter(Boolean);
 

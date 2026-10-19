@@ -4,7 +4,12 @@ import {
   getOrder,
 } from "@lemonsqueezy/lemonsqueezy.js";
 
-import { BillingType, config } from "@workspace/billing";
+import {
+  BillingModel,
+  BillingType,
+  config,
+  findVariantById,
+} from "@workspace/billing";
 import {
   getCustomerById,
   getCustomerByExternalId,
@@ -123,6 +128,15 @@ export const checkoutStatusChangeHandler = async ({
     });
   }
 
+  const variantId = order.attributes.first_order_item.variant_id.toString();
+
+  if (findVariantById(variantId)?.model === BillingModel.RECURRING) {
+    logger.info(
+      `ℹ️ Order ${order.id} belongs to a subscription, skipping order upsert`,
+    );
+    return;
+  }
+
   const customer = customerId
     ? await getCustomerById(customerId)
     : await getCustomerByExternalId(order.attributes.customer_id.toString());
@@ -138,7 +152,7 @@ export const checkoutStatusChangeHandler = async ({
   await upsertOrder({
     customerId: customer.id,
     externalId: order.id,
-    variantId: order.attributes.first_order_item.variant_id.toString(),
+    variantId,
     status,
     store: BillingProvider.LEMON_SQUEEZY,
   });
