@@ -134,7 +134,7 @@ export const Invitation = (props: InvitationProps) => {
       </View>
       <Link
         href={pathsConfig.index}
-        className="text-muted-foreground self-center text-sm font-medium underline underline-offset-4"
+        className="text-muted-foreground self-center font-sans text-sm font-medium underline underline-offset-4"
       >
         {t("invitations.invitation.skip")}
       </Link>
