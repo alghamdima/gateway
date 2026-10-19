@@ -37,6 +37,12 @@
       "cta": "Iniciar sesión como {{email}}",
       "skip": "Ir al panel"
     },
+    "emailUnverified": {
+      "title": "Verifica tu correo para unirte",
+      "description": "Debes verificar <bold>{{email}}</bold> antes de poder ver y aceptar esta invitación. Te enviaremos un enlace que te traerá de vuelta aquí.",
+      "cta": "Enviar correo de verificación",
+      "skip": "Ir al panel"
+    },
     "invitation": {
       "title": "Unirse a {{organizationName}}",
       "description": "<bold>{{inviterEmail}}</bold> te ha invitado a unirte a <bold>{{organizationName}}</bold> en TurboStarter.",

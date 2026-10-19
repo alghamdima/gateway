@@ -45,6 +45,12 @@
       "cta": "Sign in as {{email}}",
       "skip": "Skip to dashboard"
     },
+    "emailUnverified": {
+      "title": "Verify your email to join",
+      "description": "You need to verify <bold>{{email}}</bold> before you can view and accept this invitation. We'll send you a link that brings you back here.",
+      "cta": "Send verification email",
+      "skip": "Skip to dashboard"
+    },
     "invitation": {
       "title": "Join {{organizationName}}",
       "description": "<bold>{{inviterEmail}}</bold> has invited you to join <bold>{{organizationName}}</bold> on TurboStarter.",

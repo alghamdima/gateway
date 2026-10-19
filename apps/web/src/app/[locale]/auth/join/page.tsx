@@ -8,6 +8,7 @@ import { getInvitation, getSession } from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";
 import { Invitation } from "~/modules/organization/invitations/invitation";
 import { InvitationEmailMismatch } from "~/modules/organization/invitations/invitation-email-mismatch";
+import { InvitationEmailUnverified } from "~/modules/organization/invitations/invitation-email-unverified";
 import { InvitationExpired } from "~/modules/organization/invitations/invitation-expired";
 
 export const generateMetadata = getMetadata({
@@ -58,6 +59,15 @@ export default async function JoinPage({
   if (email && session.user.email !== email) {
     return (
       <InvitationEmailMismatch invitationId={invitationId} email={email} />
+    );
+  }
+
+  if (!session.user.emailVerified) {
+    return (
+      <InvitationEmailUnverified
+        invitationId={invitationId}
+        email={session.user.email}
+      />
     );
   }
 
