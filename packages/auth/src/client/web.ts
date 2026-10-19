@@ -1,4 +1,7 @@
-export { passkeyClient } from "@better-auth/passkey/client";
+export {
+  passkeyClient,
+  PASSKEY_ERROR_CODES,
+} from "@better-auth/passkey/client";
 export {
   emailOTPClient,
   magicLinkClient,

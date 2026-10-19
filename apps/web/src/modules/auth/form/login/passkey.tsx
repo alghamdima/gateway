@@ -1,10 +1,11 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { AuthProvider } from "@workspace/auth";
+import { PASSKEY_ERROR_CODES } from "@workspace/auth/client/web";
 import { useTranslation } from "@workspace/i18n";
 import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
@@ -26,6 +27,8 @@ export const PasskeyLogin = ({
   const router = useRouter();
   const { t } = useTranslation(["auth", "common"]);
 
+  const queryClient = useQueryClient();
+
   const { mutate: signInWithPasskey, isPending } = useMutation({
     ...auth.mutations.signIn.passkey,
     onSuccess: () => {
@@ -33,9 +36,23 @@ export const PasskeyLogin = ({
     },
   });
 
+  const { mutate: signInWithAutoFill } = useMutation({
+    ...auth.mutations.signIn.passkey,
+    onSuccess: () => {
+      router.replace(redirectTo);
+    },
+    onError: (error, ...args) => {
+      if (error.message === PASSKEY_ERROR_CODES.AUTH_CANCELLED.message) {
+        return;
+      }
+
+      queryClient.getDefaultOptions().mutations?.onError?.(error, ...args);
+    },
+  });
+
   useEffect(() => {
-    signInWithPasskey({ autoFill: true });
-  }, [signInWithPasskey]);
+    signInWithAutoFill({ autoFill: true });
+  }, [signInWithAutoFill]);
 
   return (
     <Button
