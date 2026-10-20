@@ -1,6 +1,6 @@
 import { MenuView } from "@expo/ui/community/menu";
 import * as React from "react";
-import { Platform, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import type { MenuAction, NativeActionEvent } from "@expo/ui/community/menu";
 import type { ButtonProps } from "@expo/ui/swift-ui";
@@ -60,14 +60,18 @@ interface ContextMenuProps {
   trigger: React.ReactElement;
   sections: ContextMenuSection[];
   disabled?: boolean;
+  fullWidth?: boolean;
 }
 
 export const ContextMenu = ({
   trigger,
   sections,
   disabled = false,
+  fullWidth = false,
 }: ContextMenuProps) => {
-  const colorScheme = useColorScheme() === "dark" ? "dark" : "light";
+  const colorScheme: "dark" | "light" =
+    useColorScheme() === "dark" ? "dark" : "light";
+  const [size, setSize] = React.useState<{ width: number; height: number }>();
   const handlersRef = React.useRef(new Map<string, () => void>());
 
   const actions = React.useMemo(() => {
@@ -93,15 +97,55 @@ export const ContextMenu = ({
     return resolvedTrigger;
   }
 
+  const menuProps = {
+    actions: actions.menuActions,
+    colorScheme,
+    onPressAction,
+    shouldOpenOnLongPress: true,
+  };
+
+  if (Platform.OS === "android") {
+    return (
+      <View
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setSize((current) =>
+            current?.width === width && current?.height === height
+              ? current
+              : { width, height },
+          );
+        }}
+      >
+        {resolvedTrigger}
+        <MenuView {...menuProps} style={StyleSheet.absoluteFill}>
+          <View style={size} />
+        </MenuView>
+      </View>
+    );
+  }
+
+  if (!fullWidth) {
+    return <MenuView {...menuProps}>{resolvedTrigger}</MenuView>;
+  }
+
   return (
-    <MenuView
-      actions={actions.menuActions}
-      colorScheme={colorScheme}
-      onPressAction={onPressAction}
-      shouldOpenOnLongPress
+    <View
+      className="w-full"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setSize((current) =>
+          current?.width === width ? current : { width, height },
+        );
+      }}
     >
-      {resolvedTrigger}
-    </MenuView>
+      {size?.width ? (
+        <MenuView {...menuProps}>
+          <View style={{ width: size.width }}>{resolvedTrigger}</View>
+        </MenuView>
+      ) : (
+        resolvedTrigger
+      )}
+    </View>
   );
 };
 
