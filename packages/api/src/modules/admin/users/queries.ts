@@ -131,7 +131,14 @@ export const getUserAccounts = async ({
 
   return db.transaction(async (tx) => {
     const data = await tx
-      .select()
+      .select({
+        id: account.id,
+        userId: account.userId,
+        providerId: account.providerId,
+        accountId: account.accountId,
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt,
+      })
       .from(account)
       .where(where)
       .limit(input.perPage)
