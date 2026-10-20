@@ -1,22 +1,11 @@
-import * as z from "zod";
-
 import { isKey } from "@workspace/i18n";
 import { getTranslation } from "@workspace/i18n/server";
 import { captureException } from "@workspace/monitoring-web/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
-import { getStatusCode } from "@workspace/shared/utils";
+import { HttpException, getStatusCode } from "@workspace/shared/utils";
 
 import type { Context } from "hono";
-
-const errorSchema = z.object({
-  code: z.string().optional(),
-  message: z.string(),
-});
-
-const isError = (e: unknown): e is z.infer<typeof errorSchema> => {
-  return errorSchema.safeParse(e).success;
-};
 
 export const onError = async (
   e: unknown,
@@ -44,7 +33,7 @@ export const onError = async (
     captureException(e, { path, status, timestamp });
   }
 
-  if (isError(e)) {
+  if (e instanceof HttpException) {
     logger.error(e.code, e.message);
     return new Response(
       JSON.stringify({
