@@ -4,9 +4,9 @@ import {
 } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { logger } from "@workspace/shared/logger";
+import { toast } from "@workspace/ui-web/toast";
 
 export function QueryClientProvider(props: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -20,7 +20,7 @@ export function QueryClientProvider(props: { children: React.ReactNode }) {
               }
 
               logger.error(error);
-              toast.error(error.message);
+              toast.add({ title: error.message, type: "error" });
             },
           },
         },

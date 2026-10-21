@@ -1,25 +1,15 @@
-import { Toaster as Sonner } from "sonner";
+import { useState } from "react";
 
-import { StorageKey, useStorage } from "~/lib/storage";
+import { Toaster as ToasterPrimitive } from "@workspace/ui-web/toast";
 
-type ToasterProps = React.ComponentProps<typeof Sonner>;
-
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { data: theme } = useStorage(StorageKey.THEME);
+const Toaster = () => {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
 
   return (
-    <Sonner
-      theme={theme.mode}
-      className="toaster group"
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-        } as React.CSSProperties
-      }
-      {...props}
-    />
+    <>
+      <div ref={setContainer} className="pointer-events-none fixed" />
+      {container ? <ToasterPrimitive portal={{ container }} /> : null}
+    </>
   );
 };
 
