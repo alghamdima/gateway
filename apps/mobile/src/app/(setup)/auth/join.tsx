@@ -10,6 +10,7 @@ import { authClient } from "~/lib/auth";
 import { Spinner } from "~/modules/common/spinner";
 import { Invitation } from "~/modules/organization/invitations/invitation";
 import { InvitationEmailMismatch } from "~/modules/organization/invitations/invitation-email-mismatch";
+import { InvitationEmailUnverified } from "~/modules/organization/invitations/invitation-email-unverified";
 import { InvitationExpired } from "~/modules/organization/invitations/invitation-expired";
 import { organization } from "~/modules/organization/lib/api";
 
@@ -51,6 +52,15 @@ const InvitationCheck = ({
   if (email && session.data?.user.email !== email) {
     return (
       <InvitationEmailMismatch invitationId={invitationId} email={email} />
+    );
+  }
+
+  if (session.data && !session.data.user.emailVerified) {
+    return (
+      <InvitationEmailUnverified
+        invitationId={invitationId}
+        email={session.data.user.email}
+      />
     );
   }
 
