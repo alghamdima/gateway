@@ -9,6 +9,7 @@ import { STRIPE_SIGNATURE_HEADER } from "./constants";
 import { constructEvent } from "./event";
 
 import type { WebhookCallbacks } from "../../types";
+import type { Stripe } from "stripe";
 
 export const webhookHandler = async (
   req: Request,
@@ -23,11 +24,18 @@ export const webhookHandler = async (
     });
   }
 
-  const event = constructEvent({
-    payload: body,
-    sig,
-    secret: env.STRIPE_WEBHOOK_SECRET,
-  });
+  let event: Stripe.Event;
+  try {
+    event = constructEvent({
+      payload: body,
+      sig,
+      secret: env.STRIPE_WEBHOOK_SECRET,
+    });
+  } catch {
+    throw new HttpException(HttpStatusCode.BAD_REQUEST, {
+      code: "billing:error.webhook.signatureInvalid",
+    });
+  }
 
   logger.info(`🔔  Webhook received: ${event.type}`);
   await callbacks?.onEvent?.(event);
