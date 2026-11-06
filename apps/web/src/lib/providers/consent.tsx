@@ -18,6 +18,7 @@ export const ConsentProvider = async ({
           locale,
           detectBrowserLanguage: false,
         },
+        streamBanner: false,
       }}
     >
       {children}
