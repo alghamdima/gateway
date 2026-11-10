@@ -14,7 +14,7 @@
     "test:e2e": "maestro test e2e"
   },
   "dependencies": {
-    "@ai-sdk/react": "4.0.60",
+    "@ai-sdk/react": "4.0.170",
     "@dev-plugins/react-navigation": "~0.4.0",
     "@dev-plugins/react-query": "~0.4.0",
     "@expo/dom-webview": "58.0.2",
@@ -43,7 +43,7 @@
     "@workspace/ui": "workspace:*",
     "@workspace/ui-mobile": "workspace:*",
     "envin": "catalog:",
-    "expo": "58.0.12",
+    "expo": "58.0.22",
     "expo-apple-authentication": "~58.0.2",
     "expo-application": "~58.1.1",
     "expo-asset": "~58.0.16",
