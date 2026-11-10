@@ -201,6 +201,10 @@
     "title": "Docs",
     "description": "Learn how to use TurboStarter"
   },
+  "sourceCode": {
+    "title": "Source code",
+    "description": "Customize and ship your product"
+  },
   "ai": {
     "description": "Unlock productivity and innovation with TurboStarter's AI assistant. Get instant answers, automate tasks, and boost your workflow using advanced artificial intelligence—secure, reliable, and designed for modern teams.",
     "prompt": {

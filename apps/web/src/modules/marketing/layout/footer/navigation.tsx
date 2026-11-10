@@ -51,6 +51,10 @@ const links = [
         href: "https://www.turbostarter.dev/docs/web",
       },
       {
+        title: "marketing:cta.buy.button",
+        href: "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
+      },
+      {
         title: "marketing:api.title",
         href: "#",
       },

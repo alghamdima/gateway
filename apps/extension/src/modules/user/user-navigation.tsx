@@ -249,6 +249,21 @@ export const UserNavigation = memo<UserNavigationProps>(
             )}
 
             <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              render={
+                <a
+                  href="https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Icons.Code className="size-4" />
+                  {t("sourceCode")}
+                  <Icons.ArrowUpRight className="ml-auto size-4" />
+                </a>
+              }
+            />
+
             <DropdownMenuItem
               nativeButton
               render={<Logout />}

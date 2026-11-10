@@ -83,6 +83,12 @@ const links = [
         icon: Icons.Plug,
       },
       {
+        title: "marketing:sourceCode.title",
+        description: "marketing:sourceCode.description",
+        href: "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
+        icon: Icons.Code,
+      },
+      {
         title: "marketing:waitlist.label",
         description: "marketing:waitlist.description",
         href: pathsConfig.marketing.waitlist,

@@ -209,6 +209,10 @@
     "title": "Documentación",
     "description": "Aprende a usar TurboStarter"
   },
+  "sourceCode": {
+    "title": "Código fuente",
+    "description": "Personaliza y lanza tu producto"
+  },
   "ai": {
     "description": "Libera productividad e innovación con el asistente de IA de TurboStarter. Obtén respuestas al instante, automatiza tareas y potencia tu flujo de trabajo con inteligencia artificial avanzada, segura, confiable y diseñada para equipos modernos.",
     "prompt": {

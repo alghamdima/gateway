@@ -81,7 +81,7 @@ const getSections = (session?: Session | null) =>
         visible: true,
       },
       {
-        title: "sourceCode",
+        title: "common:sourceCode",
         icon: Icons.Code,
         onPress: () =>
           Linking.openURL(
