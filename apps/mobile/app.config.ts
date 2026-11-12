@@ -1,3 +1,8 @@
+import {
+  withGradleProperties,
+  withProjectBuildGradle,
+} from "expo/config-plugins";
+
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const SPLASH = {
@@ -27,7 +32,10 @@ const FONTS = [
   },
 ] as const;
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+export default (context: ConfigContext): ExpoConfig =>
+  withLowMemoryAndroidBuild(createConfig(context));
+
+const createConfig = ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "TurboStarter",
   slug: "turbostarter",
@@ -132,3 +140,35 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ["expo-splash-screen", SPLASH],
   ],
 });
+
+const NATIVE_JOBS_LIMIT = `
+subprojects { sub ->
+  sub.plugins.withId("com.android.library") {
+    sub.android.defaultConfig.externalNativeBuild.cmake.arguments("-DCMAKE_JOB_POOLS=compile=2", "-DCMAKE_JOB_POOL_COMPILE=compile")
+  }
+}
+`;
+
+const GRADLE_PROPERTIES = {
+  "org.gradle.jvmargs": "-Xmx4g -XX:MaxMetaspaceSize=512m",
+  "kotlin.compiler.execution.strategy": "in-process",
+};
+
+const withLowMemoryAndroidBuild = (config: ExpoConfig) =>
+  withGradleProperties(
+    withProjectBuildGradle(config, (config) => {
+      if (!config.modResults.contents.includes(NATIVE_JOBS_LIMIT)) {
+        config.modResults.contents += NATIVE_JOBS_LIMIT;
+      }
+      return config;
+    }),
+    (config) => {
+      config.modResults = config.modResults.filter(
+        (item) => item.type !== "property" || !(item.key in GRADLE_PROPERTIES),
+      );
+      for (const [key, value] of Object.entries(GRADLE_PROPERTIES)) {
+        config.modResults.push({ type: "property", key, value });
+      }
+      return config;
+    },
+  );

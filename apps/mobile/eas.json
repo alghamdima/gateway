@@ -84,6 +84,12 @@
       "autoIncrement": true,
       "environment": "production",
       "channel": "production",
+      "android": {
+        "env": {
+          "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a",
+          "GRADLE_OPTS": "-Dorg.gradle.workers.max=2"
+        }
+      },
       "env": {
         "APP_ENV": "production"
       }
