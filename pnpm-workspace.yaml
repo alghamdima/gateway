@@ -18,7 +18,7 @@ catalog:
   envin: 1.3.0
   dayjs: 1.11.20
   react-hook-form: 7.84.0
-  react-native: 0.88.0
+  react-native: 0.88.1
   tailwindcss: 4.3.3
   typescript: 7.0.2
   tsx: 4.23.11

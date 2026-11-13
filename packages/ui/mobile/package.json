@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@expo/material-symbols": "0.1.1",
-    "@expo/ui": "~58.0.19",
+    "@expo/ui": "~58.0.28",
     "@gorhom/bottom-sheet": "5.2.14",
     "@react-native-community/slider": "5.2.1",
     "@rn-primitives/avatar": "1.5.2",
