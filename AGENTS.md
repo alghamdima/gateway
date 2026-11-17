@@ -98,7 +98,7 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 | DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`          |
 | DB studio          | `pnpm with-env pnpm -F @workspace/db db:studio`            |
 
-Environment: create `.env` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
+Environment: create `.env.local` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
 
 ## Code conventions
 
