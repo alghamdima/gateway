@@ -15,7 +15,7 @@ export const aiRouter = new Hono().post("/chat", enforceAuth, async (c) => {
   const { messages }: { messages: UIMessage[] } = await c.req.json();
 
   const result = streamText({
-    model: openai.responses("gpt-4.1-nano"),
+    model: openai.responses("gpt-6-luna"),
     messages: await convertToModelMessages(messages),
   });
 
