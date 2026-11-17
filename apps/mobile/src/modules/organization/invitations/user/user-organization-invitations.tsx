@@ -45,7 +45,7 @@ export const UserOrganizationInvitationsBanner = memo(() => {
 
   const { data } = useQuery({
     ...user.queries.invitations.getAll(userId),
-    enabled: !!userId,
+    enabled: !!userId && !!session.data?.user.emailVerified,
   });
   const pendingInvitations = data?.filter(
     (invitation) =>
