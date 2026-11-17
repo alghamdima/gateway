@@ -4,5 +4,5 @@ import postgres from "postgres";
 import { env } from "./env";
 import * as schema from "./schema";
 
-const client = postgres(env.DATABASE_URL);
+const client = postgres(env.DATABASE_URL, { idle_timeout: 20 });
 export const db = drizzle({ client, schema, casing: "snake_case" });
