@@ -437,17 +437,28 @@ Stage B needs the brand inputs (question 1). Stage C needs the payment and prici
 
 ## Progress
 
-| Phase                      | Status      |
-| -------------------------- | ----------- |
-| 0 Prepare                  | not started |
-| 1 Baseline                 | not started |
-| 2 Rename + import          | not started |
-| 3 Ledger                   | not started |
-| 4 Credits plugin           | not started |
-| 5 Keys e2e                 | not started |
-| 6 Top-ups                  | not started |
-| 7 TurboStarter white-label | not started |
-| 8 API surface + catalog    | not started |
-| 9 Usage                    | not started |
-| 10 Operations              | not started |
-| 11 Multi-instance          | deferred    |
+Updated 2026-11-21 after the Stage A verification run in a Linux cloud container. Evidence is in `gateway-baseline.md`.
+
+| Phase                      | Status                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Prepare                  | partly done. Go 1.27.4, gcc and Node work in the cloud container, and skills load there (38 links resolve). Step 0.1 is still open on the Windows machine. Postgres through `docker compose` was not run                                                                                                                                                   |
+| 1 Baseline                 | 1.1 done on SQLite: native build, boot, `/health` and UI verified. Not done: boot on Postgres, Docker image build. 1.2 done: 15 modules, 14,234 pass, 166 fail, 584 skip, by name. 1.3 not done: only the two hosts seen in the boot log are recorded                                                                                                      |
+| 2 Rename + import          | import (2.2a) done and re-verified against upstream by blob hash and file mode. Wiring (2.3) partly done: lint, format and test ignore the gateway and pass, `gateway:up` exists. Still missing from 2.3: the second Postgres database, `gateway:build` / `gateway:test` / `gateway:dev` scripts, the CI workflow. 2.1, 2.2b and 2.4 not started (Stage B) |
+| 3 Ledger                   | not started                                                                                                                                                                                                                                                                                                                                                |
+| 4 Credits plugin           | not started                                                                                                                                                                                                                                                                                                                                                |
+| 5 Keys e2e                 | not started                                                                                                                                                                                                                                                                                                                                                |
+| 6 Top-ups                  | not started                                                                                                                                                                                                                                                                                                                                                |
+| 7 TurboStarter white-label | not started                                                                                                                                                                                                                                                                                                                                                |
+| 8 API surface + catalog    | not started                                                                                                                                                                                                                                                                                                                                                |
+| 9 Usage                    | not started                                                                                                                                                                                                                                                                                                                                                |
+| 10 Operations              | not started                                                                                                                                                                                                                                                                                                                                                |
+| 11 Multi-instance          | deferred                                                                                                                                                                                                                                                                                                                                                   |
+
+### Found during Stage A
+
+- The root `ignorePatterns` did not cover `apps/gateway/ui`, because that directory has its own oxlint and oxfmt configs. The ignores now live in `.eslintignore` and `.prettierignore`.
+- The UI heap failure is in `tsc --noEmit`, not Vite. Patch `0001` raises the limit through `ui/.npmrc`.
+- Inside the monorepo the UI typecheck also failed on a stale `next-env.d.ts`. Patch `0002` deletes it.
+- A first boot with no cached pricing is fatal when `getbifrost.ai` is unreachable. Any environment without that host needs `pricing_url` pointed at a file, which Stage B has to solve for real (Step 2.2).
+- 91 of the 166 failing tests read upstream paths outside the import scope (`docs/openapi`, `examples/mcps`, an example plugin, `helm-charts`). Whether to widen the import is an owner decision; until then those tests cannot be part of the rename acceptance set.
+- Three upstream files had lost their executable bit in the import. Restored.
