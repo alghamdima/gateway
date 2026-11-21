@@ -24,18 +24,19 @@ One product in one repo: this TurboStarter monorepo is the control plane (sign-u
 - It's 58 Go modules. The product needs 15 of them: `core`, `framework`, `transports`, and 12 plugins (`maxim` is dropped). The rest are `examples/`, `tests/`, `cli/`, `scripts/` and `docs/` helpers.
 - Brand occurrences inside the product areas (`core framework transports plugins ui`):
 
-  | Kind | Hits | Example |
-  | --- | --- | --- |
-  | Go identifiers `Bifrost[A-Z]…` | 52,092 | `schemas.BifrostRequest`, `BifrostContext`, `BifrostError` |
-  | Module path | 4,840 | `github.com/maximhq/bifrost/core` |
-  | Wire headers | 1,232 | `x-bf-vk` and other `x-bf-*` |
-  | Key prefix | 995 | `sk-bf-` |
-  | Metric and DB names | 512 | `bifrost_upstream_latency_seconds` |
-  | Env vars | 469 | `BIFROST_ENCRYPTION_KEY` |
-  | Vendor URLs | 178 | `getbifrost.ai` (pricing datasheet, MCP library, OpenAPI, RSS), `getmaxim` |
-  | File and directory names | 141 | `bifrost-http/`, `bifrostmcp.go` |
+  | Kind                           | Hits   | Example                                                                    |
+  | ------------------------------ | ------ | -------------------------------------------------------------------------- |
+  | Go identifiers `Bifrost[A-Z]…` | 52,092 | `schemas.BifrostRequest`, `BifrostContext`, `BifrostError`                 |
+  | Module path                    | 4,840  | `github.com/maximhq/bifrost/core`                                          |
+  | Wire headers                   | 1,232  | `x-bf-vk` and other `x-bf-*`                                               |
+  | Key prefix                     | 995    | `sk-bf-`                                                                   |
+  | Metric and DB names            | 512    | `bifrost_upstream_latency_seconds`                                         |
+  | Env vars                       | 469    | `BIFROST_ENCRYPTION_KEY`                                                   |
+  | Vendor URLs                    | 178    | `getbifrost.ai` (pricing datasheet, MCP library, OpenAPI, RSS), `getmaxim` |
+  | File and directory names       | 141    | `bifrost-http/`, `bifrostmcp.go`                                           |
 
   Brand occurrences outside the product: `docs/` 23k, `tests/` 5.9k, `helm-charts/` 2.8k, `cli/` 1k, `examples/` 1.2k.
+
 - Outbound calls to vendor hosts: pricing datasheet (`framework/modelcatalog/datasheet/store.go`), MCP library sync, the announcements RSS feed, and `framework/warp`. Each one gets pointed at our host or switched off.
 - Governance API (`/api/governance/customers`, `/virtual-keys`, `/budgets`, `/rate-limits`, `/pricing-overrides`) covers everything the dashboard needs. Two details matter:
   - A virtual key with empty `provider_configs` is **deny-all**, so every key we create must list providers with `allowed_models: ["*"]`.
@@ -87,11 +88,11 @@ core/                              (this repo)
 
 The end result is one monorepo with two applications: `apps/web` (dashboard) and `apps/gateway` (API gateway). The work runs in three stages, and the phases below keep their numbers:
 
-| Stage | Goal | Phases and steps |
-| --- | --- | --- |
-| A. Foundation | Both applications live in this repo, untouched upstream gateway builds and boots from here | Phase 0, Phase 1, the import half of Step 2.2, Step 2.3 |
-| B. Rename | Full white-label of both codebases | Step 2.1, the cleanup half of Step 2.2, Step 2.4, Phase 7 |
-| C. Integration | Credits, keys, payments, API surface, usage, operations | Phases 3, 4, 5, 6, 8, 9, 10 (11 later) |
+| Stage          | Goal                                                                                       | Phases and steps                                          |
+| -------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| A. Foundation  | Both applications live in this repo, untouched upstream gateway builds and boots from here | Phase 0, Phase 1, the import half of Step 2.2, Step 2.3   |
+| B. Rename      | Full white-label of both codebases                                                         | Step 2.1, the cleanup half of Step 2.2, Step 2.4, Phase 7 |
+| C. Integration | Credits, keys, payments, API surface, usage, operations                                    | Phases 3, 4, 5, 6, 8, 9, 10 (11 later)                    |
 
 Stage A imports the gateway with its upstream names. Stage B then replaces that tree with the output of the rename script, so every later upgrade is "import the new tag, rename, apply patches" (ADR 0008).
 
@@ -104,6 +105,7 @@ Order: risk first, one vertical slice early, and brand-dependent work last where
 Verified when: Go builds a hello-world, `docker compose up` starts Postgres, and project skills load.
 
 #### Step 0.1: Fix project skill links (Size: S)
+
 - Acceptance criteria: each `.claude/skills/<name>` is a real directory whose `SKILL.md` matches `.agents/skills/<name>/SKILL.md`. Same for `.cursor/skills`.
 - Verification command: `find .claude/skills -name SKILL.md | wc -l` equals the number of skills in `skills-lock.json`.
 - Files likely touched: `.claude/skills/*`, `.cursor/skills/*`, `.gitattributes` or git `core.symlinks` config.
@@ -111,6 +113,7 @@ Verified when: Go builds a hello-world, `docker compose up` starts Postgres, and
 - Blocked by: none.
 
 #### Step 0.2: Toolchain (Size: S)
+
 - Acceptance criteria: Go 1.27.4 and the Kiri `docker` CLI are on PATH, and TurboStarter `pnpm services:setup` runs green. Nothing new is installed: both are already on the machine.
 - Verification command: `go version && docker compose ps`.
 - Files likely touched: none in the repo.
@@ -118,6 +121,7 @@ Verified when: Go builds a hello-world, `docker compose up` starts Postgres, and
 - Blocked by: none.
 
 #### Step 0.3: Work branch (Size: XS)
+
 - Acceptance criteria: branch `feat/gateway-platform` off `main`, with the uncommitted `PLAN.md` change carried over.
 - Verification command: `git status`.
 - Blocked by: approval.
@@ -127,6 +131,7 @@ Verified when: Go builds a hello-world, `docker compose up` starts Postgres, and
 Verified when: `docs/platform/gateway-baseline.md` lists, per module, passing, failing and skipped test **names**, and the pristine binary answers `GET /health` with a local pricing file.
 
 #### Step 1.1: Build and boot pristine `transports/v2.6.0` in a scratch dir (Size: S)
+
 - Acceptance criteria: `make build LOCAL=1` succeeds with the UI embedded. It boots against Postgres. The pricing URL points at a local file, so startup makes no call to `getbifrost.ai`.
 - Verification command: `curl -fsS localhost:8080/health`.
 - Files likely touched: scratch only.
@@ -134,6 +139,7 @@ Verified when: `docs/platform/gateway-baseline.md` lists, per module, passing, f
 - Blocked by: 0.2.
 
 #### Step 1.2: Unit-test baseline per module (Size: S)
+
 - Acceptance criteria: `go test ./...` has been run in each of the 15 product modules with no provider keys, and the results are recorded by name.
 - Verification command: `go test -json ./... | tee` per module, summarized into `gateway-baseline.md`.
 - Files likely touched: `docs/platform/gateway-baseline.md`.
@@ -141,6 +147,7 @@ Verified when: `docs/platform/gateway-baseline.md` lists, per module, passing, f
 - Blocked by: 1.1.
 
 #### Step 1.3: Outbound-call inventory (Size: S)
+
 - Acceptance criteria: every host the pristine gateway contacts at boot and in one request is listed, each with a disposition (point to our host, local file, or off).
 - Verification command: run with egress logged (Docker network with a logging proxy) and diff against the list.
 - Files likely touched: `gateway-baseline.md`.
@@ -151,6 +158,7 @@ Verified when: `docs/platform/gateway-baseline.md` lists, per module, passing, f
 Verified when: all seven checks in Step 2.4 pass.
 
 #### Step 2.1: Rename script with its own tests (Size: M)
+
 - Acceptance criteria:
   - The script is deterministic and idempotent: run twice, the second run changes nothing.
   - Mappings run most-specific first: module path, wire names (headers, key prefix, env vars, metrics, config keys, DB names), Go identifiers, file and directory names, UI text and assets.
@@ -161,6 +169,7 @@ Verified when: all seven checks in Step 2.4 pass.
 - Blocked by: 1.2. Can be built with placeholder brand values; final values from question 1.
 
 #### Step 2.2: Import scope and vendor cleanup (Size: M)
+
 - Acceptance criteria:
   - Only the product areas are imported (question 7). `plugins/maxim` is removed along with its registration.
   - Vendor URLs point to our host or are switched off, per the 1.3 inventory.
@@ -170,6 +179,7 @@ Verified when: all seven checks in Step 2.4 pass.
 - Blocked by: 2.1.
 
 #### Step 2.3: Monorepo wiring (Size: S)
+
 - Acceptance criteria:
   - `apps/gateway/**` is ignored by oxlint, oxfmt and the root vitest projects.
   - `docker-compose.yml` gains the gateway and a second Postgres database.
@@ -180,6 +190,7 @@ Verified when: all seven checks in Step 2.4 pass.
 - Blocked by: 2.2.
 
 #### Step 2.4: Rename acceptance (Size: S)
+
 - Acceptance criteria:
   1. All 15 modules build, and `go vet` is clean.
   2. The unit-test pass/fail set equals the P1 baseline.
@@ -196,6 +207,7 @@ Verified when: all seven checks in Step 2.4 pass.
 Verified when: the four ledger tests below pass on real Postgres.
 
 #### Step 3.1: Schema and migration (Size: S)
+
 - Acceptance criteria:
   - New tables:
     - `credit_ledger_entry`: append-only, `bigint` micro-USD, unique `idempotency_key`, `kind` in `top_up | usage | refund | adjustment | promo`.
@@ -208,6 +220,7 @@ Verified when: the four ledger tests below pass on real Postgres.
 - Blocked by: 0.2.
 
 #### Step 3.2: Ledger module and gateway DB role (Size: M)
+
 - Acceptance criteria:
   - `credit()`, `getBalance()` and `rebuildBalance()` exist in `packages/api/src/modules/credits`.
   - A Postgres role `gateway_ledger` has only INSERT on entries and UPDATE on accounts and reservations.
@@ -221,6 +234,7 @@ Verified when: the four ledger tests below pass on real Postgres.
 - Blocked by: 3.1.
 
 #### Step 3.3: Admin adjustment endpoint and admin UI field (Size: S)
+
 - Acceptance criteria: staff can add or remove credit for an organization, with a required reason.
 - Verification command: API test plus manual check on `/admin/organizations/<id>`.
 - Files likely touched: `packages/api/src/modules/admin/organizations/*`, `apps/web/src/app/[locale]/admin/organizations/*`.
@@ -231,6 +245,7 @@ Verified when: the four ledger tests below pass on real Postgres.
 Verified when: the six plugin checks pass against a mock upstream and real Postgres.
 
 #### Step 4.1: Reserve and refuse (Size: M)
+
 - Acceptance criteria:
   - The plugin lives in `apps/gateway/plugins/credits` and is registered by `patches/0003-register-credits.patch`. That patch is one `case` in `transports/.../server/plugins.go`.
   - Pre-hook: estimate the maximum cost (`max_tokens`, or the model's max output), then atomically reserve it.
@@ -240,6 +255,7 @@ Verified when: the six plugin checks pass against a mock upstream and real Postg
 - Blocked by: 2.4, 3.2.
 
 #### Step 4.2: Settle exactly once (Size: M)
+
 - Acceptance criteria:
   - `PostLLMHook` settles, on the final chunk for streams, with the key `nonce:request_id:fallback_index:attempt`.
   - A replay writes one entry.
@@ -248,6 +264,7 @@ Verified when: the six plugin checks pass against a mock upstream and real Postg
 - Blocked by: 4.1.
 
 #### Step 4.3: Concurrency, queue, reaper, latency (Size: M)
+
 - Acceptance criteria:
   - 50 concurrent requests on a balance that covers 10 never overdraw by more than one request's overrun.
   - The bounded settlement queue falls back to synchronous writes when full, and drains on shutdown.
@@ -261,6 +278,7 @@ Verified when: the six plugin checks pass against a mock upstream and real Postg
 Verified when: an e2e test signs up, creates an organization, gets a staff credit, creates a key in the dashboard, calls `/api/v1/chat/completions` against the mock upstream, and sees the balance drop by the expected amount. Disabling the key gives `401`.
 
 #### Step 5.1: Gateway governance client and `api_key` table (Size: M)
+
 - Acceptance criteria:
   - The client uses the private gateway URL and admin credential from env.
   - An organization is created as a gateway customer on demand (`id = organization.id`).
@@ -271,6 +289,7 @@ Verified when: an e2e test signs up, creates an organization, gets a staff credi
 - Blocked by: 4.1.
 
 #### Step 5.2: Dashboard pages for keys and credits (Size: M)
+
 - Acceptance criteria:
   - Keys page: create (value shown once), list, rename, disable, delete, and an optional limit with daily/weekly/monthly reset. The limit maps to a gateway budget.
   - Credits page: balance and ledger history.
@@ -279,6 +298,7 @@ Verified when: an e2e test signs up, creates an organization, gets a staff credi
 - Blocked by: 5.1.
 
 #### Step 5.3: Organization deletion cleans the gateway (Size: S)
+
 - Acceptance criteria: deleting an organization deletes its gateway customer and virtual keys, and the old keys get `401`.
 - Verification command: API test.
 - Blocked by: 5.1.
@@ -288,6 +308,7 @@ Verified when: an e2e test signs up, creates an organization, gets a staff credi
 Verified when, in Stripe test mode: one payment credits once even when the webhook is redelivered, a refund debits once, and the checkout redirect alone never credits.
 
 #### Step 6.1: Top-up products and checkout (Size: M)
+
 - Acceptance criteria:
   - Fixed amounts (question 3) as one-time Stripe prices.
   - Checkout runs from the credits page with `referenceId = organization.id`.
@@ -296,6 +317,7 @@ Verified when, in Stripe test mode: one payment credits once even when the webho
 - Blocked by: 3.2.
 
 #### Step 6.2: Webhook to ledger (Size: M)
+
 - Acceptance criteria:
   - `checkout.session.completed` with `payment_status=paid`, and `checkout.session.async_payment_succeeded`, append `top_up` keyed by payment intent id.
   - `charge.refunded` appends `refund` keyed by refund id.
@@ -309,11 +331,13 @@ Verified when, in Stripe test mode: one payment credits once even when the webho
 Verified when: the `turbostarter` scan returns only the allowlist (LICENSE and copyright), `pnpm lint && pnpm format && pnpm test` and the web build pass, and the session cookie carries the new prefix.
 
 #### Step 7.1: Replace the 172 hits (Size: M)
+
 - Covers `PRODUCT_NAME`, auth `appName` and `cookiePrefix`, email layout and logo, i18n, marketing links and buy CTAs, generator templates, the docker-compose project name, README and AGENTS.md.
 - Mobile config and the `turbostarter://` scheme follow question 6.
 - Blocked by: question 1.
 
 #### Step 7.2: Marketing site rewritten for the product (Size: M)
+
 - Hero, pricing (credits, no subscription plans), docs link.
 - Subscription plans are removed from the billing config.
 - Blocked by: 6.1, 7.1.
@@ -323,6 +347,7 @@ Verified when: the `turbostarter` scan returns only the allowlist (LICENSE and c
 Verified when: the official `openai` SDK with `baseURL=https://<domain>/api/v1` passes a chat, stream, tools and `/models` smoke test, and catalog prices equal catalog price × markup for a seeded set.
 
 #### Step 8.1: Edge routing (Size: S)
+
 - Acceptance criteria:
   - `/api/v1/{chat/completions,completions,responses,messages,embeddings,models}` go to the gateway's `/v1/*`.
   - `/api/v1/{key,credits,generation,keys}` go to the control plane.
@@ -331,6 +356,7 @@ Verified when: the official `openai` SDK with `baseURL=https://<domain>/api/v1` 
 - Blocked by: 5.1.
 
 #### Step 8.2: Self-service endpoints (Size: M)
+
 - Acceptance criteria:
   - `GET /api/v1/key` returns limits and usage.
   - `GET /api/v1/credits` returns total purchased and used.
@@ -340,6 +366,7 @@ Verified when: the official `openai` SDK with `baseURL=https://<domain>/api/v1` 
 - Blocked by: 8.1.
 
 #### Step 8.3: Public model catalog pages (Size: M)
+
 - A list with filters plus a page per model: context length, modalities, price per 1M tokens incl. markup, and a code snippet.
 - Server-rendered for SEO.
 - Blocked by: 8.2.
@@ -349,9 +376,11 @@ Verified when: the official `openai` SDK with `baseURL=https://<domain>/api/v1` 
 Verified when: for a fixed set of seeded requests, usage page totals equal ledger sums.
 
 #### Step 9.1: Activity page (Size: M)
+
 - Spend, requests and tokens by model, key and day, from the ledger plus the gateway log store (read through the gateway's logs API, not its tables). Blocked by: 5.2.
 
 #### Step 9.2: Generation detail and `GET /api/v1/generation?id=` (Size: M)
+
 - Brief 06 shape: model, provider, tokens, cost, latency, finish reason, attempts. Blocked by: 9.1.
 
 ### Phase 10: Operations
@@ -381,18 +410,18 @@ Stage B needs the brand inputs (question 1). Stage C needs the payment and prici
 
 ## Decision log
 
-| Decision | Chosen option | Why |
-| --- | --- | --- |
-| One repo, two applications | Gateway in `apps/gateway/` next to `apps/web` | Owner decision. It has no root `package.json`, so the npm UI and Go modules stay separate from pnpm |
-| Order of work | Foundation, then rename, then integration | Owner decision, 2026-11-21. Replaces the earlier rule that the gateway's first commit must already be renamed, so the upstream names will appear in git history until Stage B |
-| White-label depth | Full, including Go identifiers and module paths | Owner decision. Done by script so upgrades stay possible (ADR 0008) |
-| How upstream is taken | Re-import the pristine tag, rename, apply `patches/` | A normal merge would conflict on every renamed line |
-| Our gateway code | New files (`plugins/credits`) plus tiny ordered patches | Keeps each upgrade's manual work small |
-| Money | Integer micro-USD ledger, append-only, idempotent, reserve then settle | ADR 0001. Prevents overdraft under concurrency |
-| Key model | Organization = gateway customer, dashboard key = virtual key | ADR 0004 |
-| Margin | Applied at settlement in basis points; provider cost kept | ADR 0005 |
-| Admin UI | Gateway UI internal only | ADR 0007 |
-| Launch scale | One gateway instance plus a standby | ADR 0006 |
+| Decision                   | Chosen option                                                          | Why                                                                                                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One repo, two applications | Gateway in `apps/gateway/` next to `apps/web`                          | Owner decision. It has no root `package.json`, so the npm UI and Go modules stay separate from pnpm                                                                           |
+| Order of work              | Foundation, then rename, then integration                              | Owner decision, 2026-11-21. Replaces the earlier rule that the gateway's first commit must already be renamed, so the upstream names will appear in git history until Stage B |
+| White-label depth          | Full, including Go identifiers and module paths                        | Owner decision. Done by script so upgrades stay possible (ADR 0008)                                                                                                           |
+| How upstream is taken      | Re-import the pristine tag, rename, apply `patches/`                   | A normal merge would conflict on every renamed line                                                                                                                           |
+| Our gateway code           | New files (`plugins/credits`) plus tiny ordered patches                | Keeps each upgrade's manual work small                                                                                                                                        |
+| Money                      | Integer micro-USD ledger, append-only, idempotent, reserve then settle | ADR 0001. Prevents overdraft under concurrency                                                                                                                                |
+| Key model                  | Organization = gateway customer, dashboard key = virtual key           | ADR 0004                                                                                                                                                                      |
+| Margin                     | Applied at settlement in basis points; provider cost kept              | ADR 0005                                                                                                                                                                      |
+| Admin UI                   | Gateway UI internal only                                               | ADR 0007                                                                                                                                                                      |
+| Launch scale               | One gateway instance plus a standby                                    | ADR 0006                                                                                                                                                                      |
 
 ## Not yet specified
 
@@ -408,17 +437,17 @@ Stage B needs the brand inputs (question 1). Stage C needs the payment and prici
 
 ## Progress
 
-| Phase | Status |
-| --- | --- |
-| 0 Prepare | not started |
-| 1 Baseline | not started |
-| 2 Rename + import | not started |
-| 3 Ledger | not started |
-| 4 Credits plugin | not started |
-| 5 Keys e2e | not started |
-| 6 Top-ups | not started |
+| Phase                      | Status      |
+| -------------------------- | ----------- |
+| 0 Prepare                  | not started |
+| 1 Baseline                 | not started |
+| 2 Rename + import          | not started |
+| 3 Ledger                   | not started |
+| 4 Credits plugin           | not started |
+| 5 Keys e2e                 | not started |
+| 6 Top-ups                  | not started |
 | 7 TurboStarter white-label | not started |
-| 8 API surface + catalog | not started |
-| 9 Usage | not started |
-| 10 Operations | not started |
-| 11 Multi-instance | deferred |
+| 8 API surface + catalog    | not started |
+| 9 Usage                    | not started |
+| 10 Operations              | not started |
+| 11 Multi-instance          | deferred    |

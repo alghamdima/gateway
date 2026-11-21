@@ -14,10 +14,10 @@ Sources: /docs/guides/overview/auth/byok.md, /docs/api/api-reference/byok/*, /do
 
 ## API shape
 
-| Method and path | Purpose |
-| --- | --- |
-| `POST /api/v1/byok` | Create. Body: `provider`* (slug), `key`*, `name`, `workspace_id`, `allowed_models`, `allowed_api_key_hashes`, `allowed_user_ids`, `is_fallback`, `is_required`, `is_byok_only`, `declared_zdr` (true/false/null), `declared_region` (`global`/`europe`/`us`/null), `disabled` |
-| `GET /api/v1/byok`, `GET/PATCH/DELETE /api/v1/byok/{id}` | List, read, update, delete |
+| Method and path                                          | Purpose                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/v1/byok`                                      | Create. Body: `provider`* (slug), `key`*, `name`, `workspace_id`, `allowed_models`, `allowed_api_key_hashes`, `allowed_user_ids`, `is_fallback`, `is_required`, `is_byok_only`, `declared_zdr` (true/false/null), `declared_region` (`global`/`europe`/`us`/null), `disabled` |
+| `GET /api/v1/byok`, `GET/PATCH/DELETE /api/v1/byok/{id}` | List, read, update, delete                                                                                                                                                                                                                                                    |
 
 Response fields include `id`, `label` (masked snippet), `sort_order` (tried ascending), and `workspace_id` (null means usable across all workspaces). The raw key is encrypted at rest and never returned.
 

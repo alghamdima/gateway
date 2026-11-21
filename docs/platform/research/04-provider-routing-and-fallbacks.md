@@ -12,19 +12,19 @@ Sources: /docs/guides/routing/provider-selection.md, /docs/guides/providers/traf
 
 `provider` object on `/chat/completions` and `/responses`:
 
-| Field | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `order` | string[] | - | Provider slugs to try in order |
-| `allow_fallbacks` | bool | true | Allow providers outside `order` |
-| `require_parameters` | bool | false | Only providers that support every request parameter |
-| `data_collection` | `allow`/`deny` | allow | Exclude providers that may store data |
-| `zdr` | bool | - | Only zero-data-retention endpoints |
-| `enforce_distillable_text` | bool | - | Only models whose licence allows distillation |
-| `only` / `ignore` | string[] | - | Allowlist / denylist of providers |
-| `quantizations` | string[] | - | e.g. `["fp8"]` |
-| `sort` | string or `{by, partition}` | - | `price`, `throughput`, `latency`. `partition: "none"` sorts across all models in `models` |
-| `preferred_min_throughput` / `preferred_max_latency` | number or `{p50,p75,p90,p99}` | - | Soft performance thresholds |
-| `max_price` | `{prompt, completion, request, image}` | - | USD per million tokens. Endpoints above it are excluded |
+| Field                                                | Type                                   | Default | Meaning                                                                                   |
+| ---------------------------------------------------- | -------------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `order`                                              | string[]                               | -       | Provider slugs to try in order                                                            |
+| `allow_fallbacks`                                    | bool                                   | true    | Allow providers outside `order`                                                           |
+| `require_parameters`                                 | bool                                   | false   | Only providers that support every request parameter                                       |
+| `data_collection`                                    | `allow`/`deny`                         | allow   | Exclude providers that may store data                                                     |
+| `zdr`                                                | bool                                   | -       | Only zero-data-retention endpoints                                                        |
+| `enforce_distillable_text`                           | bool                                   | -       | Only models whose licence allows distillation                                             |
+| `only` / `ignore`                                    | string[]                               | -       | Allowlist / denylist of providers                                                         |
+| `quantizations`                                      | string[]                               | -       | e.g. `["fp8"]`                                                                            |
+| `sort`                                               | string or `{by, partition}`            | -       | `price`, `throughput`, `latency`. `partition: "none"` sorts across all models in `models` |
+| `preferred_min_throughput` / `preferred_max_latency` | number or `{p50,p75,p90,p99}`          | -       | Soft performance thresholds                                                               |
+| `max_price`                                          | `{prompt, completion, request, image}` | -       | USD per million tokens. Endpoints above it are excluded                                   |
 
 Model fallback: `models: ["a", "b"]`. On `/api/v1/messages`, `fallbacks: [{model}]` (at most 3, cannot be combined with `models`, per-entry overrides rejected with 400).
 

@@ -18,14 +18,14 @@ Sources: /docs/api_reference/authentication.md, /docs/guides/overview/auth/manag
 
 All under `https://openrouter.ai/api/v1`, Bearer auth.
 
-| Method and path | Auth | Purpose |
-| --- | --- | --- |
-| `POST /keys` | management | Create. Body: `name`*, `limit`, `limit_reset` (`daily`/`weekly`/`monthly`/null), `include_byok_in_limit`, `expires_at` (ISO 8601 with seconds), `workspace_id`, `creator_user_id`, `external {user, api_key}`. Returns `201 { data, key }`. |
-| `GET /keys` | management | List. Query: `include_disabled`, `include_expired`, `offset`, `workspace_id`. |
-| `GET /keys/{hash}` | management | Read one. |
-| `PATCH /keys/{hash}` | management | Update `name`, `disabled`, `limit`, `limit_reset`, `include_byok_in_limit`, `workspace_id`. An empty body returns `400 No update fields provided`. |
-| `DELETE /keys/{hash}` | management | Delete. |
-| `GET /key` | the key itself | Self-inspection: limits, usage, budgets, free-model quota. |
+| Method and path       | Auth           | Purpose                                                                                                                                                                                                                                     |
+| --------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /keys`          | management     | Create. Body: `name`*, `limit`, `limit_reset` (`daily`/`weekly`/`monthly`/null), `include_byok_in_limit`, `expires_at` (ISO 8601 with seconds), `workspace_id`, `creator_user_id`, `external {user, api_key}`. Returns `201 { data, key }`. |
+| `GET /keys`           | management     | List. Query: `include_disabled`, `include_expired`, `offset`, `workspace_id`.                                                                                                                                                               |
+| `GET /keys/{hash}`    | management     | Read one.                                                                                                                                                                                                                                   |
+| `PATCH /keys/{hash}`  | management     | Update `name`, `disabled`, `limit`, `limit_reset`, `include_byok_in_limit`, `workspace_id`. An empty body returns `400 No update fields provided`.                                                                                          |
+| `DELETE /keys/{hash}` | management     | Delete.                                                                                                                                                                                                                                     |
+| `GET /key`            | the key itself | Self-inspection: limits, usage, budgets, free-model quota.                                                                                                                                                                                  |
 
 The key object, identified by `hash` (SHA-256 hex):
 

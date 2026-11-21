@@ -77,15 +77,15 @@ flowchart LR
 
 ## Data ownership
 
-| Data | Owner | Store | Notes |
-| --- | --- | --- | --- |
-| Users, sessions, organizations, members | Control plane | control plane DB | Better Auth |
-| Customer API keys (metadata, hash, prefix) | Control plane | control plane DB (`api_key`) | Plaintext shown once, never stored |
-| Credit ledger, balances, reservations | Control plane schema, written by both | control plane DB | Integer micro-USD, append-only. The gateway's DB role can only insert entries and update balances and reservations |
-| Payments, orders | Control plane | control plane DB + payment provider | |
-| Virtual keys, customers, key caps, provider keys | Gateway, written only by the control plane | gateway config store | Encrypted at rest with a config-store encryption key |
-| Model catalog and provider prices | Gateway | gateway config store, synced from our own pricing file or host | Bifrost's default `getbifrost.ai` URL is replaced (Phase 4) |
-| Request logs | Gateway | gateway log store | Source for customer usage views and reconciliation |
+| Data                                             | Owner                                      | Store                                                          | Notes                                                                                                              |
+| ------------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Users, sessions, organizations, members          | Control plane                              | control plane DB                                               | Better Auth                                                                                                        |
+| Customer API keys (metadata, hash, prefix)       | Control plane                              | control plane DB (`api_key`)                                   | Plaintext shown once, never stored                                                                                 |
+| Credit ledger, balances, reservations            | Control plane schema, written by both      | control plane DB                                               | Integer micro-USD, append-only. The gateway's DB role can only insert entries and update balances and reservations |
+| Payments, orders                                 | Control plane                              | control plane DB + payment provider                            |                                                                                                                    |
+| Virtual keys, customers, key caps, provider keys | Gateway, written only by the control plane | gateway config store                                           | Encrypted at rest with a config-store encryption key                                                               |
+| Model catalog and provider prices                | Gateway                                    | gateway config store, synced from our own pricing file or host | Bifrost's default `getbifrost.ai` URL is replaced (Phase 4)                                                        |
+| Request logs                                     | Gateway                                    | gateway log store                                              | Source for customer usage views and reconciliation                                                                 |
 
 Both databases run on one Postgres server at launch, as two databases.
 
@@ -104,24 +104,24 @@ Both databases run on one Postgres server at launch, as two databases.
 
 ## Owner decisions still open
 
-| Decision | Where it matters |
-| --- | --- |
-| Brand inputs (name, domain, code name, prefixes, Go module path) | Phase 5 rename |
-| Payment provider | ADR 0003 |
-| Purchase fee, top-up amounts | ADR 0003 |
-| Markup on inference | ADR 0005 |
-| Charging for failed attempts that consumed tokens | ADR 0002 |
-| Lemon Squeezy buy links, EAS project, Expo updates URL | Phase 5b (mobile is skipped for now) |
+| Decision                                                         | Where it matters                     |
+| ---------------------------------------------------------------- | ------------------------------------ |
+| Brand inputs (name, domain, code name, prefixes, Go module path) | Phase 5 rename                       |
+| Payment provider                                                 | ADR 0003                             |
+| Purchase fee, top-up amounts                                     | ADR 0003                             |
+| Markup on inference                                              | ADR 0005                             |
+| Charging for failed attempts that consumed tokens                | ADR 0002                             |
+| Lemon Squeezy buy links, EAS project, Expo updates URL           | Phase 5b (mobile is skipped for now) |
 
 ## ADR index
 
-| # | Decision |
-| --- | --- |
-| [0001](adr/0001-credits-ledger.md) | Credits ledger in Postgres, enforced by a gateway plugin with reservations |
-| [0002](adr/0002-usage-path.md) | Usage reaches the ledger through a gateway plugin, with log reconciliation as a backstop |
-| [0003](adr/0003-billing.md) | Prepaid top-ups through one-time payments |
-| [0004](adr/0004-key-model.md) | One organization is one gateway customer, one dashboard key is one virtual key |
-| [0005](adr/0005-margin.md) | Margin applied in the ledger plugin as a multiplier on provider cost |
-| [0006](adr/0006-scaling.md) | One gateway instance at launch; more only after a tested invalidation patch |
-| [0007](adr/0007-gateway-admin-ui.md) | Gateway admin UI is internal only |
-| [0008](adr/0008-upstream-upgrades.md) | Take each upstream minor release within two weeks, by script |
+| #                                     | Decision                                                                                 |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [0001](adr/0001-credits-ledger.md)    | Credits ledger in Postgres, enforced by a gateway plugin with reservations               |
+| [0002](adr/0002-usage-path.md)        | Usage reaches the ledger through a gateway plugin, with log reconciliation as a backstop |
+| [0003](adr/0003-billing.md)           | Prepaid top-ups through one-time payments                                                |
+| [0004](adr/0004-key-model.md)         | One organization is one gateway customer, one dashboard key is one virtual key           |
+| [0005](adr/0005-margin.md)            | Margin applied in the ledger plugin as a multiplier on provider cost                     |
+| [0006](adr/0006-scaling.md)           | One gateway instance at launch; more only after a tested invalidation patch              |
+| [0007](adr/0007-gateway-admin-ui.md)  | Gateway admin UI is internal only                                                        |
+| [0008](adr/0008-upstream-upgrades.md) | Take each upstream minor release within two weeks, by script                             |

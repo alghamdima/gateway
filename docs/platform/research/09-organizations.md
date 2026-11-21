@@ -1,6 +1,6 @@
 # Organizations
 
-Sources: /docs/guides/features/workspaces.md, /docs/guides/features/workspaces/workspace-budgets.md, /docs/guides/best-practices/spend-controls.md, /docs/guides/overview/auth/management-api-keys.md, /docs/api/api-reference/organization/*, /docs/api/api-reference/workspaces/* (fetched 2026-11-21).
+Sources: /docs/guides/features/workspaces.md, /docs/guides/features/workspaces/workspace-budgets.md, /docs/guides/best-practices/spend-controls.md, /docs/guides/overview/auth/management-api-keys.md, /docs/api/api-reference/organization/_, /docs/api/api-reference/workspaces/_ (fetched 2026-11-21).
 
 ## What the customer sees
 
