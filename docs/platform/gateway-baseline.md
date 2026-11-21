@@ -372,6 +372,10 @@ Causes were assigned from the first matching error line in each failing test's o
 
 So of 166 failures, 91 point at files outside the import scope, 73 at this container, and 2 are open. None has been traced to a defect in the gateway itself, and none has been re-run on a host without these limits to confirm.
 
+### Stability
+
+The whole suite was run twice on the same tree. The two result sets (15,107 rows each) differ in one test: `core` `TestListAllModelsIncludesEveryPageOfASlowLargeProvider` passed in the first run and failed in the second with `context deadline exceeded`, then passed 3 times out of 3 when run alone. It is timing-sensitive under load. `scripts/test.sh` therefore re-runs a regressed test once on its own before counting it.
+
 ### Skips
 
 584 tests skip. The reasons printed most often: Postgres not available (100), ClickHouse not available (92), a provider key such as `OPENAI_API_KEY` or `MISTRAL_API_KEY` not set, and a few that upstream skips unconditionally. Names are in `results.tsv`.
