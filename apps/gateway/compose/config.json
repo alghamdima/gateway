@@ -1,0 +1,26 @@
+{
+  "config_store": {
+    "enabled": true,
+    "type": "postgres",
+    "config": {
+      "host": "env.GATEWAY_DB_HOST",
+      "port": "env.GATEWAY_DB_PORT",
+      "user": "env.GATEWAY_DB_USER",
+      "password": "env.GATEWAY_DB_PASSWORD",
+      "db_name": "env.GATEWAY_DB_NAME",
+      "ssl_mode": "disable"
+    }
+  },
+  "logs_store": {
+    "enabled": true,
+    "type": "postgres",
+    "config": {
+      "host": "env.GATEWAY_DB_HOST",
+      "port": "env.GATEWAY_DB_PORT",
+      "user": "env.GATEWAY_DB_USER",
+      "password": "env.GATEWAY_DB_PASSWORD",
+      "db_name": "env.GATEWAY_DB_NAME",
+      "ssl_mode": "disable"
+    }
+  }
+}
