@@ -17,7 +17,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # the job runs the whole Go suite and takes most of an hour; let a run finish and queue the next
+  # one instead of losing it to every push
+  cancel-in-progress: false
 
 jobs:
   gateway:
