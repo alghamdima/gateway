@@ -5,7 +5,7 @@ An OpenAI-compatible AI gateway in front of many model providers, sold with prep
 Two codebases, one repository:
 
 - **Control plane**: TurboStarter (this monorepo). Auth, organizations, billing, customer dashboard, admin.
-- **Data plane**: Bifrost (Apache-2.0, Go), pinned to `transports/v2.6.0`, white-labeled, living in `services/gateway/`. Proxies all model traffic.
+- **Data plane**: Bifrost (Apache-2.0, Go), pinned to `transports/v2.6.0`, white-labeled, living in `apps/gateway/`. Proxies all model traffic.
 
 Decisions are recorded in `adr/`. This page is the map.
 

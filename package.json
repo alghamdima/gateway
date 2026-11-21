@@ -21,6 +21,7 @@
     "test:e2e": "turbo run test:e2e",
     "test:projects": "vitest run",
     "test:projects:watch": "vitest --watch",
+    "gateway:up": "docker compose --profile gateway up -d --build --wait",
     "gen": "turbo gen",
     "with-env": "dotenv -c --"
   },

@@ -61,6 +61,8 @@ apps/
   web/         Next.js App Router (src/app/[locale]/{(marketing),auth,dashboard,admin})
   mobile/      Expo Router (src/app/{(setup),dashboard}, src/modules/)
   extension/   WXT + React (src/app/{background,content,popup,options,sidepanel,...})
+  gateway/     Go AI gateway (vendored from upstream, see apps/gateway/UPSTREAM). Not a pnpm package:
+               own Go modules (go.work) and npm UI. Read apps/gateway/AGENTS.md before editing it
 
 packages/
   api/         @workspace/api       Hono modules (admin,ai,auth,billing,organization,storage)
@@ -93,6 +95,7 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 | Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                        |
 | Test               | `pnpm test`                                                |
 | Clean              | `pnpm clean`                                               |
+| Gateway            | `pnpm gateway:up` (Docker build + run, `localhost:8080`)   |
 | Services           | `pnpm services:setup` / `services:start` / `services:stop` |
 | DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`           |
 | DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`          |

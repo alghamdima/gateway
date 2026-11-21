@@ -25,8 +25,8 @@ Option 2, with this cadence:
 
 Mechanics:
 
-- `services/gateway/UPSTREAM` (the provenance file) records repo, tag and commit. The upgrade procedure reads it.
-- Our functional changes live in `services/gateway/patches/` as an ordered series, applied after the rename. They stay small. Anything large lives in new files (for example our `credits` plugin in its own directory), not in edits to upstream files.
+- `apps/gateway/UPSTREAM` (the provenance file) records repo, tag and commit. The upgrade procedure reads it.
+- Our functional changes live in `apps/gateway/patches/` as an ordered series, applied after the rename. They stay small. Anything large lives in new files (for example our `credits` plugin in its own directory), not in edits to upstream files.
 - The rename script and the patches each run in CI on every change: rename the pinned tag from scratch and compare with the committed tree byte for byte.
 - An upgrade is one pull request: new tag, regenerated tree, patches reapplied, full checks green.
 

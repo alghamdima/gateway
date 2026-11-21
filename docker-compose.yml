@@ -48,5 +48,17 @@ services:
       timeout: 5s
       retries: 5
 
+  gateway:
+    profiles: ["gateway"]
+    build:
+      context: ./apps/gateway
+      dockerfile: transports/Dockerfile.local
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    volumes:
+      - gateway_data:/app/data
+
 volumes:
   postgres_data:
+  gateway_data:
