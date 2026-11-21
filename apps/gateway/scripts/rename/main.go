@@ -81,7 +81,11 @@ func main() {
 	if err != nil {
 		fatal(err.Error())
 	}
-	fmt.Printf("files rewritten: %d, paths renamed: %d\n", res.FilesRewritten, res.PathsRenamed)
+	pinned, err := PinWorkspace(*root, *dryRun)
+	if err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("files rewritten: %d, paths renamed: %d, go.work pinned: %t\n", res.FilesRewritten, res.PathsRenamed, pinned)
 }
 
 func fatal(msg string) {

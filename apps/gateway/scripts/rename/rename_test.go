@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -203,5 +204,51 @@ func TestRunRefusesToOverwrite(t *testing.T) {
 	write(t, root, "acme.go", "package x\n")
 	if _, err := Run(root, NewRewriter(acme), false); err == nil {
 		t.Fatal("expected an error when the renamed path already exists")
+	}
+}
+
+func TestPinWorkspace(t *testing.T) {
+	root := t.TempDir()
+	work := "go 1.27.4\n\nuse (\n\t./core\n\t./plugins/otel\n\t./transports\n)\n"
+	write(t, root, "go.work", work)
+	write(t, root, "core/go.mod", "module github.com/acme-ai/acme/core\n\ngo 1.27.4\n\nrequire github.com/x/y v1.0.0\n")
+	write(t, root, "plugins/otel/go.mod", "module github.com/acme-ai/acme/plugins/otel\n\nrequire (\n\tgithub.com/acme-ai/acme/core v1.16.0\n\tgithub.com/x/y v1.0.0\n)\n")
+	write(t, root, "transports/go.mod", "module github.com/acme-ai/acme/transports/v2\n\nrequire (\n\tgithub.com/acme-ai/acme/core v1.16.0\n\tgithub.com/acme-ai/acme/core v1.15.0 // indirect\n\tgithub.com/acme-ai/acme/plugins/otel v1.2.0\n)\n")
+
+	if changed, err := PinWorkspace(root, true); err != nil || !changed {
+		t.Fatalf("dry run: changed=%t err=%v", changed, err)
+	}
+	if got := read(t, root, "go.work"); got != work {
+		t.Fatalf("dry run wrote to disk: %q", got)
+	}
+	if changed, err := PinWorkspace(root, false); err != nil || !changed {
+		t.Fatalf("first run: changed=%t err=%v", changed, err)
+	}
+	want := work + "\n" + replaceMarker + "replace (\n" +
+		"\tgithub.com/acme-ai/acme/core v1.15.0 => ./core\n" +
+		"\tgithub.com/acme-ai/acme/core v1.16.0 => ./core\n" +
+		"\tgithub.com/acme-ai/acme/plugins/otel v1.2.0 => ./plugins/otel\n" +
+		")\n"
+	if got := read(t, root, "go.work"); got != want {
+		t.Fatalf("go.work\n got %q\nwant %q", got, want)
+	}
+	if changed, err := PinWorkspace(root, false); err != nil || changed {
+		t.Fatalf("second run: changed=%t err=%v", changed, err)
+	}
+
+	// a bumped requirement replaces the old pin instead of piling up
+	write(t, root, "plugins/otel/go.mod", "module github.com/acme-ai/acme/plugins/otel\n\nrequire github.com/acme-ai/acme/core v1.17.0\n")
+	if _, err := PinWorkspace(root, false); err != nil {
+		t.Fatal(err)
+	}
+	got := read(t, root, "go.work")
+	if !strings.Contains(got, "core v1.17.0 => ./core") || strings.Count(got, "replace (") != 1 {
+		t.Fatalf("pins not regenerated: %q", got)
+	}
+}
+
+func TestPinWorkspaceWithoutGoWork(t *testing.T) {
+	if changed, err := PinWorkspace(t.TempDir(), false); err != nil || changed {
+		t.Fatalf("changed=%t err=%v", changed, err)
 	}
 }
