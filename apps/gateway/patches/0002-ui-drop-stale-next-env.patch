@@ -1,0 +1,12 @@
+diff --git a/ui/next-env.d.ts b/ui/next-env.d.ts
+deleted file mode 100644
+index 911f40c..0000000
+--- a/ui/next-env.d.ts
++++ /dev/null
+@@ -1,5 +0,0 @@
+-/// <reference types="next" />
+-/// <reference types="next/image-types/global" />
+-
+-// NOTE: This file should not be edited
+-// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+\ No newline at end of file

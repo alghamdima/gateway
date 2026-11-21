@@ -80,3 +80,13 @@ apps/gateway/**/*.db
 apps/gateway/**/*.db-shm
 apps/gateway/**/*.db-wal
 !apps/gateway/ui/next-env.d.ts
+
+# gateway build outputs (upstream's own .gitignore is not imported)
+apps/gateway/tmp/
+apps/gateway/go.work.sum
+apps/gateway/transports/bifrost-http/ui/
+apps/gateway/ui/app/routeTree.gen.ts
+apps/gateway/**/*.tsbuildinfo
+apps/gateway/**/*.db
+apps/gateway/**/*.db-shm
+apps/gateway/**/*.db-wal
