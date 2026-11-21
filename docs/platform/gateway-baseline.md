@@ -2,7 +2,7 @@
 
 Recorded 2026-11-21 for Phase 1 of `PLAN.md`. This is what the imported gateway does before any rename, so Stage B can prove the rename changed nothing (Step 2.4, check 2).
 
-The tree measured is commit `85447a0`: upstream at `172617bb` plus the two patches in `apps/gateway/patches/`. Neither patch touches Go code.
+The build and boot checks were taken on commit `85447a0` (upstream at `172617bb` plus the two patches in `apps/gateway/patches/`, neither of which touches Go code). The unit-test baseline was retaken on `459866d`, after the import scope was widened.
 
 ## Environment
 
@@ -84,18 +84,18 @@ Limits of this inventory: 45 s of a default boot, then a configured boot plus 75
 
 ## Unit tests
 
-Run with `apps/gateway/scripts/test-baseline.sh`, which executes `go test -json -count=1 -timeout 20m ./...` in each of the 15 `go.work` modules. The whole run took 30 minutes.
+Run with `apps/gateway/scripts/test-baseline.sh` on commit `459866d`. It builds the MCP test servers (`make setup-mcp-tests`), then executes `go test -json -count=1 -timeout 20m ./...` in each of the 15 `go.work` modules with no credentials and no network. The run took 11 minutes.
 
-Every top-level test and its result is in [`gateway-baseline/results.tsv`](gateway-baseline/results.tsv) (module, package, test, result; 14,984 test rows and 123 package rows). The tables below summarise it. Subtests are not listed separately: a parent fails if any subtest fails.
+Every top-level test and its result is in [`gateway-baseline/results.tsv`](gateway-baseline/results.tsv) (module, package, test, result; 15,570 test rows and 123 package rows). Subtests are not listed separately: a parent fails if any subtest fails.
 
 ### Counts per module
 
 | Module                         | Tests pass | Tests fail | Tests skip | Packages pass | Packages fail | Packages without tests |
 | ------------------------------ | ---------- | ---------- | ---------- | ------------- | ------------- | ---------------------- |
-| `core`                         | 6253       | 51         | 206        | 50            | 6             | 4                      |
-| `framework`                    | 3999       | 61         | 291        | 29            | 6             | 4                      |
+| `core`                         | 6413       | 12         | 85         | 51            | 5             | 4                      |
+| `framework`                    | 4012       | 48         | 291        | 30            | 5             | 4                      |
 | `plugins/compat`               | 26         | 0          | 0          | 1             | 0             | 0                      |
-| `plugins/governance`           | 500        | 0          | 7          | 1             | 0             | 0                      |
+| `plugins/governance`           | 506        | 0          | 1          | 1             | 0             | 0                      |
 | `plugins/jsonparser`           | 5          | 0          | 3          | 1             | 0             | 0                      |
 | `plugins/logging`              | 374        | 0          | 2          | 1             | 0             | 0                      |
 | `plugins/maxim`                | 20         | 0          | 3          | 1             | 0             | 0                      |
@@ -106,8 +106,8 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `plugins/routing`              | 601        | 0          | 0          | 5             | 0             | 0                      |
 | `plugins/semanticcache`        | 88         | 0          | 71         | 1             | 0             | 0                      |
 | `plugins/telemetry`            | 58         | 0          | 0          | 1             | 0             | 0                      |
-| `transports`                   | 2171       | 52         | 1          | 3             | 3             | 2                      |
-| **Total**                      | **14234**  | **166**    | **584**    | **97**        | **16**        | **10**                 |
+| `transports`                   | 2808       | 1          | 1          | 5             | 1             | 2                      |
+| **Total**                      | **15050**  | **63**     | **457**    | **101**       | **12**        | **10**                 |
 
 ### Failing tests by name
 
@@ -116,50 +116,6 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | Test                      | Cause |
 | ------------------------- | ----- |
 | `TestValidateExternalURL` | dns   |
-
-**`core/internal/mcptests`** (39)
-
-| Test                                                         | Cause        |
-| ------------------------------------------------------------ | ------------ |
-| `TestAgent_Adapter_ResponsesFormat_ErrorHandling`            | mcp-stdio    |
-| `TestAgent_Adapter_ResponsesFormat_STDIO`                    | mcp-stdio    |
-| `TestAgent_MixedPermissions_AllAutoExecute`                  | mcp-stdio    |
-| `TestAgent_MixedPermissions_MultipleSTDIOSamePermissions`    | mcp-stdio    |
-| `TestAgent_MixedPermissions_PartialExecution`                | mcp-stdio    |
-| `TestAgent_MixedPermissions_SpecificToolNames`               | mcp-stdio    |
-| `TestAgent_MixedPermissions_WildcardAutoExecute`             | mcp-stdio    |
-| `TestAgent_MultiConnection_AllTypes`                         | mcp-stdio    |
-| `TestAgent_MultiConnection_ErrorInSTDIO`                     | mcp-stdio    |
-| `TestAgent_MultiConnection_LargeParallelBatch`               | mcp-stdio    |
-| `TestAgent_MultiConnection_SequentialAfterParallel`          | mcp-stdio    |
-| `TestCodeMode_STDIO_ApprovedCallIgnoresAutoExecuteList`      | missing-file |
-| `TestCodeMode_STDIO_CombinedFiltering`                       | missing-file |
-| `TestCodeMode_STDIO_ComplexCodePatterns`                     | missing-file |
-| `TestCodeMode_STDIO_EdgeCaseServer_BinaryAndEncoding`        | mcp-stdio    |
-| `TestCodeMode_STDIO_EdgeCaseServer_EmptyAndNull`             | mcp-stdio    |
-| `TestCodeMode_STDIO_EdgeCaseServer_ExtremeSizes`             | mcp-stdio    |
-| `TestCodeMode_STDIO_EdgeCaseServer_NestedAndSpecialChars`    | mcp-stdio    |
-| `TestCodeMode_STDIO_EdgeCaseServer_Unicode`                  | mcp-stdio    |
-| `TestCodeMode_STDIO_ErrorTestServer_IntermittentAndHandling` | mcp-stdio    |
-| `TestCodeMode_STDIO_ErrorTestServer_LargePayload`            | mcp-stdio    |
-| `TestCodeMode_STDIO_ErrorTestServer_MalformedAndPartial`     | mcp-stdio    |
-| `TestCodeMode_STDIO_ErrorTestServer_NetworkErrors`           | mcp-stdio    |
-| `TestCodeMode_STDIO_MultiServer_AllServers`                  | mcp-stdio    |
-| `TestCodeMode_STDIO_MultiServer_FilteringAcrossServers`      | mcp-stdio    |
-| `TestCodeMode_STDIO_MultipleServers`                         | missing-file |
-| `TestCodeMode_STDIO_ParallelTestServer_Concurrent`           | mcp-stdio    |
-| `TestCodeMode_STDIO_ParallelTestServer_Sequential`           | mcp-stdio    |
-| `TestCodeMode_STDIO_PreHookRenameIsAuthorized`               | missing-file |
-| `TestCodeMode_STDIO_ServerFiltering`                         | missing-file |
-| `TestCodeMode_STDIO_SingleServerBasicExecution`              | missing-file |
-| `TestCodeMode_STDIO_ToolCallSingleServer`                    | missing-file |
-| `TestCodeMode_STDIO_ToolFiltering`                           | missing-file |
-| `TestCodeMode_STDIO_UnattendedCallEnforcesAutoExecuteList`   | missing-file |
-| `TestHealthCheckSTDIOServerDropAndRecoverIn20Seconds`        | mcp-stdio    |
-| `TestRefreshClientTools_WorksOverSTDIO`                      | mcp-stdio    |
-| `TestToolsToExecute_EmptyArray`                              | mcp-stdio    |
-| `TestToolsToExecute_Nil`                                     | mcp-stdio    |
-| `TestToolsToExecute_Wildcard`                                | mcp-stdio    |
 
 **`core/mcp`** (1)
 
@@ -204,28 +160,10 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | ------------------------------------------ | ------------- |
 | `TestDiscoverOAuthMetadataUsesGlobalProxy` | ipv6-loopback |
 
-**`framework/openapimcp`** (1)
-
-| Test                                      | Cause        |
-| ----------------------------------------- | ------------ |
-| `TestSynthesize_RepoSpecArgNamesAreValid` | missing-file |
-
-**`framework/plugins`** (13)
+**`framework/plugins`** (1)
 
 | Test                                                | Cause         |
 | --------------------------------------------------- | ------------- |
-| `TestDynamicPluginLifecycle`                        | missing-file  |
-| `TestDynamicPlugin_ConcurrentCalls`                 | missing-file  |
-| `TestDynamicPlugin_ContextPropagation`              | missing-file  |
-| `TestDynamicPlugin_GetNameNotEmpty`                 | missing-file  |
-| `TestDynamicPlugin_NilConfig`                       | missing-file  |
-| `TestDynamicPlugin_ShortCircuitNil`                 | missing-file  |
-| `TestFilterPlugins`                                 | missing-file  |
-| `TestLoadDynamicPlugin_DirectCall`                  | missing-file  |
-| `TestLoadPluginWithOptionalHooks`                   | missing-file  |
-| `TestLoadPlugins`                                   | missing-file  |
-| `TestLoadPlugins_DisabledPlugin`                    | missing-file  |
-| `TestLoadPlugins_MultiplePlugins`                   | missing-file  |
 | `TestProxiedPluginDownloadClientHonoursGlobalProxy` | ipv6-loopback |
 
 **`framework/vectorstore`** (44)
@@ -290,107 +228,43 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `TestOtelClientGRPCUsesGlobalProxy` | ipv6-loopback |
 | `TestOtelClientHTTPUsesGlobalProxy` | ipv6-loopback |
 
-**`transports/v2/bifrost-http/handlers`** (37)
+**`transports/v2/bifrost-http/handlers`** (1)
 
-| Test                                                          | Cause         |
-| ------------------------------------------------------------- | ------------- |
-| `TestBifrostMCPAnnotations`                                   | missing-file  |
-| `TestBifrostMCPBaseURL`                                       | missing-file  |
-| `TestBifrostMCPDefaultSpecURL`                                | missing-file  |
-| `TestBifrostMCPDeniedRoutesMatchSpec`                         | missing-file  |
-| `TestBifrostMCPDestructiveMarkersSurviveBundling`             | missing-file  |
-| `TestBifrostMCPEndpoint_BifrostURLSetsHostAndScheme`          | missing-file  |
-| `TestBifrostMCPEndpoint_CancellationIsNotSharedAcrossCallers` | missing-file  |
-| `TestBifrostMCPEndpoint_ForwardsCallerButNotCookies`          | missing-file  |
-| `TestBifrostMCPEndpoint_ForwardsVirtualKeys`                  | missing-file  |
-| `TestBifrostMCPEndpoint_Protocol`                             | missing-file  |
-| `TestBifrostMCPEndpoint_RealAPIChain`                         | missing-file  |
-| `TestBifrostMCPEndpoint_Routes`                               | missing-file  |
-| `TestBifrostMCPEndpoint_RoutesTakeTheAPIChain`                | missing-file  |
-| `TestBifrostMCPExpandsMetadataTemplates`                      | missing-file  |
-| `TestBifrostMCPExposesEveryOperation`                         | missing-file  |
-| `TestBifrostMCPFailedRestrictiveReloadUnloads`                | missing-file  |
-| `TestBifrostMCPInferenceTools`                                | missing-file  |
-| `TestBifrostMCPLoadFailureThenRecovery`                       | missing-file  |
-| `TestBifrostMCPLoadFromFile`                                  | missing-file  |
-| `TestBifrostMCPLoadsUppercaseSchemeURL`                       | missing-file  |
-| `TestBifrostMCPReload`                                        | missing-file  |
-| `TestBifrostMCPRequiresBifrostURL`                            | missing-file  |
-| `TestBifrostMCPServesOnlyRoutedOperations`                    | missing-file  |
-| `TestBifrostMCPStartDoesNotBlockServer`                       | missing-file  |
-| `TestBifrostMCPToolsListAsksToolAccess`                       | missing-file  |
-| `TestBifrostMCPToolsNeverStream`                              | missing-file  |
-| `TestBifrostMCPUnroutedEnterpriseOperations`                  | missing-file  |
-| `TestBifrostMCPWritesSwitch`                                  | missing-file  |
-| `TestFetchURLSafeGoesThroughGlobalProxy`                      | ipv6-loopback |
-| `TestWarpManagementCallIsBoundToItsCatalog`                   | missing-file  |
-| `TestWarpManagementCallRunsAsTheDashboardUser`                | missing-file  |
-| `TestWarpManagementCallUsesPublicBaseURL`                     | missing-file  |
-| `TestWarpManagementCatalogOffersWhatTheBifrostMCPServes`      | missing-file  |
-| `TestWarpManagementClientsCloseOnceNoTurnUsesThem`            | missing-file  |
-| `TestWarpManagementLoadsSpecInBackground`                     | unexplained   |
-| `TestWarpManagementStaleLoadDoesNotRetireANewerBinding`       | missing-file  |
-| `TestWarpManagementUnloadClosesTheClient`                     | missing-file  |
-
-**`transports/v2/bifrost-http/lib`** (12)
-
-| Test                                                                          | Cause        |
-| ----------------------------------------------------------------------------- | ------------ |
-| `TestBasePathHelmSchemaPatternMatchesNormalize`                               | missing-file |
-| `TestLoadConfigServesCatalogFeedsFromFixture`                                 | unexplained  |
-| `TestSQLite_SourceOfTruthConfigJSON_KeepsInlineLimitsAcrossRestarts`          | dns          |
-| `TestSQLite_VirtualKey_OwnerGovernedByProfile_EditedEntryKeepsTheKeysOwnLink` | dns          |
-| `TestSQLite_VirtualKey_OwnerGovernedByProfile_ModelConfigBudgetNotRecreated`  | dns          |
-| `TestSQLite_VirtualKey_OwnerGovernedByProfile_NestedRateLimitsNotRecreated`   | dns          |
-| `TestSQLite_VirtualKey_OwnerGovernedByProfile_UnresolvedNewKeySkipsItsBudget` | dns          |
-| `TestSQLite_VirtualKey_OwnerGuardFails_EditedEntryLeftAsStored`               | dns          |
-| `TestSQLite_VirtualKey_OwnerMovedThroughAPI`                                  | dns          |
-| `TestSQLite_VirtualKey_ProviderConfigBudgetByID`                              | dns          |
-| `TestSQLite_VirtualKey_ProviderConfigBudgetByStoreAssignedID`                 | dns          |
-| `TestSQLite_VirtualKey_RateLimitSharedWithAnotherKey`                         | dns          |
-
-**`transports/v2/bifrost-http/server`** (3)
-
-| Test                                                      | Cause        |
-| --------------------------------------------------------- | ------------ |
-| `TestReloadBifrostMCPClearedBifrostURLUnloads`            | missing-file |
-| `TestReloadBifrostMCPOnSettingsChange`                    | missing-file |
-| `TestStartBifrostMCPResolvesRelativeSpecAgainstConfigDir` | missing-file |
+| Test                                     | Cause         |
+| ---------------------------------------- | ------------- |
+| `TestFetchURLSafeGoesThroughGlobalProxy` | ipv6-loopback |
 
 ### What the causes mean
 
-Causes were assigned from the first matching error line in each failing test's output, then spot-checked per group. They are not individually confirmed.
+All 63 failures come from this container, not from the tree. Each group was confirmed from its error output.
 
-| Cause             | Tests | Meaning                                                                                                                                                                                                                                                                | Expected elsewhere                                                                |
-| ----------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `missing-file`    | 62    | The test reads an upstream path we did not import: `docs/openapi/openapi.json` (most of them), `examples/mcps/test-tools-server`, the example plugin source that `framework/plugins` compiles, `helm-charts/bifrost/values.schema.json`                                | Fails everywhere until the import scope changes (owner question)                  |
-| `service-refused` | 44    | `framework/vectorstore` cannot reach Redis, Weaviate, Qdrant or Pinecone on localhost                                                                                                                                                                                  | Passes with upstream's `tests/docker-compose.yml` running, which was not imported |
-| `mcp-stdio`       | 29    | `core/internal/mcptests` cases that start MCP servers over STDIO and get no tools back. Ten sibling tests in the same package say outright that `examples/mcps/test-tools-server` is missing, so this is most likely the same gap, but these 29 do not print that line | Probably fails everywhere until `examples/mcps` is imported and built             |
-| `ipv6-loopback`   | 18    | The proxy test harness listens on `[::1]`, which this container does not have                                                                                                                                                                                          | Should pass on a normal host                                                      |
-| `dns`             | 11    | The test resolves a public hostname (`api.openai.com`)                                                                                                                                                                                                                 | Should pass on a normal host                                                      |
-| `unexplained`     | 2     | `TestWarpManagementLoadsSpecInBackground` (handlers) and `TestLoadConfigServesCatalogFeedsFromFixture` (lib). Not diagnosed                                                                                                                                            | Unknown                                                                           |
+| Cause             | Tests | Meaning                                                                                         | Expected elsewhere                             |
+| ----------------- | ----- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `service-refused` | 44    | `framework/vectorstore` cannot reach Redis, Weaviate, Qdrant or Pinecone on localhost           | Passes with `tests/docker-compose.yml` running |
+| `ipv6-loopback`   | 18    | The proxy test harness listens on `[::1]` (`listen tcp6 [::1]:0: address family not supported`) | Should pass on a normal host                   |
+| `dns`             | 1     | `TestValidateExternalURL` resolves `api.openai.com`                                             | Should pass on a normal host                   |
 
-So of 166 failures, 91 point at files outside the import scope, 73 at this container, and 2 are open. None has been traced to a defect in the gateway itself, and none has been re-run on a host without these limits to confirm.
+None of the 63 has been re-run on a host without these limits.
+
+### History of this baseline
+
+The first run, before the import scope was widened (commit `85447a0`), had 14,234 passing, 166 failing and 584 skipped. 103 of those failures were tests reading upstream paths we had not imported. Importing `docs/openapi`, `examples/mcps`, `examples/plugins/hello-world`, `examples/configs/withlocalpricingfiles`, `helm-charts/bifrost/values.schema.json` and `tests/docker-compose.yml` (282 files, commit `d043173`) and building the MCP test servers removed all 103. No test that passed in the first run fails in this one.
+
+Two things the first version of this report got wrong: it attributed 10 `transports/.../lib` failures to DNS and left 2 unexplained, when all 12 were the missing OpenAPI spec; and the commit message of `d043173` says 336 files were added, when the number is 282.
 
 ### Stability
 
-The whole suite was run twice on the same tree. The two result sets (15,107 rows each) differ in one test: `core` `TestListAllModelsIncludesEveryPageOfASlowLargeProvider` passed in the first run and failed in the second with `context deadline exceeded`, then passed 3 times out of 3 when run alone. It is timing-sensitive under load. `scripts/test.sh` therefore re-runs a regressed test once on its own before counting it.
+On the first tree the whole suite was run twice. The two result sets differed in one test: `core` `TestListAllModelsIncludesEveryPageOfASlowLargeProvider` passed, then failed with `context deadline exceeded`, then passed 3 times out of 3 alone. It is timing-sensitive under load. `scripts/test.sh` therefore re-runs a regressed test once on its own before counting it. The current tree has been run once.
 
 ### Skips
 
-584 tests skip. The reasons printed most often: Postgres not available (100), ClickHouse not available (92), a provider key such as `OPENAI_API_KEY` or `MISTRAL_API_KEY` not set, and a few that upstream skips unconditionally. Names are in `results.tsv`.
-
-### Framework tests need backing services
-
-Upstream starts them with `tests/docker-compose.yml`, which is outside the import scope: Postgres 16, Redis Stack 7.4 plus TLS, cluster and sentinel variants, Weaviate 1.32, Qdrant 1.16, a Pinecone local index and ClickHouse 24.8. Without them the `vectorstore` tests fail and the Postgres and ClickHouse tests skip, as recorded here.
-
-### Skipped tests per package
+457 tests skip. The reasons printed most often: Postgres not available, ClickHouse not available, a provider key such as `OPENAI_API_KEY` not set, and a few that upstream skips unconditionally. Names are in `results.tsv`.
 
 | Package                                     | Skipped |
 | ------------------------------------------- | ------- |
 | `core`                                      | 1       |
 | `core/internal/llmtests`                    | 11      |
-| `core/internal/mcptests`                    | 150     |
+| `core/internal/mcptests`                    | 29      |
 | `core/network`                              | 1       |
 | `core/providers/anthropic`                  | 1       |
 | `core/providers/azure`                      | 1       |
@@ -438,9 +312,13 @@ Upstream starts them with `tests/docker-compose.yml`, which is outside the impor
 | `framework/queue`                           | 56      |
 | `framework/vectorstore`                     | 6       |
 | `framework/warp`                            | 1       |
-| `plugins/governance`                        | 7       |
+| `plugins/governance`                        | 1       |
 | `plugins/jsonparser`                        | 3       |
 | `plugins/logging`                           | 2       |
 | `plugins/maxim`                             | 3       |
 | `plugins/semanticcache`                     | 71      |
 | `transports/v2/bifrost-http/tests/realtime` | 1       |
+
+### Backing services
+
+Upstream starts them with `tests/docker-compose.yml`, now imported: Postgres 16, Redis Stack 7.4 plus TLS, cluster and sentinel variants, Weaviate 1.32, Qdrant 1.16, a Pinecone local index and ClickHouse 24.8. This baseline was taken without them, so the `vectorstore` tests fail and the Postgres and ClickHouse tests skip. A run with the services up has not been done.
