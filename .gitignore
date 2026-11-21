@@ -71,3 +71,12 @@ dist/
 
 # content collections
 .content-collections
+
+# gateway (Go)
+apps/gateway/tmp/
+apps/gateway/data/
+apps/gateway/transports/bifrost-http/ui/
+apps/gateway/**/*.db
+apps/gateway/**/*.db-shm
+apps/gateway/**/*.db-wal
+!apps/gateway/ui/next-env.d.ts

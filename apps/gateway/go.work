@@ -1,0 +1,19 @@
+go 1.27.4
+
+use (
+	./core
+	./framework
+	./plugins/compat
+	./plugins/governance
+	./plugins/jsonparser
+	./plugins/logging
+	./plugins/maxim
+	./plugins/mocker
+	./plugins/modelcatalogresolver
+	./plugins/otel
+	./plugins/prompts
+	./plugins/routing
+	./plugins/semanticcache
+	./plugins/telemetry
+	./transports
+)
