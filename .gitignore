@@ -90,3 +90,4 @@ apps/gateway/**/*.tsbuildinfo
 apps/gateway/**/*.db
 apps/gateway/**/*.db-shm
 apps/gateway/**/*.db-wal
+apps/gateway/**/:memory:
