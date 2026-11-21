@@ -18,7 +18,7 @@ for mod in "${modules[@]}"; do
   echo "== $mod" >&2
   (cd "$mod" && env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
     GOPATH="$(go env GOPATH)" GOCACHE="$(go env GOCACHE)" GOMODCACHE="$(go env GOMODCACHE)" \
-    GOTOOLCHAIN="${GOTOOLCHAIN:-auto}" GOPROXY=off GOFLAGS=-mod=mod CGO_ENABLED=1 \
+    GOTOOLCHAIN="${GOTOOLCHAIN:-auto}" GOPROXY=off CGO_ENABLED=1 \
     go test -json -count=1 -timeout "${TEST_TIMEOUT:-20m}" ./... > "$raw" 2> "${raw%.jsonl}.stderr")
   echo "   exit $?" >&2
   jq -r --arg mod "$mod" '
