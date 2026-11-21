@@ -77,7 +77,7 @@ func main() {
 	if err := brand.Validate(); err != nil {
 		fatal(err.Error())
 	}
-	res, err := Run(*root, NewRewriter(brand), *dryRun)
+	res, err := Run(*root, NewRewriter(brand), NewGoRewriter(brand), *dryRun)
 	if err != nil {
 		fatal(err.Error())
 	}
@@ -118,7 +118,8 @@ func isBinary(data []byte) bool {
 }
 
 // Run rewrites contents first and names second, so a failure leaves paths that still match upstream.
-func Run(root string, rewrite Rewriter, dryRun bool) (Result, error) {
+// rewriteGo is used for the contents of .go files, rewrite for everything else and for names.
+func Run(root string, rewrite, rewriteGo Rewriter, dryRun bool) (Result, error) {
 	var res Result
 	var paths []string
 	err := walk(root, func(path string, d fs.DirEntry) error {
@@ -137,7 +138,11 @@ func Run(root string, rewrite Rewriter, dryRun bool) (Result, error) {
 		if d.Name() == "go.sum" {
 			text = dropUpstreamSums(text)
 		}
-		text = rewrite(text)
+		if filepath.Ext(path) == ".go" {
+			text = rewriteGo(text)
+		} else {
+			text = rewrite(text)
+		}
 		if text == string(data) {
 			return nil
 		}

@@ -134,7 +134,7 @@ func TestRunOnTree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dry, err := Run(root, NewRewriter(acme), true)
+	dry, err := Run(root, NewRewriter(acme), NewGoRewriter(acme), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestRunOnTree(t *testing.T) {
 		t.Fatalf("dry run wrote to disk: %q", got)
 	}
 
-	first, err := Run(root, NewRewriter(acme), false)
+	first, err := Run(root, NewRewriter(acme), NewGoRewriter(acme), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +180,7 @@ func TestRunOnTree(t *testing.T) {
 		t.Errorf("file mode changed to %v", info.Mode().Perm())
 	}
 
-	second, err := Run(root, NewRewriter(acme), false)
+	second, err := Run(root, NewRewriter(acme), NewGoRewriter(acme), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestRunRefusesToOverwrite(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "bifrost.go", "package x\n")
 	write(t, root, "acme.go", "package x\n")
-	if _, err := Run(root, NewRewriter(acme), false); err == nil {
+	if _, err := Run(root, NewRewriter(acme), NewGoRewriter(acme), false); err == nil {
 		t.Fatal("expected an error when the renamed path already exists")
 	}
 }
@@ -250,5 +250,41 @@ func TestPinWorkspace(t *testing.T) {
 func TestPinWorkspaceWithoutGoWork(t *testing.T) {
 	if changed, err := PinWorkspace(t.TempDir(), false); err != nil || changed {
 		t.Fatalf("changed=%t err=%v", changed, err)
+	}
+}
+
+func TestRewriteGo(t *testing.T) {
+	cases := []struct {
+		name, in, want string
+	}{
+		{"struct field and its column", "type T struct {\n\tBfMode string `json:\"bf_mode\"`\n}\n", "type T struct {\n\tAcMode string `json:\"ac_mode\"`\n}\n"},
+		{"selector", `var _ = row.BfSub == sub && x.BfSubDisplay != ""`, `var _ = row.AcSub == sub && x.AcSubDisplay != ""`},
+		{"local variable", "bfCtx := schemas.NewBifrostContext(ctx)", "acCtx := schemas.NewAcmeContext(ctx)"},
+		{"after any operator", `x := "a:"+bfMode+":"+bfSub; <-bfCtx.Done(); y := -bfN`, `x := "a:"+acMode+":"+acSub; <-acCtx.Done(); y := -acN`},
+		{"word start inside an identifier", `streamBfCtx, createBfCtx, UserBfSub, toBf`, `streamAcCtx, createAcCtx, UserAcSub, toAc`},
+		{"not a word start", `xbfProto, ABfX, Bfoo, bfoo, bf, subfMode`, `xbfProto, ABfX, Bfoo, bfoo, bf, subfMode`},
+		{"string literals keep base64 and hashes", `var k = "uoA43SdFwacedBfSgfFSjj+BfOd/bfEY2 BfMode"`, `var k = "uoA43SdFwacedBfSgfFSjj+BfOd/bfEY2 BfMode"`},
+		{"raw strings and comments are not identifiers", "// BfMode is the mode\nvar q = `SELECT BfMode`\n", "// BfMode is the mode\nvar q = `SELECT BfMode`\n"},
+		{"general mappings still apply in strings", `var h = "x-bf-vk"; var c = "bf_mode = ?"`, `var h = "x-ac-vk"; var c = "ac_mode = ?"`},
+	}
+	rewrite := NewGoRewriter(acme)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := rewrite(c.in)
+			if got != c.want {
+				t.Fatalf("rewrite(%q)\n got %q\nwant %q", c.in, got, c.want)
+			}
+			if again := rewrite(got); again != got {
+				t.Fatalf("not idempotent: %q -> %q", got, again)
+			}
+		})
+	}
+	// the general rewriter leaves Go identifiers alone, so other file types cannot be hit by it
+	if got := NewRewriter(acme)("BfMode bfCtx"); got != "BfMode bfCtx" {
+		t.Fatalf("general rewriter touched identifiers: %q", got)
+	}
+	// source that does not scan gets the general rewrite only
+	if got := rewrite("bfCtx := \"unterminated bifrost\n"); got != "bfCtx := \"unterminated acme\n" {
+		t.Fatalf("unscannable source: %q", got)
 	}
 }

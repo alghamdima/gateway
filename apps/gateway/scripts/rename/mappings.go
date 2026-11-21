@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"go/scanner"
+	"go/token"
 	"regexp"
 	"strings"
 )
@@ -77,6 +79,10 @@ type Rewriter func(string) string
 //  4. the name in its three cases: Bifrost, bifrost, BIFROST
 //  5. the short prefix as its own token: bf_, BF_, bf-
 //
+// NewGoRewriter adds one mapping for Go source: the short prefix at the start of an identifier
+// (BfMode, bfCtx). It has to move together with mapping 5, because the ORM derives the column name
+// bf_mode from the field BfMode while raw SQL in the same package spells the column out.
+//
 // Deliberately not rewritten:
 //   - the company name "Maxim" on its own (maximum, maximize, maxImages and Minimax would be hit by
 //     any loose rule; what is left of it goes with the maxim plugin, which a patch removes)
@@ -134,3 +140,65 @@ func NewRewriter(b Brand) Rewriter {
 		return strings.Join(lines, "")
 	}
 }
+
+// NewGoRewriter is NewRewriter plus the identifier mapping that only Go source needs. It works on
+// identifier tokens, not on text, so string literals (test fixtures hold base64 and hashes such as
+// "wacedBfSgf") and comments are never touched by it, and an identifier is renamed the same way at
+// every use. Inside an identifier it renames "Bf" at a word start (BfMode, streamBfCtx) and a leading
+// "bf" before a capital (bfCtx). Source that does not scan is returned with only the general rewrite.
+func NewGoRewriter(b Brand) Rewriter {
+	base := NewRewriter(b)
+	title := strings.ToUpper(b.Prefix[:1]) + b.Prefix[1:]
+	ident := func(name string) string {
+		var out strings.Builder
+		for i := 0; i < len(name); i++ {
+			rest := name[i:]
+			wordEnd := len(rest) == 2 || (len(rest) > 2 && isUpper(rest[2]))
+			switch {
+			case strings.HasPrefix(rest, "Bf") && wordEnd && (i == 0 || !isUpper(name[i-1])):
+				out.WriteString(title)
+				i++
+			case i == 0 && strings.HasPrefix(rest, "bf") && len(rest) > 2 && isUpper(rest[2]):
+				out.WriteString(b.Prefix)
+				i++
+			default:
+				out.WriteByte(name[i])
+			}
+		}
+		return out.String()
+	}
+	return func(s string) string {
+		src := []byte(base(s))
+		fset := token.NewFileSet()
+		file := fset.AddFile("", fset.Base(), len(src))
+		var sc scanner.Scanner
+		failed := false
+		sc.Init(file, src, func(token.Position, string) { failed = true }, 0)
+		var out strings.Builder
+		last := 0
+		for {
+			pos, tok, lit := sc.Scan()
+			if tok == token.EOF {
+				break
+			}
+			if tok != token.IDENT {
+				continue
+			}
+			renamed := ident(lit)
+			if renamed == lit {
+				continue
+			}
+			off := file.Offset(pos)
+			out.Write(src[last:off])
+			out.WriteString(renamed)
+			last = off + len(lit)
+		}
+		if failed {
+			return string(src)
+		}
+		out.Write(src[last:])
+		return out.String()
+	}
+}
+
+func isUpper(c byte) bool { return c >= 'A' && c <= 'Z' }
