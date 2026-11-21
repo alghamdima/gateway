@@ -55,6 +55,10 @@ jobs:
           git status --porcelain -- . | tee "$RUNNER_TEMP/drift"
           test ! -s "$RUNNER_TEMP/drift"
 
+      - name: 🏷️ Rename tool tests
+        working-directory: apps/gateway/scripts/rename
+        run: GOWORK=off go test ./...
+
       - name: 🏗️ Build
         run: make build LOCAL=1
 

@@ -1,0 +1,6 @@
+{
+  "name": "Acme",
+  "prefix": "ac",
+  "module": "github.com/acme-ai/acme",
+  "domain": "acme.example"
+}
