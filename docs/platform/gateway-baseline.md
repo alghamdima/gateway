@@ -45,14 +45,42 @@ The config used for the boot, with SQLite stores created in the app directory:
 }
 ```
 
-Not covered by this baseline:
+### Added in the second pass (same day, tree at `709c53f`)
 
-- **Docker build (`pnpm gateway:up`).** The container this ran in cannot run `apk` inside a build, so the image was not built. Base images pulled fine.
-- **Boot on Postgres.** Step 1.1 asks for it; only the SQLite default was booted.
-- **A real model request.** No provider key, and the governance API is locked until a setup token is configured.
-- **Outbound-call inventory (Step 1.3).** Two hosts were seen in the boot log and are listed below; the full inventory needs an egress-logging proxy and has not been done.
+| Check                                                                                                    | Command                                                               | Result                                                                                                     |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `go vet`, all 15 modules                                                                                 | `go vet ./...` per module                                             | exit 0 everywhere, no output                                                                               |
+| Native boot on Postgres 16 with the real datasheet (5.0 MB, fetched once from `getbifrost.ai/datasheet`) | `config.json` with `config_store` and `logs_store` of type `postgres` | ready in 32 s, `/health` 200, 91 tables, 8,108 rows in `governance_model_pricing`, no SQLite files written |
+| Docker image                                                                                             | `docker build -f transports/Dockerfile.local` (see the caveat below)  | exit 0 in 378 s, 496 MB image; the UI stage runs `npm run build-enterprise` on `node:25-alpine` and passes |
+| Compose stack                                                                                            | `docker compose --profile gateway up -d --wait`                       | exit 0 in 47 s; `db`, `mailpit`, `gateway` healthy, `gateway-db` exited 0                                  |
+| Database separation                                                                                      | `psql` in the `db` container                                          | databases `core` and `gateway`; `gateway` has 91 tables, `core` has 0                                      |
+| Re-run                                                                                                   | the same `up` again                                                   | exit 0, `gateway-db` exits 0 without creating anything                                                     |
+| UI under compose                                                                                         | headless Chromium                                                     | setup screen asks for the setup token, as configured                                                       |
 
-Vendor hosts seen at boot: `getbifrost.ai/datasheet` (fatal on first boot if unreachable) and `getbifrost.ai/mcp-library` (warning, retried in the background).
+Caveat on the Docker rows: this container reaches the internet only through a TLS-inspecting proxy, so the image was built from a copy of `Dockerfile.local` with two extra lines after each `FROM` (copy the proxy CA, set `SSL_CERT_FILE` and `NODE_EXTRA_CA_CERTS`) and with `--network host`. The gateway container also cannot resolve DNS here, so the compose run mounted a local pricing file. The Dockerfile and compose file in the repo were not run exactly as committed. That still has to be done once on a normal machine with `pnpm gateway:up`.
+
+Still not covered:
+
+- **`pnpm gateway:up` exactly as committed**, for the reason above.
+- **First boot with default pricing.** It needs `getbifrost.ai` over the gateway's own DNS lookup, which this container cannot do. Verified here only that the boot is fatal without it.
+- **A real model request.** No provider key. Inference also requires a virtual key by default (`401 virtual_key_required`), and creating one needs an admin account.
+- **CI.** `.github/workflows/gateway.yml` is written but has never run: it triggers on pull requests and on `main`.
+
+## Outbound calls (Step 1.3)
+
+Method: the gateway ran in a mount namespace whose `/etc/resolv.conf` pointed at a logging DNS stub that answers every name with an unroutable address, with no proxy variables set. Every hostname the process tried to resolve was recorded. This shows which hosts are contacted, not the full URLs; URLs are from the gateway's own log lines and the source.
+
+| Host                                                   | When                                   | Seen at runtime                        | Source                                       | Recommended disposition                                 |
+| ------------------------------------------------------ | -------------------------------------- | -------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
+| `getbifrost.ai/datasheet`                              | boot, then every 24 h                  | yes; fatal on first boot if it fails   | `framework/modelcatalog/datasheet`           | our host or a file shipped in the image (`pricing_url`) |
+| `getbifrost.ai/datasheet/model-parameters`             | boot                                   | yes (same host)                        | same                                         | our host or a file (`model_parameters_url`)             |
+| `getbifrost.ai/mcp-library`                            | boot, retried in the background        | yes; warning only                      | `framework/modelcatalog/mcp_library_sync.go` | off, or our host (`mcp_library_url`)                    |
+| each configured provider, for example `api.openai.com` | boot (model listing) and every request | yes, with a fake OpenAI key configured | provider config                              | expected; this is the product                           |
+| `getbifrost.ai/openapi-oss.json`                       | when `/v1/mcp` builds its tools        | no                                     | `openapi_url` default                        | our host or a file                                      |
+| `www.getbifrost.ai/announcements/rss.xml`              | not seen before login                  | no                                     | Go source                                    | off                                                     |
+| `www.getbifrost.ai/schema`                             | never fetched; only named in a warning | no                                     | config validator                             | rename only                                             |
+
+Limits of this inventory: 45 s of a default boot, then a configured boot plus 75 s idle and the UI login page in a browser (which made no external request). Not exercised: the UI after login, a successful inference request, any plugin that is off by default (OTel, semantic cache, Maxim), and `framework/warp`. Those need an admin account and provider keys.
 
 ## Unit tests
 

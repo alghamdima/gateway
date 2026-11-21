@@ -96,6 +96,7 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 | Test               | `pnpm test`                                                |
 | Clean              | `pnpm clean`                                               |
 | Gateway            | `pnpm gateway:up` (Docker build + run, `localhost:8080`)   |
+| Gateway build/test | `pnpm gateway:build` (image) / `gateway:test` (Go, native) |
 | Services           | `pnpm services:setup` / `services:start` / `services:stop` |
 | DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`           |
 | DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`          |

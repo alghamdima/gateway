@@ -1,0 +1,68 @@
+name: CI / Gateway
+
+on:
+  pull_request:
+    branches: ["*"]
+    paths:
+      - "apps/gateway/**"
+      - "docs/platform/gateway-baseline/**"
+      - ".github/workflows/gateway.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "apps/gateway/**"
+      - "docs/platform/gateway-baseline/**"
+      - ".github/workflows/gateway.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gateway:
+    name: 🚪 Gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: apps/gateway
+
+    steps:
+      - name: ✅ Checkout code
+        uses: actions/checkout@v7
+
+      - name: 🔨 Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/gateway/go.work
+          cache-dependency-path: apps/gateway/**/go.sum
+
+      - name: 🔨 Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/gateway/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/gateway/ui/package-lock.json
+
+      # the committed tree must equal the pinned upstream tag plus patches/ (ADR 0008)
+      - name: 🧬 Reproduce from upstream
+        run: |
+          repo=$(sed -n 's/^repo: //p' UPSTREAM)
+          tag=$(sed -n 's/^tag: //p' UPSTREAM)
+          git clone --quiet --filter=blob:none --no-checkout --depth 1 --branch "$tag" "$repo" "$RUNNER_TEMP/upstream"
+          scripts/import.sh "$RUNNER_TEMP/upstream" "$tag"
+          git status --porcelain -- . | tee "$RUNNER_TEMP/drift"
+          test ! -s "$RUNNER_TEMP/drift"
+
+      - name: 🏗️ Build
+        run: make build LOCAL=1
+
+      - name: 🔎 Vet
+        run: |
+          for mod in $(go work edit -json | jq -r '.Use[].DiskPath'); do
+            (cd "$mod" && go vet ./...)
+          done
+
+      - name: 🧪 Test against the baseline
+        run: scripts/test.sh
