@@ -4,7 +4,9 @@
 # keeps the raw event stream in <out-dir>/raw/, and writes <out-dir>/results.tsv:
 #   module <TAB> package <TAB> test <TAB> pass|fail|skip
 # Top-level tests only; a package that fails to build or has no test files gets one row with test "-".
-# Needs go, gcc and jq. Modules must already be in the module cache (run `go mod download` first).
+# Needs go, gcc, node and jq. Modules must already be in the module cache (run `go mod download` first).
+# The MCP test servers under examples/mcps are built first (that step uses the network); the MCP tests
+# start them over STDIO.
 set -uo pipefail
 out=$(mkdir -p "$1" && cd "$1" && pwd)
 shift
@@ -12,6 +14,7 @@ cd "$(dirname "$0")/.."
 modules=("$@")
 [ ${#modules[@]} -gt 0 ] || mapfile -t modules < <(go work edit -json | jq -r '.Use[].DiskPath | ltrimstr("./")')
 mkdir -p "$out/raw"
+make setup-mcp-tests > "$out/setup-mcp-tests.log" 2>&1 || { echo "setup-mcp-tests failed, see $out/setup-mcp-tests.log" >&2; exit 1; }
 : > "$out/results.tsv"
 for mod in "${modules[@]}"; do
   raw="$out/raw/${mod//\//-}.jsonl"

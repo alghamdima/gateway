@@ -91,3 +91,5 @@ apps/gateway/**/*.db
 apps/gateway/**/*.db-shm
 apps/gateway/**/*.db-wal
 apps/gateway/**/:memory:
+apps/gateway/examples/mcps/*/bin/
+apps/gateway/tests/redis-certs/
