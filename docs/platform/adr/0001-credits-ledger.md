@@ -1,6 +1,6 @@
 # ADR 0001: Credits ledger in Postgres, enforced by a gateway plugin with reservations
 
-Status: Accepted
+Status: Accepted. Where the reserve and settle statements run is revised by ADR 0009.
 Date: 2026-11-21
 
 ## Context
