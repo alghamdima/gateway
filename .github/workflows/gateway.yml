@@ -49,6 +49,14 @@ jobs:
           --health-retries 10
 
     steps:
+      # The race-enabled build of the credits tests plus the full suite's build cache fill the
+      # runner's disk and cut the baseline run short. These preinstalled toolchains are not used.
+      - name: 🧹 Free disk space
+        working-directory: /
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: ✅ Checkout code
         uses: actions/checkout@v7
 
