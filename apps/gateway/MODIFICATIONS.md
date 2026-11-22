@@ -26,11 +26,13 @@ Every change to an upstream file is a patch in `patches/`, applied in order afte
 | `0001-ui-build-heap.patch` | `ui/.npmrc` |
 | `0002-ui-drop-stale-next-env.patch` | `ui/next-env.d.ts` (deleted) |
 | `0003-remove-maxim-plugin.patch` | `transports/bifrost-http/server/plugins.go`, `transports/bifrost-http/lib/ctx.go`, `transports/bifrost-http/lib/config.go`, `transports/go.mod`, `transports/go.sum`, `ui/app/workspace/observability/views/observabilityView.tsx` |
+| `0004-register-credits-plugin.patch` | `transports/bifrost-http/server/plugins.go` |
 
 ## Files added
 
 - `UPSTREAM`, `MODIFICATIONS.md`, `go.work`
 - `patches/`, `scripts/`, `compose/`
+- `plugins/credits/`: the prepaid credits plugin
 
 ## Renaming
 

@@ -95,6 +95,7 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `core`                         | 6413       | 12         | 85         | 51            | 5             | 4                      |
 | `framework`                    | 4012       | 48         | 291        | 30            | 5             | 4                      |
 | `plugins/compat`               | 26         | 0          | 0          | 1             | 0             | 0                      |
+| `plugins/credits`              | 18         | 0          | 14         | 1             | 0             | 0                      |
 | `plugins/governance`           | 506        | 0          | 1          | 1             | 0             | 0                      |
 | `plugins/jsonparser`           | 5          | 0          | 3          | 1             | 0             | 0                      |
 | `plugins/logging`              | 374        | 0          | 2          | 1             | 0             | 0                      |
@@ -106,7 +107,7 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `plugins/semanticcache`        | 88         | 0          | 71         | 1             | 0             | 0                      |
 | `plugins/telemetry`            | 58         | 0          | 0          | 1             | 0             | 0                      |
 | `transports`                   | 2808       | 1          | 1          | 5             | 1             | 2                      |
-| **Total**                      | **15030**  | **63**     | **454**    | **100**       | **12**        | **10**                 |
+| **Total**                      | **15048**  | **63**     | **468**    | **101**       | **12**        | **10**                 |
 
 ### Failing tests by name
 
@@ -258,6 +259,10 @@ Two things the first version of this report got wrong: it attributed 10 `transpo
 ### After removing the Maxim plugin
 
 Patch `0003` and the import script drop `plugins/maxim` and the UI that configured it. The run after that differs from the one before in exactly the plugin's own rows (20 passing tests, 3 skipped, 1 package): 15,030 pass, 63 fail, 454 skip. Nothing else moved.
+
+### Our own module
+
+`plugins/credits` is ours, not upstream's. In this baseline it is recorded without a database: 18 tests pass and 14 skip, the 14 being the ones that need Postgres or the built gateway. Those run in CI in their own step, with both.
 
 ### Stability
 

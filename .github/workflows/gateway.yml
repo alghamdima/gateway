@@ -79,14 +79,15 @@ jobs:
         working-directory: apps/gateway/scripts/rename
         run: GOWORK=off go test ./...
 
-      - name: 💳 Credits plugin tests
-        working-directory: apps/gateway/plugins/credits
-        run: go test -count=1 -race ./...
-        env:
-          CREDITS_TEST_DATABASE_URL: postgresql://turbostarter:turbostarter@localhost:5432/core
-
       - name: 🏗️ Build
         run: make build LOCAL=1
+
+      # unit tests, the ledger against Postgres, and the built gateway end to end with a mock provider
+      - name: 💳 Credits plugin tests
+        working-directory: apps/gateway/plugins/credits
+        run: CREDITS_E2E_BINARY=$(ls "$GITHUB_WORKSPACE"/apps/gateway/tmp/*-http) go test -count=1 -race ./...
+        env:
+          CREDITS_TEST_DATABASE_URL: postgresql://turbostarter:turbostarter@localhost:5432/core
 
       - name: 🔎 Vet
         run: |
