@@ -84,23 +84,24 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 
 ## Commands
 
-| Task               | Command                                                    |
-| ------------------ | ---------------------------------------------------------- |
-| Install deps       | `pnpm install`                                             |
-| Dev (all/specific) | `pnpm dev` / `pnpm --filter <app> dev`                     |
-| Build              | `pnpm build` / `pnpm --filter <app> build`                 |
-| Mobile run         | `pnpm --filter mobile ios` / `android`                     |
-| Extension build    | `pnpm --filter extension build:chrome` / `build:firefox`   |
-| Lint/Format        | `pnpm lint` / `pnpm format`                                |
-| Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                        |
-| Test               | `pnpm test`                                                |
-| Clean              | `pnpm clean`                                               |
-| Gateway            | `pnpm gateway:up` (Docker build + run, `localhost:8080`)   |
-| Gateway build/test | `pnpm gateway:build` (image) / `gateway:test` (Go, native) |
-| Services           | `pnpm services:setup` / `services:start` / `services:stop` |
-| DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`           |
-| DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`          |
-| DB studio          | `pnpm with-env pnpm -F @workspace/db db:studio`            |
+| Task               | Command                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| Install deps       | `pnpm install`                                               |
+| Dev (all/specific) | `pnpm dev` / `pnpm --filter <app> dev`                       |
+| Build              | `pnpm build` / `pnpm --filter <app> build`                   |
+| Mobile run         | `pnpm --filter mobile ios` / `android`                       |
+| Extension build    | `pnpm --filter extension build:chrome` / `build:firefox`     |
+| Lint/Format        | `pnpm lint` / `pnpm format`                                  |
+| Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                          |
+| Test               | `pnpm test`                                                  |
+| Clean              | `pnpm clean`                                                 |
+| Gateway            | `pnpm gateway:up` (Docker build + run, `localhost:8080`)     |
+| Gateway build/test | `pnpm gateway:build` (image) / `gateway:test` (Go, native)   |
+| Gateway dev/verify | `pnpm gateway:dev` (from source) / `gateway:verify` (rename) |
+| Services           | `pnpm services:setup` / `services:start` / `services:stop`   |
+| DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`             |
+| DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`            |
+| DB studio          | `pnpm with-env pnpm -F @workspace/db db:studio`              |
 
 Environment: create `.env.local` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
 

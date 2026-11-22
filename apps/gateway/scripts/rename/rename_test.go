@@ -129,6 +129,8 @@ func TestRunOnTree(t *testing.T) {
 	write(t, root, "UPSTREAM", "repo: https://github.com/maximhq/bifrost.git\n")
 	write(t, root, "patches/0001-x.patch", "--- a/transports/bifrost-http/main.go\n")
 	write(t, root, "scripts/import.sh", "# imports maximhq/bifrost\n")
+	write(t, root, "scripts/rename/main.go", "package main // bifrost\n")
+	write(t, root, "scripts/dev.sh", "BIFROST_PORT=8080 go run .\n")
 	write(t, root, "ui/node_modules/x/index.js", "bifrost\n")
 	write(t, root, "ui/public/bifrost-logo.png", binary)
 	write(t, root, "transports/bifrost-http/main.go", "package main\n\nimport bifrost \"github.com/maximhq/bifrost/core\"\n")
@@ -154,8 +156,8 @@ func TestRunOnTree(t *testing.T) {
 	if first != dry {
 		t.Fatalf("dry run reported %+v, real run %+v", dry, first)
 	}
-	// 3 text files rewritten (main.go, bifrostmcp.go, go.sum); 3 names renamed (dir, go file, png)
-	if first.FilesRewritten != 3 || first.PathsRenamed != 3 {
+	// 4 text files rewritten (main.go, bifrostmcp.go, go.sum, dev.sh); 3 names renamed (dir, go file, png)
+	if first.FilesRewritten != 4 || first.PathsRenamed != 3 {
 		t.Fatalf("unexpected counts: %+v", first)
 	}
 
@@ -165,6 +167,8 @@ func TestRunOnTree(t *testing.T) {
 		"UPSTREAM":                     "repo: https://github.com/maximhq/bifrost.git\n",
 		"patches/0001-x.patch":         "--- a/transports/bifrost-http/main.go\n",
 		"scripts/import.sh":            "# imports maximhq/bifrost\n",
+		"scripts/rename/main.go":       "package main // bifrost\n",
+		"scripts/dev.sh":               "ACME_PORT=8080 go run .\n",
 		"ui/node_modules/x/index.js":   "bifrost\n",
 		"ui/public/acme-logo.png":      binary,
 		"transports/acme-http/main.go": "package main\n\nimport acme \"github.com/acme-ai/acme/core\"\n",

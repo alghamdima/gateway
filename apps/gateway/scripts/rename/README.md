@@ -28,7 +28,7 @@ GOWORK=off go run . -scan -root <gateway dir>                        # list upst
 5. File and directory names, deepest first.
 6. `go.work`: writes a `replace` block that pins every version at which one workspace module requires another to its directory.
 
-It never touches `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `UPSTREAM`, `MODIFICATIONS.md`, `patches/`, `scripts/`, binary files, or a line that carries a copyright notice.
+It never touches `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `UPSTREAM`, `MODIFICATIONS.md`, `patches/`, `scripts/import.sh`, `scripts/rename/`, `scripts/verify.sh`, binary files, or a line that carries a copyright notice.
 
 ## Checked on a scratch copy (placeholder brand, tree at `bb19342`)
 

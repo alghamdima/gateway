@@ -30,8 +30,9 @@ var skipNames = map[string]bool{
 	"MODIFICATIONS.md": true, ".git": true, "node_modules": true,
 }
 
-// skipPaths are relative to the root: our own tooling, which names upstream on purpose.
-var skipPaths = map[string]bool{"patches": true, "scripts": true}
+// skipPaths are relative to the root: the parts of our own tooling that name upstream on purpose.
+// The other scripts are rewritten like any file, so the names they pass to the gateway stay in step.
+var skipPaths = map[string]bool{"patches": true, "scripts/import.sh": true, "scripts/rename": true, "scripts/verify.sh": true}
 
 const upstreamModule = "github.com/maximhq/bifrost"
 
