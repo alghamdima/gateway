@@ -60,6 +60,11 @@ type ledger interface {
 	Settle(ctx context.Context, st Settlement) (SettleResult, error)
 }
 
+// reaper releases holds whose settlement never arrived.
+type reaper interface {
+	Reap(ctx context.Context) (int64, error)
+}
+
 // pricer is the part of the model catalog the plugin uses.
 type pricer interface {
 	GetPricingEntryForModel(model string, provider schemas.ModelProvider) *modelcatalog.PricingEntry
@@ -78,8 +83,13 @@ type Plugin struct {
 	inputBytesPerToken int
 	// refuseAll is set when the plugin could not be configured. It then refuses every
 	// request with this reason, so a broken setup cannot serve traffic unaccounted.
-	refuseAll string
-	pool      *pgxpool.Pool
+	refuseAll  string
+	pool       *pgxpool.Pool
+	reaper     reaper
+	background *background
+
+	settleBackoff time.Duration
+	shutdownGrace time.Duration
 }
 
 // hold is what PreLLMHook leaves on the context for the matching PostLLMHook.
@@ -137,8 +147,11 @@ func build(ctx context.Context, config *Config, logger schemas.Logger, catalog *
 	if err != nil {
 		return nil, fmt.Errorf("database pool: %w", err)
 	}
-	plugin := newPlugin(NewStore(pool), catalog, logger, config)
+	store := NewStore(pool)
+	plugin := newPlugin(store, catalog, logger, config)
 	plugin.pool = pool
+	plugin.reaper = store
+	plugin.start(defaultSettleQueueSize, defaultSettleWorkers, defaultReapInterval)
 	return plugin, nil
 }
 
@@ -150,6 +163,8 @@ func newPlugin(l ledger, p pricer, logger schemas.Logger, config *Config) *Plugi
 		markupBps:          config.MarkupBps,
 		reservationTTL:     defaultReservationTTL,
 		inputBytesPerToken: defaultInputBytesPerToken,
+		settleBackoff:      settleBackoff,
+		shutdownGrace:      defaultShutdownGrace,
 	}
 	if config.ReservationTTLSeconds > 0 {
 		plugin.reservationTTL = time.Duration(config.ReservationTTLSeconds) * time.Second
@@ -163,8 +178,11 @@ func newPlugin(l ledger, p pricer, logger schemas.Logger, config *Config) *Plugi
 // GetName returns the plugin's name.
 func (p *Plugin) GetName() string { return PluginName }
 
-// Cleanup closes the ledger connection.
+// Cleanup writes the settlements still queued, then closes the ledger connection.
 func (p *Plugin) Cleanup() error {
+	if p.background != nil {
+		p.background.stop()
+	}
 	if p.pool != nil {
 		p.pool.Close()
 	}
@@ -300,11 +318,7 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			"failed":            bifrostErr != nil,
 		},
 	}
-	ledgerCtx, cancel := context.WithTimeout(context.Background(), ledgerTimeout)
-	defer cancel()
-	if _, err := p.ledger.Settle(ledgerCtx, settlement); err != nil {
-		p.logger.Error("credits: settlement of %s for organization %s (%d micro-USD, request %s) failed: %v", held.reservationID, held.organizationID, cost, requestID, err)
-	}
+	p.settle(settlement)
 	return resp, bifrostErr, nil
 }
 

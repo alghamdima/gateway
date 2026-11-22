@@ -52,6 +52,16 @@ type fakeLedger struct {
 	reserveErr  error
 	settleErr   error
 	reserveCall atomic.Int64
+
+	settleFailures int           // fail this many Settle calls before succeeding
+	settleGate     chan struct{} // when set, Settle waits until it is closed
+	settleCall     atomic.Int64
+}
+
+func (f *fakeLedger) settlements() []Settlement {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]Settlement(nil), f.settled...)
 }
 
 func (f *fakeLedger) Reserve(_ context.Context, _ string, amount int64, _ time.Duration) (string, bool, error) {
@@ -69,8 +79,16 @@ func (f *fakeLedger) Reserve(_ context.Context, _ string, amount int64, _ time.D
 }
 
 func (f *fakeLedger) Settle(_ context.Context, st Settlement) (SettleResult, error) {
+	f.settleCall.Add(1)
+	if f.settleGate != nil {
+		<-f.settleGate
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.settleFailures > 0 {
+		f.settleFailures--
+		return SettleResult{}, errors.New("connection reset")
+	}
 	if f.settleErr != nil {
 		return SettleResult{}, f.settleErr
 	}
@@ -86,7 +104,9 @@ func testPricer() *fakePricer {
 }
 
 func testPlugin(l ledger, p pricer) *Plugin {
-	return newPlugin(l, p, bifrost.NewNoOpLogger(), &Config{})
+	plugin := newPlugin(l, p, bifrost.NewNoOpLogger(), &Config{})
+	plugin.settleBackoff = time.Millisecond
+	return plugin
 }
 
 func testContext(organizationID string) *schemas.BifrostContext {
