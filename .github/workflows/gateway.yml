@@ -6,12 +6,14 @@ on:
     paths:
       - "apps/gateway/**"
       - "docs/platform/gateway-baseline/**"
+      - "packages/db/migrations/**"
       - ".github/workflows/gateway.yml"
   push:
     branches: ["main"]
     paths:
       - "apps/gateway/**"
       - "docs/platform/gateway-baseline/**"
+      - "packages/db/migrations/**"
       - ".github/workflows/gateway.yml"
   workflow_dispatch:
 
@@ -29,6 +31,22 @@ jobs:
     defaults:
       run:
         working-directory: apps/gateway
+
+    # the credits plugin's tests run against real Postgres with the control plane's migrations
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: turbostarter
+          POSTGRES_PASSWORD: turbostarter
+          POSTGRES_DB: core
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U turbostarter -d core"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: ✅ Checkout code
@@ -60,6 +78,12 @@ jobs:
       - name: 🏷️ Rename tool tests
         working-directory: apps/gateway/scripts/rename
         run: GOWORK=off go test ./...
+
+      - name: 💳 Credits plugin tests
+        working-directory: apps/gateway/plugins/credits
+        run: go test -count=1 -race ./...
+        env:
+          CREDITS_TEST_DATABASE_URL: postgresql://turbostarter:turbostarter@localhost:5432/core
 
       - name: 🏗️ Build
         run: make build LOCAL=1

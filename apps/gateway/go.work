@@ -4,6 +4,7 @@ use (
 	./core
 	./framework
 	./plugins/compat
+	./plugins/credits
 	./plugins/governance
 	./plugins/jsonparser
 	./plugins/logging
