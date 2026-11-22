@@ -31,6 +31,9 @@ var (
 	upstreamRe = regexp.MustCompile(`(?i)bifrost|maximhq|getmaxim`)
 	// shortRe matches the short prefix as its own token: bf_so_x, BF_TEST, bf-sess-1, but not abf_x or 0xbf-1.
 	shortRe = regexp.MustCompile(`(^|[^A-Za-z0-9])(bf|BF)([_-])`)
+	// orgRe matches the upstream GitHub organisation wherever the module mappings did not already
+	// consume it (owner:"maximhq", maximhq.github.io), and captures the repositories that stay.
+	orgRe = regexp.MustCompile(`maximhq(/(?:mcp-go|fasthttp|maxim-go)\b)?`)
 )
 
 var goKeywords = map[string]bool{
@@ -73,7 +76,8 @@ type Rewriter func(string) string
 // NewRewriter builds the rewrite for a brand. Mappings run most specific first, in one pass, so the
 // output of one mapping is never fed to another:
 //
-//  1. module path and repository: github.com/maximhq/bifrost, maximhq/bifrost
+//  1. module path and repository: github.com/maximhq/bifrost, maximhq/bifrost; then the organisation
+//     on its own (owner:"maximhq", maximhq.github.io), except in front of a repository we depend on
 //  2. vendor hosts: docs.getbifrost.ai, www.getbifrost.ai, getbifrost.ai, and the company site
 //     getmaxim.ai, whose /bifrost pages are the product's own
 //  3. wire prefixes: x-bf-, sk-bf-
@@ -92,6 +96,7 @@ type Rewriter func(string) string
 func NewRewriter(b Brand) Rewriter {
 	lower, upper := strings.ToLower(b.Name), strings.ToUpper(b.Name)
 	repo := b.Module[strings.Index(b.Module, "/")+1:]
+	org := repo[:strings.Index(repo, "/")]
 	title := strings.ToUpper(b.Prefix[:1]) + b.Prefix[1:]
 	replacer := strings.NewReplacer(
 		"github.com/maximhq/bifrost", b.Module,
@@ -127,6 +132,12 @@ func NewRewriter(b Brand) Rewriter {
 			return s
 		}
 		s = replacer.Replace(s)
+		s = orgRe.ReplaceAllStringFunc(s, func(m string) string {
+			if m != "maximhq" {
+				return m // a dependency we keep
+			}
+			return org
+		})
 		// shortRe consumes the character before the token, so two tokens that share it ("bf_bf_")
 		// need a second look
 		for {

@@ -44,7 +44,7 @@ var allowed = []struct {
 	re     *regexp.Regexp
 	reason string
 }{
-	{regexp.MustCompile(`github\.com/maximhq/(mcp-go|fasthttp)\b`), "external Go dependency: upstream's forks of mcp-go and fasthttp"},
+	{regexp.MustCompile(`maximhq/(mcp-go|fasthttp)\b`), "external Go dependency: upstream's forks of mcp-go and fasthttp"},
 }
 
 // Result counts what a run changed.
