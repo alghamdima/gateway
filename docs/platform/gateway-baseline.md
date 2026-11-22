@@ -246,6 +246,10 @@ All 63 failures come from this container, not from the tree. Each group was conf
 
 None of the 63 has been re-run on a host without these limits.
 
+### This baseline depends on one DNS name
+
+`transports/.../lib` `TestLoadConfigServesCatalogFeedsFromFixture` and six `plugins/governance` tests need the default pricing host, `getbifrost.ai`, to resolve (the governance tests also download the datasheet from it). The cloud container answers DNS only for hosts on its network allowlist, and that host was added before this run, so they pass here. On a machine where it does not resolve, the first fails, its package runs into the 20 minute timeout, and the six skip. That is what the first baseline recorded as "unexplained".
+
 ### History of this baseline
 
 The first run, before the import scope was widened (commit `85447a0`), had 14,234 passing, 166 failing and 584 skipped. 103 of those failures were tests reading upstream paths we had not imported. Importing `docs/openapi`, `examples/mcps`, `examples/plugins/hello-world`, `examples/configs/withlocalpricingfiles`, `helm-charts/bifrost/values.schema.json` and `tests/docker-compose.yml` (282 files, commit `d043173`) and building the MCP test servers removed all 103. No test that passed in the first run fails in this one.
