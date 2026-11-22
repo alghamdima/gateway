@@ -316,3 +316,18 @@ export const getCustomersResponseSchema = z.object({
 });
 
 export type GetCustomersResponse = z.infer<typeof getCustomersResponseSchema>;
+
+export const adjustOrganizationCreditsSchema = z.object({
+  /** Signed micro-USD (1 USD = 1,000,000): positive adds credit, negative removes it. */
+  amount: z
+    .number()
+    .int()
+    .refine((value) => value !== 0),
+  reason: z.string().trim().min(3).max(500),
+  /** Send the same key when retrying, so one decision is never applied twice. */
+  idempotencyKey: z.string().min(8).max(200).optional(),
+});
+
+export type AdjustOrganizationCreditsInput = z.infer<
+  typeof adjustOrganizationCreditsSchema
+>;

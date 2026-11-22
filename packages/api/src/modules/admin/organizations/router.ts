@@ -4,12 +4,15 @@ import { updateMemberSchema, updateOrganizationSchema } from "@workspace/auth";
 
 import { validate } from "../../../middleware";
 import {
+  adjustOrganizationCreditsSchema,
   getInvitationsInputSchema,
   getMembersInputSchema,
   getOrganizationOrdersInputSchema,
   getOrganizationSubscriptionsInputSchema,
   getOrganizationsInputSchema,
 } from "../../../schema";
+import { adjustCredits } from "../../credits/adjust";
+import { getBalance } from "../../credits/ledger";
 import { getInvitations } from "../../organization/queries/invitations";
 import { getMembers } from "../../organization/queries/members";
 import {
@@ -26,7 +29,9 @@ import {
   getOrganizationSubscriptions,
 } from "./queries";
 
-export const organizationsRouter = new Hono()
+import type { User } from "@workspace/auth";
+
+export const organizationsRouter = new Hono<{ Variables: { user: User } }>()
   .get("/", validate("query", getOrganizationsInputSchema), async (c) =>
     c.json(await getOrganizations(c.req.valid("query"))),
   )
@@ -52,6 +57,19 @@ export const organizationsRouter = new Hono()
         await getOrganizationOrders({
           organizationId: c.req.param("id"),
           ...c.req.valid("query"),
+        }),
+      ),
+  )
+  .get("/:id/credits", async (c) => c.json(await getBalance(c.req.param("id"))))
+  .post(
+    "/:id/credits",
+    validate("json", adjustOrganizationCreditsSchema),
+    async (c) =>
+      c.json(
+        await adjustCredits({
+          organizationId: c.req.param("id"),
+          staffId: c.var.user.id,
+          ...c.req.valid("json"),
         }),
       ),
   )

@@ -14,6 +14,7 @@ import { adminRouter } from "./modules/admin/router";
 import { aiRouter } from "./modules/ai/router";
 import { authRouter } from "./modules/auth/router";
 import { billingRouter } from "./modules/billing/router";
+import { creditsRouter } from "./modules/credits/router";
 import { organizationRouter } from "./modules/organization/router";
 import { userRouter } from "./modules/user/router";
 import { monitor } from "./monitor";
@@ -52,6 +53,7 @@ const appRouter = new Hono()
   .route("/ai", aiRouter)
   .route("/auth", authRouter)
   .route("/billing", billingRouter)
+  .route("/credits", creditsRouter)
   .route("/organizations", organizationRouter)
   .route("/user", userRouter)
   .onError(onError);
