@@ -17,15 +17,16 @@ GOWORK=off go run . -scan -root <gateway dir>                        # list upst
 | `name` | `Bifrost`, `bifrost`, `BIFROST` | PascalCase letters and digits; its lowercase form becomes a Go package name |
 | `prefix` | `bf` in `x-bf-*`, `sk-bf-`, `bf_*`, `BfMode`, `bfCtx` | lowercase letters and digits |
 | `module` | `github.com/maximhq/bifrost` | `host/org/repo`; the part after the host also replaces `maximhq/bifrost` in image and npm names |
-| `domain` | `getbifrost.ai` and its `docs.` and `www.` subdomains | a bare hostname that **resolves in DNS** (see below) |
+| `domain` | `getbifrost.ai` and its `docs.` and `www.` subdomains, and the company site `getmaxim.ai` | a bare hostname that **resolves in DNS** (see below) |
 
 ## What it does, in order
 
 1. Contents of every text file, in one pass, most specific mapping first (`mappings.go` lists them).
 2. In `.go` files only, identifiers that carry the short prefix, by token (`go/scanner`), so string literals and comments are not touched by this step.
 3. `go.sum`: drops the checksums of the upstream modules.
-4. File and directory names, deepest first.
-5. `go.work`: writes a `replace` block that pins every version at which one workspace module requires another to its directory.
+4. `.go` files are formatted the way `gofmt` does, because renamed identifiers shift column alignment.
+5. File and directory names, deepest first.
+6. `go.work`: writes a `replace` block that pins every version at which one workspace module requires another to its directory.
 
 It never touches `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `UPSTREAM`, `MODIFICATIONS.md`, `patches/`, `scripts/`, binary files, or a line that carries a copyright notice.
 
@@ -47,11 +48,15 @@ The two differences both come from the placeholder domain `acme.example`, which 
 
 So the brand's domain has to exist in DNS before the rename is accepted, and something has to serve the datasheet there (or the default has to become a file; Step 2.2).
 
-## Left for the acceptance step (2.4), not done here
+## Acceptance
 
-- `-scan` on the renamed tree still reports 355 lines: 285 `getmaxim.ai` links, 64 references to the `maximhq` forks `mcp-go` and `fasthttp` and to `maxim-go`, which are external Go dependencies, and a handful in `plugins/maxim`. The plan removes that plugin by patch and needs an allowlist with a reason per remaining line.
+`pnpm gateway:verify [brand.json]` runs the whole acceptance on a scratch copy (`scripts/verify.sh`): determinism, the scan, build and vet, boot and response checks, and the unit tests against a renamed copy of the baseline. It first checks that the brand's domain resolves.
+
+## Still open
+
+- `-scan` now passes on a renamed tree: the only names left are the `maximhq` forks of `mcp-go` and `fasthttp`, which are external Go dependencies and are on the allowed list in `main.go` with that reason. A fully white-labeled module graph would need our own forks of both.
 - The JSON error body has a field `is_bifrost_error`, which becomes `is_<name>_error`. It is on the wire, so it is worth deciding before launch whether a customer should see the brand there.
-- `gofmt -l` flags 655 Go files after the rename against 96 before: renamed identifiers shift column alignment. A `gofmt -w` pass after the rename would fix it and is not wired in.
 - Logo and icon files are renamed but still hold the upstream artwork.
 - `docker-compose.yml` at the repo root sets `BIFROST_SETUP_TOKEN` and is outside the tool's root; it has to change in the same commit as the rename.
+- The acceptance does not yet send a chat request through a virtual key against a mock upstream (Step 2.4, check 4).
 - A renamed tree has not been run under Docker or on Postgres.

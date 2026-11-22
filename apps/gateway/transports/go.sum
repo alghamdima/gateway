@@ -339,8 +339,6 @@ github.com/maximhq/bifrost/plugins/governance v1.12.3 h1:jFNgovekmrmtVw3kd6BDOar
 github.com/maximhq/bifrost/plugins/governance v1.12.3/go.mod h1:IFb5NkBvd1hpR+bRlCCJXgYeEl5/2tLwMxM3X3gTVtQ=
 github.com/maximhq/bifrost/plugins/logging v1.12.3 h1:LIoU0czRFE4BB4gE2XsRzar+wTh+AnchwvG/6KnCU1c=
 github.com/maximhq/bifrost/plugins/logging v1.12.3/go.mod h1:vkYohT0elmV0zEjXgTGCxqPwiE6MTn70KB4OqrGwfC8=
-github.com/maximhq/bifrost/plugins/maxim v1.7.18 h1:qPf5lEiYX9tdCTEN4TTH7GWq8But2dbWLuMqv/HvQVg=
-github.com/maximhq/bifrost/plugins/maxim v1.7.18/go.mod h1:V2XP9X6XWI3uM/ewVm9hyXtiHrYxget2xqEgT5/Oq2I=
 github.com/maximhq/bifrost/plugins/mocker v1.6.18 h1:tkYeMeX+gv2q0y4qZvrj4QHW96Qtizwji11gvxAG+/Q=
 github.com/maximhq/bifrost/plugins/mocker v1.6.18/go.mod h1:BS2SDTfEZpVCe3r6AsC9Z4vQJ3KizmOCsZgZROjawwA=
 github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.18 h1:V+u7eNFueV1jOclq78stPp8FssyR6woLVAK0f9hYYrY=
@@ -355,8 +353,6 @@ github.com/maximhq/bifrost/plugins/semanticcache v1.7.8 h1:ZSx+g8aSPosyGKNtr6o1Q
 github.com/maximhq/bifrost/plugins/semanticcache v1.7.8/go.mod h1:I8EZKt3ZEFGLoiPCq4nhrYSVI6evrTujOROkDJyID2w=
 github.com/maximhq/bifrost/plugins/telemetry v1.9.8 h1:3DKy8p6GC7xVnfbyv/+QiWDfMIifz/yyIqwJ1gLgFuQ=
 github.com/maximhq/bifrost/plugins/telemetry v1.9.8/go.mod h1:3as2oeRZBQJlKMbyFO/ZRrweIOdWrFV3tonqrOvqS9E=
-github.com/maximhq/maxim-go v0.2.1 h1:hCp8dQ4HsyyNC+y5HCUuY/HFD0sOnGkjL5MdYCHkgEQ=
-github.com/maximhq/maxim-go v0.2.1/go.mod h1:nwFznXy0Dn4mxXGU4X+BCnE3VP68L+FPEaW0yUgk96o=
 github.com/maximhq/mcp-go v0.0.0-20261102181017-b7da3bc145a1 h1:vn9eGk7ghkI0Z+YQir35oMFVfqNXZ1KLRuHtDAC30zk=
 github.com/maximhq/mcp-go v0.0.0-20261102181017-b7da3bc145a1/go.mod h1:6L8eBboqlAMnYrvl8rpbUeV2qE/SJh52aVGrXIomVb0=
 github.com/molecule-man/go-brrr v1.0.1 h1:cEjgx8hgNw6UGdhQ94SPDbPkKuRbkUcxBO3IzbGpA/o=

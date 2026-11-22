@@ -6,9 +6,10 @@
 # A test that regresses in the full run is run once more on its own, because a few upstream tests time
 # out when the whole suite loads the machine; it counts only if it fails again.
 # RESULTS=<dir> reuses the output of an earlier run instead of running the suite.
+# BASELINE=<file> compares against another baseline (verify.sh passes a renamed one).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-baseline=$PWD/../../docs/platform/gateway-baseline/results.tsv
+baseline=${BASELINE:-$PWD/../../docs/platform/gateway-baseline/results.tsv}
 # test-baseline.sh runs offline, so fetch every module the tests need first
 go mod download
 for mod in $(go work edit -json | jq -r '.Use[].DiskPath'); do

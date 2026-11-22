@@ -21,7 +21,6 @@ require (
 	github.com/maximhq/bifrost/plugins/compat v0.5.7
 	github.com/maximhq/bifrost/plugins/governance v1.12.3
 	github.com/maximhq/bifrost/plugins/logging v1.12.3
-	github.com/maximhq/bifrost/plugins/maxim v1.7.18
 	github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.18
 	github.com/maximhq/bifrost/plugins/otel v1.6.8
 	github.com/maximhq/bifrost/plugins/prompts v1.1.18
@@ -161,7 +160,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/maximhq/bifrost/plugins/mocker v1.6.18 // indirect
-	github.com/maximhq/maxim-go v0.2.1 // indirect
 	github.com/molecule-man/go-brrr v1.0.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oapi-codegen/runtime v1.6.0 // indirect

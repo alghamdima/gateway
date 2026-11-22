@@ -52,7 +52,9 @@ func TestRewrite(t *testing.T) {
 		{"maximum", `maximum, Maximum, MAXIMUM, exclusiveMaximum, maximize, maximal`, `maximum, Maximum, MAXIMUM, exclusiveMaximum, maximize, maximal`},
 		{"max + word", `maxImages, maxImageIndex, maxImpactPhrases`, `maxImages, maxImageIndex, maxImpactPhrases`},
 		{"minimax", `MinimaxImageGenerationRequest`, `MinimaxImageGenerationRequest`},
-		{"maxim product", `Maxim, maxim_config, www.getmaxim.ai`, `Maxim, maxim_config, www.getmaxim.ai`},
+		{"maxim product", `Maxim, maxim_config, sk_mx_`, `Maxim, maxim_config, sk_mx_`},
+		{"company site", `https://www.getmaxim.ai/bifrost/enterprise and https://getmaxim.ai/bifrost`, `https://www.acme.example/enterprise and https://acme.example`},
+		{"company site root", `engineering@getmaxim.ai, https://www.getmaxim.ai`, `engineering@acme.example, https://www.acme.example`},
 		// copyright lines are never edited
 		{"copyright", "// Copyright 2025 Bifrost Authors\nvar x = \"bifrost\"\n", "// Copyright 2025 Bifrost Authors\nvar x = \"acme\"\n"},
 		// line structure is preserved
@@ -188,13 +190,41 @@ func TestRunOnTree(t *testing.T) {
 		t.Fatalf("second run changed something: %+v", second)
 	}
 
-	hits, err := Scan(root)
+	// the dependency we keep is allowed, with its reason; skipped files are not scanned
+	hits, kept, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// only the dependency we keep is left; skipped files are not scanned
-	if len(hits) != 1 || hits[0] != "core/go.sum:1: github.com/maximhq/mcp-go v0.4.0 h1:ccc=" {
+	if len(hits) != 0 || len(kept) != 1 {
+		t.Fatalf("unexpected scan result: hits %q, allowed %v", hits, kept)
+	}
+	// an allowed name does not hide another upstream name on the same line
+	write(t, root, "core/note.txt", "github.com/maximhq/mcp-go replaces mark3labs, see getmaxim\n")
+	hits, _, err = Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || !strings.HasPrefix(hits[0], "core/note.txt:1:") {
 		t.Fatalf("unexpected scan hits: %q", hits)
+	}
+}
+
+func TestRunFormatsGo(t *testing.T) {
+	root := t.TempDir()
+	// the longer name would leave the struct misaligned; unparseable Go is rewritten but not formatted
+	write(t, root, "a.go", "package a\n\ntype T struct {\n\tBifrostName string\n\tID          int\n}\n")
+	write(t, root, "testdata/bad.go", "package {{ bifrost\n")
+	if _, err := Run(root, NewRewriter(acme), NewGoRewriter(acme), false); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, root, "a.go"), "package a\n\ntype T struct {\n\tAcmeName string\n\tID       int\n}\n"; got != want {
+		t.Fatalf("a.go\n got %q\nwant %q", got, want)
+	}
+	if got, want := read(t, root, "testdata/bad.go"), "package {{ acme\n"; got != want {
+		t.Fatalf("bad.go\n got %q\nwant %q", got, want)
+	}
+	if again, err := Run(root, NewRewriter(acme), NewGoRewriter(acme), false); err != nil || again != (Result{}) {
+		t.Fatalf("second run: %+v %v", again, err)
 	}
 }
 

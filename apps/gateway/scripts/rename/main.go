@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"go/format"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -37,6 +38,15 @@ const upstreamModule = "github.com/maximhq/bifrost"
 // scanRe is the acceptance scan from PLAN.md Step 2.4, check 5.
 var scanRe = regexp.MustCompile(`(?i)bifrost|maximhq|getmaxim|x-bf-|sk-bf-`)
 
+// allowed lists the upstream names that stay after a rename, each with the reason. A scan hit that
+// matches one is reported in the summary, not as a failure.
+var allowed = []struct {
+	re     *regexp.Regexp
+	reason string
+}{
+	{regexp.MustCompile(`github\.com/maximhq/(mcp-go|fasthttp)\b`), "external Go dependency: upstream's forks of mcp-go and fasthttp"},
+}
+
 // Result counts what a run changed.
 type Result struct {
 	FilesRewritten int
@@ -53,12 +63,15 @@ func main() {
 		fatal("-root is required")
 	}
 	if *scan {
-		hits, err := Scan(*root)
+		hits, kept, err := Scan(*root)
 		if err != nil {
 			fatal(err.Error())
 		}
 		for _, h := range hits {
 			fmt.Println(h)
+		}
+		for reason, n := range kept {
+			fmt.Fprintf(os.Stderr, "allowed, %d lines: %s\n", n, reason)
 		}
 		fmt.Fprintf(os.Stderr, "%d lines or paths still carry an upstream name\n", len(hits))
 		if len(hits) > 0 {
@@ -140,6 +153,11 @@ func Run(root string, rewrite, rewriteGo Rewriter, dryRun bool) (Result, error) 
 		}
 		if filepath.Ext(path) == ".go" {
 			text = rewriteGo(text)
+			// renamed identifiers shift column alignment, so finish with gofmt's formatting; a file
+			// that does not parse (test fixtures) is left as it is
+			if formatted, err := format.Source([]byte(text)); err == nil {
+				text = string(formatted)
+			}
 		} else {
 			text = rewrite(text)
 		}
@@ -196,15 +214,30 @@ func dropUpstreamSums(sum string) string {
 }
 
 // Scan returns "path:line: text" for every line, and "path" for every name, that still carries an
-// upstream name.
-func Scan(root string) ([]string, error) {
+// upstream name and is not on the allowed list, plus the number of allowed hits per reason.
+func Scan(root string) ([]string, map[string]int, error) {
 	var hits []string
+	kept := map[string]int{}
+	check := func(text, hit string) {
+		if !scanRe.MatchString(text) {
+			return
+		}
+		rest := text
+		for _, a := range allowed {
+			if a.re.MatchString(rest) {
+				rest = a.re.ReplaceAllString(rest, "")
+				if !scanRe.MatchString(rest) {
+					kept[a.reason]++
+					return
+				}
+			}
+		}
+		hits = append(hits, hit)
+	}
 	err := walk(root, func(path string, d fs.DirEntry) error {
 		rel, _ := filepath.Rel(root, path)
 		rel = filepath.ToSlash(rel)
-		if scanRe.MatchString(d.Name()) {
-			hits = append(hits, rel)
-		}
+		check(d.Name(), rel)
 		if !d.Type().IsRegular() {
 			return nil
 		}
@@ -216,11 +249,9 @@ func Scan(root string) ([]string, error) {
 			return nil
 		}
 		for i, l := range strings.Split(string(data), "\n") {
-			if scanRe.MatchString(l) {
-				hits = append(hits, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(l)))
-			}
+			check(l, fmt.Sprintf("%s:%d: %s", rel, i+1, strings.TrimSpace(l)))
 		}
 		return nil
 	})
-	return hits, err
+	return hits, kept, err
 }

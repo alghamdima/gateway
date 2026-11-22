@@ -28,7 +28,7 @@ var (
 	domainRe = regexp.MustCompile(`^[a-z0-9-]+(\.[a-z0-9-]+)+$`)
 	// upstreamRe matches every upstream name the rewrite acts on. A brand value that contains one
 	// would be rewritten again on the next run, so the rewrite would stop being idempotent.
-	upstreamRe = regexp.MustCompile(`(?i)bifrost|maximhq`)
+	upstreamRe = regexp.MustCompile(`(?i)bifrost|maximhq|getmaxim`)
 	// shortRe matches the short prefix as its own token: bf_so_x, BF_TEST, bf-sess-1, but not abf_x or 0xbf-1.
 	shortRe = regexp.MustCompile(`(^|[^A-Za-z0-9])(bf|BF)([_-])`)
 )
@@ -74,7 +74,8 @@ type Rewriter func(string) string
 // output of one mapping is never fed to another:
 //
 //  1. module path and repository: github.com/maximhq/bifrost, maximhq/bifrost
-//  2. vendor hosts: docs.getbifrost.ai, www.getbifrost.ai, getbifrost.ai
+//  2. vendor hosts: docs.getbifrost.ai, www.getbifrost.ai, getbifrost.ai, and the company site
+//     getmaxim.ai, whose /bifrost pages are the product's own
 //  3. wire prefixes: x-bf-, sk-bf-
 //  4. the name in its three cases: Bifrost, bifrost, BIFROST
 //  5. the short prefix as its own token: bf_, BF_, bf-
@@ -85,7 +86,7 @@ type Rewriter func(string) string
 //
 // Deliberately not rewritten:
 //   - the company name "Maxim" on its own (maximum, maximize, maxImages and Minimax would be hit by
-//     any loose rule; what is left of it goes with the maxim plugin, which a patch removes)
+//     any loose rule; the plugin that carried most of it is removed by patches/0003)
 //   - other maximhq repositories (mcp-go, fasthttp, maxim-go): they are external dependencies
 //   - any line that carries a copyright notice
 func NewRewriter(b Brand) Rewriter {
@@ -99,6 +100,10 @@ func NewRewriter(b Brand) Rewriter {
 		"docs.getbifrost.io", "docs."+b.Domain,
 		"www.getbifrost.ai", "www."+b.Domain,
 		"getbifrost.ai", b.Domain,
+		"www.getmaxim.ai/bifrost", "www."+b.Domain,
+		"getmaxim.ai/bifrost", b.Domain,
+		"www.getmaxim.ai", "www."+b.Domain,
+		"getmaxim.ai", b.Domain,
 		"x-bf-", "x-"+b.Prefix+"-",
 		"X-Bf-", "X-"+title+"-",
 		"X-BF-", "X-"+strings.ToUpper(b.Prefix)+"-",

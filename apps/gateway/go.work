@@ -7,7 +7,6 @@ use (
 	./plugins/governance
 	./plugins/jsonparser
 	./plugins/logging
-	./plugins/maxim
 	./plugins/mocker
 	./plugins/modelcatalogresolver
 	./plugins/otel

@@ -2,7 +2,7 @@
 
 Recorded 2026-11-21 for Phase 1 of `PLAN.md`. This is what the imported gateway does before any rename, so Stage B can prove the rename changed nothing (Step 2.4, check 2).
 
-The build and boot checks were taken on commit `85447a0` (upstream at `172617bb` plus the two patches in `apps/gateway/patches/`, neither of which touches Go code). The unit-test baseline was retaken on `459866d`, after the import scope was widened.
+The build and boot checks were taken on commit `85447a0` (upstream at `172617bb` plus the two patches in `apps/gateway/patches/`, neither of which touches Go code). The unit-test baseline was last retaken after the import scope was widened and the Maxim plugin was removed (patch `0003`), which leaves 14 Go modules.
 
 ## Environment
 
@@ -49,7 +49,7 @@ The config used for the boot, with SQLite stores created in the app directory:
 
 | Check                                                                                                    | Command                                                               | Result                                                                                                     |
 | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `go vet`, all 15 modules                                                                                 | `go vet ./...` per module                                             | exit 0 everywhere, no output                                                                               |
+| `go vet`, all 15 modules (14 after patch `0003`)                                                         | `go vet ./...` per module                                             | exit 0 everywhere, no output                                                                               |
 | Native boot on Postgres 16 with the real datasheet (5.0 MB, fetched once from `getbifrost.ai/datasheet`) | `config.json` with `config_store` and `logs_store` of type `postgres` | ready in 32 s, `/health` 200, 91 tables, 8,108 rows in `governance_model_pricing`, no SQLite files written |
 | Docker image                                                                                             | `docker build -f transports/Dockerfile.local` (see the caveat below)  | exit 0 in 378 s, 496 MB image; the UI stage runs `npm run build-enterprise` on `node:25-alpine` and passes |
 | Compose stack                                                                                            | `docker compose --profile gateway up -d --wait`                       | exit 0 in 47 s; `db`, `mailpit`, `gateway` healthy, `gateway-db` exited 0                                  |
@@ -84,9 +84,9 @@ Limits of this inventory: 45 s of a default boot, then a configured boot plus 75
 
 ## Unit tests
 
-Run with `apps/gateway/scripts/test-baseline.sh` on commit `459866d`. It builds the MCP test servers (`make setup-mcp-tests`), then executes `go test -json -count=1 -timeout 20m ./...` in each of the 15 `go.work` modules with no credentials and no network. The run took 11 minutes.
+Run with `apps/gateway/scripts/test-baseline.sh` on the tree with patch `0003` applied. It builds the MCP test servers (`make setup-mcp-tests`), then executes `go test -json -count=1 -timeout 20m ./...` in each of the 14 `go.work` modules with no credentials and no network. The run took 11 minutes.
 
-Every top-level test and its result is in [`gateway-baseline/results.tsv`](gateway-baseline/results.tsv) (module, package, test, result; 15,570 test rows and 123 package rows). Subtests are not listed separately: a parent fails if any subtest fails.
+Every top-level test and its result is in [`gateway-baseline/results.tsv`](gateway-baseline/results.tsv) (module, package, test, result; 15,547 test rows and 122 package rows). Subtests are not listed separately: a parent fails if any subtest fails.
 
 ### Counts per module
 
@@ -98,7 +98,6 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `plugins/governance`           | 506        | 0          | 1          | 1             | 0             | 0                      |
 | `plugins/jsonparser`           | 5          | 0          | 3          | 1             | 0             | 0                      |
 | `plugins/logging`              | 374        | 0          | 2          | 1             | 0             | 0                      |
-| `plugins/maxim`                | 20         | 0          | 3          | 1             | 0             | 0                      |
 | `plugins/mocker`               | 8          | 0          | 0          | 1             | 0             | 0                      |
 | `plugins/modelcatalogresolver` | 4          | 0          | 0          | 1             | 0             | 0                      |
 | `plugins/otel`                 | 85         | 2          | 0          | 0             | 1             | 0                      |
@@ -107,7 +106,7 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `plugins/semanticcache`        | 88         | 0          | 71         | 1             | 0             | 0                      |
 | `plugins/telemetry`            | 58         | 0          | 0          | 1             | 0             | 0                      |
 | `transports`                   | 2808       | 1          | 1          | 5             | 1             | 2                      |
-| **Total**                      | **15050**  | **63**     | **457**    | **101**       | **12**        | **10**                 |
+| **Total**                      | **15030**  | **63**     | **454**    | **100**       | **12**        | **10**                 |
 
 ### Failing tests by name
 
@@ -256,13 +255,17 @@ The first run, before the import scope was widened (commit `85447a0`), had 14,23
 
 Two things the first version of this report got wrong: it attributed 10 `transports/.../lib` failures to DNS and left 2 unexplained, when all 12 were the missing OpenAPI spec; and the commit message of `d043173` says 336 files were added, when the number is 282.
 
+### After removing the Maxim plugin
+
+Patch `0003` and the import script drop `plugins/maxim` and the UI that configured it. The run after that differs from the one before in exactly the plugin's own rows (20 passing tests, 3 skipped, 1 package): 15,030 pass, 63 fail, 454 skip. Nothing else moved.
+
 ### Stability
 
 On the first tree the whole suite was run twice. The two result sets differed in one test: `core` `TestListAllModelsIncludesEveryPageOfASlowLargeProvider` passed, then failed with `context deadline exceeded`, then passed 3 times out of 3 alone. It is timing-sensitive under load. `scripts/test.sh` therefore re-runs a regressed test once on its own before counting it. The current tree has been run once.
 
 ### Skips
 
-457 tests skip. The reasons printed most often: Postgres not available, ClickHouse not available, a provider key such as `OPENAI_API_KEY` not set, and a few that upstream skips unconditionally. Names are in `results.tsv`.
+454 tests skip. The reasons printed most often: Postgres not available, ClickHouse not available, a provider key such as `OPENAI_API_KEY` not set, and a few that upstream skips unconditionally. Names are in `results.tsv`.
 
 | Package                                     | Skipped |
 | ------------------------------------------- | ------- |
@@ -319,7 +322,6 @@ On the first tree the whole suite was run twice. The two result sets differed in
 | `plugins/governance`                        | 1       |
 | `plugins/jsonparser`                        | 3       |
 | `plugins/logging`                           | 2       |
-| `plugins/maxim`                             | 3       |
 | `plugins/semanticcache`                     | 71      |
 | `transports/v2/bifrost-http/tests/realtime` | 1       |
 

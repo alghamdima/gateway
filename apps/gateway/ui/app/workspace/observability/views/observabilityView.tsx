@@ -11,7 +11,6 @@ import { useEffect, useMemo, useState } from "react";
 import BigQueryView from "./plugins/bigqueryView";
 import DatadogView from "./plugins/datadogView";
 import KafkaView from "./plugins/kafkaView";
-import MaximView from "./plugins/maximView";
 import NewrelicView from "./plugins/newRelicView";
 import OtelView from "./plugins/otelView";
 import PrometheusView from "./plugins/prometheusView";
@@ -50,11 +49,6 @@ const supportedPlatformsList = (resolvedTheme: string): SupportedPlatform[] => [
 		id: "prometheus",
 		name: "Prometheus", // i18n-ignore: brand name
 		icon: <img alt="Prometheus" src={withBasePath("/images/prometheus-logo.svg")} width={21} height={21} className="-ml-0.5" />,
-	},
-	{
-		id: "maxim",
-		name: "Maxim", // i18n-ignore: brand name
-		icon: <img alt="Maxim" src={withBasePath(`/maxim-logo${resolvedTheme === "dark" ? "-dark" : ""}.webp`)} width={19} height={19} />,
 	},
 	{
 		id: "datadog",
@@ -212,7 +206,6 @@ export default function ObservabilityView() {
 				</Button>
 				{selectedPluginId === "prometheus" && <PrometheusView />}
 				{selectedPluginId === "otel" && <OtelView />}
-				{selectedPluginId === "maxim" && <MaximView />}
 				{selectedPluginId === "kafka" && <KafkaView />}
 				{selectedPluginId === "datadog" && <DatadogView />}
 				{selectedPluginId === "bigquery" && <BigQueryView />}

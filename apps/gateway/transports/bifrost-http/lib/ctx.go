@@ -19,7 +19,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/plugins/governance"
-	"github.com/maximhq/bifrost/plugins/maxim"
 	"github.com/maximhq/bifrost/plugins/semanticcache"
 	"github.com/valyala/fasthttp"
 )
@@ -407,8 +406,6 @@ func ConvertToBifrostContext(ctx *fasthttp.RequestCtx, store HandlerStore) (*sch
 		EmitModelCatalogRoutingLog(bifrostCtx, res)
 	}
 
-	// Initialize tags map for collecting maxim tags
-	maximTags := make(map[string]string)
 	// Initialize dimensions map for x-bf-dim-* headers
 	dimensions := make(map[string]string)
 	// Initialize extra headers map for headers prefixed with x-bf-eh-
@@ -462,28 +459,6 @@ func ConvertToBifrostContext(ctx *fasthttp.RequestCtx, store HandlerStore) (*sch
 		if labelName, ok := strings.CutPrefix(keyStr, "x-bf-prom-"); ok && labelName != "" {
 			// x-bf-prom-* is a removed legacy prefix. Swallow it so it neither flows
 			// into unified dimensions (logs/OTEL/Maxim/etc) nor is forwarded upstream.
-			return true
-		}
-		// Checking for maxim headers
-		if labelName, ok := strings.CutPrefix(keyStr, "x-bf-maxim-"); ok {
-			switch labelName {
-			case string(maxim.GenerationIDKey):
-				bifrostCtx.SetValue(schemas.BifrostContextKey(labelName), string(value))
-			case string(maxim.TraceIDKey):
-				bifrostCtx.SetValue(schemas.BifrostContextKey(labelName), string(value))
-			case string(maxim.SessionIDKey):
-				bifrostCtx.SetValue(schemas.BifrostContextKey(labelName), string(value))
-			case string(maxim.TraceNameKey):
-				bifrostCtx.SetValue(schemas.BifrostContextKey(labelName), string(value))
-			case string(maxim.GenerationNameKey):
-				bifrostCtx.SetValue(schemas.BifrostContextKey(labelName), string(value))
-			case string(maxim.LogRepoIDKey):
-				bifrostCtx.SetValue(schemas.BifrostContextKey(labelName), string(value))
-			default:
-				// apart from these all headers starting with x-bf-maxim- are keys for tags
-				// collect them in the maximTags map
-				maximTags[labelName] = string(value)
-			}
 			return true
 		}
 		// MCP control headers (include-only filtering)
@@ -839,11 +814,6 @@ func ConvertToBifrostContext(ctx *fasthttp.RequestCtx, store HandlerStore) (*sch
 		}
 		return true
 	})
-
-	// Store the collected maxim tags in the context
-	if len(maximTags) > 0 {
-		bifrostCtx.SetValue(schemas.BifrostContextKey(maxim.TagsKey), maximTags)
-	}
 
 	// Store collected dimensions (x-bf-dim-* only) in the context
 	if len(dimensions) > 0 {
