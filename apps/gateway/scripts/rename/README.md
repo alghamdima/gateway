@@ -30,27 +30,24 @@ GOWORK=off go run . -scan -root <gateway dir>                        # list upst
 
 It never touches `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `UPSTREAM`, `MODIFICATIONS.md`, `patches/`, `scripts/import.sh`, `scripts/rename/`, `scripts/verify.sh`, binary files, or a line that carries a copyright notice.
 
-## Checked on a scratch copy (placeholder brand, tree at `bb19342`)
+## Acceptance
+
+`pnpm gateway:verify [brand.json]` runs the whole acceptance on a scratch copy of the committed tree (`scripts/verify.sh`) and changes nothing in the repo. It first checks that the brand's domain resolves and whether it serves the pricing datasheet.
+
+Last full run: tree at `0c0c338`, placeholder brand with a domain that resolves, 20 minutes, exit 0.
 
 | Check | Result |
 | --- | --- |
-| Rewrite | 2620 files, 16 paths, `go.work` pinned |
-| Second run | 0 files, 0 paths, nothing pinned |
-| `make build LOCAL=1` | exit 0; binary is `tmp/acme-http` |
-| Boot | `/health` 200; UI title is the new name; 401, 400 and 403 bodies and the boot log carry no upstream name |
-| `go vet`, 15 modules | clean |
-| Unit tests against `docs/platform/gateway-baseline/results.tsv`, test names mapped back | identical except the two items below |
+| Two renames of fresh copies | identical; 2628 files, 16 paths, `go.work` pinned |
+| Second run on a renamed tree | 0 files, 0 paths, nothing pinned |
+| Scan | 0 lines left; 47 lines allowed (the `maximhq` forks of `mcp-go` and `fasthttp`) |
+| `make build LOCAL=1` and `go vet` in 14 modules | pass; the binary is `tmp/acme-http` |
+| Boot | `/health` 200, UI title is the new name; `/v1/models` 200, `/api/config` 403 and a 400 chat response carry no upstream name, nor does the boot log |
+| Unit tests against the renamed baseline | no regressions |
 
-The two differences both come from the placeholder domain `acme.example`, which resolves nowhere:
+That run left 6 governance tests out of the comparison, because the placeholder domain does not serve the datasheet they download (`needs-datasheet-host.txt`). With a domain that does not resolve at all the script stops at the start: the catalog loader resolves the default pricing host first, one fixture test in `transports/.../lib` fails, and its package runs into the 20 minute test timeout.
 
-- `transports/.../lib`: `TestLoadConfigServesCatalogFeedsFromFixture` fails and the package then runs into its 20 minute timeout. The loader resolves the default pricing host before the test fixture can answer for it. With a domain that resolves, the package passes 820 of 820, as in the baseline.
-- `plugins/governance`: 6 tests skip instead of pass. They download the real datasheet from the default pricing host.
-
-So the brand's domain has to exist in DNS before the rename is accepted, and something has to serve the datasheet there (or the default has to become a file; Step 2.2).
-
-## Acceptance
-
-`pnpm gateway:verify [brand.json]` runs the whole acceptance on a scratch copy (`scripts/verify.sh`): determinism, the scan, build and vet, boot and response checks, and the unit tests against a renamed copy of the baseline. It first checks that the brand's domain resolves.
+So the brand's domain has to exist in DNS before the rename is accepted, and to get those 6 tests back something has to serve the datasheet there.
 
 ## Still open
 
