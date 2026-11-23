@@ -1,4 +1,5 @@
 import {
+  bigint,
   bigserial,
   check,
   integer,
@@ -21,6 +22,8 @@ import type * as z from "zod";
  */
 export const MAX_MARKUP_BPS = 100_000;
 export const MAX_TOPUP_FEE_BPS = 10_000;
+/** 100 USD in micro-USD: a ceiling against a typo, not a business rule. */
+export const MAX_TOPUP_FEE_MIN_MICRO_USD = 100_000_000;
 
 /** A single row (id = 1), created by the migration. */
 export const pricingSettings = pgTable(
@@ -31,6 +34,11 @@ export const pricingSettings = pgTable(
     defaultMarkupBps: integer().notNull(),
     /** Added on a top-up payment, never taken from credits (ADR 0003). */
     topupFeeBps: integer().notNull(),
+    /**
+     * The least fee a top-up pays, in micro-USD: the fee is the larger of the
+     * percentage and this amount, as OpenRouter's 5.5% with a $0.80 minimum.
+     */
+    topupFeeMinMicroUsd: bigint({ mode: "number" }).notNull().default(800_000),
     updatedAt: timestamp().notNull().defaultNow(),
     updatedBy: text(),
   },
@@ -43,6 +51,10 @@ export const pricingSettings = pgTable(
     check(
       "pricing_settings_topup_fee_range",
       sql`${t.topupFeeBps} between 0 and ${sql.raw(String(MAX_TOPUP_FEE_BPS))}`,
+    ),
+    check(
+      "pricing_settings_topup_fee_min_range",
+      sql`${t.topupFeeMinMicroUsd} between 0 and ${sql.raw(String(MAX_TOPUP_FEE_MIN_MICRO_USD))}`,
     ),
   ],
 );

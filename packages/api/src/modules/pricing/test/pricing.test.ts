@@ -43,7 +43,11 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
 
   it("starts at no markup and a 5.5% top-up fee", async () => {
     const { settings, providers } = await pricing.getPricing();
-    expect(settings).toMatchObject({ defaultMarkupBps: 0, topupFeeBps: 550 });
+    expect(settings).toMatchObject({
+      defaultMarkupBps: 0,
+      topupFeeBps: 550,
+      topupFeeMinMicroUsd: 800_000,
+    });
     expect(providers).toEqual([]);
   });
 
@@ -52,6 +56,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     const after = await pricing.updatePricingSettings({
       defaultMarkupBps: 300,
       topupFeeBps: 500,
+      topupFeeMinMicroUsd: 1_000_000,
       staffId: "staff_1",
     });
     expect(after).toMatchObject({
@@ -65,8 +70,13 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       before: {
         defaultMarkupBps: before.defaultMarkupBps,
         topupFeeBps: before.topupFeeBps,
+        topupFeeMinMicroUsd: before.topupFeeMinMicroUsd,
       },
-      after: { defaultMarkupBps: 300, topupFeeBps: 500 },
+      after: {
+        defaultMarkupBps: 300,
+        topupFeeBps: 500,
+        topupFeeMinMicroUsd: 1_000_000,
+      },
       changed_by: "staff_1",
     });
   });
@@ -79,6 +89,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       pricing.updatePricingSettings({
         defaultMarkupBps: -1,
         topupFeeBps: 0,
+        topupFeeMinMicroUsd: 800_000,
         staffId: "staff_1",
       }),
     ).rejects.toMatchObject({
@@ -88,10 +99,21 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       pricing.updatePricingSettings({
         defaultMarkupBps: 0,
         topupFeeBps: 10_001,
+        topupFeeMinMicroUsd: 800_000,
         staffId: "staff_1",
       }),
     ).rejects.toMatchObject({
       cause: { constraint_name: "pricing_settings_topup_fee_range" },
+    });
+    await expect(
+      pricing.updatePricingSettings({
+        defaultMarkupBps: 0,
+        topupFeeBps: 0,
+        topupFeeMinMicroUsd: 100_000_001,
+        staffId: "staff_1",
+      }),
+    ).rejects.toMatchObject({
+      cause: { constraint_name: "pricing_settings_topup_fee_min_range" },
     });
     await expect(
       pricing.setProviderMarkup({
@@ -162,6 +184,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         pricing.updatePricingSettings({
           defaultMarkupBps: 1000 + i,
           topupFeeBps: 100 + i,
+          topupFeeMinMicroUsd: 800_000,
           staffId: `staff_${i}`,
         }),
       ),
@@ -176,6 +199,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     expect(history.at(-1)?.after).toEqual({
       defaultMarkupBps: settings.defaultMarkupBps,
       topupFeeBps: settings.topupFeeBps,
+      topupFeeMinMicroUsd: settings.topupFeeMinMicroUsd,
     });
   });
 
@@ -185,6 +209,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     await pricing.updatePricingSettings({
       defaultMarkupBps: 42,
       topupFeeBps: 550,
+      topupFeeMinMicroUsd: 800_000,
       staffId: "staff_named",
     });
     const [latest, previous] = await pricing.getPricingChanges(2);
@@ -253,9 +278,23 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     });
 
     it.each([
-      [{ defaultMarkupBps: 0, topupFeeBps: 10_000 }, true],
-      [{ defaultMarkupBps: 0, topupFeeBps: 10_001 }, false],
-      [{ defaultMarkupBps: 0 }, false],
+      [
+        { defaultMarkupBps: 0, topupFeeBps: 10_000, topupFeeMinMicroUsd: 0 },
+        true,
+      ],
+      [
+        { defaultMarkupBps: 0, topupFeeBps: 10_001, topupFeeMinMicroUsd: 0 },
+        false,
+      ],
+      [
+        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroUsd: -1 },
+        false,
+      ],
+      [
+        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroUsd: 0.5 },
+        false,
+      ],
+      [{ defaultMarkupBps: 0, topupFeeBps: 550 }, false],
     ])("settings %j", async (input, isValid) => {
       const { updatePricingSettingsSchema } = await import("../../../schema");
       expect(updatePricingSettingsSchema.safeParse(input).success).toBe(

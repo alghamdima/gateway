@@ -5,6 +5,12 @@ export const bpsToPercent = (bps: number) => bps / 100;
 
 export const percentToBps = (percent: number) => Math.round(percent * 100);
 
+export const MICRO_USD = 1_000_000;
+
+export const microUsdToUsd = (microUsd: number) => microUsd / MICRO_USD;
+
+export const usdToMicroUsd = (usd: number) => Math.round(usd * MICRO_USD);
+
 /** A percentage with at most two decimals, so it maps to whole basis points. */
 export const percentSchema = (max: number, decimalsMessage: string) =>
   z

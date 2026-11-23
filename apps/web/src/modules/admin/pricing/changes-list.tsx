@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@workspace/ui-web/table";
 
-import { bpsToPercent } from "~/modules/admin/pricing/rates";
+import { bpsToPercent, microUsdToUsd } from "~/modules/admin/pricing/rates";
 
 interface PricingChange {
   id: number;
@@ -28,7 +28,12 @@ interface ChangesListProps {
   readonly changes: PricingChange[];
 }
 
-const RATE_KEYS = ["defaultMarkupBps", "topupFeeBps", "markupBps"] as const;
+const RATE_KEYS = [
+  "defaultMarkupBps",
+  "topupFeeBps",
+  "topupFeeMinMicroUsd",
+  "markupBps",
+] as const;
 
 export const ChangesList = ({ changes }: ChangesListProps) => {
   const { t, i18n } = useTranslation(["common", "admin"]);
@@ -38,10 +43,14 @@ export const ChangesList = ({ changes }: ChangesListProps) => {
       return t("admin:pricing.changes.none");
     }
     return RATE_KEYS.filter((key) => typeof values[key] === "number")
-      .map(
-        (key) =>
-          `${t(`admin:pricing.changes.fields.${key}`)}: ${bpsToPercent(values[key] as number)}%`,
-      )
+      .map((key) => {
+        const value = values[key] as number;
+        const shown =
+          key === "topupFeeMinMicroUsd"
+            ? `$${microUsdToUsd(value).toFixed(2)}`
+            : `${bpsToPercent(value)}%`;
+        return `${t(`admin:pricing.changes.fields.${key}`)}: ${shown}`;
+      })
       .join(", ");
   };
 

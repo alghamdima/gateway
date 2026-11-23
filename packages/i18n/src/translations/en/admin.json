@@ -128,7 +128,11 @@
       },
       "topupFee": {
         "label": "Top-up fee",
-        "description": "Added to the payment when a customer buys credits. It is never taken from their credits."
+        "description": "Added to the payment when a customer buys credits, but never less than the minimum. It is never taken from their credits."
+      },
+      "topupFeeMin": {
+        "label": "Minimum top-up fee",
+        "description": "The least fee a top-up pays, in dollars: the fee is the larger of the percentage and this amount. OpenRouter charges 5.5% with a $0.80 minimum."
       }
     },
     "providers": {
@@ -155,6 +159,7 @@
       "fields": {
         "defaultMarkupBps": "Default markup",
         "topupFeeBps": "Top-up fee",
+        "topupFeeMinMicroUsd": "Minimum fee",
         "markupBps": "Markup"
       }
     }

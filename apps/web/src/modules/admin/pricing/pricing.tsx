@@ -36,6 +36,7 @@ export const Pricing = () => {
             <SettingsForm
               defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
               topupFeeBps={pricing.data.settings.topupFeeBps}
+              topupFeeMinMicroUsd={pricing.data.settings.topupFeeMinMicroUsd}
             />
           ) : (
             <Skeleton className="h-32 w-full" />

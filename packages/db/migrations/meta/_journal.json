@@ -127,6 +127,13 @@
       "when": 1795402170175,
       "tag": "0017_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795418698895,
+      "tag": "0018_topup_fee_minimum",
+      "breakpoints": true
     }
   ]
 }

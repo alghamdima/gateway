@@ -10,6 +10,7 @@ import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
   MAX_MARKUP_BPS,
   MAX_TOPUP_FEE_BPS,
+  MAX_TOPUP_FEE_MIN_MICRO_USD,
   selectCustomerSchema,
   selectOrderSchema,
   selectSubscriptionSchema,
@@ -341,6 +342,8 @@ export const updatePricingSettingsSchema = z.object({
   defaultMarkupBps: markupBpsSchema,
   /** Basis points added on a top-up payment. */
   topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
+  /** The least fee a top-up pays, in micro-USD (1 USD = 1,000,000). */
+  topupFeeMinMicroUsd: z.number().int().min(0).max(MAX_TOPUP_FEE_MIN_MICRO_USD),
 });
 
 /** The gateway's provider name, as in its config: openai, anthropic, ... */

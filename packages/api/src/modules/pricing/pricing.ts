@@ -19,6 +19,8 @@ import type { SelectProviderMarkup } from "@workspace/db/schema";
 export interface PricingSettings {
   defaultMarkupBps: number;
   topupFeeBps: number;
+  /** The least fee a top-up pays, in micro-USD. */
+  topupFeeMinMicroUsd: number;
   updatedAt: Date;
   updatedBy: string | null;
 }
@@ -35,6 +37,7 @@ export const getPricingSettings = async (): Promise<PricingSettings> => {
     .select({
       defaultMarkupBps: pricingSettings.defaultMarkupBps,
       topupFeeBps: pricingSettings.topupFeeBps,
+      topupFeeMinMicroUsd: pricingSettings.topupFeeMinMicroUsd,
       updatedAt: pricingSettings.updatedAt,
       updatedBy: pricingSettings.updatedBy,
     })
@@ -77,12 +80,14 @@ export const getPricingChanges = async (limit = 50) =>
 export interface UpdatePricingSettingsInput {
   defaultMarkupBps: number;
   topupFeeBps: number;
+  topupFeeMinMicroUsd: number;
   staffId: string;
 }
 
 export const updatePricingSettings = async ({
   defaultMarkupBps,
   topupFeeBps,
+  topupFeeMinMicroUsd,
   staffId,
 }: UpdatePricingSettingsInput): Promise<PricingSettings> =>
   db.transaction(async (tx) => {
@@ -91,6 +96,7 @@ export const updatePricingSettings = async ({
       .select({
         defaultMarkupBps: pricingSettings.defaultMarkupBps,
         topupFeeBps: pricingSettings.topupFeeBps,
+        topupFeeMinMicroUsd: pricingSettings.topupFeeMinMicroUsd,
       })
       .from(pricingSettings)
       .where(eq(pricingSettings.id, SETTINGS_ID))
@@ -107,6 +113,7 @@ export const updatePricingSettings = async ({
       .set({
         defaultMarkupBps,
         topupFeeBps,
+        topupFeeMinMicroUsd,
         updatedAt: new Date(),
         updatedBy: staffId,
       })
@@ -114,6 +121,7 @@ export const updatePricingSettings = async ({
       .returning({
         defaultMarkupBps: pricingSettings.defaultMarkupBps,
         topupFeeBps: pricingSettings.topupFeeBps,
+        topupFeeMinMicroUsd: pricingSettings.topupFeeMinMicroUsd,
         updatedAt: pricingSettings.updatedAt,
         updatedBy: pricingSettings.updatedBy,
       });
@@ -125,7 +133,7 @@ export const updatePricingSettings = async ({
     await tx.insert(pricingChange).values({
       target: "settings",
       before,
-      after: { defaultMarkupBps, topupFeeBps },
+      after: { defaultMarkupBps, topupFeeBps, topupFeeMinMicroUsd },
       changedBy: staffId,
     });
 

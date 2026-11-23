@@ -20,18 +20,22 @@ import { toast } from "@workspace/ui-web/toast";
 import { admin } from "~/modules/admin/lib/api";
 import {
   bpsToPercent,
+  microUsdToUsd,
   percentSchema,
   percentToBps,
+  usdToMicroUsd,
 } from "~/modules/admin/pricing/rates";
 
 interface SettingsFormProps {
   readonly defaultMarkupBps: number;
   readonly topupFeeBps: number;
+  readonly topupFeeMinMicroUsd: number;
 }
 
 export const SettingsForm = ({
   defaultMarkupBps,
   topupFeeBps,
+  topupFeeMinMicroUsd,
 }: SettingsFormProps) => {
   const { t } = useTranslation(["common", "admin"]);
   const queryClient = useQueryClient();
@@ -39,6 +43,8 @@ export const SettingsForm = ({
   const schema = z.object({
     defaultMarkup: percentSchema(1000, t("admin:pricing.error.decimals")),
     topupFee: percentSchema(100, t("admin:pricing.error.decimals")),
+    // dollars and cents, at most $100: the same two-decimal rule as a percentage
+    topupFeeMin: percentSchema(100, t("admin:pricing.error.decimals")),
   });
 
   const form = useForm({
@@ -46,6 +52,7 @@ export const SettingsForm = ({
     values: {
       defaultMarkup: bpsToPercent(defaultMarkupBps),
       topupFee: bpsToPercent(topupFeeBps),
+      topupFeeMin: microUsdToUsd(topupFeeMinMicroUsd),
     },
   });
 
@@ -61,6 +68,7 @@ export const SettingsForm = ({
     await updateSettings.mutateAsync({
       defaultMarkupBps: percentToBps(data.defaultMarkup),
       topupFeeBps: percentToBps(data.topupFee),
+      topupFeeMinMicroUsd: usdToMicroUsd(data.topupFeeMin),
     });
   };
 
@@ -75,6 +83,11 @@ export const SettingsForm = ({
       label: t("admin:pricing.settings.topupFee.label"),
       description: t("admin:pricing.settings.topupFee.description"),
     },
+    {
+      name: "topupFeeMin",
+      label: t("admin:pricing.settings.topupFeeMin.label"),
+      description: t("admin:pricing.settings.topupFeeMin.description"),
+    },
   ] as const;
 
   return (
@@ -84,7 +97,7 @@ export const SettingsForm = ({
       onSubmit={form.handleSubmit(onSubmit)}
       className="space-y-6"
     >
-      <div className="grid gap-6 @lg:grid-cols-2">
+      <div className="grid gap-6 @lg:grid-cols-3">
         {fields.map(({ name, label, description }) => (
           <Controller
             key={name}
@@ -96,6 +109,9 @@ export const SettingsForm = ({
                   {label}
                 </FieldLabel>
                 <div className="flex items-center gap-2">
+                  {name === "topupFeeMin" && (
+                    <span className="text-muted-foreground">$</span>
+                  )}
                   <Input
                     id={`admin-pricing-${name}`}
                     type="number"
@@ -111,7 +127,9 @@ export const SettingsForm = ({
                     aria-invalid={fieldState.invalid}
                     className="max-w-32"
                   />
-                  <span className="text-muted-foreground">%</span>
+                  {name !== "topupFeeMin" && (
+                    <span className="text-muted-foreground">%</span>
+                  )}
                 </div>
                 <FieldDescription>{description}</FieldDescription>
                 {fieldState.invalid && (

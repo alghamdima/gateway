@@ -136,7 +136,11 @@
       },
       "topupFee": {
         "label": "Comisión de recarga",
-        "description": "Se suma al pago cuando un cliente compra créditos. Nunca se descuenta de sus créditos."
+        "description": "Se suma al pago cuando un cliente compra créditos, nunca menos que el mínimo. Nunca se descuenta de sus créditos."
+      },
+      "topupFeeMin": {
+        "label": "Comisión mínima de recarga",
+        "description": "La comisión mínima de una recarga, en dólares: la comisión es el mayor entre el porcentaje y este importe. OpenRouter cobra 5,5% con un mínimo de $0,80."
       }
     },
     "providers": {
@@ -163,6 +167,7 @@
       "fields": {
         "defaultMarkupBps": "Margen por defecto",
         "topupFeeBps": "Comisión de recarga",
+        "topupFeeMinMicroUsd": "Comisión mínima",
         "markupBps": "Margen"
       }
     }
