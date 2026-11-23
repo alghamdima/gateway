@@ -148,6 +148,13 @@
       "when": 1795429473779,
       "tag": "0020_admin_audit_log",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795439447778,
+      "tag": "0021_api_keys",
+      "breakpoints": true
     }
   ]
 }

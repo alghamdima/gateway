@@ -129,6 +129,10 @@ func (db *testDB) organization(t *testing.T, balance int64) string {
 	if _, err := db.admin.Exec(ctx, `INSERT INTO organization (id, name, slug, created_at) VALUES ($1, $1, $1, now())`, id); err != nil {
 		t.Fatal(err)
 	}
+	// its gateway customer has the same id here; organizations_test.go covers different ids
+	if _, err := db.admin.Exec(ctx, `INSERT INTO gateway_customer (organization_id, customer_id) VALUES ($1, $1)`, id); err != nil {
+		t.Fatal(err)
+	}
 	if balance == 0 {
 		return id
 	}

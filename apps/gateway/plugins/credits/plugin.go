@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -55,6 +56,7 @@ type Config struct {
 
 // ledger is the part of Store the hooks use.
 type ledger interface {
+	OrganizationFor(ctx context.Context, customerID string) (string, bool, error)
 	Reserve(ctx context.Context, organizationID string, amount int64, ttl time.Duration) (string, bool, error)
 	Settle(ctx context.Context, st Settlement) (SettleResult, error)
 }
@@ -74,11 +76,13 @@ type pricer interface {
 
 // Plugin implements schemas.LLMPlugin.
 type Plugin struct {
-	ledger             ledger
-	pricer             pricer
-	logger             schemas.Logger
-	prices             pricingSource
-	markups            atomic.Pointer[markups]
+	ledger  ledger
+	pricer  pricer
+	logger  schemas.Logger
+	prices  pricingSource
+	markups atomic.Pointer[markups]
+	// organizations caches gateway customer id -> organization id (organizations.go)
+	organizations      sync.Map
 	reservationTTL     time.Duration
 	inputBytesPerToken int
 	// refuseAll is set when the plugin could not be configured. It then refuses every
@@ -237,8 +241,18 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		return req, refuse(403, ErrorTypeUnsupportedRequest, fmt.Sprintf("Requests of type %q are not available.", req.RequestType)), nil
 	}
 
-	organizationID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerID)
-	if organizationID == "" {
+	customerID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerID)
+	if customerID == "" {
+		return req, refuse(403, ErrorTypeNoOrganization, "This API key is not linked to an organization."), nil
+	}
+	lookupCtx, cancelLookup := context.WithTimeout(context.Background(), ledgerTimeout)
+	organizationID, mapped, err := p.organizationFor(lookupCtx, customerID)
+	cancelLookup()
+	if err != nil {
+		p.logger.Error("credits: cannot resolve gateway customer %s: %v", customerID, err)
+		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits could not be checked. Try again shortly."), nil
+	}
+	if !mapped {
 		return req, refuse(403, ErrorTypeNoOrganization, "This API key is not linked to an organization."), nil
 	}
 

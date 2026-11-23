@@ -53,6 +53,10 @@ type fakeLedger struct {
 	settleErr   error
 	reserveCall atomic.Int64
 
+	unmapped  map[string]bool // customers OrganizationFor does not know
+	lookupErr error
+	lookups   int
+
 	settleFailures int           // fail this many Settle calls before succeeding
 	settleGate     chan struct{} // when set, Settle waits until it is closed
 	settleCall     atomic.Int64
@@ -62,6 +66,21 @@ func (f *fakeLedger) settlements() []Settlement {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]Settlement(nil), f.settled...)
+}
+
+// OrganizationFor maps each customer to the organization of the same id, unless unmapped
+// lists it.
+func (f *fakeLedger) OrganizationFor(_ context.Context, customerID string) (string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.lookupErr != nil {
+		return "", false, f.lookupErr
+	}
+	f.lookups++
+	if f.unmapped[customerID] {
+		return "", false, nil
+	}
+	return customerID, true, nil
 }
 
 func (f *fakeLedger) Reserve(_ context.Context, _ string, amount int64, _ time.Duration) (string, bool, error) {

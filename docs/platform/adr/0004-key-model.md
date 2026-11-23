@@ -28,6 +28,16 @@ Option 1.
 - Key prefix: the brand's customer key prefix (brief input, for example `sk-acme-`) replaces `sk-bf-` in the rename (ADR 0008). Keys keep the UUIDv4 body (122 random bits), which is enough entropy.
 - Only members with the organization's admin or owner role can create, disable or delete keys.
 
+## Amendment (2026-11-23): customer ids come from the gateway
+
+The gateway's governance API does not accept a customer id: it generates one (a UUID). So `organization.id` cannot be the customer id, and a mapping table replaces that part of the decision:
+
+- `gateway_customer (organization_id primary key, customer_id unique)` in the control plane, created when an organization's first key is made.
+- The credits plugin reads it as `gateway_ledger` to turn the customer id the governance plugin puts on the context into the organization that pays. It caches hits in memory; a miss is asked again, so a new organization works at once.
+- A customer with no row is refused with 403 `credits_no_organization`, before any provider call.
+- Deleting an organization deletes its row (foreign key), so its keys can no longer be charged even if removing them from the gateway failed: they are refused.
+- Disabling a key in the gateway returns 403 `policy_access_denied` to its holder, not 401; a deleted or unknown key returns 401.
+
 ## Consequences
 
 - The control plane is the only writer of customers and virtual keys. The Bifrost admin UI is not exposed to customers (ADR 0007), so there is one source of truth.
