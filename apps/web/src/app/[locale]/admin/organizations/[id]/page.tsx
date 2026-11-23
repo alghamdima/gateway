@@ -9,6 +9,7 @@ import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { getQueryClient } from "~/lib/query/server";
 import { admin } from "~/modules/admin/lib/api";
+import { OrganizationCredits } from "~/modules/admin/organizations/organization/credits";
 import { OrganizationDetails } from "~/modules/admin/organizations/organization/details";
 import { OrganizationHeader } from "~/modules/admin/organizations/organization/header";
 import { InvitationsDataTable } from "~/modules/admin/organizations/organization/invitations/data-table/invitations-data-table";
@@ -62,6 +63,10 @@ export default async function OrganizationPage({
   );
 
   const sections = [
+    {
+      label: t("credits"),
+      component: <OrganizationCredits organizationId={id} />,
+    },
     {
       label: t("members"),
       component: <MembersDataTable organizationId={id} />,

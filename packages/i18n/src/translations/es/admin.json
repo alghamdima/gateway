@@ -66,6 +66,23 @@
       "description": "Gestiona tus organizaciones y sus miembros."
     },
     "organization": {
+      "credits": {
+        "available": "Disponible",
+        "balance": "Saldo",
+        "held": "Reservado por solicitudes en curso",
+        "amount": {
+          "label": "Importe",
+          "placeholder": "10 o -2,50",
+          "invalid": "Indica un importe distinto de 0 y hasta 1.000.000. Negativo quita crédito."
+        },
+        "reason": {
+          "label": "Motivo",
+          "placeholder": "Por qué este ajuste (obligatorio)"
+        },
+        "submit": "Ajustar saldo",
+        "success": "Saldo ajustado.",
+        "description": "Positivo añade crédito, negativo lo quita. El ajuste es un movimiento del libro con tu nombre y el motivo, y aparece en el registro de auditoría."
+      },
       "delete": {
         "title": "Eliminar {{name}}",
         "disclaimer": "Estás a punto de eliminar esta organización. \n\nTras eliminarla, todos los datos (incluidos miembros y equipos) se eliminarán permanentemente y no podrán recuperarse. \n\n¿Deseas continuar?",

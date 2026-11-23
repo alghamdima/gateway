@@ -62,6 +62,23 @@
       "description": "Manage your organizations and their members."
     },
     "organization": {
+      "credits": {
+        "available": "Available",
+        "balance": "Balance",
+        "held": "Held by requests in flight",
+        "amount": {
+          "label": "Amount",
+          "placeholder": "10 or -2.50",
+          "invalid": "Enter a non-zero amount, up to 1,000,000. Negative removes credit."
+        },
+        "reason": {
+          "label": "Reason",
+          "placeholder": "Why this adjustment (required)"
+        },
+        "submit": "Adjust balance",
+        "success": "Balance adjusted.",
+        "description": "Positive adds credit, negative removes it. The adjustment is a ledger entry with your name and reason, and appears in the audit log."
+      },
       "delete": {
         "title": "Delete {{name}}",
         "disclaimer": "You are about to delete this organization. \n\nAfter deleting it, all organization data (including members and teams) will be permanently deleted and cannot be recovered. \n\nDo you want to continue?",
