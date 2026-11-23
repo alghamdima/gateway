@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { canAccessAdminRoute, findAccessRule } from "../access";
+import {
+  ADMIN_ACCESS_RULES,
+  auditTarget,
+  canAccessAdminRoute,
+  findAccessRule,
+} from "../access";
 
 // Every route the admin routers define, as [method, path after /api/admin].
 // Keep in step with modules/admin/**/router.ts and modules/pricing/router.ts.
@@ -115,5 +120,24 @@ describe("admin route access", () => {
 
   it.each(Object.values(ROUTES))("covers %s %s with a rule", (method, path) => {
     expect(findAccessRule(method, path)).toBeDefined();
+  });
+});
+
+describe("admin audit", () => {
+  it.each(ADMIN_ACCESS_RULES.filter((rule) => rule.method !== "GET"))(
+    "names an audit action for $method $path",
+    (rule) => {
+      expect(rule.audit?.action).toMatch(/^[a-z]+\.[a-z-]+$/);
+    },
+  );
+
+  it.each([
+    ["/organizations/o1/credits", "o1"],
+    ["/organizations/o1/members/m1", "o1"],
+    ["/users/u1/accounts/a1", "u1"],
+    ["/pricing/settings", "settings"],
+    ["/pricing/providers/openai", "openai"],
+  ])("targets %s at %s", (path, target) => {
+    expect(auditTarget(path)).toBe(target);
   });
 });

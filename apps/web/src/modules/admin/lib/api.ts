@@ -1,4 +1,8 @@
-import { mutationOptions, queryOptions } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  mutationOptions,
+  queryOptions,
+} from "@tanstack/react-query";
 
 import {
   getInvitationsResponseSchema,
@@ -21,6 +25,7 @@ import type { User } from "@workspace/auth";
 import type { InferRequestType } from "hono/client";
 
 const KEY = "admin";
+const AUDIT_PAGE_SIZE = 100;
 
 const queries = {
   users: {
@@ -192,6 +197,22 @@ const queries = {
           schema: getOrganizationOrdersResponseSchema,
         })({ query, param: { id } }),
     }),
+  },
+  audit: {
+    list: () =>
+      infiniteQueryOptions({
+        queryKey: [KEY, "audit"],
+        initialPageParam: undefined as number | undefined,
+        queryFn: ({ pageParam }) =>
+          handle(api.admin.audit.$get)({
+            query: {
+              limit: String(AUDIT_PAGE_SIZE),
+              ...(pageParam === undefined ? {} : { before: String(pageParam) }),
+            },
+          }),
+        getNextPageParam: (lastPage) =>
+          lastPage.length === AUDIT_PAGE_SIZE ? lastPage.at(-1)?.id : undefined,
+      }),
   },
   pricing: {
     get: () =>

@@ -1,10 +1,6 @@
-import { createMiddleware } from "hono/factory";
-
 import { hasStaffPermission, isStaff } from "@workspace/auth";
-import { HttpStatusCode } from "@workspace/shared/constants";
-import { HttpException } from "@workspace/shared/utils";
 
-import type { StaffPermissions, User } from "@workspace/auth";
+import type { StaffPermissions } from "@workspace/auth";
 
 /**
  * Which staff permission each /api/admin route needs
@@ -17,6 +13,8 @@ interface AccessRule {
   path: RegExp;
   /** "any-staff" lets every staff role through. */
   needs: StaffPermissions | "any-staff";
+  /** Set on every rule that changes something: the audit log's action name. */
+  audit?: { action: string; target: string };
 }
 
 const ID = "[^/]+";
@@ -34,6 +32,7 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     method: "DELETE",
     path: new RegExp(`^/users/${ID}/accounts/${ID}$`),
     needs: { user: ["update"] },
+    audit: { action: "user.unlink-account", target: "user" },
   },
 
   {
@@ -45,6 +44,7 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     method: "POST",
     path: new RegExp(`^/organizations/${ID}/credits$`),
     needs: { credits: ["adjust"] },
+    audit: { action: "credits.adjust", target: "organization" },
   },
   {
     method: "GET",
@@ -55,21 +55,25 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     method: "DELETE",
     path: new RegExp(`^/organizations/${ID}$`),
     needs: { organizations: ["delete"] },
+    audit: { action: "organization.delete", target: "organization" },
   },
   {
     method: "PATCH",
     path: new RegExp(`^/organizations/${ID}$`),
     needs: { organizations: ["update"] },
+    audit: { action: "organization.update", target: "organization" },
   },
   {
     method: "PATCH",
     path: new RegExp(`^/organizations/${ID}/members/${ID}$`),
     needs: { organizations: ["update"] },
+    audit: { action: "organization.member-update", target: "organization" },
   },
   {
     method: "DELETE",
     path: new RegExp(`^/organizations/${ID}/(members|invitations)/${ID}$`),
     needs: { organizations: ["update"] },
+    audit: { action: "organization.member-remove", target: "organization" },
   },
 
   { method: "GET", path: /^\/customers$/, needs: { customers: ["read"] } },
@@ -83,11 +87,13 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     method: "PUT",
     path: /^\/pricing\/(settings|providers\/[^/]+)$/,
     needs: { pricing: ["update"] },
+    audit: { action: "pricing.update", target: "pricing" },
   },
   {
     method: "DELETE",
     path: /^\/pricing\/providers\/[^/]+$/,
     needs: { pricing: ["update"] },
+    audit: { action: "pricing.remove-provider", target: "pricing" },
   },
 
   { method: "GET", path: /^\/audit$/, needs: { audit: ["read"] } },
@@ -116,15 +122,11 @@ export const canAccessAdminRoute = (
   return hasStaffPermission(user, rule.needs);
 };
 
-/** Mounted on /api/admin after enforceAdmin, which has already required a staff role. */
-export const enforceStaffAccess = createMiddleware<{
-  Variables: { user: User };
-}>(async (c, next) => {
-  const path = c.req.path.replace(/^.*?\/api\/admin/, "") || "/";
-  if (!canAccessAdminRoute(c.var.user, c.req.method, path)) {
-    throw new HttpException(HttpStatusCode.FORBIDDEN, {
-      code: "error.forbidden",
-    });
-  }
-  await next();
-});
+/**
+ * For the audit log: which record a path is about. /organizations/o1/credits
+ * is organization o1; /pricing/providers/openai is the pricing of openai.
+ */
+export const auditTarget = (path: string) => {
+  const segments = path.split("/").filter(Boolean);
+  return segments[0] === "pricing" ? segments.at(-1) : segments[1];
+};

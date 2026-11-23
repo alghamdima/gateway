@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { hasAdminPermission } from "@workspace/auth";
+import { hasAdminPermission, hasStaffPermission } from "@workspace/auth";
 import { Icons } from "@workspace/ui-web/icons";
 import { SidebarInset, SidebarProvider } from "@workspace/ui-web/sidebar";
 
@@ -12,6 +12,8 @@ import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
 import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
 import { DashboardSidebarSkeleton } from "~/modules/common/layout/dashboard/sidebar/skeleton";
 import { TurboLink } from "~/modules/common/turbo-link";
+
+import type { StaffPermissions, User } from "@workspace/auth";
 
 const menu = [
   {
@@ -45,9 +47,28 @@ const menu = [
         href: pathsConfig.admin.pricing.index,
         icon: <Icons.Percent />,
       },
+      {
+        title: "audit",
+        href: pathsConfig.admin.audit.index,
+        icon: <Icons.ScrollText />,
+      },
     ],
   },
 ];
+
+/** Menu entries only some staff roles may open (ADR 0011). The API refuses the rest anyway. */
+const RESTRICTED: Record<string, StaffPermissions> = {
+  [pathsConfig.admin.audit.index]: { audit: ["read"] },
+};
+
+const menuFor = (user: User) =>
+  menu.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const needs = RESTRICTED[item.href];
+      return !needs || hasStaffPermission(user, needs);
+    }),
+  }));
 
 export default function AdminLayout({
   children,
@@ -88,7 +109,7 @@ async function AuthenticatedAdminSidebar() {
   return (
     <DashboardSidebar
       user={user}
-      menu={menu}
+      menu={menuFor(user)}
       header={
         <TurboLink
           href={pathsConfig.index}

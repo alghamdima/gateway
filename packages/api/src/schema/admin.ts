@@ -360,3 +360,11 @@ export type UpdatePricingSettingsInput = z.infer<
   typeof updatePricingSettingsSchema
 >;
 export type SetProviderMarkupInput = z.infer<typeof setProviderMarkupSchema>;
+
+export const getAdminActionsInputSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  before: z.coerce.number().int().positive().optional(),
+  actorId: z.string().min(1).max(100).optional(),
+});
+
+export type GetAdminActionsInput = z.infer<typeof getAdminActionsInputSchema>;

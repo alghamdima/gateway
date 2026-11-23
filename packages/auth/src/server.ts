@@ -5,6 +5,7 @@ import {
   APIError,
   createAuthMiddleware,
   getSessionFromCtx,
+  isAPIError,
 } from "better-auth/api";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
@@ -29,6 +30,7 @@ import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 import { hooks } from "./hooks";
+import { AUTH_ADMIN_ACTIONS, clientIp, recordStaffAction } from "./lib/audit";
 import { syncSubscriptionSeats } from "./lib/server";
 import { getUrl, trustedOrigins } from "./lib/utils";
 import {
@@ -168,6 +170,8 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      await recordAuthAdminAction(ctx);
+
       if (ctx.path !== "/organization/leave") {
         return;
       }
@@ -308,6 +312,51 @@ export const auth = betterAuth({
   },
 });
 
+/**
+ * Records a successful Better Auth admin action in the audit log
+ * (ADR 0011). The request still carries the staff member's own session, so
+ * they are the actor, including for impersonate-user; for
+ * stop-impersonating the session is the customer's and names the staff
+ * member in impersonatedBy.
+ */
+async function recordAuthAdminAction(
+  ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
+) {
+  const entry = AUTH_ADMIN_ACTIONS[ctx.path];
+  if (!entry || isAPIError(ctx.context.returned)) {
+    return;
+  }
+  const session = await getSessionFromCtx(ctx);
+  if (!session) {
+    return;
+  }
+  const impersonatedBy =
+    typeof session.session.impersonatedBy === "string"
+      ? session.session.impersonatedBy
+      : null;
+  const body: Record<string, unknown> =
+    ctx.body && typeof ctx.body === "object" ? ctx.body : {};
+  const targetId =
+    typeof body.userId === "string"
+      ? body.userId
+      : impersonatedBy
+        ? session.user.id
+        : undefined;
+
+  await recordStaffAction({
+    actorId: impersonatedBy ?? session.user.id,
+    actorRole:
+      impersonatedBy === null && typeof session.user.role === "string"
+        ? session.user.role
+        : null,
+    action: entry.action,
+    targetType: "user",
+    targetId,
+    details: entry.details?.(body),
+    ipAddress: clientIp(ctx.request?.headers),
+  });
+}
+
 export type AuthErrorCode = keyof typeof auth.$ERROR_CODES;
 export type Session = typeof auth.$Infer.Session;
 export type User = Session["user"];
@@ -323,3 +372,4 @@ export type Permissions = NonNullable<
 
 export * from "./hooks";
 export * from "./lib/server";
+export * from "./lib/audit";

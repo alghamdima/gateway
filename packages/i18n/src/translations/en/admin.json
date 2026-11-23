@@ -163,5 +163,20 @@
         "markupBps": "Markup"
       }
     }
+  },
+  "audit": {
+    "header": {
+      "title": "Audit log",
+      "description": "Every change staff made in this console, newest first. It cannot be edited or deleted."
+    },
+    "empty": "No staff actions yet.",
+    "more": "Show older",
+    "columns": {
+      "when": "When",
+      "who": "Who",
+      "action": "Action",
+      "target": "On",
+      "details": "Details"
+    }
   }
 }

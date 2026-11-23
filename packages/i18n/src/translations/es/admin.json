@@ -171,5 +171,20 @@
         "markupBps": "Margen"
       }
     }
+  },
+  "audit": {
+    "header": {
+      "title": "Registro de auditoría",
+      "description": "Cada cambio que hizo el personal en esta consola, el más reciente primero. No se puede editar ni borrar."
+    },
+    "empty": "Aún no hay acciones del personal.",
+    "more": "Ver anteriores",
+    "columns": {
+      "when": "Cuándo",
+      "who": "Quién",
+      "action": "Acción",
+      "target": "Sobre",
+      "details": "Detalles"
+    }
   }
 }
