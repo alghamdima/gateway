@@ -93,3 +93,6 @@ apps/gateway/**/*.db-wal
 apps/gateway/**/:memory:
 apps/gateway/examples/mcps/*/bin/
 apps/gateway/tests/redis-certs/
+
+# written by `next dev` on start; the repo root AGENTS.md already carries these rules
+apps/web/AGENTS.md
