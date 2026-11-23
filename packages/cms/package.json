@@ -9,7 +9,8 @@
   "scripts": {
     "build": "content-collections build",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "content-collections watch"
+    "dev": "content-collections watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@content-collections/core": "0.15.2",

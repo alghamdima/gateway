@@ -55,6 +55,11 @@ jobs:
       - name: 🛻 Lint
         run: node --run lint -- --format=github
 
+      # oxlint does not check types; without this a type error in a package or a test
+      # reaches main
+      - name: 🔎 Typecheck
+        run: node --run typecheck
+
       - name: 🧪 Test
         run: node --run test
         env:

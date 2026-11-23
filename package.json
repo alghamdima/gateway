@@ -18,6 +18,7 @@
     "services:status": "docker compose ps",
     "services:stop": "docker compose down",
     "test": "turbo run test",
+    "typecheck": "turbo build --filter=./packages/* && turbo run typecheck",
     "test:e2e": "turbo run test:e2e",
     "test:projects": "vitest run",
     "test:projects:watch": "vitest --watch",

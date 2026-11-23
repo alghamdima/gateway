@@ -11,7 +11,8 @@
     "test:coverage": "nyc report -t coverage/merged --report-dir coverage/report --reporter=html --exclude-after-remap false",
     "test:coverage:collect": "tsx ./src/scripts/collect-json-outputs.ts",
     "test:coverage:merge": "nyc merge coverage/raw coverage/merged/merged-coverage.json",
-    "test:coverage:view": "open coverage/report/index.html"
+    "test:coverage:view": "open coverage/report/index.html",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "vitest": "catalog:"

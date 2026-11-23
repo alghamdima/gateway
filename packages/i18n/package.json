@@ -10,7 +10,8 @@
     "./env": "./src/env.ts"
   },
   "scripts": {
-    "clean": "git clean -xdf .cache .turbo dist node_modules"
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@formatjs/intl-localematcher": "0.8.4",

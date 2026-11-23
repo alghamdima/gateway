@@ -9,7 +9,8 @@
     "./server": "./src/server.ts"
   },
   "scripts": {
-    "clean": "git clean -xdf .cache .turbo dist node_modules"
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@openpanel/nextjs": "1.5.0",
