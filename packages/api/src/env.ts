@@ -2,7 +2,6 @@ import { defineEnv } from "envin";
 import * as z from "zod";
 
 import { preset as auth } from "@workspace/auth/env";
-import { preset as billingMobile } from "@workspace/billing-mobile/server/env";
 import { preset as billingWeb } from "@workspace/billing-web/env";
 import { preset as db } from "@workspace/db/env";
 import { preset as email } from "@workspace/email/env";
@@ -17,7 +16,7 @@ export const preset = {
   server: {
     OPENAI_API_KEY: z.string().optional(), // change it to your provider API key (e.g. ANTHROPIC_API_KEY if you use Anthropic)
   },
-  extends: [auth, billingWeb, billingMobile, db, email, storage, monitoring],
+  extends: [auth, billingWeb, db, email, storage, monitoring],
 } as const satisfies Preset;
 
 export const env = defineEnv({

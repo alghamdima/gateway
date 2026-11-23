@@ -11,8 +11,6 @@ export const SortOrder = {
 
 export const Platform = {
   WEB: "web",
-  MOBILE: "mobile",
-  EXTENSION: "extension",
 } as const;
 
 export const ExecutionSide = {

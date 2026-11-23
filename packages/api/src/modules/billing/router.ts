@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import { Permissions, User } from "@workspace/auth";
-import * as mobile from "@workspace/billing-mobile/server";
 import {
   checkoutSchema,
   getBillingPortalSchema,
@@ -122,5 +121,4 @@ export const billingRouter = new Hono()
         }),
       ),
   )
-  .post(`/webhook/${web.provider}`, (c) => web.webhookHandler(c.req.raw))
-  .post(`/webhook/${mobile.provider}`, (c) => mobile.webhookHandler(c.req.raw));
+  .post(`/webhook/${web.provider}`, (c) => web.webhookHandler(c.req.raw));

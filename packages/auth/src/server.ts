@@ -1,5 +1,4 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { expo } from "@better-auth/expo";
 import { i18n, locales, TranslationDictionary } from "@better-auth/i18n";
 import { passkey } from "@better-auth/passkey";
 import { createAuthMiddleware } from "better-auth/api";
@@ -215,7 +214,6 @@ export const auth = betterAuth({
       },
     }),
     oneTap(),
-    expo(),
     nextCookies(),
   ],
   socialProviders: {

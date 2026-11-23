@@ -45,47 +45,14 @@ describe("getUrl", () => {
     expect(url.hostname).toBe("localhost");
   });
 
-  it("should use expo-origin header if present (mobile)", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "expo-origin": "exp://192.168.1.1:8081" },
-    });
-    const url = getUrl({ request });
-    expect(url.toString()).toBe("exp://192.168.1.1:8081");
-  });
-
-  it("should replace params from passed url into expo-origin", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "expo-origin": "exp://host" },
-    });
-    const url = getUrl({
-      request,
-      url: "https://ignored.com?foo=bar",
-    });
-    expect(url.searchParams.get("foo")).toBe("bar");
-    expect(url.protocol).toBe("exp:");
-    expect(url.host).toBe("host");
-  });
-
-  it("should ignore untrusted expo-origin and fall back to provided url", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "expo-origin": "evil://phish" },
-    });
-    const url = getUrl({
-      request,
-      url: "http://localhost:3000/api/auth/magic-link/verify?token=abc",
-    });
-    expect(url.toString()).toBe(
-      "http://localhost:3000/api/auth/magic-link/verify?token=abc",
-    );
-  });
-
-  it("should use turbostarter scheme from x-url", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "x-url": "turbostarter://setup/auth/join" },
-    });
-    const url = getUrl({ request });
-    expect(url.toString()).toBe("turbostarter://setup/auth/join");
-  });
+  it.each(["turbostarter://setup/auth/join", "chrome-extension://abc/popup"])(
+    "should not trust the removed app origin %s",
+    (origin) => {
+      const request = new Request(BASE_URL, { headers: { "x-url": origin } });
+      const url = getUrl({ request });
+      expect(url.origin).toBe(BASE_URL);
+    },
+  );
 
   it("should fallback to request url for web", () => {
     const request = new Request("https://web.com/current");

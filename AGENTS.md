@@ -40,44 +40,40 @@ Guide for AI agents working on the Turbostarter monorepo.
 
 ## Where to look first
 
-| Task              | Start here                                                           |
-| ----------------- | -------------------------------------------------------------------- |
-| Auth logic        | `packages/auth/` → then app-specific usage                           |
-| API endpoints     | `packages/api/src/modules/`                                          |
-| Database schema   | `packages/db/src/schema/`                                            |
-| UI components     | `packages/ui/web/` or `packages/ui/mobile/`                          |
-| Billing           | `packages/billing/{shared,web,mobile}/`                              |
-| Feature flags     | `packages/flags/` → `flags-web` / `flags-mobile` / `flags-extension` |
-| Translations      | `packages/i18n/src/translations/`                                    |
-| Email templates   | `packages/email/src/templates/`                                      |
-| Web pages         | `apps/web/src/app/[locale]/`                                         |
-| Mobile screens    | `apps/mobile/src/app/`                                               |
-| Extension entries | `apps/extension/src/app/`                                            |
+| Task            | Start here                                 |
+| --------------- | ------------------------------------------ |
+| Auth logic      | `packages/auth/` → then app-specific usage |
+| API endpoints   | `packages/api/src/modules/`                |
+| Database schema | `packages/db/src/schema/`                  |
+| UI components   | `packages/ui/web/`                         |
+| Billing         | `packages/billing/{shared,web}/`           |
+| Feature flags   | `packages/flags/` → `flags-web`            |
+| Translations    | `packages/i18n/src/translations/`          |
+| Email templates | `packages/email/src/templates/`            |
+| Web pages       | `apps/web/src/app/[locale]/`               |
 
 ## Project structure
 
 ```
 apps/
   web/         Next.js App Router (src/app/[locale]/{(marketing),auth,dashboard,admin})
-  mobile/      Expo Router (src/app/{(setup),dashboard}, src/modules/)
-  extension/   WXT + React (src/app/{background,content,popup,options,sidepanel,...})
   gateway/     Go AI gateway (vendored from upstream, see apps/gateway/UPSTREAM). Not a pnpm package:
                own Go modules (go.work) and npm UI. Read apps/gateway/AGENTS.md before editing it
 
 packages/
   api/         @workspace/api       Hono modules (admin,ai,auth,billing,organization,storage)
-  auth/        @workspace/auth      Better Auth server + clients (src/client/{web,mobile}.ts)
-  billing/     @workspace/billing   Shared + web (Stripe,LemonSqueezy,Polar) + mobile (RevenueCat,Superwall)
-  flags/       @workspace/flags     OpenFeature helpers + flags-web / flags-mobile / flags-extension
+  auth/        @workspace/auth      Better Auth server + web client (src/client/web.ts)
+  billing/     @workspace/billing   Shared + web (Stripe,LemonSqueezy,Polar)
+  flags/       @workspace/flags     OpenFeature helpers + flags-web
   cms/         @workspace/cms       MDX content (blog, legal)
   db/          @workspace/db        Drizzle schema, migrations, scripts
   email/       @workspace/email     React Email templates + providers
   i18n/        @workspace/i18n      Translations + server/client utils
   shared/      @workspace/shared    Constants, schema, logger, hooks, utils
   storage/     @workspace/storage   S3 storage providers
-  analytics/   @workspace/analytics[-web|-mobile|-extension]
-  monitoring/  @workspace/monitoring[-web|-mobile|-extension]
-  ui/          @workspace/ui[-web|-mobile]
+  analytics/   @workspace/analytics[-web]
+  monitoring/  @workspace/monitoring[-web]
+  ui/          @workspace/ui[-web]
 
 tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 ```
@@ -89,8 +85,6 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 | Install deps       | `pnpm install`                                               |
 | Dev (all/specific) | `pnpm dev` / `pnpm --filter <app> dev`                       |
 | Build              | `pnpm build` / `pnpm --filter <app> build`                   |
-| Mobile run         | `pnpm --filter mobile ios` / `android`                       |
-| Extension build    | `pnpm --filter extension build:chrome` / `build:firefox`     |
 | Lint/Format        | `pnpm lint` / `pnpm format`                                  |
 | Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                          |
 | Test               | `pnpm test`                                                  |
@@ -117,10 +111,6 @@ Environment: create `.env.local` at repo root with `DATABASE_URL`, `PRODUCT_NAME
 ## App-specific
 
 **Web:** RSC by default; `use client` only when needed; `Suspense` for client components; `nuqs` for URL state; `@workspace/ui-web`. Next.js 16.4: `proxy.ts` (not middleware); error boundaries use `retry` (not `reset`); TypeScript 7 via project-local `tsc`; locale via `next/root-params` (`~/lib/i18n`).
-
-**Mobile:** SafeAreaProvider; minimize hooks; memoize; `expo-image`; `@workspace/ui-mobile`. To run or check the app, use `npx @expo/agent-cli` from `apps/mobile` (`status`, `dev`, `smoke`) instead of raw Expo/EAS CLI; it is experimental and falls back to Expo CLI. `expo start` also prints an Expo Device Hub link for driving simulators/emulators from the browser.
-
-**Extension:** background for long tasks; content scripts for DOM; WXT messaging; `@workspace/ui-web`
 
 ## Troubleshooting
 

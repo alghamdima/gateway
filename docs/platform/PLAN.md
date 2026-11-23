@@ -333,7 +333,7 @@ Verified when: the `turbostarter` scan returns only the allowlist (LICENSE and c
 #### Step 7.1: Replace the 172 hits (Size: M)
 
 - Covers `PRODUCT_NAME`, auth `appName` and `cookiePrefix`, email layout and logo, i18n, marketing links and buy CTAs, generator templates, the docker-compose project name, README and AGENTS.md.
-- Mobile config and the `turbostarter://` scheme follow question 6.
+- The mobile and extension apps were removed on the owner's decision (2026-11-23), with the `turbostarter://` and `chrome-extension://` trusted origins.
 - Blocked by: question 1.
 
 #### Step 7.2: Marketing site rewritten for the product (Size: M)

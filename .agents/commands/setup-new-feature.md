@@ -4,7 +4,7 @@ Set up a new feature in the Turbostarter monorepo following project conventions.
 
 ## Before starting
 
-1. **Clarify scope**: Which apps need this feature? (web, mobile, extension, or all)
+1. **Clarify scope**: Which parts need this feature? (web, API, gateway)
 2. **Check existing code**: Look in `packages/*` for reusable logic before creating new code
 3. **Identify shared vs app-specific**: Shared logic goes in `packages/*`, UI in app-specific modules
 
@@ -28,28 +28,6 @@ Set up a new feature in the Turbostarter monorepo following project conventions.
 
 3. **Use RSC by default**: Only add `use client` when necessary
 
-### Mobile feature (`apps/mobile`)
-
-1. **Screen**: Create in `src/app/`
-   - Setup/onboarding → `(setup)/`
-   - Main app → `dashboard/`
-
-2. **Module**: Create in `src/modules/{feature}/`
-   ```
-   src/modules/{feature}/
-     components/     # React Native components
-     lib/            # Hooks, utils, API calls
-     index.ts        # Public exports
-   ```
-
-3. **Remember**: SafeAreaView, memoization, `@workspace/ui-mobile`
-
-### Extension feature (`apps/extension`)
-
-1. **Entry point**: Add to `src/app/` if new entry needed
-2. **Module**: Create in `src/modules/{feature}/`
-3. **Background vs content**: Long tasks → background, DOM → content scripts
-
 ### Shared logic (`packages/*`)
 
 If the feature needs shared logic across apps:
@@ -65,11 +43,11 @@ If the feature needs shared logic across apps:
 
 ## Checklist
 
-- [ ] Scope defined (which apps)
+- [ ] Scope defined
 - [ ] Checked `packages/*` for existing helpers
 - [ ] Created module structure in target app(s)
 - [ ] Added shared logic to appropriate package (if needed)
-- [ ] Used correct UI package (`@workspace/ui-web` or `@workspace/ui-mobile`)
+- [ ] Used `@workspace/ui-web` for UI
 - [ ] Added translations if user-facing text
 - [ ] Types explicit, no `any`
 - [ ] Zod schemas for validation

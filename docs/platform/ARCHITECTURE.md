@@ -104,14 +104,14 @@ Both databases run on one Postgres server at launch, as two databases.
 
 ## Owner decisions still open
 
-| Decision                                                         | Where it matters                     |
-| ---------------------------------------------------------------- | ------------------------------------ |
-| Brand inputs (name, domain, code name, prefixes, Go module path) | Phase 5 rename                       |
-| Payment provider                                                 | ADR 0003                             |
-| Purchase fee, top-up amounts                                     | ADR 0003                             |
-| Markup on inference                                              | ADR 0005                             |
-| Charging for failed attempts that consumed tokens                | ADR 0002                             |
-| Lemon Squeezy buy links, EAS project, Expo updates URL           | Phase 5b (mobile is skipped for now) |
+| Decision                                                         | Where it matters |
+| ---------------------------------------------------------------- | ---------------- |
+| Brand inputs (name, domain, code name, prefixes, Go module path) | Phase 5 rename   |
+| Payment provider                                                 | ADR 0003         |
+| Purchase fee, top-up amounts                                     | ADR 0003         |
+| Markup on inference                                              | ADR 0005         |
+| Charging for failed attempts that consumed tokens                | ADR 0002         |
+| Lemon Squeezy buy links                                          | Phase 5b         |
 
 ## ADR index
 
