@@ -29,9 +29,8 @@ vi.mock(
   "../../../../../billing/web/src/providers/stripe/sdk",
   async (importOriginal) => {
     const original =
-      await importOriginal<
-        typeof import("../../../../../billing/web/src/providers/stripe/sdk")
-      >();
+      // only the signature checker is used from the real client
+      await importOriginal<{ stripe: () => { webhooks: object } }>();
     const real = original.stripe();
     return {
       stripe: () => ({

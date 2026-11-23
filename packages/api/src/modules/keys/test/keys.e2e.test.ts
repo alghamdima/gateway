@@ -247,19 +247,19 @@ describe.skipIf(!adminUrl || !binary)(
       );
     }, 60_000);
 
-    it("a key whose spending limit is used up is refused", async () => {
-      // a cap below one request's cost: the first request may pass, the next must not
+    it("a key whose spending limit does not cover the request is refused by the credits plugin", async () => {
+      // a cap below one request's hold: refused before the provider is called (ADR 0013)
       const { key } = await keys.createKey({
         organizationId: "org_e2e",
         userId: "user_e2e",
         name: "capped",
         limit: { limitMicroUsd: 100, reset: "daily" },
       });
-      const first = await chat(key);
-      expect([200, 402, 429]).toContain(first.status);
-      await settled("org_e2e");
-      const second = await chat(key);
-      expect(second.status).not.toBe(200);
+      const refused = await chat(key);
+      expect(refused.status).toBe(403);
+      expect(JSON.stringify(await refused.json())).toContain(
+        "credits_key_limit",
+      );
     }, 60_000);
 
     it("a deleted key and the keys of a deleted organization stop working", async () => {

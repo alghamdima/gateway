@@ -50,6 +50,8 @@ export const creditLedgerEntry = pgTable(
     idempotencyKey: text().notNull().unique(),
     reference: text(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    /** The gateway virtual key that spent it (usage only): per-key limits and reports (ADR 0013). */
+    virtualKeyId: text(),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [
@@ -57,6 +59,9 @@ export const creditLedgerEntry = pgTable(
       t.organizationId,
       t.createdAt,
     ),
+    index("credit_ledger_entry_usage_virtualKeyId_createdAt_idx")
+      .on(t.virtualKeyId, t.createdAt)
+      .where(sql`${t.kind} = 'usage' and ${t.virtualKeyId} is not null`),
     check("credit_ledger_entry_amount_not_zero", sql`${t.amount} <> 0`),
   ],
 );
@@ -91,6 +96,8 @@ export const creditReservation = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     amount: microUsd().notNull(),
+    /** The gateway virtual key the hold is for, when the request came with one (ADR 0013). */
+    virtualKeyId: text(),
     expiresAt: timestamp().notNull(),
     settledAt: timestamp(),
     createdAt: timestamp().notNull().defaultNow(),
@@ -99,6 +106,9 @@ export const creditReservation = pgTable(
     index("credit_reservation_open_expiresAt_idx")
       .on(t.expiresAt)
       .where(sql`${t.settledAt} is null`),
+    index("credit_reservation_open_virtualKeyId_idx")
+      .on(t.virtualKeyId)
+      .where(sql`${t.settledAt} is null and ${t.virtualKeyId} is not null`),
     check("credit_reservation_amount_positive", sql`${t.amount} > 0`),
   ],
 );

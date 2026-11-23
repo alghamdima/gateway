@@ -281,8 +281,8 @@ func TestBackground_TheReaperLoopReleasesAnAbandonedHold(t *testing.T) {
 	plugin.reaper = store
 	org := db.organization(t, 5000)
 
-	if _, ok, err := store.Reserve(context.Background(), org, 4000, 50*time.Millisecond); err != nil || !ok {
-		t.Fatalf("reserve: %v %v", ok, err)
+	if _, got, err := store.Reserve(context.Background(), org, "", 4000, 50*time.Millisecond); err != nil || got != Reserved {
+		t.Fatalf("reserve: %v %v", got, err)
 	}
 	if s := db.consistent(t, org); s.Held != 4000 {
 		t.Fatalf("held: %+v", s)

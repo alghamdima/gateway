@@ -146,7 +146,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
     );
   });
 
-  it("passes the spending limit and expiry to the gateway and records them", async () => {
+  it("records the spending limit, and gives the gateway only the expiry", async () => {
     const org = await createOrganization();
     const expiresAt = new Date(Date.now() + 86_400_000);
     const { apiKey } = await keys.createKey(
@@ -160,13 +160,31 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
       gateway.client,
     );
     const [sent] = [...gateway.state.keys.values()];
-    expect(sent).toMatchObject({
-      limit: { limitMicroUsd: 5_000_000, reset: "weekly" },
-      expiresAt,
-    });
+    // the limit is enforced by the credits plugin from this record (ADR 0013)
+    expect(sent).toMatchObject({ expiresAt });
+    expect(sent).not.toHaveProperty("limit");
     expect(apiKey).toMatchObject({
       limitMicroUsd: 5_000_000,
       limitReset: "weekly",
+    });
+  });
+
+  it("changes only the record when only the limit changes", async () => {
+    const org = await createOrganization();
+    const { apiKey } = await keys.createKey(
+      { organizationId: org, userId: "u", name: "a" },
+      gateway.client,
+    );
+    const updated = await keys.updateKey(
+      org,
+      apiKey.id,
+      { limit: { limitMicroUsd: 2_000_000, reset: "daily" } },
+      gateway.client,
+    );
+    expect(gateway.state.updates).toEqual([]);
+    expect(updated).toMatchObject({
+      limitMicroUsd: 2_000_000,
+      limitReset: "daily",
     });
   });
 
@@ -239,7 +257,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
     }
   });
 
-  it("disables, renames and removes the limit in the gateway, then records it", async () => {
+  it("disables and renames in the gateway, and removes the limit in the record", async () => {
     const org = await createOrganization();
     const { apiKey } = await keys.createKey(
       {
@@ -257,7 +275,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
       gateway.client,
     );
     expect(gateway.state.updates).toEqual([
-      [expect.any(String), { name: "renamed", isActive: false, limit: null }],
+      [expect.any(String), { name: "renamed", isActive: false }],
     ]);
     expect(updated).toMatchObject({
       name: "renamed",

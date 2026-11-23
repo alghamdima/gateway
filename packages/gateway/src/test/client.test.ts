@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { createGatewayClient, GatewayError, toBudgets } from "../client";
+import { createGatewayClient, GatewayError } from "../client";
 
 import type { IncomingMessage, Server } from "node:http";
 
@@ -79,7 +79,7 @@ describe("gateway client", () => {
     expect(seen[0]?.authorization).toBeUndefined();
   });
 
-  it("creates a key for every provider under the customer, with its limit", async () => {
+  it("creates a key for every provider under the customer, with no gateway budget", async () => {
     replies.push({
       status: 200,
       body: { virtual_key: { id: "vk_1", value: "sk-bf-abc" } },
@@ -89,7 +89,6 @@ describe("gateway client", () => {
       await client().createVirtualKey({
         name: "prod",
         customerId: "cust_1",
-        limit: { limitMicroUsd: 25_000_000, reset: "monthly" },
         expiresAt,
       }),
     ).toEqual({ id: "vk_1", value: "sk-bf-abc" });
@@ -98,8 +97,6 @@ describe("gateway client", () => {
       customer_id: "cust_1",
       allow_all_providers: true,
       is_active: true,
-      calendar_aligned: true,
-      budgets: [{ max_limit: 25, reset_duration: "1M" }],
       expires_at: "2027-01-01T00:00:00.000Z",
     });
   });
@@ -111,16 +108,12 @@ describe("gateway client", () => {
     ).rejects.toThrow(/without an id or value/);
   });
 
-  it("updates only what it is given, and null removes the limit", async () => {
+  it("updates only what it is given", async () => {
     await client().updateVirtualKey("vk_1", { isActive: false });
-    await client().updateVirtualKey("vk_1", { name: "renamed", limit: null });
+    await client().updateVirtualKey("vk_1", { name: "renamed" });
     expect(seen.map((s) => [s.method, s.path, s.body])).toEqual([
       ["PUT", "/api/governance/virtual-keys/vk_1", { is_active: false }],
-      [
-        "PUT",
-        "/api/governance/virtual-keys/vk_1",
-        { name: "renamed", budgets: [], calendar_aligned: true },
-      ],
+      ["PUT", "/api/governance/virtual-keys/vk_1", { name: "renamed" }],
     ]);
   });
 
@@ -156,25 +149,5 @@ describe("gateway client", () => {
     expect(seen[0]?.path).toBe(
       "/api/governance/virtual-keys/..%2Fcustomers%2Fx",
     );
-  });
-});
-
-describe("spending limits as gateway budgets", () => {
-  it.each([
-    [
-      { limitMicroUsd: 1_000_000, reset: "daily" as const },
-      [{ max_limit: 1, reset_duration: "1d" }],
-    ],
-    [
-      { limitMicroUsd: 2_500_000, reset: "weekly" as const },
-      [{ max_limit: 2.5, reset_duration: "1w" }],
-    ],
-    [
-      { limitMicroUsd: 100, reset: null },
-      [{ max_limit: 0.0001, reset_duration: "100Y" }],
-    ],
-    [null, []],
-  ])("%j", (limit, budgets) => {
-    expect(toBudgets(limit)).toEqual(budgets);
   });
 });

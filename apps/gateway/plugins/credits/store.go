@@ -25,6 +25,20 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+// ReserveOutcome says whether a hold was taken, and if not, why.
+type ReserveOutcome int
+
+const (
+	// Reserved means the hold was taken.
+	Reserved ReserveOutcome = iota
+	// InsufficientCredits means the organization's spendable balance does not cover it,
+	// or the organization has no account.
+	InsufficientCredits
+	// KeyLimitReached means the API key's spending limit for its current window does not
+	// cover it (docs/platform/adr/0013-key-limits-in-the-ledger.md).
+	KeyLimitReached
+)
+
 // reserveSQL raises held only if the spendable balance covers the amount, and records
 // the reservation in the same statement. No returned row means the hold was refused:
 // either the balance is too low or the organization has no account.
@@ -35,27 +49,98 @@ WITH hold AS (
    WHERE organization_id = $2 AND balance - held >= $3
   RETURNING organization_id
 )
-INSERT INTO credit_reservation (id, organization_id, amount, expires_at)
-SELECT $1, organization_id, $3, now() + make_interval(secs => $4)
+INSERT INTO credit_reservation (id, organization_id, amount, expires_at, virtual_key_id)
+SELECT $1, organization_id, $3, now() + make_interval(secs => $4), nullif($5, '')
   FROM hold
 RETURNING id`
 
-// Reserve holds amount against the organization's balance. ok is false when the balance
-// does not cover it. amount must be positive.
-func (s *Store) Reserve(ctx context.Context, organizationID string, amount int64, ttl time.Duration) (reservationID string, ok bool, err error) {
+// keyLimitSQL reads the limit the control plane stored for a virtual key. No row: the
+// key was not made by the control plane, and only the balance applies.
+const keyLimitSQL = `SELECT limit_micro_usd, limit_reset FROM api_key WHERE virtual_key_id = $1`
+
+// keyLockSQL serializes the limit check of one key: two holds checked at once would both
+// see the same spend. The lock ends with the transaction.
+const keyLockSQL = `SELECT pg_advisory_xact_lock(hashtextextended('credits:key:' || $1, 0))`
+
+// keySpendSQL is what a key has spent in its current window (UTC calendar day, ISO week
+// or month; all time without a reset), plus what its open holds may still spend.
+const keySpendSQL = `
+SELECT coalesce((
+         SELECT -sum(amount) FROM credit_ledger_entry
+          WHERE virtual_key_id = $1 AND kind = 'usage'
+            AND created_at >= CASE $2::text
+                  WHEN 'daily' THEN date_trunc('day', now() AT TIME ZONE 'UTC')
+                  WHEN 'weekly' THEN date_trunc('week', now() AT TIME ZONE 'UTC')
+                  WHEN 'monthly' THEN date_trunc('month', now() AT TIME ZONE 'UTC')
+                  ELSE '-infinity'::timestamp
+                END), 0)
+     + coalesce((
+         SELECT sum(amount) FROM credit_reservation
+          WHERE virtual_key_id = $1 AND settled_at IS NULL), 0)`
+
+// Reserve holds amount against the organization's balance and, when virtualKeyID names a
+// key with a spending limit, against that limit too. amount must be positive.
+func (s *Store) Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error) {
 	if amount <= 0 {
-		return "", false, fmt.Errorf("credits: reservation amount must be positive, got %d", amount)
+		return "", InsufficientCredits, fmt.Errorf("credits: reservation amount must be positive, got %d", amount)
 	}
 	id := uuid.NewString()
+	if virtualKeyID == "" {
+		return s.hold(ctx, s.pool, id, organizationID, "", amount, ttl)
+	}
+
+	var limit *int64
+	var reset *string
+	err := s.pool.QueryRow(ctx, keyLimitSQL, virtualKeyID).Scan(&limit, &reset)
+	if err != nil && err != pgx.ErrNoRows {
+		return "", InsufficientCredits, fmt.Errorf("credits: read key limit: %w", err)
+	}
+	if limit == nil {
+		// no limit: the common case pays nothing more than the balance check
+		return s.hold(ctx, s.pool, id, organizationID, virtualKeyID, amount, ttl)
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", InsufficientCredits, fmt.Errorf("credits: reserve: %w", err)
+	}
+	defer tx.Rollback(context.Background()) //nolint:errcheck // a committed transaction ignores it
+	if _, err := tx.Exec(ctx, keyLockSQL, virtualKeyID); err != nil {
+		return "", InsufficientCredits, fmt.Errorf("credits: lock key: %w", err)
+	}
+	// read after the lock, so holds committed by the previous holder are counted
+	var spent int64
+	if err := tx.QueryRow(ctx, keySpendSQL, virtualKeyID, reset).Scan(&spent); err != nil {
+		return "", InsufficientCredits, fmt.Errorf("credits: key spend: %w", err)
+	}
+	if spent+amount > *limit {
+		return "", KeyLimitReached, nil
+	}
+	got, outcome, err := s.hold(ctx, tx, id, organizationID, virtualKeyID, amount, ttl)
+	if err != nil || outcome != Reserved {
+		return got, outcome, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", InsufficientCredits, fmt.Errorf("credits: reserve: %w", err)
+	}
+	return got, Reserved, nil
+}
+
+// querier is a pool or a transaction.
+type querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func (s *Store) hold(ctx context.Context, q querier, id, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error) {
 	var got string
-	err = s.pool.QueryRow(ctx, reserveSQL, id, organizationID, amount, ttl.Seconds()).Scan(&got)
+	err := q.QueryRow(ctx, reserveSQL, id, organizationID, amount, ttl.Seconds(), virtualKeyID).Scan(&got)
 	if err == pgx.ErrNoRows {
-		return "", false, nil
+		return "", InsufficientCredits, nil
 	}
 	if err != nil {
-		return "", false, fmt.Errorf("credits: reserve: %w", err)
+		return "", InsufficientCredits, fmt.Errorf("credits: reserve: %w", err)
 	}
-	return got, true, nil
+	return got, Reserved, nil
 }
 
 // Settlement is the outcome of one attempt.
@@ -92,8 +177,9 @@ WITH released AS (
    WHERE id = $1 AND organization_id = $2 AND settled_at IS NULL
   RETURNING amount
 ), charged AS (
-  INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, metadata)
-  SELECT $3, $2, -$4::bigint, 'usage', $5, $6, $7::jsonb
+  INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, metadata, virtual_key_id)
+  SELECT $3, $2, -$4::bigint, 'usage', $5, $6, $7::jsonb,
+         (SELECT virtual_key_id FROM credit_reservation WHERE id = $1)
    WHERE $4::bigint > 0
   ON CONFLICT (idempotency_key) DO NOTHING
   RETURNING amount

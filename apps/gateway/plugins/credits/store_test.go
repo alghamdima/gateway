@@ -16,9 +16,9 @@ func TestReserve_HoldsWhenTheBalanceCovers(t *testing.T) {
 	store := NewStore(db.ledger)
 	org := db.organization(t, 10*usd)
 
-	id, ok, err := store.Reserve(context.Background(), org, 4*usd, time.Minute)
-	if err != nil || !ok || id == "" {
-		t.Fatalf("Reserve = %q, %t, %v", id, ok, err)
+	id, got, err := store.Reserve(context.Background(), org, "", 4*usd, time.Minute)
+	if err != nil || got != Reserved || id == "" {
+		t.Fatalf("Reserve = %q, %d, %v", id, got, err)
 	}
 	if s := db.consistent(t, org); s.Balance != 10*usd || s.Held != 4*usd {
 		t.Fatalf("state after reserve: %+v", s)
@@ -31,18 +31,18 @@ func TestReserve_RefusesWhatTheBalanceDoesNotCover(t *testing.T) {
 	ctx := context.Background()
 	org := db.organization(t, 10*usd)
 
-	if _, ok, err := store.Reserve(ctx, org, 10*usd+1, time.Minute); err != nil || ok {
-		t.Fatalf("more than the balance: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, org, "", 10*usd+1, time.Minute); err != nil || got == Reserved {
+		t.Fatalf("more than the balance: outcome=%d err=%v", got, err)
 	}
-	if _, ok, err := store.Reserve(ctx, org, 7*usd, time.Minute); err != nil || !ok {
-		t.Fatalf("first hold: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, org, "", 7*usd, time.Minute); err != nil || got != Reserved {
+		t.Fatalf("first hold: outcome=%d err=%v", got, err)
 	}
 	// 3 USD left to hold: the spendable amount is balance minus what is already held
-	if _, ok, err := store.Reserve(ctx, org, 3*usd+1, time.Minute); err != nil || ok {
-		t.Fatalf("more than balance - held: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, org, "", 3*usd+1, time.Minute); err != nil || got == Reserved {
+		t.Fatalf("more than balance - held: outcome=%d err=%v", got, err)
 	}
-	if _, ok, err := store.Reserve(ctx, org, 3*usd, time.Minute); err != nil || !ok {
-		t.Fatalf("exactly balance - held: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, org, "", 3*usd, time.Minute); err != nil || got != Reserved {
+		t.Fatalf("exactly balance - held: outcome=%d err=%v", got, err)
 	}
 	if s := db.consistent(t, org); s.Held != 10*usd {
 		t.Fatalf("state: %+v", s)
@@ -54,13 +54,13 @@ func TestReserve_RefusesAnOrganizationWithoutAnAccount(t *testing.T) {
 	store := NewStore(db.ledger)
 	ctx := context.Background()
 
-	if _, ok, err := store.Reserve(ctx, db.organization(t, 0), 1, time.Minute); err != nil || ok {
-		t.Fatalf("no account: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, db.organization(t, 0), "", 1, time.Minute); err != nil || got == Reserved {
+		t.Fatalf("no account: outcome=%d err=%v", got, err)
 	}
-	if _, ok, err := store.Reserve(ctx, "org_that_does_not_exist", 1, time.Minute); err != nil || ok {
-		t.Fatalf("no organization: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, "org_that_does_not_exist", "", 1, time.Minute); err != nil || got == Reserved {
+		t.Fatalf("no organization: outcome=%d err=%v", got, err)
 	}
-	if _, _, err := store.Reserve(ctx, db.organization(t, usd), 0, time.Minute); err == nil {
+	if _, _, err := store.Reserve(ctx, db.organization(t, usd), "", 0, time.Minute); err == nil {
 		t.Fatal("a zero reservation must be an error")
 	}
 }
@@ -78,11 +78,11 @@ func TestReserve_ConcurrentRequestsNeverHoldMoreThanTheBalance(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, ok, err := store.Reserve(context.Background(), org, usd, time.Minute)
+			_, got, err := store.Reserve(context.Background(), org, "", usd, time.Minute)
 			if err != nil {
 				t.Error(err)
 			}
-			if ok {
+			if got == Reserved {
 				granted.Add(1)
 			}
 		}()
@@ -202,8 +202,8 @@ func TestSettle_CostAboveTheHoldCanTakeTheBalanceBelowZero(t *testing.T) {
 		t.Fatalf("state: %+v", s)
 	}
 	// and the next request is refused until a top-up
-	if _, ok, err := store.Reserve(ctx, org, 1, time.Minute); err != nil || ok {
-		t.Fatalf("reserve on a negative balance: ok=%t err=%v", ok, err)
+	if _, got, err := store.Reserve(ctx, org, "", 1, time.Minute); err != nil || got == Reserved {
+		t.Fatalf("reserve on a negative balance: outcome=%d err=%v", got, err)
 	}
 }
 
@@ -285,12 +285,12 @@ func TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance(t *testing.T)
 		go func() {
 			defer wg.Done()
 			ctx := context.Background()
-			id, ok, err := store.Reserve(ctx, org, usd, time.Minute)
+			id, got, err := store.Reserve(ctx, org, "", usd, time.Minute)
 			if err != nil {
 				t.Error(err)
 				return
 			}
-			if !ok {
+			if got != Reserved {
 				refused.Add(1)
 				return
 			}
@@ -320,8 +320,8 @@ func TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance(t *testing.T)
 }
 
 func reserve(store *Store, organizationID string, amount int64) (string, error) {
-	id, ok, err := store.Reserve(context.Background(), organizationID, amount, time.Minute)
-	if err == nil && !ok {
+	id, got, err := store.Reserve(context.Background(), organizationID, "", amount, time.Minute)
+	if err == nil && got != Reserved {
 		err = fmt.Errorf("reservation of %d refused", amount)
 	}
 	return id, err

@@ -106,7 +106,6 @@ export const createKey = async (
   const virtualKey = await gateway.createVirtualKey({
     name,
     customerId,
-    limit,
     expiresAt,
   });
 
@@ -170,8 +169,9 @@ export interface UpdateKeyInput {
 
 /**
  * The gateway first: disabling must take effect even if recording it fails,
- * and a retry repeats the same change. Returns undefined when the
- * organization has no such key.
+ * and a retry repeats the same change. The spending limit lives only here:
+ * the credits plugin reads it on every hold (ADR 0013). Returns undefined
+ * when the organization has no such key.
  */
 export const updateKey = async (
   organizationId: string,
@@ -183,11 +183,12 @@ export const updateKey = async (
   if (!found) {
     return undefined;
   }
-  await gateway.updateVirtualKey(found.virtualKeyId, {
-    name: input.name,
-    isActive: input.disabled === undefined ? undefined : !input.disabled,
-    limit: input.limit,
-  });
+  if (input.name !== undefined || input.disabled !== undefined) {
+    await gateway.updateVirtualKey(found.virtualKeyId, {
+      name: input.name,
+      isActive: input.disabled === undefined ? undefined : !input.disabled,
+    });
+  }
   const [row] = await db
     .update(apiKey)
     .set({

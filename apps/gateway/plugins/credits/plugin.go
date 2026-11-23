@@ -40,6 +40,7 @@ const (
 	ErrorTypeUnsupportedRequest  = "credits_unsupported_request"
 	ErrorTypeUnpriced            = "credits_unpriced_model"
 	ErrorTypeLedgerUnavailable   = "credits_ledger_unavailable"
+	ErrorTypeKeyLimit            = "credits_key_limit"
 )
 
 // Config is the plugin's entry in the gateway config.
@@ -57,7 +58,7 @@ type Config struct {
 // ledger is the part of Store the hooks use.
 type ledger interface {
 	OrganizationFor(ctx context.Context, customerID string) (string, bool, error)
-	Reserve(ctx context.Context, organizationID string, amount int64, ttl time.Duration) (string, bool, error)
+	Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error)
 	Settle(ctx context.Context, st Settlement) (SettleResult, error)
 }
 
@@ -275,13 +276,17 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 
 	ledgerCtx, cancel := context.WithTimeout(context.Background(), ledgerTimeout)
 	defer cancel()
-	reservationID, ok, err := p.ledger.Reserve(ledgerCtx, organizationID, amount, p.reservationTTL)
+	virtualKeyID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceVirtualKeyID)
+	reservationID, outcome, err := p.ledger.Reserve(ledgerCtx, organizationID, virtualKeyID, amount, p.reservationTTL)
 	if err != nil {
 		p.logger.Error("credits: reserve failed for organization %s: %v", organizationID, err)
 		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits could not be checked. Try again shortly."), nil
 	}
-	if !ok {
+	switch outcome {
+	case InsufficientCredits:
 		return req, refuse(402, ErrorTypeInsufficientCredits, "Insufficient credits. Add credits to continue, or lower max_tokens."), nil
+	case KeyLimitReached:
+		return req, refuse(403, ErrorTypeKeyLimit, "This API key has reached its spending limit. Raise the limit, wait for it to reset, or lower max_tokens."), nil
 	}
 
 	ctx.SetValue(holdContextKey, &hold{

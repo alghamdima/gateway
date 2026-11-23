@@ -52,6 +52,8 @@ type fakeLedger struct {
 	reserveErr  error
 	settleErr   error
 	reserveCall atomic.Int64
+	virtualKeys []string // the key each Reserve call named
+	keyLimited  bool     // refuse every hold as over the key's limit
 
 	unmapped  map[string]bool // customers OrganizationFor does not know
 	lookupErr error
@@ -83,18 +85,22 @@ func (f *fakeLedger) OrganizationFor(_ context.Context, customerID string) (stri
 	return customerID, true, nil
 }
 
-func (f *fakeLedger) Reserve(_ context.Context, _ string, amount int64, _ time.Duration) (string, bool, error) {
+func (f *fakeLedger) Reserve(_ context.Context, _, virtualKeyID string, amount int64, _ time.Duration) (string, ReserveOutcome, error) {
 	f.reserveCall.Add(1)
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.virtualKeys = append(f.virtualKeys, virtualKeyID)
 	if f.reserveErr != nil {
-		return "", false, f.reserveErr
+		return "", InsufficientCredits, f.reserveErr
+	}
+	if f.keyLimited {
+		return "", KeyLimitReached, nil
 	}
 	if amount > f.balance {
-		return "", false, nil
+		return "", InsufficientCredits, nil
 	}
 	f.reserved = append(f.reserved, amount)
-	return "res_1", true, nil
+	return "res_1", Reserved, nil
 }
 
 func (f *fakeLedger) Settle(_ context.Context, st Settlement) (SettleResult, error) {
@@ -245,6 +251,8 @@ func TestPreLLMHook_Refuses(t *testing.T) {
 	}{
 		{"a balance that does not cover the hold", &fakeLedger{balance: 100}, testPricer(), testOrg,
 			chatRequest(schemas.ChatCompletionRequest, nil), 402, ErrorTypeInsufficientCredits, 1},
+		{"a key over its spending limit", &fakeLedger{balance: 10 * usd, keyLimited: true}, testPricer(), testOrg,
+			chatRequest(schemas.ChatCompletionRequest, nil), 403, ErrorTypeKeyLimit, 1},
 		{"a key that belongs to no organization", &fakeLedger{balance: 10 * usd}, testPricer(), "",
 			chatRequest(schemas.ChatCompletionRequest, nil), 403, ErrorTypeNoOrganization, 0},
 		{"a model with no price", &fakeLedger{balance: 10 * usd}, &fakePricer{unknown: true}, testOrg,
@@ -278,6 +286,18 @@ func TestPreLLMHook_Refuses(t *testing.T) {
 				t.Error("a refused request left a hold on the context")
 			}
 		})
+	}
+}
+
+func TestPreLLMHook_NamesTheVirtualKeyToTheLedger(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	ctx := testContext(testOrg)
+	ctx.SetValue(schemas.BifrostContextKeyGovernanceVirtualKeyID, "vk_123")
+	if _, sc, err := testPlugin(ledger, testPricer()).PreLLMHook(ctx, chatRequest(schemas.ChatCompletionRequest, nil)); err != nil || sc != nil {
+		t.Fatalf("hook: %v %+v", err, sc)
+	}
+	if len(ledger.virtualKeys) != 1 || ledger.virtualKeys[0] != "vk_123" {
+		t.Fatalf("ledger was given keys %q, want [vk_123]", ledger.virtualKeys)
 	}
 }
 

@@ -16,25 +16,15 @@ export interface GatewayClientOptions {
   fetch?: typeof fetch;
 }
 
-export interface SpendLimit {
-  /** micro-USD (1 USD = 1,000,000). */
-  limitMicroUsd: number;
-  /** null: the limit never resets. */
-  reset: LimitReset | null;
-}
-
 export interface CreateVirtualKeyInput {
   name: string;
   customerId: string;
-  limit?: SpendLimit | null;
   expiresAt?: Date | null;
 }
 
 export interface UpdateVirtualKeyInput {
   name?: string;
   isActive?: boolean;
-  /** null removes the limit; undefined leaves it unchanged. */
-  limit?: SpendLimit | null;
 }
 
 export interface CreatedVirtualKey {
@@ -53,27 +43,6 @@ export class GatewayError extends Error {
     this.name = "GatewayError";
   }
 }
-
-const RESET_DURATIONS: Record<LimitReset, string> = {
-  daily: "1d",
-  weekly: "1w",
-  monthly: "1M",
-};
-
-/**
- * A gateway budget for a spending limit. Resets are calendar-aligned (UTC
- * midnight, week, month), as OpenRouter's. A limit that never resets is a
- * budget whose window is a century.
- */
-export const toBudgets = (limit: SpendLimit | null | undefined) =>
-  limit
-    ? [
-        {
-          max_limit: limit.limitMicroUsd / 1_000_000,
-          reset_duration: limit.reset ? RESET_DURATIONS[limit.reset] : "100Y",
-        },
-      ]
-    : [];
 
 interface CustomerResponse {
   customer: { id: string };
@@ -156,11 +125,14 @@ export const createGatewayClient = ({
       );
     },
 
-    /** Every provider the gateway has, every model: the prepaid balance is the limit. */
+    /**
+     * Every provider the gateway has, every model, and no gateway budget: the
+     * prepaid balance and the key's spending limit are both enforced on what
+     * the ledger charges (docs/platform/adr/0013-key-limits-in-the-ledger.md).
+     */
     createVirtualKey: async ({
       name,
       customerId,
-      limit,
       expiresAt,
     }: CreateVirtualKeyInput): Promise<CreatedVirtualKey> => {
       const created = await call<VirtualKeyResponse>(
@@ -171,8 +143,6 @@ export const createGatewayClient = ({
           customer_id: customerId,
           allow_all_providers: true,
           is_active: true,
-          calendar_aligned: true,
-          budgets: toBudgets(limit),
           ...(expiresAt ? { expires_at: expiresAt.toISOString() } : {}),
         },
       );
@@ -194,9 +164,6 @@ export const createGatewayClient = ({
           ...(input.isActive === undefined
             ? {}
             : { is_active: input.isActive }),
-          ...(input.limit === undefined
-            ? {}
-            : { budgets: toBudgets(input.limit), calendar_aligned: true }),
         },
       );
     },
