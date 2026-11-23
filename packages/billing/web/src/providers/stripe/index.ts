@@ -2,6 +2,7 @@ import { BillingProvider } from "../types";
 import { checkout } from "./checkout";
 import { getBillingPortal } from "./customer";
 import { updateSubscription } from "./subscription";
+import { createTopUpCheckout } from "./top-up";
 import { getUsage, recordUsage } from "./usage";
 import { webhookHandler } from "./webhook";
 
@@ -14,5 +15,6 @@ export const strategy = {
   updateSubscription,
   recordUsage,
   getUsage,
+  topUp: { checkout: createTopUpCheckout },
   provider: BillingProvider.STRIPE,
 } satisfies BillingProviderStrategy;

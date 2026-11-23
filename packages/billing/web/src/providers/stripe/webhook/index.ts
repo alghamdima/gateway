@@ -5,6 +5,7 @@ import { HttpException } from "@workspace/shared/utils";
 import { checkoutStatusChangeHandler } from "../checkout";
 import { env } from "../env";
 import { subscriptionStatusChangeHandler } from "../subscription";
+import { isTopUpSession, toTopUpEvent } from "../top-up";
 import { STRIPE_SIGNATURE_HEADER } from "./constants";
 import { constructEvent } from "./event";
 
@@ -40,6 +41,11 @@ export const webhookHandler = async (
   logger.info(`🔔  Webhook received: ${event.type}`);
   await callbacks?.onEvent?.(event);
 
+  const topUpEvent = toTopUpEvent(event);
+  if (topUpEvent) {
+    await callbacks?.onTopUpEvent?.(topUpEvent);
+  }
+
   switch (event.type) {
     case "customer.subscription.created":
       await callbacks?.onSubscriptionCreated?.(event.data.object.id);
@@ -64,7 +70,10 @@ export const webhookHandler = async (
       break;
     case "checkout.session.completed":
       await callbacks?.onCheckoutSessionCompleted?.(event.data.object.id);
-      await checkoutStatusChangeHandler(event.data.object);
+      // a top-up is credited by onEvent; it is not an order of a plan
+      if (!isTopUpSession(event.data.object)) {
+        await checkoutStatusChangeHandler(event.data.object);
+      }
       break;
   }
 

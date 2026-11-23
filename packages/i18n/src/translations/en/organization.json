@@ -275,6 +275,27 @@
     }
   },
   "credits": {
+    "topUp": {
+      "title": "Add credits",
+      "description": "A one-time card payment. Credits are spent on model requests by every key in this organization.",
+      "amount": "Amount of credits",
+      "credits": "Credits",
+      "fee": "Payment processing fee",
+      "total": "Total charged",
+      "pay": "Pay {{total}}",
+      "feeNote": "The fee is added to the payment and is never taken from your credits. Credits are added when the payment is confirmed, usually within seconds.",
+      "invalid": "Enter an amount between {{min}} and {{max}}, in dollars and cents.",
+      "returned": {
+        "success": {
+          "title": "Payment received",
+          "description": "Your credits are added as soon as the payment is confirmed. This page updates by itself."
+        },
+        "cancelled": {
+          "title": "Payment cancelled",
+          "description": "Nothing was charged."
+        }
+      }
+    },
     "title": "Credits",
     "description": "What this organization has to spend on models. Requests in flight hold the most they can cost until they finish.",
     "available": "Available",

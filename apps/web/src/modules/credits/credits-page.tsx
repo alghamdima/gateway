@@ -1,9 +1,12 @@
 "use client";
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 
 import { handle } from "@workspace/api/utils";
+import { toMemberRole } from "@workspace/auth";
 import { useTranslation } from "@workspace/i18n";
+import { Alert, AlertDescription, AlertTitle } from "@workspace/ui-web/alert";
 import { Button } from "@workspace/ui-web/button";
 import {
   Card,
@@ -24,9 +27,14 @@ import {
 } from "@workspace/ui-web/table";
 
 import { api } from "~/lib/api/client";
+import { authClient } from "~/lib/auth/client";
+import { TopUp } from "~/modules/credits/top-up";
 import { formatMicroUsd } from "~/modules/keys/money";
+import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
 
 const PAGE_SIZE = 25;
+/** While back from a payment, look for the webhook's credit this often. */
+const AFTER_PAYMENT_REFRESH_MS = 3_000;
 
 interface CreditsPageProps {
   readonly organizationId: string;
@@ -35,8 +43,22 @@ interface CreditsPageProps {
 /** The prepaid balance and every entry in the organization's ledger (ADR 0001). */
 export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
   const { t, i18n } = useTranslation(["common", "organization"]);
+  const { activeMember } = useActiveOrganization();
+  // owners and admins pay; the API checks the same
+  const canTopUp = authClient.organization.checkRolePermission({
+    permissions: { billing: ["create"] },
+    role: toMemberRole(activeMember?.role),
+  });
+  // set by the payment page when it sends the customer back
+  const [returned, setReturned] = useQueryState(
+    "top_up",
+    parseAsStringLiteral(["success", "cancelled"]),
+  );
+  const refetchInterval =
+    returned === "success" ? AFTER_PAYMENT_REFRESH_MS : false;
 
   const balance = useQuery({
+    refetchInterval,
     queryKey: ["credits", organizationId, "balance"],
     queryFn: () =>
       handle(api.credits[":organizationId"].$get)({
@@ -45,6 +67,7 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
   });
 
   const entries = useInfiniteQuery({
+    refetchInterval,
     queryKey: ["credits", organizationId, "entries"],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam }) =>
@@ -77,6 +100,23 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
 
   return (
     <div className="flex w-full flex-col gap-6">
+      {returned && (
+        <Alert>
+          <AlertTitle>
+            {t(`organization:credits.topUp.returned.${returned}.title`)}
+          </AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            {t(`organization:credits.topUp.returned.${returned}.description`)}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReturned(null)}
+            >
+              {t("common:close")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{t("organization:credits.title")}</CardTitle>
@@ -103,6 +143,8 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
           )}
         </CardContent>
       </Card>
+
+      {canTopUp && <TopUp organizationId={organizationId} />}
 
       <Card>
         <CardHeader>

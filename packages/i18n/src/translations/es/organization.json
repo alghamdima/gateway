@@ -265,6 +265,27 @@
     }
   },
   "credits": {
+    "topUp": {
+      "title": "Añadir créditos",
+      "description": "Un pago único con tarjeta. Los créditos se gastan en las solicitudes a modelos de todas las claves de esta organización.",
+      "amount": "Cantidad de créditos",
+      "credits": "Créditos",
+      "fee": "Comisión de procesamiento de pago",
+      "total": "Total a cobrar",
+      "pay": "Pagar {{total}}",
+      "feeNote": "La comisión se suma al pago y nunca se descuenta de tus créditos. Los créditos se añaden cuando se confirma el pago, normalmente en segundos.",
+      "invalid": "Indica un importe entre {{min}} y {{max}}, en dólares y céntimos.",
+      "returned": {
+        "success": {
+          "title": "Pago recibido",
+          "description": "Tus créditos se añaden en cuanto se confirma el pago. Esta página se actualiza sola."
+        },
+        "cancelled": {
+          "title": "Pago cancelado",
+          "description": "No se ha cobrado nada."
+        }
+      }
+    },
     "title": "Créditos",
     "description": "Lo que esta organización puede gastar en modelos. Las solicitudes en curso reservan lo máximo que pueden costar hasta que terminan.",
     "available": "Disponible",

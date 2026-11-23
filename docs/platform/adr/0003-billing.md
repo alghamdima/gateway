@@ -1,5 +1,7 @@
 # ADR 0003: Prepaid top-ups through one-time payments
 
+> Amended by ADR 0012: the customer types the amount (no product per amount), because the fee is a setting staff change (ADR 0010).
+
 Status: Accepted for the model. The payment provider is the owner's decision and still open. The purchase fee is set by staff in the admin console (ADR 0010).
 Date: 2026-11-21
 

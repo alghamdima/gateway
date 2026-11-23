@@ -7,11 +7,28 @@ import {
   validate,
 } from "../../middleware";
 import { getBalance, getEntries } from "./ledger";
+import {
+  MICRO_USD_PER_CENT,
+  quoteTopUp,
+  startTopUp,
+  TOP_UP_MAX_MICRO_USD,
+  TOP_UP_MIN_MICRO_USD,
+} from "./top-up";
 
 const getEntriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
   before: z.string().optional(),
 });
+
+/** Credit to buy in micro-USD: whole cents, within the per-payment limits. */
+const topUpAmountSchema = z.coerce
+  .number()
+  .int()
+  .min(TOP_UP_MIN_MICRO_USD)
+  .max(TOP_UP_MAX_MICRO_USD)
+  .refine((value) => value % MICRO_USD_PER_CENT === 0, {
+    message: "Must be a whole number of cents",
+  });
 
 export const creditsRouter = new Hono()
   .use(enforceAuth)
@@ -37,6 +54,34 @@ export const creditsRouter = new Hono()
         await getEntries({
           organizationId: c.req.param("organizationId"),
           ...c.req.valid("query"),
+        }),
+      ),
+  )
+  .get(
+    "/:organizationId/top-up/quote",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["create"] },
+      })(c, next),
+    validate("query", z.object({ amount: topUpAmountSchema })),
+    async (c) => c.json(await quoteTopUp(c.req.valid("query").amount)),
+  )
+  .post(
+    "/:organizationId/top-up",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["create"] },
+      })(c, next),
+    validate("json", z.object({ amount: topUpAmountSchema })),
+    async (c) =>
+      c.json(
+        await startTopUp({
+          user: c.var.user,
+          organizationId: c.req.param("organizationId"),
+          creditMicroUsd: c.req.valid("json").amount,
+          origin: new URL(c.req.url).origin,
         }),
       ),
   );

@@ -19,6 +19,7 @@ import {
   enforceOrganizationPermission,
   validate,
 } from "../../middleware";
+import { topUpWebhookCallbacks } from "../credits/top-up";
 
 const enforceAccessToReference = (permissions: Permissions["billing"]) =>
   createMiddleware<
@@ -121,4 +122,6 @@ export const billingRouter = new Hono()
         }),
       ),
   )
-  .post(`/webhook/${web.provider}`, (c) => web.webhookHandler(c.req.raw));
+  .post(`/webhook/${web.provider}`, (c) =>
+    web.webhookHandler(c.req.raw, topUpWebhookCallbacks),
+  );

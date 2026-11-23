@@ -1,0 +1,474 @@
+import { createHmac } from "node:crypto";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+import type { TestDatabase } from "@workspace/db/testing";
+import type postgres from "postgres";
+
+// Needs real Postgres: the ledger's idempotency keys are what make a
+// redelivered webhook count once. Skips without DATABASE_URL.
+const adminUrl = process.env.DATABASE_URL;
+
+const WEBHOOK_SECRET = "whsec_test_secret";
+const USD = 1_000_000;
+
+/** Records what would be sent to Stripe instead of sending it. */
+const stripeCalls = vi.hoisted(() => ({
+  sessions: [] as Record<string, unknown>[],
+  customers: [] as Record<string, unknown>[],
+}));
+
+vi.mock(
+  "../../../../../billing/web/src/providers/stripe/sdk",
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import("../../../../../billing/web/src/providers/stripe/sdk")
+      >();
+    const real = original.stripe();
+    return {
+      stripe: () => ({
+        // signature checks are Stripe's own code, unchanged
+        webhooks: real.webhooks,
+        customers: {
+          create: async (params: Record<string, unknown>) => {
+            stripeCalls.customers.push(params);
+            return { id: `cus_${stripeCalls.customers.length}` };
+          },
+          retrieve: async (id: string) => ({ id }),
+        },
+        checkout: {
+          sessions: {
+            create: async (params: Record<string, unknown>) => {
+              stripeCalls.sessions.push(params);
+              return { id: "cs_test_1", url: "https://checkout.stripe.test/1" };
+            },
+          },
+        },
+      }),
+    };
+  },
+);
+
+/** The Stripe-Signature header Stripe sends: HMAC-SHA256 of "timestamp.payload". */
+const sign = (payload: string, secret = WEBHOOK_SECRET) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = createHmac("sha256", secret)
+    .update(`${timestamp}.${payload}`)
+    .digest("hex");
+  return `t=${timestamp},v1=${signature}`;
+};
+
+let eventSeq = 0;
+const event = (type: string, object: Record<string, unknown>) =>
+  JSON.stringify({
+    id: `evt_${++eventSeq}`,
+    object: "event",
+    type,
+    api_version: "2026-11-18.endive",
+    created: Math.floor(Date.now() / 1000),
+    data: { object },
+  });
+
+const session = (input: {
+  organizationId: string;
+  paymentIntent: string;
+  creditMicroUsd: number;
+  feeMicroUsd: number;
+  amountTotalCents?: number;
+  paymentStatus?: string;
+}) => ({
+  id: `cs_${input.paymentIntent}`,
+  object: "checkout.session",
+  mode: "payment",
+  customer: "cus_1",
+  currency: "usd",
+  payment_intent: input.paymentIntent,
+  payment_status: input.paymentStatus ?? "paid",
+  amount_total:
+    input.amountTotalCents ??
+    (input.creditMicroUsd + input.feeMicroUsd) / 10_000,
+  metadata: {
+    purpose: "credits_top_up",
+    organizationId: input.organizationId,
+    creditMicroUsd: String(input.creditMicroUsd),
+    feeMicroUsd: String(input.feeMicroUsd),
+  },
+});
+
+const refund = (input: {
+  id: string;
+  paymentIntent: string;
+  amountCents: number;
+  status?: string;
+}) => ({
+  id: input.id,
+  object: "refund",
+  amount: input.amountCents,
+  currency: "usd",
+  payment_intent: input.paymentIntent,
+  status: input.status ?? "succeeded",
+});
+
+describe.skipIf(!adminUrl)("credit top-ups", () => {
+  let database: TestDatabase;
+  let sql: postgres.Sql;
+  let webhookHandler: typeof import("@workspace/billing-web/server").webhookHandler;
+  let topUp: typeof import("../top-up");
+  let seq = 0;
+
+  const createOrganization = async () => {
+    const id = `org_topup_${++seq}`;
+    await sql`insert into organization (id, name, slug, created_at) values (${id}, ${id}, ${id}, now())`;
+    return id;
+  };
+
+  // the handler and callbacks the webhook route uses (billing/router.ts)
+  const deliver = async (payload: string, signature = sign(payload)) =>
+    webhookHandler(
+      new Request("http://localhost/api/billing/webhook/stripe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Stripe-Signature": signature,
+        },
+        body: payload,
+      }),
+      topUp.topUpWebhookCallbacks,
+    );
+
+  const entries = async (organizationId: string) =>
+    sql<{ kind: string; amount: string; idempotency_key: string }[]>`
+      select kind, amount, idempotency_key from credit_ledger_entry
+      where organization_id = ${organizationId} order by created_at`;
+
+  const balance = async (organizationId: string) => {
+    const [row] = await sql<
+      { balance: string }[]
+    >`select balance from credit_account where organization_id = ${organizationId}`;
+    return Number(row?.balance ?? 0);
+  };
+
+  beforeAll(async () => {
+    const { createTestDatabase } = await import("@workspace/db/testing");
+    database = await createTestDatabase(adminUrl ?? "");
+    process.env.DATABASE_URL = database.url;
+    process.env.STRIPE_SECRET_KEY = "sk_test_not_used";
+    process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+
+    sql = (await import("postgres")).default(database.url, { max: 4 });
+    ({ webhookHandler } = await import("@workspace/billing-web/server"));
+    topUp = await import("../top-up");
+  });
+
+  afterAll(async () => {
+    const { db } = await import("@workspace/db/server");
+    await db.$client.end();
+    await sql.end();
+    await database.drop();
+  });
+
+  beforeEach(() => {
+    stripeCalls.sessions.length = 0;
+    stripeCalls.customers.length = 0;
+  });
+
+  describe("checkout", () => {
+    it("quotes the fee from the admin settings: the minimum, then the percentage", async () => {
+      // migration defaults: 5.5% with a $0.80 minimum
+      expect(await topUp.quoteTopUp(10 * USD)).toEqual({
+        creditMicroUsd: 10 * USD,
+        feeMicroUsd: 800_000,
+        totalMicroUsd: 10_800_000,
+      });
+      expect((await topUp.quoteTopUp(100 * USD)).feeMicroUsd).toBe(5_500_000);
+    });
+
+    it("asks Stripe for a payment with a credits line, a fee line and the metadata the webhook reads", async () => {
+      const organizationId = await createOrganization();
+
+      const result = await topUp.startTopUp({
+        user: { id: "user_1", email: "owner@example.com" },
+        organizationId,
+        creditMicroUsd: 25 * USD,
+        origin: "https://app.example.com",
+      });
+
+      expect(result).toMatchObject({
+        url: "https://checkout.stripe.test/1",
+        creditMicroUsd: 25 * USD,
+        feeMicroUsd: 1_380_000, // 5.5% of $25 = $1.375, half up to $1.38
+        totalMicroUsd: 26_380_000,
+      });
+      expect(stripeCalls.sessions).toHaveLength(1);
+      const params = stripeCalls.sessions[0];
+      const metadata = {
+        purpose: "credits_top_up",
+        organizationId,
+        creditMicroUsd: "25000000",
+        feeMicroUsd: "1380000",
+      };
+      expect(params).toMatchObject({
+        mode: "payment",
+        customer: "cus_1",
+        client_reference_id: organizationId,
+        metadata,
+        payment_intent_data: { metadata },
+        success_url: `https://app.example.com/dashboard/${organizationId}/credits?top_up=success`,
+        cancel_url: `https://app.example.com/dashboard/${organizationId}/credits?top_up=cancelled`,
+      });
+      expect(params?.line_items).toEqual([
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: 2500,
+            product_data: { name: "Credits" },
+          },
+        },
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: 138,
+            product_data: { name: "Payment processing fee" },
+          },
+        },
+      ]);
+      expect(params).not.toHaveProperty("payment_method_types");
+      // starting a checkout credits nothing
+      expect(await entries(organizationId)).toHaveLength(0);
+    });
+
+    it("refuses an organization that does not exist", async () => {
+      await expect(
+        topUp.startTopUp({
+          user: { id: "user_1", email: "owner@example.com" },
+          organizationId: "org_missing",
+          creditMicroUsd: 10 * USD,
+          origin: "https://app.example.com",
+        }),
+      ).rejects.toMatchObject({ status: 404 });
+      expect(stripeCalls.sessions).toHaveLength(0);
+    });
+  });
+
+  describe("payment webhook", () => {
+    it("credits a paid session once, however many times and ways it is delivered", async () => {
+      const organizationId = await createOrganization();
+      const paid = session({
+        organizationId,
+        paymentIntent: "pi_once",
+        creditMicroUsd: 10 * USD,
+        feeMicroUsd: 800_000,
+      });
+
+      const first = await deliver(event("checkout.session.completed", paid));
+      expect(first.status).toBe(200);
+      expect(
+        (await deliver(event("checkout.session.completed", paid))).status,
+      ).toBe(200);
+      expect(
+        (await deliver(event("checkout.session.async_payment_succeeded", paid)))
+          .status,
+      ).toBe(200);
+
+      expect(await entries(organizationId)).toEqual([
+        {
+          kind: "top_up",
+          amount: String(10 * USD),
+          idempotency_key: "top_up:stripe:pi_once",
+        },
+      ]);
+      expect(await balance(organizationId)).toBe(10 * USD);
+    });
+
+    it("credits a delayed payment only when the money arrives", async () => {
+      const organizationId = await createOrganization();
+      const input = {
+        organizationId,
+        paymentIntent: "pi_delayed",
+        creditMicroUsd: 50 * USD,
+        feeMicroUsd: 2_750_000,
+      };
+
+      await deliver(
+        event(
+          "checkout.session.completed",
+          session({ ...input, paymentStatus: "unpaid" }),
+        ),
+      );
+      expect(await entries(organizationId)).toHaveLength(0);
+
+      await deliver(
+        event("checkout.session.async_payment_succeeded", session(input)),
+      );
+      expect(await balance(organizationId)).toBe(50 * USD);
+    });
+
+    it("rejects an event whose signature does not match and writes nothing", async () => {
+      const organizationId = await createOrganization();
+      const payload = event(
+        "checkout.session.completed",
+        session({
+          organizationId,
+          paymentIntent: "pi_forged",
+          creditMicroUsd: 1_000 * USD,
+          feeMicroUsd: 0,
+        }),
+      );
+
+      await expect(
+        deliver(payload, sign(payload, "whsec_someone_else")),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(await entries(organizationId)).toHaveLength(0);
+    });
+
+    it("credits nothing when Stripe collected a different amount than credit plus fee", async () => {
+      const organizationId = await createOrganization();
+      const response = await deliver(
+        event(
+          "checkout.session.completed",
+          session({
+            organizationId,
+            paymentIntent: "pi_mismatch",
+            creditMicroUsd: 10 * USD,
+            feeMicroUsd: 800_000,
+            amountTotalCents: 500,
+          }),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(await entries(organizationId)).toHaveLength(0);
+    });
+
+    it("acknowledges a payment for a deleted organization without crediting it", async () => {
+      const response = await deliver(
+        event(
+          "checkout.session.completed",
+          session({
+            organizationId: "org_deleted",
+            paymentIntent: "pi_deleted",
+            creditMicroUsd: 10 * USD,
+            feeMicroUsd: 800_000,
+          }),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      const [row] = await sql<
+        { count: string }[]
+      >`select count(*) from credit_ledger_entry where idempotency_key = 'top_up:stripe:pi_deleted'`;
+      expect(Number(row?.count)).toBe(0);
+    });
+  });
+
+  describe("refund webhook", () => {
+    const paidTopUp = async (paymentIntent: string) => {
+      const organizationId = await createOrganization();
+      await deliver(
+        event(
+          "checkout.session.completed",
+          session({
+            organizationId,
+            paymentIntent,
+            creditMicroUsd: 10 * USD,
+            feeMicroUsd: 800_000,
+          }),
+        ),
+      );
+      return organizationId;
+    };
+
+    it("removes exactly the credit on a full refund, once, and only when it succeeded", async () => {
+      const organizationId = await paidTopUp("pi_full");
+      const full = {
+        id: "re_full",
+        paymentIntent: "pi_full",
+        amountCents: 1080,
+      };
+
+      await deliver(
+        event("refund.created", refund({ ...full, status: "pending" })),
+      );
+      expect(await balance(organizationId)).toBe(10 * USD);
+
+      await deliver(event("refund.updated", refund(full)));
+      await deliver(event("refund.updated", refund(full)));
+      await deliver(event("refund.created", refund(full)));
+
+      expect(await balance(organizationId)).toBe(0);
+      const refunds = (await entries(organizationId)).filter(
+        (entry) => entry.kind === "refund",
+      );
+      expect(refunds).toEqual([
+        {
+          kind: "refund",
+          amount: String(-10 * USD),
+          idempotency_key: "refund:stripe:re_full",
+        },
+      ]);
+    });
+
+    it("removes the refunded share of the payment on a partial refund", async () => {
+      const organizationId = await paidTopUp("pi_partial");
+
+      // $5.40 of $10.80 paid is half: half of the $10 credit
+      await deliver(
+        event(
+          "refund.created",
+          refund({
+            id: "re_half",
+            paymentIntent: "pi_partial",
+            amountCents: 540,
+          }),
+        ),
+      );
+      expect(await balance(organizationId)).toBe(5 * USD);
+    });
+
+    it("ignores a refund of a payment that was not a top-up", async () => {
+      const response = await deliver(
+        event(
+          "refund.created",
+          refund({
+            id: "re_plan",
+            paymentIntent: "pi_plan",
+            amountCents: 1900,
+          }),
+        ),
+      );
+
+      expect(response.status).toBe(200);
+      const [row] = await sql<
+        { count: string }[]
+      >`select count(*) from credit_ledger_entry where idempotency_key = 'refund:stripe:re_plan'`;
+      expect(Number(row?.count)).toBe(0);
+    });
+  });
+
+  describe("refundedCredit", () => {
+    it.each([
+      { refunded: 10_800_000, expected: 10 * USD, label: "full refund" },
+      { refunded: 5_400_000, expected: 5 * USD, label: "half" },
+      { refunded: 1, expected: 0, label: "less than a credit micro-USD" },
+      { refunded: 20 * USD, expected: 10 * USD, label: "more than collected" },
+    ])("$label", ({ refunded, expected }) => {
+      expect(
+        topUp.refundedCredit({
+          creditMicroUsd: 10 * USD,
+          collectedMicroUsd: 10_800_000,
+          refundedMicroUsd: refunded,
+        }),
+      ).toBe(expected);
+    });
+  });
+});
