@@ -16,6 +16,7 @@ import { creditsRouter } from "./modules/credits/router";
 import { keysRouter } from "./modules/keys/router";
 import { organizationRouter } from "./modules/organization/router";
 import { userRouter } from "./modules/user/router";
+import { v1Router } from "./modules/v1/router";
 import { monitor } from "./monitor";
 import { onError } from "./utils/on-error";
 
@@ -32,7 +33,7 @@ const appRouter = new Hono()
   .use(
     cors({
       origin: "*",
-      allowHeaders: ["Content-Type", "Authorization"],
+      allowHeaders: ["Content-Type", "Authorization", "X-Api-Key"],
       maxAge: 3600,
       credentials: true,
     }),
@@ -50,6 +51,7 @@ const appRouter = new Hono()
   .route("/keys", keysRouter)
   .route("/organizations", organizationRouter)
   .route("/user", userRouter)
+  .route("/v1", v1Router)
   .onError(onError);
 
 type AppRouter = typeof appRouter;

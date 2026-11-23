@@ -44,6 +44,41 @@ export class GatewayError extends Error {
   }
 }
 
+/** One model the gateway can serve, from its catalog. Costs are USD per token. */
+export interface GatewayModel {
+  name: string;
+  provider: string;
+  context_length?: number;
+  max_input_tokens?: number;
+  max_output_tokens?: number;
+  input_cost_per_token?: number;
+  output_cost_per_token?: number;
+  cache_creation_input_token_cost?: number;
+  cache_read_input_token_cost?: number;
+  architecture?: {
+    modality?: string;
+    tokenizer?: string;
+    instruct_type?: string;
+    input_modalities?: string[];
+    output_modalities?: string[];
+  };
+  is_deprecated?: boolean;
+  /** Present when a gateway pricing override changes a cost: the cost actually charged. */
+  overridden_pricing?: {
+    input_cost_per_token?: number;
+    output_cost_per_token?: number;
+    cache_creation_input_token_cost?: number;
+    cache_read_input_token_cost?: number;
+  };
+}
+
+interface ModelDetailsResponse {
+  models?: GatewayModel[];
+  total?: number;
+}
+
+const MODEL_PAGE_SIZE = 500;
+
 interface CustomerResponse {
   customer: { id: string };
 }
@@ -166,6 +201,26 @@ export const createGatewayClient = ({
             : { is_active: input.isActive }),
         },
       );
+    },
+
+    /** Every model of every configured provider, with its catalog price. */
+    listModels: async (): Promise<GatewayModel[]> => {
+      const models: GatewayModel[] = [];
+      for (let offset = 0; ; offset += MODEL_PAGE_SIZE) {
+        const page = await call<ModelDetailsResponse>(
+          "GET",
+          `/api/models/details?limit=${MODEL_PAGE_SIZE}&offset=${offset}`,
+          undefined,
+        );
+        const rows = page?.models ?? [];
+        models.push(...rows);
+        if (
+          rows.length < MODEL_PAGE_SIZE ||
+          models.length >= (page?.total ?? 0)
+        ) {
+          return models;
+        }
+      }
     },
 
     /** A key that is already gone counts as deleted. */

@@ -262,6 +262,18 @@ describe.skipIf(!adminUrl || !binary)(
       );
     }, 60_000);
 
+    it("lists the gateway's models with their catalog price on /api/v1/models", async () => {
+      const models = await import("../../v1/models");
+      models.clearModelCache();
+      const { data } = await models.listPublicModels();
+      const mini = data.find((model) => model.id === "openai/gpt-4o-mini");
+      // the local pricing file, at the migrations' default 0% markup
+      expect(mini?.pricing).toMatchObject({
+        prompt: "0.00000015",
+        completion: "0.0000006",
+      });
+    }, 60_000);
+
     it("a deleted key and the keys of a deleted organization stop working", async () => {
       const { key, apiKey } = await keys.createKey({
         organizationId: "org_e2e",

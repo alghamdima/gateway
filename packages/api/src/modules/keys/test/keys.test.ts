@@ -66,6 +66,7 @@ const fakeGateway = () => {
         key.isActive = input.isActive;
       }
     },
+    listModels: async () => [],
     deleteVirtualKey: async (id) => {
       state.keys.delete(id);
       state.deletedKeys.push(id);
