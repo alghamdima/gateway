@@ -2,6 +2,7 @@ import { auth } from "@workspace/auth/server";
 import { and, eq } from "@workspace/db";
 import { invitation, member, organization } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
+import { removeOrganizationFromGateway } from "@workspace/gateway/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
@@ -10,8 +11,11 @@ import type {
   UpdateOrganizationPayload,
 } from "@workspace/auth";
 
-export const deleteOrganization = async ({ id }: { id: string }) =>
-  db.delete(organization).where(eq(organization.id, id));
+/** Its keys and customer leave the gateway first (ADR 0004); a gateway failure stops the deletion. */
+export const deleteOrganization = async ({ id }: { id: string }) => {
+  await removeOrganizationFromGateway(id);
+  return db.delete(organization).where(eq(organization.id, id));
+};
 
 export const updateOrganization = async ({
   id,

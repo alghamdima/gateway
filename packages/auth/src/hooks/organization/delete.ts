@@ -1,5 +1,6 @@
 import { isSubscriptionActive } from "@workspace/billing";
 import { getCustomersWithPurchasesByReferenceId } from "@workspace/billing/server";
+import { removeOrganizationFromGateway } from "@workspace/gateway/server";
 
 import { OrganizationHooks } from "./types";
 
@@ -17,5 +18,7 @@ export const { beforeDeleteOrganization } = {
         "You cannot delete this organization because it has active subscriptions.",
       );
     }
+
+    await removeOrganizationFromGateway(organization.id);
   },
 } satisfies OrganizationHooks;

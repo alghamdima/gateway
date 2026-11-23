@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "env": [
+        "GATEWAY_E2E_BINARY",
+        "GATEWAY_URL",
+        "GATEWAY_ADMIN_USERNAME",
+        "GATEWAY_ADMIN_PASSWORD"
+      ]
+    }
+  }
+}
