@@ -3,8 +3,9 @@
 # Runs the unit tests (see test-baseline.sh) and fails if a test that passes in the recorded baseline
 # (docs/platform/gateway-baseline/results.tsv) fails, skips or is missing now. Tests that fail in the
 # baseline are not checked: most of them depend on the machine (DNS, IPv6 loopback, backing services).
-# A test that regresses in the full run is run once more on its own, because a few upstream tests time
-# out when the whole suite loads the machine; it counts only if it fails again.
+# A test that regresses in the full run is run again on its own, up to 3 times, because a few upstream
+# tests are timing-sensitive (TestListAllModelsIncludesEveryPageOfASlowLargeProvider fails about 1 run
+# in 16 even alone); it counts only if it fails every time. Each one forgiven is printed by name.
 # A package that failed only because of such tests is not a regression either.
 # RESULTS=<dir> reuses the output of an earlier run instead of running the suite.
 # BASELINE=<file> compares against another baseline (verify.sh passes a renamed one).
@@ -29,6 +30,19 @@ regressions=$(awk -F'\t' -v mods="$*" '
     if (!(key in now)) print key FS "missing"
     else if (now[key] != "pass") print key FS now[key]
   }' "$out/results.tsv" "$baseline")
+# passes_alone runs one test by itself up to 3 times and succeeds on the first pass.
+passes_alone() {
+  local attempt
+  for attempt in 1 2 3; do
+    if (cd "$1" && env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
+      GOPATH="$(go env GOPATH)" GOCACHE="$(go env GOCACHE)" GOMODCACHE="$(go env GOMODCACHE)" \
+      GOTOOLCHAIN="${GOTOOLCHAIN:-auto}" GOPROXY=off CGO_ENABLED=1 \
+      go test -count=1 -run "^$3\$" "$2" > /dev/null 2>&1); then
+      return 0
+    fi
+  done
+  return 1
+}
 confirmed=
 packages=
 flaky=
@@ -36,11 +50,7 @@ while IFS=$'\t' read -r mod pkg test result; do
   [ -n "$mod" ] || continue
   if [ "$test" = "-" ] && [ "$result" = "fail" ]; then
     packages+="$mod"$'\t'"$pkg"$'\n'
-  elif [ "$result" = "fail" ] &&
-    (cd "$mod" && env -i PATH="$PATH" HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
-      GOPATH="$(go env GOPATH)" GOCACHE="$(go env GOCACHE)" GOMODCACHE="$(go env GOMODCACHE)" \
-      GOTOOLCHAIN="${GOTOOLCHAIN:-auto}" GOPROXY=off CGO_ENABLED=1 \
-      go test -count=1 -run "^$test\$" "$pkg" > /dev/null 2>&1); then
+  elif [ "$result" = "fail" ] && passes_alone "$mod" "$pkg" "$test"; then
     echo "flaky, passed on its own: $pkg $test" >&2
     flaky+="$mod"$'\t'"$pkg"$'\n'
   else

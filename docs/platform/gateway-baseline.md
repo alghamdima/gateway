@@ -266,7 +266,7 @@ Patch `0003` and the import script drop `plugins/maxim` and the UI that configur
 
 ### Stability
 
-On the first tree the whole suite was run twice. The two result sets differed in one test: `core` `TestListAllModelsIncludesEveryPageOfASlowLargeProvider` passed, then failed with `context deadline exceeded`, then passed 3 times out of 3 alone. It is timing-sensitive under load. `scripts/test.sh` therefore re-runs a regressed test once on its own before counting it. The current tree has been run once.
+On the first tree the whole suite was run twice. The two result sets differed in one test: `core` `TestListAllModelsIncludesEveryPageOfASlowLargeProvider` passed, then failed with `context deadline exceeded`, then passed 3 times out of 3 alone. It is timing-sensitive under load. `scripts/test.sh` therefore re-runs a regressed test on its own before counting it: once at first, up to 3 times since 2026-11-23, when the same test failed the full run and one solo re-run in CI. Measured alone on this container it fails 3 times in 50 (each page sleeps 300 ms against a 500 ms deadline). The current tree has been run once.
 
 ### Skips
 
