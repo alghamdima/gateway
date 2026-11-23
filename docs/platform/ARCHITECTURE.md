@@ -108,21 +108,22 @@ Both databases run on one Postgres server at launch, as two databases.
 | ---------------------------------------------------------------- | ---------------- |
 | Brand inputs (name, domain, code name, prefixes, Go module path) | Phase 5 rename   |
 | Payment provider                                                 | ADR 0003         |
-| Purchase fee, top-up amounts                                     | ADR 0003         |
-| Markup on inference                                              | ADR 0005         |
+| Purchase fee (value set by staff, ADR 0010), top-up amounts      | ADR 0003         |
+| Markup on inference (value set by staff per provider, ADR 0010)  | ADR 0005         |
 | Charging for failed attempts that consumed tokens                | ADR 0002         |
 | Lemon Squeezy buy links                                          | Phase 5b         |
 
 ## ADR index
 
-| #                                        | Decision                                                                                 |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
-| [0001](adr/0001-credits-ledger.md)       | Credits ledger in Postgres, enforced by a gateway plugin with reservations               |
-| [0002](adr/0002-usage-path.md)           | Usage reaches the ledger through a gateway plugin, with log reconciliation as a backstop |
-| [0003](adr/0003-billing.md)              | Prepaid top-ups through one-time payments                                                |
-| [0004](adr/0004-key-model.md)            | One organization is one gateway customer, one dashboard key is one virtual key           |
-| [0005](adr/0005-margin.md)               | Margin applied in the ledger plugin as a multiplier on provider cost                     |
-| [0006](adr/0006-scaling.md)              | One gateway instance at launch; more only after a tested invalidation patch              |
-| [0007](adr/0007-gateway-admin-ui.md)     | Gateway admin UI is internal only                                                        |
-| [0008](adr/0008-upstream-upgrades.md)    | Take each upstream minor release within two weeks, by script                             |
-| [0009](adr/0009-credits-plugin-hooks.md) | The credits plugin reserves and settles per attempt, and fails closed                    |
+| #                                            | Decision                                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [0001](adr/0001-credits-ledger.md)           | Credits ledger in Postgres, enforced by a gateway plugin with reservations               |
+| [0002](adr/0002-usage-path.md)               | Usage reaches the ledger through a gateway plugin, with log reconciliation as a backstop |
+| [0003](adr/0003-billing.md)                  | Prepaid top-ups through one-time payments                                                |
+| [0004](adr/0004-key-model.md)                | One organization is one gateway customer, one dashboard key is one virtual key           |
+| [0005](adr/0005-margin.md)                   | Margin applied in the ledger plugin as a multiplier on provider cost                     |
+| [0006](adr/0006-scaling.md)                  | One gateway instance at launch; more only after a tested invalidation patch              |
+| [0007](adr/0007-gateway-admin-ui.md)         | Gateway admin UI is internal only                                                        |
+| [0008](adr/0008-upstream-upgrades.md)        | Take each upstream minor release within two weeks, by script                             |
+| [0009](adr/0009-credits-plugin-hooks.md)     | The credits plugin reserves and settles per attempt, and fails closed                    |
+| [0010](adr/0010-admin-controlled-pricing.md) | Markup per provider and the top-up fee are set by staff in the admin console             |

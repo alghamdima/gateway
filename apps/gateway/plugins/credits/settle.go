@@ -49,6 +49,13 @@ func (p *Plugin) start(queueSize, workers int, reapInterval time.Duration) {
 			}
 		}()
 	}
+	if p.prices != nil {
+		bg.workers.Add(1)
+		go func() {
+			defer bg.workers.Done()
+			p.refreshLoop(ctx, markupRefreshInterval, markupRetryInterval)
+		}()
+	}
 	if reapInterval > 0 && p.reaper != nil {
 		bg.workers.Add(1)
 		go func() {

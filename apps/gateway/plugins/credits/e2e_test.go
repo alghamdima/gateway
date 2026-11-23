@@ -219,7 +219,9 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 	provider := newMockProvider(t)
 	funded := db.organization(t, usd)
 	broke := db.organization(t, 10)
-	gw := startGateway(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db), "markup_bps": 500}, []string{funded, broke})
+	// as staff would set them: 1 percent by default, 5 percent for the provider under test
+	db.setPricing(t, 100, map[string]int64{"openai": 500})
+	gw := startGateway(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db)}, []string{funded, broke})
 
 	// gpt-4o-mini in the local pricing file: 0.15 USD per million input tokens, 0.60 per million output
 	providerCost := e2ePromptTokens*0.15e-6 + e2eCompletionTokens*0.60e-6
@@ -228,7 +230,7 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		t.Fatalf("expected charge: %d, %v", charge, err)
 	}
 
-	t.Run("a chat completion is charged once at cost plus markup", func(t *testing.T) {
+	t.Run("a chat completion is charged once at cost plus the provider's markup", func(t *testing.T) {
 		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false))
 		if status != 200 || !strings.Contains(body, "hello") {
 			t.Fatalf("status %d: %s", status, body)
@@ -239,9 +241,10 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		}
 		var cost float64
 		var model, reference string
-		err := db.admin.QueryRow(context.Background(), `SELECT (metadata->>'provider_cost_usd')::float8, metadata->>'model', reference FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&cost, &model, &reference)
-		if err != nil || cost < providerCost-1e-9 || cost > providerCost+1e-9 || !strings.Contains(model, "gpt-4o-mini") || reference == "" {
-			t.Fatalf("entry: cost=%v model=%q reference=%q err=%v", cost, model, reference, err)
+		var markup int64
+		err := db.admin.QueryRow(context.Background(), `SELECT (metadata->>'provider_cost_usd')::float8, metadata->>'model', reference, (metadata->>'markup_bps')::bigint FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&cost, &model, &reference, &markup)
+		if err != nil || cost < providerCost-1e-9 || cost > providerCost+1e-9 || !strings.Contains(model, "gpt-4o-mini") || reference == "" || markup != 500 {
+			t.Fatalf("entry: cost=%v model=%q reference=%q markup=%d err=%v", cost, model, reference, markup, err)
 		}
 	})
 
@@ -297,6 +300,23 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		}
 	})
 
+	t.Run("a markup staff change applies without restarting the gateway", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("waits for the plugin's 30 second refresh")
+		}
+		db.setPricing(t, 100, map[string]int64{"openai": 2000})
+		time.Sleep(markupRefreshInterval + 2*time.Second)
+		before := db.consistent(t, funded)
+		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false))
+		if status != 200 {
+			t.Fatalf("status %d: %s", status, body)
+		}
+		raised, _ := toMicroUSD(providerCost, 2000)
+		if s := settled(t, db, funded); s.Balance != before.Balance-raised {
+			t.Fatalf("charged %d, want %d at the new 20 percent markup", before.Balance-s.Balance, raised)
+		}
+	})
+
 	t.Run("no key at all is refused by the gateway itself", func(t *testing.T) {
 		status, _ := gw.post(t, "/v1/chat/completions", "", chatBody(false))
 		if status != 401 {
@@ -316,7 +336,7 @@ func TestEndToEnd_AMisconfiguredPluginRefusesInsteadOfServingForFree(t *testing.
 
 	for name, config := range map[string]map[string]any{
 		"no database url":             {},
-		"a config of the wrong shape": {"markup_bps": "five"},
+		"a config of the wrong shape": {"database_url": 5},
 		"a database that is down":     {"database_url": "postgres://nobody:nothing@127.0.0.1:1/none"},
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -109,5 +109,54 @@
     "cannotSetUsersPassword": "You cannot set users password.",
     "cannotSetUsersEmail": "You cannot set users email.",
     "cannotUpdateUsersPassword": "You cannot update a user's password via update user."
+  },
+  "pricing": {
+    "header": {
+      "title": "Pricing",
+      "description": "Set the markup on inference per provider and the fee added to top-ups."
+    },
+    "saved": "Prices saved. Gateways apply them within 30 seconds.",
+    "error": {
+      "decimals": "Use at most two decimals."
+    },
+    "settings": {
+      "title": "Default markup and top-up fee",
+      "description": "Rates are percentages. Changes reach the gateway within 30 seconds and apply to requests that start after that.",
+      "defaultMarkup": {
+        "label": "Default markup",
+        "description": "Added to the provider's cost for every provider without its own markup below. 0% charges at cost."
+      },
+      "topupFee": {
+        "label": "Top-up fee",
+        "description": "Added to the payment when a customer buys credits. It is never taken from their credits."
+      }
+    },
+    "providers": {
+      "title": "Markup per provider",
+      "subtitle": "Overrides the default markup for one provider.",
+      "provider": "Provider",
+      "markup": "Markup",
+      "updatedAt": "Updated",
+      "empty": "No provider has its own markup: every provider uses the default.",
+      "removed": "Provider markup removed. It now uses the default.",
+      "description": "Use the gateway's provider name, such as openai or anthropic. Saving an existing provider replaces its markup. Providers not listed use the default markup of {{markup}}%."
+    },
+    "changes": {
+      "title": "Change history",
+      "description": "Every change to these prices, newest first. It cannot be edited.",
+      "empty": "No changes yet.",
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "before": "Before",
+      "after": "After",
+      "settings": "Default markup and fee",
+      "none": "None",
+      "fields": {
+        "defaultMarkupBps": "Default markup",
+        "topupFeeBps": "Top-up fee",
+        "markupBps": "Markup"
+      }
+    }
   }
 }

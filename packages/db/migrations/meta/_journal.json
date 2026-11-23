@@ -120,6 +120,13 @@
       "when": 1795369419264,
       "tag": "0016_graceful_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795402170175,
+      "tag": "0017_pricing",
+      "breakpoints": true
     }
   ]
 }

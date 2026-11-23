@@ -1,6 +1,6 @@
 # ADR 0005: Margin is applied in the ledger plugin as a multiplier on provider cost
 
-Status: Accepted for the mechanism. The markup value is the owner's decision and still open.
+Status: Accepted for the mechanism. The value is set by staff per provider in the admin console: see ADR 0010, which supersedes the storage described here.
 Date: 2026-11-21
 
 ## Context

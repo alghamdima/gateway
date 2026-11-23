@@ -103,10 +103,17 @@ func testPricer() *fakePricer {
 	return &fakePricer{inputRate: 1e-6, outputRate: 2e-6, maxOutput: 1000}
 }
 
+// testPlugin charges at cost: its markups are loaded and all zero.
 func testPlugin(l ledger, p pricer) *Plugin {
 	plugin := newPlugin(l, p, bifrost.NewNoOpLogger(), &Config{})
 	plugin.settleBackoff = time.Millisecond
-	return plugin
+	return withMarkups(plugin, 0, nil)
+}
+
+// withMarkups publishes a markups snapshot, as a successful load from the database would.
+func withMarkups(p *Plugin, defaultBps int64, byProvider map[string]int64) *Plugin {
+	p.markups.Store(&markups{defaultBps: defaultBps, byProvider: byProvider})
+	return p
 }
 
 func testContext(organizationID string) *schemas.BifrostContext {
@@ -196,7 +203,7 @@ func TestPreLLMHook_TheRequestsOwnLimitLowersTheHold(t *testing.T) {
 func TestPreLLMHook_MarkupIsHeldToo(t *testing.T) {
 	ledger := &fakeLedger{balance: 10 * usd}
 	plain := testPlugin(ledger, testPricer())
-	marked := newPlugin(ledger, testPricer(), bifrost.NewNoOpLogger(), &Config{MarkupBps: 1000})
+	marked := withMarkups(testPlugin(ledger, testPricer()), 1000, nil)
 	plain.PreLLMHook(testContext(testOrg), chatRequest(schemas.ChatCompletionRequest, nil))
 	marked.PreLLMHook(testContext(testOrg), chatRequest(schemas.ChatCompletionRequest, nil))
 
@@ -300,7 +307,6 @@ func TestInit_AMisconfiguredPluginLoadsAndRefuses(t *testing.T) {
 		"no configuration": nil,
 		"no database url":  {},
 		"unset env var":    {DatabaseURL: "env.CREDITS_TEST_SURELY_UNSET"},
-		"negative markup":  {DatabaseURL: "postgres://x/y", MarkupBps: -1},
 		"unparsable url":   {DatabaseURL: "not a url ://"},
 	} {
 		plugin, err := Init(context.Background(), config, bifrost.NewNoOpLogger(), &modelcatalog.ModelCatalog{})
@@ -322,7 +328,7 @@ func TestInit_AMisconfiguredPluginLoadsAndRefuses(t *testing.T) {
 
 func TestPostLLMHook_ChargesTheRealCostAndReleasesTheHold(t *testing.T) {
 	ledger := &fakeLedger{balance: 10 * usd}
-	plugin := newPlugin(ledger, testPricer(), bifrost.NewNoOpLogger(), &Config{MarkupBps: 500})
+	plugin := withMarkups(testPlugin(ledger, testPricer()), 500, nil)
 	ctx := testContext(testOrg)
 	plugin.PreLLMHook(ctx, chatRequest(schemas.ChatCompletionRequest, nil))
 
@@ -446,7 +452,14 @@ func TestPostLLMHook_ALedgerFailureDoesNotBreakTheResponse(t *testing.T) {
 // The hooks against real Postgres with the gateway role: the whole path the money takes.
 func TestHooks_AgainstTheRealLedger(t *testing.T) {
 	db := newTestDB(t)
-	plugin := newPlugin(NewStore(db.ledger), testPricer(), bifrost.NewNoOpLogger(), &Config{MarkupBps: 500})
+	store := NewStore(db.ledger)
+	plugin := newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{})
+	// the markup comes from the database, as staff would set it
+	db.setPricing(t, 500, nil)
+	plugin.prices = store
+	if err := plugin.refreshMarkups(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	org := db.organization(t, 5000) // half a cent
 
 	// held: a little over 2000 x 1.05. Two fit in 5000, a third does not.

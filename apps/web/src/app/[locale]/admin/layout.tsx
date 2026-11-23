@@ -40,6 +40,11 @@ const menu = [
         exact: false,
         icon: <Icons.HandCoins />,
       },
+      {
+        title: "pricing",
+        href: pathsConfig.admin.pricing.index,
+        icon: <Icons.Percent />,
+      },
     ],
   },
 ];

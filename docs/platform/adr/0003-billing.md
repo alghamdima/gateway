@@ -1,6 +1,6 @@
 # ADR 0003: Prepaid top-ups through one-time payments
 
-Status: Accepted for the model. The payment provider is the owner's decision and still open.
+Status: Accepted for the model. The payment provider is the owner's decision and still open. The purchase fee is set by staff in the admin console (ADR 0010).
 Date: 2026-11-21
 
 ## Context

@@ -193,6 +193,18 @@ const queries = {
         })({ query, param: { id } }),
     }),
   },
+  pricing: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "pricing"],
+        queryFn: () => handle(api.admin.pricing.$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "pricing", "changes"],
+        queryFn: () => handle(api.admin.pricing.changes.$get)(),
+      }),
+  },
 };
 
 const mutations = {
@@ -325,6 +337,34 @@ const mutations = {
           }),
       }),
     },
+  },
+  pricing: {
+    updateSettings: mutationOptions({
+      mutationKey: [KEY, "pricing", "settings", "update"],
+      mutationFn: (
+        json: InferRequestType<typeof api.admin.pricing.settings.$put>["json"],
+      ) => handle(api.admin.pricing.settings.$put)({ json }),
+    }),
+    setProvider: mutationOptions({
+      mutationKey: [KEY, "pricing", "providers", "set"],
+      mutationFn: ({
+        provider,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.pricing.providers)[":provider"]["$put"]
+      >["json"] & { provider: string }) =>
+        handle(api.admin.pricing.providers[":provider"].$put)({
+          param: { provider },
+          json,
+        }),
+    }),
+    removeProvider: mutationOptions({
+      mutationKey: [KEY, "pricing", "providers", "remove"],
+      mutationFn: ({ provider }: { provider: string }) =>
+        handle(api.admin.pricing.providers[":provider"].$delete)({
+          param: { provider },
+        }),
+    }),
   },
 };
 

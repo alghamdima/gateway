@@ -95,7 +95,7 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `core`                         | 6413       | 12         | 85         | 51            | 5             | 4                      |
 | `framework`                    | 4012       | 48         | 291        | 30            | 5             | 4                      |
 | `plugins/compat`               | 26         | 0          | 0          | 1             | 0             | 0                      |
-| `plugins/credits`              | 26         | 0          | 18         | 1             | 0             | 0                      |
+| `plugins/credits`              | 32         | 0          | 20         | 1             | 0             | 0                      |
 | `plugins/governance`           | 506        | 0          | 1          | 1             | 0             | 0                      |
 | `plugins/jsonparser`           | 5          | 0          | 3          | 1             | 0             | 0                      |
 | `plugins/logging`              | 374        | 0          | 2          | 1             | 0             | 0                      |
@@ -107,7 +107,7 @@ Every top-level test and its result is in [`gateway-baseline/results.tsv`](gatew
 | `plugins/semanticcache`        | 88         | 0          | 71         | 1             | 0             | 0                      |
 | `plugins/telemetry`            | 58         | 0          | 0          | 1             | 0             | 0                      |
 | `transports`                   | 2808       | 1          | 1          | 5             | 1             | 2                      |
-| **Total**                      | **15056**  | **63**     | **472**    | **101**       | **12**        | **10**                 |
+| **Total**                      | **15062**  | **63**     | **474**    | **101**       | **12**        | **10**                 |
 
 ### Failing tests by name
 
@@ -262,7 +262,7 @@ Patch `0003` and the import script drop `plugins/maxim` and the UI that configur
 
 ### Our own module
 
-`plugins/credits` is ours, not upstream's. In this baseline it is recorded without a database: 26 tests pass and 18 skip: 17 need Postgres or the built gateway, and one is the latency report, which runs only on request. Those run in CI in their own step, with both.
+`plugins/credits` is ours, not upstream's. In this baseline it is recorded without a database: 32 tests pass and 20 skip: 19 need Postgres or the built gateway, and one is the latency report, which runs only on request. Those run in CI in their own step, with both.
 
 ### Stability
 

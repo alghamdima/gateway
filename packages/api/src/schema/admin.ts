@@ -8,6 +8,8 @@ import {
 } from "@workspace/auth";
 import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
+  MAX_MARKUP_BPS,
+  MAX_TOPUP_FEE_BPS,
   selectCustomerSchema,
   selectOrderSchema,
   selectSubscriptionSchema,
@@ -331,3 +333,27 @@ export const adjustOrganizationCreditsSchema = z.object({
 export type AdjustOrganizationCreditsInput = z.infer<
   typeof adjustOrganizationCreditsSchema
 >;
+
+const markupBpsSchema = z.number().int().min(0).max(MAX_MARKUP_BPS);
+
+export const updatePricingSettingsSchema = z.object({
+  /** Basis points added to provider cost when no provider rule matches: 100 = 1%. */
+  defaultMarkupBps: markupBpsSchema,
+  /** Basis points added on a top-up payment. */
+  topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
+});
+
+/** The gateway's provider name, as in its config: openai, anthropic, ... */
+export const pricingProviderSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9][a-z0-9_.-]{0,63}$/);
+
+export const setProviderMarkupSchema = z.object({
+  markupBps: markupBpsSchema,
+});
+
+export type UpdatePricingSettingsInput = z.infer<
+  typeof updatePricingSettingsSchema
+>;
+export type SetProviderMarkupInput = z.infer<typeof setProviderMarkupSchema>;

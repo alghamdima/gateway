@@ -117,5 +117,54 @@
     "cannotSetUsersPassword": "No puedes establecer contraseñas de usuarios.",
     "cannotSetUsersEmail": "No puedes establecer el correo de usuarios.",
     "cannotUpdateUsersPassword": "No puedes actualizar la contraseña de un usuario mediante actualizar usuario."
+  },
+  "pricing": {
+    "header": {
+      "title": "Precios",
+      "description": "Define el margen sobre la inferencia por proveedor y la comisión que se añade a las recargas."
+    },
+    "saved": "Precios guardados. Los gateways los aplican en 30 segundos.",
+    "error": {
+      "decimals": "Usa como máximo dos decimales."
+    },
+    "settings": {
+      "title": "Margen por defecto y comisión de recarga",
+      "description": "Las tasas son porcentajes. Los cambios llegan al gateway en 30 segundos y se aplican a las solicitudes que empiezan después.",
+      "defaultMarkup": {
+        "label": "Margen por defecto",
+        "description": "Se suma al costo del proveedor para todo proveedor sin margen propio abajo. 0% cobra al costo."
+      },
+      "topupFee": {
+        "label": "Comisión de recarga",
+        "description": "Se suma al pago cuando un cliente compra créditos. Nunca se descuenta de sus créditos."
+      }
+    },
+    "providers": {
+      "title": "Margen por proveedor",
+      "subtitle": "Reemplaza el margen por defecto para un proveedor.",
+      "provider": "Proveedor",
+      "markup": "Margen",
+      "updatedAt": "Actualizado",
+      "empty": "Ningún proveedor tiene margen propio: todos usan el margen por defecto.",
+      "removed": "Margen del proveedor eliminado. Ahora usa el margen por defecto.",
+      "description": "Usa el nombre del proveedor en el gateway, como openai o anthropic. Guardar un proveedor existente reemplaza su margen. Los proveedores no listados usan el margen por defecto de {{markup}}%."
+    },
+    "changes": {
+      "title": "Historial de cambios",
+      "description": "Cada cambio de estos precios, el más reciente primero. No se puede editar.",
+      "empty": "Aún no hay cambios.",
+      "when": "Cuándo",
+      "who": "Quién",
+      "what": "Qué",
+      "before": "Antes",
+      "after": "Después",
+      "settings": "Margen por defecto y comisión",
+      "none": "Ninguno",
+      "fields": {
+        "defaultMarkupBps": "Margen por defecto",
+        "topupFeeBps": "Comisión de recarga",
+        "markupBps": "Margen"
+      }
+    }
   }
 }

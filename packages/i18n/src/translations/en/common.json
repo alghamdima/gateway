@@ -261,5 +261,6 @@
       "type": "Only {{types}} files are accepted."
     }
   },
-  "goBackHome": "Go back home"
+  "goBackHome": "Go back home",
+  "pricing": "Pricing"
 }

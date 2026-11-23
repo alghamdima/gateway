@@ -261,5 +261,6 @@
       "type": "Solo se aceptan archivos {{types}}."
     }
   },
-  "goBackHome": "Volver al inicio"
+  "goBackHome": "Volver al inicio",
+  "pricing": "Precios"
 }

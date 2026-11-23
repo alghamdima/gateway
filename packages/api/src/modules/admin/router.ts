@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { enforceAdmin, enforceAuth } from "../../middleware";
+import { pricingRouter } from "../pricing/router";
 import { getCustomersCount } from "./customers/queries";
 import { customersRouter } from "./customers/router";
 import { getOrganizationsCount } from "./organizations/queries";
@@ -14,6 +15,7 @@ export const adminRouter = new Hono()
   .route("/users", usersRouter)
   .route("/organizations", organizationsRouter)
   .route("/customers", customersRouter)
+  .route("/pricing", pricingRouter)
   .get("/summary", async (c) => {
     const [users, organizations, customers] = await Promise.all([
       getUsersCount(),
