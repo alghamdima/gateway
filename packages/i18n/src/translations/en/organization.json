@@ -217,5 +217,83 @@
       "cannotDeletePreDefinedRole": "You cannot delete a pre-defined role.",
       "roleNameAlreadyTaken": "The role name is already taken."
     }
+  },
+  "keys": {
+    "title": "API keys",
+    "description": "Keys call the models through the API and spend this organization's credits. Owners and admins manage them.",
+    "create": {
+      "cta": "Create key",
+      "title": "Create an API key"
+    },
+    "edit": {
+      "title": "Edit key",
+      "success": "Key updated."
+    },
+    "delete": {
+      "title": "Delete {{name}}?",
+      "description": "Requests with this key stop working at once. This cannot be undone.",
+      "success": "Key deleted."
+    },
+    "secret": {
+      "title": "Copy your new key",
+      "description": "This is the only time it is shown. Store it somewhere safe; if you lose it, create a new one.",
+      "copy": "Copy key",
+      "done": "I have copied it"
+    },
+    "form": {
+      "description": "A spending limit caps what this key can spend, on top of the organization's balance.",
+      "name": {
+        "label": "Name",
+        "placeholder": "Production"
+      },
+      "limit": {
+        "label": "Spending limit",
+        "placeholder": "No limit",
+        "description": "Leave the limit empty for no cap. Limits reset at midnight UTC, on Mondays, or on the first of the month.",
+        "invalid": "Enter an amount above 0, up to 1,000,000."
+      },
+      "reset": {
+        "label": "Resets",
+        "never": "Never",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      }
+    },
+    "list": {
+      "empty": "No keys yet.",
+      "name": "Name",
+      "key": "Key",
+      "limit": "Limit",
+      "status": "Status",
+      "created": "Created",
+      "noLimit": "No limit",
+      "active": "Active",
+      "disabled": "Disabled",
+      "enable": "Enable",
+      "disable": "Disable"
+    }
+  },
+  "credits": {
+    "title": "Credits",
+    "description": "What this organization has to spend on models. Requests in flight hold the most they can cost until they finish.",
+    "available": "Available",
+    "balance": "Balance",
+    "held": "Held by requests in flight",
+    "history": {
+      "title": "History",
+      "empty": "No entries yet.",
+      "when": "When",
+      "kind": "Type",
+      "amount": "Amount",
+      "more": "Show older"
+    },
+    "kinds": {
+      "top_up": "Top-up",
+      "usage": "Usage",
+      "refund": "Refund",
+      "adjustment": "Adjustment",
+      "promo": "Promotion"
+    }
   }
 }

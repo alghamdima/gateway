@@ -265,5 +265,7 @@
   "goBackHome": "Go back home",
   "pricing": "Pricing",
   "finance": "Finance",
-  "audit": "Audit log"
+  "audit": "Audit log",
+  "apiKeys": "API keys",
+  "credits": "Credits"
 }

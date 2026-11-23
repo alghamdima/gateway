@@ -41,6 +41,23 @@ const menu = ({
         href: pathsConfig.dashboard.organization(slug).index,
         icon: <Icons.Home />,
       },
+      {
+        title: "apiKeys",
+        href: pathsConfig.dashboard.organization(slug).keys,
+        icon: <Icons.Key />,
+      },
+      ...(authClient.organization.checkRolePermission({
+        permissions: { billing: ["read"] },
+        role: toMemberRole(member?.role),
+      })
+        ? [
+            {
+              title: "credits",
+              href: pathsConfig.dashboard.organization(slug).credits,
+              icon: <Icons.HandCoins />,
+            },
+          ]
+        : []),
     ],
   },
   {

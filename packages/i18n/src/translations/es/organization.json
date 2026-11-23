@@ -207,5 +207,83 @@
       "cannotDeletePreDefinedRole": "No puedes eliminar un rol predefinido.",
       "roleNameAlreadyTaken": "El nombre del rol ya está en uso."
     }
+  },
+  "keys": {
+    "title": "Claves de API",
+    "description": "Las claves llaman a los modelos por la API y gastan los créditos de esta organización. Las gestionan propietarios y administradores.",
+    "create": {
+      "cta": "Crear clave",
+      "title": "Crear una clave de API"
+    },
+    "edit": {
+      "title": "Editar clave",
+      "success": "Clave actualizada."
+    },
+    "delete": {
+      "title": "¿Eliminar {{name}}?",
+      "description": "Las solicitudes con esta clave dejan de funcionar al instante. No se puede deshacer.",
+      "success": "Clave eliminada."
+    },
+    "secret": {
+      "title": "Copia tu nueva clave",
+      "description": "Solo se muestra esta vez. Guárdala en un lugar seguro; si la pierdes, crea otra.",
+      "copy": "Copiar clave",
+      "done": "Ya la copié"
+    },
+    "form": {
+      "description": "Un límite de gasto limita lo que puede gastar esta clave, además del saldo de la organización.",
+      "name": {
+        "label": "Nombre",
+        "placeholder": "Producción"
+      },
+      "limit": {
+        "label": "Límite de gasto",
+        "placeholder": "Sin límite",
+        "description": "Deja el límite vacío para no limitar. Los límites se reinician a medianoche UTC, los lunes o el primer día del mes.",
+        "invalid": "Indica un importe mayor que 0 y hasta 1.000.000."
+      },
+      "reset": {
+        "label": "Se reinicia",
+        "never": "Nunca",
+        "daily": "Cada día",
+        "weekly": "Cada semana",
+        "monthly": "Cada mes"
+      }
+    },
+    "list": {
+      "empty": "Aún no hay claves.",
+      "name": "Nombre",
+      "key": "Clave",
+      "limit": "Límite",
+      "status": "Estado",
+      "created": "Creada",
+      "noLimit": "Sin límite",
+      "active": "Activa",
+      "disabled": "Desactivada",
+      "enable": "Activar",
+      "disable": "Desactivar"
+    }
+  },
+  "credits": {
+    "title": "Créditos",
+    "description": "Lo que esta organización puede gastar en modelos. Las solicitudes en curso reservan lo máximo que pueden costar hasta que terminan.",
+    "available": "Disponible",
+    "balance": "Saldo",
+    "held": "Reservado por solicitudes en curso",
+    "history": {
+      "title": "Historial",
+      "empty": "Aún no hay movimientos.",
+      "when": "Cuándo",
+      "kind": "Tipo",
+      "amount": "Importe",
+      "more": "Ver anteriores"
+    },
+    "kinds": {
+      "top_up": "Recarga",
+      "usage": "Uso",
+      "refund": "Reembolso",
+      "adjustment": "Ajuste",
+      "promo": "Promoción"
+    }
   }
 }

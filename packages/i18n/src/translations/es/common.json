@@ -265,5 +265,7 @@
   "goBackHome": "Volver al inicio",
   "pricing": "Precios",
   "finance": "Finanzas",
-  "audit": "Registro de auditoría"
+  "audit": "Registro de auditoría",
+  "apiKeys": "Claves de API",
+  "credits": "Créditos"
 }

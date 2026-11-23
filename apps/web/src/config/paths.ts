@@ -64,6 +64,8 @@ const pathsConfig = {
         billing: `${DASHBOARD_PREFIX}/${slug}/settings/billing`,
       },
       members: `${DASHBOARD_PREFIX}/${slug}/members`,
+      keys: `${DASHBOARD_PREFIX}/${slug}/keys`,
+      credits: `${DASHBOARD_PREFIX}/${slug}/credits`,
     }),
   },
 } as const;
