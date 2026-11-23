@@ -27,7 +27,7 @@ import { env } from "./env";
 import { hooks } from "./hooks";
 import { syncSubscriptionSeats } from "./lib/server";
 import { getUrl, trustedOrigins } from "./lib/utils";
-import { ac, roles } from "./rbac";
+import { ac, roles, STAFF_ROLE_NAMES, staffAc, staffRoles } from "./rbac";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
 export const auth = betterAuth({
@@ -194,7 +194,12 @@ export const auth = betterAuth({
     anonymous({
       emailDomainName: "turbostarter.dev",
     }),
-    admin(),
+    admin({
+      ac: staffAc,
+      roles: staffRoles,
+      // impersonating any staff member needs "impersonate-admins", which no role has
+      adminRoles: [...STAFF_ROLE_NAMES],
+    }),
     organization({
       requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: async (

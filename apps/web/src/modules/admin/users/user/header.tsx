@@ -9,6 +9,7 @@ import { Icons } from "@workspace/ui-web/icons";
 
 import { authClient } from "~/lib/auth/client";
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import {
   DashboardHeader,
   DashboardHeaderTitle,
@@ -27,6 +28,9 @@ export const UserHeader = ({ id }: UserHeaderProps) => {
   const { t } = useTranslation("common");
   const session = authClient.useSession();
   const { data: user } = useQuery(admin.queries.users.get({ id }));
+  const canImpersonate = useStaffPermission({ user: ["impersonate"] });
+  const canBan = useStaffPermission({ user: ["ban"] });
+  const canDelete = useStaffPermission({ user: ["delete"] });
 
   return (
     <DashboardHeader>
@@ -62,9 +66,9 @@ export const UserHeader = ({ id }: UserHeaderProps) => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Impersonate id={id} />
-        <Ban id={id} />
-        <Delete id={id} />
+        {canImpersonate && <Impersonate id={id} />}
+        {canBan && <Ban id={id} />}
+        {canDelete && <Delete id={id} />}
       </div>
     </DashboardHeader>
   );

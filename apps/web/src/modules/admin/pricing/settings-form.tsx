@@ -27,12 +27,14 @@ import {
 } from "~/modules/admin/pricing/rates";
 
 interface SettingsFormProps {
+  readonly canEdit: boolean;
   readonly defaultMarkupBps: number;
   readonly topupFeeBps: number;
   readonly topupFeeMinMicroUsd: number;
 }
 
 export const SettingsForm = ({
+  canEdit,
   defaultMarkupBps,
   topupFeeBps,
   topupFeeMinMicroUsd,
@@ -123,7 +125,7 @@ export const SettingsForm = ({
                       field.onChange(event.target.valueAsNumber)
                     }
                     onBlur={field.onBlur}
-                    disabled={form.formState.isSubmitting}
+                    disabled={form.formState.isSubmitting || !canEdit}
                     aria-invalid={fieldState.invalid}
                     className="max-w-32"
                   />
@@ -140,12 +142,14 @@ export const SettingsForm = ({
           />
         ))}
       </div>
-      <Button
-        type="submit"
-        disabled={form.formState.isSubmitting || !form.formState.isDirty}
-      >
-        {form.formState.isSubmitting ? <Spinner /> : t("save")}
-      </Button>
+      {canEdit && (
+        <Button
+          type="submit"
+          disabled={form.formState.isSubmitting || !form.formState.isDirty}
+        >
+          {form.formState.isSubmitting ? <Spinner /> : t("save")}
+        </Button>
+      )}
     </form>
   );
 };

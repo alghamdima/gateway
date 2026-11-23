@@ -7,6 +7,7 @@ import * as z from "zod";
 
 import { pricingProviderSchema } from "@workspace/api/schema";
 import { useTranslation } from "@workspace/i18n";
+import { cn } from "@workspace/ui";
 import { Button } from "@workspace/ui-web/button";
 import {
   Field,
@@ -42,11 +43,13 @@ interface ProviderMarkup {
 }
 
 interface ProviderMarkupsProps {
+  readonly canEdit: boolean;
   readonly providers: ProviderMarkup[];
   readonly defaultMarkupBps: number;
 }
 
 export const ProviderMarkups = ({
+  canEdit,
   providers,
   defaultMarkupBps,
 }: ProviderMarkupsProps) => {
@@ -108,7 +111,7 @@ export const ProviderMarkups = ({
                 <TableCell className="text-muted-foreground">
                   {new Date(row.updatedAt).toLocaleString(i18n.language)}
                 </TableCell>
-                <TableCell className="flex gap-1">
+                <TableCell className={cn("flex gap-1", !canEdit && "hidden")}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -145,77 +148,83 @@ export const ProviderMarkups = ({
         </p>
       )}
 
-      <form
-        id="admin-pricing-provider-form"
-        noValidate
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="flex flex-wrap items-start gap-4"
-      >
-        <Controller
-          name="provider"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid} className="w-56">
-              <FieldLabel htmlFor="admin-pricing-provider">
-                {t("admin:pricing.providers.provider")}
-              </FieldLabel>
-              <Input
-                id="admin-pricing-provider"
-                list="admin-pricing-provider-names"
-                autoComplete="off"
-                placeholder="openai"
-                {...field}
-                aria-invalid={fieldState.invalid}
-                disabled={form.formState.isSubmitting}
-              />
-              <datalist id="admin-pricing-provider-names">
-                {GATEWAY_PROVIDERS.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </datalist>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
-        <Controller
-          name="markup"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid} className="w-40">
-              <FieldLabel htmlFor="admin-pricing-provider-markup">
-                {t("admin:pricing.providers.markup")}
-              </FieldLabel>
-              <div className="flex items-center gap-2">
+      {canEdit && (
+        <form
+          id="admin-pricing-provider-form"
+          noValidate
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex flex-wrap items-start gap-4"
+        >
+          <Controller
+            name="provider"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid} className="w-56">
+                <FieldLabel htmlFor="admin-pricing-provider">
+                  {t("admin:pricing.providers.provider")}
+                </FieldLabel>
                 <Input
-                  id="admin-pricing-provider-markup"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min={0}
-                  value={Number.isNaN(field.value) ? "" : field.value}
-                  onChange={(event) =>
-                    field.onChange(event.target.valueAsNumber)
-                  }
-                  onBlur={field.onBlur}
+                  id="admin-pricing-provider"
+                  list="admin-pricing-provider-names"
+                  autoComplete="off"
+                  placeholder="openai"
+                  {...field}
                   aria-invalid={fieldState.invalid}
                   disabled={form.formState.isSubmitting}
                 />
-                <span className="text-muted-foreground">%</span>
-              </div>
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
-        <Button
-          type="submit"
-          className="mt-6"
-          disabled={form.formState.isSubmitting}
-        >
-          {form.formState.isSubmitting ? <Spinner /> : t("save")}
-        </Button>
-      </form>
+                <datalist id="admin-pricing-provider-names">
+                  {GATEWAY_PROVIDERS.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </datalist>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+          <Controller
+            name="markup"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid} className="w-40">
+                <FieldLabel htmlFor="admin-pricing-provider-markup">
+                  {t("admin:pricing.providers.markup")}
+                </FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="admin-pricing-provider-markup"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min={0}
+                    value={Number.isNaN(field.value) ? "" : field.value}
+                    onChange={(event) =>
+                      field.onChange(event.target.valueAsNumber)
+                    }
+                    onBlur={field.onBlur}
+                    aria-invalid={fieldState.invalid}
+                    disabled={form.formState.isSubmitting}
+                  />
+                  <span className="text-muted-foreground">%</span>
+                </div>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+          <Button
+            type="submit"
+            className="mt-6"
+            disabled={form.formState.isSubmitting}
+          >
+            {form.formState.isSubmitting ? <Spinner /> : t("save")}
+          </Button>
+        </form>
+      )}
       <FieldDescription>
         {t("admin:pricing.providers.description", {
           markup: bpsToPercent(defaultMarkupBps),

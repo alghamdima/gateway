@@ -23,6 +23,7 @@ import { toast } from "@workspace/ui-web/toast";
 import { pathsConfig } from "~/config/paths";
 import { authClient } from "~/lib/auth/client";
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import { TurboLink } from "~/modules/common/turbo-link";
 
 import { UpdateMemberRoleModal } from "../update-member-role";
@@ -124,6 +125,7 @@ export const MemberActions = ({ member }: { member: Member }) => {
 
 export const useColumns = (): ColumnDef<DataTableFeatures, Member>[] => {
   const { t, i18n } = useTranslation("common");
+  const canUpdate = useStaffPermission({ organizations: ["update"] });
   const { data: session } = authClient.useSession();
 
   return [
@@ -225,7 +227,7 @@ export const useColumns = (): ColumnDef<DataTableFeatures, Member>[] => {
       id: "actions",
       cell: ({ row }) => (
         <div className="ml-auto w-fit">
-          <MemberActions member={row.original} />
+          {canUpdate && <MemberActions member={row.original} />}
         </div>
       ),
       enableHiding: false,

@@ -13,6 +13,7 @@ import {
 import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import { ChangesList } from "~/modules/admin/pricing/changes-list";
 import { ProviderMarkups } from "~/modules/admin/pricing/provider-markups";
 import { SettingsForm } from "~/modules/admin/pricing/settings-form";
@@ -21,6 +22,7 @@ export const Pricing = () => {
   const { t } = useTranslation(["common", "admin"]);
   const pricing = useQuery(admin.queries.pricing.get());
   const changes = useQuery(admin.queries.pricing.getChanges());
+  const canEdit = useStaffPermission({ pricing: ["update"] });
 
   return (
     <div className="@container flex w-full flex-col gap-6">
@@ -34,6 +36,7 @@ export const Pricing = () => {
         <CardContent>
           {pricing.data ? (
             <SettingsForm
+              canEdit={canEdit}
               defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
               topupFeeBps={pricing.data.settings.topupFeeBps}
               topupFeeMinMicroUsd={pricing.data.settings.topupFeeMinMicroUsd}
@@ -54,6 +57,7 @@ export const Pricing = () => {
         <CardContent>
           {pricing.data ? (
             <ProviderMarkups
+              canEdit={canEdit}
               providers={pricing.data.providers}
               defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
             />

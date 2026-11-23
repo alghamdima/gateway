@@ -6,7 +6,8 @@ import {
   mergeSearchParams,
 } from "@workspace/shared/utils";
 
-import { MemberRole, UserRole } from "../types";
+import { isStaff } from "../rbac/staff";
+import { MemberRole } from "../types";
 
 import type { User } from "../types";
 
@@ -88,8 +89,8 @@ export const getAllRolesAtOrAbove = (role: MemberRole): MemberRole[] => {
   return hierarchy.slice(idx, hierarchy.length);
 };
 
-export const hasAdminPermission = (user: User) =>
-  user.role?.split(",").includes(UserRole.ADMIN) ?? false;
+/** Whether the user may open the admin console: any staff role (rbac/staff.ts). */
+export const hasAdminPermission = (user: User) => isStaff(user);
 
 export const toMemberRole = (role: unknown): MemberRole => {
   if (z.enum(MemberRole).safeParse(role).success) {

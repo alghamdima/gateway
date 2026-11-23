@@ -41,9 +41,12 @@ const authConfigSchema = z.object({
   }),
 });
 
+/** Platform roles (rbac/staff.ts). A user may hold several, comma-separated. */
 const UserRole = {
   USER: "user",
   ADMIN: "admin",
+  FINANCE: "finance",
+  SUPPORT: "support",
 } as const;
 
 type UserRole = (typeof UserRole)[keyof typeof UserRole];

@@ -127,3 +127,4 @@ Both databases run on one Postgres server at launch, as two databases.
 | [0008](adr/0008-upstream-upgrades.md)        | Take each upstream minor release within two weeks, by script                             |
 | [0009](adr/0009-credits-plugin-hooks.md)     | The credits plugin reserves and settles per attempt, and fails closed                    |
 | [0010](adr/0010-admin-controlled-pricing.md) | Markup per provider and the top-up fee are set by staff in the admin console             |
+| [0011](adr/0011-staff-roles.md)              | Staff roles (admin, finance, support) and how the admin console is protected             |

@@ -19,6 +19,7 @@ import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Invitation } from "@workspace/auth";
@@ -84,6 +85,7 @@ export const InvitationActions = ({
 
 export const useColumns = (): ColumnDef<DataTableFeatures, Invitation>[] => {
   const { t, i18n } = useTranslation("common");
+  const canUpdate = useStaffPermission({ organizations: ["update"] });
 
   return [
     {
@@ -186,7 +188,7 @@ export const useColumns = (): ColumnDef<DataTableFeatures, Invitation>[] => {
       id: "actions",
       cell: ({ row }) => (
         <div className="ml-auto w-fit">
-          <InvitationActions invitation={row.original} />
+          {canUpdate && <InvitationActions invitation={row.original} />}
         </div>
       ),
       enableHiding: false,
