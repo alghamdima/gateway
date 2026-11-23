@@ -1,6 +1,6 @@
 # ADR 0012: Top-up checkout and the payment webhook
 
-- Status: Accepted (amount limits proposed, owner to confirm)
+- Status: Accepted (amount limits confirmed by the owner on 2026-11-23)
 - Date: 2026-11-23
 - Builds on: ADR 0001 (ledger), ADR 0003 (prepaid top-ups), ADR 0010 (fee set by staff)
 
@@ -10,7 +10,7 @@ ADR 0003 planned a fixed list of amounts, each a one-time product in Stripe. Sin
 
 ## Decision
 
-1. **Amounts.** The customer types an amount in whole cents, with quick picks of $10, $25, $50 and $100. Proposed limits: at least $5 and at most $1,000 per payment (constants in `packages/api/src/modules/credits/top-up.ts`). This replaces the fixed list in ADR 0003.
+1. **Amounts.** The customer types an amount in whole cents, with quick picks of $10, $25, $50 and $100. Limits: at least $5 and at most $1,000 per payment (constants in `packages/api/src/modules/credits/top-up.ts`). This replaces the fixed list in ADR 0003.
 2. **Checkout.** A Stripe Checkout Session in `payment` mode with two inline lines (`price_data`, USD): the credits, and the fee from `computeTopupFee` with the settings read at that moment. No promotion codes. The session and its payment intent carry metadata `purpose=credits_top_up`, `organizationId`, `creditMicroUsd`, `feeMicroUsd`. An invoice is created for the receipt. The organization's Stripe customer is reused (the same one the subscription code uses).
 3. **Who may pay.** Members with `billing:create` (organization admins and owners).
 4. **Crediting.** Only the signed webhook credits, never the redirect. `checkout.session.completed` with `payment_status=paid`, and `checkout.session.async_payment_succeeded`, append one `top_up` entry of `creditMicroUsd`, keyed `top_up:stripe:<payment intent id>`, so both events and every redelivery credit once. If the amount Stripe collected is not exactly credit plus fee, nothing is credited and the event is logged as an error for staff to resolve with an adjustment: that can only mean a bug or a change made in the Stripe dashboard.

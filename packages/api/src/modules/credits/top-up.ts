@@ -19,7 +19,7 @@ import type { WebhookCallbacks } from "@workspace/billing-web/server";
  * arrives, never on the redirect back.
  */
 
-/** Proposed limits per payment, in micro-USD (owner to confirm). */
+/** Limits per payment, in micro-USD (confirmed by the owner, ADR 0012). */
 export const TOP_UP_MIN_MICRO_USD = 5_000_000;
 export const TOP_UP_MAX_MICRO_USD = 1_000_000_000;
 export const MICRO_USD_PER_CENT = 10_000;
