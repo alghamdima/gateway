@@ -33,7 +33,8 @@ export default defineEnv({
     NEXT_PUBLIC_AUTH_MAGIC_LINK: castStringToBool.optional().default(false),
     NEXT_PUBLIC_AUTH_EMAIL_OTP: castStringToBool.optional().default(false),
     NEXT_PUBLIC_AUTH_PASSKEY: castStringToBool.optional().default(true),
-    NEXT_PUBLIC_AUTH_ANONYMOUS: castStringToBool.optional().default(true),
+    // the server refuses anonymous sign-in whatever this says (packages/auth/src/server.ts)
+    NEXT_PUBLIC_AUTH_ANONYMOUS: castStringToBool.optional().default(false),
     NEXT_PUBLIC_GOOGLE_ONE_TAP_CLIENT_ID: z.string().optional().default(""),
 
     NEXT_PUBLIC_PRODUCT_NAME: z.string(),

@@ -1,7 +1,7 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { i18n, locales, TranslationDictionary } from "@better-auth/i18n";
 import { passkey } from "@better-auth/passkey";
-import { createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -32,10 +32,23 @@ import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
 export const auth = betterAuth({
   appName: "TurboStarter",
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // 5 minutes
+  // No cookie cache: every request reads the session from the database, so a
+  // ban, a revoked session or a changed role applies on the next request
+  // instead of up to five minutes later.
+  session: {},
+  rateLimit: {
+    // on in every environment, so it is exercised before production; counters
+    // are shared by every instance
+    enabled: true,
+    storage: "database",
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 3 },
+      "/request-password-reset": { window: 60, max: 3 },
+      "/sign-in/magic-link": { window: 60, max: 3 },
+      "/email-otp/send-verification-otp": { window: 60, max: 3 },
+      "/two-factor/verify-totp": { window: 60, max: 5 },
+      "/two-factor/verify-backup-code": { window: 60, max: 5 },
     },
   },
   user: {
@@ -114,6 +127,16 @@ export const auth = betterAuth({
     user: hooks.user,
   },
   hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      // Anonymous accounts are off for a paid API: they would let anyone
+      // create accounts without an email. The plugin stays registered only so
+      // the existing schema and types keep working; its sign-in is refused.
+      if (ctx.path === "/sign-in/anonymous") {
+        throw new APIError("FORBIDDEN", {
+          message: "Anonymous sign-in is disabled",
+        });
+      }
+    }),
     after: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== "/organization/leave") {
         return;
