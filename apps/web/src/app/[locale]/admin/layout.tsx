@@ -80,6 +80,11 @@ async function AuthenticatedAdminSidebar() {
     return redirect(pathsConfig.dashboard.user.index);
   }
 
+  // staff need two-factor authentication on (ADR 0011); the API refuses them without it
+  if (!user.twoFactorEnabled) {
+    return redirect(pathsConfig.dashboard.user.settings.security);
+  }
+
   return (
     <DashboardSidebar
       user={user}

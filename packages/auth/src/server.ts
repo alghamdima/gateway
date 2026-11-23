@@ -1,7 +1,11 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { i18n, locales, TranslationDictionary } from "@better-auth/i18n";
 import { passkey } from "@better-auth/passkey";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -27,7 +31,14 @@ import { env } from "./env";
 import { hooks } from "./hooks";
 import { syncSubscriptionSeats } from "./lib/server";
 import { getUrl, trustedOrigins } from "./lib/utils";
-import { ac, roles, STAFF_ROLE_NAMES, staffAc, staffRoles } from "./rbac";
+import {
+  ac,
+  isStaff,
+  roles,
+  STAFF_ROLE_NAMES,
+  staffAc,
+  staffRoles,
+} from "./rbac";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
 export const auth = betterAuth({
@@ -135,6 +146,25 @@ export const auth = betterAuth({
         throw new APIError("FORBIDDEN", {
           message: "Anonymous sign-in is disabled",
         });
+      }
+
+      // Staff act on every customer's account and money (ADR 0011): their
+      // admin actions need two-factor authentication turned on. Stopping an
+      // impersonation runs as the customer, who is not staff, so it passes.
+      if (ctx.path.startsWith("/admin/")) {
+        const session = await getSessionFromCtx(ctx);
+        // the hook context types the user loosely; read the two fields we need
+        const role =
+          typeof session?.user.role === "string" ? session.user.role : null;
+        if (
+          session &&
+          isStaff({ role }) &&
+          session.user.twoFactorEnabled !== true
+        ) {
+          throw new APIError("FORBIDDEN", {
+            message: "Turn on two-factor authentication to use admin actions",
+          });
+        }
       }
     }),
     after: createAuthMiddleware(async (ctx) => {

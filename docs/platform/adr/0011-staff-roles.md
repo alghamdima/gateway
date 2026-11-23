@@ -31,9 +31,11 @@ Three staff roles, defined with Better Auth's access control and registered with
 - No role may impersonate another staff member (`impersonate-admins` is granted to nobody, and all three roles are listed as admin roles to the plugin).
 - **Two places enforce the table, both on the server.** Better Auth checks `user` and `session` permissions on its own `/api/auth/admin/*` endpoints. Our `/api/admin/*` routes go through one middleware with a table that maps each method and path to a permission (`packages/api/src/modules/admin/access.ts`). A route that has no entry in the table is refused, so a new route cannot ship unguarded.
 - The console hides what a role cannot do. That is convenience only; the server refuses it either way.
+- **Staff need two-factor authentication.** Without it, a staff member is refused on every `/api/admin` route and every Better Auth `/api/auth/admin/*` endpoint, and the console sends them to their security settings. Customers are not affected.
 
 ## Consequences
 
 - Granting a role is a change to `user.role` made by an `admin`, through the console or Better Auth's `set-role`.
 - A new admin route needs an entry in the access table, or every role gets 403. `access.test.ts` lists every route and checks each role against it.
 - Sessions are read from the database on every request (no cookie cache), so revoking a role or banning someone applies on their next request.
+- Granting a staff role to someone without 2FA gives them nothing until they turn it on. Turning it off takes the access away on the next request.

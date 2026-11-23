@@ -54,6 +54,13 @@ export const enforceAdmin = createMiddleware<{
     });
   }
 
+  // staff need two-factor authentication on (ADR 0011)
+  if (!user.twoFactorEnabled) {
+    throw new HttpException(HttpStatusCode.FORBIDDEN, {
+      code: "error.twoFactorRequired",
+    });
+  }
+
   await next();
 });
 
