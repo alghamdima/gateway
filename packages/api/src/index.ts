@@ -7,6 +7,7 @@ import { auth } from "@workspace/auth/server";
 import { logger } from "@workspace/shared/logger";
 import { matchesPattern } from "@workspace/shared/utils";
 
+import { refuseImpersonatedWrites } from "./impersonation";
 import { localize, delay } from "./middleware";
 import { activityRouter } from "./modules/activity/router";
 import { adminRouter } from "./modules/admin/router";
@@ -41,6 +42,7 @@ const appRouter = new Hono()
     }),
   )
   .use(loggerMiddleware((...args) => logger.info(...args)))
+  .use(refuseImpersonatedWrites)
   .use(delay)
   .use(localize)
   .use(monitor.middleware)

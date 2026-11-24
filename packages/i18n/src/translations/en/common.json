@@ -250,6 +250,7 @@
     "title": "Oops!",
     "general": "Something went wrong, please try again.",
     "twoFactorRequired": "Staff need two-factor authentication. Turn it on in your security settings.",
+    "impersonationReadOnly": "You are viewing as this customer. Changes are not allowed while impersonating.",
     "apologies": "Apologies, an error occurred while processing your request. Please contact us if the issue persists.",
     "invalid": "Invalid payload!",
     "notFound": "Not found!",

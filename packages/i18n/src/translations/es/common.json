@@ -250,6 +250,7 @@
     "title": "¡Ups!",
     "general": "Algo salió mal, por favor intenta de nuevo.",
     "twoFactorRequired": "El personal necesita la autenticación en dos pasos. Actívala en tu configuración de seguridad.",
+    "impersonationReadOnly": "Estás viendo como este cliente. No se permiten cambios mientras suplantas su identidad.",
     "apologies": "Lo sentimos, ocurrió un error al procesar tu solicitud. Por favor, contáctanos si el problema persiste.",
     "invalid": "¡Datos inválidos!",
     "notFound": "¡No encontrado!",
