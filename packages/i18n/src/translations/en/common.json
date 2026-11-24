@@ -272,5 +272,6 @@
   "rateLimit": "Rate limit",
   "activity": "Activity",
   "reconciliation": "Reconciliation",
-  "providers": "Providers"
+  "providers": "Providers",
+  "dataPolicy": "Data policy"
 }

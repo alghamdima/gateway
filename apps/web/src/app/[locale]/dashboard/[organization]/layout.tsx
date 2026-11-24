@@ -46,6 +46,11 @@ const menu = ({
         href: pathsConfig.dashboard.organization(slug).keys,
         icon: <Icons.Key />,
       },
+      {
+        title: "dataPolicy",
+        href: pathsConfig.dashboard.organization(slug).dataPolicy,
+        icon: <Icons.Globe2 />,
+      },
       ...(authClient.organization.checkRolePermission({
         permissions: { billing: ["read"] },
         role: toMemberRole(member?.role),

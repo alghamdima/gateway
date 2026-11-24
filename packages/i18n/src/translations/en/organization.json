@@ -333,6 +333,55 @@
       "promo": "Promotion"
     }
   },
+  "dataPolicy": {
+    "title": "Data policy",
+    "description": "Decide where this organization's requests may be processed and what a provider may do with them. The policy applies to every API key, and a request that no endpoint can serve under it is refused, never sent elsewhere.",
+    "saved": "Data policy saved and applied to every key.",
+    "saveFailed": "The policy could not be applied to every key. Save again to retry.",
+    "notApplied": "This policy is not on every key yet. Save it again to finish applying it.",
+    "unavailable": "The data policy could not be loaded. Try again shortly.",
+    "readOnly": "Owners and admins can change the data policy.",
+    "nothingMatches": "No endpoint matches these requirements: every request would be refused.",
+    "zeroRetention": {
+      "label": "Require zero data retention",
+      "description": "Only endpoints that keep no prompts or completions. Endpoints with unknown retention are excluded."
+    },
+    "noTraining": {
+      "label": "Never train on our data",
+      "description": "Only endpoints that never train on what you send. Endpoints with unknown terms are excluded."
+    },
+    "regions": {
+      "label": "Limit where requests are processed",
+      "description": "Only endpoints in the regions you choose.",
+      "names": {
+        "sa": "Saudi Arabia",
+        "eu": "European Union",
+        "us": "United States",
+        "other": "Elsewhere"
+      }
+    },
+    "providers": {
+      "label": "Limit providers",
+      "description": "Only the providers you choose."
+    },
+    "endpoints": {
+      "title": "Endpoints",
+      "description": "{{matching}} of {{total}} endpoints match the requirements above.",
+      "empty": "No endpoints are available yet.",
+      "provider": "Provider",
+      "region": "Processing region",
+      "retention": "Retention",
+      "training": "Training",
+      "status": "Status",
+      "unknown": "Unknown",
+      "notKept": "Not kept",
+      "mayKeep": "May be kept",
+      "neverTrains": "Never",
+      "mayTrain": "May train",
+      "allowed": "Allowed",
+      "blocked": "Blocked"
+    }
+  },
   "activity": {
     "recent": {
       "title": "Recent requests",

@@ -73,6 +73,7 @@ const pathsConfig = {
       keys: `${DASHBOARD_PREFIX}/${slug}/keys`,
       credits: `${DASHBOARD_PREFIX}/${slug}/credits`,
       activity: `${DASHBOARD_PREFIX}/${slug}/activity`,
+      dataPolicy: `${DASHBOARD_PREFIX}/${slug}/data-policy`,
     }),
   },
 } as const;

@@ -272,5 +272,6 @@
   "rateLimit": "Límite de uso",
   "activity": "Actividad",
   "reconciliation": "Conciliación",
-  "providers": "Proveedores"
+  "providers": "Proveedores",
+  "dataPolicy": "Política de datos"
 }

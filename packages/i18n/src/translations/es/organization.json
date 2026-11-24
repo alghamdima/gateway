@@ -323,6 +323,55 @@
       "promo": "Promoción"
     }
   },
+  "dataPolicy": {
+    "title": "Política de datos",
+    "description": "Decide dónde pueden procesarse las solicitudes de esta organización y qué puede hacer un proveedor con ellas. La política se aplica a todas las claves API, y una solicitud que ningún endpoint pueda atender bajo ella se rechaza, nunca se envía a otro lugar.",
+    "saved": "Política de datos guardada y aplicada a todas las claves.",
+    "saveFailed": "No se pudo aplicar la política a todas las claves. Guarda de nuevo para reintentar.",
+    "notApplied": "Esta política aún no está en todas las claves. Guárdala de nuevo para terminar de aplicarla.",
+    "unavailable": "No se pudo cargar la política de datos. Inténtalo de nuevo en breve.",
+    "readOnly": "Los propietarios y administradores pueden cambiar la política de datos.",
+    "nothingMatches": "Ningún endpoint cumple estos requisitos: todas las solicitudes se rechazarían.",
+    "zeroRetention": {
+      "label": "Exigir cero retención de datos",
+      "description": "Solo endpoints que no conservan prompts ni respuestas. Se excluyen los de retención desconocida."
+    },
+    "noTraining": {
+      "label": "No entrenar nunca con nuestros datos",
+      "description": "Solo endpoints que nunca entrenan con lo que envías. Se excluyen los de condiciones desconocidas."
+    },
+    "regions": {
+      "label": "Limitar dónde se procesan las solicitudes",
+      "description": "Solo endpoints en las regiones que elijas.",
+      "names": {
+        "sa": "Arabia Saudí",
+        "eu": "Unión Europea",
+        "us": "Estados Unidos",
+        "other": "Otro lugar"
+      }
+    },
+    "providers": {
+      "label": "Limitar proveedores",
+      "description": "Solo los proveedores que elijas."
+    },
+    "endpoints": {
+      "title": "Endpoints",
+      "description": "{{matching}} de {{total}} endpoints cumplen los requisitos anteriores.",
+      "empty": "Aún no hay endpoints disponibles.",
+      "provider": "Proveedor",
+      "region": "Región de procesamiento",
+      "retention": "Retención",
+      "training": "Entrenamiento",
+      "status": "Estado",
+      "unknown": "Desconocida",
+      "notKept": "No se conserva",
+      "mayKeep": "Puede conservarse",
+      "neverTrains": "Nunca",
+      "mayTrain": "Puede entrenar",
+      "allowed": "Permitido",
+      "blocked": "Bloqueado"
+    }
+  },
   "activity": {
     "recent": {
       "title": "Solicitudes recientes",
