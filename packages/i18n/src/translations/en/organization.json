@@ -398,7 +398,7 @@
       "policyOpen": "no restrictions",
       "policyNone": "None set",
       "dataMissing": "Not recorded for this request.",
-      "termsChanged": "The endpoint's terms were edited after this request: these are today's.",
+      "termsChanged": "The endpoint's terms were edited after this request. These are the terms recorded when it was made.",
       "title": "Request",
       "yes": "Yes",
       "no": "No",

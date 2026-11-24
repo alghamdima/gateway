@@ -177,12 +177,79 @@ describe.skipIf(!adminUrl)("provider catalog", () => {
       { keyId: "k_openai", staffId: "staff_1", ...TERMS },
       gateway,
     );
-    expect(await providers.removeProviderTerms("k_openai")).toBe(true);
-    expect(await providers.removeProviderTerms("k_openai")).toBe(false);
+    expect(await providers.removeProviderTerms("k_openai", "staff_2")).toBe(
+      true,
+    );
+    expect(await providers.removeProviderTerms("k_openai", "staff_2")).toBe(
+      false,
+    );
     const entry = (await providers.getProviderCatalog(gateway)).find(
       (e) => e.keyId === "k_openai",
     );
     expect(entry).toMatchObject({ terms: null, isZeroRetention: false });
+  });
+
+  it("keeps every change of a key's terms, and their removal, with who made it", async () => {
+    const gateway = fakeGateway([
+      { id: "k_hist", name: "history", provider: "humain", isEnabled: true },
+    ]);
+    await providers.setProviderTerms(
+      { keyId: "k_hist", staffId: "staff_1", ...TERMS },
+      gateway,
+    );
+    await providers.setProviderTerms(
+      { keyId: "k_hist", staffId: "staff_2", ...TERMS, retentionDays: 30 },
+      gateway,
+    );
+    await providers.removeProviderTerms("k_hist", "staff_3");
+    // removing what is already gone writes nothing
+    await providers.removeProviderTerms("k_hist", "staff_3");
+
+    const history = await sql<
+      {
+        retention_days: number | null;
+        is_removed: boolean;
+        changed_by: string;
+        region: string | null;
+      }[]
+    >`select retention_days, is_removed, changed_by, region from provider_endpoint_change where key_id = 'k_hist' order by id`;
+    expect(history).toEqual([
+      {
+        retention_days: 0,
+        is_removed: false,
+        changed_by: "staff_1",
+        region: "sa",
+      },
+      {
+        retention_days: 30,
+        is_removed: false,
+        changed_by: "staff_2",
+        region: "sa",
+      },
+      {
+        retention_days: null,
+        is_removed: true,
+        changed_by: "staff_3",
+        region: null,
+      },
+    ]);
+    await expect(
+      sql`update provider_endpoint_change set retention_days = 0 where key_id = 'k_hist'`,
+    ).rejects.toThrow("append-only");
+    await expect(
+      sql`delete from provider_endpoint_change where key_id = 'k_hist'`,
+    ).rejects.toThrow("append-only");
+  });
+
+  it("the database refuses a removal that carries terms, and a change that carries none", async () => {
+    await expect(
+      sql`insert into provider_endpoint_change (key_id, provider, is_removed, region, agreement, source, verified_on, changed_by)
+          values ('k_bad', 'p', true, 'sa', 'direct', 's', '2026-11-24', 'u')`,
+    ).rejects.toThrow("provider_endpoint_change_removal_has_no_terms");
+    await expect(
+      sql`insert into provider_endpoint_change (key_id, provider, is_removed, changed_by)
+          values ('k_bad', 'p', false, 'u')`,
+    ).rejects.toThrow("provider_endpoint_change_removal_has_no_terms");
   });
 
   it("answers 503 when the gateway cannot be reached, and saves nothing", async () => {

@@ -43,7 +43,10 @@ export const providersRouter = new Hono<{ Variables: { user: User } }>()
     },
   )
   .delete("/:keyId/terms", validate("param", keyParamSchema), async (c) => {
-    const isRemoved = await removeProviderTerms(c.req.valid("param").keyId);
+    const isRemoved = await removeProviderTerms(
+      c.req.valid("param").keyId,
+      c.var.user.id,
+    );
     if (!isRemoved) {
       throw new HttpException(HttpStatusCode.NOT_FOUND, {
         code: "error.notFound",

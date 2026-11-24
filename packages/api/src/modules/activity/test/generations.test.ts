@@ -165,16 +165,21 @@ describe.skipIf(!adminUrl)("generation records", () => {
   });
 
   describe("evidence of where a request went", () => {
+    /** One entry in a key's history of terms, as staff recorded it at `at`. */
     const terms = (
       keyId: string,
       provider: string,
       region: string,
       retentionDays: number | null,
       trainsOnData: boolean | null,
-      updatedAt: string,
+      at: string,
     ) =>
-      sql`insert into provider_endpoint (key_id, provider, region, retention_days, trains_on_data, agreement, source, verified_on, updated_by, updated_at)
-          values (${keyId}, ${provider}, ${region}, ${retentionDays}, ${trainsOnData}, 'direct', 'contract', '2026-11-01', 'staff', ${updatedAt})`;
+      sql`insert into provider_endpoint_change (key_id, provider, region, retention_days, trains_on_data, agreement, source, verified_on, changed_by, changed_at)
+          values (${keyId}, ${provider}, ${region}, ${retentionDays}, ${trainsOnData}, 'direct', 'contract', '2026-11-01', 'staff', ${at})`;
+
+    const termsRemoved = (keyId: string, provider: string, at: string) =>
+      sql`insert into provider_endpoint_change (key_id, provider, is_removed, changed_by, changed_at)
+          values (${keyId}, ${provider}, true, 'staff', ${at})`;
 
     const policyChange = (
       organizationId: string,
@@ -286,9 +291,11 @@ describe.skipIf(!adminUrl)("generation records", () => {
       });
     });
 
-    it("says when the terms were edited after the request", async () => {
+    it("shows the terms recorded when the request was made, not a later edit, and says they changed", async () => {
       const org = await createOrganization();
-      await terms("k_edited", "azure", "eu", 0, false, "2026-11-24T18:00:00Z");
+      // zero retention when the request was served; staff learned of 30 days that evening
+      await terms("k_edited", "azure", "eu", 0, false, "2026-11-20T00:00:00Z");
+      await terms("k_edited", "azure", "eu", 30, true, "2026-11-24T18:00:00Z");
       await attempt(org, {
         reference: "req_edited",
         amount: 450,
@@ -301,9 +308,71 @@ describe.skipIf(!adminUrl)("generation records", () => {
         "req_edited",
         gatewayWithLogs([]),
       );
-      expect(record?.data_policy.endpoint).toMatchObject({
+      expect(record?.data_policy.endpoint).toEqual({
+        provider: "azure",
         region: "eu",
+        zero_retention: true,
+        never_trained_on: true,
+        verified_on: "2026-11-01",
         terms_changed_since: true,
+      });
+    });
+
+    it("claims nothing for terms that were only recorded after the request", async () => {
+      const org = await createOrganization();
+      await terms("k_late", "groq", "us", 0, false, "2026-11-24T18:00:00Z");
+      await attempt(org, {
+        reference: "req_late",
+        amount: 450,
+        at: "2026-11-24T13:00:00Z",
+        provider: "groq",
+        providerKeyId: "k_late",
+      });
+      const record = await generations.getGeneration(
+        org,
+        "req_late",
+        gatewayWithLogs([]),
+      );
+      expect(record?.data_region).toBeNull();
+      expect(record?.data_policy.endpoint).toEqual({
+        provider: "groq",
+        region: null,
+        zero_retention: false,
+        never_trained_on: false,
+        verified_on: null,
+        terms_changed_since: true,
+      });
+    });
+
+    it("claims nothing for terms that had been removed by then", async () => {
+      const org = await createOrganization();
+      await terms(
+        "k_removed",
+        "cohere",
+        "eu",
+        0,
+        false,
+        "2026-11-10T00:00:00Z",
+      );
+      await termsRemoved("k_removed", "cohere", "2026-11-20T00:00:00Z");
+      await attempt(org, {
+        reference: "req_removed",
+        amount: 450,
+        at: "2026-11-24T13:00:00Z",
+        provider: "cohere",
+        providerKeyId: "k_removed",
+      });
+      const record = await generations.getGeneration(
+        org,
+        "req_removed",
+        gatewayWithLogs([]),
+      );
+      expect(record?.data_policy.endpoint).toMatchObject({
+        provider: "cohere",
+        region: null,
+        zero_retention: false,
+        never_trained_on: false,
+        terms_changed_since: false,
       });
     });
 

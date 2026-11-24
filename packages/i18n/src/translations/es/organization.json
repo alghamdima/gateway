@@ -388,7 +388,7 @@
       "policyOpen": "sin restricciones",
       "policyNone": "Ninguna",
       "dataMissing": "No registrado para esta solicitud.",
-      "termsChanged": "Las condiciones del endpoint se editaron después de esta solicitud: estas son las de hoy.",
+      "termsChanged": "Las condiciones del endpoint se editaron después de esta solicitud. Estas son las registradas cuando se hizo.",
       "title": "Solicitud",
       "yes": "Sí",
       "no": "No",

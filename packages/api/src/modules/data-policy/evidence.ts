@@ -1,27 +1,28 @@
-import { and, desc, eq, lte } from "@workspace/db";
+import { and, desc, eq, gt, lte } from "@workspace/db";
 import {
   organizationDataPolicyChange,
-  providerEndpoint,
+  providerEndpointChange,
 } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
 /**
  * Where one request went and under which policy (step D3, ADR 0015). Built
- * from what is kept for good: the provider key on the ledger entry, the
- * terms recorded for that key, and the history of the organization's policy.
+ * from what is kept for good: the provider key on the ledger entry, and the
+ * histories of that key's terms and of the organization's policy. Both are
+ * read as of the moment of the request.
  */
 export interface DataEvidence {
   /** The endpoint that served the request; null when the entry names no key. */
   endpoint: {
     provider: string;
-    /** Null: no terms are recorded for the key. */
+    /** Null: no terms were recorded for the key when the request was made. */
     region: string | null;
     zero_retention: boolean;
     never_trained_on: boolean;
     verified_on: string | null;
     /**
-     * True when the terms were edited after the request: the fields above
-     * are today's, not necessarily what was recorded then.
+     * True when the terms were edited after the request. The fields above
+     * are the terms recorded at the time, not today's.
      */
     terms_changed_since: boolean;
   } | null;
@@ -58,21 +59,46 @@ export const getDataEvidence = async ({
   provider,
   at,
 }: EvidenceInput): Promise<DataEvidence> => {
-  const [terms, change] = await Promise.all([
+  const [recorded, later, change] = await Promise.all([
+    // the terms as they stood when the request was made; an entry that records
+    // their removal has none (the table's check guarantees it)
     providerKeyId
       ? db
           .select({
-            provider: providerEndpoint.provider,
-            region: providerEndpoint.region,
-            retentionDays: providerEndpoint.retentionDays,
-            trainsOnData: providerEndpoint.trainsOnData,
-            verifiedOn: providerEndpoint.verifiedOn,
-            updatedAt: providerEndpoint.updatedAt,
+            provider: providerEndpointChange.provider,
+            region: providerEndpointChange.region,
+            retentionDays: providerEndpointChange.retentionDays,
+            trainsOnData: providerEndpointChange.trainsOnData,
+            verifiedOn: providerEndpointChange.verifiedOn,
           })
-          .from(providerEndpoint)
-          .where(eq(providerEndpoint.keyId, providerKeyId))
+          .from(providerEndpointChange)
+          .where(
+            and(
+              eq(providerEndpointChange.keyId, providerKeyId),
+              lte(providerEndpointChange.changedAt, at),
+            ),
+          )
+          .orderBy(
+            desc(providerEndpointChange.changedAt),
+            desc(providerEndpointChange.id),
+          )
+          .limit(1)
           .then((rows) => rows[0])
       : undefined,
+    // whether they were edited afterwards
+    providerKeyId
+      ? db
+          .select({ id: providerEndpointChange.id })
+          .from(providerEndpointChange)
+          .where(
+            and(
+              eq(providerEndpointChange.keyId, providerKeyId),
+              gt(providerEndpointChange.changedAt, at),
+            ),
+          )
+          .limit(1)
+          .then((rows) => rows.length > 0)
+      : false,
     db
       .select({
         version: organizationDataPolicyChange.version,
@@ -99,13 +125,13 @@ export const getDataEvidence = async ({
   return {
     endpoint: providerKeyId
       ? {
-          provider: terms?.provider ?? provider ?? "",
-          region: terms?.region ?? null,
+          provider: recorded?.provider ?? provider ?? "",
+          region: recorded?.region ?? null,
           // unknown is the worst case, as in the policy itself
-          zero_retention: terms?.retentionDays === 0,
-          never_trained_on: terms?.trainsOnData === false,
-          verified_on: terms?.verifiedOn ?? null,
-          terms_changed_since: terms ? terms.updatedAt > at : false,
+          zero_retention: recorded?.retentionDays === 0,
+          never_trained_on: recorded?.trainsOnData === false,
+          verified_on: recorded?.verifiedOn ?? null,
+          terms_changed_since: later,
         }
       : null,
     policy: change

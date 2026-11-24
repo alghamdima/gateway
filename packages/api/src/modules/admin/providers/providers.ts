@@ -1,5 +1,5 @@
 import { eq } from "@workspace/db";
-import { providerEndpoint } from "@workspace/db/schema";
+import { providerEndpoint, providerEndpointChange } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import {
   GatewayError,
@@ -162,6 +162,14 @@ export const setProviderTerms = async (
   };
   const [row] = await db.transaction(async (tx) => {
     await markPoliciesUnapplied(tx);
+    // the history is what evidence reads: terms as they were when a request was served
+    await tx.insert(providerEndpointChange).values({
+      keyId,
+      provider: key.provider,
+      ...terms,
+      changedBy: staffId,
+      changedAt: values.updatedAt,
+    });
     return tx
       .insert(providerEndpoint)
       .values({ keyId, ...values })
@@ -176,13 +184,26 @@ export const setProviderTerms = async (
 };
 
 /** Back to unknown. False when there were no terms to remove. */
-export const removeProviderTerms = async (keyId: string) => {
+export const removeProviderTerms = async (keyId: string, staffId: string) => {
   const removed = await db.transaction(async (tx) => {
-    await markPoliciesUnapplied(tx);
-    return tx
+    const rows = await tx
       .delete(providerEndpoint)
       .where(eq(providerEndpoint.keyId, keyId))
-      .returning({ keyId: providerEndpoint.keyId });
+      .returning({
+        keyId: providerEndpoint.keyId,
+        provider: providerEndpoint.provider,
+      });
+    const [gone] = rows;
+    if (gone) {
+      await markPoliciesUnapplied(tx);
+      await tx.insert(providerEndpointChange).values({
+        keyId,
+        provider: gone.provider,
+        isRemoved: true,
+        changedBy: staffId,
+      });
+    }
+    return rows;
   });
   return removed.length > 0;
 };

@@ -138,3 +138,41 @@ export const organizationDataPolicyChange = pgTable(
     ),
   ],
 );
+
+/**
+ * Every change to a provider key's data terms, as it was made: what was
+ * recorded for an endpoint when a request was served is read from here (step
+ * D3). `isRemoved` marks the terms being taken away; the terms columns are
+ * then null. Append only: a trigger rejects UPDATE and DELETE. No foreign
+ * key, so the record outlives the key.
+ */
+export const providerEndpointChange = pgTable(
+  "provider_endpoint_change",
+  {
+    id: bigserial({ mode: "number" }).primaryKey(),
+    keyId: text().notNull(),
+    provider: text().notNull(),
+    isRemoved: boolean().notNull().default(false),
+    region: text({ enum: PROVIDER_REGIONS }),
+    retentionDays: integer(),
+    trainsOnData: boolean(),
+    agreement: text({ enum: PROVIDER_AGREEMENTS }),
+    source: text(),
+    verifiedOn: date({ mode: "string" }),
+    changedBy: text().notNull(),
+    changedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index("provider_endpoint_change_key_idx").on(t.keyId, t.changedAt),
+    // a removal carries no terms; a change carries at least where and under what agreement
+    check(
+      "provider_endpoint_change_removal_has_no_terms",
+      sql`case when ${t.isRemoved}
+        then ${t.region} is null and ${t.retentionDays} is null and ${t.trainsOnData} is null
+          and ${t.agreement} is null and ${t.source} is null and ${t.verifiedOn} is null
+        else ${t.region} is not null and ${t.agreement} is not null
+          and ${t.source} is not null and ${t.verifiedOn} is not null
+      end`,
+    ),
+  ],
+);
