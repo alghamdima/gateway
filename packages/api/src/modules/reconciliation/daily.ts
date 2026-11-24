@@ -2,7 +2,7 @@ import { EmailTemplate } from "@workspace/email";
 import { sendEmail } from "@workspace/email/server";
 import { logger } from "@workspace/shared/logger";
 
-import { env } from "../../env";
+import { env } from "./env";
 import { previousDay, reconcile } from "./reconcile";
 
 import type { GatewayClient } from "@workspace/gateway/server";

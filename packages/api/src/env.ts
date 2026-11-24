@@ -10,18 +10,25 @@ import { preset as monitoring } from "@workspace/monitoring-web/env";
 import { envConfig, NodeEnv } from "@workspace/shared/constants";
 import { preset as storage } from "@workspace/storage/env";
 
+import { preset as internal } from "./modules/reconciliation/env";
+
 import type { Preset } from "envin/types";
 
 export const preset = {
   id: "api",
   server: {
     OPENAI_API_KEY: z.string().optional(), // change it to your provider API key (e.g. ANTHROPIC_API_KEY if you use Anthropic)
-    /** Bearer secret for /api/internal jobs (the daily reconciliation). Unset refuses them all. */
-    CRON_SECRET: z.string().min(32).optional(),
-    /** Who is emailed when the daily reconciliation finds a difference. */
-    RECONCILIATION_ALERT_EMAIL: z.email().optional(),
   },
-  extends: [auth, billingWeb, db, email, gateway, storage, monitoring],
+  extends: [
+    auth,
+    billingWeb,
+    db,
+    email,
+    gateway,
+    storage,
+    monitoring,
+    internal,
+  ],
 } as const satisfies Preset;
 
 export const env = defineEnv({
