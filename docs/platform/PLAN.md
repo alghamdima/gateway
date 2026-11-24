@@ -396,17 +396,72 @@ Verified when: a deliberately dropped settlement appears in the next reconciliat
 
 Run the ADR 0006 test without the patch, then write the `LISTEN/NOTIFY` patch and run it again. Results go in `docs/platform/scaling-test.md`.
 
+### Phase G: Gateway controls (inventory in `gateway-capabilities.md`)
+
+Verified when: each limit set in our console is refused by the built gateway with the documented status, the change is in the audit log, and provider secrets never leave our API.
+
+#### Step G1: Rate limit per organization (Size: M)
+
+- Acceptance criteria:
+  - Staff set requests per minute and tokens per minute on the admin organization page; a platform default applies to new organizations (owner decision; none until decided).
+  - Stored in our database with who and when, audited, and pushed to the gateway customer's `rate_limit`.
+  - A request over the limit gets 429 in OpenRouter's shape with `Retry-After`, the provider is never called, and the credits hold is released.
+- Verification: an end-to-end test against the built gateway (the PreLLMHook order of governance and credits decides whether a hold is taken first; the test proves no hold is left).
+- Blocked by: nothing. The default waits on the owner.
+
+#### Step G2: Rate limit per key (Size: S)
+
+- Requests per minute on the keys page next to the spending limit, pushed to the virtual key's `rate_limit`; refused if above the organization's.
+- Blocked by: G1; owner decision whether customers set it.
+
+#### Step G3: Providers page (Size: M)
+
+- Admin role only: providers, status, model count, keys masked, add or replace a key, weights, turn a provider off. Secrets are write-only through our API. Every change audited.
+- Blocked by: nothing.
+
+#### Step G4: Provider and model caps (Size: S)
+
+- Requests and tokens per minute per provider and per model across all customers, from the admin console.
+- Blocked by: G3.
+
+#### Step G5: Allowed models per key, and key rotation (Size: M)
+
+- Blocked by: G2.
+
+### Phase 9 additions
+
+- 9.0 (Size: S), before 9.1: prove the gateway stores no prompt or completion text by default (logging plugin configuration plus a test that reads a log entry), and set the log retention window. Owner decision: whether customers can opt in to content logging.
+
 ## Order and parallel work
 
-```
-Stage A:  P0 ──> import (2.2a) ──> wiring (2.3) ──> P1 baseline
-Stage B:  rename script (2.1) ──> cleanup (2.2b) ──> acceptance (2.4) ──> P7
-Stage C:  P3 ──> P4 ──> P5 ──┬─> P8 ──> P9
-                 P6 (after P3) ├─> P10
-                               └─> P11 (later)
-```
+Stages A to C are history now (see Progress). What remains, in the order to build it. Steps marked with a decision wait on the owner; everything else can start at once.
 
-Stage B needs the brand inputs (question 1). Stage C needs the payment and pricing answers (questions 2 to 4).
+### Milestone 1: ready for the first paying customer
+
+| #   | Step                                                                            | Needs from the owner                   |
+| --- | ------------------------------------------------------------------------------- | -------------------------------------- |
+| 1   | G1 rate limit per organization                                                  | default limit (can ship with none)     |
+| 2   | 9.0 no prompt or completion text stored by default, retention window            | opt-in content logging, retention days |
+| 3   | 9.1 activity page                                                               |                                        |
+| 4   | 9.2 generation detail and `GET /api/v1/generation`                              |                                        |
+| 5   | 10.1 daily reconciliation with alert                                            |                                        |
+| 6   | 10.2 low-balance email                                                          |                                        |
+| 7   | 10.4 security pass over the new code                                            |                                        |
+| 8   | 6.3 a real top-up and refund in a Stripe sandbox, plus `stripe trigger` replays | a Stripe sandbox                       |
+| 9   | Refund and credit-expiry policy built and shown on the site                     | the policy                             |
+| 10  | Phase 7 white-label and the gateway rename (Stage B)                            | brand name, domain, logo               |
+| 11  | 8.1 edge routing and the `openai` SDK smoke test                                | where we host                          |
+| 12  | 10.3 deployment and runbooks; `pnpm gateway:up` on a normal machine             | where we host                          |
+
+Steps 1 to 7 need nothing and go in that order. Steps 8 to 12 start the day their input arrives.
+
+### Milestone 2: soon after launch
+
+G2, G3, G4, G5; 8.3 catalog pages; management keys and `/api/v1/keys`; auto top-up; leaked-key scanning with GitHub (needs the key prefix from the brand).
+
+### Milestone 3: when customers ask
+
+Workspaces, zero data retention routing, guardrails, presets, BYOK, provider routing controls per request, web search. Reasons in `openrouter-comparison.md`.
 
 ## Decision log
 
@@ -428,7 +483,7 @@ Stage B needs the brand inputs (question 1). Stage C needs the payment and prici
 - Phase 4: the per-model max-output fallback when a request sets no `max_tokens` and the catalog lacks the value. Settled in 4.1 from catalog coverage data.
 - Phase 8: which provider-compatible paths (`/anthropic/*`, `/genai/*`) are public. Recommend `/api/v1/*` only at launch.
 - Phase 9: log retention window and whether prompts and completions are stored at all (privacy). Fog until we pick a launch market.
-- Later, not planned: BYOK, management keys, OAuth PKCE for apps, presets, auto top-up, `:free` models, app rankings, workspaces.
+- Later: see Milestones 2 and 3 above and `openrouter-comparison.md`.
 
 ## Always / Never
 
@@ -452,9 +507,7 @@ Updated 2026-11-21 after two Stage A verification passes in a Linux cloud contai
 | 6 Top-ups (ADR 0012)       | built, not yet run against Stripe: the credits page quotes the fee from the admin settings and starts a Stripe Checkout payment with a credits line and a fee line (owners and admins only); the signed webhook credits `top_up` once per payment intent (completed and paid, or async payment succeeded) and a succeeded refund removes the refunded share of the credit once per refund id. 15 tests on Postgres with webhooks signed the way Stripe signs them, mutation-checked; in the browser on the production build the page polled and showed the credit after a signed webhook to the real route, a forged one got 400, a member saw no box and got 403. Stripe is unreachable from the build sandbox, so the checkout redirect and `stripe trigger` replays wait for a Stripe sandbox. Amount limits $5 to $1,000 per payment, confirmed by the owner                                            |
 | Key limits (ADR 0013)      | fixed: a key's spending limit was a gateway budget, which counted provider cost without the markup, so a $5 key could spend about $5.25 at a 5% markup. The credits plugin now refuses the hold (403 `credits_key_limit`) when the key's spend in its UTC window plus open holds would pass the limit; holds and usage entries record the key (migration `0022`). 5 store tests on Postgres (window boundaries, 40 concurrent holds on one key, the gateway role cannot read key hashes), mutation-checked; end to end against the built gateway                                                                                                                                                                                                                                                                                                                                                            |
 | 8 API surface              | 8.2 done: `GET /api/v1/key` (usage all time and per UTC day, week, month; limit_remaining net of open holds), `GET /api/v1/credits` (total_credits - total_usage = balance) with the organization key as Bearer or `x-api-key`, and a distinct 401 message for a missing, malformed, unknown, disabled or expired key; `GET /api/v1/models` public, from the gateway's catalog with our markup per provider as exact decimal strings, cached one minute. 23 tests on Postgres, mutation-checked, and the catalog checked against the built gateway. Not done: 8.1 edge routing (waits on where we host), 8.3 catalog pages. Management keys are not offered: `/credits` answers to the organization's own keys                                                                                                                                                                                              |
-| 6 Top-ups                  | not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 7 TurboStarter white-label | not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| 8 API surface + catalog    | not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 9 Usage                    | not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 10 Operations              | not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 11 Multi-instance          | deferred                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
