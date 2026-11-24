@@ -5,6 +5,7 @@ import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import * as z from "zod";
 
 import type { TestDatabase } from "@workspace/db/testing";
 import type { ChildProcess } from "node:child_process";
@@ -26,6 +27,10 @@ const ADMIN_PASSWORD = "e2e-gateway-admin-password";
 const USD = 1_000_000;
 const LOCAL = "sk-mock-in-kingdom";
 const ABROAD = "sk-mock-abroad";
+
+const modelListSchema = z.object({
+  data: z.array(z.object({ id: z.string() })).optional(),
+});
 
 const freePort = () =>
   new Promise<number>((done) => {
@@ -52,7 +57,28 @@ describe.skipIf(!adminUrl || !binary)(
     let policy: typeof import("../policy");
     let providers: typeof import("../../admin/providers/providers");
     let generations: typeof import("../../activity/generations");
+    let models: typeof import("../../v1/models");
+    let v1Router: typeof import("../../v1/router").v1Router;
     let localKeyId = "";
+
+    /** GET /api/v1/models as a caller with this key, or with none. */
+    const modelsRoute = async (key?: string) => {
+      const response = await v1Router.request("/models", {
+        headers: key ? { authorization: `Bearer ${key}` } : {},
+      });
+      const body = modelListSchema.parse(await response.json());
+      return { status: response.status, ids: body.data?.map((m) => m.id) };
+    };
+
+    /** The model ids the organization is offered under its policy. */
+    const offered = async (organizationId: string) =>
+      (
+        await models.listPublicModels(
+          undefined,
+          undefined,
+          await policy.accessForOrganization(organizationId),
+        )
+      ).data.map((model) => model.id);
 
     const chat = (key: string) =>
       fetch(`${gatewayUrl}/v1/chat/completions`, {
@@ -227,6 +253,8 @@ describe.skipIf(!adminUrl || !binary)(
       policy = await import("../policy");
       providers = await import("../../admin/providers/providers");
       generations = await import("../../activity/generations");
+      models = await import("../../v1/models");
+      ({ v1Router } = await import("../../v1/router"));
 
       // staff record the terms of the in-Kingdom key; the other stays unknown
       const catalog = await providers.getProviderCatalog();
@@ -282,6 +310,9 @@ describe.skipIf(!adminUrl || !binary)(
         expect(result.served).toEqual({ [LOCAL]: 24 });
       }
 
+      // the model list it is offered is what its endpoint serves
+      expect(await offered("org_strict")).toContain("openai/gpt-4o-mini");
+
       // the record of one of those requests says where it went and under which policy
       const response = await chat(after.key);
       const requestId = response.headers.get("x-bifrost-request-id") ?? "";
@@ -315,6 +346,13 @@ describe.skipIf(!adminUrl || !binary)(
         applied: 1,
         failed: [],
       });
+
+      // no endpoint is left: no model is offered, though the gateway still has them
+      expect(await offered("org_strict")).toEqual([]);
+      expect(await offered("org_open")).toContain("openai/gpt-4o-mini");
+      // the same through GET /api/v1/models: by this key nothing, with no key the public catalog
+      expect(await modelsRoute(key)).toEqual({ status: 200, ids: [] });
+      expect((await modelsRoute()).ids).toContain("openai/gpt-4o-mini");
 
       const refused = await send(key, 6);
       expect(refused.statuses).toEqual([403]);

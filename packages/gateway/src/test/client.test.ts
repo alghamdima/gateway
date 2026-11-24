@@ -204,6 +204,17 @@ describe("gateway client", () => {
     ]);
   });
 
+  it("asks for the models of given provider keys, or of all", async () => {
+    replies.push({ status: 200, body: { models: [], total: 0 } });
+    replies.push({ status: 200, body: { models: [], total: 0 } });
+    await client().listModels(["k 1", "k2"]);
+    await client().listModels();
+    expect(seen.map((request) => request.path)).toEqual([
+      "/api/models/details?limit=500&offset=0&keys=k%201%2Ck2",
+      "/api/models/details?limit=500&offset=0",
+    ]);
+  });
+
   it("lists provider keys with their id, name, provider and state, and nothing else", async () => {
     replies.push({
       status: 200,

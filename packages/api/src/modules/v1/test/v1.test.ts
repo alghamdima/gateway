@@ -279,6 +279,92 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
       });
     });
 
+    describe("for an organization with a data policy", () => {
+      const catalog: GatewayModel[] = [
+        {
+          name: "allam-34b",
+          provider: "humain",
+          input_cost_per_token: 0.000001,
+          output_cost_per_token: 0.000002,
+          accessible_by_keys: ["k_riyadh"],
+        },
+        {
+          name: "gpt-oss-120b",
+          provider: "humain",
+          input_cost_per_token: 0.000001,
+          output_cost_per_token: 0.000002,
+          // served only by a key the policy does not allow
+          accessible_by_keys: ["k_other"],
+        },
+        {
+          // the gateway returns a provider that has none of the keys unfiltered
+          name: "gpt-4o-mini",
+          provider: "openai",
+          input_cost_per_token: 0.00000015,
+          output_cost_per_token: 0.0000006,
+        },
+      ];
+      const recording = (seen: (string[] | undefined)[]): GatewayClient => ({
+        ...gatewayWith(catalog),
+        listModels: async (keyIds) => {
+          seen.push(keyIds);
+          return catalog;
+        },
+      });
+
+      it("lists only the models an allowed provider key serves", async () => {
+        models.clearModelCache();
+        const seen: (string[] | undefined)[] = [];
+        const { data } = await models.listPublicModels(
+          recording(seen),
+          undefined,
+          {
+            allowAll: false,
+            providers: [{ provider: "humain", keyIds: ["k_riyadh"] }],
+          },
+        );
+        expect(seen).toEqual([["k_riyadh"]]);
+        expect(data.map((model) => model.id)).toEqual(["humain/allam-34b"]);
+      });
+
+      it("lists nothing, without asking the gateway, when the policy allows no endpoint", async () => {
+        const seen: (string[] | undefined)[] = [];
+        const { data } = await models.listPublicModels(
+          recording(seen),
+          undefined,
+          { allowAll: false, providers: [] },
+        );
+        expect(data).toEqual([]);
+        expect(seen).toEqual([]);
+      });
+
+      it("keeps the public catalog and a policy's list apart", async () => {
+        models.clearModelCache();
+        const gateway = recording([]);
+        const strict = {
+          allowAll: false as const,
+          providers: [{ provider: "humain", keyIds: ["k_riyadh"] }],
+        };
+        const open = await models.listPublicModels(gateway);
+        expect(open.data).toHaveLength(3);
+        expect(
+          (await models.listPublicModels(gateway, undefined, strict)).data,
+        ).toHaveLength(1);
+        // the cached public catalog is still whole
+        expect((await models.listPublicModels(gateway)).data).toHaveLength(3);
+      });
+
+      it("refuses a key that is not valid rather than showing it the whole catalog", async () => {
+        for (const headers of [
+          { authorization: "Bearer sk-bf-not-a-real-key" },
+          { authorization: "Basic abc" },
+        ]) {
+          const response = await get("/models", headers);
+          expect(response.status).toBe(401);
+        }
+      });
+    });
+
     it("is public, and answers 503 in OpenRouter's shape when the gateway is not reachable", async () => {
       models.clearModelCache();
       // no GATEWAY_URL in tests: the gateway is not configured

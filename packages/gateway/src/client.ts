@@ -50,6 +50,8 @@ export class GatewayError extends Error {
 export interface GatewayModel {
   name: string;
   provider: string;
+  /** With a key filter: the provider keys among them that serve the model. */
+  accessible_by_keys?: string[];
   context_length?: number;
   max_input_tokens?: number;
   max_output_tokens?: number;
@@ -339,13 +341,23 @@ export const createGatewayClient = ({
       }));
     },
 
-    /** Every model of every configured provider, with its catalog price. */
-    listModels: async (): Promise<GatewayModel[]> => {
+    /**
+     * Every model of every configured provider, with its catalog price.
+     *
+     * With `keyIds`, the gateway narrows each provider's models to those the
+     * given provider keys serve and names them in `accessible_by_keys`. A
+     * provider that has none of the keys comes back unfiltered, without
+     * that field: callers that filter must require it.
+     */
+    listModels: async (keyIds?: string[]): Promise<GatewayModel[]> => {
+      const filter = keyIds?.length
+        ? `&keys=${encodeURIComponent(keyIds.join(","))}`
+        : "";
       const models: GatewayModel[] = [];
       for (let offset = 0; ; offset += MODEL_PAGE_SIZE) {
         const page = await call<ModelDetailsResponse>(
           "GET",
-          `/api/models/details?limit=${MODEL_PAGE_SIZE}&offset=${offset}`,
+          `/api/models/details?limit=${MODEL_PAGE_SIZE}&offset=${offset}${filter}`,
           undefined,
         );
         const rows = page?.models ?? [];

@@ -8,7 +8,8 @@ import {
 import { logger } from "@workspace/shared/logger";
 
 import { getGeneration } from "../activity/generations";
-import { authenticateKey, readKey } from "./auth";
+import { accessForOrganization } from "../data-policy/policy";
+import { AUTH_MESSAGES, authenticateKey, readKey } from "./auth";
 import { listPublicModels } from "./models";
 import { describeCredits, describeKey } from "./queries";
 
@@ -43,10 +44,32 @@ const enforceKey = createMiddleware<{ Variables: { key: CallingKey } }>(
 );
 
 export const v1Router = new Hono<{ Variables: { key: CallingKey } }>()
-  // public, as OpenRouter's: no key needed to see models and prices
+  // public, as OpenRouter's: no key needed to see models and prices. With a
+  // key, the list is what that organization's data policy can reach (ADR 0015);
+  // a key that is not valid is refused rather than shown the whole catalog.
   .get("/models", async (c) => {
+    const sent = readKey({
+      authorization: c.req.header("authorization"),
+      apiKey: c.req.header("x-api-key"),
+    });
+    // no credentials at all is the public catalog; anything else must be a valid key
+    if ("message" in sent && sent.message !== AUTH_MESSAGES.missing) {
+      return apiError(401, sent.message);
+    }
+    const caller = "key" in sent ? await authenticateKey(sent.key) : undefined;
+    if (caller && !caller.isAuthenticated) {
+      return apiError(401, caller.message);
+    }
     try {
-      return c.json(await listPublicModels());
+      return c.json(
+        await listPublicModels(
+          undefined,
+          undefined,
+          caller
+            ? await accessForOrganization(caller.key.organizationId)
+            : undefined,
+        ),
+      );
     } catch (error) {
       if (
         error instanceof GatewayError ||

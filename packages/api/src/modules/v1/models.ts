@@ -3,7 +3,11 @@ import { getGateway } from "@workspace/gateway/server";
 import { marketPrice } from "../pricing/price";
 import { getPricing } from "../pricing/pricing";
 
-import type { GatewayClient, GatewayModel } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  GatewayModel,
+  VirtualKeyAccess,
+} from "@workspace/gateway/server";
 
 /**
  * GET /api/v1/models: the models the gateway can serve, in OpenRouter's
@@ -36,17 +40,35 @@ export interface PublicModel {
 const CACHE_MS = 60_000;
 let cached: { at: number; models: PublicModel[] } | undefined;
 
+/**
+ * The models on offer. With an `access` that names provider keys (an
+ * organization with a data policy, ADR 0015), only the models those keys
+ * serve: a model is listed when the gateway says one of them serves it, so a
+ * policy nothing satisfies lists nothing. Only the full catalog is cached.
+ */
 export const listPublicModels = async (
   gateway: GatewayClient = getGateway(),
   now = Date.now(),
+  access: VirtualKeyAccess = { allowAll: true },
 ): Promise<{ data: PublicModel[] }> => {
-  if (cached && now - cached.at < CACHE_MS) {
+  if (access.allowAll && cached && now - cached.at < CACHE_MS) {
     return { data: cached.models };
   }
-  const [models, { settings, providers }] = await Promise.all([
-    gateway.listModels(),
+  const allowedKeys = access.allowAll
+    ? undefined
+    : new Set(access.providers.flatMap((provider) => provider.keyIds));
+  if (allowedKeys?.size === 0) {
+    return { data: [] };
+  }
+  const [listed, { settings, providers }] = await Promise.all([
+    gateway.listModels(allowedKeys && [...allowedKeys]),
     getPricing(),
   ]);
+  const models = allowedKeys
+    ? listed.filter((model) =>
+        model.accessible_by_keys?.some((keyId) => allowedKeys.has(keyId)),
+      )
+    : listed;
   const markupFor = new Map(
     providers.map((row) => [row.provider, row.markupBps]),
   );
@@ -60,7 +82,9 @@ export const listPublicModels = async (
     )
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  cached = { at: now, models: publicModels };
+  if (access.allowAll) {
+    cached = { at: now, models: publicModels };
+  }
   return { data: publicModels };
 };
 
