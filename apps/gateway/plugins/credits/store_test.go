@@ -358,3 +358,55 @@ func reserve(store *Store, organizationID string, amount int64) (string, error) 
 	}
 	return id, err
 }
+
+func TestGatewayRole_CannotMintCredit(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	org := db.organization(t, 10*usd)
+	hold := must[string](t)(reserve(NewStore(db.ledger), org, usd))
+
+	for name, statement := range map[string]string{
+		"a top-up entry":           `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) VALUES ('mint1', $1, 1000000, 'top_up', 'mint1')`,
+		"a positive usage entry":   `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) VALUES ('mint2', $1, 1000000, 'usage', 'mint2')`,
+		"a raised balance":         `UPDATE credit_account SET balance = balance + 1000000 WHERE organization_id = $1`,
+		"a changed account owner":  `UPDATE credit_account SET organization_id = organization_id WHERE organization_id = $1`,
+		"a hold's amount":          `UPDATE credit_reservation SET amount = 1 WHERE organization_id = $1`,
+		"a hold moved to an owner": `UPDATE credit_reservation SET organization_id = organization_id WHERE organization_id = $1`,
+	} {
+		if _, err := db.ledger.Exec(ctx, statement, org); err == nil {
+			t.Errorf("gateway_ledger wrote %s", name)
+		}
+	}
+	if s := db.consistent(t, org); s.Balance != 10*usd || s.Held != usd {
+		t.Fatalf("state: %+v", s)
+	}
+
+	// what the gateway does still works: charge, release, extend, reap
+	store := NewStore(db.ledger)
+	if ok := must[bool](t)(store.Extend(ctx, hold, time.Minute)); !ok {
+		t.Fatal("extend failed")
+	}
+	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: hold, OrganizationID: org, Cost: 400_000, IdempotencyKey: "nonce:role:0:0"}))
+	if !res.Charged || !res.Released {
+		t.Fatalf("settle: %+v", res)
+	}
+	must[int64](t)(store.Reap(ctx))
+	if s := db.consistent(t, org); s.Balance != 10*usd-400_000 || s.Held != 0 {
+		t.Fatalf("state after settle: %+v", s)
+	}
+}
+
+func TestGatewayRole_TheControlPlaneStillCredits(t *testing.T) {
+	db := newTestDB(t)
+	org := db.organization(t, usd)
+	// the owning role (the control plane) records top-ups as before
+	if _, err := db.admin.Exec(context.Background(), `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) VALUES ('topup2', $1, 500000, 'top_up', 'topup2')`, org); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.admin.Exec(context.Background(), `UPDATE credit_account SET balance = balance + 500000 WHERE organization_id = $1`, org); err != nil {
+		t.Fatal(err)
+	}
+	if s := db.consistent(t, org); s.Balance != usd+500_000 {
+		t.Fatalf("state: %+v", s)
+	}
+}

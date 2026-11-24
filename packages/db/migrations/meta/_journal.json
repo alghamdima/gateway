@@ -183,6 +183,13 @@
       "when": 1795505596777,
       "tag": "0025_low_balance_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795522240954,
+      "tag": "0026_ledger_role_limits",
+      "breakpoints": true
     }
   ]
 }
