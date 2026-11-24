@@ -48,7 +48,10 @@ func newMockProvider(t *testing.T) *mockProvider {
 		}
 		m.chats.Add(1)
 		var body struct {
-			Stream bool `json:"stream"`
+			Stream   bool `json:"stream"`
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
 		}
 		raw, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(raw, &body)
@@ -66,6 +69,17 @@ func newMockProvider(t *testing.T) *mockProvider {
 				flusher.Flush()
 			}
 		}
+		if len(body.Messages) > 0 && body.Messages[0].Content == e2eStallPrompt {
+			// some text, then nothing until the caller gives up: usage never arrives
+			for range 4 {
+				send(fmt.Sprintf(`{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":%q},"finish_reason":null}]}`, strings.Repeat("a", 100)))
+			}
+			select {
+			case <-r.Context().Done():
+			case <-time.After(30 * time.Second):
+			}
+			return
+		}
 		for _, word := range []string{"hel", "lo"} {
 			send(fmt.Sprintf(`{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":%q},"finish_reason":null}]}`, word))
 		}
@@ -76,6 +90,9 @@ func newMockProvider(t *testing.T) *mockProvider {
 	t.Cleanup(m.server.Close)
 	return m
 }
+
+// e2eStallPrompt makes the mock provider stream a little and then stall.
+const e2eStallPrompt = "stall"
 
 const (
 	e2eAdminUser     = "e2e-admin"
@@ -249,9 +266,10 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 	provider := newMockProvider(t)
 	funded := db.organization(t, usd)
 	broke := db.organization(t, 10)
+	cutOff := db.organization(t, usd)
 	// as staff would set them: 1 percent by default, 5 percent for the provider under test
 	db.setPricing(t, 100, map[string]int64{"openai": 500})
-	gw := startGateway(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db)}, []string{funded, broke})
+	gw := startGateway(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db)}, []string{funded, broke, cutOff})
 
 	// gpt-4o-mini in the local pricing file: 0.15 USD per million input tokens, 0.60 per million output
 	providerCost := e2ePromptTokens*0.15e-6 + e2eCompletionTokens*0.60e-6
@@ -291,6 +309,63 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		s := settled(t, db, funded)
 		if s.UsageEntries != 2 || s.Balance != usd-2*charge || s.Held != 0 {
 			t.Fatalf("state %+v, want two usage entries of %d", s, charge)
+		}
+	})
+
+	t.Run("a stream the caller abandons is charged its input and what was streamed", func(t *testing.T) {
+		body := chatBody(true)
+		body["messages"] = []map[string]any{{"role": "user", "content": e2eStallPrompt}}
+		raw, _ := json.Marshal(body)
+		req, _ := http.NewRequest(http.MethodPost, gw.url+"/v1/chat/completions", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer sk-bf-e2e-"+cutOff)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// read until the streamed text has arrived, then hang up
+		var seen strings.Builder
+		buf := make([]byte, 4096)
+		for strings.Count(seen.String(), "aaaa") < 4*25 {
+			n, err := resp.Body.Read(buf)
+			seen.Write(buf[:n])
+			if err != nil {
+				t.Fatalf("stream ended before the text arrived: %v: %s", err, seen.String())
+			}
+		}
+		resp.Body.Close()
+
+		s := settled(t, db, cutOff)
+		if s.UsageEntries != 1 || s.Held != 0 {
+			t.Fatalf("state %+v, want one usage entry and no open hold", s)
+		}
+		// the provider never reported usage; the gateway counts the prompt and the
+		// text received (core/streamusage, fed by the logging plugin's record of the stream)
+		var cost, held int64
+		var prompt, completion int
+		err = db.admin.QueryRow(context.Background(), `SELECT -amount, (metadata->>'held')::bigint, coalesce((metadata->>'prompt_tokens')::int, 0), coalesce((metadata->>'completion_tokens')::int, 0) FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, cutOff).Scan(&cost, &held, &prompt, &completion)
+		if err != nil || cost <= 0 || cost > held || prompt == 0 || completion == 0 {
+			t.Fatalf("entry: cost=%d held=%d prompt=%d completion=%d err=%v", cost, held, prompt, completion, err)
+		}
+	})
+
+	t.Run("a request whose cost the hold cannot bound is refused and the provider is never called", func(t *testing.T) {
+		before := provider.chats.Load()
+		for name, extra := range map[string]map[string]any{
+			"priority tier":     {"service_tier": "priority"},
+			"server-side tools": {"tools": []map[string]any{{"type": "web_search"}}},
+		} {
+			body := chatBody(false)
+			for k, v := range extra {
+				body[k] = v
+			}
+			status, out := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, body)
+			if status != 400 || !strings.Contains(out, ErrorTypeUnsupportedRequest) {
+				t.Errorf("%s: status %d: %s", name, status, out)
+			}
+		}
+		if provider.chats.Load() != before {
+			t.Fatal("the provider was called for a request that was refused")
 		}
 	})
 

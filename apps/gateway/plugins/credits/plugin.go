@@ -264,7 +264,14 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 	provider, _, _ := req.GetRequestFields()
 	markupBps := prices.forProvider(provider)
 
+	if reason := unboundable(ctx, req); reason != "" {
+		return req, refuse(400, ErrorTypeUnsupportedRequest, string(reason)), nil
+	}
 	amount, err := p.estimate(ctx, req, markupBps)
+	var cannotBound unboundableError
+	if errors.As(err, &cannotBound) {
+		return req, refuse(400, ErrorTypeUnsupportedRequest, string(cannotBound.reason)), nil
+	}
 	if err != nil {
 		p.logger.Warn("credits: cannot estimate %s for organization %s: %v", req.RequestType, organizationID, err)
 		return req, refuse(400, ErrorTypeUnpriced, "This model cannot be priced, so the request was not sent."), nil
@@ -320,7 +327,9 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 	case resp != nil:
 		costUSD = p.pricer.CalculateCost(resp, scopes)
 	case bifrostErr != nil && bifrostErr.ExtraFields.BilledUsage != nil:
-		// the provider billed for tokens before the attempt failed
+		// the provider billed for tokens before the attempt failed; for a stream
+		// that was cancelled or timed out, the gateway counts the prompt and the
+		// text already received (core/streamusage)
 		costUSD = p.pricer.CalculateCostForUsage(bifrostErr.ExtraFields.BilledUsage, provider, model, requestType, scopes)
 	}
 	cost, err := toMicroUSD(costUSD, held.markupBps)
@@ -401,7 +410,14 @@ func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostReque
 	if err != nil {
 		return 0, fmt.Errorf("measure request: %w", err)
 	}
-	inputTokens := (len(encoded) + p.inputBytesPerToken - 1) / p.inputBytesPerToken
+	shape, reason, err := shapeOf(encoded)
+	if err != nil {
+		return 0, err
+	}
+	if reason != "" {
+		return 0, unboundableError{reason: reason}
+	}
+	inputTokens := (len(encoded)+p.inputBytesPerToken-1)/p.inputBytesPerToken + shape.imageParts*imagePartTokens
 
 	outputTokens := 0
 	if generates {
@@ -412,6 +428,8 @@ func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostReque
 		if outputTokens == 0 {
 			return 0, fmt.Errorf("%s/%s has no maximum output and the request sets none", provider, model)
 		}
+		// n and best_of generate that many answers, each up to the limit
+		outputTokens *= shape.completions
 	}
 
 	usage := &schemas.BifrostLLMUsage{PromptTokens: inputTokens, CompletionTokens: outputTokens, TotalTokens: inputTokens + outputTokens}
