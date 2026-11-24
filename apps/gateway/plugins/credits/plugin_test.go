@@ -405,6 +405,29 @@ func TestPostLLMHook_ChargesTheRealCostAndReleasesTheHold(t *testing.T) {
 	}
 }
 
+func TestPostLLMHook_RecordsTheProviderKeyThatServedTheAttempt(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	plugin := testPlugin(ledger, testPricer())
+
+	served := testContext(testOrg)
+	plugin.PreLLMHook(served, chatRequest(schemas.ChatCompletionRequest, nil))
+	served.SetValue(schemas.BifrostContextKeySelectedKeyID, "key-in-kingdom")
+	plugin.PostLLMHook(served, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+
+	// an attempt that ended before a key was chosen names none
+	unserved := testContext(testOrg)
+	plugin.PreLLMHook(unserved, chatRequest(schemas.ChatCompletionRequest, nil))
+	plugin.PostLLMHook(unserved, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+
+	settled := ledger.settlements()
+	if len(settled) != 2 || settled[0].Metadata["provider_key_id"] != "key-in-kingdom" {
+		t.Fatalf("settlements: %+v", settled)
+	}
+	if _, named := settled[1].Metadata["provider_key_id"]; named {
+		t.Fatalf("a key was named for an attempt that chose none: %+v", settled[1].Metadata)
+	}
+}
+
 func TestPostLLMHook_AStreamIsChargedOnceOnItsFinalChunk(t *testing.T) {
 	ledger := &fakeLedger{balance: 10 * usd}
 	plugin := testPlugin(ledger, testPricer())

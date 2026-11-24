@@ -366,6 +366,11 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			"failed":            bifrostErr != nil,
 		},
 	}
+	// which provider key served the attempt: the ledger keeps it for good, as evidence
+	// of where the request went (docs/platform/adr/0015-data-policy.md)
+	if keyID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeySelectedKeyID); keyID != "" {
+		settlement.Metadata["provider_key_id"] = keyID
+	}
 	// token counts for the activity pages, which read the ledger (kept for good) rather
 	// than the gateway's logs (kept for the retention window, ADR 0014)
 	if usage := usageOf(resp, bifrostErr); usage != nil {

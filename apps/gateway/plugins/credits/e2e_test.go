@@ -259,6 +259,30 @@ func (g *e2eGateway) post(t *testing.T, path, key string, body map[string]any) (
 	return resp.StatusCode, string(out)
 }
 
+// hasProviderKey asks the gateway whether it holds a provider key with this id.
+func (g *e2eGateway) hasProviderKey(t *testing.T, keyID string) bool {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodGet, g.url+"/api/keys", nil)
+	req.SetBasicAuth(e2eAdminUser, e2eAdminPassword)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var keys []struct {
+		KeyID string `json:"key_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
+		t.Fatalf("GET /api/keys: %v", err)
+	}
+	for _, key := range keys {
+		if keyID != "" && key.KeyID == keyID {
+			return true
+		}
+	}
+	return false
+}
+
 func chatBody(stream bool) map[string]any {
 	return map[string]any{
 		"model": "openai/gpt-4o-mini", "max_tokens": 600, "stream": stream,
@@ -329,6 +353,12 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		err := db.admin.QueryRow(context.Background(), `SELECT (metadata->>'provider_cost_usd')::float8, metadata->>'model', reference, (metadata->>'markup_bps')::bigint FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&cost, &model, &reference, &markup)
 		if err != nil || cost < providerCost-1e-9 || cost > providerCost+1e-9 || !strings.Contains(model, "gpt-4o-mini") || reference == "" || markup != 500 {
 			t.Fatalf("entry: cost=%v model=%q reference=%q markup=%d err=%v", cost, model, reference, markup, err)
+		}
+		// the provider key that served it is on the entry: the gateway's own id for it
+		var providerKey string
+		err = db.admin.QueryRow(context.Background(), `SELECT coalesce(metadata->>'provider_key_id', '') FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&providerKey)
+		if err != nil || !gw.hasProviderKey(t, providerKey) {
+			t.Fatalf("provider key on the entry: %q, %v", providerKey, err)
 		}
 		var prompt, completion int
 		err = db.admin.QueryRow(context.Background(), `SELECT (metadata->>'prompt_tokens')::int, (metadata->>'completion_tokens')::int FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&prompt, &completion)
