@@ -7,6 +7,7 @@ import {
   getSessionFromCtx,
   isAPIError,
 } from "better-auth/api";
+import { deleteSessionCookie } from "better-auth/cookies";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -42,6 +43,47 @@ import {
   staffRoles,
 } from "./rbac";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
+
+/**
+ * Where a staff member with two-factor authentication may get a session.
+ * Better Auth asks for the second factor only on password sign-ins; every
+ * other way in (magic link, email code, Google, GitHub, Apple, one-tap) would
+ * give staff a full session on their mailbox or social account alone
+ * (ADR 0011).
+ */
+const STAFF_SESSION_PATHS = new Set([
+  // the password step: the two-factor plugin turns it into a challenge
+  "/sign-in/email",
+  "/two-factor/verify-totp",
+  "/two-factor/verify-backup-code",
+  // a passkey is itself a strong second factor
+  "/passkey/verify-authentication",
+  "/sign-in/passkey",
+  // already signed in with both factors
+  "/change-password",
+  "/admin/impersonate-user",
+  "/admin/stop-impersonating",
+]);
+
+const refuseStaffSessionsWithoutSecondFactor = async (
+  ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
+) => {
+  const created = ctx.context.newSession;
+  if (!created || STAFF_SESSION_PATHS.has(ctx.path)) {
+    return;
+  }
+  // the hook context types the user loosely; read the two fields we need
+  const role = typeof created.user.role === "string" ? created.user.role : null;
+  if (!isStaff({ role }) || created.user.twoFactorEnabled !== true) {
+    return;
+  }
+  await ctx.context.internalAdapter.deleteSession(created.session.token);
+  deleteSessionCookie(ctx);
+  throw new APIError("FORBIDDEN", {
+    message:
+      "Staff accounts sign in with their password and authenticator app, or a passkey",
+  });
+};
 
 export const auth = betterAuth({
   appName: "TurboStarter",
@@ -170,6 +212,7 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      await refuseStaffSessionsWithoutSecondFactor(ctx);
       await recordAuthAdminAction(ctx);
 
       if (ctx.path !== "/organization/leave") {
