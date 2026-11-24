@@ -391,6 +391,14 @@
       "failed": "Failed"
     },
     "record": {
+      "dataTitle": "Where it was processed",
+      "termsVerified": "Terms verified on",
+      "policy": "Policy in force",
+      "policyVersion": "Version {{version}}: {{requirements}}",
+      "policyOpen": "no restrictions",
+      "policyNone": "None set",
+      "dataMissing": "Not recorded for this request.",
+      "termsChanged": "The endpoint's terms were edited after this request: these are today's.",
       "title": "Request",
       "yes": "Yes",
       "no": "No",

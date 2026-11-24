@@ -381,6 +381,14 @@
       "failed": "Fallida"
     },
     "record": {
+      "dataTitle": "Dónde se procesó",
+      "termsVerified": "Condiciones verificadas el",
+      "policy": "Política vigente",
+      "policyVersion": "Versión {{version}}: {{requirements}}",
+      "policyOpen": "sin restricciones",
+      "policyNone": "Ninguna",
+      "dataMissing": "No registrado para esta solicitud.",
+      "termsChanged": "Las condiciones del endpoint se editaron después de esta solicitud: estas son las de hoy.",
       "title": "Solicitud",
       "yes": "Sí",
       "no": "No",

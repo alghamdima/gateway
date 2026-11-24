@@ -240,6 +240,48 @@ const RequestRecord = ({
       ]
     : [];
 
+  // where the request went and the policy in force then (ADR 0015)
+  const endpoint = data?.data_policy.endpoint;
+  const policy = data?.data_policy.policy;
+  const regionName = (region: string) =>
+    t(`organization:dataPolicy.regions.names.${region as "sa"}`);
+  const requirements = policy
+    ? [
+        policy.require_zero_retention &&
+          t("organization:dataPolicy.zeroRetention.label"),
+        policy.forbid_training && t("organization:dataPolicy.noTraining.label"),
+        policy.allowed_regions?.map(regionName).join(", "),
+        policy.allowed_providers?.join(", "),
+      ].filter((item): item is string => Boolean(item))
+    : [];
+  const evidence = endpoint
+    ? [
+        {
+          label: t("organization:dataPolicy.endpoints.region"),
+          value:
+            endpoint.region === null
+              ? t("organization:dataPolicy.endpoints.unknown")
+              : regionName(endpoint.region),
+        },
+        {
+          label: t("organization:dataPolicy.endpoints.retention"),
+          value: endpoint.zero_retention
+            ? t("organization:dataPolicy.endpoints.notKept")
+            : t("organization:dataPolicy.endpoints.mayKeep"),
+        },
+        {
+          label: t("organization:dataPolicy.endpoints.training"),
+          value: endpoint.never_trained_on
+            ? t("organization:dataPolicy.endpoints.neverTrains")
+            : t("organization:dataPolicy.endpoints.mayTrain"),
+        },
+        {
+          label: t("organization:activity.record.termsVerified"),
+          value: endpoint.verified_on ?? unknown,
+        },
+      ]
+    : [];
+
   return (
     <Modal
       open
@@ -298,6 +340,45 @@ const RequestRecord = ({
                   </ul>
                 </div>
               )}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {t("organization:activity.record.dataTitle")}
+                </p>
+                {endpoint ? (
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                    {evidence.map((fact) => (
+                      <div key={fact.label} className="contents">
+                        <dt className="text-muted-foreground">{fact.label}</dt>
+                        <dd>{fact.value}</dd>
+                      </div>
+                    ))}
+                    <div className="contents">
+                      <dt className="text-muted-foreground">
+                        {t("organization:activity.record.policy")}
+                      </dt>
+                      <dd>
+                        {policy && policy.version > 0
+                          ? t("organization:activity.record.policyVersion", {
+                              version: policy.version,
+                              requirements:
+                                requirements.join(" · ") ||
+                                t("organization:activity.record.policyOpen"),
+                            })
+                          : t("organization:activity.record.policyNone")}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {t("organization:activity.record.dataMissing")}
+                  </p>
+                )}
+                {endpoint?.terms_changed_since && (
+                  <p className="text-muted-foreground text-xs">
+                    {t("organization:activity.record.termsChanged")}
+                  </p>
+                )}
+              </div>
               <p className="text-muted-foreground text-xs">
                 {t("organization:activity.record.note")}
               </p>
