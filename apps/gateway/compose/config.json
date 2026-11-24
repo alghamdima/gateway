@@ -1,4 +1,10 @@
 {
+  "client": {
+    "disable_content_logging": true,
+    "allow_per_request_content_storage_override": false,
+    "allow_per_request_raw_override": false,
+    "log_retention_days": 90
+  },
   "config_store": {
     "enabled": true,
     "type": "postgres",

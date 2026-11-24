@@ -77,8 +77,34 @@ func newMockProvider(t *testing.T) *mockProvider {
 	return m
 }
 
+const (
+	e2eAdminUser     = "e2e-admin"
+	e2eAdminPassword = "e2e-admin-password"
+)
+
 type e2eGateway struct {
 	url string
+	// logPath is the gateway's own log, for what it says at boot.
+	logPath string
+}
+
+// shippedClientConfig is the "client" block of the config we deploy
+// (apps/gateway/compose/config.json): content logging and retention are tested
+// as shipped, not as each test would set them.
+func shippedClientConfig(t *testing.T, migrations string) map[string]any {
+	t.Helper()
+	path := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(migrations))), "apps", "gateway", "compose", "config.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	var shipped struct {
+		Client map[string]any `json:"client"`
+	}
+	if err := json.Unmarshal(raw, &shipped); err != nil || shipped.Client == nil {
+		t.Fatalf("%s has no client block: %v", path, err)
+	}
+	return shipped.Client
 }
 
 // startGateway boots the binary with the given credits plugin config and waits for /health.
@@ -108,8 +134,12 @@ func startGateway(t *testing.T, binary string, provider *mockProvider, creditsCo
 			"provider_configs": providerConfigs,
 		})
 	}
+	client := shippedClientConfig(t, migrations)
+	client["enforce_auth_on_inference"] = true
 	config := map[string]any{
-		"client": map[string]any{"enforce_auth_on_inference": true},
+		"client": client,
+		// the management API (logs, governance) needs an admin; inference uses virtual keys
+		"auth_config": map[string]any{"admin_username": e2eAdminUser, "admin_password": e2eAdminPassword, "is_enabled": true},
 		"providers": map[string]any{"openai": map[string]any{
 			"keys":           []map[string]any{{"name": "mock", "value": "sk-mock-upstream", "models": []string{"*"}, "weight": 1}},
 			"network_config": map[string]any{"base_url": provider.server.URL, "allow_private_network": true, "max_retries": 0},
@@ -146,7 +176,7 @@ func startGateway(t *testing.T, binary string, provider *mockProvider, creditsCo
 		}
 	})
 
-	gw := &e2eGateway{url: fmt.Sprintf("http://127.0.0.1:%d", port)}
+	gw := &e2eGateway{url: fmt.Sprintf("http://127.0.0.1:%d", port), logPath: logPath}
 	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
 		if resp, err := http.Get(gw.url + "/health"); err == nil {
