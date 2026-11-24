@@ -8,6 +8,7 @@ import { logger } from "@workspace/shared/logger";
 import { matchesPattern } from "@workspace/shared/utils";
 
 import { localize, delay } from "./middleware";
+import { activityRouter } from "./modules/activity/router";
 import { adminRouter } from "./modules/admin/router";
 import { aiRouter } from "./modules/ai/router";
 import { authRouter } from "./modules/auth/router";
@@ -43,6 +44,7 @@ const appRouter = new Hono()
   .use(localize)
   .use(monitor.middleware)
   .route("/status", monitor.routes)
+  .route("/activity", activityRouter)
   .route("/admin", adminRouter)
   .route("/ai", aiRouter)
   .route("/auth", authRouter)

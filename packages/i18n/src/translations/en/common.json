@@ -268,5 +268,6 @@
   "audit": "Audit log",
   "apiKeys": "API keys",
   "credits": "Credits",
-  "rateLimit": "Rate limit"
+  "rateLimit": "Rate limit",
+  "activity": "Activity"
 }

@@ -350,6 +350,13 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			"failed":            bifrostErr != nil,
 		},
 	}
+	// token counts for the activity pages, which read the ledger (kept for good) rather
+	// than the gateway's logs (kept for the retention window, ADR 0014)
+	if usage := usageOf(resp, bifrostErr); usage != nil {
+		settlement.Metadata["prompt_tokens"] = usage.PromptTokens
+		settlement.Metadata["completion_tokens"] = usage.CompletionTokens
+		settlement.Metadata["total_tokens"] = usage.TotalTokens
+	}
 	p.settle(settlement)
 	return resp, bifrostErr, nil
 }
@@ -420,4 +427,16 @@ func refuse(status int, errorType, message string) *schemas.LLMPluginShortCircui
 		Error:          &schemas.ErrorField{Message: message},
 		AllowFallbacks: &allowFallbacks,
 	}}
+}
+
+// usageOf is the attempt's token usage: the response's, or what the provider billed for
+// before the attempt failed. Nil when neither says.
+func usageOf(resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) *schemas.BifrostLLMUsage {
+	if usage := resp.NormalizedUsage(); usage != nil {
+		return usage
+	}
+	if bifrostErr != nil {
+		return bifrostErr.ExtraFields.BilledUsage
+	}
+	return nil
 }

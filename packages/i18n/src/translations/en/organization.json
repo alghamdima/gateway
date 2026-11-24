@@ -316,5 +316,22 @@
       "adjustment": "Adjustment",
       "promo": "Promotion"
     }
+  },
+  "activity": {
+    "title": "Activity",
+    "description": "What this organization's keys spent, by day, model and key. Only charged requests are counted; prompts and completions are not stored.",
+    "window": "Period",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "spend": "Spend",
+    "requests": "Requests",
+    "tokens": "Tokens",
+    "byDay": "Spend by day (UTC)",
+    "byModel": "By model",
+    "byKey": "By key",
+    "model": "Model",
+    "key": "Key",
+    "deletedKey": "Deleted key",
+    "empty": "No requests in this period."
   }
 }

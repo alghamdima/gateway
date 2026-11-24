@@ -66,6 +66,7 @@ const pathsConfig = {
       members: `${DASHBOARD_PREFIX}/${slug}/members`,
       keys: `${DASHBOARD_PREFIX}/${slug}/keys`,
       credits: `${DASHBOARD_PREFIX}/${slug}/credits`,
+      activity: `${DASHBOARD_PREFIX}/${slug}/activity`,
     }),
   },
 } as const;

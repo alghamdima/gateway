@@ -306,5 +306,22 @@
       "adjustment": "Ajuste",
       "promo": "Promoción"
     }
+  },
+  "activity": {
+    "title": "Actividad",
+    "description": "Lo que gastaron las claves de esta organización, por día, modelo y clave. Solo se cuentan las solicitudes cobradas; no se guardan prompts ni respuestas.",
+    "window": "Periodo",
+    "days_one": "{{count}} día",
+    "days_other": "{{count}} días",
+    "spend": "Gasto",
+    "requests": "Solicitudes",
+    "tokens": "Tokens",
+    "byDay": "Gasto por día (UTC)",
+    "byModel": "Por modelo",
+    "byKey": "Por clave",
+    "model": "Modelo",
+    "key": "Clave",
+    "deletedKey": "Clave eliminada",
+    "empty": "No hay solicitudes en este periodo."
   }
 }

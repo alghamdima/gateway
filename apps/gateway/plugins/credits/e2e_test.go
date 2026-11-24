@@ -276,6 +276,11 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		if err != nil || cost < providerCost-1e-9 || cost > providerCost+1e-9 || !strings.Contains(model, "gpt-4o-mini") || reference == "" || markup != 500 {
 			t.Fatalf("entry: cost=%v model=%q reference=%q markup=%d err=%v", cost, model, reference, markup, err)
 		}
+		var prompt, completion int
+		err = db.admin.QueryRow(context.Background(), `SELECT (metadata->>'prompt_tokens')::int, (metadata->>'completion_tokens')::int FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&prompt, &completion)
+		if err != nil || prompt != e2ePromptTokens || completion != e2eCompletionTokens {
+			t.Fatalf("token counts on the entry: %d %d %v", prompt, completion, err)
+		}
 	})
 
 	t.Run("a streamed completion is charged once, after its final chunk", func(t *testing.T) {

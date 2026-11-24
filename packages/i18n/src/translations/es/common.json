@@ -268,5 +268,6 @@
   "audit": "Registro de auditoría",
   "apiKeys": "Claves de API",
   "credits": "Créditos",
-  "rateLimit": "Límite de uso"
+  "rateLimit": "Límite de uso",
+  "activity": "Actividad"
 }

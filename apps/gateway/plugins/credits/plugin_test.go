@@ -387,6 +387,9 @@ func TestPostLLMHook_ChargesTheRealCostAndReleasesTheHold(t *testing.T) {
 	if st.Metadata["provider_cost_usd"] != 0.002 || st.Metadata["model"] != "gpt-4o-mini" || st.Metadata["failed"] != false {
 		t.Fatalf("metadata: %+v", st.Metadata)
 	}
+	if st.Metadata["prompt_tokens"] != 1000 || st.Metadata["completion_tokens"] != 500 || st.Metadata["total_tokens"] != 1500 {
+		t.Fatalf("token counts: %+v", st.Metadata)
+	}
 
 	// the pipeline calling the hook again for the same attempt settles nothing more
 	plugin.PostLLMHook(ctx, resp, nil)
@@ -413,6 +416,9 @@ func TestPostLLMHook_AStreamIsChargedOnceOnItsFinalChunk(t *testing.T) {
 	plugin.PostLLMHook(ctx, chatResponse(schemas.ChatCompletionStreamRequest, 1000, 500), nil)
 	if len(ledger.settled) != 1 || ledger.settled[0].Cost != 2000 {
 		t.Fatalf("settlements after the final chunk: %+v", ledger.settled)
+	}
+	if ledger.settled[0].Metadata["total_tokens"] != 1500 {
+		t.Fatalf("stream token counts: %+v", ledger.settled[0].Metadata)
 	}
 }
 
@@ -443,6 +449,9 @@ func TestPostLLMHook_AFailedAttemptReleasesTheHoldAndChargesOnlyWhatWasBilled(t 
 		plugin.PostLLMHook(ctx, nil, failure(&schemas.BifrostLLMUsage{PromptTokens: 1000, CompletionTokens: 100, TotalTokens: 1100}))
 		if len(ledger.settled) != 1 || ledger.settled[0].Cost != 1200 {
 			t.Fatalf("settlements: %+v", ledger.settled)
+		}
+		if ledger.settled[0].Metadata["prompt_tokens"] != 1000 || ledger.settled[0].Metadata["completion_tokens"] != 100 {
+			t.Fatalf("billed token counts: %+v", ledger.settled[0].Metadata)
 		}
 	})
 }

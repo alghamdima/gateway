@@ -52,6 +52,11 @@ const menu = ({
       })
         ? [
             {
+              title: "activity",
+              href: pathsConfig.dashboard.organization(slug).activity,
+              icon: <Icons.TrendingUp />,
+            },
+            {
               title: "credits",
               href: pathsConfig.dashboard.organization(slug).credits,
               icon: <Icons.HandCoins />,
