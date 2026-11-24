@@ -212,6 +212,70 @@
       "details": "Detalles"
     }
   },
+  "providers": {
+    "header": {
+      "title": "Proveedores",
+      "description": "Cada clave de proveedor del gateway, con lo que sabemos sobre dónde procesa los datos, cuánto tiempo los conserva y si entrena con ellos. Una política de datos solo se apoya en lo registrado aquí: lo desconocido cuenta como conservado y usado para entrenar."
+    },
+    "unavailable": "No se pudo contactar con el gateway, así que no se pueden listar sus claves de proveedor.",
+    "empty": "El gateway aún no tiene claves de proveedor. Añade primero un proveedor en el gateway.",
+    "noTerms": "Nada registrado: se trata como conservado y usado para entrenar",
+    "unknown": "Desconocido",
+    "saved": "Condiciones de datos guardadas.",
+    "removed": "Condiciones de datos eliminadas. La clave vuelve a ser desconocida.",
+    "columns": {
+      "provider": "Proveedor",
+      "key": "Clave",
+      "region": "Región de procesamiento",
+      "retention": "Conservación",
+      "training": "Entrena con los datos",
+      "agreement": "Acuerdo",
+      "verified": "Verificado el"
+    },
+    "regions": {
+      "sa": "Arabia Saudí",
+      "eu": "Unión Europea",
+      "us": "Estados Unidos",
+      "other": "Otro lugar"
+    },
+    "agreements": {
+      "direct": "Acuerdo directo",
+      "public_terms": "Condiciones públicas",
+      "private": "Despliegue privado"
+    },
+    "retention": {
+      "none": "No se conserva",
+      "days_one": "{{count}} día",
+      "days_other": "{{count}} días"
+    },
+    "training": {
+      "yes": "Sí",
+      "no": "Nunca"
+    },
+    "trainingOptions": {
+      "unknown": "Desconocido",
+      "no": "Nunca entrena con ellos",
+      "yes": "Puede entrenar con ellos"
+    },
+    "state": {
+      "off": "Desactivada",
+      "gone": "Eliminada del gateway"
+    },
+    "form": {
+      "title": "Condiciones de datos de {{key}} ({{provider}})",
+      "description": "Registra solo lo que dice un acuerdo o las condiciones publicadas del proveedor, y dónde lo dice.",
+      "retention": {
+        "label": "Conservación en días",
+        "description": "0 si no se conserva nada. Déjalo vacío si se desconoce."
+      },
+      "source": {
+        "label": "Fuente",
+        "placeholder": "Un enlace o una referencia de contrato"
+      },
+      "remove": "Eliminar condiciones",
+      "gone": "Esta clave ya no está en el gateway. Sus condiciones solo se pueden eliminar."
+    }
+  },
   "reconciliation": {
     "title": "Conciliación",
     "description": "Cada día se compara, por organización, el coste del proveedor que registró el gateway con el que registró el libro. Aquí aparece cualquier diferencia, coste sin organización o reserva liberada sin su cobro.",

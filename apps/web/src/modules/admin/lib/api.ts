@@ -226,6 +226,13 @@ const queries = {
         queryFn: () => handle(api.admin.pricing.changes.$get)(),
       }),
   },
+  providers: {
+    getCatalog: () =>
+      queryOptions({
+        queryKey: [KEY, "providers"],
+        queryFn: () => handle(api.admin.providers.$get)(),
+      }),
+  },
 };
 
 const mutations = {
@@ -384,6 +391,28 @@ const mutations = {
       mutationFn: ({ provider }: { provider: string }) =>
         handle(api.admin.pricing.providers[":provider"].$delete)({
           param: { provider },
+        }),
+    }),
+  },
+  providers: {
+    setTerms: mutationOptions({
+      mutationKey: [KEY, "providers", "terms", "set"],
+      mutationFn: ({
+        keyId,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.providers)[":keyId"]["terms"]["$put"]
+      >["json"] & { keyId: string }) =>
+        handle(api.admin.providers[":keyId"].terms.$put)({
+          param: { keyId },
+          json,
+        }),
+    }),
+    removeTerms: mutationOptions({
+      mutationKey: [KEY, "providers", "terms", "remove"],
+      mutationFn: ({ keyId }: { keyId: string }) =>
+        handle(api.admin.providers[":keyId"].terms.$delete)({
+          param: { keyId },
         }),
     }),
   },

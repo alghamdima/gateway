@@ -25,6 +25,9 @@ const pathsConfig = {
     pricing: {
       index: `${ADMIN_PREFIX}/pricing`,
     },
+    providers: {
+      index: `${ADMIN_PREFIX}/providers`,
+    },
     audit: {
       index: `${ADMIN_PREFIX}/audit`,
     },

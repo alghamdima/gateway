@@ -106,6 +106,22 @@ interface ModelDetailsResponse {
 
 const MODEL_PAGE_SIZE = 500;
 
+/** One provider key in the gateway, without its secret. */
+export interface GatewayProviderKey {
+  /** The gateway's key_id: what a virtual key's allowlist names. */
+  id: string;
+  name: string;
+  provider: string;
+  isEnabled: boolean;
+}
+
+interface ProviderKeyResponse {
+  key_id?: string;
+  name?: string;
+  provider?: string;
+  enabled?: boolean | null;
+}
+
 /** Per-minute ceilings for a customer; null fields are no limit of that kind. */
 export interface CustomerRateLimit {
   requestsPerMinute: number | null;
@@ -307,6 +323,31 @@ export const createGatewayClient = ({
           return models;
         }
       }
+    },
+
+    /**
+     * Every provider key the gateway holds. Only the fields named here are
+     * passed on: the gateway redacts the secret, and it never leaves this
+     * function either way.
+     */
+    listProviderKeys: async (): Promise<GatewayProviderKey[]> => {
+      const rows = await call<ProviderKeyResponse[]>(
+        "GET",
+        "/api/keys",
+        undefined,
+      );
+      return (rows ?? []).flatMap((row) =>
+        row.key_id && row.provider
+          ? [
+              {
+                id: row.key_id,
+                name: row.name ?? "",
+                provider: row.provider,
+                isEnabled: row.enabled ?? true,
+              },
+            ]
+          : [],
+      );
     },
 
     /** A key that is already gone counts as deleted. */

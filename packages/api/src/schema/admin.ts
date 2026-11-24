@@ -11,6 +11,8 @@ import {
   MAX_MARKUP_BPS,
   MAX_TOPUP_FEE_BPS,
   MAX_TOPUP_FEE_MIN_MICRO_USD,
+  PROVIDER_AGREEMENTS,
+  PROVIDER_REGIONS,
   selectCustomerSchema,
   selectOrderSchema,
   selectSubscriptionSchema,
@@ -369,6 +371,24 @@ export type UpdatePricingSettingsInput = z.infer<
   typeof updatePricingSettingsSchema
 >;
 export type SetProviderMarkupInput = z.infer<typeof setProviderMarkupSchema>;
+
+/** The gateway's key_id for a provider key. */
+export const providerKeyIdSchema = z.string().min(1).max(255);
+
+/**
+ * The data terms of one provider key (ADR 0015). Null retention or training
+ * is "unknown", which a policy treats as the worst case.
+ */
+export const setProviderTermsSchema = z.object({
+  region: z.enum(PROVIDER_REGIONS),
+  retentionDays: z.number().int().min(0).max(36_500).nullable(),
+  trainsOnData: z.boolean().nullable(),
+  agreement: z.enum(PROVIDER_AGREEMENTS),
+  source: z.string().trim().min(1).max(500),
+  verifiedOn: z.iso.date(),
+});
+
+export type SetProviderTermsInput = z.infer<typeof setProviderTermsSchema>;
 
 export const getAdminActionsInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),

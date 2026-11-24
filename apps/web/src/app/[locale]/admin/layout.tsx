@@ -48,6 +48,11 @@ const menu = [
         icon: <Icons.Percent />,
       },
       {
+        title: "providers",
+        href: pathsConfig.admin.providers.index,
+        icon: <Icons.Globe2 />,
+      },
+      {
         title: "audit",
         href: pathsConfig.admin.audit.index,
         icon: <Icons.ScrollText />,
@@ -64,6 +69,7 @@ const menu = [
 /** Menu entries only some staff roles may open (ADR 0011). The API refuses the rest anyway. */
 const RESTRICTED: Record<string, StaffPermissions> = {
   [pathsConfig.admin.audit.index]: { audit: ["read"] },
+  [pathsConfig.admin.providers.index]: { providers: ["read"] },
   [pathsConfig.admin.reconciliation.index]: { credits: ["read"] },
 };
 

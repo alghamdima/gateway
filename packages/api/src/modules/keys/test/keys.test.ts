@@ -78,6 +78,7 @@ const fakeGateway = () => {
       }
     },
     listModels: async () => [],
+    listProviderKeys: async () => [],
     getCustomerCosts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async (id, limit) => {

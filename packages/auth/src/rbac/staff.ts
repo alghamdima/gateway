@@ -15,6 +15,7 @@ export const staffAc = createAccessControl({
   customers: ["read"],
   credits: ["read", "adjust"],
   pricing: ["read", "update"],
+  providers: ["read", "update"],
   audit: ["read"],
 });
 
@@ -37,6 +38,7 @@ const admin = staffAc.newRole({
   customers: ["read"],
   credits: ["read", "adjust"],
   pricing: ["read", "update"],
+  providers: ["read", "update"],
   audit: ["read"],
 });
 
@@ -48,6 +50,7 @@ const finance = staffAc.newRole({
   customers: ["read"],
   credits: ["read", "adjust"],
   pricing: ["read", "update"],
+  providers: ["read"],
   audit: ["read"],
 });
 
@@ -59,6 +62,7 @@ const support = staffAc.newRole({
   customers: ["read"],
   credits: ["read"],
   pricing: ["read"],
+  providers: ["read"],
   audit: [],
 });
 
@@ -70,6 +74,7 @@ const user = staffAc.newRole({
   customers: [],
   credits: [],
   pricing: [],
+  providers: [],
   audit: [],
 });
 

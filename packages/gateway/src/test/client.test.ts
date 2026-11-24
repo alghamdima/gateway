@@ -149,6 +149,33 @@ describe("gateway client", () => {
     ]);
   });
 
+  it("lists provider keys with their id, name, provider and state, and nothing else", async () => {
+    replies.push({
+      status: 200,
+      body: [
+        {
+          key_id: "k1",
+          name: "main",
+          provider: "openai",
+          enabled: false,
+          value: "sk-live-secret",
+          azure_key_config: { client_secret: "also-secret" },
+        },
+        // enabled is absent on a key that was never turned off
+        { key_id: "k2", name: "riyadh", provider: "humain" },
+        // a row without an id cannot be put on an allowlist
+        { name: "broken", provider: "openai" },
+      ],
+    });
+    const keys = await client().listProviderKeys();
+    expect(seen[0]).toMatchObject({ method: "GET", path: "/api/keys" });
+    expect(keys).toEqual([
+      { id: "k1", name: "main", provider: "openai", isEnabled: false },
+      { id: "k2", name: "riyadh", provider: "humain", isEnabled: true },
+    ]);
+    expect(JSON.stringify(keys)).not.toContain("secret");
+  });
+
   it("treats a key or customer that is already gone as deleted", async () => {
     replies.push({ status: 404, body: { error: "not found" } });
     replies.push({ status: 404, body: { error: "not found" } });

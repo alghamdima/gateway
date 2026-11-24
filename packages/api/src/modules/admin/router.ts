@@ -9,6 +9,7 @@ import { getCustomersCount } from "./customers/queries";
 import { customersRouter } from "./customers/router";
 import { getOrganizationsCount } from "./organizations/queries";
 import { organizationsRouter } from "./organizations/router";
+import { providersRouter } from "./providers/router";
 import { getUsersCount } from "./users/queries";
 import { usersRouter } from "./users/router";
 
@@ -20,6 +21,7 @@ export const adminRouter = new Hono()
   .route("/organizations", organizationsRouter)
   .route("/customers", customersRouter)
   .route("/pricing", pricingRouter)
+  .route("/providers", providersRouter)
   .route("/audit", auditRouter)
   // the daily gateway/ledger comparisons, newest first (credits:read, access.ts)
   .get("/reconciliation", async (c) => c.json(await listReconciliationRuns()))

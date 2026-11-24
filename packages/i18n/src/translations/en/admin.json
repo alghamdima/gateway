@@ -204,6 +204,70 @@
       "details": "Details"
     }
   },
+  "providers": {
+    "header": {
+      "title": "Providers",
+      "description": "Every provider key in the gateway, with what we know about where it processes data, how long it keeps it and whether it trains on it. A data policy relies only on what is recorded here: anything unknown counts as kept and trained on."
+    },
+    "unavailable": "The gateway could not be reached, so its provider keys cannot be listed.",
+    "empty": "The gateway has no provider keys yet. Add a provider in the gateway first.",
+    "noTerms": "Nothing recorded: treated as kept and trained on",
+    "unknown": "Unknown",
+    "saved": "Data terms saved.",
+    "removed": "Data terms removed. The key is unknown again.",
+    "columns": {
+      "provider": "Provider",
+      "key": "Key",
+      "region": "Processing region",
+      "retention": "Retention",
+      "training": "Trains on data",
+      "agreement": "Agreement",
+      "verified": "Verified on"
+    },
+    "regions": {
+      "sa": "Saudi Arabia",
+      "eu": "European Union",
+      "us": "United States",
+      "other": "Elsewhere"
+    },
+    "agreements": {
+      "direct": "Direct agreement",
+      "public_terms": "Public terms",
+      "private": "Private deployment"
+    },
+    "retention": {
+      "none": "Not kept",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days"
+    },
+    "training": {
+      "yes": "Yes",
+      "no": "Never"
+    },
+    "trainingOptions": {
+      "unknown": "Unknown",
+      "no": "Never trains on it",
+      "yes": "May train on it"
+    },
+    "state": {
+      "off": "Off",
+      "gone": "Removed from the gateway"
+    },
+    "form": {
+      "title": "Data terms for {{key}} ({{provider}})",
+      "description": "Record only what an agreement or the provider's published terms say, and where it says so.",
+      "retention": {
+        "label": "Retention in days",
+        "description": "0 if nothing is kept. Leave empty if unknown."
+      },
+      "source": {
+        "label": "Source",
+        "placeholder": "A link or a contract reference"
+      },
+      "remove": "Remove terms",
+      "gone": "This key is no longer in the gateway. Its terms can only be removed."
+    }
+  },
   "reconciliation": {
     "title": "Reconciliation",
     "description": "Each day, the provider cost the gateway logged is compared with the provider cost the ledger recorded, per organization. A difference, a cost no organization owns, or a hold released without its charge is listed here.",

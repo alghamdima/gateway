@@ -40,6 +40,7 @@ const gatewayReporting = (
   updateVirtualKey: async () => {},
   deleteVirtualKey: async () => {},
   listModels: async () => [],
+  listProviderKeys: async () => [],
   getCustomerCosts: async () => {
     if (options.isDown) {
       // loaded here: a static import would open the database before the test points it at its own

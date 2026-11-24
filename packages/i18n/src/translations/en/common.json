@@ -271,5 +271,6 @@
   "credits": "Credits",
   "rateLimit": "Rate limit",
   "activity": "Activity",
-  "reconciliation": "Reconciliation"
+  "reconciliation": "Reconciliation",
+  "providers": "Providers"
 }

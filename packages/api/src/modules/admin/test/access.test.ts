@@ -31,6 +31,9 @@ const ROUTES = {
   updatePricing: ["PUT", "/pricing/settings"],
   setProviderMarkup: ["PUT", "/pricing/providers/openai"],
   removeProviderMarkup: ["DELETE", "/pricing/providers/openai"],
+  readProviders: ["GET", "/providers"],
+  setProviderTerms: ["PUT", "/providers/k1/terms"],
+  removeProviderTerms: ["DELETE", "/providers/k1/terms"],
   readAudit: ["GET", "/audit"],
 } as const;
 
@@ -48,6 +51,7 @@ const READ_ONLY: Route[] = [
   "listCustomers",
   "readPricing",
   "pricingChanges",
+  "readProviders",
 ];
 
 const ALLOWED: Record<string, Route[]> = {
@@ -137,6 +141,7 @@ describe("admin audit", () => {
     ["/users/u1/accounts/a1", "u1"],
     ["/pricing/settings", "settings"],
     ["/pricing/providers/openai", "openai"],
+    ["/providers/k1/terms", "k1"],
   ])("targets %s at %s", (path, target) => {
     expect(auditTarget(path)).toBe(target);
   });

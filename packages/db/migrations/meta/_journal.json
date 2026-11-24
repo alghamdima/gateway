@@ -190,6 +190,13 @@
       "when": 1795522240954,
       "tag": "0026_ledger_role_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1795553575458,
+      "tag": "0027_provider_endpoints",
+      "breakpoints": true
     }
   ]
 }

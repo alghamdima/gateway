@@ -1,0 +1,65 @@
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  date,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
+
+/**
+ * What we know about the data terms of one provider key in the gateway
+ * (docs/platform/adr/0015-data-policy.md). The gateway holds the key and its
+ * secret; this row is only the terms. A key with no row, or a null column, is
+ * unknown, and unknown counts as retaining and training.
+ */
+export const PROVIDER_REGIONS = ["sa", "eu", "us", "other"] as const;
+export type ProviderRegion = (typeof PROVIDER_REGIONS)[number];
+
+export const PROVIDER_AGREEMENTS = [
+  "direct",
+  "public_terms",
+  "private",
+] as const;
+export type ProviderAgreement = (typeof PROVIDER_AGREEMENTS)[number];
+
+export const providerEndpoint = pgTable(
+  "provider_endpoint",
+  {
+    /** The gateway's key_id for the provider key. */
+    keyId: text().primaryKey(),
+    /** The gateway's provider name, kept so a row still reads after its key is gone. */
+    provider: text().notNull(),
+    /** Where requests are processed. */
+    region: text({ enum: PROVIDER_REGIONS }).notNull(),
+    /** Days the provider keeps prompts and completions. 0: none. Null: unknown. */
+    retentionDays: integer(),
+    /** Whether the provider may train on what we send. Null: unknown. */
+    trainsOnData: boolean(),
+    agreement: text({ enum: PROVIDER_AGREEMENTS }).notNull(),
+    /** Where the terms above come from: a URL or a contract reference. */
+    source: text().notNull(),
+    /** The day someone last checked the source. */
+    verifiedOn: date({ mode: "string" }).notNull(),
+    updatedBy: text().notNull(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "provider_endpoint_region",
+      sql`${t.region} in ('sa', 'eu', 'us', 'other')`,
+    ),
+    check(
+      "provider_endpoint_agreement",
+      sql`${t.agreement} in ('direct', 'public_terms', 'private')`,
+    ),
+    check(
+      "provider_endpoint_retention_not_negative",
+      sql`${t.retentionDays} is null or ${t.retentionDays} >= 0`,
+    ),
+  ],
+);
+
+export type SelectProviderEndpoint = typeof providerEndpoint.$inferSelect;

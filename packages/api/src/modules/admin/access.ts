@@ -102,6 +102,21 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "pricing.remove-provider", target: "pricing" },
   },
 
+  // the provider catalog and each key's data terms (ADR 0015)
+  { method: "GET", path: /^\/providers$/, needs: { providers: ["read"] } },
+  {
+    method: "PUT",
+    path: new RegExp(`^/providers/${ID}/terms$`),
+    needs: { providers: ["update"] },
+    audit: { action: "provider.terms-update", target: "provider-key" },
+  },
+  {
+    method: "DELETE",
+    path: new RegExp(`^/providers/${ID}/terms$`),
+    needs: { providers: ["update"] },
+    audit: { action: "provider.terms-remove", target: "provider-key" },
+  },
+
   { method: "GET", path: /^\/audit$/, needs: { audit: ["read"] } },
   // read-only money reports: admin, finance and support (support reads everything, ADR 0011)
   {
