@@ -51,6 +51,7 @@ describe.skipIf(!adminUrl || !binary)(
     let ledger: typeof import("../../credits/ledger");
     let policy: typeof import("../policy");
     let providers: typeof import("../../admin/providers/providers");
+    let generations: typeof import("../../activity/generations");
     let localKeyId = "";
 
     const chat = (key: string) =>
@@ -225,6 +226,7 @@ describe.skipIf(!adminUrl || !binary)(
       ledger = await import("../../credits/ledger");
       policy = await import("../policy");
       providers = await import("../../admin/providers/providers");
+      generations = await import("../../activity/generations");
 
       // staff record the terms of the in-Kingdom key; the other stays unknown
       const catalog = await providers.getProviderCatalog();
@@ -279,6 +281,26 @@ describe.skipIf(!adminUrl || !binary)(
         expect(result.statuses).toEqual([200]);
         expect(result.served).toEqual({ [LOCAL]: 24 });
       }
+
+      // the record of one of those requests says where it went and under which policy
+      const response = await chat(after.key);
+      const requestId = response.headers.get("x-bifrost-request-id") ?? "";
+      for (let i = 0; i < 100; i++) {
+        if ((await ledger.getBalance("org_strict")).held === 0) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const record = await generations.getGeneration("org_strict", requestId);
+      expect(record?.data_region).toBe("sa");
+      expect(record?.data_policy).toMatchObject({
+        endpoint: {
+          provider: "openai",
+          region: "sa",
+          zero_retention: true,
+          never_trained_on: true,
+          terms_changed_since: false,
+        },
+        policy: { version: 1, allowed_regions: ["sa"] },
+      });
     }, 60_000);
 
     it("when the endpoint no longer satisfies the policy, requests are refused and never rerouted", async () => {

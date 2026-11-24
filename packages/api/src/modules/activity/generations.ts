@@ -13,7 +13,9 @@ import {
 import { logger } from "@workspace/shared/logger";
 
 import { MICRO_USD } from "../credits/ledger";
+import { getDataEvidence } from "../data-policy/evidence";
 
+import type { DataEvidence } from "../data-policy/evidence";
 import type { GatewayClient, GatewayLog } from "@workspace/gateway/server";
 
 /**
@@ -45,6 +47,10 @@ export interface Generation {
     cost: number;
     created_at: string;
   }[];
+  /** Where the serving endpoint processes data; null when unknown. */
+  data_region: string | null;
+  /** The endpoint that served the request and the policy in force then (ADR 0015). */
+  data_policy: DataEvidence;
 }
 
 const metadataText = (key: string) =>
@@ -58,6 +64,7 @@ const attemptColumns = {
   createdAt: creditLedgerEntry.createdAt,
   model: metadataText("model"),
   provider: metadataText("provider"),
+  providerKeyId: metadataText("provider_key_id"),
   failed: sql<
     boolean | null
   >`(${creditLedgerEntry.metadata}->>'failed')::boolean`,
@@ -89,8 +96,21 @@ export const getGeneration = async (
   }
 
   const last = attempts.at(-1);
+  // the attempt that answered, or failing that the last one that reached a provider key
+  const reached = attempts.filter((a) => a.providerKeyId).reverse();
+  const served = reached.find((a) => !a.failed) ?? reached[0];
+  const startedAt =
+    attempts[0]?.createdAt ?? (log?.timestamp ? new Date(log.timestamp) : null);
+  const evidence = await getDataEvidence({
+    organizationId,
+    providerKeyId: served?.providerKeyId ?? null,
+    provider: served?.provider ?? null,
+    at: startedAt ?? new Date(),
+  });
   return {
     id,
+    data_region: evidence.endpoint?.region ?? null,
+    data_policy: evidence,
     created_at: attempts[0]?.createdAt.toISOString() ?? log?.timestamp ?? null,
     model: log?.model ?? last?.model ?? null,
     provider_name: log?.provider ?? last?.provider ?? null,

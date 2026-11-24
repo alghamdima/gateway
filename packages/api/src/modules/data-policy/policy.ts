@@ -3,6 +3,7 @@ import {
   apiKey,
   organization,
   organizationDataPolicy,
+  organizationDataPolicyChange,
 } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import {
@@ -192,17 +193,30 @@ export const setDataPolicy = async (
   // read first: with the gateway down, nothing is recorded that cannot be pushed
   const catalog = await getProviderCatalog(gateway);
   const values = { ...policy, updatedBy: userId, updatedAt: new Date() };
-  const [row] = await db
-    .insert(organizationDataPolicy)
-    .values({ organizationId, ...values })
-    .onConflictDoUpdate({
-      target: organizationDataPolicy.organizationId,
-      set: {
-        ...values,
-        version: sql`${organizationDataPolicy.version} + 1`,
-      },
-    })
-    .returning(policyColumns);
+  // the version and its entry in the history are written together
+  const row = await db.transaction(async (tx) => {
+    const [saved] = await tx
+      .insert(organizationDataPolicy)
+      .values({ organizationId, ...values })
+      .onConflictDoUpdate({
+        target: organizationDataPolicy.organizationId,
+        set: {
+          ...values,
+          version: sql`${organizationDataPolicy.version} + 1`,
+        },
+      })
+      .returning(policyColumns);
+    if (saved) {
+      await tx.insert(organizationDataPolicyChange).values({
+        organizationId,
+        version: saved.version,
+        ...policy,
+        changedBy: userId,
+        changedAt: values.updatedAt,
+      });
+    }
+    return saved;
+  });
   if (!row) {
     throw new Error("organization_data_policy upsert returned no row");
   }

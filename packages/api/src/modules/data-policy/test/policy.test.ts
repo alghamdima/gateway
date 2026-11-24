@@ -199,6 +199,18 @@ describe.skipIf(!adminUrl)("organization data policy", () => {
       gateway.client,
     );
     expect(reopened).toMatchObject({ version: 2, isApplied: true });
+    // each version is in the history, as it was set and by whom
+    const history = await sql<
+      {
+        version: number;
+        allowed_regions: string[] | null;
+        changed_by: string;
+      }[]
+    >`select version, allowed_regions, changed_by from organization_data_policy_change where organization_id = ${org.id} order by id`;
+    expect(history).toEqual([
+      { version: 1, allowed_regions: ["sa"], changed_by: "user_1" },
+      { version: 2, allowed_regions: null, changed_by: "user_2" },
+    ]);
     expect(gateway.state.pushes.at(-1)).toEqual([
       org.virtualKeys[0],
       { allowAll: true },

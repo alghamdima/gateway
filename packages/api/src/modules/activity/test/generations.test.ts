@@ -58,12 +58,13 @@ describe.skipIf(!adminUrl)("generation records", () => {
       prompt?: number;
       completion?: number;
       virtualKeyId?: string;
+      providerKeyId?: string;
     },
   ) => {
     const id = `gen_${++seq}`;
     await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, virtual_key_id, metadata, created_at)
       values (${id}, ${organizationId}, ${-entry.amount}, 'usage', ${id}, ${entry.reference}, ${entry.virtualKeyId ?? null},
-              ${sql.json({ model: "gpt-4o-mini", provider: entry.provider ?? "openai", failed: entry.failed ?? false, prompt_tokens: entry.prompt ?? 0, completion_tokens: entry.completion ?? 0 })},
+              ${sql.json({ model: "gpt-4o-mini", provider: entry.provider ?? "openai", failed: entry.failed ?? false, prompt_tokens: entry.prompt ?? 0, completion_tokens: entry.completion ?? 0, ...(entry.providerKeyId ? { provider_key_id: entry.providerKeyId } : {}) })},
               ${entry.at})`;
   };
 
@@ -148,6 +149,173 @@ describe.skipIf(!adminUrl)("generation records", () => {
           created_at: "2026-11-24T10:00:01.000Z",
         },
       ],
+      // entries written before provider keys were recorded name no endpoint
+      data_region: null,
+      data_policy: {
+        endpoint: null,
+        policy: {
+          version: 0,
+          require_zero_retention: false,
+          forbid_training: false,
+          allowed_regions: null,
+          allowed_providers: null,
+        },
+      },
+    });
+  });
+
+  describe("evidence of where a request went", () => {
+    const terms = (
+      keyId: string,
+      provider: string,
+      region: string,
+      retentionDays: number | null,
+      trainsOnData: boolean | null,
+      updatedAt: string,
+    ) =>
+      sql`insert into provider_endpoint (key_id, provider, region, retention_days, trains_on_data, agreement, source, verified_on, updated_by, updated_at)
+          values (${keyId}, ${provider}, ${region}, ${retentionDays}, ${trainsOnData}, 'direct', 'contract', '2026-11-01', 'staff', ${updatedAt})`;
+
+    const policyChange = (
+      organizationId: string,
+      version: number,
+      at: string,
+      regions: string[] | null,
+    ) =>
+      sql`insert into organization_data_policy_change (organization_id, version, require_zero_retention, forbid_training, allowed_regions, changed_by, changed_at)
+          values (${organizationId}, ${version}, ${regions !== null}, false, ${regions}, 'user', ${at})`;
+
+    it("shows the endpoint that served the request, its terms, and the policy in force then", async () => {
+      const org = await createOrganization();
+      await terms("k_riyadh", "humain", "sa", 0, false, "2026-11-01T00:00:00Z");
+      await policyChange(org, 1, "2026-11-10T00:00:00Z", null);
+      await policyChange(org, 2, "2026-11-20T00:00:00Z", ["sa"]);
+      // set after the request: not what was in force
+      await policyChange(org, 3, "2026-11-25T00:00:00Z", ["sa", "eu"]);
+      await attempt(org, {
+        reference: "req_sa",
+        amount: 450,
+        at: "2026-11-24T10:00:00Z",
+        provider: "humain",
+        providerKeyId: "k_riyadh",
+      });
+
+      const record = await generations.getGeneration(
+        org,
+        "req_sa",
+        gatewayWithLogs([]),
+      );
+      expect(record?.data_region).toBe("sa");
+      expect(record?.data_policy).toEqual({
+        endpoint: {
+          provider: "humain",
+          region: "sa",
+          zero_retention: true,
+          never_trained_on: true,
+          verified_on: "2026-11-01",
+          terms_changed_since: false,
+        },
+        policy: {
+          version: 2,
+          require_zero_retention: true,
+          forbid_training: false,
+          allowed_regions: ["sa"],
+          allowed_providers: null,
+        },
+      });
+    });
+
+    it("names the endpoint that answered, not the one that failed before it", async () => {
+      const org = await createOrganization();
+      await terms(
+        "k_virginia",
+        "openai",
+        "us",
+        30,
+        true,
+        "2026-11-01T00:00:00Z",
+      );
+      await attempt(org, {
+        reference: "req_fb",
+        amount: 10,
+        at: "2026-11-24T11:00:00Z",
+        provider: "openai",
+        failed: true,
+        providerKeyId: "k_virginia",
+      });
+      await attempt(org, {
+        reference: "req_fb",
+        amount: 450,
+        at: "2026-11-24T11:00:01Z",
+        provider: "humain",
+        providerKeyId: "k_riyadh",
+      });
+      const record = await generations.getGeneration(
+        org,
+        "req_fb",
+        gatewayWithLogs([]),
+      );
+      expect(record?.data_policy.endpoint).toMatchObject({
+        provider: "humain",
+        region: "sa",
+      });
+    });
+
+    it("claims nothing for a key with no recorded terms", async () => {
+      const org = await createOrganization();
+      await attempt(org, {
+        reference: "req_unknown",
+        amount: 450,
+        at: "2026-11-24T12:00:00Z",
+        provider: "groq",
+        providerKeyId: "k_never_described",
+      });
+      const record = await generations.getGeneration(
+        org,
+        "req_unknown",
+        gatewayWithLogs([]),
+      );
+      expect(record?.data_region).toBeNull();
+      expect(record?.data_policy.endpoint).toEqual({
+        provider: "groq",
+        region: null,
+        zero_retention: false,
+        never_trained_on: false,
+        verified_on: null,
+        terms_changed_since: false,
+      });
+    });
+
+    it("says when the terms were edited after the request", async () => {
+      const org = await createOrganization();
+      await terms("k_edited", "azure", "eu", 0, false, "2026-11-24T18:00:00Z");
+      await attempt(org, {
+        reference: "req_edited",
+        amount: 450,
+        at: "2026-11-24T13:00:00Z",
+        provider: "azure",
+        providerKeyId: "k_edited",
+      });
+      const record = await generations.getGeneration(
+        org,
+        "req_edited",
+        gatewayWithLogs([]),
+      );
+      expect(record?.data_policy.endpoint).toMatchObject({
+        region: "eu",
+        terms_changed_since: true,
+      });
+    });
+
+    it("keeps the policy history: no update, no delete", async () => {
+      const org = await createOrganization();
+      await policyChange(org, 1, "2026-11-10T00:00:00Z", ["sa"]);
+      await expect(
+        sql`update organization_data_policy_change set allowed_regions = null where organization_id = ${org}`,
+      ).rejects.toThrow("append-only");
+      await expect(
+        sql`delete from organization_data_policy_change where organization_id = ${org}`,
+      ).rejects.toThrow("append-only");
     });
   });
 

@@ -1,8 +1,10 @@
 import { sql } from "drizzle-orm";
 import {
+  bigserial,
   boolean,
   check,
   date,
+  index,
   integer,
   pgTable,
   text,
@@ -109,3 +111,30 @@ export const organizationDataPolicy = pgTable(
 
 export type SelectOrganizationDataPolicy =
   typeof organizationDataPolicy.$inferSelect;
+
+/**
+ * Every version of every organization's data policy, as it was set: what
+ * was in force when a request was made is read from here (step D3). Append
+ * only: a trigger rejects UPDATE and DELETE. No foreign key, so the record
+ * outlives the organization.
+ */
+export const organizationDataPolicyChange = pgTable(
+  "organization_data_policy_change",
+  {
+    id: bigserial({ mode: "number" }).primaryKey(),
+    organizationId: text().notNull(),
+    version: integer().notNull(),
+    requireZeroRetention: boolean().notNull(),
+    forbidTraining: boolean().notNull(),
+    allowedRegions: text({ enum: PROVIDER_REGIONS }).array(),
+    allowedProviders: text().array(),
+    changedBy: text().notNull(),
+    changedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index("organization_data_policy_change_organization_idx").on(
+      t.organizationId,
+      t.changedAt,
+    ),
+  ],
+);
