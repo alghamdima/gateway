@@ -276,6 +276,13 @@
   },
   "credits": {
     "lowBalance": {
+      "title": "Low-balance email",
+      "on": "Owners and admins are emailed when available credits drop below {{threshold}}, once until credits are added.",
+      "off": "Low-balance emails are off.",
+      "threshold": "Email below",
+      "invalid": "Enter an amount above 0, in dollars and cents.",
+      "turnOff": "Turn off",
+      "saved": "Low-balance email saved.",
       "email": {
         "subject": "{{organization}} is running low on credits",
         "subjectShort": "Your credits are running low",

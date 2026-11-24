@@ -7,6 +7,7 @@ import {
   validate,
 } from "../../middleware";
 import { getBalance, getEntries } from "./ledger";
+import { getLowBalanceSetting, setLowBalanceSetting } from "./low-balance";
 import {
   MICRO_USD_PER_CENT,
   quoteTopUp,
@@ -55,6 +56,44 @@ export const creditsRouter = new Hono()
           organizationId: c.req.param("organizationId"),
           ...c.req.valid("query"),
         }),
+      ),
+  )
+  .get(
+    "/:organizationId/low-balance-alert",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["read"] },
+      })(c, next),
+    async (c) =>
+      c.json(await getLowBalanceSetting(c.req.param("organizationId"))),
+  )
+  .put(
+    "/:organizationId/low-balance-alert",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["update"] },
+      })(c, next),
+    validate(
+      "json",
+      z.object({
+        // micro-USD, whole cents; null turns the alert off
+        thresholdMicroUsd: z
+          .number()
+          .int()
+          .positive()
+          .max(1_000_000 * 1_000_000)
+          .refine((value) => value % 10_000 === 0)
+          .nullable(),
+      }),
+    ),
+    async (c) =>
+      c.json(
+        await setLowBalanceSetting(
+          c.req.param("organizationId"),
+          c.req.valid("json").thresholdMicroUsd,
+        ),
       ),
   )
   .get(

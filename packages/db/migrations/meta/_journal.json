@@ -176,6 +176,13 @@
       "when": 1795504749219,
       "tag": "0024_reconciliation",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795505596777,
+      "tag": "0025_low_balance_alerts",
+      "breakpoints": true
     }
   ]
 }

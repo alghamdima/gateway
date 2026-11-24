@@ -28,6 +28,7 @@ import {
 
 import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
+import { LowBalanceAlert } from "~/modules/credits/low-balance-alert";
 import { TopUp } from "~/modules/credits/top-up";
 import { formatMicroUsd } from "~/modules/keys/money";
 import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
@@ -145,6 +146,8 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
       </Card>
 
       {canTopUp && <TopUp organizationId={organizationId} />}
+
+      <LowBalanceAlert organizationId={organizationId} />
 
       <Card>
         <CardHeader>

@@ -25,7 +25,7 @@ export const LowBalance = async ({
   return (
     <Layout origin={getOrigin(url)} locale={locale}>
       <Preview>
-        {t("credits.lowBalance.email.preview", { organization })}
+        {t("credits.lowBalance.email.preview", { organization, available })}
       </Preview>
       <Heading className="leading-tight tracking-tight">
         {t("credits.lowBalance.email.subject", { organization })}

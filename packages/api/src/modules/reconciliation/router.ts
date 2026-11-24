@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
 import { env } from "../../env";
+import { checkLowBalances } from "../credits/low-balance";
 import { runDailyReconciliation } from "./daily";
 
 import type { Context } from "hono";
@@ -30,12 +31,24 @@ const reconcileYesterday = async (c: Context) => {
   });
 };
 
+const lowBalances = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await checkLowBalances({ origin: new URL(c.req.url).origin }));
+};
+
 /**
  * /api/internal: jobs a scheduler calls with `Authorization: Bearer
  * <CRON_SECRET>`. Without CRON_SECRET set, every call is refused. GET is
  * accepted because some schedulers (Vercel Cron) only send GET; a POST must
  * carry a JSON content type to pass the CSRF check.
+ *
+ * - /reconciliation: once a day, after 00:00 UTC (step 10.1)
+ * - /low-balance: hourly (step 10.2)
  */
 export const internalRouter = new Hono()
   .get("/reconciliation", reconcileYesterday)
-  .post("/reconciliation", reconcileYesterday);
+  .post("/reconciliation", reconcileYesterday)
+  .get("/low-balance", lowBalances)
+  .post("/low-balance", lowBalances);

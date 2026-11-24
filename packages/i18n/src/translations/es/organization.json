@@ -266,6 +266,13 @@
   },
   "credits": {
     "lowBalance": {
+      "title": "Correo de saldo bajo",
+      "on": "Se avisa por correo a propietarios y administradores cuando los créditos disponibles bajan de {{threshold}}, una vez hasta que se añadan créditos.",
+      "off": "Los correos de saldo bajo están desactivados.",
+      "threshold": "Avisar por debajo de",
+      "invalid": "Indica un importe mayor que 0, en dólares y céntimos.",
+      "turnOff": "Desactivar",
+      "saved": "Correo de saldo bajo guardado.",
       "email": {
         "subject": "A {{organization}} le quedan pocos créditos",
         "subjectShort": "Te quedan pocos créditos",

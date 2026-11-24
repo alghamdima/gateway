@@ -127,3 +127,31 @@ export type SelectCreditLedgerEntry = z.infer<
 >;
 export type SelectCreditAccount = z.infer<typeof selectCreditAccountSchema>;
 export type CreditEntryKind = (typeof creditEntryKindEnum.enumValues)[number];
+
+/**
+ * When to email an organization that its credits are running out (step 10.2).
+ * No row: the default threshold, alerts on. notifiedAt is set when the email
+ * goes out and cleared once the balance is back above the threshold, so one
+ * dip sends one email.
+ */
+export const lowBalanceAlert = pgTable(
+  "low_balance_alert",
+  {
+    organizationId: text()
+      .primaryKey()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** micro-USD; null turns the alert off. */
+    thresholdMicroUsd: microUsd(),
+    notifiedAt: timestamp(),
+    updatedAt: timestamp()
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    check(
+      "low_balance_alert_threshold_positive",
+      sql`${t.thresholdMicroUsd} is null or ${t.thresholdMicroUsd} > 0`,
+    ),
+  ],
+);
