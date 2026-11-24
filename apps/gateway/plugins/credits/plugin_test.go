@@ -62,6 +62,13 @@ type fakeLedger struct {
 	settleFailures int           // fail this many Settle calls before succeeding
 	settleGate     chan struct{} // when set, Settle waits until it is closed
 	settleCall     atomic.Int64
+
+	extended atomic.Int64 // Extend calls
+}
+
+func (f *fakeLedger) Extend(context.Context, string, time.Duration) (bool, error) {
+	f.extended.Add(1)
+	return true, nil
 }
 
 func (f *fakeLedger) settlements() []Settlement {
@@ -454,6 +461,48 @@ func TestPostLLMHook_AFailedAttemptReleasesTheHoldAndChargesOnlyWhatWasBilled(t 
 			t.Fatalf("billed token counts: %+v", ledger.settled[0].Metadata)
 		}
 	})
+}
+
+func TestPostLLMHook_ARunningStreamKeepsItsHoldAlive(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	plugin := testPlugin(ledger, testPricer())
+	plugin.reservationTTL = 300 * time.Millisecond
+	ctx := testContext(testOrg)
+	plugin.PreLLMHook(ctx, chatRequest(schemas.ChatCompletionStreamRequest, nil))
+	extendsAfter := func(chunks int) int64 {
+		t.Helper()
+		for range chunks {
+			plugin.PostLLMHook(ctx, chatResponse(schemas.ChatCompletionStreamRequest, 0, 0), nil)
+		}
+		time.Sleep(20 * time.Millisecond) // the extension runs off the stream's path
+		return ledger.extended.Load()
+	}
+
+	if n := extendsAfter(5); n != 0 {
+		t.Fatalf("extended a fresh hold %d times", n)
+	}
+	time.Sleep(plugin.reservationTTL / 3)
+	if n := extendsAfter(5); n != 1 {
+		t.Fatalf("after a third of the lifetime, %d extensions for 5 chunks, want 1", n)
+	}
+	time.Sleep(plugin.reservationTTL / 3)
+	if n := extendsAfter(1); n != 2 {
+		t.Fatalf("extensions %d, want 2", n)
+	}
+}
+
+func TestPostLLMHook_ANonStreamingAttemptIsNotExtended(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	plugin := testPlugin(ledger, testPricer())
+	plugin.reservationTTL = 30 * time.Millisecond
+	ctx := testContext(testOrg)
+	plugin.PreLLMHook(ctx, chatRequest(schemas.ChatCompletionRequest, nil))
+	time.Sleep(plugin.reservationTTL)
+	plugin.PostLLMHook(ctx, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+	time.Sleep(20 * time.Millisecond)
+	if n := ledger.extended.Load(); n != 0 {
+		t.Fatalf("extended %d times", n)
+	}
 }
 
 func TestPostLLMHook_DoesNothingForARequestItDidNotHold(t *testing.T) {

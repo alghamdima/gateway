@@ -60,6 +60,7 @@ type ledger interface {
 	OrganizationFor(ctx context.Context, customerID string) (string, bool, error)
 	Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error)
 	Settle(ctx context.Context, st Settlement) (SettleResult, error)
+	Extend(ctx context.Context, reservationID string, ttl time.Duration) (bool, error)
 }
 
 // reaper releases holds whose settlement never arrived.
@@ -107,6 +108,9 @@ type hold struct {
 	// its hold was sized for even if staff change it meanwhile
 	markupBps int64
 	settled   atomic.Bool
+	// when the hold's lifetime last started (unix nanoseconds): a stream that is still
+	// running pushes it forward (keepAlive)
+	renewedAt atomic.Int64
 }
 
 const holdContextKey schemas.BifrostContextKey = "credits-hold"
@@ -296,13 +300,15 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		return req, refuse(403, ErrorTypeKeyLimit, "This API key has reached its spending limit. Raise the limit, wait for it to reset, or lower max_tokens."), nil
 	}
 
-	ctx.SetValue(holdContextKey, &hold{
+	held := &hold{
 		reservationID:  reservationID,
 		organizationID: organizationID,
 		requestType:    req.RequestType,
 		amount:         amount,
 		markupBps:      markupBps,
-	})
+	}
+	held.renewedAt.Store(time.Now().UnixNano())
+	ctx.SetValue(holdContextKey, held)
 	return req, nil, nil
 }
 
@@ -314,6 +320,7 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		return resp, bifrostErr, nil
 	}
 	if bifrostErr == nil && bifrost.IsStreamRequestType(held.requestType) && !bifrost.IsFinalChunk(ctx) {
+		p.keepAlive(held)
 		return resp, bifrostErr, nil
 	}
 	if !held.settled.CompareAndSwap(false, true) {
@@ -457,4 +464,24 @@ func usageOf(resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) *s
 		return bifrostErr.ExtraFields.BilledUsage
 	}
 	return nil
+}
+
+// keepAlive extends a streaming attempt's hold once a third of its lifetime has passed.
+// The gateway puts no limit on how long a stream runs, only on the silence between its
+// chunks, so a long stream can outlive a fixed hold. A released hold would free the
+// money it covers for other requests, and stop counting against the key's limit, while
+// the stream goes on spending it. The update runs off the stream's path.
+func (p *Plugin) keepAlive(held *hold) {
+	last := held.renewedAt.Load()
+	now := time.Now().UnixNano()
+	if time.Duration(now-last) < p.reservationTTL/3 || !held.renewedAt.CompareAndSwap(last, now) {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), ledgerTimeout)
+		defer cancel()
+		if _, err := p.ledger.Extend(ctx, held.reservationID, p.reservationTTL); err != nil {
+			p.logger.Warn("credits: cannot extend the hold of attempt %s for organization %s: %v", held.reservationID, held.organizationID, err)
+		}
+	}()
 }

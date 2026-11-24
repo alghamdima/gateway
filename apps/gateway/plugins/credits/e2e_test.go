@@ -69,6 +69,16 @@ func newMockProvider(t *testing.T) *mockProvider {
 				flusher.Flush()
 			}
 		}
+		if len(body.Messages) > 0 && body.Messages[0].Content == e2eSlowPrompt {
+			// a long stream: a chunk a second, then the usage
+			for range 6 {
+				send(`{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"tick "},"finish_reason":null}]}`)
+				time.Sleep(time.Second)
+			}
+			send(fmt.Sprintf(`{"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"gpt-4o-mini","choices":[],"usage":%s}`, usage))
+			send("[DONE]")
+			return
+		}
 		if len(body.Messages) > 0 && body.Messages[0].Content == e2eStallPrompt {
 			// some text, then nothing until the caller gives up: usage never arrives
 			for range 4 {
@@ -91,8 +101,12 @@ func newMockProvider(t *testing.T) *mockProvider {
 	return m
 }
 
-// e2eStallPrompt makes the mock provider stream a little and then stall.
-const e2eStallPrompt = "stall"
+// e2eStallPrompt makes the mock provider stream a little and then stall;
+// e2eSlowPrompt makes it stream for six seconds.
+const (
+	e2eStallPrompt = "stall"
+	e2eSlowPrompt  = "slow"
+)
 
 const (
 	e2eAdminUser     = "e2e-admin"
@@ -513,5 +527,39 @@ func TestEndToEnd_AMisconfiguredPluginRefusesInsteadOfServingForFree(t *testing.
 	})
 	if s := db.consistent(t, org); s.Balance != usd || s.UsageEntries != 0 {
 		t.Fatalf("state %+v", s)
+	}
+}
+
+func TestEndToEnd_AStreamThatOutlivesItsHoldKeepsIt(t *testing.T) {
+	binary := os.Getenv("CREDITS_E2E_BINARY")
+	if binary == "" {
+		t.Skip("CREDITS_E2E_BINARY is not set")
+	}
+	db := newTestDB(t)
+	provider := newMockProvider(t)
+	org := db.organization(t, usd)
+	// a hold lives 3 seconds; the stream takes 6
+	gw := startGatewayWithCredits(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db), "reservation_ttl_seconds": 3}, []string{org})
+
+	done := make(chan int, 1)
+	go func() {
+		body := chatBody(true)
+		body["messages"] = []map[string]any{{"role": "user", "content": e2eSlowPrompt}}
+		status, _ := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+org, body)
+		done <- status
+	}()
+
+	time.Sleep(4500 * time.Millisecond)
+	var live, expired int
+	err := db.admin.QueryRow(context.Background(), `SELECT count(*) FILTER (WHERE expires_at > now()), count(*) FILTER (WHERE expires_at <= now()) FROM credit_reservation WHERE organization_id = $1 AND settled_at IS NULL`, org).Scan(&live, &expired)
+	if err != nil || live != 1 || expired != 0 {
+		t.Fatalf("1.5 seconds past the hold's first lifetime: %d live, %d expired open holds (%v)", live, expired, err)
+	}
+
+	if status := <-done; status != 200 {
+		t.Fatalf("status %d", status)
+	}
+	if s := settled(t, db, org); s.UsageEntries != 1 || s.Held != 0 {
+		t.Fatalf("state %+v, want one usage entry and no open hold", s)
 	}
 }

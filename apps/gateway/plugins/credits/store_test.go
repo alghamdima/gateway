@@ -270,6 +270,38 @@ func TestReap_ReleasesExpiredHoldsOnly(t *testing.T) {
 	_ = live
 }
 
+func TestExtend_KeepsAnOpenHoldFromTheReaper(t *testing.T) {
+	db := newTestDB(t)
+	store := NewStore(db.ledger)
+	ctx := context.Background()
+	org := db.organization(t, 10*usd)
+
+	open := must[string](t)(reserve(store, org, 2*usd))
+	settled := must[string](t)(reserve(store, org, usd))
+	must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: settled, OrganizationID: org, Cost: 0, IdempotencyKey: "nonce:extend:0:0"}))
+	// both are past their lifetime when the extension arrives
+	if _, err := db.admin.Exec(ctx, `UPDATE credit_reservation SET expires_at = now() - interval '1 second' WHERE id = ANY($1)`, []string{open, settled}); err != nil {
+		t.Fatal(err)
+	}
+
+	if ok := must[bool](t)(store.Extend(ctx, open, time.Hour)); !ok {
+		t.Fatal("an open hold was not extended")
+	}
+	if ok := must[bool](t)(store.Extend(ctx, settled, time.Hour)); ok {
+		t.Fatal("a settled hold was extended")
+	}
+	var minutes float64
+	if err := db.admin.QueryRow(ctx, `SELECT extract(epoch FROM expires_at - now()) / 60 FROM credit_reservation WHERE id = $1`, open).Scan(&minutes); err != nil || minutes < 59 || minutes > 61 {
+		t.Fatalf("new lifetime %.1f minutes, %v", minutes, err)
+	}
+	if n := must[int64](t)(store.Reap(ctx)); n != 0 {
+		t.Fatalf("reaped %d holds, want none", n)
+	}
+	if s := db.consistent(t, org); s.Held != 2*usd {
+		t.Fatalf("state: %+v", s)
+	}
+}
+
 // TestConcurrentTraffic is the Phase 4 check: many requests at once against a small
 // balance never hold more than the balance, and the books agree afterwards.
 func TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance(t *testing.T) {

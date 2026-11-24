@@ -225,6 +225,18 @@ func (s *Store) Settle(ctx context.Context, st Settlement) (SettleResult, error)
 	return res, nil
 }
 
+// Extend gives an open hold a new lifetime from now. A hold already settled or reaped
+// stays as it is; ok says whether one was extended.
+func (s *Store) Extend(ctx context.Context, reservationID string, ttl time.Duration) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE credit_reservation SET expires_at = now() + make_interval(secs => $2) WHERE id = $1 AND settled_at IS NULL`,
+		reservationID, ttl.Seconds())
+	if err != nil {
+		return false, fmt.Errorf("credits: extend: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // reapSQL releases every reservation that is past its lifetime and still open.
 const reapSQL = `
 WITH expired AS (
