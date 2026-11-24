@@ -38,6 +38,8 @@ type AuthEmailVariables = Record<
 export const EmailTemplate = {
   ...AuthEmailTemplate,
   CONTACT_FORM: "contact-form",
+  RECONCILIATION_ALERT: "reconciliation-alert",
+  LOW_BALANCE: "low-balance",
 } as const;
 
 export type EmailTemplate = (typeof EmailTemplate)[keyof typeof EmailTemplate];
@@ -47,5 +49,21 @@ export type EmailVariables = AuthEmailVariables & {
     name: string;
     email: string;
     message: string;
+  };
+  [EmailTemplate.RECONCILIATION_ALERT]: {
+    url: string;
+    /** The UTC day checked, YYYY-MM-DD. */
+    period: string;
+    status: "mismatch" | "error";
+    organizations: number;
+    reapedHolds: number;
+    unattributed: number;
+  };
+  [EmailTemplate.LOW_BALANCE]: {
+    url: string;
+    organization: string;
+    /** Formatted amounts, e.g. "$1.20". */
+    available: string;
+    threshold: string;
   };
 };

@@ -17,6 +17,7 @@ const gatewayWith = (models: GatewayModel[]): GatewayClient => ({
   updateVirtualKey: async () => {},
   deleteVirtualKey: async () => {},
   listModels: async () => models,
+  getCustomerCosts: async () => [],
   getLog: async () => undefined,
   setCustomerRateLimit: async () => {},
 });

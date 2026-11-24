@@ -1,11 +1,15 @@
+import { sql } from "drizzle-orm";
 import {
   bigserial,
+  check,
   index,
   jsonb,
   pgTable,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+
+import { generateId } from "@workspace/shared/utils";
 
 import { createSelectSchema } from "../lib/zod";
 
@@ -40,3 +44,28 @@ export const adminAuditLog = pgTable(
 
 export const selectAdminAuditLogSchema = createSelectSchema(adminAuditLog);
 export type SelectAdminAuditLog = z.infer<typeof selectAdminAuditLogSchema>;
+
+/**
+ * One daily comparison of what the gateway logged against what the ledger
+ * charged (docs/platform/PLAN.md, step 10.1). Findings are kept as written,
+ * so a past report can be read as it was.
+ */
+export const reconciliationRun = pgTable(
+  "reconciliation_run",
+  {
+    id: text().primaryKey().$defaultFn(generateId),
+    periodStart: timestamp().notNull(),
+    periodEnd: timestamp().notNull(),
+    /** ok, mismatch, or error when a source could not be read. */
+    status: text().notNull(),
+    findings: jsonb().$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index("reconciliation_run_periodStart_idx").on(t.periodStart),
+    check(
+      "reconciliation_run_status",
+      sql`${t.status} in ('ok', 'mismatch', 'error')`,
+    ),
+  ],
+);

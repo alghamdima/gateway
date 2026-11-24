@@ -203,5 +203,29 @@
       "target": "On",
       "details": "Details"
     }
+  },
+  "reconciliation": {
+    "title": "Reconciliation",
+    "description": "Each day, the provider cost the gateway logged is compared with the provider cost the ledger recorded, per organization. A difference, a cost no organization owns, or a hold released without its charge is listed here.",
+    "period": "Day (UTC)",
+    "status": "Status",
+    "statuses": {
+      "ok": "Matches",
+      "mismatch": "Differences",
+      "error": "Could not run"
+    },
+    "organizations": "Organizations differing",
+    "reaped": "Charges lost",
+    "unattributed": "Unattributed cost",
+    "empty": "No reconciliation has run yet.",
+    "details": "Details",
+    "email": {
+      "subject": "Reconciliation needs a look",
+      "preview": "The gateway and the ledger differ for {{period}}",
+      "mismatch": "The daily reconciliation for {{period}} (UTC) found differences between what the gateway logged and what the ledger charged.",
+      "error": "The daily reconciliation for {{period}} (UTC) could not read one of its sources.",
+      "counts": "Organizations differing: {{organizations}}. Charges lost to reaped holds: {{reapedHolds}}. Unattributed costs: {{unattributed}}.",
+      "cta": "Open the report"
+    }
   }
 }

@@ -52,6 +52,11 @@ const menu = [
         href: pathsConfig.admin.audit.index,
         icon: <Icons.ScrollText />,
       },
+      {
+        title: "reconciliation",
+        href: pathsConfig.admin.reconciliation.index,
+        icon: <Icons.BadgeCheck />,
+      },
     ],
   },
 ];
@@ -59,6 +64,7 @@ const menu = [
 /** Menu entries only some staff roles may open (ADR 0011). The API refuses the rest anyway. */
 const RESTRICTED: Record<string, StaffPermissions> = {
   [pathsConfig.admin.audit.index]: { audit: ["read"] },
+  [pathsConfig.admin.reconciliation.index]: { credits: ["read"] },
 };
 
 const menuFor = (user: User) =>

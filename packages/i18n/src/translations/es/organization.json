@@ -265,6 +265,15 @@
     }
   },
   "credits": {
+    "lowBalance": {
+      "email": {
+        "subject": "A {{organization}} le quedan pocos créditos",
+        "subjectShort": "Te quedan pocos créditos",
+        "preview": "A {{organization}} le quedan {{available}}",
+        "body": "A {{organization}} le quedan {{available}} de créditos, por debajo de {{threshold}}. Cuando se acaben, las solicitudes se rechazan con 402 hasta que añadas más.",
+        "cta": "Añadir créditos"
+      }
+    },
     "topUp": {
       "title": "Añadir créditos",
       "description": "Un pago único con tarjeta. Los créditos se gastan en las solicitudes a modelos de todas las claves de esta organización.",

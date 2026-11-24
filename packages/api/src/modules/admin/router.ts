@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import { enforceAdmin, enforceAuth } from "../../middleware";
 import { pricingRouter } from "../pricing/router";
+import { listReconciliationRuns } from "../reconciliation/reconcile";
 import { enforceStaffAccess } from "./access-middleware";
 import { auditRouter } from "./audit/router";
 import { getCustomersCount } from "./customers/queries";
@@ -20,6 +21,8 @@ export const adminRouter = new Hono()
   .route("/customers", customersRouter)
   .route("/pricing", pricingRouter)
   .route("/audit", auditRouter)
+  // the daily gateway/ledger comparisons, newest first (credits:read, access.ts)
+  .get("/reconciliation", async (c) => c.json(await listReconciliationRuns()))
   .get("/summary", async (c) => {
     const [users, organizations, customers] = await Promise.all([
       getUsersCount(),

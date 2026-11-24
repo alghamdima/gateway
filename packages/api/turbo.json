@@ -9,7 +9,9 @@
         "GATEWAY_ADMIN_USERNAME",
         "GATEWAY_ADMIN_PASSWORD",
         "STRIPE_SECRET_KEY",
-        "STRIPE_WEBHOOK_SECRET"
+        "STRIPE_WEBHOOK_SECRET",
+        "CRON_SECRET",
+        "RECONCILIATION_ALERT_EMAIL"
       ]
     }
   }

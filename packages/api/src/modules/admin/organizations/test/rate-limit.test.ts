@@ -38,6 +38,7 @@ const fakeGateway = () => {
     updateVirtualKey: async () => {},
     deleteVirtualKey: async () => {},
     listModels: async () => [],
+    getCustomerCosts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async (id, limit) => {
       if (state.isDown) {

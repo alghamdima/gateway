@@ -18,6 +18,7 @@ const gatewayWithLogs = (
   updateVirtualKey: async () => {},
   deleteVirtualKey: async () => {},
   listModels: async () => [],
+  getCustomerCosts: async () => [],
   setCustomerRateLimit: async () => {},
   getLog: async (id) => {
     if (options.isDown) {

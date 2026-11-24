@@ -380,6 +380,20 @@ describe.skipIf(!adminUrl || !binary)(
       });
     }, 60_000);
 
+    it("the gateway's cost and the ledger's agree for everything charged so far", async () => {
+      const { reconcile } = await import("../../reconciliation/reconcile");
+      const now = Date.now();
+      const result = await reconcile({
+        from: new Date(now - 60 * 60_000),
+        to: new Date(now + 60_000),
+      });
+      expect(result.findings.error).toBeUndefined();
+      expect(result.findings.organizations).toEqual([]);
+      expect(result.findings.unattributed).toEqual([]);
+      expect(result.findings.checkedOrganizations).toBeGreaterThan(0);
+      expect(result.status).toBe("ok");
+    }, 60_000);
+
     it("a deleted key and the keys of a deleted organization stop working", async () => {
       const { key, apiKey } = await keys.createKey({
         organizationId: "org_e2e",

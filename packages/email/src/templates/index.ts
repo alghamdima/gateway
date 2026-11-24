@@ -9,6 +9,8 @@ import { OrganizationInvitation } from "./auth/organization-invitation";
 import { ResetPassword } from "./auth/reset-password";
 import { SignInOtp } from "./auth/sign-in-otp";
 import { ContactForm } from "./contact-form";
+import { LowBalance } from "./low-balance";
+import { ReconciliationAlert } from "./reconciliation-alert";
 
 import type { CommonEmailProps, EmailVariables } from "../types";
 
@@ -30,6 +32,8 @@ export const templates: {
   [EmailTemplate.CHANGE_EMAIL]: ChangeEmail,
   [EmailTemplate.ORGANIZATION_INVITATION]: OrganizationInvitation,
   [EmailTemplate.CONTACT_FORM]: ContactForm,
+  [EmailTemplate.RECONCILIATION_ALERT]: ReconciliationAlert,
+  [EmailTemplate.LOW_BALANCE]: LowBalance,
 } as const;
 
 export const getTemplate = async <T extends EmailTemplate>({

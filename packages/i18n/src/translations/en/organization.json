@@ -275,6 +275,15 @@
     }
   },
   "credits": {
+    "lowBalance": {
+      "email": {
+        "subject": "{{organization}} is running low on credits",
+        "subjectShort": "Your credits are running low",
+        "preview": "{{organization}} has {{available}} left",
+        "body": "{{organization}} has {{available}} of credits left, below {{threshold}}. When credits run out, requests are refused with 402 until you add more.",
+        "cta": "Add credits"
+      }
+    },
     "topUp": {
       "title": "Add credits",
       "description": "A one-time card payment. Credits are spent on model requests by every key in this organization.",

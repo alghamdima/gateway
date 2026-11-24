@@ -64,6 +64,8 @@
         "GATEWAY_URL",
         "GATEWAY_ADMIN_USERNAME",
         "GATEWAY_ADMIN_PASSWORD",
+        "CRON_SECRET",
+        "RECONCILIATION_ALERT_EMAIL",
 
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",

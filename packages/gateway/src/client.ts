@@ -87,6 +87,18 @@ export interface GatewayLog {
   timestamp?: string;
 }
 
+/** What the gateway logged for one customer over a period. Cost is provider cost in USD. */
+export interface CustomerCost {
+  /** The gateway customer id, or "unassigned" for requests it could not attribute. */
+  customerId: string;
+  requests: number;
+  costUsd: number;
+}
+
+interface RankingsResponse {
+  rankings?: { id: string; total_requests?: number; total_cost?: number }[];
+}
+
 interface ModelDetailsResponse {
   models?: GatewayModel[];
   total?: number;
@@ -255,6 +267,27 @@ export const createGatewayClient = ({
         undefined,
         { allowNotFound: true },
       ),
+
+    /** Logged requests and provider cost per customer, from `from` up to `to`. */
+    getCustomerCosts: async (from: Date, to: Date): Promise<CustomerCost[]> => {
+      const query = new URLSearchParams({
+        dimension: "customer",
+        start_time: from.toISOString(),
+        end_time: to.toISOString(),
+        // the gateway returns 100 rows unless asked for all
+        all: "true",
+      });
+      const result = await call<RankingsResponse>(
+        "GET",
+        `/api/logs/rankings/by-dimension?${query.toString()}`,
+        undefined,
+      );
+      return (result?.rankings ?? []).map((row) => ({
+        customerId: row.id,
+        requests: row.total_requests ?? 0,
+        costUsd: row.total_cost ?? 0,
+      }));
+    },
 
     /** Every model of every configured provider, with its catalog price. */
     listModels: async (): Promise<GatewayModel[]> => {

@@ -78,6 +78,7 @@ const fakeGateway = () => {
       }
     },
     listModels: async () => [],
+    getCustomerCosts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async (id, limit) => {
       if (state.failRateLimit) {

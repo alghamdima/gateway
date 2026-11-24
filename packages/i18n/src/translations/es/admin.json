@@ -211,5 +211,29 @@
       "target": "Sobre",
       "details": "Detalles"
     }
+  },
+  "reconciliation": {
+    "title": "Conciliación",
+    "description": "Cada día se compara, por organización, el coste del proveedor que registró el gateway con el que registró el libro. Aquí aparece cualquier diferencia, coste sin organización o reserva liberada sin su cobro.",
+    "period": "Día (UTC)",
+    "status": "Estado",
+    "statuses": {
+      "ok": "Coincide",
+      "mismatch": "Diferencias",
+      "error": "No se pudo ejecutar"
+    },
+    "organizations": "Organizaciones con diferencias",
+    "reaped": "Cobros perdidos",
+    "unattributed": "Coste sin atribuir",
+    "empty": "Todavía no se ha ejecutado ninguna conciliación.",
+    "details": "Detalles",
+    "email": {
+      "subject": "La conciliación necesita revisión",
+      "preview": "El gateway y el libro difieren el {{period}}",
+      "mismatch": "La conciliación diaria del {{period}} (UTC) encontró diferencias entre lo que registró el gateway y lo que cobró el libro.",
+      "error": "La conciliación diaria del {{period}} (UTC) no pudo leer una de sus fuentes.",
+      "counts": "Organizaciones con diferencias: {{organizations}}. Cobros perdidos por reservas liberadas: {{reapedHolds}}. Costes sin atribuir: {{unattributed}}.",
+      "cta": "Abrir el informe"
+    }
   }
 }

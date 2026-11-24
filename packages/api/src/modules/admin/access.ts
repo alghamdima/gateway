@@ -103,6 +103,12 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
   },
 
   { method: "GET", path: /^\/audit$/, needs: { audit: ["read"] } },
+  // read-only money reports: admin, finance and support (support reads everything, ADR 0011)
+  {
+    method: "GET",
+    path: /^\/reconciliation$/,
+    needs: { credits: ["read"] },
+  },
 ];
 
 /** The rule for a request, or undefined when no rule covers it. */

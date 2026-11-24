@@ -269,5 +269,6 @@
   "apiKeys": "Claves de API",
   "credits": "Créditos",
   "rateLimit": "Límite de uso",
-  "activity": "Actividad"
+  "activity": "Actividad",
+  "reconciliation": "Conciliación"
 }
