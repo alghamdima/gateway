@@ -39,6 +39,12 @@ const pathsConfig = {
     pricing: "/pricing",
     contact: "/contact",
     waitlist: "/waitlist",
+    models: {
+      index: "/models",
+      // a model id is provider/name; each part is encoded on its own
+      model: (id: string) =>
+        `/models/${id.split("/").map(encodeURIComponent).join("/")}`,
+    },
     blog: {
       index: BLOG_PREFIX,
       post: (slug: string) => `${BLOG_PREFIX}/${slug}`,

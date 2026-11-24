@@ -149,6 +149,39 @@
     }
   },
 
+  "models": {
+    "label": "Modelos",
+    "title": "Modelos",
+    "description": "Todos los modelos que puedes llamar a través de la API, con su precio por millón de tokens. El precio mostrado es el precio cobrado.",
+    "unavailable": "El catálogo de modelos no está disponible ahora. Inténtalo de nuevo en breve.",
+    "count_one": "{{count}} modelo",
+    "count_other": "{{count}} modelos",
+    "priceNote": "Los precios están en dólares estadounidenses por millón de tokens e incluyen nuestra comisión.",
+    "filters": {
+      "search": "Buscar",
+      "searchPlaceholder": "Modelo o proveedor",
+      "provider": "Proveedor",
+      "allProviders": "Todos los proveedores",
+      "apply": "Aplicar"
+    },
+    "columns": {
+      "model": "Modelo",
+      "context": "Longitud de contexto",
+      "input": "Entrada, por 1M de tokens",
+      "output": "Salida, por 1M de tokens"
+    },
+    "detail": {
+      "description": "Precio, límites y cómo llamarlo.",
+      "maxOutput": "Salida máxima",
+      "inputs": "Acepta",
+      "outputs": "Devuelve",
+      "cacheRead": "Lectura de entrada en caché, por 1M de tokens",
+      "cacheWrite": "Escritura de entrada en caché, por 1M de tokens",
+      "use": "Llama a este modelo",
+      "sdkNote": "La API es compatible con OpenAI: apunta cualquier SDK de OpenAI a {{url}} con tu clave API.",
+      "back": "Todos los modelos"
+    }
+  },
   "contact": {
     "label": "Contacto",
     "title": "Ponte en contacto con nosotros hoy para soporte",

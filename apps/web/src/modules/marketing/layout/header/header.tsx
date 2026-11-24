@@ -97,6 +97,10 @@ const links = [
     ],
   },
   {
+    label: "marketing:models.label",
+    href: pathsConfig.marketing.models.index,
+  },
+  {
     label: "billing:pricing.label",
     href: pathsConfig.marketing.pricing,
   },
