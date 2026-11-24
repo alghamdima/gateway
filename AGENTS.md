@@ -27,6 +27,14 @@ Guide for AI agents working on the Turbostarter monorepo.
 - Check `packages/*` for shared helpers before duplicating logic
 - Import from package entry points (`@workspace/ui-web`, not deep paths)
 
+**Gateway first:** `apps/gateway` (Bifrost) is the engine; TurboStarter is the SaaS shell around it. Before writing any gateway, money, usage, limit, logging or provider logic:
+
+1. Search `apps/gateway` (core, framework, plugins, transports) for an existing feature and read it.
+2. State what you found, with file paths, or that you found nothing and where you looked.
+3. Use or configure it. Write our own code only for what it does not do, and say why.
+
+Findings from reviews or subagents are claims: verify them in the code before building on them.
+
 **DON'T:**
 
 - Commit, push, or modify git state unless explicitly asked
