@@ -318,6 +318,28 @@
     }
   },
   "activity": {
+    "recent": {
+      "title": "Recent requests",
+      "description": "Each charged attempt, newest first. Open one to see its record; the id is the x-bifrost-request-id response header, also readable with GET /api/v1/generation?id=.",
+      "when": "When",
+      "details": "Details",
+      "failed": "Failed"
+    },
+    "record": {
+      "title": "Request",
+      "yes": "Yes",
+      "no": "No",
+      "unknown": "Not available",
+      "promptTokens": "Prompt tokens",
+      "completionTokens": "Completion tokens",
+      "latency": "Latency",
+      "finishReason": "Finish reason",
+      "streamed": "Streamed",
+      "attempts": "Attempts",
+      "success": "Answered",
+      "error": "Failed",
+      "note": "Latency, finish reason and streaming come from request logs kept 90 days. The charge is kept for good. Prompts and completions are never stored."
+    },
     "title": "Activity",
     "description": "What this organization's keys spent, by day, model and key. Only charged requests are counted; prompts and completions are not stored.",
     "window": "Period",

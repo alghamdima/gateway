@@ -7,6 +7,7 @@ import {
 } from "@workspace/gateway/server";
 import { logger } from "@workspace/shared/logger";
 
+import { getGeneration } from "../activity/generations";
 import { authenticateKey, readKey } from "./auth";
 import { listPublicModels } from "./models";
 import { describeCredits, describeKey } from "./queries";
@@ -62,7 +63,19 @@ export const v1Router = new Hono<{ Variables: { key: CallingKey } }>()
   })
   .use("/key", enforceKey)
   .use("/credits", enforceKey)
+  .use("/generation", enforceKey)
   .get("/key", async (c) => c.json(await describeKey(c.var.key)))
   .get("/credits", async (c) =>
     c.json(await describeCredits(c.var.key.organizationId)),
-  );
+  )
+  // any key of the organization may read its requests, as OpenRouter's
+  .get("/generation", async (c) => {
+    const id = c.req.query("id")?.trim();
+    if (!id) {
+      return apiError(400, "Missing the id query parameter");
+    }
+    const generation = await getGeneration(c.var.key.organizationId, id);
+    return generation
+      ? c.json({ data: generation })
+      : apiError(404, "Generation not found");
+  });

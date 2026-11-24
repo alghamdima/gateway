@@ -30,6 +30,7 @@ import {
 } from "@workspace/ui-web/table";
 
 import { api } from "~/lib/api/client";
+import { RecentRequests } from "~/modules/activity/recent-requests";
 import { formatMicroUsd, MICRO_USD } from "~/modules/keys/money";
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
@@ -204,6 +205,8 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
           }))}
         />
       </div>
+
+      <RecentRequests organizationId={organizationId} />
     </div>
   );
 };

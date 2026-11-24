@@ -78,6 +78,7 @@ const fakeGateway = () => {
       }
     },
     listModels: async () => [],
+    getLog: async () => undefined,
     setCustomerRateLimit: async (id, limit) => {
       if (state.failRateLimit) {
         // loaded here: a static import would open the database before the test points it at its own

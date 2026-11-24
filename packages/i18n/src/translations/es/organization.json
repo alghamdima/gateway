@@ -308,6 +308,28 @@
     }
   },
   "activity": {
+    "recent": {
+      "title": "Solicitudes recientes",
+      "description": "Cada intento cobrado, del más reciente al más antiguo. Abre uno para ver su registro; el id es la cabecera de respuesta x-bifrost-request-id, también legible con GET /api/v1/generation?id=.",
+      "when": "Cuándo",
+      "details": "Detalles",
+      "failed": "Fallida"
+    },
+    "record": {
+      "title": "Solicitud",
+      "yes": "Sí",
+      "no": "No",
+      "unknown": "No disponible",
+      "promptTokens": "Tokens de entrada",
+      "completionTokens": "Tokens de salida",
+      "latency": "Latencia",
+      "finishReason": "Motivo de fin",
+      "streamed": "En streaming",
+      "attempts": "Intentos",
+      "success": "Respondida",
+      "error": "Fallida",
+      "note": "La latencia, el motivo de fin y el streaming vienen de los registros que se guardan 90 días. El cobro se guarda siempre. Nunca se guardan prompts ni respuestas."
+    },
     "title": "Actividad",
     "description": "Lo que gastaron las claves de esta organización, por día, modelo y clave. Solo se cuentan las solicitudes cobradas; no se guardan prompts ni respuestas.",
     "window": "Periodo",

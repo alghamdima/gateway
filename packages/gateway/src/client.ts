@@ -72,6 +72,21 @@ export interface GatewayModel {
   };
 }
 
+/** One request as the gateway logged it; content is never stored (ADR 0014). */
+export interface GatewayLog {
+  id: string;
+  customer_id?: string | null;
+  virtual_key_id?: string | null;
+  provider?: string;
+  model?: string;
+  status?: string;
+  stop_reason?: string | null;
+  stream?: boolean;
+  /** Milliseconds. */
+  latency?: number;
+  timestamp?: string;
+}
+
 interface ModelDetailsResponse {
   models?: GatewayModel[];
   total?: number;
@@ -231,6 +246,15 @@ export const createGatewayClient = ({
         },
       });
     },
+
+    /** The gateway's log of one request, or undefined when it has none (or it expired). */
+    getLog: async (id: string): Promise<GatewayLog | undefined> =>
+      call<GatewayLog>(
+        "GET",
+        `/api/logs/${encodeURIComponent(id)}`,
+        undefined,
+        { allowNotFound: true },
+      ),
 
     /** Every model of every configured provider, with its catalog price. */
     listModels: async (): Promise<GatewayModel[]> => {

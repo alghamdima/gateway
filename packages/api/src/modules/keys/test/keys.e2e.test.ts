@@ -334,6 +334,40 @@ describe.skipIf(!adminUrl || !binary)(
       await settled("org_e2e");
     }, 60_000);
 
+    it("a request's record joins the charge with the gateway's timing, by the id the gateway returned", async () => {
+      const generations = await import("../../activity/generations");
+      const { key } = await keys.createKey({
+        organizationId: "org_e2e",
+        userId: "user_e2e",
+        name: "records",
+      });
+      const response = await chat(key);
+      expect(response.status).toBe(200);
+      await response.text();
+      const id = response.headers.get("x-bifrost-request-id");
+      expect(id).toBeTruthy();
+      await settled("org_e2e");
+
+      // the gateway writes its log after answering
+      let record: Awaited<ReturnType<typeof generations.getGeneration>>;
+      for (let i = 0; i < 50; i++) {
+        record = await generations.getGeneration("org_e2e", id ?? "");
+        if (record?.latency !== null && record?.latency !== undefined) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      expect(record).toMatchObject({
+        id,
+        model: expect.stringContaining("gpt-4o-mini"),
+        provider_name: "openai",
+        tokens_prompt: PROMPT_TOKENS,
+        tokens_completion: COMPLETION_TOKENS,
+        total_cost: EXPECTED_CHARGE / USD,
+        finish_reason: "stop",
+        streamed: false,
+      });
+      expect(record?.latency).toBeGreaterThan(0);
+    }, 60_000);
+
     it("lists the gateway's models with their catalog price on /api/v1/models", async () => {
       const models = await import("../../v1/models");
       models.clearModelCache();
