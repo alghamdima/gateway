@@ -10,6 +10,7 @@ import {
   getOrganizationOrdersInputSchema,
   getOrganizationSubscriptionsInputSchema,
   getOrganizationsInputSchema,
+  setOrganizationRateLimitSchema,
 } from "../../../schema";
 import { adjustCredits } from "../../credits/adjust";
 import { getBalance } from "../../credits/ledger";
@@ -28,6 +29,10 @@ import {
   getOrganization,
   getOrganizationSubscriptions,
 } from "./queries";
+import {
+  getOrganizationRateLimit,
+  setOrganizationRateLimit,
+} from "./rate-limit";
 
 import type { User } from "@workspace/auth";
 
@@ -67,6 +72,21 @@ export const organizationsRouter = new Hono<{ Variables: { user: User } }>()
     async (c) =>
       c.json(
         await adjustCredits({
+          organizationId: c.req.param("id"),
+          staffId: c.var.user.id,
+          ...c.req.valid("json"),
+        }),
+      ),
+  )
+  .get("/:id/rate-limit", async (c) =>
+    c.json(await getOrganizationRateLimit(c.req.param("id"))),
+  )
+  .put(
+    "/:id/rate-limit",
+    validate("json", setOrganizationRateLimitSchema),
+    async (c) =>
+      c.json(
+        await setOrganizationRateLimit({
           organizationId: c.req.param("id"),
           staffId: c.var.user.id,
           ...c.req.valid("json"),

@@ -5,6 +5,7 @@ import { apiKey, gatewayCustomer } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { getGateway } from "@workspace/gateway/server";
 import { logger } from "@workspace/shared/logger";
+import { generateId } from "@workspace/shared/utils";
 
 import type { GatewayClient, LimitReset } from "@workspace/gateway/server";
 
@@ -103,8 +104,11 @@ export const createKey = async (
   gateway: GatewayClient = getGateway(),
 ) => {
   const customerId = await ensureGatewayCustomer(organizationId, gateway);
+  // the gateway's key names are unique across every customer, so it gets our
+  // id; the name the customer chose lives only here
+  const id = generateId();
   const virtualKey = await gateway.createVirtualKey({
-    name,
+    name: id,
     customerId,
     expiresAt,
   });
@@ -113,6 +117,7 @@ export const createKey = async (
     const [row] = await db
       .insert(apiKey)
       .values({
+        id,
         organizationId,
         createdBy: userId,
         name,
@@ -183,10 +188,10 @@ export const updateKey = async (
   if (!found) {
     return undefined;
   }
-  if (input.name !== undefined || input.disabled !== undefined) {
+  // the name lives only here (createKey): only disabling reaches the gateway
+  if (input.disabled !== undefined) {
     await gateway.updateVirtualKey(found.virtualKeyId, {
-      name: input.name,
-      isActive: input.disabled === undefined ? undefined : !input.disabled,
+      isActive: !input.disabled,
     });
   }
   const [row] = await db

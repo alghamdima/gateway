@@ -267,5 +267,6 @@
   "finance": "Finanzas",
   "audit": "Registro de auditoría",
   "apiKeys": "Claves de API",
-  "credits": "Créditos"
+  "credits": "Créditos",
+  "rateLimit": "Límite de uso"
 }

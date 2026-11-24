@@ -320,6 +320,15 @@ export const getCustomersResponseSchema = z.object({
 
 export type GetCustomersResponse = z.infer<typeof getCustomersResponseSchema>;
 
+const perMinuteSchema = (max: number) =>
+  z.number().int().positive().max(max).nullable();
+
+/** Both null removes the organization's rate limit. */
+export const setOrganizationRateLimitSchema = z.object({
+  requestsPerMinute: perMinuteSchema(1_000_000),
+  tokensPerMinute: perMinuteSchema(10_000_000_000),
+});
+
 export const adjustOrganizationCreditsSchema = z.object({
   /** Signed micro-USD (1 USD = 1,000,000): positive adds credit, negative removes it. */
   amount: z

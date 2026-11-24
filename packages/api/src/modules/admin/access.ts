@@ -47,6 +47,12 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "credits.adjust", target: "organization" },
   },
   {
+    method: "PUT",
+    path: new RegExp(`^/organizations/${ID}/rate-limit$`),
+    needs: { organizations: ["update"] },
+    audit: { action: "organization.rate-limit", target: "organization" },
+  },
+  {
     method: "GET",
     path: /^\/organizations(\/.*)?$/,
     needs: { organizations: ["read"] },

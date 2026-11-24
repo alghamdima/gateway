@@ -117,6 +117,38 @@ describe("gateway client", () => {
     ]);
   });
 
+  it("sets a customer's rate limit per minute, and removes it with nothing set", async () => {
+    await client().setCustomerRateLimit("cust_1", {
+      requestsPerMinute: 600,
+      tokensPerMinute: 1_000_000,
+    });
+    await client().setCustomerRateLimit("cust_1", {
+      requestsPerMinute: 60,
+      tokensPerMinute: null,
+    });
+    await client().setCustomerRateLimit("cust_1", null);
+    expect(seen.map((s) => [s.method, s.path, s.body])).toEqual([
+      [
+        "PUT",
+        "/api/governance/customers/cust_1",
+        {
+          rate_limit: {
+            request_max_limit: 600,
+            request_reset_duration: "1m",
+            token_max_limit: 1_000_000,
+            token_reset_duration: "1m",
+          },
+        },
+      ],
+      [
+        "PUT",
+        "/api/governance/customers/cust_1",
+        { rate_limit: { request_max_limit: 60, request_reset_duration: "1m" } },
+      ],
+      ["PUT", "/api/governance/customers/cust_1", { rate_limit: {} }],
+    ]);
+  });
+
   it("treats a key or customer that is already gone as deleted", async () => {
     replies.push({ status: 404, body: { error: "not found" } });
     replies.push({ status: 404, body: { error: "not found" } });

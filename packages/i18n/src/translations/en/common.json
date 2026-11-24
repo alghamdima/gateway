@@ -267,5 +267,6 @@
   "finance": "Finance",
   "audit": "Audit log",
   "apiKeys": "API keys",
-  "credits": "Credits"
+  "credits": "Credits",
+  "rateLimit": "Rate limit"
 }

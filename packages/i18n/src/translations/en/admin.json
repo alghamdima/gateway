@@ -62,6 +62,14 @@
       "description": "Manage your organizations and their members."
     },
     "organization": {
+      "rateLimit": {
+        "requests": "Requests per minute",
+        "tokens": "Tokens per minute",
+        "none": "No limit",
+        "invalid": "Enter a whole number above 0, or leave it empty for no limit.",
+        "saved": "Rate limit saved.",
+        "description": "Applies to all the organization's keys together. Requests over it are refused with 429 before reaching a provider, and are not charged. Leave both empty to remove the limit. With more than one gateway instance, each instance counts on its own."
+      },
       "credits": {
         "available": "Available",
         "balance": "Balance",

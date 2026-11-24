@@ -5,6 +5,7 @@ import { roles } from "@workspace/auth";
 import type { TestDatabase } from "@workspace/db/testing";
 import type {
   CreateVirtualKeyInput,
+  CustomerRateLimit,
   GatewayClient,
   UpdateVirtualKeyInput,
 } from "@workspace/gateway/server";
@@ -25,6 +26,8 @@ const fakeGateway = () => {
     updates: [] as [string, UpdateVirtualKeyInput][],
     deletedKeys: [] as string[],
     deletedCustomers: [] as string[],
+    rateLimits: [] as [string, CustomerRateLimit | null][],
+    failRateLimit: false,
     failCreateKey: false,
     /** When set, every new key gets this value (to force a duplicate). */
     fixedValue: undefined as string | undefined,
@@ -55,6 +58,14 @@ const fakeGateway = () => {
       if (state.failCreateKey) {
         throw new Error("gateway down");
       }
+      // like the real gateway: virtual key names are unique across all customers
+      if ([...state.keys.values()].some((key) => key.name === input.name)) {
+        const { GatewayError } = await import("@workspace/gateway/server");
+        throw new GatewayError(
+          "A virtual key with this name already exists",
+          409,
+        );
+      }
       const id = `vk_${++next}`;
       state.keys.set(id, { ...input, isActive: true });
       return { id, value: state.fixedValue ?? `sk-bf-${id}-${"x".repeat(30)}` };
@@ -67,6 +78,14 @@ const fakeGateway = () => {
       }
     },
     listModels: async () => [],
+    setCustomerRateLimit: async (id, limit) => {
+      if (state.failRateLimit) {
+        // loaded here: a static import would open the database before the test points it at its own
+        const { GatewayError } = await import("@workspace/gateway/server");
+        throw new GatewayError("gateway down");
+      }
+      state.rateLimits.push([id, limit]);
+    },
     deleteVirtualKey: async (id) => {
       state.keys.delete(id);
       state.deletedKeys.push(id);
@@ -168,6 +187,56 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
       limitMicroUsd: 5_000_000,
       limitReset: "weekly",
     });
+  });
+
+  it("lets two organizations, and one organization twice, use the same key name", async () => {
+    const first = await createOrganization();
+    const second = await createOrganization();
+    const made = await Promise.all([
+      keys.createKey(
+        { organizationId: first, userId: "u", name: "Production" },
+        gateway.client,
+      ),
+      keys.createKey(
+        { organizationId: second, userId: "u", name: "Production" },
+        gateway.client,
+      ),
+    ]);
+    const again = await keys.createKey(
+      { organizationId: first, userId: "u", name: "Production" },
+      gateway.client,
+    );
+    expect([...made, again].map((k) => k.apiKey.name)).toEqual([
+      "Production",
+      "Production",
+      "Production",
+    ]);
+    // the gateway was given our ids, never the customer's name
+    const sent = [...gateway.state.keys.values()].map((k) => k.name);
+    expect(sent).not.toContain("Production");
+    expect(sent).toEqual(
+      expect.arrayContaining([
+        made[0].apiKey.id,
+        made[1].apiKey.id,
+        again.apiKey.id,
+      ]),
+    );
+  });
+
+  it("renames only in the record", async () => {
+    const org = await createOrganization();
+    const { apiKey } = await keys.createKey(
+      { organizationId: org, userId: "u", name: "old" },
+      gateway.client,
+    );
+    const updated = await keys.updateKey(
+      org,
+      apiKey.id,
+      { name: "new" },
+      gateway.client,
+    );
+    expect(updated?.name).toBe("new");
+    expect(gateway.state.updates).toEqual([]);
   });
 
   it("changes only the record when only the limit changes", async () => {
@@ -276,7 +345,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
       gateway.client,
     );
     expect(gateway.state.updates).toEqual([
-      [expect.any(String), { name: "renamed", isActive: false }],
+      [expect.any(String), { isActive: false }],
     ]);
     expect(updated).toMatchObject({
       name: "renamed",

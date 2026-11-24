@@ -66,6 +66,14 @@
       "description": "Gestiona tus organizaciones y sus miembros."
     },
     "organization": {
+      "rateLimit": {
+        "requests": "Solicitudes por minuto",
+        "tokens": "Tokens por minuto",
+        "none": "Sin límite",
+        "invalid": "Indica un número entero mayor que 0, o déjalo vacío para no limitar.",
+        "saved": "Límite guardado.",
+        "description": "Se aplica a todas las claves de la organización juntas. Las solicitudes que lo superan se rechazan con 429 antes de llegar al proveedor y no se cobran. Deja ambos vacíos para quitar el límite. Con más de una instancia del gateway, cada una cuenta por separado."
+      },
       "credits": {
         "available": "Disponible",
         "balance": "Saldo",

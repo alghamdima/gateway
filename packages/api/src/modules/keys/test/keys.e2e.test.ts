@@ -262,6 +262,78 @@ describe.skipIf(!adminUrl || !binary)(
       );
     }, 60_000);
 
+    it("an organization over its rate limit gets 429, keeps no hold, and pays only for what ran", async () => {
+      const rateLimit = await import("../../admin/organizations/rate-limit");
+      await sql`insert into organization (id, name, slug, created_at) values ('org_rl', 'RL', 'rl', now())`;
+      await sql`insert into credit_account (organization_id, balance) values ('org_rl', ${USD})`;
+      await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) values ('seed_rl', 'org_rl', ${USD}, 'top_up', 'seed_rl')`;
+      const { key } = await keys.createKey({
+        organizationId: "org_rl",
+        userId: "user_e2e",
+        name: "limited",
+      });
+      await rateLimit.setOrganizationRateLimit({
+        organizationId: "org_rl",
+        staffId: "staff_e2e",
+        requestsPerMinute: 2,
+        tokensPerMinute: null,
+      });
+
+      const statuses: number[] = [];
+      let refusal = "";
+      for (let i = 0; i < 3; i++) {
+        const response = await chat(key);
+        statuses.push(response.status);
+        if (response.status !== 200) {
+          refusal = JSON.stringify(await response.json());
+        } else {
+          await response.text();
+        }
+        await settled("org_rl");
+      }
+      expect(statuses).toEqual([200, 200, 429]);
+      expect(refusal).toContain("rate");
+
+      const balance = await settled("org_rl");
+      expect(balance.held).toBe(0);
+      expect(balance.balance).toBe(USD - 2 * EXPECTED_CHARGE);
+      const [open] = await sql<
+        { n: string }[]
+      >`select count(*) as n from credit_reservation where organization_id = 'org_rl' and settled_at is null`;
+      expect(Number(open?.n)).toBe(0);
+
+      // removing the limit lets the organization through again
+      await rateLimit.setOrganizationRateLimit({
+        organizationId: "org_rl",
+        staffId: "staff_e2e",
+        requestsPerMinute: null,
+        tokensPerMinute: null,
+      });
+      const after = await chat(key);
+      expect(after.status).toBe(200);
+      await after.text();
+      await settled("org_rl");
+    }, 60_000);
+
+    it("two keys with the same name both work: the gateway gets our ids as names", async () => {
+      const one = await keys.createKey({
+        organizationId: "org_e2e",
+        userId: "user_e2e",
+        name: "Same name",
+      });
+      const two = await keys.createKey({
+        organizationId: "org_e2e",
+        userId: "user_e2e",
+        name: "Same name",
+      });
+      for (const { key } of [one, two]) {
+        const response = await chat(key);
+        expect(response.status).toBe(200);
+        await response.text();
+      }
+      await settled("org_e2e");
+    }, 60_000);
+
     it("lists the gateway's models with their catalog price on /api/v1/models", async () => {
       const models = await import("../../v1/models");
       models.clearModelCache();

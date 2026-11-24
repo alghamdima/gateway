@@ -15,6 +15,7 @@ import { OrganizationHeader } from "~/modules/admin/organizations/organization/h
 import { InvitationsDataTable } from "~/modules/admin/organizations/organization/invitations/data-table/invitations-data-table";
 import { MembersDataTable } from "~/modules/admin/organizations/organization/members/data-table/members-data-table";
 import { OrdersDataTable } from "~/modules/admin/organizations/organization/orders/data-table/orders-data-table";
+import { OrganizationRateLimit } from "~/modules/admin/organizations/organization/rate-limit";
 import { SubscriptionsDataTable } from "~/modules/admin/organizations/organization/subscriptions/data-table/subscriptions-data-table";
 
 export const generateMetadata = async ({
@@ -66,6 +67,10 @@ export default async function OrganizationPage({
     {
       label: t("credits"),
       component: <OrganizationCredits organizationId={id} />,
+    },
+    {
+      label: t("rateLimit"),
+      component: <OrganizationRateLimit organizationId={id} />,
     },
     {
       label: t("members"),

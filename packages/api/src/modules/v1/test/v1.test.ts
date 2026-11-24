@@ -17,6 +17,7 @@ const gatewayWith = (models: GatewayModel[]): GatewayClient => ({
   updateVirtualKey: async () => {},
   deleteVirtualKey: async () => {},
   listModels: async () => models,
+  setCustomerRateLimit: async () => {},
 });
 
 describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {

@@ -79,6 +79,12 @@ interface ModelDetailsResponse {
 
 const MODEL_PAGE_SIZE = 500;
 
+/** Per-minute ceilings for a customer; null fields are no limit of that kind. */
+export interface CustomerRateLimit {
+  requestsPerMinute: number | null;
+  tokensPerMinute: number | null;
+}
+
 interface CustomerResponse {
   customer: { id: string };
 }
@@ -201,6 +207,29 @@ export const createGatewayClient = ({
             : { is_active: input.isActive }),
         },
       );
+    },
+
+    /**
+     * Replaces the customer's rate limit, in one-minute windows; null (or both
+     * fields null) removes it. The gateway refuses a request over it with 429.
+     */
+    setCustomerRateLimit: async (
+      id: string,
+      limit: CustomerRateLimit | null,
+    ) => {
+      const requests = limit?.requestsPerMinute ?? null;
+      const tokens = limit?.tokensPerMinute ?? null;
+      await call("PUT", `/api/governance/customers/${encodeURIComponent(id)}`, {
+        // both maximums absent is the gateway's "remove the rate limit"
+        rate_limit: {
+          ...(requests === null
+            ? {}
+            : { request_max_limit: requests, request_reset_duration: "1m" }),
+          ...(tokens === null
+            ? {}
+            : { token_max_limit: tokens, token_reset_duration: "1m" }),
+        },
+      });
     },
 
     /** Every model of every configured provider, with its catalog price. */
