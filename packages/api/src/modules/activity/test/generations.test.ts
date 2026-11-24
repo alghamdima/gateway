@@ -19,6 +19,7 @@ const gatewayWithLogs = (
   deleteVirtualKey: async () => {},
   listModels: async () => [],
   listProviderKeys: async () => [],
+  setVirtualKeyAccess: async () => {},
   getCustomerCosts: async () => [],
   setCustomerRateLimit: async () => {},
   getLog: async (id) => {

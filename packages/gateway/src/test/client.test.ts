@@ -96,9 +96,64 @@ describe("gateway client", () => {
       name: "prod",
       customer_id: "cust_1",
       allow_all_providers: true,
+      provider_configs: [],
       is_active: true,
       expires_at: "2027-01-01T00:00:00.000Z",
     });
+  });
+
+  it("creates a key that reaches only the provider keys it is given", async () => {
+    replies.push({
+      status: 200,
+      body: { virtual_key: { id: "vk_2", value: "sk-bf-def" } },
+    });
+    await client().createVirtualKey({
+      name: "strict",
+      customerId: "cust_1",
+      access: {
+        allowAll: false,
+        providers: [{ provider: "humain", keyIds: ["k_riyadh"] }],
+      },
+    });
+    expect(seen[0]?.body).toEqual({
+      name: "strict",
+      customer_id: "cust_1",
+      allow_all_providers: false,
+      provider_configs: [
+        { provider: "humain", allowed_models: ["*"], key_ids: ["k_riyadh"] },
+      ],
+      is_active: true,
+    });
+  });
+
+  it("replaces what a key may reach: a list, nothing, or everything", async () => {
+    await client().setVirtualKeyAccess("vk/1", {
+      allowAll: false,
+      providers: [
+        { provider: "openai", keyIds: ["k1", "k2"] },
+        { provider: "humain", keyIds: ["k3"] },
+      ],
+    });
+    await client().setVirtualKeyAccess("vk_1", {
+      allowAll: false,
+      providers: [],
+    });
+    await client().setVirtualKeyAccess("vk_1", { allowAll: true });
+    expect(seen[0]).toMatchObject({
+      method: "PUT",
+      path: "/api/governance/virtual-keys/vk%2F1",
+    });
+    expect(seen.map((request) => request.body)).toEqual([
+      {
+        allow_all_providers: false,
+        provider_configs: [
+          { provider: "openai", allowed_models: ["*"], key_ids: ["k1", "k2"] },
+          { provider: "humain", allowed_models: ["*"], key_ids: ["k3"] },
+        ],
+      },
+      { allow_all_providers: false, provider_configs: [] },
+      { allow_all_providers: true, provider_configs: [] },
+    ]);
   });
 
   it("refuses a created key that came back without a value", async () => {

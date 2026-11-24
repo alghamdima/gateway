@@ -9,6 +9,8 @@ import {
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
+import { markPoliciesUnapplied } from "../../data-policy/pending";
+
 import type { ProviderAgreement, ProviderRegion } from "@workspace/db/schema";
 import type { GatewayClient } from "@workspace/gateway/server";
 
@@ -136,7 +138,11 @@ export interface SetProviderTermsInput {
   verifiedOn: string;
 }
 
-/** Terms can only be recorded for a key the gateway has. */
+/**
+ * Terms can only be recorded for a key the gateway has. The change marks
+ * every data policy as not applied in the same transaction: the caller then
+ * pushes them (applyPendingPolicies).
+ */
 export const setProviderTerms = async (
   { keyId, staffId, ...terms }: SetProviderTermsInput,
   gateway: GatewayClient = getGateway(),
@@ -154,11 +160,14 @@ export const setProviderTerms = async (
     updatedBy: staffId,
     updatedAt: new Date(),
   };
-  const [row] = await db
-    .insert(providerEndpoint)
-    .values({ keyId, ...values })
-    .onConflictDoUpdate({ target: providerEndpoint.keyId, set: values })
-    .returning(termColumns);
+  const [row] = await db.transaction(async (tx) => {
+    await markPoliciesUnapplied(tx);
+    return tx
+      .insert(providerEndpoint)
+      .values({ keyId, ...values })
+      .onConflictDoUpdate({ target: providerEndpoint.keyId, set: values })
+      .returning(termColumns);
+  });
   if (!row) {
     throw new Error("provider_endpoint upsert returned no row");
   }
@@ -168,9 +177,12 @@ export const setProviderTerms = async (
 
 /** Back to unknown. False when there were no terms to remove. */
 export const removeProviderTerms = async (keyId: string) => {
-  const removed = await db
-    .delete(providerEndpoint)
-    .where(eq(providerEndpoint.keyId, keyId))
-    .returning({ keyId: providerEndpoint.keyId });
+  const removed = await db.transaction(async (tx) => {
+    await markPoliciesUnapplied(tx);
+    return tx
+      .delete(providerEndpoint)
+      .where(eq(providerEndpoint.keyId, keyId))
+      .returning({ keyId: providerEndpoint.keyId });
+  });
   return removed.length > 0;
 };

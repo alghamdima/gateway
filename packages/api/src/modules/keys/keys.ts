@@ -7,6 +7,8 @@ import { getGateway } from "@workspace/gateway/server";
 import { logger } from "@workspace/shared/logger";
 import { generateId } from "@workspace/shared/utils";
 
+import { accessForOrganization } from "../data-policy/policy";
+
 import type { GatewayClient, LimitReset } from "@workspace/gateway/server";
 
 /**
@@ -111,6 +113,8 @@ export const createKey = async (
     name: id,
     customerId,
     expiresAt,
+    // the organization's data policy, from the key's first request (ADR 0015)
+    access: await accessForOrganization(organizationId, gateway),
   });
 
   try {

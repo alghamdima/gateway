@@ -9,6 +9,8 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
+import { organization } from "./auth";
+
 /**
  * What we know about the data terms of one provider key in the gateway
  * (docs/platform/adr/0015-data-policy.md). The gateway holds the key and its
@@ -63,3 +65,47 @@ export const providerEndpoint = pgTable(
 );
 
 export type SelectProviderEndpoint = typeof providerEndpoint.$inferSelect;
+
+/**
+ * What an organization requires of the endpoints that serve it
+ * (docs/platform/adr/0015-data-policy.md). No row: everything is allowed. A
+ * null list allows every region or every provider.
+ *
+ * The gateway enforces the policy through each key's allowlist. `version`
+ * counts the changes to this row; `appliedVersion` is the version every key
+ * of the organization is known to carry. They differ while a change is being
+ * pushed, and after a push that failed.
+ */
+export const organizationDataPolicy = pgTable(
+  "organization_data_policy",
+  {
+    organizationId: text()
+      .primaryKey()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    requireZeroRetention: boolean().notNull().default(false),
+    forbidTraining: boolean().notNull().default(false),
+    allowedRegions: text({ enum: PROVIDER_REGIONS }).array(),
+    allowedProviders: text().array(),
+    version: integer().notNull().default(1),
+    appliedVersion: integer().notNull().default(0),
+    updatedBy: text().notNull(),
+    updatedAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "organization_data_policy_regions",
+      sql`${t.allowedRegions} is null or (cardinality(${t.allowedRegions}) > 0 and ${t.allowedRegions} <@ array['sa', 'eu', 'us', 'other'])`,
+    ),
+    check(
+      "organization_data_policy_providers",
+      sql`${t.allowedProviders} is null or cardinality(${t.allowedProviders}) > 0`,
+    ),
+    check(
+      "organization_data_policy_versions",
+      sql`${t.version} >= 1 and ${t.appliedVersion} >= 0 and ${t.appliedVersion} <= ${t.version}`,
+    ),
+  ],
+);
+
+export type SelectOrganizationDataPolicy =
+  typeof organizationDataPolicy.$inferSelect;

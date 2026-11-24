@@ -20,6 +20,8 @@ export interface CreateVirtualKeyInput {
   name: string;
   customerId: string;
   expiresAt?: Date | null;
+  /** Default: everything. */
+  access?: VirtualKeyAccess;
 }
 
 export interface UpdateVirtualKeyInput {
@@ -105,6 +107,27 @@ interface ModelDetailsResponse {
 }
 
 const MODEL_PAGE_SIZE = 500;
+
+/**
+ * What a virtual key may reach (docs/platform/adr/0015-data-policy.md):
+ * everything, or only the listed provider keys. An empty list reaches
+ * nothing: the gateway refuses every request of the key.
+ */
+export type VirtualKeyAccess =
+  | { allowAll: true }
+  | { allowAll: false; providers: { provider: string; keyIds: string[] }[] };
+
+const accessBody = (access: VirtualKeyAccess) => ({
+  allow_all_providers: access.allowAll,
+  // sent without ids: the gateway replaces the key's whole list with these
+  provider_configs: access.allowAll
+    ? []
+    : access.providers.map(({ provider, keyIds }) => ({
+        provider,
+        allowed_models: ["*"],
+        key_ids: keyIds,
+      })),
+});
 
 /** One provider key in the gateway, without its secret. */
 export interface GatewayProviderKey {
@@ -210,14 +233,16 @@ export const createGatewayClient = ({
     },
 
     /**
-     * Every provider the gateway has, every model, and no gateway budget: the
-     * prepaid balance and the key's spending limit are both enforced on what
-     * the ledger charges (docs/platform/adr/0013-key-limits-in-the-ledger.md).
+     * Every model of what `access` allows (by default every provider the
+     * gateway has), and no gateway budget: the prepaid balance and the key's
+     * spending limit are both enforced on what the ledger charges
+     * (docs/platform/adr/0013-key-limits-in-the-ledger.md).
      */
     createVirtualKey: async ({
       name,
       customerId,
       expiresAt,
+      access = { allowAll: true },
     }: CreateVirtualKeyInput): Promise<CreatedVirtualKey> => {
       const created = await call<VirtualKeyResponse>(
         "POST",
@@ -225,7 +250,7 @@ export const createGatewayClient = ({
         {
           name,
           customer_id: customerId,
-          allow_all_providers: true,
+          ...accessBody(access),
           is_active: true,
           ...(expiresAt ? { expires_at: expiresAt.toISOString() } : {}),
         },
@@ -249,6 +274,15 @@ export const createGatewayClient = ({
             ? {}
             : { is_active: input.isActive }),
         },
+      );
+    },
+
+    /** Replaces what the key may reach. A key that is gone is an error. */
+    setVirtualKeyAccess: async (id: string, access: VirtualKeyAccess) => {
+      await call(
+        "PUT",
+        `/api/governance/virtual-keys/${encodeURIComponent(id)}`,
+        accessBody(access),
       );
     },
 

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
 import { checkLowBalances } from "../credits/low-balance";
+import { applyPendingPolicies } from "../data-policy/policy";
 import { runDailyReconciliation } from "./daily";
 import { env } from "./env";
 
@@ -38,6 +39,13 @@ const lowBalances = async (c: Context) => {
   return c.json(await checkLowBalances({ origin: new URL(c.req.url).origin }));
 };
 
+const dataPolicies = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await applyPendingPolicies());
+};
+
 /**
  * /api/internal: jobs a scheduler calls with `Authorization: Bearer
  * <CRON_SECRET>`. Without CRON_SECRET set, every call is refused. GET is
@@ -46,9 +54,13 @@ const lowBalances = async (c: Context) => {
  *
  * - /reconciliation: once a day, after 00:00 UTC (step 10.1)
  * - /low-balance: hourly (step 10.2)
+ * - /data-policy: every few minutes; pushes data policies whose keys do not
+ *   carry them yet, after a gateway failure (step D2)
  */
 export const internalRouter = new Hono()
   .get("/reconciliation", reconcileYesterday)
   .post("/reconciliation", reconcileYesterday)
   .get("/low-balance", lowBalances)
-  .post("/low-balance", lowBalances);
+  .post("/low-balance", lowBalances)
+  .get("/data-policy", dataPolicies)
+  .post("/data-policy", dataPolicies);
