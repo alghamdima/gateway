@@ -105,27 +105,51 @@ type e2eGateway struct {
 	logPath string
 }
 
-// shippedClientConfig is the "client" block of the config we deploy
-// (apps/gateway/compose/config.json): content logging and retention are tested
-// as shipped, not as each test would set them.
-func shippedClientConfig(t *testing.T, migrations string) map[string]any {
+// shippedConfig is the config we deploy (apps/gateway/compose/config.json):
+// content logging, retention, inference auth, the admin, the encryption key and
+// the credits plugin are tested as shipped, not as each test would set them.
+// The Postgres stores are left out: the gateway's default local stores serve
+// the tests.
+func shippedConfig(t *testing.T, migrations string) map[string]any {
 	t.Helper()
 	path := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(migrations))), "apps", "gateway", "compose", "config.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
-	var shipped struct {
-		Client map[string]any `json:"client"`
-	}
-	if err := json.Unmarshal(raw, &shipped); err != nil || shipped.Client == nil {
+	var shipped map[string]any
+	if err := json.Unmarshal(raw, &shipped); err != nil || shipped["client"] == nil {
 		t.Fatalf("%s has no client block: %v", path, err)
 	}
-	return shipped.Client
+	delete(shipped, "config_store")
+	delete(shipped, "logs_store")
+	return shipped
 }
 
-// startGateway boots the binary with the given credits plugin config and waits for /health.
-func startGateway(t *testing.T, binary string, provider *mockProvider, creditsConfig map[string]any, organizations []string) *e2eGateway {
+// shippedEnv is what the shipped config reads from the environment.
+func shippedEnv(ledgerURL string) []string {
+	return []string{
+		"GATEWAY_ADMIN_USER=" + e2eAdminUser,
+		"GATEWAY_ADMIN_PASSWORD=" + e2eAdminPassword,
+		"GATEWAY_ENCRYPTION_KEY=e2e-encryption-key-0123456789abcdef",
+		"GATEWAY_LEDGER_DATABASE_URL=" + ledgerURL,
+	}
+}
+
+// startGateway boots the binary with the shipped config, charging the ledger at
+// ledgerURL, and waits for /health.
+func startGateway(t *testing.T, binary string, provider *mockProvider, ledgerURL string, organizations []string) *e2eGateway {
+	t.Helper()
+	return bootGateway(t, binary, provider, nil, shippedEnv(ledgerURL), organizations)
+}
+
+// startGatewayWithCredits replaces the shipped credits plugin config with creditsConfig.
+func startGatewayWithCredits(t *testing.T, binary string, provider *mockProvider, creditsConfig map[string]any, organizations []string) *e2eGateway {
+	t.Helper()
+	return bootGateway(t, binary, provider, creditsConfig, shippedEnv(""), organizations)
+}
+
+func bootGateway(t *testing.T, binary string, provider *mockProvider, creditsConfig map[string]any, env []string, organizations []string) *e2eGateway {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -151,22 +175,19 @@ func startGateway(t *testing.T, binary string, provider *mockProvider, creditsCo
 			"provider_configs": providerConfigs,
 		})
 	}
-	client := shippedClientConfig(t, migrations)
-	client["enforce_auth_on_inference"] = true
-	config := map[string]any{
-		"client": client,
-		// the management API (logs, governance) needs an admin; inference uses virtual keys
-		"auth_config": map[string]any{"admin_username": e2eAdminUser, "admin_password": e2eAdminPassword, "is_enabled": true},
-		"providers": map[string]any{"openai": map[string]any{
-			"keys":           []map[string]any{{"name": "mock", "value": "sk-mock-upstream", "models": []string{"*"}, "weight": 1}},
-			"network_config": map[string]any{"base_url": provider.server.URL, "allow_private_network": true, "max_retries": 0},
-		}},
-		"governance": map[string]any{"customers": customers, "virtual_keys": keys},
-		"plugins":    []map[string]any{{"name": PluginName, "enabled": true, "config": creditsConfig}},
-		"framework": map[string]any{"pricing": map[string]any{
-			"pricing_url":          "file://" + filepath.Join(pricing, "pricing.json"),
-			"model_parameters_url": "file://" + filepath.Join(pricing, "model-parameters.json"),
-		}},
+	config := shippedConfig(t, migrations)
+	// what a deployment adds at run time: providers, customers and keys, and pricing
+	config["providers"] = map[string]any{"openai": map[string]any{
+		"keys":           []map[string]any{{"name": "mock", "value": "sk-mock-upstream", "models": []string{"*"}, "weight": 1}},
+		"network_config": map[string]any{"base_url": provider.server.URL, "allow_private_network": true, "max_retries": 0},
+	}}
+	config["governance"] = map[string]any{"customers": customers, "virtual_keys": keys}
+	config["framework"] = map[string]any{"pricing": map[string]any{
+		"pricing_url":          "file://" + filepath.Join(pricing, "pricing.json"),
+		"model_parameters_url": "file://" + filepath.Join(pricing, "model-parameters.json"),
+	}}
+	if creditsConfig != nil {
+		config["plugins"] = []map[string]any{{"name": PluginName, "enabled": true, "config": creditsConfig}}
 	}
 	appDir := t.TempDir()
 	raw, _ := json.MarshalIndent(config, "", "  ")
@@ -178,6 +199,7 @@ func startGateway(t *testing.T, binary string, provider *mockProvider, creditsCo
 	logFile, _ := os.Create(logPath)
 	cmd := exec.Command(binary, "-app-dir", appDir, "-port", fmt.Sprint(port), "-host", "127.0.0.1")
 	cmd.Stdout, cmd.Stderr = logFile, logFile
+	cmd.Env = append(os.Environ(), env...)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start %s: %v", binary, err)
 	}
@@ -269,7 +291,7 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 	cutOff := db.organization(t, usd)
 	// as staff would set them: 1 percent by default, 5 percent for the provider under test
 	db.setPricing(t, 100, map[string]int64{"openai": 500})
-	gw := startGateway(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db)}, []string{funded, broke, cutOff})
+	gw := startGateway(t, binary, provider, ledgerURL(t, db), []string{funded, broke, cutOff})
 
 	// gpt-4o-mini in the local pricing file: 0.15 USD per million input tokens, 0.60 per million output
 	providerCost := e2ePromptTokens*0.15e-6 + e2eCompletionTokens*0.60e-6
@@ -433,6 +455,23 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 			t.Fatalf("status %d, want 401", status)
 		}
 	})
+
+	t.Run("the management API needs the admin", func(t *testing.T) {
+		for _, admin := range []bool{false, true} {
+			req, _ := http.NewRequest(http.MethodGet, gw.url+"/api/providers", nil)
+			if admin {
+				req.SetBasicAuth(e2eAdminUser, e2eAdminPassword)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if want := map[bool]int{false: 401, true: 200}[admin]; resp.StatusCode != want {
+				t.Errorf("admin=%v: status %d, want %d", admin, resp.StatusCode, want)
+			}
+		}
+	})
 }
 
 func TestEndToEnd_AMisconfiguredPluginRefusesInsteadOfServingForFree(t *testing.T) {
@@ -450,7 +489,7 @@ func TestEndToEnd_AMisconfiguredPluginRefusesInsteadOfServingForFree(t *testing.
 		"a database that is down":     {"database_url": "postgres://nobody:nothing@127.0.0.1:1/none"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			gw := startGateway(t, binary, provider, config, []string{org})
+			gw := startGatewayWithCredits(t, binary, provider, config, []string{org})
 			before := provider.chats.Load()
 			status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+org, chatBody(false))
 			if status != 503 || !strings.Contains(body, ErrorTypeLedgerUnavailable) {
@@ -461,6 +500,17 @@ func TestEndToEnd_AMisconfiguredPluginRefusesInsteadOfServingForFree(t *testing.
 			}
 		})
 	}
+	t.Run("the shipped config with no ledger url set", func(t *testing.T) {
+		gw := startGateway(t, binary, provider, "", []string{org})
+		before := provider.chats.Load()
+		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+org, chatBody(false))
+		if status != 503 || !strings.Contains(body, ErrorTypeLedgerUnavailable) {
+			t.Fatalf("status %d: %s", status, body)
+		}
+		if provider.chats.Load() != before {
+			t.Fatal("the provider was called although the request could not be accounted for")
+		}
+	})
 	if s := db.consistent(t, org); s.Balance != usd || s.UsageEntries != 0 {
 		t.Fatalf("state %+v", s)
 	}

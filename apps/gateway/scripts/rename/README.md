@@ -54,6 +54,6 @@ So the brand's domain has to exist in DNS before the rename is accepted, and to 
 - `-scan` now passes on a renamed tree: the only names left are the `maximhq` forks of `mcp-go` and `fasthttp`, which are external Go dependencies and are on the allowed list in `main.go` with that reason. A fully white-labeled module graph would need our own forks of both.
 - The JSON error body has a field `is_bifrost_error`, which becomes `is_<name>_error`. It is on the wire, so it is worth deciding before launch whether a customer should see the brand there.
 - Logo and icon files are renamed but still hold the upstream artwork.
-- `docker-compose.yml` at the repo root sets `BIFROST_SETUP_TOKEN` and is outside the tool's root; it has to change in the same commit as the rename.
+- `docker-compose.yml` at the repo root is outside the tool's root. It names no upstream variable: the shipped config reads `GATEWAY_*` variables through `env.` references.
 - The acceptance does not yet send a chat request through a virtual key against a mock upstream (Step 2.4, check 4).
 - A renamed tree has not been run under Docker or on Postgres.

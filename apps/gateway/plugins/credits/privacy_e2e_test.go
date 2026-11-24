@@ -22,7 +22,7 @@ func TestEndToEnd_PromptsAndCompletionsAreNotStored(t *testing.T) {
 	db := newTestDB(t)
 	provider := newMockProvider(t)
 	org := db.organization(t, usd)
-	gw := startGateway(t, binary, provider, map[string]any{"database_url": ledgerURL(t, db)}, []string{org})
+	gw := startGateway(t, binary, provider, ledgerURL(t, db), []string{org})
 
 	// a request that asks for its content to be kept: the shipped config must ignore it
 	const secret = "the-customer-prompt-must-not-be-stored"

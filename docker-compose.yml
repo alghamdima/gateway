@@ -81,9 +81,16 @@ services:
       GATEWAY_DB_USER: ${POSTGRES_USER:-turbostarter}
       GATEWAY_DB_PASSWORD: ${POSTGRES_PASSWORD:-turbostarter}
       GATEWAY_DB_NAME: ${GATEWAY_DB_NAME:-gateway}
-      BIFROST_SETUP_TOKEN: ${GATEWAY_SETUP_TOKEN:-local-setup-token}
+      # the first admin; with no password the gateway refuses to start
+      GATEWAY_ADMIN_USER: ${GATEWAY_ADMIN_USER:-admin}
+      GATEWAY_ADMIN_PASSWORD: ${GATEWAY_ADMIN_PASSWORD:-}
+      # encrypts provider keys at rest; cannot be changed once data is written
+      GATEWAY_ENCRYPTION_KEY: ${GATEWAY_ENCRYPTION_KEY:-}
+      # the credits plugin charges the control plane's ledger as the gateway_ledger role
+      GATEWAY_LEDGER_DATABASE_URL: ${GATEWAY_LEDGER_DATABASE_URL:-postgres://${POSTGRES_USER:-turbostarter}:${POSTGRES_PASSWORD:-turbostarter}@db:5432/${POSTGRES_DB:-core}?options=-c%20role%3Dgateway_ledger}
     ports:
-      - "${GATEWAY_PORT:-8080}:8080"
+      # internal only (ADR 0007): the public edge is step 8.1
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
     volumes:
       - gateway_data:/app/data
       - ./apps/gateway/compose/config.json:/app/data/config.json:ro
