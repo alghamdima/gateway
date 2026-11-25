@@ -161,6 +161,76 @@ interface VirtualKeyResponse {
   virtual_key: { id: string; value: string };
 }
 
+/** A provider as the gateway holds it, with its keys. No secret is in here. */
+export interface GatewayProvider {
+  name: string;
+  /** Set for a provider of our own that speaks another provider's protocol. */
+  baseProvider: string | null;
+  baseUrl: string | null;
+  status: string;
+  keys: GatewayProviderKeyDetails[];
+}
+
+export interface GatewayProviderKeyDetails {
+  id: string;
+  name: string;
+  /** The key as the gateway shows it: masked, never the secret itself. */
+  maskedValue: string;
+  models: string[];
+  weight: number;
+  isEnabled: boolean;
+}
+
+export interface NewGatewayProvider {
+  name: string;
+  /** With a base provider this is a provider of our own behind `baseUrl`. */
+  baseProvider?: string;
+  baseUrl?: string;
+}
+
+export interface NewGatewayProviderKey {
+  name: string;
+  value: string;
+  models?: string[];
+  weight?: number;
+}
+
+/** Only the fields named are changed; the gateway keeps the rest, the value included. */
+export interface GatewayProviderKeyChange {
+  name?: string;
+  value?: string;
+  models?: string[];
+  weight?: number;
+  isEnabled?: boolean;
+}
+
+interface ProviderResponse {
+  name?: string;
+  provider_status?: string;
+  network_config?: { base_url?: string };
+  custom_provider_config?: { base_provider_type?: string } | null;
+}
+
+interface ProviderKeyDetailsResponse {
+  id?: string;
+  name?: string;
+  value?: { value?: string };
+  models?: string[] | null;
+  weight?: number;
+  enabled?: boolean;
+}
+
+const toProviderKey = (
+  key: ProviderKeyDetailsResponse,
+): GatewayProviderKeyDetails => ({
+  id: key.id ?? "",
+  name: key.name ?? "",
+  maskedValue: key.value?.value ?? "",
+  models: key.models ?? [],
+  weight: key.weight ?? 1,
+  isEnabled: key.enabled ?? true,
+});
+
 export const createGatewayClient = ({
   url,
   username,
@@ -393,6 +463,113 @@ export const createGatewayClient = ({
               },
             ]
           : [],
+      );
+    },
+
+    /** Every provider with its keys. One request per provider for the keys. */
+    listProviders: async (): Promise<GatewayProvider[]> => {
+      const list = await call<{ providers?: ProviderResponse[] }>(
+        "GET",
+        "/api/providers",
+        undefined,
+      );
+      return Promise.all(
+        (list?.providers ?? []).flatMap((provider) => {
+          const name = provider.name;
+          if (!name) {
+            return [];
+          }
+          return [
+            call<{ keys?: ProviderKeyDetailsResponse[] }>(
+              "GET",
+              `/api/providers/${encodeURIComponent(name)}/keys`,
+              undefined,
+            ).then((keys) => ({
+              name,
+              baseProvider:
+                provider.custom_provider_config?.base_provider_type ?? null,
+              baseUrl: provider.network_config?.base_url || null,
+              status: provider.provider_status ?? "",
+              keys: (keys?.keys ?? []).map(toProviderKey),
+            })),
+          ];
+        }),
+      );
+    },
+
+    /** The gateway checks the name and the address; its refusal comes back as a GatewayError. */
+    createProvider: async ({
+      name,
+      baseProvider,
+      baseUrl,
+    }: NewGatewayProvider) => {
+      await call("POST", "/api/providers", {
+        provider: name,
+        ...(baseProvider
+          ? { custom_provider_config: { base_provider_type: baseProvider } }
+          : {}),
+        ...(baseUrl ? { network_config: { base_url: baseUrl } } : {}),
+      });
+    },
+
+    /** Deletes the provider's keys with it. A provider that is already gone counts as deleted. */
+    deleteProvider: async (name: string) => {
+      await call(
+        "DELETE",
+        `/api/providers/${encodeURIComponent(name)}`,
+        undefined,
+        { allowNotFound: true },
+      );
+    },
+
+    /** The value goes to the gateway and nowhere else; what comes back is masked. */
+    createProviderKey: async (
+      provider: string,
+      { name, value, models, weight }: NewGatewayProviderKey,
+    ): Promise<GatewayProviderKeyDetails> => {
+      const key = await call<ProviderKeyDetailsResponse>(
+        "POST",
+        `/api/providers/${encodeURIComponent(provider)}/keys`,
+        { name, value, models: models ?? ["*"], weight: weight ?? 1 },
+      );
+      return toProviderKey(key ?? {});
+    },
+
+    updateProviderKey: async (
+      provider: string,
+      keyId: string,
+      { name, value, models, weight, isEnabled }: GatewayProviderKeyChange,
+    ): Promise<GatewayProviderKeyDetails> => {
+      const key = await call<ProviderKeyDetailsResponse>(
+        "PUT",
+        `/api/providers/${encodeURIComponent(provider)}/keys/${encodeURIComponent(keyId)}`,
+        {
+          ...(name === undefined ? {} : { name }),
+          ...(value === undefined ? {} : { value }),
+          ...(models === undefined ? {} : { models }),
+          ...(weight === undefined ? {} : { weight }),
+          ...(isEnabled === undefined ? {} : { enabled: isEnabled }),
+        },
+      );
+      return toProviderKey(key ?? {});
+    },
+
+    /** A key that is already gone counts as deleted. */
+    deleteProviderKey: async (provider: string, keyId: string) => {
+      await call(
+        "DELETE",
+        `/api/providers/${encodeURIComponent(provider)}/keys/${encodeURIComponent(keyId)}`,
+        undefined,
+        { allowNotFound: true },
+      );
+    },
+
+    /** Asks the provider which models it serves now, instead of waiting for the next sync. */
+    refreshProviderModels: async (provider: string) => {
+      await call(
+        "POST",
+        `/api/providers/${encodeURIComponent(provider)}/refresh-models`,
+        {},
       );
     },
 

@@ -4,7 +4,12 @@ import { clientIp, recordStaffAction } from "@workspace/auth/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
-import { auditTarget, canAccessAdminRoute, findAccessRule } from "./access";
+import {
+  auditTarget,
+  canAccessAdminRoute,
+  findAccessRule,
+  withoutSecrets,
+} from "./access";
 
 import type { User } from "@workspace/auth";
 
@@ -25,7 +30,7 @@ export const enforceStaffAccess = createMiddleware<{
   }
 
   const audit = findAccessRule(c.req.method, path)?.audit;
-  // read before the route consumes the body; admin routes carry no secrets
+  // read before the route consumes the body; a rule names the fields that are secrets
   const body: unknown =
     audit && c.req.header("content-type")?.includes("application/json")
       ? await c.req.raw
@@ -43,7 +48,11 @@ export const enforceStaffAccess = createMiddleware<{
       action: audit.action,
       targetType: audit.target,
       targetId: auditTarget(path),
-      details: { method: c.req.method, path, body },
+      details: {
+        method: c.req.method,
+        path,
+        body: withoutSecrets(body, audit.secrets ?? []),
+      },
       ipAddress: clientIp(c.req.raw.headers),
     });
   }

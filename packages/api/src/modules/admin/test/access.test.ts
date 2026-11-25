@@ -5,6 +5,7 @@ import {
   auditTarget,
   canAccessAdminRoute,
   findAccessRule,
+  withoutSecrets,
 } from "../access";
 
 // Every route the admin routers define, as [method, path after /api/admin].
@@ -35,6 +36,13 @@ const ROUTES = {
   readProviders: ["GET", "/providers"],
   setProviderTerms: ["PUT", "/providers/k1/terms"],
   removeProviderTerms: ["DELETE", "/providers/k1/terms"],
+  readProviderAccounts: ["GET", "/providers/accounts"],
+  createProvider: ["POST", "/providers/accounts"],
+  deleteProvider: ["DELETE", "/providers/accounts/openai"],
+  refreshProviderModels: ["POST", "/providers/accounts/openai/refresh-models"],
+  createProviderKey: ["POST", "/providers/accounts/openai/keys"],
+  updateProviderKey: ["PUT", "/providers/accounts/openai/keys/k1"],
+  deleteProviderKey: ["DELETE", "/providers/accounts/openai/keys/k1"],
   readAudit: ["GET", "/audit"],
 } as const;
 
@@ -54,6 +62,7 @@ const READ_ONLY: Route[] = [
   "readPricing",
   "pricingChanges",
   "readProviders",
+  "readProviderAccounts",
 ];
 
 const ALLOWED: Record<string, Route[]> = {
@@ -144,7 +153,28 @@ describe("admin audit", () => {
     ["/pricing/settings", "settings"],
     ["/pricing/providers/openai", "openai"],
     ["/providers/k1/terms", "k1"],
+    ["/providers/accounts/openai", "openai"],
+    ["/providers/accounts/openai/keys/k1", "openai"],
   ])("targets %s at %s", (path, target) => {
     expect(auditTarget(path)).toBe(target);
+  });
+
+  // a provider key's value is the one secret an admin route carries
+  it.each([
+    ["POST", "/providers/accounts/openai/keys"],
+    ["PUT", "/providers/accounts/openai/keys/k1"],
+  ])("keeps the key value of %s %s out of the log", (method, path) => {
+    const audit = findAccessRule(method, path)?.audit;
+    expect(
+      withoutSecrets(
+        { name: "main", value: "sk-live-secret", models: ["*"] },
+        audit?.secrets ?? [],
+      ),
+    ).toEqual({ name: "main", value: "[redacted]", models: ["*"] });
+  });
+
+  it("leaves a body with no secret as it is", () => {
+    expect(withoutSecrets({ region: "sa" }, [])).toEqual({ region: "sa" });
+    expect(withoutSecrets(undefined, ["value"])).toBeUndefined();
   });
 });

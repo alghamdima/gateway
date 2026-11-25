@@ -390,6 +390,57 @@ export const setProviderTermsSchema = z.object({
 
 export type SetProviderTermsInput = z.infer<typeof setProviderTermsSchema>;
 
+/** A provider's name in the gateway: what a model id starts with ("openai/gpt-..."). */
+export const providerNameSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9][a-z0-9_-]{0,62}$/);
+
+/**
+ * A provider the gateway knows by name, or one of our own: then `baseProvider`
+ * names the protocol it speaks and `baseUrl` where it is.
+ */
+export const createProviderAccountSchema = z
+  .object({
+    name: providerNameSchema,
+    baseProvider: providerNameSchema.optional(),
+    baseUrl: z.url().max(500).optional(),
+  })
+  .refine((value) => Boolean(value.baseProvider) === Boolean(value.baseUrl), {
+    path: ["baseUrl"],
+  });
+
+export type CreateProviderAccountInput = z.infer<
+  typeof createProviderAccountSchema
+>;
+
+const providerKeyModelsSchema = z
+  .array(z.string().trim().min(1).max(200))
+  .min(1)
+  .max(500);
+
+/** `value` is the secret. It is sent to the gateway and stored nowhere else. */
+export const createProviderKeySchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  value: z.string().min(1).max(4000),
+  models: providerKeyModelsSchema.optional(),
+  weight: z.number().min(0).max(100).optional(),
+});
+
+export type CreateProviderKeyInput = z.infer<typeof createProviderKeySchema>;
+
+export const updateProviderKeySchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    value: z.string().min(1).max(4000).optional(),
+    models: providerKeyModelsSchema.optional(),
+    weight: z.number().min(0).max(100).optional(),
+    isEnabled: z.boolean().optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined));
+
+export type UpdateProviderKeyInput = z.infer<typeof updateProviderKeySchema>;
+
 export const getAdminActionsInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
   before: z.coerce.number().int().positive().optional(),

@@ -23,6 +23,27 @@ const fakeGateway = (keys: GatewayProviderKey[], isDown = false) => {
     getLog: async () => undefined,
     setCustomerRateLimit: async () => {},
     setVirtualKeyAccess: async () => {},
+    listProviders: async () => [],
+    createProvider: async () => {},
+    deleteProvider: async () => {},
+    createProviderKey: async () => ({
+      id: "pk",
+      name: "",
+      maskedValue: "",
+      models: [],
+      weight: 1,
+      isEnabled: true,
+    }),
+    updateProviderKey: async () => ({
+      id: "pk",
+      name: "",
+      maskedValue: "",
+      models: [],
+      weight: 1,
+      isEnabled: true,
+    }),
+    deleteProviderKey: async () => {},
+    refreshProviderModels: async () => {},
     listProviderKeys: async () => {
       if (isDown) {
         // loaded here: a static import would open the database before the test points it at its own

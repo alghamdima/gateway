@@ -41,6 +41,27 @@ const fakeGateway = () => {
     getCustomerCosts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async () => {},
+    listProviders: async () => [],
+    createProvider: async () => {},
+    deleteProvider: async () => {},
+    createProviderKey: async () => ({
+      id: "pk",
+      name: "",
+      maskedValue: "",
+      models: [],
+      weight: 1,
+      isEnabled: true,
+    }),
+    updateProviderKey: async () => ({
+      id: "pk",
+      name: "",
+      maskedValue: "",
+      models: [],
+      weight: 1,
+      isEnabled: true,
+    }),
+    deleteProviderKey: async () => {},
+    refreshProviderModels: async () => {},
     listProviderKeys: async () => {
       state.catalogReads++;
       if (state.isDown) {

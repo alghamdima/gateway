@@ -13,8 +13,11 @@ interface AccessRule {
   path: RegExp;
   /** "any-staff" lets every staff role through. */
   needs: StaffPermissions | "any-staff";
-  /** Set on every rule that changes something: the audit log's action name. */
-  audit?: { action: string; target: string };
+  /**
+   * Set on every rule that changes something: the audit log's action name.
+   * `secrets` names the body fields the log must not keep.
+   */
+  audit?: { action: string; target: string; secrets?: readonly string[] };
 }
 
 const ID = "[^/]+";
@@ -104,6 +107,56 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
 
   // the provider catalog and each key's data terms (ADR 0015)
   { method: "GET", path: /^\/providers$/, needs: { providers: ["read"] } },
+  // the providers and their keys in the gateway; a key's value is a secret
+  {
+    method: "GET",
+    path: /^\/providers\/accounts$/,
+    needs: { providers: ["read"] },
+  },
+  {
+    method: "POST",
+    path: /^\/providers\/accounts$/,
+    needs: { providers: ["update"] },
+    audit: { action: "provider.create", target: "provider" },
+  },
+  {
+    method: "DELETE",
+    path: new RegExp(`^/providers/accounts/${ID}$`),
+    needs: { providers: ["update"] },
+    audit: { action: "provider.delete", target: "provider" },
+  },
+  {
+    method: "POST",
+    path: new RegExp(`^/providers/accounts/${ID}/refresh-models$`),
+    needs: { providers: ["update"] },
+    audit: { action: "provider.refresh-models", target: "provider" },
+  },
+  {
+    method: "POST",
+    path: new RegExp(`^/providers/accounts/${ID}/keys$`),
+    needs: { providers: ["update"] },
+    audit: {
+      action: "provider.key-create",
+      target: "provider",
+      secrets: ["value"],
+    },
+  },
+  {
+    method: "PUT",
+    path: new RegExp(`^/providers/accounts/${ID}/keys/${ID}$`),
+    needs: { providers: ["update"] },
+    audit: {
+      action: "provider.key-update",
+      target: "provider",
+      secrets: ["value"],
+    },
+  },
+  {
+    method: "DELETE",
+    path: new RegExp(`^/providers/accounts/${ID}/keys/${ID}$`),
+    needs: { providers: ["update"] },
+    audit: { action: "provider.key-delete", target: "provider" },
+  },
   {
     method: "PUT",
     path: new RegExp(`^/providers/${ID}/terms$`),
@@ -155,5 +208,24 @@ export const canAccessAdminRoute = (
  */
 export const auditTarget = (path: string) => {
   const segments = path.split("/").filter(Boolean);
-  return segments[0] === "pricing" ? segments.at(-1) : segments[1];
+  if (segments[0] === "pricing") {
+    return segments.at(-1);
+  }
+  // /providers/accounts/openai/keys/k1 is about provider openai
+  return segments[0] === "providers" && segments[1] === "accounts"
+    ? segments[2]
+    : segments[1];
+};
+
+/** The body as the audit log may keep it: the named fields are blanked. */
+export const withoutSecrets = (body: unknown, secrets: readonly string[]) => {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return body;
+  }
+  return Object.fromEntries(
+    Object.entries(body).map(([field, value]) => [
+      field,
+      secrets.includes(field) ? "[redacted]" : value,
+    ]),
+  );
 };
