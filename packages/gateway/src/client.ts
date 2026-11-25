@@ -91,6 +91,56 @@ export interface GatewayLog {
   timestamp?: string;
 }
 
+/**
+ * One logged request as staff may see it: what happened, never what was said.
+ * The gateway's row also carries the prompt and the answer; they are left out
+ * where the row is read.
+ */
+export interface GatewayRequest {
+  id: string;
+  timestamp: string;
+  status: string;
+  provider: string;
+  model: string;
+  customerId: string | null;
+  providerKeyName: string | null;
+  isStream: boolean;
+  latencyMs: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  /** Provider cost in USD, before our fee. */
+  costUsd: number | null;
+  stopReason: string | null;
+  /** The provider's or the gateway's error message, when the request failed. */
+  error: string | null;
+}
+
+export interface GatewayRequestSearch {
+  customerIds?: string[];
+  status?: "success" | "error";
+  limit: number;
+  offset: number;
+}
+
+interface LogRowResponse {
+  id?: string;
+  timestamp?: string;
+  status?: string;
+  provider?: string;
+  model?: string;
+  customer_id?: string | null;
+  selected_key_name?: string | null;
+  stream?: boolean;
+  latency?: number | null;
+  token_usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  } | null;
+  cost?: number | null;
+  stop_reason?: string | null;
+  error_details?: { error?: { message?: string } } | null;
+}
+
 /** What the gateway logged for one customer over a period. Cost is provider cost in USD. */
 export interface CustomerCost {
   /** The gateway customer id, or "unassigned" for requests it could not attribute. */
@@ -389,6 +439,57 @@ export const createGatewayClient = ({
         undefined,
         { allowNotFound: true },
       ),
+
+    /**
+     * Logged requests, newest first. Only the fields named here are passed on:
+     * the gateway's rows hold the prompt and the answer, and neither leaves
+     * this function.
+     */
+    searchRequests: async ({
+      customerIds,
+      status,
+      limit,
+      offset,
+    }: GatewayRequestSearch): Promise<{
+      requests: GatewayRequest[];
+      total: number;
+    }> => {
+      const query = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        sort_by: "timestamp",
+        order: "desc",
+      });
+      if (customerIds?.length) {
+        query.set("customer_ids", customerIds.join(","));
+      }
+      if (status) {
+        query.set("status", status);
+      }
+      const result = await call<{
+        logs?: LogRowResponse[] | null;
+        pagination?: { total_count?: number };
+      }>("GET", `/api/logs?${query.toString()}`, undefined);
+      return {
+        requests: (result?.logs ?? []).map((row) => ({
+          id: row.id ?? "",
+          timestamp: row.timestamp ?? "",
+          status: row.status ?? "",
+          provider: row.provider ?? "",
+          model: row.model ?? "",
+          customerId: row.customer_id || null,
+          providerKeyName: row.selected_key_name || null,
+          isStream: row.stream ?? false,
+          latencyMs: row.latency ?? null,
+          promptTokens: row.token_usage?.prompt_tokens ?? null,
+          completionTokens: row.token_usage?.completion_tokens ?? null,
+          costUsd: row.cost ?? null,
+          stopReason: row.stop_reason || null,
+          error: row.error_details?.error?.message ?? null,
+        })),
+        total: result?.pagination?.total_count ?? 0,
+      };
+    },
 
     /** Logged requests and provider cost per customer, from `from` up to `to`. */
     getCustomerCosts: async (from: Date, to: Date): Promise<CustomerCost[]> => {

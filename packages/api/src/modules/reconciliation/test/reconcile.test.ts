@@ -40,6 +40,7 @@ const gatewayReporting = (
   updateVirtualKey: async () => {},
   deleteVirtualKey: async () => {},
   listModels: async () => [],
+  searchRequests: async () => ({ requests: [], total: 0 }),
   listProviders: async () => [],
   createProvider: async () => {},
   deleteProvider: async () => {},

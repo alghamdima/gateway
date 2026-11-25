@@ -105,6 +105,9 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "pricing.remove-provider", target: "pricing" },
   },
 
+  // the request log: what happened to each call, never its content
+  { method: "GET", path: /^\/requests$/, needs: "any-staff" },
+
   // the provider catalog and each key's data terms (ADR 0015)
   { method: "GET", path: /^\/providers$/, needs: { providers: ["read"] } },
   // the providers and their keys in the gateway; a key's value is a secret

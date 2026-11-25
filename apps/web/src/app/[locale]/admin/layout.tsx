@@ -53,6 +53,11 @@ const menu = [
         icon: <Icons.Globe2 />,
       },
       {
+        title: "requests",
+        href: pathsConfig.admin.requests.index,
+        icon: <Icons.TrendingUp />,
+      },
+      {
         title: "audit",
         href: pathsConfig.admin.audit.index,
         icon: <Icons.ScrollText />,

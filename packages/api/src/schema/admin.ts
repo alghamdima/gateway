@@ -441,6 +441,16 @@ export const updateProviderKeySchema = z
 
 export type UpdateProviderKeyInput = z.infer<typeof updateProviderKeySchema>;
 
+/** The staff request log: newest first, optionally one organization or one outcome. */
+export const getStaffRequestsInputSchema = z.object({
+  organizationId: z.string().min(1).max(100).optional(),
+  status: z.enum(["success", "error"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+});
+
+export type GetStaffRequestsInput = z.infer<typeof getStaffRequestsInputSchema>;
+
 export const getAdminActionsInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
   before: z.coerce.number().int().positive().optional(),

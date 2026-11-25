@@ -265,6 +265,7 @@
   "pricing": "Pricing",
   "finance": "Finance",
   "audit": "Audit log",
+  "requests": "Requests",
   "apiKeys": "API keys",
   "credits": "Credits",
   "rateLimit": "Rate limit",

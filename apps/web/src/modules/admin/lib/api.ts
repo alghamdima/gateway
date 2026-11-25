@@ -226,6 +226,15 @@ const queries = {
         queryFn: () => handle(api.admin.pricing.changes.$get)(),
       }),
   },
+  requests: {
+    list: (
+      query: InferRequestType<typeof api.admin.requests.$get>["query"] = {},
+    ) =>
+      queryOptions({
+        queryKey: [KEY, "requests", query],
+        queryFn: () => handle(api.admin.requests.$get)({ query }),
+      }),
+  },
   providers: {
     getCatalog: () =>
       queryOptions({

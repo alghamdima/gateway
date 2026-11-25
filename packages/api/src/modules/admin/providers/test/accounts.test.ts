@@ -44,6 +44,7 @@ const fakeGateway = (
     setCustomerRateLimit: async () => {},
     setVirtualKeyAccess: async () => {},
     listProviderKeys: async () => [],
+    searchRequests: async () => ({ requests: [], total: 0 }),
     listProviders: async () => {
       await act("listProviders");
       return providers;

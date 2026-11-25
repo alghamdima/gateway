@@ -43,6 +43,7 @@ const ROUTES = {
   createProviderKey: ["POST", "/providers/accounts/openai/keys"],
   updateProviderKey: ["PUT", "/providers/accounts/openai/keys/k1"],
   deleteProviderKey: ["DELETE", "/providers/accounts/openai/keys/k1"],
+  readRequests: ["GET", "/requests"],
   readAudit: ["GET", "/audit"],
 } as const;
 
@@ -63,6 +64,7 @@ const READ_ONLY: Route[] = [
   "pricingChanges",
   "readProviders",
   "readProviderAccounts",
+  "readRequests",
 ];
 
 const ALLOWED: Record<string, Route[]> = {

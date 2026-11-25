@@ -347,5 +347,33 @@
       "counts": "Organizations differing: {{organizations}}. Charges lost to reaped holds: {{reapedHolds}}. Unattributed costs: {{unattributed}}.",
       "cta": "Open the report"
     }
+  },
+  "requests": {
+    "header": {
+      "title": "Requests",
+      "description": "Every request the gateway logged, newest first, failed ones included. It shows what happened to a request, never the prompt or the answer."
+    },
+    "status": {
+      "all": "All",
+      "success": "Succeeded",
+      "error": "Failed"
+    },
+    "allOrganizations": "Show every organization",
+    "onlyThis": "Only this one",
+    "noOrganization": "Not attributed",
+    "total_one": "{{count}} request",
+    "total_other": "{{count}} requests",
+    "unavailable": "The request log is not available right now.",
+    "empty": "No request matches.",
+    "newer": "Newer",
+    "older": "Older",
+    "columns": {
+      "when": "When",
+      "organization": "Organization",
+      "model": "Model",
+      "outcome": "Outcome",
+      "latency": "Latency",
+      "tokens": "Tokens in / out"
+    }
   }
 }

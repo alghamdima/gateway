@@ -31,6 +31,9 @@ const pathsConfig = {
     audit: {
       index: `${ADMIN_PREFIX}/audit`,
     },
+    requests: {
+      index: `${ADMIN_PREFIX}/requests`,
+    },
     reconciliation: {
       index: `${ADMIN_PREFIX}/reconciliation`,
     },
