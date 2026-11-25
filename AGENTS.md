@@ -37,6 +37,10 @@ Findings from reviews or subagents are claims: verify them in the code before bu
 
 **One product:** the gateway and the control plane are one product. A product-level change (a language added or removed, the brand, a feature taken out) is made in both in the same piece of work, so no difference is left between them. In `apps/gateway` that is a patch in `apps/gateway/patches/` or a path in the `dropped` list of `scripts/import.sh`, never a direct edit left unrecorded.
 
+**Our own product (owner, 2026-11-25):** we do not stay dependent on the gateway's upstream; the owner's team develops the whole product. One frontend only: `apps/web` (customer dashboard and admin). The gateway's own UI is being removed, and what staff need from it is rebuilt in the admin (`docs/platform/PLAN.md`, "Gateway UI removal"). Until that step retires the import check, CI still compares `apps/gateway` with "upstream tag + patches".
+
+**Modular monolith:** follow the project's shape. A feature is a module with its own folder and a narrow surface: `packages/api/src/modules/<feature>` (router, logic, tests), `apps/web/src/modules/<feature>` (UI), schema in `packages/db/src/schema`, and in the gateway a plugin under `apps/gateway/plugins/<name>`. No feature reaches into another module's internals.
+
 **DON'T:**
 
 - Commit, push, or modify git state unless explicitly asked
