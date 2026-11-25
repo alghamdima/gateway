@@ -12,6 +12,8 @@ This block is written for Next.js 16.4. Verify patterns against bundled docs whe
 
 Guide for AI agents working on the Lemru monorepo.
 
+**Start here:** `docs/platform/STATE.md` says what the product is, where everything lives, what is done, what is next and what waits on the owner. Read it before anything else, and update it when you finish a piece of work, so the next agent does not have to read the whole repository.
+
 ## Agent rules
 
 **DO:**
@@ -56,38 +58,43 @@ Findings from reviews or subagents are claims: verify them in the code before bu
 
 ## Where to look first
 
-| Task            | Start here                                 |
-| --------------- | ------------------------------------------ |
-| Auth logic      | `packages/auth/` → then app-specific usage |
-| API endpoints   | `packages/api/src/modules/`                |
-| Database schema | `packages/db/src/schema/`                  |
-| UI components   | `packages/ui/web/`                         |
-| Billing         | `packages/billing/{shared,web}/`           |
-| Feature flags   | `packages/flags/` → `flags-web`            |
-| Translations    | `packages/i18n/src/translations/`          |
-| Email templates | `packages/email/src/templates/`            |
-| Web pages       | `apps/web/src/app/[locale]/`               |
+| Task                  | Start here                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| Where things stand    | `docs/platform/STATE.md`, then `PLAN.md` and `adr/`                                                      |
+| A product feature     | `packages/api/src/modules/<feature>` (keys, credits, activity, data-policy, pricing, reconciliation, v1) |
+| Admin (staff) feature | `packages/api/src/modules/admin/<feature>` and `apps/web/src/modules/admin/<feature>`                    |
+| Access of staff roles | `packages/api/src/modules/admin/access.ts` (a route with no rule is refused)                             |
+| Talking to the engine | `packages/gateway/src/client.ts`                                                                         |
+| Engine behaviour      | `apps/gateway` (core, framework, transports, plugins/credits)                                            |
+| Auth logic            | `packages/auth/` → then app-specific usage                                                               |
+| Database schema       | `packages/db/src/schema/`                                                                                |
+| UI components         | `packages/ui/web/`                                                                                       |
+| Payments              | `packages/billing/{shared,web}/`, top-ups in `modules/credits`                                           |
+| Translations          | `packages/i18n/src/translations/` (English only for now)                                                 |
+| Email templates       | `packages/email/src/templates/`                                                                          |
+| Web pages             | `apps/web/src/app/[locale]/`                                                                             |
 
 ## Project structure
 
 ```
 apps/
-  web/         Next.js App Router (src/app/[locale]/{(marketing),auth,dashboard,admin})
-  gateway/     Go AI gateway (ours; started from Bifrost, see apps/gateway/MODIFICATIONS.md). Not a pnpm
-               package: own Go modules (go.work). Read apps/gateway/AGENTS.md before editing it
+  web/         Next.js App Router (src/app/[locale]/{(marketing),auth,dashboard,admin}). The only frontend
+  gateway/     The engine, in Go (ours; started from Bifrost, see apps/gateway/MODIFICATIONS.md). Not a pnpm
+               package: own Go modules (go.work), no UI. Read apps/gateway/AGENTS.md before editing it
 
 packages/
-  api/         @workspace/api       Hono modules (admin,ai,auth,billing,organization,storage)
-  auth/        @workspace/auth      Better Auth server + web client (src/client/web.ts)
-  billing/     @workspace/billing   Shared + web (Stripe,LemonSqueezy,Polar)
-  flags/       @workspace/flags     OpenFeature helpers + flags-web
-  cms/         @workspace/cms       MDX content (blog, legal)
+  api/         @workspace/api       Hono modules: the product's features, admin, auth, billing, organization
+  gateway/     @workspace/gateway   TypeScript client for the engine's management API
+  auth/        @workspace/auth      Better Auth server + web client (src/client/web.ts), staff roles
+  billing/     @workspace/billing   Shared + web (Stripe; the template's other providers are still there)
   db/          @workspace/db        Drizzle schema, migrations, scripts
   email/       @workspace/email     React Email templates + providers
   i18n/        @workspace/i18n      Translations + server/client utils
   shared/      @workspace/shared    Constants, schema, logger, hooks, utils
   storage/     @workspace/storage   S3 storage providers
-  analytics/   @workspace/analytics[-web]
+  cms/         @workspace/cms       MDX content (legal)
+  flags/       @workspace/flags     OpenFeature helpers + flags-web
+  analytics/   @workspace/analytics[-web]   PostHog only
   monitoring/  @workspace/monitoring[-web]
   ui/          @workspace/ui[-web]
 
@@ -96,22 +103,23 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 
 ## Commands
 
-| Task               | Command                                                      |
-| ------------------ | ------------------------------------------------------------ |
-| Install deps       | `pnpm install`                                               |
-| Dev (all/specific) | `pnpm dev` / `pnpm --filter <app> dev`                       |
-| Build              | `pnpm build` / `pnpm --filter <app> build`                   |
-| Lint/Format        | `pnpm lint` / `pnpm format`                                  |
-| Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                          |
-| Test               | `pnpm test`                                                  |
-| Clean              | `pnpm clean`                                                 |
-| Gateway            | `pnpm gateway:up` (Docker build + run, `localhost:8080`)     |
-| Gateway build/test | `pnpm gateway:build` (image) / `gateway:test` (Go, native)   |
-| Gateway dev/verify | `pnpm gateway:dev` (from source) / `gateway:verify` (rename) |
-| Services           | `pnpm services:setup` / `services:start` / `services:stop`   |
-| DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`             |
-| DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`            |
-| DB studio          | `pnpm with-env pnpm -F @workspace/db db:studio`              |
+| Task               | Command                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Install deps       | `pnpm install`                                                                                                              |
+| Dev (all/specific) | `pnpm dev` / `pnpm --filter <app> dev`                                                                                      |
+| Build              | `pnpm build` / `pnpm --filter <app> build`                                                                                  |
+| Lint/Format        | `pnpm lint` / `pnpm format`                                                                                                 |
+| Fix lint/format    | `pnpm lint:fix` / `pnpm format:fix`                                                                                         |
+| Test               | `pnpm test`                                                                                                                 |
+| Clean              | `pnpm clean`                                                                                                                |
+| Gateway            | `pnpm gateway:up` (Docker build + run, `localhost:8080`)                                                                    |
+| Gateway build/test | `pnpm gateway:build` (image) / `gateway:test` (Go, native)                                                                  |
+| Gateway dev/verify | `pnpm gateway:dev` (from source) / `gateway:verify` (rename)                                                                |
+| Checks before push | `node --run format && node --run lint && node --run typecheck`, then the tests and the web build (`docs/platform/STATE.md`) |
+| Services           | `pnpm services:setup` / `services:start` / `services:stop`                                                                  |
+| DB migrate         | `pnpm with-env pnpm -F @workspace/db db:migrate`                                                                            |
+| DB generate        | `pnpm with-env pnpm -F @workspace/db db:generate`                                                                           |
+| DB studio          | `pnpm with-env pnpm -F @workspace/db db:studio`                                                                             |
 
 Environment: create `.env.local` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
 

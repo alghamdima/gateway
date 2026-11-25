@@ -50,11 +50,6 @@
 
         "SENTRY_AUTH_TOKEN",
 
-        "OPEN_PANEL_SECRET",
-        "GOOGLE_ANALYTICS_SECRET",
-        "UMAMI_API_HOST",
-        "UMAMI_API_KEY",
-
         "S3_REGION",
         "S3_BUCKET",
         "S3_ENDPOINT",
