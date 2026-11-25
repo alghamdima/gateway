@@ -49,26 +49,5 @@
     }
   },
   "trendingUp": "Trending up by {{percentage}}% this month",
-  "trendingDown": "Trending down by {{percentage}}% this month",
-  "notifications": {
-    "description": "Manage notifications and send them remotely with push token.",
-    "status": {
-      "enabled": "Ready to receive notifications",
-      "disabled": "Notifications are not enabled",
-      "permissions": "Permissions - {{status}}",
-      "unknown": "Permissions has not been requested yet."
-    },
-    "token": {
-      "title": "Push token",
-      "placeholder": "Enable notifications to generate a token for this device."
-    },
-    "notification": {
-      "title": "You're all set! 🎉",
-      "body": "This is a demo push notification."
-    },
-    "note": "Store this token on your backend when you are ready to send remote notifications to this user.",
-    "tool": "Use <a>expo.dev/notifications</a> to quickly test remote notifications in real-time.",
-    "docs": "Learn more at <a>turbostarter.dev/docs/mobile/push-notifications</a>.",
-    "cta": "Notify"
-  }
+  "trendingDown": "Trending down by {{percentage}}% this month"
 }

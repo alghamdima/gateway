@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
 
-// check requirements to run TurboStarter
+// check requirements to run Lemru
 checkRequirements();
 
 function checkRequirements() {
@@ -19,7 +19,7 @@ function validatePnpmInstalled() {
   if (!currentPnpmVersion) {
     console.error(
       `\x1b[31m%s\x1b[0m`,
-      `You are running TurboStarter from a directory that does not have pnpm installed. Please install pnpm and run "pnpm install" in your project directory.`,
+      `You are running Lemru from a directory that does not have pnpm installed. Please install pnpm and run "pnpm install" in your project directory.`,
     );
 
     process.exit(1);
@@ -36,7 +36,7 @@ function validateNodeInstalled() {
   if (!currentNodeVersion) {
     console.error(
       `\x1b[31m%s\x1b[0m`,
-      `You are running TurboStarter from a device that does not have Node installed. Please install Node (https://nodejs.org/en/download/) and try again.`,
+      `You are running Lemru from a device that does not have Node installed. Please install Node (https://nodejs.org/en/download/) and try again.`,
     );
 
     process.exit(1);
@@ -53,7 +53,7 @@ function validatePathNotOneDrive() {
   if (path.includes("OneDrive")) {
     console.error(
       `\x1b[31m%s\x1b[0m`,
-      `You are running TurboStarter from OneDrive. Please move your project to a local folder.`,
+      `You are running Lemru from OneDrive. Please move your project to a local folder.`,
     );
 
     process.exit(1);

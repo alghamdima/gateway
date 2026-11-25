@@ -86,7 +86,7 @@ const refuseStaffSessionsWithoutSecondFactor = async (
 };
 
 export const auth = betterAuth({
-  appName: "TurboStarter",
+  appName: "Lemru",
   // No cookie cache: every request reads the session from the database, so a
   // ban, a revoked session or a changed role applies on the next request
   // instead of up to five minutes later.
@@ -269,7 +269,7 @@ export const auth = betterAuth({
     passkey(),
     twoFactor(),
     anonymous({
-      emailDomainName: "turbostarter.dev",
+      emailDomainName: "anonymous.invalid",
     }),
     admin({
       ac: staffAc,
@@ -337,7 +337,7 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    cookiePrefix: "turbostarter",
+    cookiePrefix: "lemru",
     database: {
       joins: true,
     },

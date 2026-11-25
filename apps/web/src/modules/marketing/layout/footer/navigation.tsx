@@ -11,31 +11,6 @@ import { TurboLink } from "~/modules/common/turbo-link";
 
 const links = [
   {
-    label: "common:product",
-    items: [
-      {
-        title: "marketing:product.mobile.ios.title",
-        href: "https://apps.apple.com/app/id6754278899",
-      },
-      {
-        title: "marketing:product.mobile.android.title",
-        href: "https://play.google.com/store/apps/details?id=com.turbostarter.core",
-      },
-      {
-        title: "marketing:product.extension.chrome.title",
-        href: "https://chromewebstore.google.com/detail/bcjmonmlfbnngpkllpnpmnjajaciaboo",
-      },
-      {
-        title: "marketing:product.extension.firefox.title",
-        href: "https://addons.mozilla.org/addon/turbostarter_",
-      },
-      {
-        title: "marketing:product.extension.edge.title",
-        href: "https://microsoftedge.microsoft.com/addons/detail/turbostarter/ianbflanmmoeleokihabnmmcahhfijig",
-      },
-    ],
-  },
-  {
     label: "resources",
     items: [
       {
@@ -43,20 +18,8 @@ const links = [
         href: pathsConfig.marketing.contact,
       },
       {
-        title: "marketing:roadmap.title",
-        href: "https://github.com/orgs/turbostarter/projects/1",
-      },
-      {
-        title: "marketing:docs.title",
-        href: "https://www.turbostarter.dev/docs/web",
-      },
-      {
-        title: "marketing:cta.buy.button",
-        href: "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
-      },
-      {
-        title: "marketing:api.title",
-        href: "#",
+        title: "marketing:models.label",
+        href: pathsConfig.marketing.models.index,
       },
     ],
   },

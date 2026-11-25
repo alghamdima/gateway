@@ -20,32 +20,24 @@ import {
 
 const questions = [
   {
-    question: "faq.question.whatDoesOurPlatformDo.question",
-    answer: "faq.question.whatDoesOurPlatformDo.answer",
+    question: "faq.question.whatIsIt.question",
+    answer: "faq.question.whatIsIt.answer",
   },
   {
-    question: "faq.question.howWillThisBenefitMyBusiness.question",
-    answer: "faq.question.howWillThisBenefitMyBusiness.answer",
+    question: "faq.question.billing.question",
+    answer: "faq.question.billing.answer",
   },
   {
-    question: "faq.question.isMyDataSafe.question",
-    answer: "faq.question.isMyDataSafe.answer",
+    question: "faq.question.compatibility.question",
+    answer: "faq.question.compatibility.answer",
   },
   {
-    question: "faq.question.whatKindOfIntegrationsAreAvailable.question",
-    answer: "faq.question.whatKindOfIntegrationsAreAvailable.answer",
+    question: "faq.question.dataLocation.question",
+    answer: "faq.question.dataLocation.answer",
   },
   {
-    question: "faq.question.howEasyIsItToOnboardMyTeam.question",
-    answer: "faq.question.howEasyIsItToOnboardMyTeam.answer",
-  },
-  {
-    question: "faq.question.whatTypesOfBusinessesCanUseThis.question",
-    answer: "faq.question.whatTypesOfBusinessesCanUseThis.answer",
-  },
-  {
-    question: "faq.question.canICustomizeThisToFitMyBusinessNeeds.question",
-    answer: "faq.question.canICustomizeThisToFitMyBusinessNeeds.answer",
+    question: "faq.question.evidence.question",
+    answer: "faq.question.evidence.answer",
   },
 ] as const;
 

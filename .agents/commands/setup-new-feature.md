@@ -1,6 +1,6 @@
 # Setup New Feature
 
-Set up a new feature in the Turbostarter monorepo following project conventions.
+Set up a new feature in the Lemru monorepo following project conventions.
 
 ## Before starting
 

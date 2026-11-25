@@ -22,10 +22,18 @@
       "title": "Has sido invitado a unirte a una organización",
       "description": "Inicia sesión o crea una cuenta para aceptar la invitación y unirte a la organización."
     },
-    "resend": { "success": "¡Invitación reenviada exitosamente!" },
-    "cancel": { "success": "¡Invitación cancelada exitosamente!" },
-    "accept": { "success": "¡Ahora eres miembro de {{organization}}!" },
-    "reject": { "success": "Has rechazado unirte a {{organization}}." },
+    "resend": {
+      "success": "¡Invitación reenviada exitosamente!"
+    },
+    "cancel": {
+      "success": "¡Invitación cancelada exitosamente!"
+    },
+    "accept": {
+      "success": "¡Ahora eres miembro de {{organization}}!"
+    },
+    "reject": {
+      "success": "Has rechazado unirte a {{organization}}."
+    },
     "expired": {
       "title": "Invitación no encontrada o expirada",
       "description": "La invitación que estás buscando está expirada o no existe. Contacta al propietario de la organización para renovar la invitación.",
@@ -45,7 +53,7 @@
     },
     "invitation": {
       "title": "Unirse a {{organizationName}}",
-      "description": "<bold>{{inviterEmail}}</bold> te ha invitado a unirte a <bold>{{organizationName}}</bold> en TurboStarter.",
+      "description": "<bold>{{inviterEmail}}</bold> te ha invitado a unirte a <bold>{{organizationName}}</bold> en Lemru.",
       "skip": "Ir al panel"
     },
     "user": {
@@ -75,8 +83,8 @@
       "success_other": "¡Miembros invitados exitosamente!",
       "email": {
         "subject": "Has sido invitado a unirte a una organización",
-        "preview": "Únete a {{inviter}} en TurboStarter",
-        "body": "<bold>{{inviter}}</bold> te ha invitado a unirte a <bold>{{organization}}</bold> en TurboStarter.",
+        "preview": "Únete a {{inviter}} en Lemru",
+        "body": "<bold>{{inviter}}</bold> te ha invitado a unirte a <bold>{{organization}}</bold> en Lemru.",
         "or": "O, copia y pega este enlace en tu navegador:",
         "cta": "Unirse a {{organization}}",
         "disclaimer": "Si no esperabas esta invitación, no te preocupes, puedes ignorar este correo."
@@ -90,7 +98,9 @@
         "success": "¡Rol del miembro actualizado exitosamente!"
       }
     },
-    "remove": { "success": "¡Miembro eliminado exitosamente!" }
+    "remove": {
+      "success": "¡Miembro eliminado exitosamente!"
+    }
   },
   "name": {
     "edit": {
@@ -121,7 +131,7 @@
   },
   "delete": {
     "title": "Eliminar organización",
-    "description": "Elimina permanentemente esta organización y todo su contenido de la plataforma TurboStarter. Esta acción no es reversible.",
+    "description": "Elimina permanentemente esta organización y todo su contenido de la plataforma Lemru. Esta acción no es reversible.",
     "cta": "Eliminar organización",
     "disclaimer": "Estás a punto de eliminar esta organización. \n\nDespués, todos los datos (incluidos miembros y equipos) serán eliminados permanentemente y no podrán recuperarse. \n\n¿Deseas continuar?",
     "success": "¡Organización eliminada exitosamente!",

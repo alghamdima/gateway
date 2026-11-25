@@ -55,7 +55,7 @@ const CF_TURBO_TASKS = {
 export function createCloudflareGenerator(plop: PlopTypes.NodePlopAPI): void {
   const rootEnv = loadRootEnvironmentVariables();
   const defaultWorkerName = slugify(
-    rootEnv.PRODUCT_NAME ?? rootEnv.NEXT_PUBLIC_PRODUCT_NAME ?? "turbostarter",
+    rootEnv.PRODUCT_NAME ?? rootEnv.NEXT_PUBLIC_PRODUCT_NAME ?? "lemru",
   );
 
   plop.setGenerator("cloudflare", {
@@ -66,13 +66,13 @@ export function createCloudflareGenerator(plop: PlopTypes.NodePlopAPI): void {
         type: "input",
         name: "workerName",
         message: "Cloudflare Worker name:",
-        default: defaultWorkerName || "turbostarter",
+        default: defaultWorkerName || "lemru",
       },
       {
         type: "input",
         name: "r2BucketName",
         message: "R2 bucket name for Next.js incremental cache:",
-        default: defaultWorkerName || "turbostarter",
+        default: defaultWorkerName || "lemru",
       },
       {
         type: "input",
@@ -87,7 +87,7 @@ export function createCloudflareGenerator(plop: PlopTypes.NodePlopAPI): void {
         message: "Local Postgres URL for Hyperdrive preview/dev:",
         default:
           rootEnv.DATABASE_URL ??
-          "postgresql://turbostarter:turbostarter@localhost:5432/core",
+          "postgresql://lemru:lemru@localhost:5432/core",
       },
       {
         type: "input",
@@ -106,7 +106,7 @@ export function createCloudflareGenerator(plop: PlopTypes.NodePlopAPI): void {
       (answers) => {
         const { workerName, r2BucketName } = answers as CloudflareAnswers;
 
-        answers.workerName = slugify(workerName) || "turbostarter";
+        answers.workerName = slugify(workerName) || "lemru";
         answers.r2BucketName = slugify(r2BucketName) || answers.workerName;
 
         return "Sanitized Cloudflare generator inputs";

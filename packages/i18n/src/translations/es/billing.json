@@ -2,8 +2,7 @@
   "pricing": {
     "label": "Precios",
     "title": "Planifica tu ingreso con precios ajustados",
-    "description": "Configura precios basados en tus necesidades y comienza a cobrar a tus clientes.",
-    "disclaimer": "Combina y ajusta configuraciones para crear el precio perfecto para tu negocio. <reference>Revisa la documentación para más información.</reference>"
+    "description": "Configura precios basados en tus necesidades y comienza a cobrar a tus clientes."
   },
   "settings": {
     "subscriptions": {

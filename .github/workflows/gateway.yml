@@ -37,13 +37,13 @@ jobs:
       postgres:
         image: postgres:18-alpine
         env:
-          POSTGRES_USER: turbostarter
-          POSTGRES_PASSWORD: turbostarter
+          POSTGRES_USER: lemru
+          POSTGRES_PASSWORD: lemru
           POSTGRES_DB: core
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U turbostarter -d core"
+          --health-cmd "pg_isready -U lemru -d core"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -95,7 +95,7 @@ jobs:
         working-directory: apps/gateway/plugins/credits
         run: CREDITS_E2E_BINARY=$(ls "$GITHUB_WORKSPACE"/apps/gateway/tmp/*-http) go test -count=1 -race ./...
         env:
-          CREDITS_TEST_DATABASE_URL: postgresql://turbostarter:turbostarter@localhost:5432/core
+          CREDITS_TEST_DATABASE_URL: postgresql://lemru:lemru@localhost:5432/core
 
       - name: 🔎 Vet
         run: |

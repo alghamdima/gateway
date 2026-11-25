@@ -1,154 +1,81 @@
 {
   "home": {
     "seo": {
-      "title": "TurboStarter - lanza tu SaaS más rápido con un kit de inicio full-stack"
+      "title": "Lemru: una API para modelos de IA, con control sobre tus datos"
     }
   },
   "product": {
-    "title": "Esta podría ser tu propia startup de 1 millón de dólares",
-    "description": "Una aplicación TurboStarter totalmente personalizable. Sustituye tu contenido y lanza tu producto más rápido que nunca.",
-    "mobile": {
-      "ios": {
-        "title": "App para iOS",
-        "description": "Experiencia nativa en iPhone y iPad"
-      },
-      "android": {
-        "title": "App para Android",
-        "description": "Optimizada para teléfonos Android"
-      }
-    },
-    "extension": {
-      "chrome": {
-        "title": "Extensión de Chrome",
-        "description": "Integración con el navegador Chrome"
-      },
-      "firefox": {
-        "title": "Complemento de Firefox",
-        "description": "Navegación mejorada para usuarios de Firefox"
-      },
-      "edge": {
-        "title": "Complemento de Edge",
-        "description": "Herramientas potentes para Microsoft Edge"
-      }
-    }
+    "title": "Una API para todos los modelos de IA, con tus datos bajo tus reglas",
+    "description": "Lemru pone muchos modelos de IA detrás de una API compatible con OpenAI. Paga con créditos prepagados y decide adónde pueden ir tus datos: en qué regiones, cuánto tiempo se pueden conservar y si se pueden usar para entrenamiento."
   },
-
-  "announcement": "Aquí va el anuncio de tu próxima función",
-  "shippedWith": "Incluye herramientas listas para producción",
   "cta": {
     "question": "¿Listo para empezar?",
     "button": "Empieza gratis",
-    "buy": {
-      "question": "¿Listo para empezar?",
-      "description": "Compra para desbloquear el acceso completo a la base de código y empieza a lanzar tu producto hoy mismo. En todas las plataformas.",
-      "button": "Obtén acceso",
-      "join": {
-        "description": "Únete a otros fundadores que personalizan TurboStarter, comparte tácticas de lanzamiento y mantente al tanto de las novedades.",
-        "button": "Únete a la comunidad"
-      }
-    }
+    "models": "Ver modelos"
   },
-  "editToReload": "Edita <code>{{file}}</code> y guarda para recargar.",
   "workInProgress": {
     "title": "¡Estamos trabajando en ello!",
     "description": "Actualmente {{feature}} no está disponible. Estamos trabajando en ello y estará disponible pronto."
   },
-
   "features": {
-    "label": "Características",
-    "title": "Convierte a los visitantes en clientes",
-    "description": "Todo lo que necesitas para crear, desplegar y escalar tus aplicaciones con confianza.",
+    "label": "Qué obtienes",
+    "title": "Una clave, muchos modelos, tus reglas",
+    "description": "Todo lo que necesitas para llamar a modelos de IA desde tu producto y saber adónde fue cada solicitud.",
     "feature": {
-      "core": {
-        "title": "Base fundamental",
-        "description": "Autenticación, base de datos y API ya conectadas para que puedas enfocarte en aportar valor a tus clientes."
+      "oneApi": {
+        "title": "Una API, muchos modelos",
+        "description": "Llama a modelos de distintos proveedores a través de un único endpoint compatible con OpenAI, con una sola clave."
       },
-      "ai": {
-        "title": "Capacidades impulsadas por IA",
-        "description": "Funciones inteligentes con recomendaciones y flujos de trabajo automatizados impulsados por IA."
+      "credits": {
+        "title": "Créditos prepagados",
+        "description": "Recarga y paga solo por lo que usas. Sin suscripción, y el precio de cada modelo es público."
       },
-      "mobile": {
-        "title": "Experiencia móvil nativa",
-        "description": "Aplicación móvil completamente equipada con sincronización perfecta en todos tus dispositivos."
+      "dataPolicy": {
+        "title": "Tu política de datos",
+        "description": "Elige las regiones en las que se pueden procesar tus solicitudes, el tiempo máximo que un proveedor puede conservarlas y si se permite entrenar con ellas. Una solicitud que ningún proveedor puede atender bajo tu política se rechaza, no se envía a otro lugar."
       },
-      "extension": {
-        "title": "Extensión de navegador",
-        "description": "Mantén a los usuarios comprometidos en su navegador con accesos directos personalizables a tu producto."
+      "evidence": {
+        "title": "Un registro por cada solicitud",
+        "description": "Cada solicitud registra dónde se procesó y las condiciones del proveedor vigentes en ese momento, para que puedas demostrarlo después."
+      },
+      "keys": {
+        "title": "Claves con límites",
+        "description": "Crea una clave por aplicación o compañero, ponle un límite de gasto y desactívala cuando quieras."
+      },
+      "usage": {
+        "title": "Uso que se entiende",
+        "description": "Consulta cada solicitud con su modelo, sus tokens y su coste."
       }
     }
   },
-
-  "testimonials": {
-    "label": "Testimonios",
-    "title": "Los equipos lanzan más rápido con nosotros",
-    "description": "Conoce a fundadores y desarrolladores que personalizaron el starter para lanzar antes y convertir mejor.",
-    "rating": "{{rating}} de {{count}}+ reseñas",
-    "reviews": {
-      "jack": {
-        "name": "Jack",
-        "position": "Desarrollador Full Stack",
-        "body": "El starter liberó a nuestro equipo del trabajo repetitivo. Sustituimos el copy en un fin de semana y nos concentramos en las funciones que los clientes realmente querían."
-      },
-      "jill": {
-        "name": "Jill",
-        "position": "Fundadora de startup",
-        "body": "Lanzamos nuestro MVP en dos semanas. Todo, desde las páginas de marketing hasta la autenticación, estaba listo; solo reescribimos el copy para nuestra audiencia."
-      },
-      "john": {
-        "name": "John",
-        "position": "Desarrollador senior",
-        "body": "La experiencia de desarrollador es incomparable. El stack funciona desde el primer momento y se mantiene lo suficientemente flexible como para adaptarse a la narrativa de nuestro producto."
-      },
-      "sarah": {
-        "name": "Sarah",
-        "position": "Product Manager",
-        "body": "Escalamos del prototipo a miles de usuarios sin complicaciones. La analítica, la facturación y los flujos de marketing estaban listos para personalizar."
-      },
-      "mike": {
-        "name": "Mike",
-        "position": "Líder de ingeniería",
-        "body": "La comunidad es excelente. Respuestas rápidas, feedback para los lanzamientos y mejoras constantes mantienen a nuestro equipo avanzando."
-      }
-    }
-  },
-
   "faq": {
     "label": "Preguntas frecuentes",
-    "title": "¿Tienes una pregunta? Tenemos respuestas",
-    "description": "Encuentra respuestas a preguntas frecuentes sobre funciones, precios, implementación y cómo empezar con nuestra plataforma.",
+    "title": "Preguntas y respuestas",
+    "description": "La versión corta de cómo funciona Lemru.",
     "cta": "Contáctanos",
     "question": {
-      "whatDoesOurPlatformDo": {
-        "question": "¿Qué hace nuestra plataforma?",
-        "answer": "TurboStarter te ofrece una base SaaS full-stack: sitio de marketing, aplicación web, apps móviles y extensiones, para que puedas enfocarte en la experiencia única de tus clientes."
+      "whatIsIt": {
+        "question": "¿Qué es Lemru?",
+        "answer": "Una API delante de muchos modelos de IA. Creas una clave, añades créditos y llamas a cualquier modelo del catálogo con el mismo formato de solicitud."
       },
-      "howWillThisBenefitMyBusiness": {
-        "question": "¿Cómo beneficiará esto a mi negocio?",
-        "answer": "Lanzas más rápido, entregas funciones antes y conviertes más leads porque el producto base, la analítica y los flujos de facturación ya están listos."
+      "billing": {
+        "question": "¿Cómo funciona la facturación?",
+        "answer": "Compras créditos por adelantado y cada solicitud se cobra al precio publicado del modelo que usó. No hay suscripción."
       },
-      "isMyDataSafe": {
-        "question": "¿Mis datos están seguros?",
-        "answer": "Sí. Seguimos prácticas de seguridad de nivel empresarial y ofrecemos salvaguardas para que adaptes las políticas a los requisitos de tu industria."
+      "compatibility": {
+        "question": "¿Funciona con el SDK de OpenAI?",
+        "answer": "Sí. Apunta la URL base del SDK a Lemru y usa tu clave de Lemru."
       },
-      "whatKindOfIntegrationsAreAvailable": {
-        "question": "¿Qué tipo de integraciones están disponibles?",
-        "answer": "TurboStarter incluye desde el inicio integraciones SaaS populares, y su arquitectura modular facilita añadir tu propio stack."
+      "dataLocation": {
+        "question": "¿Adónde van mis datos?",
+        "answer": "Solo adonde tu política de datos lo permite. Tú eliges las regiones, el límite de conservación y si se permite el entrenamiento, y una solicitud que ningún proveedor puede atender bajo esas reglas se rechaza."
       },
-      "howEasyIsItToOnboardMyTeam": {
-        "question": "¿Qué tan fácil es incorporar a mi equipo?",
-        "answer": "Tu equipo puede incorporarse rápidamente con documentación clara, patrones TypeScript-first y ejemplos que muestran exactamente dónde personalizar."
-      },
-      "whatTypesOfBusinessesCanUseThis": {
-        "question": "¿Qué tipos de empresas pueden usar esto?",
-        "answer": "Desde fundadores individuales hasta equipos de innovación empresarial, TurboStarter se adapta a cualquier caso de uso SaaS que necesite una ventaja inicial."
-      },
-      "canICustomizeThisToFitMyBusinessNeeds": {
-        "question": "¿Puedo personalizar esto para adaptarlo a las necesidades de mi negocio?",
-        "answer": "Por supuesto. Cada módulo está diseñado para personalizarse rápidamente: actualiza el copy, cambia componentes y amplía la lógica sin pelearte con el framework."
+      "evidence": {
+        "question": "¿Puedo demostrar dónde se procesó una solicitud?",
+        "answer": "Sí. Cada solicitud de tu actividad muestra dónde se procesó y las condiciones del proveedor vigentes en ese momento."
       }
     }
   },
-
   "models": {
     "label": "Modelos",
     "title": "Modelos",
@@ -208,7 +135,6 @@
       "body": "Nuevo envío del formulario de contacto"
     }
   },
-
   "blog": {
     "label": "Blog",
     "title": "Noticias y actualizaciones sobre la plataforma",
@@ -224,30 +150,8 @@
       "launch": "lanzamiento"
     }
   },
-
-  "api": {
-    "title": "Referencia de API",
-    "description": "Crea integraciones con nuestra API"
-  },
-  "mcp": {
-    "title": "Servidor MCP",
-    "description": "Conecta a tu LLM favorito"
-  },
-  "roadmap": {
-    "title": "Hoja de ruta",
-    "description": "Descubre lo que viene después"
-  },
-
-  "docs": {
-    "title": "Documentación",
-    "description": "Aprende a usar TurboStarter"
-  },
-  "sourceCode": {
-    "title": "Código fuente",
-    "description": "Personaliza y lanza tu producto"
-  },
   "ai": {
-    "description": "Libera productividad e innovación con el asistente de IA de TurboStarter. Obtén respuestas al instante, automatiza tareas y potencia tu flujo de trabajo con inteligencia artificial avanzada, segura, confiable y diseñada para equipos modernos.",
+    "description": "Hazle una pregunta al asistente.",
     "prompt": {
       "history": "Cuenta la historia de internet",
       "capitals": "Hazme un cuestionario sobre las capitales del mundo",
@@ -302,17 +206,11 @@
       "description": "La actualización está siendo instalada. Por favor, espera un momento."
     }
   },
-  "buyCta": {
-    "title": "Esta aplicación puede ser tuya.",
-    "description": "Personaliza, despliega y empieza a ganar $$$ en minutos.",
-    "link": "Obtén TurboStarter"
-  },
   "waitlist": {
     "label": "Lista de espera",
-    "description": "Recopila emails antes del lanzamiento oficial",
+    "description": "Te avisamos cuando lancemos",
     "title": "Recibe una notificación cuando lancemos",
-    "subtitle": "Conduce interés, recopila emails y construye impulso antes de tu lanzamiento",
-    "proof": "No estás solo, <highlight>1,500+</highlight> personas se han unido!",
+    "subtitle": "Déjanos tu correo y te avisaremos cuando Lemru abra.",
     "submit": "Avísame",
     "success": {
       "title": "¡Estás en la lista!",
@@ -320,24 +218,26 @@
       "cta": "¡Nos vemos!"
     }
   },
-  "newsletter": {
-    "label": "Newsletter",
-    "title": "Mantente al día",
-    "subtitle": "Actualizaciones del producto, consejos de lanzamiento y consejos prácticos — directo a tu bandeja de entrada",
-    "submit": "Suscribirse",
-    "success": {
-      "title": "¡Estás suscrito!",
-      "description": "Gracias por unirte. Te mantendremos informado.",
-      "cta": "¡Listo!"
-    }
-  },
   "status": {
     "operational": "Todos los sistemas en funcionamiento",
     "degraded": "Sistemas degradados"
   },
-  "featureFlags": {
-    "demo": {
-      "banner": "Feature flag \"{{flag}}\" está activado"
+  "pricing": {
+    "title": "Paga por lo que usas",
+    "description": "Sin suscripción ni planes. Añades créditos y cada solicitud se cobra al precio del modelo que usó.",
+    "point": {
+      "perModel": {
+        "title": "Precio por modelo",
+        "description": "Cada modelo tiene un precio público por millón de tokens, el mismo que informa la API."
+      },
+      "prepaid": {
+        "title": "Créditos prepagados",
+        "description": "Añade créditos cuando los necesites. Las solicitudes se detienen cuando se agota el saldo, así que no hay facturas sorpresa."
+      },
+      "fee": {
+        "title": "Comisiones visibles antes de pagar",
+        "description": "Si una recarga lleva comisión, la ves antes de confirmar el pago."
+      }
     }
   }
 }

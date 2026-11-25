@@ -15,41 +15,6 @@ import type { Session } from "~/lib/auth/client";
 
 const links = [
   {
-    label: "product",
-    items: [
-      {
-        title: "marketing:product.mobile.ios.title",
-        description: "marketing:product.mobile.ios.description",
-        href: "https://apps.apple.com/app/id6754278899",
-        icon: Icons.AppleStroke,
-      },
-      {
-        title: "marketing:product.mobile.android.title",
-        description: "marketing:product.mobile.android.description",
-        href: "https://play.google.com/store/apps/details?id=com.turbostarter.core",
-        icon: Icons.AndroidStroke,
-      },
-      {
-        title: "marketing:product.extension.chrome.title",
-        description: "marketing:product.extension.chrome.description",
-        href: "https://chromewebstore.google.com/detail/bcjmonmlfbnngpkllpnpmnjajaciaboo",
-        icon: Icons.ChromeStroke,
-      },
-      {
-        title: "marketing:product.extension.firefox.title",
-        description: "marketing:product.extension.firefox.description",
-        href: "https://addons.mozilla.org/addon/turbostarter_",
-        icon: Icons.FirefoxStroke,
-      },
-      {
-        title: "marketing:product.extension.edge.title",
-        description: "marketing:product.extension.edge.description",
-        href: "https://microsoftedge.microsoft.com/addons/detail/turbostarter/ianbflanmmoeleokihabnmmcahhfijig",
-        icon: Icons.EdgeStroke,
-      },
-    ],
-  },
-  {
     label: "resources",
     items: [
       {
@@ -57,36 +22,6 @@ const links = [
         description: "marketing:contact.description",
         href: pathsConfig.marketing.contact,
         icon: Icons.SendHorizontal,
-      },
-      {
-        title: "marketing:roadmap.title",
-        description: "marketing:roadmap.description",
-        href: "https://github.com/orgs/turbostarter/projects/1",
-        icon: Icons.ChartNoAxesGantt,
-      },
-      {
-        title: "marketing:docs.title",
-        description: "marketing:docs.description",
-        href: "https://www.turbostarter.dev/docs/web",
-        icon: Icons.BookOpen,
-      },
-      {
-        title: "marketing:api.title",
-        description: "marketing:api.description",
-        href: "https://www.turbostarter.dev/docs/web/api/openapi",
-        icon: Icons.Webhook,
-      },
-      {
-        title: "marketing:mcp.title",
-        description: "marketing:mcp.description",
-        href: "https://www.turbostarter.dev/docs/web/installation/mcp",
-        icon: Icons.Plug,
-      },
-      {
-        title: "marketing:sourceCode.title",
-        description: "marketing:sourceCode.description",
-        href: "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
-        icon: Icons.Code,
       },
       {
         title: "marketing:waitlist.label",

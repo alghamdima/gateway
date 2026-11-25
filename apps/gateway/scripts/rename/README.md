@@ -1,6 +1,6 @@
 # rename
 
-Rewrites an imported upstream gateway tree to the owner's brand (PLAN.md Step 2.1, ADR 0008). Nothing in the committed tree has been renamed yet: no brand is chosen. `brand.example.json` holds placeholder values used only to test the tool.
+Rewrites an imported upstream gateway tree to the owner's brand (PLAN.md Step 2.1, ADR 0008). Nothing in the committed tree has been renamed yet. The owner chose the name **Lemru** and the prefix `lm` on 2026-11-25; the rename waits on a domain, which the tool requires to resolve in DNS (see Acceptance). `brand.example.json` holds placeholder values used only to test the tool.
 
 ```sh
 cd apps/gateway/scripts/rename

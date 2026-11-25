@@ -1,9 +1,9 @@
-<div align="center">
+# Lemru
 
-# TurboStarter
+One API for many AI models, with prepaid credits and control over where your data goes.
 
-Ship your startup everywhere. In minutes.
+This monorepo holds the control plane (`apps/web`, `packages/*`: sign-up, organizations, credits, API keys, usage, data policy) and the gateway that serves the API (`apps/gateway`).
 
-[📚 Documentation](https://www.turbostarter.dev/docs/web)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[💬 Discord](https://discord.gg/KjpK2uk3JP)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[🚀 Demo](https://www.demo.turbostarter.dev)
-
-</div>
+- Plan, architecture and decisions: `docs/platform/` (`PLAN.md`, `ARCHITECTURE.md`, `adr/`).
+- Commands and conventions: `AGENTS.md`.
+- Licenses: `LICENSE.md` for the SaaS template the control plane is built on; `apps/gateway/LICENSE`, `NOTICE` and `THIRD_PARTY_NOTICES.md` for the gateway.

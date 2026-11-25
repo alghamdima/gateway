@@ -1,10 +1,3 @@
-import { Trans } from "@workspace/i18n";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarImage,
-} from "@workspace/ui-web/components/avatar";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { pathsConfig } from "~/config/paths";
@@ -13,29 +6,6 @@ import { getMetadata } from "~/lib/metadata";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { WaitlistForm } from "~/modules/marketing/waitlist/form";
 import { WaitlistGradient } from "~/modules/marketing/waitlist/gradient";
-
-const socials = [
-  {
-    id: "x",
-    href: "https://x.com/turbostarter_",
-    icon: Icons.Twitter,
-  },
-  {
-    id: "linkedin",
-    href: "#",
-    icon: Icons.Linkedin,
-  },
-  {
-    id: "facebook",
-    href: "#",
-    icon: Icons.Facebook,
-  },
-  {
-    id: "discord",
-    href: "https://discord.gg/KjpK2uk3JP",
-    icon: Icons.Discord,
-  },
-] as const;
 
 export const generateMetadata = getMetadata({
   title: "marketing:waitlist.label",
@@ -68,47 +38,9 @@ export default async function WaitlistPage() {
         </div>
 
         <WaitlistForm />
-
-        <div className="flex flex-col items-center gap-2">
-          <AvatarGroup className="animate-fade-in -space-x-3 opacity-0 [--animation-delay:250ms] *:data-[slot=avatar]:ring-0">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <Avatar key={index} className="size-10 md:size-12">
-                <AvatarImage
-                  src={`https://randomuser.me/api/portraits/men/${index}.jpg`}
-                />
-                <AvatarFallback>
-                  <Icons.UserRound className="size-5 md:size-7" />
-                </AvatarFallback>
-              </Avatar>
-            ))}
-          </AvatarGroup>
-
-          <span className="text-muted-foreground animate-fade-in text-sm font-medium tracking-tight opacity-0 [--animation-delay:300ms]">
-            <Trans
-              t={t}
-              i18nKey="waitlist.proof"
-              components={{
-                highlight: <span className="text-foreground font-semibold" />,
-              }}
-            />
-          </span>
-        </div>
       </div>
 
-      <footer className="relative z-10 flex gap-5">
-        {socials.map((social) => (
-          <a
-            key={social.id}
-            href={social.href}
-            rel="noopener noreferrer"
-            target="_blank"
-            className="text-background hover:text-background/80 transition-colors"
-            aria-label={social.id}
-          >
-            <social.icon className="size-5" />
-          </a>
-        ))}
-      </footer>
+      <div aria-hidden className="h-8" />
     </main>
   );
 }

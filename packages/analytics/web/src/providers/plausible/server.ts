@@ -23,7 +23,7 @@ export const strategy = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "TurboStarter-Server/1.0 (Server-side tracking)",
+        "User-Agent": "Lemru-Server/1.0 (Server-side tracking)",
         ...(ip && { "X-Forwarded-For": ip }),
       },
       body: JSON.stringify({

@@ -10,7 +10,7 @@ This block is written for Next.js 16.4. Verify patterns against bundled docs whe
 
 <!-- END:nextjs-agent-rules -->
 
-Guide for AI agents working on the Turbostarter monorepo.
+Guide for AI agents working on the Lemru monorepo.
 
 ## Agent rules
 

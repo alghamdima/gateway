@@ -1,4 +1,3 @@
-import { BuiltWith } from "@workspace/ui-web/built-with";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { appConfig } from "~/config/app";
@@ -8,30 +7,6 @@ import { I18nControls } from "~/modules/common/i18n/controls";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { FooterNavigation } from "~/modules/marketing/layout/footer/navigation";
 import { StatusIndicator } from "~/modules/marketing/layout/status-indicator";
-
-const socials = [
-  {
-    id: "x",
-    href: "https://x.com/turbostarter_",
-    icon: Icons.Twitter,
-  },
-  {
-    id: "github",
-    href: "https://github.com/turbostarter",
-    icon: Icons.Github,
-  },
-
-  {
-    id: "facebook",
-    href: "#",
-    icon: Icons.Facebook,
-  },
-  {
-    id: "linkedin",
-    href: "#",
-    icon: Icons.Linkedin,
-  },
-];
 
 export const Footer = async () => {
   const { t } = await getTranslation({
@@ -57,21 +32,6 @@ export const Footer = async () => {
             </p>
 
             <I18nControls />
-
-            <div className="mt-2 flex items-center gap-2.5">
-              {socials.map((social) => (
-                <a
-                  key={social.id}
-                  href={social.href}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={social.id}
-                >
-                  <social.icon className="size-7" />
-                </a>
-              ))}
-            </div>
           </div>
 
           <FooterNavigation />
@@ -88,7 +48,6 @@ export const Footer = async () => {
             </div>
 
             <div className="flex flex-col items-center gap-1 sm:items-end">
-              <BuiltWith />
               <p className="text-muted-foreground text-xs sm:pr-0.5">
                 {`v${appConfig.version}`}
               </p>

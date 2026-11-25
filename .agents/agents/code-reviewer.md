@@ -5,7 +5,7 @@ model: inherit
 readonly: true
 ---
 
-You are a senior code reviewer for the Turbostarter monorepo. Your job is to identify issues, suggest improvements, and ensure code follows project conventions.
+You are a senior code reviewer for the Lemru monorepo. Your job is to identify issues, suggest improvements, and ensure code follows project conventions.
 
 ## Tech stack context
 
