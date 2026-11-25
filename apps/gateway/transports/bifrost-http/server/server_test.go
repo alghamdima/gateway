@@ -44,7 +44,6 @@ import (
 
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/logging"
-	"github.com/maximhq/bifrost/plugins/prompts"
 	"github.com/maximhq/bifrost/plugins/routing"
 	"github.com/maximhq/bifrost/plugins/routing/complexity"
 	"github.com/maximhq/bifrost/plugins/routing/rules"
@@ -1703,10 +1702,10 @@ func TestReloadProxyConfigAcceptsRemoval(t *testing.T) {
 	}
 }
 
-// ctxSensitivePromptStore fails any read whose context is already cancelled. That is how
-// a test observes the context ReloadPlugin handed the plugin constructor: prompts.Init
-// calls loadCache(ctx) and returns its error.
-type ctxSensitivePromptStore struct {
+// ctxRecordingStore records the context of the first read a plugin constructor makes. That is
+// how a test observes the context ReloadPlugin handed the constructor: governance.Init loads
+// its store from the database, customers first, and returns the read's error.
+type ctxRecordingStore struct {
 	configstore.ConfigStore
 	gotCtx context.Context
 }
@@ -1715,13 +1714,9 @@ type ctxSensitivePromptStore struct {
 // Bifrost client, so the test can inspect the context the constructor was given.
 var errStopAfterInstantiation = errors.New("stop after instantiation")
 
-func (s *ctxSensitivePromptStore) GetPrompts(ctx context.Context, _ *string) ([]configstoreTables.TablePrompt, error) {
+func (s *ctxRecordingStore) GetCustomers(ctx context.Context) ([]configstoreTables.TableCustomer, error) {
 	s.gotCtx = ctx
 	return nil, errStopAfterInstantiation
-}
-
-func (s *ctxSensitivePromptStore) GetAllPromptVersions(ctx context.Context) ([]configstoreTables.TablePromptVersion, error) {
-	return nil, ctx.Err()
 }
 
 // A plugin outlives the request that loaded it, so ReloadPlugin must hand its constructor
@@ -1736,14 +1731,14 @@ func TestReloadPluginGivesTheConstructorTheServerContext(t *testing.T) {
 	)
 	defer cancelServer()
 
-	store := &ctxSensitivePromptStore{}
+	store := &ctxRecordingStore{}
 	s := &BifrostHTTPServer{Ctx: serverCtx, Config: &lib.Config{ConfigStore: store}}
 
 	// The admin reload request is already over by the time the constructor runs.
 	reloadReqCtx, cancelRequest := context.WithCancel(context.Background())
 	cancelRequest()
 
-	err := s.ReloadPlugin(reloadReqCtx, prompts.PluginName, nil, nil, nil, nil)
+	err := s.ReloadPlugin(reloadReqCtx, governance.PluginName, nil, map[string]any{}, nil, nil)
 
 	if store.gotCtx == nil {
 		t.Fatal("the plugin constructor never reached the store")

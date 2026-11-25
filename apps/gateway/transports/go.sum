@@ -345,8 +345,6 @@ github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.18 h1:V+u7eNFueV1jO
 github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.18/go.mod h1:JykusnWdYMk3nXK5bYnfCJHcyHzyEB46HfAeu32i/sU=
 github.com/maximhq/bifrost/plugins/otel v1.6.8 h1:CPPCJMCyX1/uXsx8DsLo3omN0zQKk9KsJp3nEE17GpI=
 github.com/maximhq/bifrost/plugins/otel v1.6.8/go.mod h1:oQMY8rDYIWIalFWJ6pY0UtoxYJRLRRvTze8L3TUecy0=
-github.com/maximhq/bifrost/plugins/prompts v1.1.18 h1:RYYMSYH/p1cDd5aisfaCm03FFTHxRBO+mG3SDHxtSS4=
-github.com/maximhq/bifrost/plugins/prompts v1.1.18/go.mod h1:UlouLcsEbnT6jLMXEFzq9lOvR9A6lVMoUNQ5i7vwI4w=
 github.com/maximhq/bifrost/plugins/routing v1.4.0 h1:en5EnWQVkwL0pf/ufBt9/spYhJBFsYn4rub/QT7WohA=
 github.com/maximhq/bifrost/plugins/routing v1.4.0/go.mod h1:LxbezgWlRMJYwJwaUlNVYuCqvIylM4RnSs9kmkRH+Ok=
 github.com/maximhq/bifrost/plugins/semanticcache v1.7.8 h1:ZSx+g8aSPosyGKNtr6o1QGjYI9bzePlJA1qFDhB3sLM=

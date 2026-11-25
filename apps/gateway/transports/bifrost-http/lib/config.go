@@ -55,7 +55,6 @@ import (
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/otel"
-	"github.com/maximhq/bifrost/plugins/prompts"
 	"github.com/maximhq/bifrost/plugins/routing"
 	"github.com/maximhq/bifrost/plugins/routing/complexity"
 	"github.com/maximhq/bifrost/plugins/routing/rules"
@@ -144,7 +143,6 @@ func getWeight(w *float64) float64 {
 // It is the single source of truth — update here when adding or removing a built-in plugin.
 var builtinPluginNames = []string{
 	telemetry.PluginName,
-	prompts.PluginName,
 	logging.PluginName,
 	governance.PluginName,
 	otel.PluginName,

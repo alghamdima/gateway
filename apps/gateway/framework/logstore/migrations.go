@@ -286,7 +286,6 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_has_object_column"}, run: migrationAddHasObjectColumn},
 	{IDs: []string{"mcp_tool_logs_add_has_object_column"}, run: migrationAddHasObjectColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_attempt_trail_column"}, run: migrationAddAttemptTrailColumn},
-	{IDs: []string{"logs_add_selected_prompt_columns"}, run: migrationAddSelectedPromptColumns},
 	{IDs: []string{"logs_add_user_name_column"}, run: migrationAddUserNameColumn},
 	{IDs: []string{"logs_add_ocr_input_column"}, run: migrationAddOCRInputColumn},
 	{IDs: []string{"logs_add_stop_reason_column"}, run: migrationAddStopReasonColumn},
@@ -4123,44 +4122,6 @@ func migrationAddAttemptTrailColumn(ctx context.Context, db *gorm.DB, logger sch
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while adding attempt trail column: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddSelectedPromptColumns adds selected_prompt_name, selected_prompt_version, selected_prompt_id for logs UI.
-func migrationAddSelectedPromptColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "logs_add_selected_prompt_columns"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-
-	columns := []string{"selected_prompt_name", "selected_prompt_version", "selected_prompt_id"}
-
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range columns {
-				if err := addColumnIfNotExists(tx, logger, &Log{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range columns {
-				if err := dropColumnIfExists(tx, logger, &Log{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while adding selected prompt columns: %s", err.Error())
 	}
 	return nil
 }

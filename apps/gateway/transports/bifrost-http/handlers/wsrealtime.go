@@ -489,7 +489,7 @@ func (h *WSRealtimeHandler) runRealtimeSession(
 	// Restore governance and routing values from the transport middleware context.
 	// These include routing rule ID/name, virtual key ID/name, routing engines,
 	// routing engine logs, raw-storage header overrides, and other values set by
-	// HTTPTransportPreHook plugins (governance, prompts, etc.).
+	// HTTPTransportPreHook plugins (governance, etc.).
 	applyRealtimeMiddlewareValues(bifrostCtx, middlewareValues)
 	// The middleware values are where the user the upgrade authenticated arrives, after the
 	// session context settled its identity from the headers alone, so it is settled again now

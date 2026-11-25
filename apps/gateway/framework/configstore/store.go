@@ -1049,28 +1049,6 @@ type ConfigStore interface {
 	// Not found retry wrapper
 	RetryOnNotFound(ctx context.Context, fn func(ctx context.Context) (any, error), maxRetries int, retryDelay time.Duration) (any, error)
 
-	// Prompt Repository - Folders
-	GetFolders(ctx context.Context) ([]tables.TableFolder, error)
-	GetFolderByID(ctx context.Context, id string) (*tables.TableFolder, error)
-	CreateFolder(ctx context.Context, folder *tables.TableFolder) error
-	UpdateFolder(ctx context.Context, folder *tables.TableFolder) error
-	DeleteFolder(ctx context.Context, id string) error
-
-	// Prompt Repository - Prompts
-	GetPrompts(ctx context.Context, folderID *string) ([]tables.TablePrompt, error)
-	GetPromptByID(ctx context.Context, id string) (*tables.TablePrompt, error)
-	CreatePrompt(ctx context.Context, prompt *tables.TablePrompt, tx ...*gorm.DB) error
-	UpdatePrompt(ctx context.Context, prompt *tables.TablePrompt) error
-	DeletePrompt(ctx context.Context, id string) error
-
-	// Prompt Repository - Versions
-	GetAllPromptVersions(ctx context.Context) ([]tables.TablePromptVersion, error)
-	GetPromptVersions(ctx context.Context, promptID string) ([]tables.TablePromptVersion, error)
-	GetPromptVersionByID(ctx context.Context, id uint) (*tables.TablePromptVersion, error)
-	GetLatestPromptVersion(ctx context.Context, promptID string) (*tables.TablePromptVersion, error)
-	CreatePromptVersion(ctx context.Context, version *tables.TablePromptVersion) error
-	DeletePromptVersion(ctx context.Context, id uint) error
-
 	// Skills Repository
 	CreateSkill(ctx context.Context, skill *tables.TableSkill, version string, objectStore objectstore.ObjectStore) error
 	GetSkill(ctx context.Context, id string) (*tables.TableSkill, error)
@@ -1087,14 +1065,6 @@ type ConfigStore interface {
 	CreateSkillFileBlob(ctx context.Context, blob *tables.TableSkillFileBlob) error
 	CleanupOrphanSkillFileBlobs(ctx context.Context, force bool) (int64, error)
 	UpdateSkillConfigHash(ctx context.Context, skillID string, configHash string) error
-
-	// Prompt Repository - Sessions
-	GetPromptSessions(ctx context.Context, promptID string) ([]tables.TablePromptSession, error)
-	GetPromptSessionByID(ctx context.Context, id uint) (*tables.TablePromptSession, error)
-	CreatePromptSession(ctx context.Context, session *tables.TablePromptSession) error
-	UpdatePromptSession(ctx context.Context, session *tables.TablePromptSession) error
-	RenamePromptSession(ctx context.Context, id uint, name string) error
-	DeletePromptSession(ctx context.Context, id uint) error
 
 	// Sidekiq - generic durable background jobs
 	CreateSidekiqJob(ctx context.Context, job *tables.TableSidekiqJob) error

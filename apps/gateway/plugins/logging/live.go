@@ -312,7 +312,6 @@ func (p *LoggerPlugin) applyLiveContextFields(ctx *schemas.BifrostContext, entry
 		get(schemas.BifrostContextKeySelectedKeyID), get(schemas.BifrostContextKeySelectedKeyName),
 		get(schemas.BifrostContextKeyGovernanceVirtualKeyID), get(schemas.BifrostContextKeyGovernanceVirtualKeyName),
 		get(schemas.BifrostContextKeyGovernanceRoutingRuleID), get(schemas.BifrostContextKeyGovernanceRoutingRuleName),
-		get(schemas.BifrostContextKeySelectedPromptID), get(schemas.BifrostContextKeySelectedPromptName), get(schemas.BifrostContextKeySelectedPromptVersion),
 		get(schemas.BifrostContextKeyGovernanceTeamID), get(schemas.BifrostContextKeyGovernanceTeamName),
 		get(schemas.BifrostContextKeyGovernanceCustomerID), get(schemas.BifrostContextKeyGovernanceCustomerName),
 		get(schemas.BifrostContextKeyUserID), get(schemas.BifrostContextKeyUserName),

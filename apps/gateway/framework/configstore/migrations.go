@@ -363,7 +363,7 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"rename_truncated_pricing_column"}, run: migrationRenameTruncatedPricingColumn},
 	{IDs: []string{"add_image_quality_pricing_columns"}, run: migrationAddImageQualityPricingColumns},
 	{IDs: []string{"add_routing_targets_table"}, run: migrationAddRoutingTargetsTable},
-	{IDs: []string{"add_prompt_repo_tables", "add_prompt_id_to_prompt_message_tables", "add_model_parameters_table"}, run: migrationAddPromptRepoTables},
+	{IDs: []string{"add_model_parameters_table"}, run: migrationAddModelParametersTable},
 	{IDs: []string{"add_plugin_order_columns"}, run: migrationAddPluginOrderColumns},
 	{IDs: []string{"add_allow_all_keys_to_provider_config"}, run: migrationAddAllowAllKeysToProviderConfig},
 	{IDs: []string{"add_vk_provider_config_blacklisted_models_column"}, run: migrationAddVirtualKeyBlacklistedModelsColumn},
@@ -381,7 +381,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_replicate_key_config_column"}, run: migrationAddReplicateKeyConfigColumn},
 	{IDs: []string{"add_budget_calendar_aligned_column"}, run: migrationAddBudgetCalendarAlignedColumn},
 	{IDs: []string{"add_routing_chain_max_depth_column"}, run: migrationAddRoutingChainMaxDepthColumn},
-	{IDs: []string{"add_prompt_variables_columns"}, run: migrationAddPromptVariablesColumns},
 	{IDs: []string{"add_model_capability_columns"}, run: migrationAddModelCapabilityColumns},
 	{IDs: []string{"add_ollama_sgl_config_columns"}, run: migrationAddOllamaSGLConfigColumns},
 	{IDs: []string{"add_multi_budget_tables"}, run: migrationAddMultiBudgetTables},
@@ -7267,145 +7266,12 @@ func migrationAddRoutingTargetsTable(ctx context.Context, db *gorm.DB, logger sc
 	return nil
 }
 
-// migrationAddPromptRepoTables adds the prompt repository tables (folders, prompts, versions, sessions)
-func migrationAddPromptRepoTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_prompt_repo_tables"
+// migrationAddModelParametersTable adds the table of model parameters and capabilities.
+func migrationAddModelParametersTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_model_parameters_table"
 	logger.Info("[configstore] starting migration %s", migrationName)
 	defer logger.Info("[configstore] finished migration %s", migrationName)
 	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: "add_prompt_repo_tables",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Create folders table
-			if !migrator.HasTable(&tables.TableFolder{}) {
-				logger.Info("[configstore] %s: creating table TableFolder", migrationName)
-				if err := migrator.CreateTable(&tables.TableFolder{}); err != nil {
-					return err
-				}
-			}
-
-			// Create prompts table
-			if !migrator.HasTable(&tables.TablePrompt{}) {
-				logger.Info("[configstore] %s: creating table TablePrompt", migrationName)
-				if err := migrator.CreateTable(&tables.TablePrompt{}); err != nil {
-					return err
-				}
-			}
-
-			// Create prompt_versions table
-			if !migrator.HasTable(&tables.TablePromptVersion{}) {
-				logger.Info("[configstore] %s: creating table TablePromptVersion", migrationName)
-				if err := migrator.CreateTable(&tables.TablePromptVersion{}); err != nil {
-					return err
-				}
-			}
-
-			// Create prompt_version_messages table
-			if !migrator.HasTable(&tables.TablePromptVersionMessage{}) {
-				logger.Info("[configstore] %s: creating table TablePromptVersionMessage", migrationName)
-				if err := migrator.CreateTable(&tables.TablePromptVersionMessage{}); err != nil {
-					return err
-				}
-			}
-
-			// Create prompt_sessions table
-			if !migrator.HasTable(&tables.TablePromptSession{}) {
-				logger.Info("[configstore] %s: creating table TablePromptSession", migrationName)
-				if err := migrator.CreateTable(&tables.TablePromptSession{}); err != nil {
-					return err
-				}
-			}
-
-			// Create prompt_session_messages table
-			if !migrator.HasTable(&tables.TablePromptSessionMessage{}) {
-				logger.Info("[configstore] %s: creating table TablePromptSessionMessage", migrationName)
-				if err := migrator.CreateTable(&tables.TablePromptSessionMessage{}); err != nil {
-					return err
-				}
-			}
-
-			// Apply schema updates (indexes, constraints) to existing tables
-			logger.Info("[configstore] %s: auto-migrating TablePromptVersion and TablePromptSession", migrationName)
-			if err := tx.AutoMigrate(
-				&tables.TablePromptVersion{},
-				&tables.TablePromptSession{},
-			); err != nil {
-				return err
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Drop tables in reverse order (respecting foreign key constraints)
-			logger.Info("[configstore] %s: dropping table TablePromptSessionMessage", migrationName)
-			if err := migrator.DropTable(&tables.TablePromptSessionMessage{}); err != nil {
-				return err
-			}
-			logger.Info("[configstore] %s: dropping table TablePromptSession", migrationName)
-			if err := migrator.DropTable(&tables.TablePromptSession{}); err != nil {
-				return err
-			}
-			logger.Info("[configstore] %s: dropping table TablePromptVersionMessage", migrationName)
-			if err := migrator.DropTable(&tables.TablePromptVersionMessage{}); err != nil {
-				return err
-			}
-			logger.Info("[configstore] %s: dropping table TablePromptVersion", migrationName)
-			if err := migrator.DropTable(&tables.TablePromptVersion{}); err != nil {
-				return err
-			}
-			logger.Info("[configstore] %s: dropping table TablePrompt", migrationName)
-			if err := migrator.DropTable(&tables.TablePrompt{}); err != nil {
-				return err
-			}
-			logger.Info("[configstore] %s: dropping table TableFolder", migrationName)
-			if err := migrator.DropTable(&tables.TableFolder{}); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running prompt repo tables migration: %s", err.Error())
-	}
-
-	// Add prompt_id column to prompt message tables
-	m = migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: "add_prompt_id_to_prompt_message_tables",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			if err := addColumnIfNotExists(tx, logger, &tables.TablePromptVersionMessage{}, "PromptID"); err != nil {
-				return err
-			}
-
-			if err := addColumnIfNotExists(tx, logger, &tables.TablePromptSessionMessage{}, "PromptID"); err != nil {
-				return err
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			if err := dropColumnIfExists(tx, logger, &tables.TablePromptVersionMessage{}, "prompt_id"); err != nil {
-				return err
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TablePromptSessionMessage{}, "prompt_id"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running add_prompt_id_to_prompt_message_tables migration: %s", err.Error())
-	}
-
-	m = migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
 		ID: "add_model_parameters_table",
 		Migrate: func(tx *gorm.DB) error {
 			tx = tx.WithContext(ctx)
@@ -7861,43 +7727,6 @@ func migrationAddInjectedToolsJSONColumn(ctx context.Context, db *gorm.DB, logge
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error while running %s migration: %s", migrationName, err.Error())
-	}
-	return nil
-}
-
-// migrationAddPromptVariablesColumns adds variables_json column to prompt_sessions and prompt_versions
-func migrationAddPromptVariablesColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_prompt_variables_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			if err := addColumnIfNotExists(tx, logger, &tables.TablePromptSession{}, "VariablesJSON"); err != nil {
-				return fmt.Errorf("failed to add variables_json column to prompt_sessions: %w", err)
-			}
-
-			if err := addColumnIfNotExists(tx, logger, &tables.TablePromptVersion{}, "VariablesJSON"); err != nil {
-				return fmt.Errorf("failed to add variables_json column to prompt_versions: %w", err)
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TablePromptSession{}, "variables_json"); err != nil {
-				return err
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TablePromptVersion{}, "variables_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running add_prompt_variables_columns migration: %s", err.Error())
 	}
 	return nil
 }

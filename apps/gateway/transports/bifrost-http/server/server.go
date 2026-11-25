@@ -40,7 +40,6 @@ import (
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/otel"
-	"github.com/maximhq/bifrost/plugins/prompts"
 	"github.com/maximhq/bifrost/plugins/routing"
 	"github.com/maximhq/bifrost/plugins/routing/complexity"
 	"github.com/maximhq/bifrost/plugins/semanticcache"
@@ -158,8 +157,6 @@ type ServerCallbacks interface {
 	RemoveModelRouter(ctx context.Context, id string) error
 	GetModelRouterStatus(ctx context.Context, id string) (complexity.SemanticStatusInfo, complexity.LLMStatusInfo, error)
 	RetryModelRouterWarmup(ctx context.Context, id string) (complexity.SemanticStatusInfo, bool, error)
-	// Prompt repository related callbacks
-	ReloadPromptCache(ctx context.Context) error
 	// MCP related callbacks
 	AddMCPClient(ctx context.Context, clientConfig *schemas.MCPClientConfig) error
 	RemoveMCPClient(ctx context.Context, id string) error
@@ -674,35 +671,6 @@ func governancePluginNameFromContext(ctx context.Context) string {
 		}
 	}
 	return governance.PluginName
-}
-
-// getPromptsPluginName returns the prompts plugin name from context or default
-func (s *BifrostHTTPServer) getPromptsPluginName() string {
-	if name, ok := s.Ctx.Value(schemas.BifrostContextKeyPromptsPluginName).(string); ok && name != "" {
-		return name
-	}
-	return prompts.PluginName
-}
-
-// promptCacheReloadable is the prompts plugin's cache refresh entry point.
-type promptCacheReloadable interface {
-	Reload(ctx context.Context) error
-}
-
-// ReloadPromptCache rebuilds the prompts plugin's in-memory index; no-op when the plugin is not loaded.
-func (s *BifrostHTTPServer) ReloadPromptCache(ctx context.Context) error {
-	name := s.getPromptsPluginName()
-	plugin, err := lib.FindPluginAs[schemas.BasePlugin](s.Config, name)
-	if err != nil || plugin == nil {
-		return nil
-	}
-	reloader, ok := plugin.(promptCacheReloadable)
-	if !ok {
-		// A plugin registered under this name that cannot reload leaves the cache stale silently.
-		logger.Warn("plugin %s does not support prompt cache reload", name)
-		return nil
-	}
-	return reloader.Reload(ctx)
 }
 
 // getGovernancePlugin safely retrieves the governance plugin with proper locking.
@@ -3156,7 +3124,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	if s.setupLockInstalled && s.AuthMiddleware != nil {
 		sessionHandler.SetSetupLock(s.AuthMiddleware)
 	}
-	promptsHandler := handlers.NewPromptsHandler(s.Config.ConfigStore, callbacks)
 	featureFlagsHandler := handlers.NewFeatureFlagsHandler(s.Config.FeatureFlags, s.Config.ConfigStore)
 	if s.AgentGatewayHandler != nil {
 		s.AgentGatewayHandler.RegisterManagementRoutes(s.Router, middlewares...)
@@ -3195,9 +3162,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	}
 	if sessionHandler != nil {
 		sessionHandler.RegisterRoutes(s.Router, middlewares...)
-	}
-	if promptsHandler != nil {
-		promptsHandler.RegisterRoutes(s.Router, middlewares...)
 	}
 	skillsHandler := handlers.NewSkillsHandler(s.Config.ConfigStore, s.Config.ObjectStore)
 	if skillsHandler != nil {

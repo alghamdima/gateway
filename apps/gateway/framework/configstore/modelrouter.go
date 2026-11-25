@@ -718,3 +718,13 @@ func (s *RDBConfigStore) saveModelRouterWithTx(ctx context.Context, txDB *gorm.D
 	}
 	return &r, nil
 }
+
+// isUniqueConstraintError checks if the error is a unique constraint violation (SQLite or PostgreSQL)
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") ||
+		strings.Contains(msg, "duplicate key value violates unique constraint")
+}
