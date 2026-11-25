@@ -8,13 +8,19 @@
 set -euo pipefail
 src=$1 tag=$2
 # Upstream paths we do not ship: the Maxim observability plugin and its UI (patches/0003 removes the
-# code that wired it in). They are left out of the extract and deleted from an existing tree.
+# code that wired it in), and every UI language but English with the two test files that only switch
+# between languages (patches/0005 makes the UI English-only). They are left out of the extract and
+# deleted from an existing tree.
 dropped=(
   plugins/maxim
   ui/app/workspace/observability/views/plugins/maximView.tsx
   ui/app/workspace/observability/fragments/maximFormFragment.tsx
   ui/public/maxim-logo.webp
   ui/public/maxim-logo-dark.webp
+  ui/locales/de ui/locales/es ui/locales/fr ui/locales/it ui/locales/ja
+  ui/locales/ko ui/locales/pt ui/locales/ru ui/locales/zh-CN ui/locales/zh-TW
+  ui/lib/i18n/index.test.ts
+  ui/lib/i18n/useLocale.test.tsx
 )
 cd "$(dirname "$0")/.."
 rm -rf "${dropped[@]}"

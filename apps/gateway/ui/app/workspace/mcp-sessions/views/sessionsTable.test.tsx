@@ -41,7 +41,8 @@ afterEach(async () => {
 	await i18n.changeLanguage("en");
 });
 
-describe.each(["en", "zh-CN"])("MCP session refresh in %s", (locale) => {
+// English is the only language of this product.
+describe.each(["en"])("MCP session refresh in %s", (locale) => {
 	it("shows a loading status instead of an empty result during a fetch", async () => {
 		await i18n.changeLanguage(locale);
 		for (const hasActiveFilters of [false, true]) {

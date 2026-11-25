@@ -17,6 +17,11 @@ Only part of the upstream repository is copied: `core`, `framework`, `plugins`, 
 - `ui/app/workspace/observability/fragments/maximFormFragment.tsx`
 - `ui/public/maxim-logo.webp`, `ui/public/maxim-logo-dark.webp`
 
+Nor every language of the UI but English, with the two test files that only switch between languages:
+
+- `ui/locales/{de,es,fr,it,ja,ko,pt,ru,zh-CN,zh-TW}/`
+- `ui/lib/i18n/index.test.ts`, `ui/lib/i18n/useLocale.test.tsx`
+
 ## Files changed
 
 Every change to an upstream file is a patch in `patches/`, applied in order after the copy. `patches/README.md` gives the reason for each.
@@ -27,6 +32,7 @@ Every change to an upstream file is a patch in `patches/`, applied in order afte
 | `0002-ui-drop-stale-next-env.patch` | `ui/next-env.d.ts` (deleted) |
 | `0003-remove-maxim-plugin.patch` | `transports/bifrost-http/server/plugins.go`, `transports/bifrost-http/lib/ctx.go`, `transports/bifrost-http/lib/config.go`, `transports/go.mod`, `transports/go.sum`, `ui/app/workspace/observability/views/observabilityView.tsx` |
 | `0004-register-credits-plugin.patch` | `transports/bifrost-http/server/plugins.go` |
+| `0005-ui-english-only.patch` | `ui/lib/i18n/index.ts`; tests: `ui/app/workspace/agent-logs/views/agentTrace.test.ts`, `ui/app/workspace/logs/views/columns.test.ts`, `ui/app/workspace/mcp-sessions/views/sessionsTable.test.tsx`, `ui/lib/i18n/resources.test.ts`, `ui/lib/i18n/validationMessage.test.ts`, `ui/lib/types/schemas.proxy.test.ts`, `ui/lib/utils/databricksMigration.test.ts`, `ui/lib/utils/mcpCredential.test.ts`, `ui/lib/utils/numbers.test.ts` |
 
 ## Files added
 

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import i18n, { changeLocale } from "@/lib/i18n";
-import { loadCatalog } from "@/lib/i18n/resources";
+import { changeLocale } from "@/lib/i18n";
 import {
 	DEFAULT_TOKEN_PRICE_MAX_FRACTION_DIGITS,
 	formatCharacterPriceFull,
@@ -108,23 +107,6 @@ describe("formatCurrencyNumber", () => {
 describe("locale-aware number formatting", () => {
 	afterEach(async () => {
 		await changeLocale("en");
-	});
-
-	async function useLocale(locale: "de" | "ja") {
-		i18n.addResourceBundle(locale, "common", await loadCatalog(locale, "common"));
-		await changeLocale(locale);
-	}
-
-	test("compact numbers follow the active language", async () => {
-		await useLocale("ja");
-		expect(formatCompactNumber(1500000)).toBe("150万");
-	});
-
-	test("currency follows the active language, including amounts below one cent", async () => {
-		await useLocale("de");
-		expect(formatCurrencyNumber(1250)).toBe("1250,00\u00a0$");
-		expect(formatCurrencyNumber(0.005)).toBe("0,0050\u00a0$");
-		expect(formatCurrencyNumber(-0.005)).toBe("-0,0050\u00a0$");
 	});
 
 	test("small English amounts keep four decimals", () => {

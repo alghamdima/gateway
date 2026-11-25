@@ -35,6 +35,8 @@ Guide for AI agents working on the Lemru monorepo.
 
 Findings from reviews or subagents are claims: verify them in the code before building on them.
 
+**One product:** the gateway and the control plane are one product. A product-level change (a language added or removed, the brand, a feature taken out) is made in both in the same piece of work, so no difference is left between them. In `apps/gateway` that is a patch in `apps/gateway/patches/` or a path in the `dropped` list of `scripts/import.sh`, never a direct edit left unrecorded.
+
 **DON'T:**
 
 - Commit, push, or modify git state unless explicitly asked
