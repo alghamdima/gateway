@@ -228,8 +228,8 @@ func TestRelaysHandlerDelegatesMutationsAndReloads(t *testing.T) {
 
 // TestRelaysHandlerRequiresGenuineAuthForDialChanges: a caller let through the fail-open bypass
 // (dashboard auth disabled or unconfigured) cannot choose where a relay sends its credential or
-// which gateway secret it sends, the relay counterpart of the provider, provider-key, plugin and
-// webhook gates. Repointing base_url while sending back the redacted credential would hand the
+// which gateway secret it sends, the relay counterpart of the provider, provider-key and plugin
+// gates. Repointing base_url while sending back the redacted credential would hand the
 // stored secret to the new host; an env. reference would send the gateway's own environment.
 // Edits that keep every such setting still pass, and an authenticated admin is never refused.
 func TestRelaysHandlerRequiresGenuineAuthForDialChanges(t *testing.T) {

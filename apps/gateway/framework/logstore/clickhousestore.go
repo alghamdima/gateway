@@ -1445,12 +1445,6 @@ func (s *ClickHouseLogStore) DeleteStaleAsyncJobs(ctx context.Context, staleSinc
 	return s.chDeleteWhere(ctx, "async_jobs", "status = 'processing' AND created_at < ?", staleSince)
 }
 
-// DeleteExpiredWebhookDeliveries deletes webhook delivery history whose
-// expiry has passed. See DeleteExpiredAsyncJobs.
-func (s *ClickHouseLogStore) DeleteExpiredWebhookDeliveries(ctx context.Context) (int64, error) {
-	return s.chDeleteWhere(ctx, "webhook_deliveries", "expires_at IS NOT NULL AND expires_at < ?", time.Now().UTC())
-}
-
 // UpdateAsyncJob applies a column->value map to an async job row via
 // read-modify-write.
 func (s *ClickHouseLogStore) UpdateAsyncJob(ctx context.Context, id string, updates map[string]interface{}) error {

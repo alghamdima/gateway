@@ -211,14 +211,3 @@ func auditProxyConfig(cfg *configstoreTables.GlobalProxyConfig) json.RawMessage 
 	}
 	return lib.AuditSnapshot(c, "password")
 }
-
-// auditWebhookEndpoint snapshots a webhook endpoint with header values and URL credentials masked; the signing secret never serializes.
-func auditWebhookEndpoint(endpoint *configstoreTables.TableWebhookEndpoint) json.RawMessage {
-	if endpoint == nil {
-		return nil
-	}
-	c := *redactedWebhookEndpoint(endpoint)
-	c.Secret = nil
-	c.URL = lib.RedactURLCredentials(c.URL)
-	return lib.AuditSnapshot(c)
-}

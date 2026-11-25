@@ -58,7 +58,7 @@ func TestWarpManagementCatalogOffersWhatTheBifrostMCPServes(t *testing.T) {
 		"deleteVirtualKey": {true, schemas.WarpManagementDelete, true},
 		// Return virtual key values, or a secret shown once.
 		"listVirtualKeys": {}, "getVirtualKey": {}, "listUserVirtualKeys": {}, "getUserVirtualKeysByEmail": {},
-		"rotateVirtualKey": {}, "bulkRotateVirtualKeys": {}, "createWebhookEndpoint": {}, "rotateWebhookEndpointSecret": {},
+		"rotateVirtualKey": {}, "bulkRotateVirtualKeys": {},
 		// Answered by Warp's own tools, or outside /api.
 		"getLogs": {}, "getMCPLogs": {}, "createChatCompletion": {}, "listModels": {},
 	}

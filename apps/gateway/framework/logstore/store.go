@@ -288,12 +288,6 @@ type LogStore interface {
 	UpdateAsyncJob(ctx context.Context, id string, updates map[string]interface{}) error
 	DeleteExpiredAsyncJobs(ctx context.Context) (int64, error)
 	DeleteStaleAsyncJobs(ctx context.Context, staleSince time.Time) (int64, error)
-
-	// Webhook Delivery methods
-	CreateWebhookDelivery(ctx context.Context, delivery *WebhookDelivery) error
-	FindWebhookDeliveryByID(ctx context.Context, id string) (*WebhookDelivery, error)
-	SearchWebhookDeliveries(ctx context.Context, filters *WebhookDeliverySearchFilters, pagination PaginationOptions) (*WebhookDeliverySearchResult, error)
-	DeleteExpiredWebhookDeliveries(ctx context.Context) (int64, error)
 }
 
 // NewLogStore creates a new log store based on the configuration.

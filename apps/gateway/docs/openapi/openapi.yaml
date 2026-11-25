@@ -158,8 +158,6 @@ tags:
     description: Skills Repository management, marketplace, and download endpoints
   - name: Audit Logs
     description: CADF-compliant audit log search, export, and signature verification endpoints
-  - name: Webhooks
-    description: Webhook endpoint management and signed async-job delivery history
   - name: Notifications
     description: Role-targeted dashboard notifications, delivered over the dashboard WebSocket
   - name: News Feeds
@@ -1427,22 +1425,6 @@ paths:
   /api/api-keys/{id}:
     $ref: "./paths/management/apikeys.yaml#/api-keys-by-id"
 
-  # Webhooks
-  /api/webhooks:
-    $ref: "./paths/management/webhooks.yaml#/webhooks"
-  /api/webhooks/{id}:
-    $ref: "./paths/management/webhooks.yaml#/webhooks-by-id"
-  /api/webhooks/{id}/rotate-secret:
-    $ref: "./paths/management/webhooks.yaml#/webhooks-rotate-secret"
-  /api/webhooks/{id}/test:
-    $ref: "./paths/management/webhooks.yaml#/webhooks-test"
-  /api/webhooks/{id}/deliveries:
-    $ref: "./paths/management/webhooks.yaml#/webhooks-deliveries"
-  /api/webhooks/deliveries:
-    $ref: "./paths/management/webhooks.yaml#/webhooks-deliveries-search"
-  /api/webhooks/deliveries/{id}/redeliver:
-    $ref: "./paths/management/webhooks.yaml#/webhooks-deliveries-redeliver"
-
   # Notifications
   /api/notifications:
     $ref: "./paths/management/notifications.yaml#/notifications"
@@ -1675,10 +1657,6 @@ components:
       $ref: "./paths/inference/async.yaml#/components/parameters/AsyncJobId"
     AsyncResultTTL:
       $ref: "./paths/inference/async.yaml#/components/parameters/AsyncResultTTL"
-    AsyncWebhookEndpoint:
-      $ref: "./paths/inference/async.yaml#/components/parameters/AsyncWebhookEndpoint"
-    WebhookEndpointId:
-      $ref: "./paths/management/webhooks.yaml#/components/parameters/WebhookEndpointId"
 
   headers:
     BifrostRequestId:
@@ -2573,32 +2551,6 @@ components:
       $ref: "./schemas/management/apikeys.yaml#/APIKeyCreatedResponse"
     APIKeyList:
       $ref: "./schemas/management/apikeys.yaml#/APIKeyList"
-
-    # Webhooks
-    WebhookEvent:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookEvent"
-    WebhookEndpointRequest:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookEndpointRequest"
-    WebhookEndpoint:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookEndpoint"
-    WebhookEndpointList:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookEndpointList"
-    WebhookEndpointWithSecret:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookEndpointWithSecret"
-    TestWebhookRequest:
-      $ref: "./schemas/management/webhooks.yaml#/TestWebhookRequest"
-    TestWebhookResponse:
-      $ref: "./schemas/management/webhooks.yaml#/TestWebhookResponse"
-    WebhookDeliveryOutcome:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookDeliveryOutcome"
-    WebhookDelivery:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookDelivery"
-    WebhookDeliveryList:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookDeliveryList"
-    RedeliverWebhookResponse:
-      $ref: "./schemas/management/webhooks.yaml#/RedeliverWebhookResponse"
-    WebhookStatusResponse:
-      $ref: "./schemas/management/webhooks.yaml#/WebhookStatusResponse"
 
     # Notifications
     NotificationSeverity:

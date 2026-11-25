@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -552,12 +551,7 @@ func getResultTTLFromHeaderWithDefault(ctx *fasthttp.RequestCtx, defaultTTL int)
 	return resultTTLInt
 }
 
-// sendSubmitJobError maps a submit failure to HTTP: an unusable webhook
-// reference is the caller's mistake, everything else is server-side.
+// sendSubmitJobError maps a submit failure to HTTP.
 func sendSubmitJobError(ctx *fasthttp.RequestCtx, err error) {
-	if errors.Is(err, logstore.ErrInvalidWebhookReference) {
-		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-		return
-	}
 	SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to create async job: %v", err))
 }

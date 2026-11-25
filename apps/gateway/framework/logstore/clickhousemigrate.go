@@ -563,26 +563,6 @@ func migrationClickHouseAsyncJobsTable(ctx context.Context, db *gorm.DB, cluster
 	return clickhouseReconcileTTL(ctx, db, "async_jobs", cluster, "toDateTime(created_at) + INTERVAL 7 DAY", logger)
 }
 
-// migrationClickHouseWebhookDeliveriesTable creates the webhook_deliveries
-// table and reconciles it with the WebhookDelivery struct. Delivery history
-// is insert-only metadata, so it follows the logs retention setting for its
-// TTL backstop; DeleteExpiredWebhookDeliveries handles normal expiry from
-// each row's expires_at.
-func migrationClickHouseWebhookDeliveriesTable(ctx context.Context, db *gorm.DB, cluster string, retentionDays int, logger schemas.Logger) error {
-	logger.Info("[logstore] clickhouse: creating table webhook_deliveries")
-	if err := clickhouseCreateTable(ctx, db, &WebhookDelivery{}, chTableOpts{
-		table:   "webhook_deliveries",
-		orderBy: "id",
-		ttl:     chLogsTTL(retentionDays),
-	}, cluster); err != nil {
-		return fmt.Errorf("clickhouse: create webhook_deliveries table: %w", err)
-	}
-	if err := clickhouseReconcileColumns(ctx, db, &WebhookDelivery{}, "webhook_deliveries", cluster, logger); err != nil {
-		return err
-	}
-	return clickhouseReconcileTTL(ctx, db, "webhook_deliveries", cluster, chLogsTTL(retentionDays), logger)
-}
-
 // migrationClickHouseWarpConversationTables creates Warp's saved-chat tables.
 //
 // No TTL clause, and that is deliberate rather than an omission. Every other
@@ -725,7 +705,6 @@ var clickhouseMigrationSteps = []clickhouseMigrationStep{
 	migrationClickHouseAgentLogsTable,
 	migrationClickHouseMCPToolLogsTable,
 	migrationClickHouseAsyncJobsTable,
-	migrationClickHouseWebhookDeliveriesTable,
 	migrationClickHouseWarpConversationTables,
 	migrationClickHouseUserAgentMappingsTable,
 	migrationClickHouseWarpTopicTables,

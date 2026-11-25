@@ -1649,7 +1649,7 @@ func TestNotificationPublisher_ResolvesPublisherSetAfterRegistration(t *testing.
 }
 
 // TestReloadProxyConfigUpdatesHTTPClientFactory pins that saving the global proxy reaches
-// the factory behind webhooks, skills and plugin downloads, not only provider inference.
+// the factory behind skills and plugin downloads, not only provider inference.
 func TestReloadProxyConfigUpdatesHTTPClientFactory(t *testing.T) {
 	prevLogger := logger
 	logger = noopTestLogger{}

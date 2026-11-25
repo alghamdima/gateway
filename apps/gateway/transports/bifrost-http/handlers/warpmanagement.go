@@ -41,11 +41,10 @@ var warpManagementSecretReads = bifrostMCPRouteSet(
 )
 
 // warpManagementSecretWrites are the writes Warp leaves out because their
-// response carries a plaintext secret shown once (a webhook's signing secret, a
-// rotated virtual key's new value): the result would go to the model, and the
+// response carries a plaintext secret shown once (a rotated virtual key's new
+// value): the result would go to the model, and the
 // person would have no other place to read it.
 var warpManagementSecretWrites = bifrostMCPRouteSet(
-	"POST /api/webhooks", "POST /api/webhooks/{id}/rotate-secret",
 	"POST /api/governance/virtual-keys/{vk_id}/rotate", "POST /api/governance/virtual-keys/rotate",
 )
 

@@ -174,7 +174,7 @@ func SSRFSafeDialContext(dialTimeout time.Duration) func(ctx context.Context, ne
 // This is the only place allowlist behavior exists - do not add an
 // allowlist parameter to SSRFSafeDialContext itself, and do not use this
 // function at SSRF-guarded call sites other than plugin downloads (provider
-// fetch, webhooks, skills serving); those must keep blocking all private
+// fetch, skills serving); those must keep blocking all private
 // targets unconditionally.
 func SSRFSafeDialContextWithAllowlist(dialTimeout time.Duration, allow *Allowlist) func(ctx context.Context, netw, addr string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: dialTimeout}

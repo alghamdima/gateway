@@ -126,7 +126,6 @@ func TestJSONFieldDimensionRankings_ThreeWayParity(t *testing.T) {
 		dropAllManagedMatViews(pgDB)
 		require.NoError(t, pgDB.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE").Error)
 		require.NoError(t, pgDB.Exec("DROP TABLE IF EXISTS async_jobs CASCADE").Error)
-		require.NoError(t, pgDB.Exec("DROP TABLE IF EXISTS webhook_deliveries CASCADE").Error)
 		require.NoError(t, pgDB.Exec("DROP TABLE IF EXISTS logs CASCADE").Error)
 		require.NoError(t, pgDB.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)
 		require.NoError(t, pgDB.Exec("DELETE FROM migrations").Error)

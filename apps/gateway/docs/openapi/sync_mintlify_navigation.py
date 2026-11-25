@@ -82,7 +82,6 @@ SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "Vault",
             "Audit Logs",
             "Infrastructure",
-            "Webhooks",
             "Notifications",
             "News Feeds",
             "Warp",

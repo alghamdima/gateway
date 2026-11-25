@@ -128,9 +128,6 @@ type TableClientConfig struct {
 	// by AfterFind. The explicit column name avoids GORM deriving the leading
 	// acronym as "o_auth2_..." from the field name.
 	OAuth2ServerConfigJSON string `gorm:"column:oauth2_server_config_json;type:text" json:"-"`
-	// WebhookConfigJSON holds the webhook delivery settings as a JSON blob,
-	// deserialized into Webhooks by AfterFind.
-	WebhookConfigJSON string `gorm:"column:webhook_config_json;type:text" json:"-"`
 	// MCPCodeModeLimitsJSON holds the per-execution code mode limits as a JSON blob,
 	// deserialized into MCPCodeModeLimits by AfterFind.
 	MCPCodeModeLimitsJSON        string `gorm:"column:mcp_code_mode_limits_json;type:text" json:"-"`
@@ -155,7 +152,6 @@ type TableClientConfig struct {
 	HeaderFilterConfig *GlobalHeaderFilterConfig `gorm:"-" json:"header_filter_config,omitempty"`
 	Metadata           map[string]any            `gorm:"-" json:"metadata,omitempty"`
 	OAuth2ServerConfig *OAuth2ServerConfig       `gorm:"-" json:"oauth2_server_config,omitempty"`
-	WebhookConfig      *WebhookConfig            `gorm:"-" json:"webhook_config,omitempty"`
 
 	// UsageEstimationTokenizers is persisted as UsageEstimationTokenizersJSON.
 	UsageEstimationTokenizers []string `gorm:"-" json:"usage_estimation_tokenizers,omitempty"`
@@ -164,24 +160,6 @@ type TableClientConfig struct {
 
 	MCPOAuthPrivateAllowlist []string `gorm:"-" json:"mcp_oauth_private_allowlist,omitempty"` // Virtual: private targets the MCP OAuth chain may reach
 	A2APrivateAllowlist      []string `gorm:"-" json:"a2a_private_allowlist,omitempty"`       // Virtual: private targets the Agent Gateway may reach
-}
-
-// WebhookConfig holds global webhook delivery settings. Delivery
-// tuning (retries, backoff, timeouts, payload caps) lives on each endpoint;
-// only storage policy is global. Zero values fall back to the defaults,
-// read at server startup.
-type WebhookConfig struct {
-	DeliveryHistoryRetentionDays int `json:"delivery_history_retention_days,omitempty"` // How long delivery history rows are kept (default: 30)
-}
-
-// DeliveryHistoryRetention returns the configured retention for webhook
-// delivery history rows, falling back to the default (30 days) when unset.
-// Safe on a nil receiver — nil means all defaults.
-func (w *WebhookConfig) DeliveryHistoryRetention() time.Duration {
-	if w == nil || w.DeliveryHistoryRetentionDays <= 0 {
-		return 30 * 24 * time.Hour
-	}
-	return time.Duration(w.DeliveryHistoryRetentionDays) * 24 * time.Hour
 }
 
 // TableName sets the table name for each model
@@ -300,16 +278,6 @@ func (cc *TableClientConfig) BeforeSave(tx *gorm.DB) error {
 		cc.OAuth2ServerConfigJSON = ""
 	}
 
-	if cc.WebhookConfig != nil {
-		data, err := json.Marshal(cc.WebhookConfig)
-		if err != nil {
-			return err
-		}
-		cc.WebhookConfigJSON = string(data)
-	} else {
-		cc.WebhookConfigJSON = ""
-	}
-
 	if cc.MCPCodeModeLimits != nil {
 		data, err := json.Marshal(cc.MCPCodeModeLimits)
 		if err != nil {
@@ -418,16 +386,6 @@ func (cc *TableClientConfig) AfterFind(tx *gorm.DB) error {
 		cc.OAuth2ServerConfig = &authCfg
 	} else {
 		cc.OAuth2ServerConfig = nil
-	}
-
-	if cc.WebhookConfigJSON != "" {
-		var webhooksCfg WebhookConfig
-		if err := json.Unmarshal([]byte(cc.WebhookConfigJSON), &webhooksCfg); err != nil {
-			return err
-		}
-		cc.WebhookConfig = &webhooksCfg
-	} else {
-		cc.WebhookConfig = nil
 	}
 
 	if cc.MCPCodeModeLimitsJSON != "" {

@@ -38,7 +38,6 @@ import (
 	"github.com/maximhq/bifrost/framework/tracing"
 	"github.com/maximhq/bifrost/framework/vectorstore"
 	"github.com/maximhq/bifrost/framework/warp"
-	"github.com/maximhq/bifrost/framework/webhooks"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/otel"
@@ -162,9 +161,6 @@ type ServerCallbacks interface {
 	RetryModelRouterWarmup(ctx context.Context, id string) (complexity.SemanticStatusInfo, bool, error)
 	// Prompt repository related callbacks
 	ReloadPromptCache(ctx context.Context) error
-	// Webhook related callbacks
-	ReloadWebhookEndpoint(ctx context.Context, id string) error
-	RemoveWebhookEndpoint(ctx context.Context, id string) error
 	// MCP related callbacks
 	AddMCPClient(ctx context.Context, clientConfig *schemas.MCPClientConfig) error
 	RemoveMCPClient(ctx context.Context, id string) error
@@ -274,7 +270,7 @@ type BifrostHTTPServer struct {
 	Config *lib.Config
 
 	// HTTPClientFactory hands out clients for outbound traffic other than provider
-	// inference (webhooks, skills, plugin downloads, MCP, catalog sync) that honour
+	// inference (skills, plugin downloads, MCP, catalog sync) that honour
 	// the global proxy for their purpose and follow proxy changes live.
 	HTTPClientFactory *network.HTTPClientFactory
 
@@ -362,8 +358,6 @@ type BifrostHTTPServer struct {
 	// exclusive with every key refresh for that provider.
 	refreshInFlightMu sync.Mutex
 	refreshInFlight   map[schemas.ModelProvider]*providerRefreshState
-
-	WebhookDispatcher *webhooks.Dispatcher
 
 	wsPool                *bfws.Pool
 	agentGatewayCloseOnce sync.Once
@@ -1534,25 +1528,6 @@ func (s *BifrostHTTPServer) RemoveRoutingRule(ctx context.Context, id string) er
 	if err := routingPlugin.GetRuleStore().DeleteRule(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete routing rule from rule store: %w", err)
 	}
-	return nil
-}
-
-// ReloadWebhookEndpoint refreshes a single webhook endpoint in the in-memory
-// store from the database after a mutation. A clustered deployment overrides
-// this to also notify peers so their in-memory copies stay current.
-func (s *BifrostHTTPServer) ReloadWebhookEndpoint(ctx context.Context, id string) error {
-	endpoint, err := s.Config.ConfigStore.GetWebhookEndpointByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	s.Config.SetWebhookEndpoint(endpoint)
-	return nil
-}
-
-// RemoveWebhookEndpoint drops a webhook endpoint from the in-memory store after
-// a database delete. A clustered deployment overrides this to also notify peers.
-func (s *BifrostHTTPServer) RemoveWebhookEndpoint(ctx context.Context, id string) error {
-	s.Config.RemoveWebhookEndpoint(id)
 	return nil
 }
 
@@ -3305,8 +3280,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	if skillsHandler != nil {
 		skillsHandler.RegisterRoutes(s.Router, middlewares...)
 	}
-	webhookHandler := handlers.NewWebhookHandler(callbacks, s.Config, s.WebhookDispatcher)
-	webhookHandler.RegisterRoutes(s.Router, middlewares...)
 	skillsServingHandler := handlers.NewSkillsServingHandler(s.Config.ConfigStore, s.Config.ObjectStore, s.Config)
 	if skillsServingHandler != nil {
 		skillsServingHandler.RegisterRoutes(s.Router, middlewares...)
@@ -3559,7 +3532,6 @@ func (s *BifrostHTTPServer) ApplyBasePath() error {
 	s.BasePath = basePath
 	s.Config.ServerConfig.BasePath = basePath
 	lib.SetBasePath(basePath)
-	webhooks.SetResultURLPrefix(basePath)
 	return nil
 }
 
@@ -3734,25 +3706,11 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		return fmt.Errorf("failed to instantiate plugins: %v", err)
 	}
 
-	// Initialize the webhook delivery dispatcher (requires both stores; the
-	// in-memory endpoint store on Config serves endpoint lookups).
-	if s.Config.LogsStore != nil && s.Config.ConfigStore != nil {
-		s.WebhookDispatcher = webhooks.NewDispatcher(ctx, "", s.Config.ClientConfig.WebhookConfig.DeliveryHistoryRetention(), s.Config.ConfigStore, s.Config.LogsStore, s.Config, logger, webhooks.WithHTTPClientFactory(s.HTTPClientFactory))
-		s.WebhookDispatcher.Start()
-		logger.Info("webhook dispatcher initialized")
-	}
-
 	// Initialize async job executor (requires LogsStore + governance plugin)
 	if s.Config.LogsStore != nil {
 		governancePlugin, govErr := lib.FindPluginAs[governance.BaseGovernancePlugin](s.Config, s.getGovernancePluginName())
 		if govErr == nil {
-			// The dispatcher interface value must stay nil when no dispatcher
-			// exists — a typed-nil pointer would defeat the executor's nil check.
-			var jobDispatcher logstore.WebhookDispatcher
-			if s.WebhookDispatcher != nil {
-				jobDispatcher = s.WebhookDispatcher
-			}
-			s.Config.AsyncJobExecutor = logstore.NewAsyncJobExecutor(s.Config.LogsStore, governancePlugin.GetGovernanceStore(), jobDispatcher, s.Config, logger)
+			s.Config.AsyncJobExecutor = logstore.NewAsyncJobExecutor(s.Config.LogsStore, governancePlugin.GetGovernanceStore(), logger)
 			logger.Info("async job executor initialized")
 		}
 	}
@@ -4243,10 +4201,6 @@ func (s *BifrostHTTPServer) Start() error {
 			if s.AsyncJobCleaner != nil {
 				logger.Info("stopping async job cleaner...")
 				s.AsyncJobCleaner.StopCleanupRoutine()
-			}
-			if s.WebhookDispatcher != nil {
-				logger.Info("stopping webhook dispatcher...")
-				s.WebhookDispatcher.Stop()
 			}
 			if s.WSTicketStore != nil {
 				logger.Info("stopping ws ticket store...")

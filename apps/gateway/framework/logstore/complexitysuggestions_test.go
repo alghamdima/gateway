@@ -35,7 +35,7 @@ func forEachComplexitySuggestionStore(t *testing.T, test func(t *testing.T, stor
 			t.Skip("Postgres not available")
 		}
 		dropAllManagedMatViews(db)
-		tables := append([]string{"mcp_tool_logs", "async_jobs", "webhook_deliveries", "logs"}, warpTopicTables...)
+		tables := append([]string{"mcp_tool_logs", "async_jobs", "logs"}, warpTopicTables...)
 		for _, table := range append(tables, complexitySuggestionTables...) {
 			require.NoError(t, db.Exec("DROP TABLE IF EXISTS "+table+" CASCADE").Error)
 		}

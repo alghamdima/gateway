@@ -363,7 +363,7 @@ func (f *HTTPClientFactory) HTTPClientWithTLS(purpose ClientPurpose, tlsConfig *
 }
 
 // DialPolicy decides which targets a client may reach, for callers that fetch
-// user-controlled URLs (webhooks, skills, plugin downloads). Build one with SSRFPolicy
+// user-controlled URLs (skills, plugin downloads). Build one with SSRFPolicy
 // or NewDialPolicy, once per caller: the factory keeps one transport per policy pointer.
 type DialPolicy struct {
 	dial          func(ctx context.Context, netw, addr string) (net.Conn, error)

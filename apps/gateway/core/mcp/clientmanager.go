@@ -3817,8 +3817,8 @@ func (m *MCPManager) failConnectAttempt(entry *schemas.MCPClientState, config *s
 // transport is always routed through network.PrivateNetworkDialContext, which
 // blocks link-local and unspecified destinations (including the
 // 169.254.169.254 cloud metadata endpoint) but - unlike the stricter
-// network.SSRFSafeDialContext used for image/document fetch, webhook
-// delivery, and skill URL sources - permits loopback and private-network
+// network.SSRFSafeDialContext used for image/document fetch and skill URL
+// sources - permits loopback and private-network
 // targets. Loopback/private MCP servers are the documented primary use case
 // for this feature (docs/mcp/connecting-to-servers.mdx's own HTTP-client
 // example is http://localhost:3001/mcp), so this is dial-time defense in

@@ -859,7 +859,7 @@ func isSecretVarFieldsOnly(object map[string]any) bool {
 // process environment and posts them to the collector on every export, and the telemetry plugin
 // does the same for its push gateway and basic auth, so a caller with no credential check must
 // not be able to read the gateway's secrets by naming them, nor redirect exports. This is the
-// plugins counterpart of the MCP, provider, provider-key and webhook gates. stored is the
+// plugins counterpart of the MCP, provider and provider-key gates. stored is the
 // persisted normalized config on update and nil on create; a value identical to the stored one
 // passes, as does removing one, so bypassed callers can still toggle a plugin or edit its other
 // fields. Config.json provisioning is not gated. On rejection the response has been sent and

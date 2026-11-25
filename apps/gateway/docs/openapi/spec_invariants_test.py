@@ -756,9 +756,7 @@ def test_warp_config_input_models_the_enabled_contract():
 # Secret-shaped schemas that are deliberately object-only because they only ever appear in
 # responses, where the API never emits a bare string. Listed so the bare-string check below can
 # demand a string branch from every other secret value without a description heuristic.
-RESPONSE_ONLY_SECRET_PATHS = {
-    "/components/schemas/WebhookEndpoint/properties/headers/additionalProperties",  # RedactedSecretVar
-}
+RESPONSE_ONLY_SECRET_PATHS: set[str] = set()
 
 
 def test_secret_capable_values_accept_bare_strings():
@@ -1097,9 +1095,6 @@ CLAMPED_LIST_HANDLERS = {
     "getMCPClientsPaginated": ("mcp.yaml", "clients"),
     "listVirtualMCPs": ("virtualmcps.yaml", "virtual-mcps"),
     "listPushConfigs": ("agents.yaml", "agent-push-configs"),
-    "listWebhookEndpoints": ("webhooks.yaml", "webhooks"),
-    "listWebhookDeliveries": ("webhooks.yaml", "webhooks-deliveries"),
-    "searchWebhookDeliveries": ("webhooks.yaml", "webhooks-deliveries-search"),
 }
 
 # Clamped handlers whose route has no operation in the spec yet. Listed so the gap stays visible.

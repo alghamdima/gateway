@@ -384,7 +384,7 @@ func relayDialChanges(old, next *schemas.RelayConfig) []string {
 // (dashboard auth disabled or unconfigured) that would let the caller choose where the relay's
 // credential is sent or which gateway secret it sends (see relayDialChanges): repointing base_url
 // while sending back the redacted credential would hand the stored secret to the new host. It is
-// the relay counterpart of the provider, provider-key, plugin and webhook gates. old is the stored
+// the relay counterpart of the provider, provider-key and plugin gates. old is the stored
 // relay on update, merged with the incoming config's redacted secrets, and nil on create; an update
 // that keeps every such setting passes, so bypassed callers can still edit routes and pricing. On
 // rejection this sends the response and returns true; callers should return immediately.

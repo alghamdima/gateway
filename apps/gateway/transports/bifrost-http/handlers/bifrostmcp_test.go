@@ -263,7 +263,6 @@ func TestBifrostMCPAnnotations(t *testing.T) {
 		{"createVirtualKey", false, false},
 		{"updateVirtualKey", false, false},
 		{"deleteVirtualKey", false, true},
-		{"createWebhookEndpoint", false, false},
 	}
 	for _, tc := range cases {
 		tool, ok := tools[tc.name]

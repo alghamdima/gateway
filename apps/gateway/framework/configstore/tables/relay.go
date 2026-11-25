@@ -123,7 +123,7 @@ func (t *TableRelay) BeforeSave(*gorm.DB) error {
 	// In-memory values are always plaintext (AfterFind and AfterSave decrypt), so a save encrypts
 	// whenever encryption is on.
 	encrypting := encrypt.IsEnabled()
-	// Stored in reference-preserving form, as provider keys and webhook headers are: an env or
+	// Stored in reference-preserving form, as provider keys are: an env or
 	// vault header keeps only its reference (the resolved value never reaches the column), a literal
 	// keeps its value, encrypted when encryption is on.
 	headers := make(map[string]string, len(t.ExtraHeaders))

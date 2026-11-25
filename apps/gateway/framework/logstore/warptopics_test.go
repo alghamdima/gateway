@@ -40,7 +40,7 @@ func forEachWarpTopicStore(t *testing.T, test func(t *testing.T, store LogStore)
 		// The same clean slate parityBackends takes, in this package's own
 		// schema: drop everything and migrate from nothing.
 		dropAllManagedMatViews(db)
-		for _, table := range append([]string{"mcp_tool_logs", "async_jobs", "webhook_deliveries", "logs"}, warpTopicTables...) {
+		for _, table := range append([]string{"mcp_tool_logs", "async_jobs", "logs"}, warpTopicTables...) {
 			require.NoError(t, db.Exec("DROP TABLE IF EXISTS "+table+" CASCADE").Error)
 		}
 		require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)

@@ -37,37 +37,19 @@ type GovernanceStore interface {
 	GetVirtualKey(ctx context.Context, vkValue string) (*configstoreTables.TableVirtualKey, bool)
 }
 
-// WebhookDispatcher queues a webhook notification for a job that reached a
-// terminal state. Implementations must not block on receiver I/O.
-type WebhookDispatcher interface {
-	EnqueueJobEvent(ctx context.Context, job *AsyncJob)
-}
-
-// WebhookManager resolves registered webhook endpoints so submit-time
-// references can be validated before a job is accepted.
-type WebhookManager interface {
-	WebhookEndpointByName(endpointName string) (*configstoreTables.TableWebhookEndpoint, bool)
-}
-
 // AsyncJobExecutor manages async job creation and background execution.
 type AsyncJobExecutor struct {
-	logstore          LogStore
-	governanceStore   GovernanceStore
-	webhookDispatcher WebhookDispatcher
-	webhookManager    WebhookManager
-	logger            schemas.Logger
+	logstore        LogStore
+	governanceStore GovernanceStore
+	logger          schemas.Logger
 }
 
-// NewAsyncJobExecutor creates a new AsyncJobExecutor. A nil webhookDispatcher
-// leaves webhook notification disabled; a nil webhookManager rejects any
-// submit that references a webhook endpoint.
-func NewAsyncJobExecutor(logstore LogStore, governanceStore GovernanceStore, webhookDispatcher WebhookDispatcher, webhookManager WebhookManager, logger schemas.Logger) *AsyncJobExecutor {
+// NewAsyncJobExecutor creates a new AsyncJobExecutor.
+func NewAsyncJobExecutor(logstore LogStore, governanceStore GovernanceStore, logger schemas.Logger) *AsyncJobExecutor {
 	return &AsyncJobExecutor{
-		logstore:          logstore,
-		governanceStore:   governanceStore,
-		webhookDispatcher: webhookDispatcher,
-		webhookManager:    webhookManager,
-		logger:            logger,
+		logstore:        logstore,
+		governanceStore: governanceStore,
+		logger:          logger,
 	}
 }
 
@@ -115,11 +97,6 @@ func (e *AsyncJobExecutor) SubmitJob(bifrostCtx *schemas.BifrostContext, resultT
 		virtualKeyID = &vk.ID
 	}
 
-	endpoint, err := e.getWebhookEndpointIfPresent(bifrostCtx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve webhook endpoint: %w", err)
-	}
-
 	// The background execution inherits the submit call's request id, so its
 	// LLM log row is keyed by it — store it for reconciliation.
 	requestID := ""
@@ -136,10 +113,6 @@ func (e *AsyncJobExecutor) SubmitJob(bifrostCtx *schemas.BifrostContext, resultT
 		VirtualKeyID: virtualKeyID,
 		ResultTTL:    resultTTL,
 		CreatedAt:    now,
-	}
-
-	if endpoint != nil {
-		job.WebhookEndpointID = &endpoint.ID
 	}
 
 	ctx := context.Background()
@@ -193,9 +166,7 @@ func (e *AsyncJobExecutor) executeJob(job *AsyncJob, operation AsyncOperation, c
 			"expires_at":   expiresAt,
 		}); err != nil {
 			e.logger.Warn("failed to update async job to failed: %v", err)
-			return
 		}
-		e.notifyWebhook(ctx, job, schemas.AsyncJobStatusFailed)
 	}
 
 	// The bifrost execution flow is very stable and panics are not expected.
@@ -242,9 +213,7 @@ func (e *AsyncJobExecutor) executeJob(job *AsyncJob, operation AsyncOperation, c
 			"expires_at":   expiresAt,
 		}); err != nil {
 			e.logger.Warn("failed to update async job: %v", err)
-			return
 		}
-		e.notifyWebhook(ctx, job, schemas.AsyncJobStatusFailed)
 		return
 	}
 
@@ -262,61 +231,7 @@ func (e *AsyncJobExecutor) executeJob(job *AsyncJob, operation AsyncOperation, c
 		"expires_at":   expiresAt,
 	}); err != nil {
 		e.logger.Warn("failed to update async job: %v", err)
-		return
 	}
-	e.notifyWebhook(ctx, job, schemas.AsyncJobStatusCompleted)
-}
-
-// notifyWebhook hands a job that just reached a terminal state to the
-// webhook dispatcher. It only fires after the terminal update committed: a
-// job whose terminal write failed still reads as processing, so notifying
-// for it would contradict what polling callers see.
-func (e *AsyncJobExecutor) notifyWebhook(ctx context.Context, job *AsyncJob, status schemas.AsyncJobStatus) {
-	if e.webhookDispatcher == nil || job.WebhookEndpointID == nil {
-		return
-	}
-	// The job's terminal state is already committed; a dispatcher panic must
-	// not reach executeJob's recovery, which would overwrite a completed job
-	// as failed.
-	defer func() {
-		if r := recover(); r != nil {
-			e.logger.Warn("async job %s webhook enqueue panicked: %v", job.ID, r)
-		}
-	}()
-	notified := *job
-	notified.Status = status
-	e.webhookDispatcher.EnqueueJobEvent(ctx, &notified)
-}
-
-// getWebhookEndpointIfPresent resolves the webhook endpoint name the caller
-// attached to the request context, if any. A reference that does not resolve
-// to an existing, enabled endpoint is an error: accepting the job anyway
-// would silently drop the notification the caller asked for.
-func (e *AsyncJobExecutor) getWebhookEndpointIfPresent(ctx *schemas.BifrostContext) (*configstoreTables.TableWebhookEndpoint, error) {
-	if ctx == nil {
-		return nil, nil
-	}
-	webhookEndpointName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyAsyncWebhookEndpoint)
-	if webhookEndpointName == "" {
-		return nil, nil
-	}
-	if e.webhookManager == nil {
-		return nil, fmt.Errorf("webhook manager is not available")
-	}
-	// Fail fast when delivery is not wired: without a dispatcher the job would
-	// persist an endpoint reference that notifyWebhook can never act on,
-	// silently dropping the notification the caller asked for.
-	if e.webhookDispatcher == nil {
-		return nil, fmt.Errorf("webhook dispatcher is not available")
-	}
-	endpoint, ok := e.webhookManager.WebhookEndpointByName(webhookEndpointName)
-	if !ok {
-		return nil, fmt.Errorf("%w: unknown webhook endpoint with name %q", ErrInvalidWebhookReference, webhookEndpointName)
-	}
-	if endpoint.Disabled {
-		return nil, fmt.Errorf("%w: webhook endpoint %q is disabled", ErrInvalidWebhookReference, endpoint.Name)
-	}
-	return endpoint, nil
 }
 
 // --- Cleaner ---
@@ -405,13 +320,6 @@ func (c *AsyncJobCleaner) cleanupExpiredJobs(ctx context.Context) {
 		c.logger.Warn("async job cleanup: deleted %d stale processing jobs (stuck > %dh)", staleDeleted, asyncJobStaleProcessingHours)
 	}
 
-	// Reap webhook delivery history whose retention window has passed.
-	deliveriesDeleted, err := c.store.DeleteExpiredWebhookDeliveries(ctx)
-	if err != nil {
-		c.logger.Warn("failed to delete expired webhook deliveries: %v", err)
-	} else if deliveriesDeleted > 0 {
-		c.logger.Debug("webhook delivery cleanup completed: deleted %d expired records", deliveriesDeleted)
-	}
 }
 
 // getVirtualKeyFromContext extracts the virtual key value from context.

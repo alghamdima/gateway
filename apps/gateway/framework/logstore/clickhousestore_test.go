@@ -79,7 +79,7 @@ func chTestTargetIsDedicated(cfg *ClickHouseConfig, overridden bool) bool {
 func requireDedicatedClickHouseTestDB(t testing.TB, cfg *ClickHouseConfig) {
 	t.Helper()
 	if !chTestTargetIsDedicated(cfg, chTestOverridden()) {
-		t.Fatalf("refusing to run destructive ClickHouse tests against database %q: BIFROST_TEST_CLICKHOUSE_* overrides must point at a database whose name contains \"test\" (the suite truncates logs, mcp_tool_logs, agent_logs, async_jobs and webhook_deliveries and rewrites their TTL)", cfg.Database.GetValue())
+		t.Fatalf("refusing to run destructive ClickHouse tests against database %q: BIFROST_TEST_CLICKHOUSE_* overrides must point at a database whose name contains \"test\" (the suite truncates logs, mcp_tool_logs, agent_logs and async_jobs and rewrites their TTL)", cfg.Database.GetValue())
 	}
 }
 
@@ -111,7 +111,7 @@ func trySetupClickHouseStore(t testing.TB) *ClickHouseLogStore {
 		t.Skipf("ClickHouse not available, skipping test: %v", err)
 	}
 	ch := store.(*ClickHouseLogStore)
-	for _, table := range []string{"logs", "mcp_tool_logs", "agent_logs", "async_jobs", "webhook_deliveries"} {
+	for _, table := range []string{"logs", "mcp_tool_logs", "agent_logs", "async_jobs"} {
 		require.NoError(t, ch.db.Exec("TRUNCATE TABLE "+table).Error)
 	}
 	t.Cleanup(func() { _ = ch.Close(context.Background()) })
@@ -1434,7 +1434,7 @@ func chEngineFull(t *testing.T, db *gorm.DB, table string) string {
 func TestClickHouseTTLReconciledOnExistingTables(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	ctx := context.Background()
-	retained := []string{"logs", "mcp_tool_logs", "webhook_deliveries"}
+	retained := []string{"logs", "mcp_tool_logs"}
 	// removeTTLs strips any TTL from the shared tables. REMOVE TTL errors on
 	// a table that has none (BAD_ARGUMENTS), so it is only issued when one is
 	// present. It runs before the initial-state check, because retention 0
