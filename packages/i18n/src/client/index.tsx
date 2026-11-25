@@ -200,7 +200,8 @@ export const I18nProvider = ({
   const [i18nClient, setI18nClient] = useState<i18n | null>(() => {
     // One server process renders every locale: a shared instance there would keep the language
     // of whichever request came first, so the server makes one per render.
-    const isBrowser = typeof window !== "undefined";
+    // asked this way because packages without the DOM types compile this file too
+    const isBrowser = "window" in globalThis;
 
     if (isBrowser && client) {
       return client;
