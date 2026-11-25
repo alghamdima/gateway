@@ -15,6 +15,8 @@ Only part of the upstream repository was copied: `core`, `framework`, `plugins`,
 - The whole admin UI, `ui/` (1,458 files at the time), with what served it: `transports/bifrost-http/handlers/ui.go` and its test, the `//go:embed all:ui` in `transports/bifrost-http/main.go`, `RegisterUIRoutes`, `UIContent` and `ShellRewriter` in `transports/bifrost-http/server/server.go`, the UI part of `CheckBasePathCollision` in `transports/bifrost-http/lib/basepath.go` with its two tests, the `install-ui`, `build-ui`, `dev` and `dev-pulse` targets of the `Makefile`, and the Node stage of `transports/Dockerfile.local`. The product has one frontend, the web app, which calls the management API; a path no route claims answers 404.
 - `transports/Dockerfile` and `transports/Dockerfile.redhat`: they build from published upstream modules, which this copy no longer is. `transports/Dockerfile.local` builds from the sources here.
 - The Maxim observability plugin: `plugins/maxim/`.
+- Features outside the product (owner, 2026-11-25), each with its tests, its routes under `/api`, its tables' migrations and its rows in the test baseline:
+  - RSS feeds: `framework/rssfeed/`, `framework/configstore/rssfeeds.go`, `framework/configstore/tables/rssfeed.go`, `transports/bifrost-http/handlers/rssfeeds.go`, the two `rss_feeds` migrations in `framework/configstore/migrations.go` and the handler's wiring in `transports/bifrost-http/server/server.go`.
 - `.claude/`, upstream's own agent tooling, and `recipes/` with the three `include` lines in the `Makefile`: deployment recipes (Fly, ECS, local Kubernetes) this product does not use.
 
 ## Changed
