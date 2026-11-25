@@ -1,7 +1,0 @@
-diff --git a/ui/.npmrc b/ui/.npmrc
-index cffe8cd..4be9c07 100644
---- a/ui/.npmrc
-+++ b/ui/.npmrc
-@@ -1 +1,2 @@
- save-exact=true
-+node-options=--max-old-space-size=4096

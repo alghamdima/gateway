@@ -73,16 +73,6 @@ jobs:
           cache: npm
           cache-dependency-path: apps/gateway/ui/package-lock.json
 
-      # the committed tree must equal the pinned upstream tag plus patches/ (ADR 0008)
-      - name: 🧬 Reproduce from upstream
-        run: |
-          repo=$(sed -n 's/^repo: //p' UPSTREAM)
-          tag=$(sed -n 's/^tag: //p' UPSTREAM)
-          git clone --quiet --filter=blob:none --no-checkout --depth 1 --branch "$tag" "$repo" "$RUNNER_TEMP/upstream"
-          scripts/import.sh "$RUNNER_TEMP/upstream" "$tag"
-          git status --porcelain -- . | tee "$RUNNER_TEMP/drift"
-          test ! -s "$RUNNER_TEMP/drift"
-
       - name: 🏷️ Rename tool tests
         working-directory: apps/gateway/scripts/rename
         run: GOWORK=off go test ./...

@@ -35,9 +35,11 @@ Guide for AI agents working on the Lemru monorepo.
 
 Findings from reviews or subagents are claims: verify them in the code before building on them.
 
-**One product:** the gateway and the control plane are one product. A product-level change (a language added or removed, the brand, a feature taken out) is made in both in the same piece of work, so no difference is left between them. In `apps/gateway` that is a patch in `apps/gateway/patches/` or a path in the `dropped` list of `scripts/import.sh`, never a direct edit left unrecorded.
+**One product:** the gateway and the control plane are one product. A product-level change (a language added or removed, the brand, a feature taken out) is made in both in the same piece of work, so no difference is left between them.
 
-**Our own product (owner, 2026-11-25):** we do not stay dependent on the gateway's upstream; the owner's team develops the whole product. One frontend only: `apps/web` (customer dashboard and admin). The gateway's own UI is being removed, and what staff need from it is rebuilt in the admin (`docs/platform/PLAN.md`, "Gateway UI removal"). Until that step retires the import check, CI still compares `apps/gateway` with "upstream tag + patches".
+**Our own product (owner, 2026-11-25):** we do not stay dependent on the gateway's upstream; the owner's team develops the whole product, and `apps/gateway` is edited directly. Every change to a file that came from upstream is listed in `apps/gateway/MODIFICATIONS.md` (the Apache licence requires it); `LICENSE`, `THIRD_PARTY_NOTICES.md` and `UPSTREAM` stay. One frontend only: `apps/web` (customer dashboard and admin); the gateway's own UI is being removed (`docs/platform/PLAN.md`, "Gateway UI removal"). The repo keeps only what the product needs: a folder that nothing builds, runs or tests is deleted.
+
+**Learn from LiteLLM:** when fixing a weakness in the gateway, look first at how LiteLLM (github.com/BerriAI/litellm) solved it. Take the idea, not the code, and never from its `enterprise/` directory, which is under a commercial licence.
 
 **Modular monolith:** follow the project's shape. A feature is a module with its own folder and a narrow surface: `packages/api/src/modules/<feature>` (router, logic, tests), `apps/web/src/modules/<feature>` (UI), schema in `packages/db/src/schema`, and in the gateway a plugin under `apps/gateway/plugins/<name>`. No feature reaches into another module's internals.
 
@@ -71,8 +73,8 @@ Findings from reviews or subagents are claims: verify them in the code before bu
 ```
 apps/
   web/         Next.js App Router (src/app/[locale]/{(marketing),auth,dashboard,admin})
-  gateway/     Go AI gateway (vendored from upstream, see apps/gateway/UPSTREAM). Not a pnpm package:
-               own Go modules (go.work) and npm UI. Read apps/gateway/AGENTS.md before editing it
+  gateway/     Go AI gateway (ours; started from Bifrost, see apps/gateway/MODIFICATIONS.md). Not a pnpm
+               package: own Go modules (go.work). Read apps/gateway/AGENTS.md before editing it
 
 packages/
   api/         @workspace/api       Hono modules (admin,ai,auth,billing,organization,storage)
