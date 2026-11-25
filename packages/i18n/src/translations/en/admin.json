@@ -18,30 +18,40 @@
     "user": {
       "details": {
         "role": {
-          "update": { "success": "User's role updated successfully!" }
+          "update": {
+            "success": "User's role updated successfully!"
+          }
         },
         "name": {
-          "update": { "success": "User's name updated successfully!" }
+          "update": {
+            "success": "User's name updated successfully!"
+          }
         }
       },
       "ban": {
         "description": "Ban this user from the platform. You can specify a reason and an optional expiration date for the ban.",
         "success": "User banned successfully!",
         "form": {
-          "reason": { "info": "Enter the reason for banning the user." },
+          "reason": {
+            "info": "Enter the reason for banning the user."
+          },
           "expiresIn": {
             "info": "Enter the expiration date for the ban or leave it blank for no expiration."
           }
         }
       },
-      "unban": { "success": "User unbanned successfully!" },
+      "unban": {
+        "success": "User unbanned successfully!"
+      },
       "delete": {
         "title": "Delete {{name}}",
         "disclaimer": "You are about to delete this user. \n\nAfter deleting it, all user data (including sessions and permissions) will be permanently deleted and cannot be recovered. \n\nDo you want to continue?",
         "success": "User deleted successfully!"
       },
       "accounts": {
-        "delete": { "success": "Account deleted successfully!" },
+        "delete": {
+          "success": "Account deleted successfully!"
+        },
         "password": {
           "update": {
             "title": "Update {{name}}'s password",
@@ -52,7 +62,9 @@
         }
       },
       "sessions": {
-        "revokeAll": { "success": "All sessions revoked successfully!" }
+        "revokeAll": {
+          "success": "All sessions revoked successfully!"
+        }
       }
     }
   },
@@ -101,10 +113,14 @@
       },
       "details": {
         "name": {
-          "update": { "success": "Organization name updated successfully!" }
+          "update": {
+            "success": "Organization name updated successfully!"
+          }
         },
         "slug": {
-          "update": { "success": "Organization slug updated successfully!" }
+          "update": {
+            "success": "Organization slug updated successfully!"
+          }
         }
       }
     }
@@ -115,7 +131,9 @@
       "description": "Manage your customers and their subscriptions."
     },
     "customer": {
-      "delete": { "success": "Customer deleted successfully!" },
+      "delete": {
+        "success": "Customer deleted successfully!"
+      },
       "updatePlan": {
         "title": "Update {{name}}'s plan",
         "description": "Pick a plan and a status for the customer. This action will immediately update the customer's plan and status.`",
@@ -273,6 +291,37 @@
       },
       "remove": "Remove terms",
       "gone": "This key is no longer in the gateway. Its terms can only be removed."
+    },
+    "accounts": {
+      "title": "Providers and keys",
+      "description": "The providers the gateway can call and the keys it calls them with. A key's value is typed once and never shown again.",
+      "empty": "No provider yet.",
+      "noKeys": "No key yet: requests to this provider will fail until it has one.",
+      "custom": "speaks {{base}}",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enable": "Enable",
+      "disable": "Disable",
+      "delete": "Delete",
+      "confirm": "Click again to delete",
+      "refresh": "Refresh models",
+      "refreshed": "Models refreshed.",
+      "created": "Provider added.",
+      "deleted": "Provider deleted.",
+      "keySaved": "Key saved.",
+      "keyDeleted": "Key deleted.",
+      "add": "Add a provider",
+      "name": "Name, for example openai",
+      "baseUrl": "Address, only for a provider of our own",
+      "addHint": "Leave the address empty for a provider the gateway knows by name. With an address, the name is ours to choose and the provider must speak the OpenAI protocol.",
+      "addProvider": "Add provider",
+      "keyName": "Key name",
+      "keyValue": "Key value",
+      "addKey": "Add key",
+      "error": {
+        "exists": "A provider with this name already exists.",
+        "refused": "The gateway refused this change. Check the name and the address."
+      }
     }
   },
   "reconciliation": {

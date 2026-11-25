@@ -232,6 +232,11 @@ const queries = {
         queryKey: [KEY, "providers"],
         queryFn: () => handle(api.admin.providers.$get)(),
       }),
+    getAccounts: () =>
+      queryOptions({
+        queryKey: [KEY, "providers", "accounts"],
+        queryFn: () => handle(api.admin.providers.accounts.$get)(),
+      }),
   },
 };
 
@@ -395,6 +400,62 @@ const mutations = {
     }),
   },
   providers: {
+    createAccount: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "create"],
+      mutationFn: (
+        json: InferRequestType<
+          typeof api.admin.providers.accounts.$post
+        >["json"],
+      ) => handle(api.admin.providers.accounts.$post)({ json }),
+    }),
+    deleteAccount: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "delete"],
+      mutationFn: ({ provider }: { provider: string }) =>
+        handle(api.admin.providers.accounts[":provider"].$delete)({
+          param: { provider },
+        }),
+    }),
+    refreshModels: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "refresh-models"],
+      mutationFn: ({ provider }: { provider: string }) =>
+        handle(
+          api.admin.providers.accounts[":provider"]["refresh-models"].$post,
+        )({ param: { provider } }),
+    }),
+    createKey: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "keys", "create"],
+      mutationFn: ({
+        provider,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.providers.accounts)[":provider"]["keys"]["$post"]
+      >["json"] & { provider: string }) =>
+        handle(api.admin.providers.accounts[":provider"].keys.$post)({
+          param: { provider },
+          json,
+        }),
+    }),
+    updateKey: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "keys", "update"],
+      mutationFn: ({
+        provider,
+        keyId,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.providers.accounts)[":provider"]["keys"][":keyId"]["$put"]
+      >["json"] & { provider: string; keyId: string }) =>
+        handle(api.admin.providers.accounts[":provider"].keys[":keyId"].$put)({
+          param: { provider, keyId },
+          json,
+        }),
+    }),
+    deleteKey: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "keys", "delete"],
+      mutationFn: ({ provider, keyId }: { provider: string; keyId: string }) =>
+        handle(
+          api.admin.providers.accounts[":provider"].keys[":keyId"].$delete,
+        )({ param: { provider, keyId } }),
+    }),
     setTerms: mutationOptions({
       mutationKey: [KEY, "providers", "terms", "set"],
       mutationFn: ({

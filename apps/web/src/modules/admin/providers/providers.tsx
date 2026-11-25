@@ -25,6 +25,7 @@ import {
 
 import { admin } from "~/modules/admin/lib/api";
 import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
+import { ProviderAccounts } from "~/modules/admin/providers/accounts";
 import { TermsForm } from "~/modules/admin/providers/terms-form";
 
 import type { CatalogEntry } from "~/modules/admin/providers/terms-form";
@@ -37,6 +38,8 @@ export const Providers = () => {
 
   return (
     <div className="@container flex w-full flex-col gap-6">
+      <ProviderAccounts />
+
       <Card>
         <CardHeader>
           <CardTitle>{t("admin:providers.header.title")}</CardTitle>
