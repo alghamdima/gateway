@@ -481,7 +481,7 @@ func TestRunIsScopedToItsRouter(t *testing.T) {
 	space.add("refund", 0, 12, now.Add(-time.Hour))
 
 	office := logstore.ComplexitySuggestion{ID: "office-refund", RouterID: "office", Status: logstore.ComplexitySuggestionStatusOpen,
-		Tier: "MEDIUM", Category: "uncovered", Centroid: logstore.EncodeWarpVector(axis(0)), EmbeddingSignature: space.Namespace()}
+		Tier: "MEDIUM", Category: "uncovered", Centroid: logstore.EncodeVector(axis(0)), EmbeddingSignature: space.Namespace()}
 	require.NoError(t, office.SetPhrases([]string{"refund help"}))
 	require.NoError(t, store.UpsertComplexitySuggestions(ctx, []logstore.ComplexitySuggestion{office}))
 

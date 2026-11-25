@@ -1833,7 +1833,7 @@ func TestSetupLockMiddleware_LocksAPIWhileAuthInactive(t *testing.T) {
 
 // TestAPIMiddleware_BasicAdminCredentialsAreNotLocalAdmin pins that the admin's username and
 // password sent as Basic authenticate the request without marking it the local admin, so
-// admin-only handlers (Warp's settings, publishing notifications) and deployments that skip
+// admin-only handlers (publishing notifications) and deployments that skip
 // their access checks for the local admin still require a session or the Bearer form.
 func TestAPIMiddleware_BasicAdminCredentialsAreNotLocalAdmin(t *testing.T) {
 	SetLogger(&mockLogger{})

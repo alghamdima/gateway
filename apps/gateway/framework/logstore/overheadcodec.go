@@ -77,7 +77,7 @@ func unmarshalOverheadBreakdown(raw string) []OverheadBucket {
 }
 
 // decodeOverheadObject reads the object in document order. Streamed via json.Token, not
-// unmarshalled into a map, because Go randomises map order and framework/warp truncates
+// unmarshalled into a map, because Go randomises map order and readers truncate
 // by position. Order still cannot survive anything that sorts keys (Postgres jsonb).
 func decodeOverheadObject(raw string) []OverheadBucket {
 	dec := json.NewDecoder(strings.NewReader(raw))

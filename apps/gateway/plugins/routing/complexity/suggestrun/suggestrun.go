@@ -555,7 +555,7 @@ func matchClusters(clusters []*suggest.Cluster, stored []logstore.ComplexitySugg
 		if row.EmbeddingSignature != namespace {
 			continue
 		}
-		centroid, err := logstore.DecodeWarpVector(row.Centroid)
+		centroid, err := logstore.DecodeVector(row.Centroid)
 		if err != nil || len(centroid) == 0 {
 			continue
 		}
@@ -655,7 +655,7 @@ func fillSuggestion(row *logstore.ComplexitySuggestion, sg suggest.Suggestion, s
 	row.RequestCount = int64(sg.Cluster.Weight)
 	row.Coverage = sg.Coverage
 	row.NearestPhrase, row.NearestTier, row.NearestSimilarity = sg.Nearest.Text, sg.Nearest.Tier, float64(sg.NearestSim)
-	row.Centroid = logstore.EncodeWarpVector(sg.Cluster.Centroid)
+	row.Centroid = logstore.EncodeVector(sg.Cluster.Centroid)
 	row.EmbeddingSignature, row.RunID, row.LastSeenAt = scope.namespace, scope.runID, now
 	_ = row.SetPhrases(sg.Phrases)
 	ids := make([]string, 0, len(sg.Examples))

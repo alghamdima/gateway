@@ -263,48 +263,6 @@ func startOldSnapshot(t *testing.T, db *gorm.DB) func() {
 	return end
 }
 
-// resetWarpUpdatedAtIndex drops idx_warp_conversations_updated_at and un-records
-// its migration, the state a 2.2.x store is in before the 2.3.0 step runs.
-func resetWarpUpdatedAtIndex(t *testing.T, db *gorm.DB) {
-	t.Helper()
-	require.NoError(t, db.Exec("DROP INDEX IF EXISTS idx_warp_conversations_updated_at").Error)
-	require.NoError(t, db.Exec("DELETE FROM migrations WHERE id = 'logs_add_warp_conversations_updated_at_index'").Error)
-}
-
-// TestUpgradeLogstoreWarpIndexCompletesBehindOldSnapshot pins the small-table
-// path of logs_add_warp_conversations_updated_at_index: the new table's index
-// builds without CONCURRENTLY, so an old replica's open transaction elsewhere in
-// the database cannot stall boot. The control forces the concurrent build and
-// shows it waiting out that transaction.
-func TestUpgradeLogstoreWarpIndexCompletesBehindOldSnapshot(t *testing.T) {
-	t.Run("fixed", func(t *testing.T) {
-		db := setupLogstoreAt225(t)
-		resetWarpUpdatedAtIndex(t, db)
-		startOldSnapshot(t, db)
-
-		start := time.Now()
-		require.NoError(t, migrateLogstorePod(t, time.Minute, MatViewPauseOptions{CancelAfter: time.Second}))
-		require.Less(t, time.Since(start), 20*time.Second, "the warp index must not wait for the old snapshot")
-		var valid bool
-		require.NoError(t, db.Raw(`SELECT COALESCE(bool_and(indisvalid), false) FROM pg_index
-			WHERE indexrelid = to_regclass('idx_warp_conversations_updated_at')`).Scan(&valid).Error)
-		require.True(t, valid, "idx_warp_conversations_updated_at must exist and be valid")
-	})
-
-	t.Run("control_concurrent_build_waits_for_old_snapshot", func(t *testing.T) {
-		db := setupLogstoreAt225(t)
-		resetWarpUpdatedAtIndex(t, db)
-		prev := smallTableForPlainIndex
-		smallTableForPlainIndex = func(*gorm.DB, string) (bool, error) { return false, nil }
-		t.Cleanup(func() { smallTableForPlainIndex = prev })
-		startOldSnapshot(t, db)
-
-		err := migrateLogstorePod(t, 15*time.Second, MatViewPauseOptions{CancelAfter: time.Second})
-		require.Error(t, err, "the concurrent build must still be waiting on the old snapshot")
-		t.Cleanup(func() { _ = db.Exec("DROP INDEX IF EXISTS idx_warp_conversations_updated_at").Error })
-	})
-}
-
 // TestDescribeTableLockHoldersNamesOldReader pins the operator hint logged on the
 // first lock timeout: it names the session holding logs by pid, lock mode and
 // statement kind, never by statement text, and a lookup with no holders stays

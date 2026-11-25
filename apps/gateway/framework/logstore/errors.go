@@ -14,10 +14,6 @@ import (
 var (
 	ErrNotFound    = fmt.Errorf("log not found")
 	ErrJobInternal = fmt.Errorf("internal job store error")
-	// ErrPartialLogDelete marks a log delete whose log rows are gone but whose
-	// Warp topic rows could not be removed after them. Only ClickHouse returns
-	// it: it has no transaction to roll the log delete back with.
-	ErrPartialLogDelete = fmt.Errorf("logs deleted but their warp topic rows were not")
 	// ErrRetentionBusy marks a retention batch skipped because another replica holds that table's retention lock.
 	ErrRetentionBusy = fmt.Errorf("another replica is draining this table")
 )

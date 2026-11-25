@@ -608,8 +608,8 @@ func TestDimensionRankings_NoVisibleRowsSkipsPreviousGroupBy(t *testing.T) {
 // ranking row and the logs its id filters to agree. The rankings fan out over
 // the JSON-array columns on every backend that has them, but the filter checked
 // only the scalar column outside Postgres, so a row credited to an array-only
-// owner linked to an empty Logs page - Warp showed 23 requests for a team and
-// its link returned none.
+// owner linked to an empty Logs page: a ranking showed 23 requests for a team
+// and its link returned none.
 func assertFilterMatchesFanoutRankings(t *testing.T, s *RDBLogStore, insert func(idCol, id, scalarID, scalarName, arrayIDs, arrayNames string), now time.Time) {
 	t.Helper()
 	ctx := context.Background()

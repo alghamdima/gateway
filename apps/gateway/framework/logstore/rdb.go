@@ -369,35 +369,6 @@ func (s *RDBLogStore) applyAgentContextFilter(baseQuery *gorm.DB, agentNames []s
 	return baseQuery.Where("session_id IN (?)", contexts)
 }
 
-// applyTopicFilter narrows a logs query to the requests Warp filed under any
-// of the topics or themes, by id.
-//
-// A request's topic lives in warp_topic_assignments, not on the log row, so
-// the filter is a membership test against that table. An id names a topic,
-// the topics merged into it, or the topics of a theme. A merged topic's
-// requests were never refiled (see MaintainTopics in framework/warp), and
-// upkeep keeps every merged topic pointing at a live survivor and carrying
-// its survivor's theme, so one level of merged_into and one of parent_id is
-// the whole tree. The id list is bound three times, which at the 50 ids a
-// request may name is well inside any backend's parameter limit.
-//
-// Only topics still in use are followed through merged_into and parent_id. A
-// topic a later run retired keeps the theme and survivor it pointed at -
-// retiring changes only its status - but its requests are no longer theirs,
-// and Warp's own counts leave them out. Merged topics are followed: their
-// requests count under the survivor. A retired topic named directly still
-// matches through topic_id.
-//
-// Not scoped on its own: the assignment rows are only a key into the logs
-// table, and the caller's access scope applies to the log rows that come
-// back.
-func applyTopicFilter(baseQuery *gorm.DB, topicIDs []string) *gorm.DB {
-	return baseQuery.Where(
-		"id IN (SELECT log_id FROM warp_topic_assignments WHERE topic_id IN ? OR topic_id IN (SELECT id FROM warp_topics WHERE (merged_into IN ? OR parent_id IN ?) AND status <> ?))",
-		topicIDs, topicIDs, topicIDs, WarpTopicStatusRetired,
-	)
-}
-
 // applyFilters applies search filters to a GORM query. Callers are
 // responsible for starting from ScopedDB(ctx) when row visibility
 // should be respected; this helper only adds the per-call filter
@@ -494,9 +465,6 @@ func (s *RDBLogStore) applyFilters(baseQuery *gorm.DB, filters SearchFilters) *g
 	// one project, so there is no array column to OR against.
 	if len(filters.ProjectIDs) > 0 {
 		baseQuery = baseQuery.Where("project_id IN ?", filters.ProjectIDs)
-	}
-	if len(filters.TopicIDs) > 0 {
-		baseQuery = applyTopicFilter(baseQuery, filters.TopicIDs)
 	}
 	if len(filters.BusinessUnitIDs) > 0 {
 		sql, args := dimensionMembershipFilterSQL(s.db.Dialector.Name(), "business_unit_id", "business_unit_ids", filters.BusinessUnitIDs)
@@ -1296,7 +1264,7 @@ func logsOrderClause(sortBy, order string) string {
 	switch sortBy {
 	case "timestamp":
 		// id breaks ties. Timestamps collide readily under load, and callers that
-		// page by (timestamp, offset) - Warp's backfill cursor among them - skip or
+		// page by (timestamp, offset) skip or
 		// repeat rows whenever equal-timestamp rows come back in a different order
 		// between calls. The session query in searchLogs already orders this way.
 		return "timestamp " + direction + ", id " + direction
@@ -5336,11 +5304,9 @@ func (s *RDBLogStore) deleteExpiredBatchByKey(ctx context.Context, table, key, c
 // retentionAdvisoryLockKeys gives each retention table its own lock, so replicas can drain different tables at once.
 // 1000040-1000049 is reserved for retention: enterprise holds 1000031 and 1000032, so keep this block separate.
 var retentionAdvisoryLockKeys = map[string]int64{
-	"logs":                   1000040,
-	"mcp_tool_logs":          1000041,
-	"relay_logs":             1000042,
-	"warp_topic_assignments": 1000043,
-	"warp_topic_unmatched":   1000044,
+	"logs":          1000040,
+	"mcp_tool_logs": 1000041,
+	"relay_logs":    1000042,
 }
 
 // retentionAdvisoryLockKeyOther covers any retention table missing from retentionAdvisoryLockKeys.
@@ -5468,22 +5434,16 @@ func (s *RDBLogStore) Close(ctx context.Context) error {
 	return sqlDB.Close()
 }
 
-// DeleteLog deletes a log entry from the database by its ID, and with it
-// what Warp's topic tables hold about it, in one transaction.
+// DeleteLog deletes a log entry from the database by its ID.
 func (s *RDBLogStore) DeleteLog(ctx context.Context, id string) error {
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", id).Delete(&Log{}).Error; err != nil {
-			return err
-		}
-		return deleteWarpTopicRowsForLogs(tx, []string{id})
-	})
+	return s.db.WithContext(ctx).Where("id = ?", id).Delete(&Log{}).Error
 }
 
 // deleteLogsChunkSize bounds one DELETE in DeleteLogs so a large id list of wide rows stays inside statement_timeout.
 const deleteLogsChunkSize = 100
 
-// DeleteLogs deletes multiple log entries from the database by their IDs, and
-// with them what Warp's topic tables hold about them, in one transaction.
+// DeleteLogs deletes multiple log entries from the database by their IDs, in
+// one transaction.
 func (s *RDBLogStore) DeleteLogs(ctx context.Context, ids []string) error {
 	if len(ids) == 0 {
 		return nil
@@ -5494,7 +5454,7 @@ func (s *RDBLogStore) DeleteLogs(ctx context.Context, ids []string) error {
 				return err
 			}
 		}
-		return deleteWarpTopicRowsForLogs(tx, ids)
+		return nil
 	})
 }
 

@@ -802,24 +802,16 @@ type failingDeleteStore struct {
 func (s failingDeleteStore) DeleteLog(context.Context, string) error    { return s.err }
 func (s failingDeleteStore) DeleteLogs(context.Context, []string) error { return s.err }
 
-// A partial delete removed the logs, so subscribers hear of it and the caller
-// still gets the error; a delete that failed before the logs went announces
-// nothing.
-func TestLogDeleteSubscribersAreToldOfPartialDeletes(t *testing.T) {
-	partial := fmt.Errorf("%w: cleanup failed", logstore.ErrPartialLogDelete)
-	plugin := &LoggerPlugin{ctx: context.Background(), store: failingDeleteStore{err: partial}, logger: testLogger{}}
+// A delete that failed before the logs went announces nothing.
+func TestLogDeleteSubscribersAreNotToldOfFailedDeletes(t *testing.T) {
+	plugin := &LoggerPlugin{ctx: context.Background(), store: failingDeleteStore{err: errors.New("log delete failed")}, logger: testLogger{}}
 	var told [][]string
 	plugin.SubscribeLogDeleteCallback(func(_ context.Context, ids []string) { told = append(told, ids) })
 	manager := plugin.GetPluginLogManager()
 
-	require.ErrorIs(t, manager.DeleteLogs(context.Background(), []string{"one", "two"}), logstore.ErrPartialLogDelete)
-	require.ErrorIs(t, manager.DeleteLog(context.Background(), "three"), logstore.ErrPartialLogDelete)
-	require.Equal(t, [][]string{{"one", "two"}, {"three"}}, told)
-
-	plugin.store = failingDeleteStore{err: errors.New("log delete failed")}
 	require.Error(t, manager.DeleteLogs(context.Background(), []string{"four"}))
 	require.Error(t, manager.DeleteLog(context.Background(), "five"))
-	require.Len(t, told, 2)
+	require.Empty(t, told)
 }
 
 func TestPostLLMHookStreamingErrorPreservesHeaderMetadata(t *testing.T) {

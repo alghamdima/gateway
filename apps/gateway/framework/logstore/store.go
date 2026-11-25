@@ -78,13 +78,6 @@ func withLogTimestamp(ctx context.Context, ts time.Time) context.Context {
 
 // LogStore is the interface for the log store.
 type LogStore interface {
-	// WarpConversationStore is Warp's saved-chat surface. Transcripts live here
-	// rather than in the config store because they are user-generated content
-	// that grows with use, not settings an install depends on.
-	WarpConversationStore
-	// WarpTopicStore is where Warp's topics, and each request's place among
-	// them, are kept. See warptopics.go.
-	WarpTopicStore
 	// ComplexitySuggestionStore is where the complexity router's phrase
 	// suggestions, and the runs that wrote them, are kept. See
 	// complexitysuggestions.go.

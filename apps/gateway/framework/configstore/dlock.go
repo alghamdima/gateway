@@ -13,7 +13,7 @@ import (
 	"github.com/maximhq/bifrost/framework/logstore"
 )
 
-// The ClickHouse log store serializes Warp history writes across instances
+// The ClickHouse log store serializes its cross-instance writes
 // through this manager; logstore declares the interface because configstore
 // imports it, not the other way round.
 var _ logstore.DistributedLocker = (*DistributedLockManager)(nil)

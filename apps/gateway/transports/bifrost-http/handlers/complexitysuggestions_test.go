@@ -210,7 +210,7 @@ func suggestionHandler(t *testing.T) (*router.Router, *suggestionManagerFake) {
 	r := router.New()
 	h.RegisterRoutes(r)
 
-	open := logstore.ComplexitySuggestion{ID: "s-open", RouterID: "default", RouterVersion: "bank-v2", Tier: "SIMPLE", Category: "uncovered", RequestCount: 40, Centroid: logstore.EncodeWarpVector([]float32{1, 0}), EmbeddingSignature: "ns"}
+	open := logstore.ComplexitySuggestion{ID: "s-open", RouterID: "default", RouterVersion: "bank-v2", Tier: "SIMPLE", Category: "uncovered", RequestCount: 40, Centroid: logstore.EncodeVector([]float32{1, 0}), EmbeddingSignature: "ns"}
 	require.NoError(t, open.SetPhrases([]string{"where is my refund"}))
 	require.NoError(t, open.SetExampleLogIDs([]string{"log-1", "log-gone"}))
 	require.NoError(t, open.SetCurrentRouting(map[string]int64{"none": 31, "MEDIUM": 9}))

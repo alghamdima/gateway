@@ -35,8 +35,7 @@ func forEachComplexitySuggestionStore(t *testing.T, test func(t *testing.T, stor
 			t.Skip("Postgres not available")
 		}
 		dropAllManagedMatViews(db)
-		tables := append([]string{"mcp_tool_logs", "async_jobs", "logs"}, warpTopicTables...)
-		for _, table := range append(tables, complexitySuggestionTables...) {
+		for _, table := range append([]string{"mcp_tool_logs", "async_jobs", "logs"}, complexitySuggestionTables...) {
 			require.NoError(t, db.Exec("DROP TABLE IF EXISTS "+table+" CASCADE").Error)
 		}
 		require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)
@@ -58,7 +57,7 @@ func testComplexitySuggestion(t *testing.T, id string, requests int64, centroid 
 	s := ComplexitySuggestion{
 		ID: id, Tier: "COMPLEX", Category: "uncovered", Confidence: "high", Reason: "multi-step design work",
 		RequestCount: requests, Coverage: 0.75, NearestPhrase: "summarize this", NearestTier: "SIMPLE", NearestSimilarity: 0.42,
-		Centroid: EncodeWarpVector(centroid), EmbeddingSignature: "BifrostComplexityRequests_abc", RunID: "run-1",
+		Centroid: EncodeVector(centroid), EmbeddingSignature: "BifrostComplexityRequests_abc", RunID: "run-1",
 	}
 	require.NoError(t, s.SetPhrases([]string{"design a distributed cache", "plan a schema migration"}))
 	require.NoError(t, s.SetExampleLogIDs([]string{"log-medoid", "log-2"}))
@@ -72,7 +71,7 @@ func testComplexitySuggestion(t *testing.T, id string, requests int64, centroid 
 func TestComplexitySuggestionsRoundTripAndReplace(t *testing.T) {
 	forEachComplexitySuggestionStore(t, func(t *testing.T, store LogStore) {
 		ctx := context.Background()
-		created := warpTopicTestTime()
+		created := suggestionTestTime()
 		big := testComplexitySuggestion(t, "big", 40, []float32{1, 0})
 		big.CreatedAt = created
 		small := testComplexitySuggestion(t, "small", 6, []float32{0, 1})
@@ -91,7 +90,7 @@ func TestComplexitySuggestionsRoundTripAndReplace(t *testing.T) {
 		assert.True(t, got.CreatedAt.Equal(created))
 		assert.True(t, got.LastSeenAt.Equal(created), "first seen when created")
 		assert.Nil(t, got.ResolvedAt)
-		centroid, err := DecodeWarpVector(got.Centroid)
+		centroid, err := DecodeVector(got.Centroid)
 		require.NoError(t, err)
 		assert.Equal(t, []float32{1, 0}, centroid)
 
@@ -131,7 +130,7 @@ func TestComplexitySuggestionsRoundTripAndReplace(t *testing.T) {
 func TestComplexitySuggestionRuns(t *testing.T) {
 	forEachComplexitySuggestionStore(t, func(t *testing.T, store LogStore) {
 		ctx := context.Background()
-		base := warpTopicTestTime()
+		base := suggestionTestTime()
 		for i, id := range []string{"r1", "r2", "r3", "r4"} {
 			require.NoError(t, store.UpsertComplexitySuggestionRun(ctx, &ComplexitySuggestionRun{
 				ID: id, RouterID: "engineering", StartedAt: base.Add(time.Duration(i) * time.Hour), EmbeddingSignature: "sig",
@@ -205,7 +204,7 @@ func TestComplexitySuggestionRuns(t *testing.T) {
 func TestInsertComplexitySuggestionRunKeepsWhatIsThere(t *testing.T) {
 	forEachComplexitySuggestionStore(t, func(t *testing.T, store LogStore) {
 		ctx := context.Background()
-		base := warpTopicTestTime()
+		base := suggestionTestTime()
 		inserted, err := store.InsertComplexitySuggestionRun(ctx, &ComplexitySuggestionRun{
 			ID: "run-1", RouterID: "engineering", Status: ComplexitySuggestionRunQueued, StartedAt: base, EmbeddingSignature: "sig",
 		})
@@ -239,7 +238,7 @@ func TestInsertComplexitySuggestionRunKeepsWhatIsThere(t *testing.T) {
 func TestComplexityVectorDeletes(t *testing.T) {
 	forEachComplexitySuggestionStore(t, func(t *testing.T, store LogStore) {
 		ctx := context.Background()
-		base := warpTopicTestTime()
+		base := suggestionTestTime()
 		require.NoError(t, store.AddComplexityVectorDeletes(ctx, []ComplexityVectorDelete{
 			{LogID: "late", Namespace: "BifrostComplexityRequests_abc", CreatedAt: base.Add(time.Minute)},
 			{LogID: "early", CreatedAt: base},
@@ -473,11 +472,11 @@ func TestComplexitySuggestionsAreScopedToARouter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, all, 2, "no router filter lists every router's suggestions")
 
-		window := warpTopicTestTime().Add(-7 * 24 * time.Hour)
+		window := suggestionTestTime().Add(-7 * 24 * time.Hour)
 		require.NoError(t, store.UpsertComplexitySuggestionRun(ctx, &ComplexitySuggestionRun{
-			ID: "run-eng", RouterID: "engineering", RouterVersion: "v3", StartedAt: warpTopicTestTime(), WindowStart: window,
+			ID: "run-eng", RouterID: "engineering", RouterVersion: "v3", StartedAt: suggestionTestTime(), WindowStart: window,
 		}))
-		require.NoError(t, store.UpsertComplexitySuggestionRun(ctx, &ComplexitySuggestionRun{ID: "run-unwindowed", StartedAt: warpTopicTestTime()}))
+		require.NoError(t, store.UpsertComplexitySuggestionRun(ctx, &ComplexitySuggestionRun{ID: "run-unwindowed", StartedAt: suggestionTestTime()}))
 		runs, err := store.ListComplexitySuggestionRuns(ctx, ComplexitySuggestionRunFilter{IDs: []string{"run-eng", "run-unwindowed"}}, 10)
 		require.NoError(t, err)
 		require.Len(t, runs, 2)
@@ -485,7 +484,7 @@ func TestComplexitySuggestionsAreScopedToARouter(t *testing.T) {
 		assert.Equal(t, "engineering", byID["run-eng"].RouterID)
 		assert.Equal(t, "v3", byID["run-eng"].RouterVersion)
 		assert.True(t, byID["run-eng"].WindowStart.Equal(window))
-		assert.True(t, byID["run-unwindowed"].WindowStart.Equal(warpTopicTestTime()), "an unset window starts with the run")
+		assert.True(t, byID["run-unwindowed"].WindowStart.Equal(suggestionTestTime()), "an unset window starts with the run")
 	})
 }
 
@@ -651,4 +650,10 @@ func TestComplexitySuggestionRunConditionalStatus(t *testing.T) {
 		require.NotNil(t, kept.FinishedAt)
 		assert.True(t, kept.FinishedAt.Equal(done))
 	})
+}
+
+// suggestionTestTime is a fixed instant with a sub-second part, so a store
+// that drops milliseconds shows up as a failed comparison.
+func suggestionTestTime() time.Time {
+	return time.Date(2026, 9, 1, 12, 0, 0, 250_000_000, time.UTC)
 }

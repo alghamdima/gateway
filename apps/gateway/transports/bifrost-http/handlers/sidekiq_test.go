@@ -60,11 +60,11 @@ func sidekiqCtx(admin bool) *fasthttp.RequestCtx {
 // runner marks routine, so an hourly job does not fill the tray.
 func TestSidekiqListJobsLeavesOutQuietKinds(t *testing.T) {
 	store := &fakeSidekiqJobsStore{}
-	runner := &fakeSidekiqJobsRunner{quiet: []string{"warp_topic_upkeep"}}
+	runner := &fakeSidekiqJobsRunner{quiet: []string{"quiet_kind"}}
 	ctx := sidekiqCtx(true)
 	NewSidekiqHandler(store, runner).listJobs(ctx)
 	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	require.Equal(t, []string{"warp_topic_upkeep"}, store.quiet)
+	require.Equal(t, []string{"quiet_kind"}, store.quiet)
 }
 
 func TestSidekiqListJobsMapsProgressAndCancellable(t *testing.T) {

@@ -58,7 +58,6 @@ func TestBuildRequestTraceResolvesTheChainFromAnyHop(t *testing.T) {
 	require.Equal(t, []string{"root", "hop"}, []string{trace.Nodes[0].ID, trace.Nodes[1].ID})
 	require.Equal(t, "success", trace.FinalStatus)
 	require.False(t, trace.TruncatedChain)
-	require.Empty(t, trace.Nodes[0].Link, "dashboard links are Warp's to add")
 }
 
 // storeTraceReader reads a real store the way the log manager does.

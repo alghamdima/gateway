@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"os"
 	"reflect"
 	"slices"
@@ -18,9 +17,7 @@ import (
 	"github.com/maximhq/bifrost/framework/queryscope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 	gormschema "gorm.io/gorm/schema"
 )
 
@@ -449,15 +446,13 @@ func TestLogsCleanerStopsAfterOversizedBatch(t *testing.T) {
 func TestClickHouseRetentionDeleteRunsOncePerCutoff(t *testing.T) {
 	s := &ClickHouseLogStore{}
 	cutoff := time.Now().UTC().AddDate(0, 0, -30)
-	for _, table := range []string{"logs", "relay_logs", "warp_topic_assignments", "warp_topic_unmatched"} {
+	for _, table := range []string{"logs", "relay_logs"} {
 		s.retentionCutoffs.Store(table, cutoff)
 	}
 	ctx := context.Background()
 	for name, deleteBatch := range map[string]func(context.Context, time.Time, int) (int64, error){
-		"logs":                   s.DeleteLogsBatch,
-		"relay_logs":             s.DeleteRelayLogsBatch,
-		"warp_topic_assignments": s.DeleteWarpTopicAssignmentsBatch,
-		"warp_topic_unmatched":   s.DeleteWarpTopicUnmatchedBatch,
+		"logs":       s.DeleteLogsBatch,
+		"relay_logs": s.DeleteRelayLogsBatch,
 	} {
 		var deleted int64
 		var err error
@@ -1005,8 +1000,8 @@ func TestClickHouseSearchAndStats(t *testing.T) {
 
 // The driver binds a time.Time at seconds precision, so a window bound inside a
 // second used to widen to that second's start and narrow to its end's start.
-// Warp's backfill resumes from a millisecond cursor, and every page re-read the
-// rows earlier in that second and embedded them again.
+// A reader that resumes from a millisecond cursor re-read the rows earlier in
+// that second on every page.
 func TestClickHouseSearchWindowKeepsMilliseconds(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	ctx := context.Background()
@@ -1739,38 +1734,6 @@ func TestClickHouseHistograms(t *testing.T) {
 	require.NotNil(t, modelRankings)
 }
 
-// The Warp history tables reach ClickHouse as generated DDL, and a wrong column
-// list there only fails against a real server - which most runs do not have.
-//
-// The specific hazard is WarpConversation.Messages. It is a GORM association,
-// not a column, and emitting it would produce DDL ClickHouse rejects at startup
-// on every deployment that uses this store. This asserts the generated columns
-// directly so the mistake is caught here instead.
-func TestClickHouseWarpConversationDDLOmitsAssociations(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{
-		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
-	})
-	require.NoError(t, err)
-	sqlDB, err := db.DB()
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = sqlDB.Close() })
-
-	cols, err := clickhouseColumnDefs(db, &WarpConversation{})
-	require.NoError(t, err)
-	names := chColumnNames(cols)
-	assert.Equal(t, []string{"id", "owner_id", "title", "created_at", "updated_at"}, names)
-	assert.NotContains(t, names, "messages", "the transcript is an association, not a column")
-
-	cols, err = clickhouseColumnDefs(db, &WarpMessage{})
-	require.NoError(t, err)
-	assert.Equal(t,
-		[]string{
-			"id", "conversation_id", "created_at", "position", "role", "content",
-			"tool_calls_json", "question_json", "error", "finish_reason", "total_tokens", "cost",
-		},
-		chColumnNames(cols))
-}
-
 // chColumnNames pulls the identifiers out of generated column definitions.
 func chColumnNames(cols []string) []string {
 	names := make([]string, 0, len(cols))
@@ -1806,159 +1769,6 @@ func (f *fakeDistributedLocker) Acquire(ctx context.Context, key string) (contex
 	return ctx, lock.Unlock, nil
 }
 
-// Two Bifrost instances on one ClickHouse do not share rmwLocks, so a delete on
-// one could land inside another's append - after its existence re-check, before
-// its re-insert - and bring the deleted thread back, or an empty-thread cleanup
-// could take a turn another instance was appending. Every Warp write must wait
-// on the owner's shared lock, whichever instance holds it.
-func TestClickHouseWarpWritesWaitForTheSharedOwnerLock(t *testing.T) {
-	holder := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	other, err := newClickHouseLogStore(ctx, clickhouseTestConfig(), 0, testLogger{})
-	require.NoError(t, err)
-	replica := other.(*ClickHouseLogStore)
-	t.Cleanup(func() { _ = replica.Close(context.Background()) })
-	locker := &fakeDistributedLocker{}
-	holder.SetDistributedLocker(locker)
-	replica.SetDistributedLocker(locker)
-
-	owner := fmt.Sprintf("user:lock-%d", time.Now().UnixNano())
-	now := time.Now().UTC()
-	seed := func(id string, at time.Time, messages int) {
-		require.NoError(t, holder.CreateWarpConversation(ctx, &WarpConversation{ID: id, OwnerID: owner, Title: id, CreatedAt: at, UpdatedAt: at}))
-		if messages > 0 {
-			batch := make([]WarpMessage, 0, messages)
-			for i := range messages {
-				batch = append(batch, WarpMessage{ID: fmt.Sprintf("%s-m%d", id, i), Role: "user", Content: "q", CreatedAt: at})
-			}
-			require.NoError(t, holder.AppendWarpMessages(ctx, owner, id, batch))
-		}
-	}
-	// Each write runs on the replica while the holder has the owner's lock, and
-	// must not finish until the holder lets go.
-	waitsForLock := func(t *testing.T, write func() error) {
-		t.Helper()
-		_, release, err := locker.Acquire(ctx, warpHistoryLockKey(owner))
-		require.NoError(t, err)
-		done := make(chan error, 1)
-		go func() { done <- write() }()
-		select {
-		case err := <-done:
-			release()
-			t.Fatalf("write finished while another instance held the owner's lock (err=%v)", err)
-		case <-time.After(300 * time.Millisecond):
-		}
-		release()
-		select {
-		case err := <-done:
-			require.NoError(t, err)
-		case <-time.After(30 * time.Second):
-			t.Fatal("write never finished after the lock was released")
-		}
-	}
-
-	t.Run("append", func(t *testing.T) {
-		seed(owner+"-append", now, 0)
-		waitsForLock(t, func() error {
-			return replica.AppendWarpMessages(ctx, owner, owner+"-append", []WarpMessage{{ID: owner + "-append-m", Role: "user", Content: "q", CreatedAt: now}})
-		})
-	})
-	t.Run("swap question", func(t *testing.T) {
-		seed(owner+"-swap", now, 1)
-		waitsForLock(t, func() error {
-			_, err := replica.SwapWarpQuestion(ctx, owner, owner+"-swap", owner+"-swap-m0", "", `{}`)
-			return err
-		})
-	})
-	t.Run("delete if empty", func(t *testing.T) {
-		seed(owner+"-empty", now, 0)
-		waitsForLock(t, func() error {
-			_, err := replica.DeleteWarpConversationIfEmpty(ctx, owner, owner+"-empty")
-			return err
-		})
-	})
-	t.Run("delete", func(t *testing.T) {
-		seed(owner+"-delete", now, 1)
-		waitsForLock(t, func() error { return replica.DeleteWarpConversation(ctx, owner, owner+"-delete") })
-	})
-	t.Run("prune", func(t *testing.T) {
-		seed(owner+"-prune-old", now.Add(-time.Hour), 1)
-		seed(owner+"-prune-new", now, 1)
-		waitsForLock(t, func() error {
-			_, err := replica.PruneWarpConversations(ctx, owner, 1)
-			return err
-		})
-	})
-	t.Run("age sweep", func(t *testing.T) {
-		stale := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
-		seed(owner+"-stale", stale, 1)
-		waitsForLock(t, func() error {
-			_, err := replica.DeleteWarpConversationsOlderThan(ctx, stale.Add(time.Hour))
-			return err
-		})
-	})
-}
-
-// A question swap writes only while the stored value is the expected one, on
-// the owner's own thread, so a confirmation card is claimed once.
-// On a cluster the claim path writes with a replica quorum and reads with
-// sequential consistency, so a second Confirm answered by another replica sees
-// the first claim. Run here against one node with the store marked clustered:
-// the settings reach the server on every Warp write and swap read, and the
-// claim still holds exactly once.
-func TestClickHouseWarpSwapQuestionOnCluster(t *testing.T) {
-	require.Equal(t, clickhouse.Settings{"insert_quorum": "auto", "insert_quorum_parallel": 0}, warpReplicaSettings(true))
-	require.Equal(t, clickhouse.Settings{"select_sequential_consistency": 1}, warpReplicaSettings(false))
-	single := &ClickHouseLogStore{}
-	ctx := context.Background()
-	require.Equal(t, ctx, single.warpReplicaContext(ctx, true), "single-node Warp queries carry no replica settings")
-
-	store := trySetupClickHouseStore(t)
-	locker := &keyRecordingLocker{}
-	store.SetDistributedLocker(locker)
-	store.cluster = "warp-test-cluster"
-	t.Cleanup(func() { store.cluster = "" })
-	owner := fmt.Sprintf("user:swap-cluster-%d", time.Now().UnixNano())
-	now := time.Now().UTC()
-	require.NoError(t, store.CreateWarpConversation(ctx, &WarpConversation{ID: owner + "-c", OwnerID: owner, Title: "t", CreatedAt: now, UpdatedAt: now}))
-	card := WarpMessage{ID: owner + "-card", Role: "assistant", Content: "a", QuestionJSON: `{"pending":{"token":"t"}}`, CreatedAt: now}
-	require.NoError(t, store.AppendWarpMessages(ctx, owner, owner+"-c", []WarpMessage{card}))
-
-	swapped, err := store.SwapWarpQuestion(ctx, owner, owner+"-c", card.ID, card.QuestionJSON, `{}`)
-	require.NoError(t, err)
-	require.True(t, swapped)
-	swapped, err = store.SwapWarpQuestion(ctx, owner, owner+"-c", card.ID, card.QuestionJSON, `{"again":true}`)
-	require.NoError(t, err)
-	require.False(t, swapped, "the second claim loses")
-
-	// With insert_quorum_parallel = 0 a replicated table takes one quorum insert
-	// at a time, so writes for different owners, under different owner locks,
-	// would fail each other; every quorum write also takes the one shared lock.
-	// The append writes twice (messages, then the thread row), the winning claim once.
-	require.Equal(t, 3, locker.count(warpQuorumWriteLockKey), "every Warp quorum write takes the shared quorum lock")
-
-	// The delete waits for every replica (lightweight_deletes_sync = 2); the server
-	// takes the setting, and the thread is gone once it returns.
-	require.NoError(t, store.DeleteWarpConversation(ctx, owner, owner+"-c"))
-	_, err = store.GetWarpConversation(ctx, owner, owner+"-c")
-	require.ErrorIs(t, err, ErrWarpConversationNotFound)
-}
-
-// A Warp history delete on a cluster waits for every replica, so once the owner's
-// lock is released no replica still shows the thread: a Confirm answered there
-// would otherwise claim the card and re-insert the message, bringing it back.
-// Other deletes, and every delete single-node, wait for the current replica only.
-func TestClickHouseWarpHistoryDeletesWaitForEveryReplica(t *testing.T) {
-	single := &ClickHouseLogStore{}
-	clustered := &ClickHouseLogStore{cluster: "warp-test-cluster"}
-	for _, table := range []string{"warp_messages", "warp_conversations"} {
-		require.Contains(t, single.chLightweightDeleteStmt(table, "id = ?"), "lightweight_deletes_sync = 1", table)
-		require.Contains(t, clustered.chLightweightDeleteStmt(table, "id = ?"), "lightweight_deletes_sync = 2", table)
-	}
-	require.Contains(t, clustered.chLightweightDeleteStmt("logs", "id = ?"), "lightweight_deletes_sync = 1", "only the Warp history tables wait for every replica")
-	require.Contains(t, clustered.chLightweightDeleteStmt("warp_topics", "id = ?"), "lightweight_deletes_sync = 1")
-}
-
 // keyRecordingLocker is a fakeDistributedLocker that counts acquisitions per key.
 type keyRecordingLocker struct {
 	fakeDistributedLocker
@@ -1982,55 +1792,6 @@ func (k *keyRecordingLocker) count(key string) int {
 	return k.seen[key]
 }
 
-// A card a later turn has overtaken is not claimed, checked under the owner's
-// lock that appends take.
-func TestClickHouseWarpSwapQuestionRefusesOvertakenCard(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	store.SetDistributedLocker(&fakeDistributedLocker{})
-	ctx := context.Background()
-	owner := fmt.Sprintf("user:swap-overtaken-%d", time.Now().UnixNano())
-	now := time.Now().UTC()
-	require.NoError(t, store.CreateWarpConversation(ctx, &WarpConversation{ID: owner + "-c", OwnerID: owner, Title: "t", CreatedAt: now, UpdatedAt: now}))
-	card := WarpMessage{ID: owner + "-card", Role: "assistant", Content: "a", QuestionJSON: `{"pending":{"token":"t"}}`, CreatedAt: now}
-	require.NoError(t, store.AppendWarpMessages(ctx, owner, owner+"-c", []WarpMessage{card}))
-	require.NoError(t, store.AppendWarpMessages(ctx, owner, owner+"-c", []WarpMessage{{ID: owner + "-later", Role: "user", Content: "never mind", CreatedAt: now.Add(time.Second)}}))
-
-	swapped, err := store.SwapWarpQuestion(ctx, owner, owner+"-c", card.ID, card.QuestionJSON, `{}`)
-	require.NoError(t, err)
-	require.False(t, swapped, "an overtaken card is not claimed")
-}
-
-func TestClickHouseWarpSwapQuestion(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	owner := fmt.Sprintf("user:swap-%d", time.Now().UnixNano())
-	now := time.Now().UTC()
-	require.NoError(t, store.CreateWarpConversation(ctx, &WarpConversation{ID: owner + "-c", OwnerID: owner, Title: "t", CreatedAt: now, UpdatedAt: now}))
-	card := WarpMessage{ID: owner + "-card", Role: "assistant", Content: "a", QuestionJSON: `{"pending":{"token":"t"}}`, CreatedAt: now}
-	require.NoError(t, store.AppendWarpMessages(ctx, owner, owner+"-c", []WarpMessage{card}))
-
-	// Without a distributed locker the claim is refused: this process's lock
-	// cannot keep a replica sharing the ClickHouse from claiming the card too.
-	_, err := store.SwapWarpQuestion(ctx, owner, owner+"-c", card.ID, card.QuestionJSON, `{}`)
-	require.ErrorIs(t, err, ErrWarpClaimNeedsSharedLock)
-	store.SetDistributedLocker(&fakeDistributedLocker{})
-
-	swapped, err := store.SwapWarpQuestion(ctx, "other", owner+"-c", card.ID, card.QuestionJSON, `{}`)
-	require.NoError(t, err)
-	require.False(t, swapped, "another owner's thread is not touched")
-	swapped, err = store.SwapWarpQuestion(ctx, owner, owner+"-c", card.ID, card.QuestionJSON, `{}`)
-	require.NoError(t, err)
-	require.True(t, swapped)
-	swapped, err = store.SwapWarpQuestion(ctx, owner, owner+"-c", card.ID, card.QuestionJSON, `{"again":true}`)
-	require.NoError(t, err)
-	require.False(t, swapped, "the second claim loses")
-
-	thread, err := store.GetWarpConversation(ctx, owner, owner+"-c")
-	require.NoError(t, err)
-	require.Len(t, thread.Messages, 1, "the re-insert replaces the card rather than adding a row")
-	require.Equal(t, `{}`, thread.Messages[0].QuestionJSON)
-}
-
 // lostLeaseLocker grants the lock but reports it lost at once, the way the
 // config-store lock does when its lease expires mid-write.
 type lostLeaseLocker struct{}
@@ -2039,25 +1800,6 @@ func (lostLeaseLocker) Acquire(ctx context.Context, _ string) (context.Context, 
 	held, lose := context.WithCancelCause(ctx)
 	lose(errors.New("lease lost"))
 	return held, func() {}, nil
-}
-
-// A write must run on the lock's context, so losing the lease stops it rather
-// than letting it finish without the protection it waited for.
-func TestClickHouseWarpWriteStopsWhenTheLeaseIsLost(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	owner := fmt.Sprintf("user:lease-%d", time.Now().UnixNano())
-	now := time.Now().UTC()
-	require.NoError(t, store.CreateWarpConversation(ctx, &WarpConversation{ID: owner + "-c", OwnerID: owner, Title: "c", CreatedAt: now, UpdatedAt: now}))
-
-	store.SetDistributedLocker(lostLeaseLocker{})
-	err := store.AppendWarpMessages(ctx, owner, owner+"-c", []WarpMessage{{ID: owner + "-m", Role: "user", Content: "q", CreatedAt: now}})
-	require.ErrorIs(t, err, context.Canceled)
-
-	store.SetDistributedLocker(nil)
-	counts, err := store.CountWarpMessages(ctx, []string{owner + "-c"})
-	require.NoError(t, err)
-	require.Zero(t, counts[owner+"-c"], "nothing was written without the lock")
 }
 
 func TestClickHouseBatchUpdate(t *testing.T) {
@@ -2194,45 +1936,6 @@ func TestClickHouseUserAgentMappingWritesWaitForTheSharedLock(t *testing.T) {
 	assert.ErrorIs(t, store.UpdateUserAgentMapping(ctx, "ch-uam-lock", &UserAgentMapping{}), context.Canceled)
 }
 
-// The assignments table is read like logs, by time range first, so it is laid
-// out like logs and expires with them. Topics must not expire at all: they
-// outlive the requests they were built from.
-func TestClickHouseWarpTopicTablesFollowLogsRetention(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	expiring := []string{"warp_topic_assignments", "warp_topic_unmatched"}
-	removeTTLs := func() {
-		t.Helper()
-		for _, table := range expiring {
-			if strings.Contains(chEngineFull(t, store.db, table), "TTL ") {
-				require.NoError(t, store.db.Exec("ALTER TABLE `"+table+"` REMOVE TTL").Error, "%s: reset TTL", table)
-			}
-		}
-	}
-	removeTTLs()
-	t.Cleanup(removeTTLs)
-
-	assignments := chEngineFull(t, store.db, "warp_topic_assignments")
-	assert.Contains(t, assignments, "PARTITION BY toYYYYMM(timestamp)")
-	assert.Contains(t, assignments, "ORDER BY (timestamp, log_id)", "the sort key is also the identity a rewritten assignment replaces")
-	assert.Contains(t, chEngineFull(t, store.db, "warp_topic_unmatched"), "ORDER BY log_id")
-	assert.Contains(t, chEngineFull(t, store.db, "warp_topics"), "ORDER BY id")
-
-	// Retention configured after the tables exist is applied to them, and a
-	// change of retention replaces the rule instead of adding a second.
-	for _, days := range []int{30, 7} {
-		require.NoError(t, migrationClickHouseWarpTopicTables(ctx, store.db, "", days, testLogger{}))
-		for _, table := range expiring {
-			engineFull := chEngineFull(t, store.db, table)
-			got, ok := chTTLDaysFromEngineFull(engineFull)
-			require.True(t, ok, "%s: expected a managed TTL, got %q", table, engineFull)
-			assert.Equal(t, days, got, "%s: %q", table, engineFull)
-			assert.Equal(t, 1, strings.Count(engineFull, "TTL "), "%s: exactly one TTL clause expected in %q", table, engineFull)
-		}
-		assert.NotContains(t, chEngineFull(t, store.db, "warp_topics"), "TTL ", "topics never expire")
-	}
-}
-
 // TestClickHouseUpdateTimestampHint: Update bounds its read with the row
 // timestamp hint, and a hint that matches no row (wrong timestamp) falls back
 // to the id alone instead of reporting the row missing.
@@ -2299,7 +2002,7 @@ func TestClickHouseMarkHasObject(t *testing.T) {
 	assert.Equal(t, doneVer, chRowVer(t, store, "mark-done"), "an already-flagged row must not be re-inserted")
 	assert.NotEqual(t, exactVer, chRowVer(t, store, "mark-exact"))
 
-	_, err = store.MarkHasObject(ctx, "warp_topics", []HasObjectMark{{ID: "x"}})
+	_, err = store.MarkHasObject(ctx, "async_jobs", []HasObjectMark{{ID: "x"}})
 	assert.Error(t, err)
 }
 

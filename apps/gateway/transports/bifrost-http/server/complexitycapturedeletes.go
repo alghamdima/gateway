@@ -62,7 +62,7 @@ type captureDeleteRecorderSetter interface {
 }
 
 // applyRoutingCaptureDeleteRecorder gives a plugin the log store to keep its
-// failed captured-vector deletes in, for its upkeep to retry, as Warp's are.
+// failed captured-vector deletes in, for its upkeep to retry.
 func (s *BifrostHTTPServer) applyRoutingCaptureDeleteRecorder(plugin any) {
 	setter, ok := plugin.(captureDeleteRecorderSetter)
 	if !ok || s.Config == nil || s.Config.LogsStore == nil {

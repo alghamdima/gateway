@@ -1556,8 +1556,8 @@ func (h *GovernanceHandler) hydrateVKGovernance(ctx context.Context, vk *configs
 }
 
 // vkModelConfigReader is the one store read hydrateVKGovernanceFromStore
-// needs, so a caller holding less than a whole ConfigStore (Warp's tests, a
-// narrowed reader) can still hydrate a row.
+// needs, so a caller holding less than a whole ConfigStore (a narrowed
+// reader) can still hydrate a row.
 type vkModelConfigReader interface {
 	GetModelConfigsByScopeAndScopeIDs(ctx context.Context, scope string, scopeIDs []string, tx ...*gorm.DB) ([]configstoreTables.TableModelConfig, error)
 }
@@ -1663,8 +1663,7 @@ func (h *GovernanceHandler) applyExternalBudgets(ctx context.Context, vk *config
 }
 
 // applyExternalQuotaBudgets overlays a resolver's answer onto a key row, for
-// every read path that shows a key's governance - the governance handler and
-// Warp's describe_virtual_key alike. It returns the result so a caller can
+// every read path that shows a key's governance. It returns the result so a caller can
 // name what governs the key (the sources on each budget); nil when the
 // resolver had nothing to say or there is no resolver.
 func applyExternalQuotaBudgets(ctx context.Context, resolver ExternalQuotaBudgetResolver, vk *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {

@@ -710,7 +710,7 @@ func TestGetUserSpendRawSumsWindowInOneQuery(t *testing.T) {
 // A failed request has no cost and, when it never reached a provider, no
 // latency. Sorted by either, those rows are "no value", not "the largest" or
 // "the smallest": Postgres puts NULLs first under DESC, so "most expensive
-// requests" led with zero-cost failures and Warp named a failed call as the
+// requests" led with zero-cost failures and a failed call was named the
 // week's most expensive; SQLite puts them first under ASC instead. Both
 // directions, both backends: rows with the value come first.
 func TestSearchLogsSortsMissingCostAndLatencyLast(t *testing.T) {

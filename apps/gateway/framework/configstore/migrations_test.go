@@ -1293,7 +1293,6 @@ func TestTriggerMigrations_FreshDB(t *testing.T) {
 		&tables.TableVirtualKeyProviderConfig{},
 		&tables.TableVirtualKeyMCPConfig{},
 		&tables.TableNotification{},
-		&tables.TableWarpConfig{},
 		&tables.TableAgentRegistration{},
 		&tables.TableVirtualKeyAgentGrant{},
 	}
@@ -4794,120 +4793,6 @@ func TestMigrationAddAgentGatewayTables_NonRollbackable(t *testing.T) {
 	assert.True(t, db.Migrator().HasTable(&tables.TableAgentPushConfig{}))
 	assert.True(t, db.Migrator().HasTable(&tables.TableAgentPushDelivery{}))
 	assert.True(t, db.Migrator().HasColumn(&tables.TableClientConfig{}, "A2AExternalClientURL"))
-}
-
-// TestMigrationAddWarpAPIKeyIDColumn_NonRollbackable pins that rolling Warp's
-// move to a key reference back is refused rather than performed. The forward
-// migration deliberately NULLs api_key - clearing the credential is the step
-// that matters, since GORM's SQLite driver reports a successful DropColumn
-// without dropping anything. A rollback therefore cannot reconstruct api_key,
-// so dropping api_key_id would leave Warp with neither a usable credential nor
-// the reference that replaced it. The rollback must fail loudly and leave the
-// column in place.
-func TestMigrationAddWarpAPIKeyIDColumn_NonRollbackable(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, db.AutoMigrate(&tables.TableWarpConfig{}))
-	require.NoError(t, db.Migrator().DropColumn(&tables.TableWarpConfig{}, "api_key_id"))
-	require.False(t, db.Migrator().HasColumn(&tables.TableWarpConfig{}, "api_key_id"),
-		"precondition: the column must be absent to reproduce the upgrade path")
-
-	require.NoError(t, migrationAddWarpAPIKeyIDColumn(ctx, db, testMigrationLogger))
-	require.True(t, db.Migrator().HasColumn(&tables.TableWarpConfig{}, "api_key_id"),
-		"migration should have added api_key_id")
-
-	// A configured Warp row is exactly the state a rollback would strand: its
-	// api_key is already gone, so losing api_key_id too leaves no credential.
-	seed := &tables.TableWarpConfig{
-		ID: tables.WarpConfigRowID, Enabled: true, Provider: "openai", Model: "gpt-4o", APIKeyID: "key-abc",
-	}
-	require.NoError(t, db.Create(seed).Error)
-
-	err := rollbackWarpAPIKeyIDColumn(ctx, db, testMigrationLogger)
-	require.Error(t, err, "rollback must refuse: the forward migration destroyed the api_key it replaced")
-	assert.Contains(t, err.Error(), "non-rollbackable")
-	assert.True(t, db.Migrator().HasColumn(&tables.TableWarpConfig{}, "api_key_id"),
-		"a refused rollback must leave the column intact")
-
-	var got tables.TableWarpConfig
-	require.NoError(t, db.Where("id = ?", seed.ID).First(&got).Error)
-	assert.Equal(t, "key-abc", got.APIKeyID, "the surviving key reference must be untouched")
-}
-
-// TestMigrationAddWarpHistoryRetentionDaysColumn pins the upgrade path for a
-// deployment whose warp_config row predates the setting.
-//
-// The column has to arrive with a zero, and zero has to keep meaning "not set"
-// all the way through to schemas.WarpConfig.EffectiveHistoryRetentionDays. If
-// it were ever read literally, the first sweep after an upgrade would delete
-// every saved chat on the deployment.
-func TestMigrationAddWarpHistoryRetentionDaysColumn(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, db.AutoMigrate(&tables.TableWarpConfig{}))
-	require.NoError(t, db.Migrator().DropColumn(&tables.TableWarpConfig{}, "history_retention_days"))
-	require.False(t, db.Migrator().HasColumn(&tables.TableWarpConfig{}, "history_retention_days"),
-		"precondition: the column must be absent to reproduce the upgrade path")
-	// Raw SQL, not Create: the model now carries the column this test just
-	// dropped, so GORM would name it in the INSERT and fail before the migration
-	// gets a chance to add it.
-	now := time.Now().UTC()
-	require.NoError(t, db.Exec(
-		"INSERT INTO warp_config (id, enabled, provider, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		tables.WarpConfigRowID, true, "openai", "gpt-4o", now, now).Error)
-
-	require.NoError(t, migrationAddWarpHistoryRetentionDaysColumn(ctx, db, testMigrationLogger))
-	require.True(t, db.Migrator().HasColumn(&tables.TableWarpConfig{}, "history_retention_days"),
-		"migration should have added history_retention_days")
-
-	var got tables.TableWarpConfig
-	require.NoError(t, db.Where("id = ?", tables.WarpConfigRowID).First(&got).Error)
-	assert.Zero(t, got.HistoryRetentionDays, "an existing row must come back unset, not expired")
-
-	config := schemas.WarpConfig{HistoryRetentionDays: got.HistoryRetentionDays}
-	assert.Equal(t, schemas.WarpDefaultHistoryRetentionDays, config.EffectiveHistoryRetentionDays(),
-		"unset must resolve to the default rather than deleting everything")
-}
-
-// The embedding columns must not arrive NULL on an existing row.
-//
-// migrationAddWarpLogEmbeddingColumns adds them with AutoMigrate, and without a
-// default the existing warp_config row gets NULL. GetWarpConfig scans them into
-// plain Go strings, where database/sql reports "converting NULL to string is
-// unsupported" - so reading the configuration fails outright on any deployment
-// that had Warp set up before this migration.
-func TestMigrationAddWarpLogEmbeddingColumnsBackfillsExistingRows(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-
-	require.NoError(t, db.AutoMigrate(&tables.TableWarpConfig{}))
-	for _, column := range []string{"embedding_provider", "embedding_model", "embedding_api_key_id", "log_vector_store_namespace"} {
-		require.NoError(t, db.Migrator().DropColumn(&tables.TableWarpConfig{}, column))
-	}
-	now := time.Now().UTC()
-	require.NoError(t, db.Exec(
-		"INSERT INTO warp_config (id, enabled, provider, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		tables.WarpConfigRowID, true, "openai", "gpt-4o", now, now).Error)
-
-	require.NoError(t, migrationAddWarpLogEmbeddingColumns(ctx, db, testMigrationLogger))
-
-	// The read that used to fail: scanning into non-pointer strings.
-	var got tables.TableWarpConfig
-	require.NoError(t, db.Where("id = ?", tables.WarpConfigRowID).First(&got).Error,
-		"reading the configuration must not fail on a row that predates these columns")
-	require.Empty(t, got.EmbeddingProvider)
-	require.Empty(t, got.LogVectorStoreNamespace)
-
-	// And the columns must hold '' rather than NULL. SQLite will scan a NULL
-	// into a string without complaint, so the assertion above passes either way;
-	// Postgres is where database/sql refuses, and this is the check that would
-	// have caught it.
-	var nulls int64
-	require.NoError(t, db.Raw(`SELECT count(*) FROM warp_config WHERE embedding_provider IS NULL
-		OR embedding_model IS NULL OR embedding_api_key_id IS NULL OR log_vector_store_namespace IS NULL`).Scan(&nulls).Error)
-	require.Zero(t, nulls, "these columns are scanned into plain strings, so NULL breaks the read on Postgres")
 }
 
 func TestMigrationAddClientConfigDeleteExpiredVirtualKeysColumn(t *testing.T) {

@@ -2,7 +2,9 @@ package logstore
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -13,7 +15,7 @@ import (
 )
 
 // Phrase suggestions for the complexity router live here, beside the logs
-// they were drawn from, as Warp's topics do.
+// they were drawn from.
 //
 // model_routing_suggestions holds one row per traffic cluster a suggestion run
 // proposed phrases for, for one model router: every row, run and decision
@@ -28,7 +30,7 @@ import (
 //
 // model_routing_suggestion_runs records each run, and model_routing_vector_deletes
 // is the retry list for captured request vectors whose delete failed when
-// their log was deleted (the same role warp_vector_deletes plays for Warp).
+// their log was deleted.
 
 const (
 	// ComplexitySuggestionStatusOpen suggestions wait for the user.
@@ -87,7 +89,7 @@ const complexitySuggestionWriteBatch = 500
 
 // ComplexitySuggestion is one cluster's suggested phrases.
 //
-// Centroid is the cluster's unit direction, encoded by EncodeWarpVector, and
+// Centroid is the cluster's unit direction, encoded by EncodeVector, and
 // is only comparable with vectors from the embedding space named by
 // EmbeddingSignature (the capture namespace), which is why both are stored.
 type ComplexitySuggestion struct {
@@ -275,8 +277,7 @@ type ComplexitySuggestionRunFilter struct {
 }
 
 // ComplexitySuggestionStore is the phrase-suggestion surface. It is embedded
-// in LogStore for the reason WarpTopicStore is: a store that forgot a method
-// should fail the build.
+// in LogStore so that a store that forgot a method fails the build.
 type ComplexitySuggestionStore interface {
 	// UpsertComplexitySuggestions writes suggestions whole, replacing any row
 	// with the same ID. A caller changing one field (a dismiss) reads the row,
@@ -460,8 +461,8 @@ func prepareComplexityVectorDeletes(rows []ComplexityVectorDelete, now time.Time
 // complexitySuggestionRunPruneWhere builds the predicate selecting the runs
 // beyond the newest keep: at or before the first run past them, in the same
 // (started_at, id) order the list uses. Empty when there is nothing to drop.
-// One predicate rather than a list of ids, for the reason
-// warpTopicUnmatchedPruneWhere gives.
+// One predicate rather than a list of ids, so the statement stays small
+// however many rows are surplus.
 func complexitySuggestionRunPruneWhere(ctx context.Context, db *gorm.DB, routerID string, keep int) (string, []any, error) {
 	var surplus []ComplexitySuggestionRun
 	if err := db.WithContext(ctx).
@@ -476,7 +477,7 @@ func complexitySuggestionRunPruneWhere(ctx context.Context, db *gorm.DB, routerI
 	if len(surplus) == 0 {
 		return "", nil, nil
 	}
-	placeholder, arg := warpTopicTimeArg(db, surplus[0].StartedAt)
+	placeholder, arg := timestampArg(db, surplus[0].StartedAt)
 	return fmt.Sprintf("router_id = ? AND (started_at < %s OR (started_at = %s AND id <= ?))", placeholder, placeholder),
 		[]any{routerID, arg, arg, surplus[0].ID}, nil
 }
@@ -821,4 +822,49 @@ func (s *RDBLogStore) ListComplexityReplayUsage(ctx context.Context, logIDs []st
 		}
 	}
 	return out, nil
+}
+
+// EncodeVector packs a vector as little-endian float32s, four bytes a
+// dimension. Stored this way instead of as JSON because a 1536-dimension
+// vector is 6 KB packed and about three times that as text.
+func EncodeVector(vector []float32) []byte {
+	if len(vector) == 0 {
+		return nil
+	}
+	encoded := make([]byte, 4*len(vector))
+	for i, value := range vector {
+		binary.LittleEndian.PutUint32(encoded[4*i:], math.Float32bits(value))
+	}
+	return encoded
+}
+
+// DecodeVector reverses EncodeVector.
+func DecodeVector(encoded []byte) ([]float32, error) {
+	if len(encoded)%4 != 0 {
+		return nil, fmt.Errorf("encoded vector is %d bytes, not a multiple of 4", len(encoded))
+	}
+	if len(encoded) == 0 {
+		return nil, nil
+	}
+	vector := make([]float32, len(encoded)/4)
+	for i := range vector {
+		vector[i] = math.Float32frombits(binary.LittleEndian.Uint32(encoded[4*i:]))
+	}
+	return vector, nil
+}
+
+// timestampArg returns the placeholder and argument that compare a
+// timestamp column against t.
+//
+// ClickHouse needs its own form: the driver formats a time.Time argument as
+// toDateTime('...'), at whole seconds, so an exact comparison against a
+// DateTime64(3) column would be off by the sub-second part. Binding epoch
+// milliseconds keeps the precision the column stores. Elsewhere the time is
+// bound in UTC, the zone every row is written in, because SQLite compares
+// timestamps as text.
+func timestampArg(db *gorm.DB, t time.Time) (string, any) {
+	if db.Dialector.Name() == "clickhouse" {
+		return "fromUnixTimestamp64Milli(?)", t.UnixMilli()
+	}
+	return "?", t.UTC()
 }

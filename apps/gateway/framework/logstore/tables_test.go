@@ -470,7 +470,7 @@ func TestOverheadBreakdownRoundTripsNameKeyedObject(t *testing.T) {
 }
 
 func TestOverheadBreakdownPreservesChronologicalOrder(t *testing.T) {
-	// framework/warp truncates by position, so map-order decoding would pick at random.
+	// Readers truncate by position, so map-order decoding would pick at random.
 	names := []string{"transport-context", "middleware.auth", "request-unmarshal", "convertor",
 		"handle-setup", "plugin.logging", "key.selection", "queue-wait", "response-parse", "scheduling"}
 	in := make([]OverheadBucket, 0, len(names))

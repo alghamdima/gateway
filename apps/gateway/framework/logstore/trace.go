@@ -19,8 +19,7 @@ import (
 // provider and model tried, in order), and returns each hop's error, guardrail
 // and cache decisions, and latency breakdown. It explains why one request did
 // what it did; it cannot explain why an aggregate changed. GET
-// /api/logs/{id}/trace serves it, and Warp's get_request_trace tool reads the
-// same function, so both report the same chain.
+// /api/logs/{id}/trace serves it.
 
 const (
 	// MaxTraceChainLength caps fallback hops returned beyond the root. A real
@@ -125,8 +124,6 @@ type TraceNode struct {
 	PluginLogs        []TracePluginLogLine `json:"plugin_logs,omitempty"`
 	RoutingEngineLogs []string             `json:"routing_engine_logs,omitempty"`
 	OverheadBreakdown []TraceOverhead      `json:"overhead_breakdown,omitempty"`
-	// Link is a dashboard path to the row. The API leaves it empty; Warp fills it.
-	Link string `json:"link,omitempty"`
 }
 
 // TraceReader is what BuildRequestTrace reads logs through. Both calls must

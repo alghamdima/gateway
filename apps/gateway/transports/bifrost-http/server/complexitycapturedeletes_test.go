@@ -41,11 +41,6 @@ func TestComplexityCaptureDeletesRoundTripThroughLogStore(t *testing.T) {
 	rows, err = recorder.ListCaptureDeletes(ctx, 10)
 	require.NoError(t, err)
 	assert.Equal(t, []complexity.CaptureDelete{{LogID: "b"}}, rows)
-
-	// Warp's retry list is a different table: neither sees the other's rows.
-	warp, err := ls.ListWarpVectorDeletes(ctx, 10)
-	require.NoError(t, err)
-	assert.Empty(t, warp)
 }
 
 // The routing plugin keeps its failed deletes through this setter; if it
