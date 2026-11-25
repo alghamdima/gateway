@@ -66,6 +66,13 @@
       "description": "Gestiona tus organizaciones y sus miembros."
     },
     "organization": {
+      "dataPolicy": {
+        "open": "Sin restricciones: cualquier endpoint puede atender a esta organización.",
+        "version": "Versión {{version}}",
+        "applied": "En todas las claves",
+        "notApplied": "Aún no está en todas las claves",
+        "nothingAllowed": "Ningún endpoint cumple esta política: todas las solicitudes de esta organización se rechazan."
+      },
       "rateLimit": {
         "requests": "Solicitudes por minuto",
         "tokens": "Tokens por minuto",

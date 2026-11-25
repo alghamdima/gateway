@@ -14,6 +14,7 @@ import {
 } from "../../../schema";
 import { adjustCredits } from "../../credits/adjust";
 import { getBalance } from "../../credits/ledger";
+import { getDataPolicy } from "../../data-policy/policy";
 import { getInvitations } from "../../organization/queries/invitations";
 import { getMembers } from "../../organization/queries/members";
 import {
@@ -80,6 +81,10 @@ export const organizationsRouter = new Hono<{ Variables: { user: User } }>()
   )
   .get("/:id/rate-limit", async (c) =>
     c.json(await getOrganizationRateLimit(c.req.param("id"))),
+  )
+  // read-only here: the organization's owners and admins set it (ADR 0015)
+  .get("/:id/data-policy", async (c) =>
+    c.json(await getDataPolicy(c.req.param("id"))),
   )
   .put(
     "/:id/rate-limit",

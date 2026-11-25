@@ -10,6 +10,7 @@ import { getMetadata } from "~/lib/metadata";
 import { getQueryClient } from "~/lib/query/server";
 import { admin } from "~/modules/admin/lib/api";
 import { OrganizationCredits } from "~/modules/admin/organizations/organization/credits";
+import { OrganizationDataPolicy } from "~/modules/admin/organizations/organization/data-policy";
 import { OrganizationDetails } from "~/modules/admin/organizations/organization/details";
 import { OrganizationHeader } from "~/modules/admin/organizations/organization/header";
 import { InvitationsDataTable } from "~/modules/admin/organizations/organization/invitations/data-table/invitations-data-table";
@@ -71,6 +72,10 @@ export default async function OrganizationPage({
     {
       label: t("rateLimit"),
       component: <OrganizationRateLimit organizationId={id} />,
+    },
+    {
+      label: t("dataPolicy"),
+      component: <OrganizationDataPolicy organizationId={id} />,
     },
     {
       label: t("members"),
