@@ -56,6 +56,9 @@ export default defineEnv({
    */
   env: {
     ...process.env,
+    // named so the browser bundle gets the real value: `...process.env` is empty there, and the
+    // default ("development") made the browser render what the server had not
+    NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_PRODUCT_NAME: process.env.NEXT_PUBLIC_PRODUCT_NAME,
     NEXT_PUBLIC_URL: process.env.NEXT_PUBLIC_URL,
     NEXT_PUBLIC_DEFAULT_LOCALE: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,

@@ -131,7 +131,9 @@ export default function DashboardLayout({
         <Suspense fallback={<div className="h-14 border-b" />}>
           <AuthenticatedOrgActionBar params={params} />
         </Suspense>
-        <DashboardInset>{children}</DashboardInset>
+        <DashboardInset>
+          <SidebarQueries params={params}>{children}</SidebarQueries>
+        </DashboardInset>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -172,9 +174,48 @@ async function AuthenticatedOrgSidebar({
   const { user, activeOrganization, organizationSlug, items } =
     await getWorkspace(params);
 
+  return (
+    <HydrationBoundary
+      state={await sidebarQueries(organizationSlug, activeOrganization)}
+    >
+      <DashboardSidebar user={user} menu={items} />
+    </HydrationBoundary>
+  );
+}
+
+/**
+ * The page gets what the sidebar reads as well. A page that reads the same query can render
+ * first, and a query that already exists is only filled in by an effect: the server then sent
+ * the sidebar without its data, and the browser, which had fetched it by then, disagreed.
+ */
+async function SidebarQueries({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ organization: string }>;
+}) {
+  const slug = (await params).organization;
+  const activeOrganization = await getOrganization({ slug });
+
+  if (!activeOrganization) {
+    return children;
+  }
+
+  return (
+    <HydrationBoundary state={await sidebarQueries(slug, activeOrganization)}>
+      {children}
+    </HydrationBoundary>
+  );
+}
+
+async function sidebarQueries(
+  slug: string,
+  activeOrganization: NonNullable<Awaited<ReturnType<typeof getOrganization>>>,
+) {
   const queryClient = getQueryClient();
   queryClient.setQueryData(
-    organization.queries.get({ slug: organizationSlug }).queryKey,
+    organization.queries.get({ slug }).queryKey,
     activeOrganization,
   );
   queryClient.setQueryData(
@@ -191,11 +232,7 @@ async function AuthenticatedOrgSidebar({
       }),
   });
 
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <DashboardSidebar user={user} menu={items} />
-    </HydrationBoundary>
-  );
+  return dehydrate(queryClient);
 }
 
 async function AuthenticatedOrgActionBar({

@@ -78,7 +78,9 @@ export default function DashboardLayout({
       </Suspense>
       <SidebarInset>
         <DashboardActionBar menu={menu} />
-        <DashboardInset>{children}</DashboardInset>
+        <DashboardInset>
+          <SidebarQueries>{children}</SidebarQueries>
+        </DashboardInset>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -93,22 +95,45 @@ async function AuthenticatedSidebar() {
 
   const { user } = session;
 
+  return (
+    <HydrationBoundary state={await sidebarQueries(user.id)}>
+      <DashboardSidebar user={user} menu={menu} />
+    </HydrationBoundary>
+  );
+}
+
+/**
+ * The page gets what the sidebar reads as well. A page that reads the same query can render
+ * first, and a query that already exists is only filled in by an effect: the server then sent
+ * the sidebar without its data, and the browser, which had fetched it by then, disagreed.
+ */
+async function SidebarQueries({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+
+  if (!session?.user) {
+    return children;
+  }
+
+  return (
+    <HydrationBoundary state={await sidebarQueries(session.user.id)}>
+      {children}
+    </HydrationBoundary>
+  );
+}
+
+async function sidebarQueries(userId: string) {
   const queryClient = getQueryClient();
   await queryClient.query({
-    ...billing.queries.summary.get(user.id),
+    ...billing.queries.summary.get(userId),
     queryFn: () =>
       handle(api.billing.summary.$get, {
         schema: getBillingSummaryResponseSchema,
       })({
         query: {
-          referenceId: user.id,
+          referenceId: userId,
         },
       }),
   });
 
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <DashboardSidebar user={user} menu={menu} />
-    </HydrationBoundary>
-  );
+  return dehydrate(queryClient);
 }
