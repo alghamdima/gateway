@@ -655,6 +655,11 @@ export const createGatewayClient = ({
       return toProviderKey(key ?? {});
     },
 
+    /** Reads the price list again now, instead of waiting for the next scheduled sync. */
+    syncPrices: async () => {
+      await call("POST", "/api/pricing/force-sync", {});
+    },
+
     /** A key that is already gone counts as deleted. */
     deleteProviderKey: async (provider: string, keyId: string) => {
       await call(

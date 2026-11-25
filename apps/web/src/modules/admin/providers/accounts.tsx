@@ -70,6 +70,7 @@ export const ProviderAccounts = () => {
           <Account key={account.name} account={account} canEdit={canEdit} />
         ))}
         {canEdit && <NewProvider />}
+        {canEdit && <PriceSync />}
       </CardContent>
     </Card>
   );
@@ -86,6 +87,34 @@ const useChanged = () => {
 
 const onError = (error: Error) =>
   toast.add({ title: error.message, type: "error" });
+
+/** The gateway reads its price list on a schedule; this reads it now. */
+const PriceSync = () => {
+  const { t } = useTranslation(["common", "admin"]);
+  const changed = useChanged();
+  const sync = useMutation({
+    ...admin.mutations.providers.syncPrices,
+    onSuccess: () => changed(t("admin:providers.accounts.pricesSynced")),
+    onError,
+  });
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+      <Button
+        variant="outline"
+        size="sm"
+        type="button"
+        disabled={sync.isPending}
+        onClick={() => sync.mutate()}
+      >
+        {t("admin:providers.accounts.syncPrices")}
+      </Button>
+      <p className="text-muted-foreground text-xs">
+        {t("admin:providers.accounts.syncPricesHint")}
+      </p>
+    </div>
+  );
+};
 
 const Account = ({
   account,

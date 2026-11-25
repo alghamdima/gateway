@@ -321,7 +321,10 @@
       "error": {
         "exists": "A provider with this name already exists.",
         "refused": "The gateway refused this change. Check the name and the address."
-      }
+      },
+      "syncPrices": "Sync prices now",
+      "pricesSynced": "Prices synced.",
+      "syncPricesHint": "The gateway reads provider prices on a schedule. Use this after a provider changes its prices and you do not want to wait."
     }
   },
   "reconciliation": {

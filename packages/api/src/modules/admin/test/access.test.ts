@@ -36,6 +36,7 @@ const ROUTES = {
   readProviders: ["GET", "/providers"],
   setProviderTerms: ["PUT", "/providers/k1/terms"],
   removeProviderTerms: ["DELETE", "/providers/k1/terms"],
+  syncProviderPrices: ["POST", "/providers/price-sync"],
   readProviderAccounts: ["GET", "/providers/accounts"],
   createProvider: ["POST", "/providers/accounts"],
   deleteProvider: ["DELETE", "/providers/accounts/openai"],

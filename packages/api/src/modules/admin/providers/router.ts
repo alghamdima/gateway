@@ -21,6 +21,7 @@ import {
   deleteProviderKey,
   listProviderAccounts,
   refreshProviderModels,
+  syncProviderPrices,
   updateProviderKey,
 } from "./accounts";
 import {
@@ -49,6 +50,10 @@ const pushPolicies = async () => ({
 /** Mounted under /api/admin, behind enforceAdmin. */
 export const providersRouter = new Hono<{ Variables: { user: User } }>()
   .get("/", async (c) => c.json(await getProviderCatalog()))
+  .post("/price-sync", async (c) => {
+    await syncProviderPrices();
+    return c.json({ isSynced: true });
+  })
   // the providers themselves and their keys, which live in the gateway
   .get("/accounts", async (c) => c.json(await listProviderAccounts()))
   .post(

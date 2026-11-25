@@ -409,6 +409,10 @@ const mutations = {
     }),
   },
   providers: {
+    syncPrices: mutationOptions({
+      mutationKey: [KEY, "providers", "price-sync"],
+      mutationFn: () => handle(api.admin.providers["price-sync"].$post)(),
+    }),
     createAccount: mutationOptions({
       mutationKey: [KEY, "providers", "accounts", "create"],
       mutationFn: (

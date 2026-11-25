@@ -79,6 +79,7 @@ const fakeGateway = () => {
     },
     listModels: async () => [],
     searchRequests: async () => ({ requests: [], total: 0 }),
+    syncPrices: async () => {},
     listProviders: async () => [],
     createProvider: async () => {},
     deleteProvider: async () => {},

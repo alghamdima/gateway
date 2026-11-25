@@ -140,3 +140,8 @@ export const refreshProviderModels = async (
   provider: string,
   gateway: GatewayClient = getGateway(),
 ) => viaGateway(() => gateway.refreshProviderModels(provider));
+
+/** The price list the gateway charges from, read again now. */
+export const syncProviderPrices = async (
+  gateway: GatewayClient = getGateway(),
+) => viaGateway(() => gateway.syncPrices());

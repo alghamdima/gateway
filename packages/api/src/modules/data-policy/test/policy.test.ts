@@ -42,6 +42,7 @@ const fakeGateway = () => {
     getLog: async () => undefined,
     setCustomerRateLimit: async () => {},
     searchRequests: async () => ({ requests: [], total: 0 }),
+    syncPrices: async () => {},
     listProviders: async () => [],
     createProvider: async () => {},
     deleteProvider: async () => {},

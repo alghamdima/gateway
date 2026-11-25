@@ -45,6 +45,7 @@ const fakeGateway = (
     setVirtualKeyAccess: async () => {},
     listProviderKeys: async () => [],
     searchRequests: async () => ({ requests: [], total: 0 }),
+    syncPrices: async () => act("syncPrices"),
     listProviders: async () => {
       await act("listProviders");
       return providers;
@@ -180,6 +181,12 @@ describe.skipIf(!adminUrl)("provider accounts", () => {
       code: "admin:providers.accounts.error.refused",
       message: "Invalid base URL: private address",
     });
+  });
+
+  it("asks the gateway to read its price list again", async () => {
+    const gateway = fakeGateway([]);
+    await accounts.syncProviderPrices(gateway.client);
+    expect(gateway.calls).toEqual([["syncPrices"]]);
   });
 
   it("removes a key's terms with the key, and only that key's", async () => {

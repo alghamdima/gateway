@@ -24,6 +24,7 @@ const fakeGateway = (keys: GatewayProviderKey[], isDown = false) => {
     setCustomerRateLimit: async () => {},
     setVirtualKeyAccess: async () => {},
     searchRequests: async () => ({ requests: [], total: 0 }),
+    syncPrices: async () => {},
     listProviders: async () => [],
     createProvider: async () => {},
     deleteProvider: async () => {},

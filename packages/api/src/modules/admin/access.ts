@@ -110,6 +110,12 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
 
   // the provider catalog and each key's data terms (ADR 0015)
   { method: "GET", path: /^\/providers$/, needs: { providers: ["read"] } },
+  {
+    method: "POST",
+    path: /^\/providers\/price-sync$/,
+    needs: { providers: ["update"] },
+    audit: { action: "provider.price-sync", target: "provider" },
+  },
   // the providers and their keys in the gateway; a key's value is a secret
   {
     method: "GET",
