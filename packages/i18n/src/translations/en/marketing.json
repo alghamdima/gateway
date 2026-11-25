@@ -150,18 +150,6 @@
       "launch": "launch"
     }
   },
-  "ai": {
-    "description": "Ask the assistant a question.",
-    "prompt": {
-      "history": "Tell the history of the internet",
-      "capitals": "Quiz me on the world capitals",
-      "quantum": "Explain quantum computing",
-      "realWorld": "Describe a real-world AI case"
-    },
-    "placeholder": "Ask a question...",
-    "cta": "Submit",
-    "thinking": "Thinking..."
-  },
   "setup": {
     "steps": {
       "step": {

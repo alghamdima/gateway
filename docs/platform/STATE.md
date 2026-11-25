@@ -55,11 +55,12 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - Brand: the control plane says Lemru everywhere; CI fails if the template's name comes back outside an allowlist.
 - One frontend (ADR 0016): the gateway's own UI is deleted. `GET /` on the gateway is a 404.
 - English only. Spanish was removed.
+- The template's leftovers are gone: seven analytics vendors (PostHog stays), demo charts, demo blog posts, the chat demo.
 
 ## What is next, in order
 
 1. **Remove gateway features that are not part of the product**, one at a time, each with its tests: MCP, agents, relays, the internal chat (`framework/warp`), RSS, webhooks, the prompt repository. `docs/` and `examples/` under `apps/gateway` go with MCP, whose tests are what reads them. After MCP, replace the 3,000-line `Makefile` with one that has `build` only: `scripts/test-baseline.sh` still calls `make setup-mcp-tests`.
-2. **The playground.** `POST /api/ai/chat` and the page `/dashboard/ai` are the template's demo: they call OpenAI directly with `OPENAI_API_KEY`, for any signed-in user, outside credits and outside the data policy. The owner wants a playground like OpenRouter's chat. It has to go through the gateway with the organization's key and credits. Until then, do not set `OPENAI_API_KEY` in a deployment.
+2. **The playground.** The template's chat demo is removed (page, API route and the `ai` packages): it called OpenAI directly for any signed-in user, outside credits and outside the data policy. The owner wants a playground like OpenRouter's chat. Build it as a new module that calls the gateway with the organization's key, so credits and the data policy apply.
 3. **Response cache, opt-in.** The owner keeps the gateway's semantic cache and routing between providers. The cache must be off unless the customer asks for it per request (OpenRouter does it with a header), and never on in the in-Kingdom deployment or for an organization whose policy forbids retention.
 4. **Arabic**, with right-to-left layout, in the web app and in emails.
 5. **The gateway rename** to Lemru (`apps/gateway/scripts/rename`): name `Lemru`, prefix `lm`. It needs a registered domain that resolves. Until then one upstream name reaches the customer: the activity page mentions the header `x-bifrost-request-id`.

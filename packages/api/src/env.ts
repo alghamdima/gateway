@@ -16,9 +16,7 @@ import type { Preset } from "envin/types";
 
 export const preset = {
   id: "api",
-  server: {
-    OPENAI_API_KEY: z.string().optional(), // change it to your provider API key (e.g. ANTHROPIC_API_KEY if you use Anthropic)
-  },
+  server: {},
   extends: [
     auth,
     billingWeb,

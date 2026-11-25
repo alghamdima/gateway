@@ -11,7 +11,6 @@ import { refuseImpersonatedWrites } from "./impersonation";
 import { localize, delay } from "./middleware";
 import { activityRouter } from "./modules/activity/router";
 import { adminRouter } from "./modules/admin/router";
-import { aiRouter } from "./modules/ai/router";
 import { authRouter } from "./modules/auth/router";
 import { billingRouter } from "./modules/billing/router";
 import { creditsRouter } from "./modules/credits/router";
@@ -50,7 +49,6 @@ const appRouter = new Hono()
   .route("/status", monitor.routes)
   .route("/activity", activityRouter)
   .route("/admin", adminRouter)
-  .route("/ai", aiRouter)
   .route("/auth", authRouter)
   .route("/billing", billingRouter)
   .route("/credits", creditsRouter)

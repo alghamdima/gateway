@@ -16,7 +16,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/openai": "4.0.110",
     "@hono/node-server": "2.1.7",
     "@hono/zod-validator": "0.8.0",
     "@workspace/auth": "workspace:*",
@@ -29,7 +28,6 @@
     "@workspace/monitoring-web": "workspace:*",
     "@workspace/shared": "workspace:*",
     "@workspace/storage": "workspace:*",
-    "ai": "7.0.166",
     "envin": "catalog:",
     "hono": "4.13.18",
     "hono-status-monitor": "1.0.9",

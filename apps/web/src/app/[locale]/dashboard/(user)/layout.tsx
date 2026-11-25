@@ -26,11 +26,6 @@ const menu = [
         href: pathsConfig.dashboard.user.index,
         icon: <Icons.Home />,
       },
-      {
-        title: "ai",
-        href: pathsConfig.dashboard.user.ai,
-        icon: <Icons.Brain />,
-      },
     ],
   },
   {
