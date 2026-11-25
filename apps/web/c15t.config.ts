@@ -1,7 +1,6 @@
 import { policyRulePresets } from "@c15t/core";
 import { defineConsentConfig, offline } from "@c15t/nextjs";
 import { translations as en } from "@c15t/translations/en";
-import { translations as es } from "@c15t/translations/es";
 
 const hasHostedBackend = Boolean(process.env.NEXT_PUBLIC_C15T_BACKEND_URL);
 
@@ -25,7 +24,6 @@ export default defineConsentConfig({
       detectBrowserLanguage: false,
       messages: {
         en,
-        es,
       },
     },
     theme: {

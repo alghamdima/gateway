@@ -10,7 +10,6 @@ import ChromeStroke from "./svg/brand/stroke/chrome.svg";
 import EdgeStroke from "./svg/brand/stroke/edge.svg";
 import FirefoxStroke from "./svg/brand/stroke/firefox.svg";
 import Twitter from "./svg/brand/twitter.svg";
-import Spain from "./svg/flag/spain.svg";
 import UnitedKingdom from "./svg/flag/united-kingdom.svg";
 import LogoText from "./svg/logo-text.svg";
 import Logo from "./svg/logo.svg";
@@ -31,5 +30,4 @@ export const Icons = {
   Linkedin,
   Discord,
   UnitedKingdom,
-  Spain,
 } as const;

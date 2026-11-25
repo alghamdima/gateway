@@ -230,7 +230,6 @@ export const auth = betterAuth({
       detection: ["cookie", "header"],
       translations: {
         en: locales.en,
-        es: locales.es,
       } satisfies Record<Locale, TranslationDictionary>,
       localeCookie: config.cookie,
       defaultLocale: config.defaultLocale,
