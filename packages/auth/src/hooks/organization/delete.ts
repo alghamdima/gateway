@@ -1,6 +1,6 @@
 import { isSubscriptionActive } from "@workspace/billing";
 import { getCustomersWithPurchasesByReferenceId } from "@workspace/billing/server";
-import { removeOrganizationFromGateway } from "@workspace/gateway/server";
+import { removeOrganizationFromGateway } from "@workspace/gateway-client/server";
 
 import { OrganizationHooks } from "./types";
 

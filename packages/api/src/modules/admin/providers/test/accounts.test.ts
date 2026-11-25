@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TestDatabase } from "@workspace/db/testing";
-import type { GatewayClient, GatewayProvider } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  GatewayProvider,
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: deleting a key removes its terms. Skips without DATABASE_URL.
@@ -25,7 +28,7 @@ const fakeGateway = (
     calls.push(call);
     if (fail) {
       // loaded here: a static import would open the database before the test points it at its own
-      const { GatewayError } = await import("@workspace/gateway/server");
+      const { GatewayError } = await import("@workspace/gateway-client/server");
       throw new GatewayError(
         `gateway answered ${fail.status}: ${fail.body ?? ""}`,
         fail.status,

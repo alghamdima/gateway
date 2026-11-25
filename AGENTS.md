@@ -64,7 +64,7 @@ Findings from reviews or subagents are claims: verify them in the code before bu
 | A product feature     | `packages/api/src/modules/<feature>` (keys, credits, activity, data-policy, pricing, reconciliation, v1) |
 | Admin (staff) feature | `packages/api/src/modules/admin/<feature>` and `apps/web/src/modules/admin/<feature>`                    |
 | Access of staff roles | `packages/api/src/modules/admin/access.ts` (a route with no rule is refused)                             |
-| Talking to the engine | `packages/gateway/src/client.ts`                                                                         |
+| Talking to the engine | `packages/gateway-client/src/client.ts`                                                                  |
 | Engine behaviour      | `apps/gateway` (core, framework, transports, plugins/credits)                                            |
 | Auth logic            | `packages/auth/` → then app-specific usage                                                               |
 | Database schema       | `packages/db/src/schema/`                                                                                |
@@ -84,7 +84,7 @@ apps/
 
 packages/
   api/         @workspace/api       Hono modules: the product's features, admin, auth, billing, organization
-  gateway/     @workspace/gateway   TypeScript client for the engine's management API
+  gateway-client/  @workspace/gateway-client   TypeScript client for the engine's management API
   auth/        @workspace/auth      Better Auth server + web client (src/client/web.ts), staff roles
   billing/     @workspace/billing   Shared + web (Stripe; the template's other providers are still there)
   db/          @workspace/db        Drizzle schema, migrations, scripts

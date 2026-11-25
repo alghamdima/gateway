@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TestDatabase } from "@workspace/db/testing";
-import type { GatewayClient, GatewayLog } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  GatewayLog,
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the record is built from ledger entries. Skips without DATABASE_URL.
@@ -48,7 +51,7 @@ const gatewayWithLogs = (
   getLog: async (id) => {
     if (options.isDown) {
       // loaded here: a static import would open the database before the test points it at its own
-      const { GatewayError } = await import("@workspace/gateway/server");
+      const { GatewayError } = await import("@workspace/gateway-client/server");
       throw new GatewayError("gateway down");
     }
     return logs.find((log) => log.id === id);

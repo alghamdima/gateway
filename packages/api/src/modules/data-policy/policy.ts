@@ -10,7 +10,7 @@ import {
   GatewayError,
   GatewayNotConfiguredError,
   getGateway,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
@@ -23,7 +23,7 @@ import type { DataPolicy } from "./eligibility";
 import type {
   GatewayClient,
   VirtualKeyAccess,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 
 /**
  * An organization's data policy and its enforcement (step D2 in

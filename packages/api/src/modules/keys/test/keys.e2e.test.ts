@@ -51,7 +51,7 @@ describe.skipIf(!adminUrl || !binary)(
     let providerCalls = 0;
     let keys: typeof import("../keys");
     let ledger: typeof import("../../credits/ledger");
-    let removeOrganizationFromGateway: (typeof import("@workspace/gateway/server"))["removeOrganizationFromGateway"];
+    let removeOrganizationFromGateway: (typeof import("@workspace/gateway-client/server"))["removeOrganizationFromGateway"];
 
     const chat = (key: string) =>
       fetch(`${gatewayUrl}/v1/chat/completions`, {
@@ -199,7 +199,7 @@ describe.skipIf(!adminUrl || !binary)(
       keys = await import("../keys");
       ledger = await import("../../credits/ledger");
       ({ removeOrganizationFromGateway } =
-        await import("@workspace/gateway/server"));
+        await import("@workspace/gateway-client/server"));
     }, 120_000);
 
     afterAll(async () => {

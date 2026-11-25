@@ -2,7 +2,7 @@ import { auth } from "@workspace/auth/server";
 import { and, eq } from "@workspace/db";
 import { invitation, member, organization } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
-import { removeOrganizationFromGateway } from "@workspace/gateway/server";
+import { removeOrganizationFromGateway } from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 

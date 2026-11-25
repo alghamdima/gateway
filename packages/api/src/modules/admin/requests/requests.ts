@@ -5,12 +5,15 @@ import {
   GatewayError,
   GatewayNotConfiguredError,
   getGateway,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
 import type { GetStaffRequestsInput } from "../../../schema";
-import type { GatewayClient, GatewayRequest } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  GatewayRequest,
+} from "@workspace/gateway-client/server";
 
 /**
  * The request log for staff (docs/platform/PLAN.md, "Gateway UI removal"):

@@ -2,7 +2,7 @@ import {
   GatewayError,
   GatewayNotConfiguredError,
   getGateway,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
@@ -13,7 +13,7 @@ import type {
   CreateProviderKeyInput,
   UpdateProviderKeyInput,
 } from "../../../schema";
-import type { GatewayClient } from "@workspace/gateway/server";
+import type { GatewayClient } from "@workspace/gateway-client/server";
 
 /**
  * Providers and their keys, managed by staff (docs/platform/PLAN.md, "Gateway

@@ -9,14 +9,17 @@ import {
   GatewayError,
   GatewayNotConfiguredError,
   getGateway,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { logger } from "@workspace/shared/logger";
 
 import { MICRO_USD } from "../credits/ledger";
 import { getDataEvidence } from "../data-policy/evidence";
 
 import type { DataEvidence } from "../data-policy/evidence";
-import type { GatewayClient, GatewayLog } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  GatewayLog,
+} from "@workspace/gateway-client/server";
 
 /**
  * One request's record (step 9.2), in OpenRouter's generation shape (research

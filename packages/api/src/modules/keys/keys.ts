@@ -3,13 +3,16 @@ import { createHash } from "node:crypto";
 import { and, desc, eq } from "@workspace/db";
 import { apiKey, gatewayCustomer } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
-import { getGateway } from "@workspace/gateway/server";
+import { getGateway } from "@workspace/gateway-client/server";
 import { logger } from "@workspace/shared/logger";
 import { generateId } from "@workspace/shared/utils";
 
 import { accessForOrganization } from "../data-policy/policy";
 
-import type { GatewayClient, LimitReset } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  LimitReset,
+} from "@workspace/gateway-client/server";
 
 /**
  * Organization API keys (docs/platform/adr/0004-key-model.md). Each one is a

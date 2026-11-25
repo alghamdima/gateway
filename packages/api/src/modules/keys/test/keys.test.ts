@@ -8,7 +8,7 @@ import type {
   CustomerRateLimit,
   GatewayClient,
   UpdateVirtualKeyInput,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the unique keys, the foreign keys and the race on the
@@ -60,7 +60,8 @@ const fakeGateway = () => {
       }
       // like the real gateway: virtual key names are unique across all customers
       if ([...state.keys.values()].some((key) => key.name === input.name)) {
-        const { GatewayError } = await import("@workspace/gateway/server");
+        const { GatewayError } =
+          await import("@workspace/gateway-client/server");
         throw new GatewayError(
           "A virtual key with this name already exists",
           409,
@@ -108,7 +109,8 @@ const fakeGateway = () => {
     setCustomerRateLimit: async (id, limit) => {
       if (state.failRateLimit) {
         // loaded here: a static import would open the database before the test points it at its own
-        const { GatewayError } = await import("@workspace/gateway/server");
+        const { GatewayError } =
+          await import("@workspace/gateway-client/server");
         throw new GatewayError("gateway down");
       }
       state.rateLimits.push([id, limit]);

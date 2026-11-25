@@ -37,7 +37,7 @@ Who uses a capability:
 
 ## Plan: Phase G, gateway controls
 
-Order by risk removed. Each step follows the pattern already in use: our database holds the setting and the audit trail, the control plane pushes it to the gateway through `@workspace/gateway`, and an end-to-end test against the built gateway proves it is enforced.
+Order by risk removed. Each step follows the pattern already in use: our database holds the setting and the audit trail, the control plane pushes it to the gateway through `@workspace/gateway-client`, and an end-to-end test against the built gateway proves it is enforced.
 
 | Step | What                                                                                                                                                                                                                                           | Who      | Gateway feature                      | Size |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------ | ---- |

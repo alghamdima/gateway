@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import {
   GatewayError,
   GatewayNotConfiguredError,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 

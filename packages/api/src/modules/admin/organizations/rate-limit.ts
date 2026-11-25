@@ -5,13 +5,13 @@ import {
   GatewayError,
   GatewayNotConfiguredError,
   getGateway,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
 import { ensureGatewayCustomer } from "../../keys/keys";
 
-import type { GatewayClient } from "@workspace/gateway/server";
+import type { GatewayClient } from "@workspace/gateway-client/server";
 
 /**
  * What staff allow an organization per minute (step G1 in

@@ -5,10 +5,10 @@ import {
   reconciliationRun,
 } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
-import { getGateway } from "@workspace/gateway/server";
+import { getGateway } from "@workspace/gateway-client/server";
 import { logger } from "@workspace/shared/logger";
 
-import type { GatewayClient } from "@workspace/gateway/server";
+import type { GatewayClient } from "@workspace/gateway-client/server";
 
 /**
  * The daily check that the gateway and the ledger agree (step 10.1 in

@@ -1,4 +1,4 @@
-import { getGateway } from "@workspace/gateway/server";
+import { getGateway } from "@workspace/gateway-client/server";
 
 import { marketPrice } from "../pricing/price";
 import { getPricing } from "../pricing/pricing";
@@ -7,7 +7,7 @@ import type {
   GatewayClient,
   GatewayModel,
   VirtualKeyAccess,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 
 /**
  * GET /api/v1/models: the models the gateway can serve, in OpenRouter's

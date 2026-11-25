@@ -4,7 +4,7 @@ import { createMiddleware } from "hono/factory";
 import {
   GatewayError,
   GatewayNotConfiguredError,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { logger } from "@workspace/shared/logger";
 
 import { getGeneration } from "../activity/generations";

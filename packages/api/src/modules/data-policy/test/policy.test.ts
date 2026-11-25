@@ -5,7 +5,7 @@ import type {
   GatewayClient,
   GatewayProviderKey,
   VirtualKeyAccess,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the policy row, its versions and the keys it is pushed
@@ -19,7 +19,7 @@ const KEYS: GatewayProviderKey[] = [
 
 const down = async () => {
   // loaded here: a static import would open the database before the test points it at its own
-  const { GatewayError } = await import("@workspace/gateway/server");
+  const { GatewayError } = await import("@workspace/gateway-client/server");
   return new GatewayError("gateway down");
 };
 

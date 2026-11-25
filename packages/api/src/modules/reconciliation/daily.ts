@@ -5,7 +5,7 @@ import { logger } from "@workspace/shared/logger";
 import { env } from "./env";
 import { previousDay, reconcile } from "./reconcile";
 
-import type { GatewayClient } from "@workspace/gateway/server";
+import type { GatewayClient } from "@workspace/gateway-client/server";
 
 /**
  * Reconciles the UTC day before `now` and, when it finds something or cannot

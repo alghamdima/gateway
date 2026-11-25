@@ -21,7 +21,7 @@ apps/
 packages/
   api/        Hono API. One folder per feature under src/modules.
   db/         Drizzle schema (one file per feature) and migrations 0000-0030.
-  gateway/    TypeScript client for the gateway's management API.
+  gateway-client/  TypeScript client for the gateway's management API.
   auth/ billing/ email/ i18n/ ui/ shared/ storage/ cms/ flags/ analytics/ monitoring/
 docs/platform/  PLAN.md, ARCHITECTURE.md, adr/, research/, this file.
 ```

@@ -5,7 +5,7 @@ import { preset as auth } from "@workspace/auth/env";
 import { preset as billingWeb } from "@workspace/billing-web/env";
 import { preset as db } from "@workspace/db/env";
 import { preset as email } from "@workspace/email/env";
-import { preset as gateway } from "@workspace/gateway/env";
+import { preset as gateway } from "@workspace/gateway-client/env";
 import { preset as monitoring } from "@workspace/monitoring-web/env";
 import { envConfig, NodeEnv } from "@workspace/shared/constants";
 import { preset as storage } from "@workspace/storage/env";

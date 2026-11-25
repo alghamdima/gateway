@@ -6,7 +6,7 @@ import type { TestDatabase } from "@workspace/db/testing";
 import type {
   CustomerRateLimit,
   GatewayClient,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the record, its checks and the gateway customer mapping.
@@ -15,7 +15,7 @@ const adminUrl = process.env.DATABASE_URL;
 
 const down = async () => {
   // loaded here: a static import would open the database before the test points it at its own
-  const { GatewayError } = await import("@workspace/gateway/server");
+  const { GatewayError } = await import("@workspace/gateway-client/server");
   return new GatewayError("gateway down");
 };
 

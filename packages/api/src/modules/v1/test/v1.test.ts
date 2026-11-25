@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TestDatabase } from "@workspace/db/testing";
-import type { GatewayClient, GatewayModel } from "@workspace/gateway/server";
+import type {
+  GatewayClient,
+  GatewayModel,
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the answers are sums over the ledger. Skips without DATABASE_URL.

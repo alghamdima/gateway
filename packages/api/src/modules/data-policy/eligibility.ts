@@ -1,6 +1,6 @@
 import type { ProviderCatalogEntry } from "../admin/providers/providers";
 import type { ProviderRegion } from "@workspace/db/schema";
-import type { VirtualKeyAccess } from "@workspace/gateway/server";
+import type { VirtualKeyAccess } from "@workspace/gateway-client/server";
 
 /**
  * What an organization requires of the endpoints that serve it

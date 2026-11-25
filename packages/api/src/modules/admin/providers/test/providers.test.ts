@@ -4,7 +4,7 @@ import type { TestDatabase } from "@workspace/db/testing";
 import type {
   GatewayClient,
   GatewayProviderKey,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the table and its checks. Skips without DATABASE_URL.
@@ -49,7 +49,8 @@ const fakeGateway = (keys: GatewayProviderKey[], isDown = false) => {
     listProviderKeys: async () => {
       if (isDown) {
         // loaded here: a static import would open the database before the test points it at its own
-        const { GatewayError } = await import("@workspace/gateway/server");
+        const { GatewayError } =
+          await import("@workspace/gateway-client/server");
         throw new GatewayError("gateway down");
       }
       return keys;

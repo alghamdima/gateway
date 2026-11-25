@@ -33,7 +33,8 @@ const row = (id: string, customerId: string | null, extra: object = {}) => ({
  * points it at its own.
  */
 const gatewayWith = async (rows: object[]) => {
-  const { createGatewayClient } = await import("@workspace/gateway/server");
+  const { createGatewayClient } =
+    await import("@workspace/gateway-client/server");
   const asked: string[] = [];
   const client = createGatewayClient({
     url: "http://gateway.test",
@@ -156,7 +157,8 @@ describe.skipIf(!adminUrl)("staff request log", () => {
   });
 
   it("answers 503 when the gateway cannot be reached", async () => {
-    const { createGatewayClient } = await import("@workspace/gateway/server");
+    const { createGatewayClient } =
+      await import("@workspace/gateway-client/server");
     const client = createGatewayClient({
       url: "http://gateway.test",
       fetch: async () => {

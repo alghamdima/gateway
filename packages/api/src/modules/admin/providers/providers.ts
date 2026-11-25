@@ -5,14 +5,14 @@ import {
   GatewayError,
   GatewayNotConfiguredError,
   getGateway,
-} from "@workspace/gateway/server";
+} from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
 import { markPoliciesUnapplied } from "../../data-policy/pending";
 
 import type { ProviderAgreement, ProviderRegion } from "@workspace/db/schema";
-import type { GatewayClient } from "@workspace/gateway/server";
+import type { GatewayClient } from "@workspace/gateway-client/server";
 
 /**
  * The provider catalog (step D1 in docs/platform/PLAN.md, ADR 0015): every

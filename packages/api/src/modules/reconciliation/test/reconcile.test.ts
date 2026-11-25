@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { TestDatabase } from "@workspace/db/testing";
-import type { CustomerCost, GatewayClient } from "@workspace/gateway/server";
+import type {
+  CustomerCost,
+  GatewayClient,
+} from "@workspace/gateway-client/server";
 import type postgres from "postgres";
 
 // Needs real Postgres: the comparison reads ledger sums and reservations.
@@ -68,7 +71,7 @@ const gatewayReporting = (
   getCustomerCosts: async () => {
     if (options.isDown) {
       // loaded here: a static import would open the database before the test points it at its own
-      const { GatewayError } = await import("@workspace/gateway/server");
+      const { GatewayError } = await import("@workspace/gateway-client/server");
       throw new GatewayError("gateway down");
     }
     return costs;

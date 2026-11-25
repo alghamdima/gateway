@@ -476,9 +476,9 @@ importers:
       '@workspace/email':
         specifier: workspace:*
         version: link:../email
-      '@workspace/gateway':
+      '@workspace/gateway-client':
         specifier: workspace:*
-        version: link:../gateway
+        version: link:../gateway-client
       '@workspace/i18n':
         specifier: workspace:*
         version: link:../i18n
@@ -540,9 +540,9 @@ importers:
       '@workspace/email':
         specifier: workspace:*
         version: link:../email
-      '@workspace/gateway':
+      '@workspace/gateway-client':
         specifier: workspace:*
-        version: link:../gateway
+        version: link:../gateway-client
       '@workspace/i18n':
         specifier: workspace:*
         version: link:../i18n
@@ -843,7 +843,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
 
-  packages/gateway:
+  packages/gateway-client:
     dependencies:
       '@workspace/db':
         specifier: workspace:*
