@@ -1,14 +1,12 @@
 package lib
 
 import (
-	"embed"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"testing"
-	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,54 +96,14 @@ func TestCheckBasePathCollision(t *testing.T) {
 		"GET":  {"/", "/{filepath:*}", "/health", "/api/providers", "/workspace"},
 		"POST": {"/v1/chat/completions", "/openai/v1/responses"},
 	}
-	assert.NoError(t, CheckBasePathCollision("", routes, nil))
-	assert.NoError(t, CheckBasePathCollision("/bifrost", routes, nil))
+	assert.NoError(t, CheckBasePathCollision("", routes))
+	assert.NoError(t, CheckBasePathCollision("/bifrost", routes))
 	// Only the first segment matters: a nested prefix under a free segment is fine.
-	assert.NoError(t, CheckBasePathCollision("/gateway/api", routes, nil))
-	assert.NoError(t, CheckBasePathCollision("/apis", routes, nil))
+	assert.NoError(t, CheckBasePathCollision("/gateway/api", routes))
+	assert.NoError(t, CheckBasePathCollision("/apis", routes))
 
 	for _, basePath := range []string{"/api", "/v1", "/openai", "/health", "/workspace", "/api/bifrost"} {
-		assert.Error(t, CheckBasePathCollision(basePath, routes, nil), basePath)
-	}
-}
-
-// TestCheckBasePathCollision_UIFiles pins that a prefix whose first segment is
-// a top-level entry of the embedded UI is rejected. The UI is served by the
-// "/{filepath:*}" catch-all, so these never show up as router paths; behind a
-// prefix-stripping proxy, base_path "/assets" would strip "/assets/index.js"
-// a second time and 404 the bundle.
-func TestCheckBasePathCollision_UIFiles(t *testing.T) {
-	routes := map[string][]string{"GET": {"/", "/{filepath:*}", "/health"}}
-	ui := fstest.MapFS{
-		"ui/index.html":            {Data: []byte("<html></html>")},
-		"ui/favicon.ico":           {Data: []byte("ico")},
-		"ui/assets/index-abc.js":   {Data: []byte("js")},
-		"ui/images/kafka-logo.svg": {Data: []byte("svg")},
-	}
-	for _, basePath := range []string{"/assets", "/images", "/favicon.ico", "/assets/bifrost"} {
-		assert.Error(t, CheckBasePathCollision(basePath, routes, ui), basePath)
-	}
-	for _, basePath := range []string{"/bifrost", "/asset", "/tools/assets"} {
-		assert.NoError(t, CheckBasePathCollision(basePath, routes, ui), basePath)
-	}
-	// Without an embedded UI (e.g. a zero embed.FS) only router paths count.
-	assert.NoError(t, CheckBasePathCollision("/assets", routes, nil))
-	assert.NoError(t, CheckBasePathCollision("/assets", routes, embed.FS{}))
-}
-
-// TestCheckBasePathCollision_UIPageRoots pins that the dashboard's top-level
-// page paths are reserved even though they are neither router paths (the SPA
-// catch-all serves them) nor files in the embedded UI: with base_path
-// "/workspace", an unprefixed "/workspace/logs" would be stripped to "/logs".
-func TestCheckBasePathCollision_UIPageRoots(t *testing.T) {
-	routes := map[string][]string{"GET": {"/", "/{filepath:*}", "/health"}}
-	// The dashboard router strips its basepath case-insensitively, so "/Workspace"
-	// would still swallow an unprefixed "/workspace/..." href in the browser.
-	for _, basePath := range []string{"/workspace", "/login", "/oauth", "/agent", "/pprof", "/workspace/gw", "/Workspace", "/LOGIN/x"} {
-		assert.Error(t, CheckBasePathCollision(basePath, routes, nil), basePath)
-	}
-	for _, basePath := range []string{"/bifrost", "/workspaces", "/gw/workspace"} {
-		assert.NoError(t, CheckBasePathCollision(basePath, routes, nil), basePath)
+		assert.Error(t, CheckBasePathCollision(basePath, routes), basePath)
 	}
 }
 

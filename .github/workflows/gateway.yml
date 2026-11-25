@@ -70,8 +70,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: apps/gateway/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/gateway/ui/package-lock.json
 
       - name: 🏷️ Rename tool tests
         working-directory: apps/gateway/scripts/rename

@@ -1,6 +1,6 @@
 # ADR 0008: Take each upstream minor release within two weeks, by script
 
-Status: Accepted
+Status: Replaced by ADR 0016 (2026-11-25): the gateway code is ours and is edited directly; there is no re-import.
 Date: 2026-11-21
 
 ## Context

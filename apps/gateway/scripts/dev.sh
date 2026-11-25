@@ -8,12 +8,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 port=${GATEWAY_PORT:-8080}
 http=$(find transports -maxdepth 1 -type d -name '*-http')
-[ -d ui/node_modules ] || (cd ui && npm ci --no-audit --no-fund)
 # the server embeds the built UI directory, so it has to exist even when the dev server is used
-[ -d "$http/ui" ] || (cd ui && npm run build)
 mkdir -p tmp/dev
 trap 'kill 0' EXIT
 (cd "$http" && BIFROST_SETUP_TOKEN=${GATEWAY_SETUP_TOKEN:-local-setup-token} \
   go run . -app-dir "$OLDPWD/tmp/dev" -port "$port" -host 127.0.0.1 -log-style pretty) &
-(cd ui && BIFROST_PORT=$port npm run dev) &
 wait

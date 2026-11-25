@@ -12985,8 +12985,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAg
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAgentGatewaySelectedIdentityRemovalPreservesUnselectedHeaders	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAgentHistoryPreservesOAuthDefinitions	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyAssignees	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyBasePathToShell_HeadWithAttributes	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyBasePathToShell_QuoteStyles	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyBusinessUnits	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyCurrentRankingNames	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyCurrentRankingNamesBatchesLookups	pass
@@ -14143,9 +14141,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestSe
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestSendJSON_ExtraFieldsPlacement	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestSendJSON_MarshalError	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestSendJSON_StandardBytes	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestServeDashboardAPIPathsReturnJSONNotFound	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestServeDashboardKeepsNonAPIPathsOnTheSPAPath	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestServeDashboardMissingAssetBody	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestServeLiveContentWritesTheRecording	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestServeStreamingRequestTearsDownServer	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestServerRootHandler_BasePathRouting	pass
@@ -14264,11 +14259,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestTr
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestTransportResponseHeadersHook_RepeatedHeaders	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestTransportResponseHeadersHook_ReverseOrder	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestTransportResponseHeadersHook_Streaming	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUIHandler_BasePathRewritesShell	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUIHandler_BasePathShellRewriterCannotMutateCache	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUIHandler_BasePathShellRewriterSeesPrefixedShell	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUIHandler_NoBasePathServesShellUnchanged	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUIHandler_NonCanonicalBasePathNotSpliced	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUnknownOpenAPITools	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfigRejectsPrivateSkillsURLComponents	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_A2AExternalClientURLPresence	pass
@@ -14820,8 +14810,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestBodyBuf
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestBuildBaseURL	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestBuildBaseURL_BasePath	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestCheckBasePathCollision	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestCheckBasePathCollision_UIFiles	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestCheckBasePathCollision_UIPageRoots	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestClientDisconnectWatcher_RetentionNoGoroutineLeak	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestClientDisconnectWatcher_RetentionWatcherActuallyStarts	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestCodeModeLimitsFromConfigFile	pass

@@ -1,6 +1,6 @@
 # ADR 0007: The gateway admin UI is internal only
 
-Status: Accepted
+Status: Replaced by ADR 0016 (2026-11-25): the UI is removed. The rule that `/api/*` stays off the public network still holds.
 Date: 2026-11-21
 
 ## Context

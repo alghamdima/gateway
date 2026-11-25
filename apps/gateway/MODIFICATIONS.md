@@ -8,25 +8,24 @@ Since 2026-11-25 the code is developed here, by the owner's team, and no longer 
 
 ## Scope of the copy
 
-Only part of the upstream repository was copied: `core`, `framework`, `plugins`, `transports`, `ui`, the build files at the root, and the paths the unit tests read (`docs/openapi`, `examples/mcps`, `examples/plugins/hello-world`, `examples/configs/withlocalpricingfiles`, `helm-charts/bifrost/values.schema.json`, `tests/docker-compose.yml`).
+Only part of the upstream repository was copied: `core`, `framework`, `plugins`, `transports`, `ui` (since removed), the build files at the root, and the paths the unit tests read (`docs/openapi`, `examples/mcps`, `examples/plugins/hello-world`, `examples/configs/withlocalpricingfiles`, `helm-charts/bifrost/values.schema.json`, `tests/docker-compose.yml`).
 
 ## Removed
 
-- The Maxim observability plugin and its UI: `plugins/maxim/`, `ui/app/workspace/observability/views/plugins/maximView.tsx`, `ui/app/workspace/observability/fragments/maximFormFragment.tsx`, `ui/public/maxim-logo.webp`, `ui/public/maxim-logo-dark.webp`.
-- Every language of the UI but English, with the two test files that only switch between languages: `ui/locales/{de,es,fr,it,ja,ko,pt,ru,zh-CN,zh-TW}/`, `ui/lib/i18n/index.test.ts`, `ui/lib/i18n/useLocale.test.tsx`.
-- `ui/next-env.d.ts`, a leftover from when the UI was a Next.js app. Inside this monorepo its `/// <reference types="next" />` found the web app's `next`, pulled in a second copy of `@types/react` and failed the type check.
+- The whole admin UI, `ui/` (1,458 files at the time), with what served it: `transports/bifrost-http/handlers/ui.go` and its test, the `//go:embed all:ui` in `transports/bifrost-http/main.go`, `RegisterUIRoutes`, `UIContent` and `ShellRewriter` in `transports/bifrost-http/server/server.go`, the UI part of `CheckBasePathCollision` in `transports/bifrost-http/lib/basepath.go` with its two tests, the `install-ui`, `build-ui`, `dev` and `dev-pulse` targets of the `Makefile`, and the Node stage of `transports/Dockerfile.local`. The product has one frontend, the web app, which calls the management API; a path no route claims answers 404.
+- `transports/Dockerfile` and `transports/Dockerfile.redhat`: they build from published upstream modules, which this copy no longer is. `transports/Dockerfile.local` builds from the sources here.
+- The Maxim observability plugin: `plugins/maxim/`.
 - `.claude/`, upstream's own agent tooling, and `recipes/` with the three `include` lines in the `Makefile`: deployment recipes (Fly, ECS, local Kubernetes) this product does not use.
 
 ## Changed
 
 | Files | Change and reason |
 | --- | --- |
-| `ui/.npmrc` | `node-options` gives every npm script a 4 GB heap. The UI type check peaks near 2.9 GB and dies at the 2 GB limit Node picks on a small machine. |
-| `transports/bifrost-http/server/plugins.go`, `transports/bifrost-http/lib/ctx.go`, `transports/bifrost-http/lib/config.go`, `transports/go.mod`, `transports/go.sum`, `ui/app/workspace/observability/views/observabilityView.tsx` | The Maxim plugin is taken out of the build: its registration, its `x-bf-maxim-*` header handling, its Go dependencies and its tab in the UI. |
+| `transports/bifrost-http/server/plugins.go`, `transports/bifrost-http/lib/ctx.go`, `transports/bifrost-http/lib/config.go`, `transports/go.mod`, `transports/go.sum` | The Maxim plugin is taken out of the build: its registration, its `x-bf-maxim-*` header handling and its Go dependencies. |
 | `transports/bifrost-http/server/plugins.go` | One import and one `case`, so the gateway loads `plugins/credits` by name from its config. If the plugin's config cannot be decoded the case returns a plugin that refuses every request, because the gateway logs a plugin that fails to load and then serves without it. |
-| `ui/lib/i18n/index.ts` | `SUPPORTED_LOCALES` keeps English only: the product has one language list for the gateway and the control plane. |
-| `ui/app/workspace/agent-logs/views/agentTrace.test.ts`, `ui/app/workspace/logs/views/columns.test.ts`, `ui/app/workspace/mcp-sessions/views/sessionsTable.test.tsx`, `ui/lib/i18n/resources.test.ts`, `ui/lib/i18n/validationMessage.test.ts`, `ui/lib/types/schemas.proxy.test.ts`, `ui/lib/utils/databricksMigration.test.ts`, `ui/lib/utils/mcpCredential.test.ts`, `ui/lib/utils/numbers.test.ts` | The cases that need a second language are switched off with the reason beside them, or removed where they no longer compile. |
-| `Makefile` | The three `include recipes/*.mk` lines are gone with `recipes/`. |
+| `transports/bifrost-http/main.go`, `transports/bifrost-http/server/server.go`, `transports/bifrost-http/lib/basepath.go`, `transports/bifrost-http/lib/basepath_test.go` | No embedded UI and no UI routes (see Removed). `NewBifrostHTTPServer` takes the version only; `CheckBasePathCollision` checks registered routes only. |
+| `Makefile` | `build` no longer builds a UI; the UI and recipe targets are gone. |
+| `transports/Dockerfile.local` | No Node stage and no UI copied into the Go stage. |
 
 ## Added
 

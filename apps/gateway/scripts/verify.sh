@@ -49,7 +49,6 @@ step "2. scan for upstream names"
 
 step "3. build and vet"
 cd "$tree"
-(cd ui && npm ci --no-audit --no-fund > "$work/npm.log" 2>&1) || { tail -20 "$work/npm.log"; exit 1; }
 make build LOCAL=1 > "$work/build.log" 2>&1 || { tail -30 "$work/build.log"; exit 1; }
 for mod in $(go work edit -json | jq -r '.Use[].DiskPath'); do
   (cd "$mod" && go vet ./...)
@@ -72,7 +71,8 @@ for path in /health /v1/models /api/config '/v1/chat/completions -d {"model":"op
   echo "$(head -1 "$work/resp.txt" | tr -d '\r')  ${path%% *}"
   ! grep -qiE "$upstream_names" "$work/resp.txt" || { echo "FAIL: upstream name in the response to ${path%% *}"; exit 1; }
 done
-curl -fsS "http://127.0.0.1:$port/" | grep -o '<title>[^<]*</title>'
+# the gateway serves no dashboard: the product's only frontend is the web app
+[ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/")" = 404 ] || { echo "FAIL: / is not a 404"; exit 1; }
 ! grep -qiE "$upstream_names" "$work/boot.log" || { echo "FAIL: upstream name in the boot log"; grep -iE "$upstream_names" "$work/boot.log" | head -3; exit 1; }
 kill $pid
 

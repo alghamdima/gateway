@@ -3,7 +3,6 @@ package server
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -259,8 +258,7 @@ type BifrostHTTPServer struct {
 	Ctx    *schemas.BifrostContext
 	cancel context.CancelFunc
 
-	Version   string
-	UIContent embed.FS
+	Version string
 
 	Port     string
 	Host     string
@@ -282,13 +280,6 @@ type BifrostHTTPServer struct {
 
 	Server *fasthttp.Server
 	Router *router.Router
-
-	// ShellRewriter lets a build rewrite the pre-hydration HTML shell before it
-	// is served — the enterprise build uses it to swap in a custom logo.
-	// nil on OSS, where the embedded document is served exactly as bundled. It
-	// must be assigned before RegisterUIRoutes, which builds the UI handler
-	// from it.
-	ShellRewriter handlers.ShellRewriter
 
 	// unsubscribeCaptureDeletes releases the log-delete subscription that
 	// drops complexity request capture's vectors with their logs.
@@ -397,10 +388,9 @@ func SetLogger(l schemas.Logger) {
 }
 
 // NewBifrostHTTPServer creates a new instance of BifrostHTTPServer.
-func NewBifrostHTTPServer(version string, uiContent embed.FS) *BifrostHTTPServer {
+func NewBifrostHTTPServer(version string) *BifrostHTTPServer {
 	return &BifrostHTTPServer{
 		Version:        version,
-		UIContent:      uiContent,
 		Port:           DefaultPort,
 		Host:           DefaultHost,
 		AppDir:         DefaultAppDir,
@@ -3427,12 +3417,6 @@ func (s *BifrostHTTPServer) ObserveWarmupRoutingEmbedding(provider, model string
 	plugin.ObserveWarmupRoutingEmbedding(provider, model, inputTokens)
 }
 
-// RegisterUIRoutes registers the UI handler with the specified router
-func (s *BifrostHTTPServer) RegisterUIRoutes(middlewares ...schemas.BifrostHTTPMiddleware) {
-	// WARNING: This UI handler needs to be registered after all the other handlers
-	handlers.NewUIHandler(s.UIContent, s.ShellRewriter, s.BasePath).RegisterRoutes(s.Router, middlewares...)
-}
-
 // GetAllRedactedKeys gets all redacted keys from the config store
 func (s *BifrostHTTPServer) GetAllRedactedKeys(ctx context.Context, ids []string) []schemas.Key {
 	if s.Config == nil || s.Config.ConfigStore == nil {
@@ -4060,9 +4044,9 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		ctx.SetContentType("text/plain; charset=utf-8")
 		ctx.SetBodyString("User-agent: *\nAllow: /\n")
 	})
-	// Register UI handler
-	s.RegisterUIRoutes()
-	if err := lib.CheckBasePathCollision(s.BasePath, s.Router.List(), s.UIContent); err != nil {
+	// No dashboard is served from here: the product's only frontend is the web
+	// app, which talks to the /api routes above. A path no route claims is a 404.
+	if err := lib.CheckBasePathCollision(s.BasePath, s.Router.List()); err != nil {
 		return err
 	}
 
