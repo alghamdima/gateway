@@ -533,34 +533,6 @@ func TestPGTextSafety_LiteralBackslashU0000RoundTrips(t *testing.T) {
 	}
 }
 
-// TestPGTextSafety_UpdatesAndMCPLogs pins the same guarantee on the update
-// paths (struct and map targets) and on MCP tool logs.
-func TestPGTextSafety_UpdatesAndMCPLogs(t *testing.T) {
-	store, _ := setupPGTextSafetyStore(t)
-	ctx := context.Background()
-
-	entry := pgTextSafetyBatch("update", 1)[0]
-	require.NoError(t, store.BatchCreateIfNotExists(ctx, []*Log{entry}))
-	require.NoError(t, store.Update(ctx, entry.ID, &Log{RawRequest: "req\x00body"}), "struct update")
-	require.NoError(t, store.Update(ctx, entry.ID, map[string]interface{}{"raw_response": "resp\x00body\xff"}), "map update")
-
-	got, err := store.FindByID(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "reqbody", got.RawRequest)
-	assert.Equal(t, "respbody\uFFFD", got.RawResponse)
-
-	now := time.Now().UTC()
-	mcp := &MCPToolLog{
-		ID:              "mcp-text-safety",
-		Timestamp:       now,
-		ToolName:        "search\x00",
-		Status:          "success",
-		ArgumentsParsed: map[string]interface{}{"q": "caf\xc3"},
-		ResultParsed:    "found\x00",
-	}
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{mcp}))
-}
-
 // TestPGTextSafety_PlainTextColumnsKeepEscapeText pins that plain-text columns
 // which merely start with "{" or "[" are not run through the JSON escape
 // sanitizer: routing_engine_logs always starts with "[<timestamp>]", and

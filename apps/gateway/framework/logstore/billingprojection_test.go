@@ -292,13 +292,4 @@ func TestClientIPRoundTripsThroughListQueries(t *testing.T) {
 	assert.Equal(t, email, *byID["llm-ip"].UserEmail)
 	assert.Nil(t, byID["llm-no-ip"].UserEmail)
 	assert.Nil(t, byID["llm-no-ip"].ClientIP, "an absent IP stays NULL")
-
-	require.NoError(t, store.CreateMCPToolLog(ctx, &MCPToolLog{ID: "mcp-ip", Timestamp: now, ToolName: "search", ServerLabel: "srv", Status: "success", CreatedAt: now, ClientIP: &ip, UserEmail: &email}))
-	mcp, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 10})
-	require.NoError(t, err)
-	require.Len(t, mcp.Logs, 1)
-	require.NotNil(t, mcp.Logs[0].ClientIP)
-	assert.Equal(t, ip, *mcp.Logs[0].ClientIP)
-	require.NotNil(t, mcp.Logs[0].UserEmail)
-	assert.Equal(t, email, *mcp.Logs[0].UserEmail)
 }

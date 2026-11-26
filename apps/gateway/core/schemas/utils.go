@@ -6,7 +6,6 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"regexp"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1021,41 +1020,6 @@ func DeepCopyChatTool(original ChatTool) ChatTool {
 		if original.Function.Strict != nil {
 			copyStrict := *original.Function.Strict
 			copyTool.Function.Strict = &copyStrict
-		}
-	}
-
-	// Deep copy Annotations if present
-	if original.Annotations != nil {
-		copyAnnotations := &MCPToolAnnotations{
-			Title: original.Annotations.Title,
-		}
-		if original.Annotations.ReadOnlyHint != nil {
-			v := *original.Annotations.ReadOnlyHint
-			copyAnnotations.ReadOnlyHint = &v
-		}
-		if original.Annotations.DestructiveHint != nil {
-			v := *original.Annotations.DestructiveHint
-			copyAnnotations.DestructiveHint = &v
-		}
-		if original.Annotations.IdempotentHint != nil {
-			v := *original.Annotations.IdempotentHint
-			copyAnnotations.IdempotentHint = &v
-		}
-		if original.Annotations.OpenWorldHint != nil {
-			v := *original.Annotations.OpenWorldHint
-			copyAnnotations.OpenWorldHint = &v
-		}
-		copyTool.Annotations = copyAnnotations
-	}
-
-	if original.MCP != nil {
-		copyTool.MCP = &MCPToolMetadata{
-			Title:         original.MCP.Title,
-			Icons:         slices.Clone(original.MCP.Icons),
-			OutputSchema:  slices.Clone(original.MCP.OutputSchema),
-			Meta:          slices.Clone(original.MCP.Meta),
-			UIResourceURI: original.MCP.UIResourceURI,
-			Visibility:    slices.Clone(original.MCP.Visibility),
 		}
 	}
 

@@ -3014,7 +3014,7 @@ func TestParseVKValueFromRequest(t *testing.T) {
 // accessForProviderPermits builds the access a key-authenticated caller carries, so these tests
 // express what the caller may reach rather than a copy of the key's rows.
 func accessForProviderPermits(permits ...schemas.ProviderPermit) schemas.Access {
-	permit := grant.NewPermit(grant.PermitVirtualKey, "vk-test", "Test VK", true, false, permits, nil)
+	permit := grant.NewPermit(grant.PermitVirtualKey, "vk-test", "Test VK", true, false, permits)
 	return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
 }
 
@@ -3023,7 +3023,7 @@ func accessForProviderPermits(permits ...schemas.ProviderPermit) schemas.Access 
 // permit, so the permit carries its whole grant and every consumer reads one list.
 func accessAllowingAllProviders(configured []string, permits ...schemas.ProviderPermit) schemas.Access {
 	permit := grant.NewPermit(grant.PermitVirtualKey, "vk-test", "Test VK", true, false,
-		governanceplugin.AppendAllProviderPermits(permits, configured), nil,
+		governanceplugin.AppendAllProviderPermits(permits, configured),
 		grant.WithAllowAllProviders(true))
 	return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
 }
@@ -3449,7 +3449,7 @@ func TestListModels_UnfilteredListingSkipsCallerAccess(t *testing.T) {
 	SetLogger(&mockLogger{})
 
 	sessionAccess := func(permits ...schemas.ProviderPermit) schemas.Access {
-		permit := grant.NewPermit(grant.PermitAccessProfile, "profile-test", "Test Profile", true, false, permits, nil)
+		permit := grant.NewPermit(grant.PermitAccessProfile, "profile-test", "Test Profile", true, false, permits)
 		return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
 	}
 	signedIn := func(ctx *fasthttp.RequestCtx) {

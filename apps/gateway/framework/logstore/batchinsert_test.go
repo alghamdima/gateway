@@ -41,32 +41,6 @@ func TestBatchCreateIfNotExists_WriterSizedBatch(t *testing.T) {
 	require.Equal(t, int64(DefaultWriterMaxBatchSize), count)
 }
 
-// TestBatchCreateMCPToolLogsIfNotExists_WriterSizedBatch is the MCP tool log
-// counterpart of TestBatchCreateIfNotExists_WriterSizedBatch.
-func TestBatchCreateMCPToolLogsIfNotExists_WriterSizedBatch(t *testing.T) {
-	ctx := context.Background()
-	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "batchmcp.db")}, testLogger{})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = store.Close(ctx) })
-
-	now := time.Now().UTC()
-	entries := make([]*MCPToolLog, DefaultWriterMaxBatchSize)
-	for i := range entries {
-		entries[i] = &MCPToolLog{
-			ID:        fmt.Sprintf("mcp-batch-%04d", i),
-			Timestamp: now,
-			ToolName:  "search_web",
-			Status:    "success",
-			CreatedAt: now,
-		}
-	}
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, entries))
-
-	var count int64
-	require.NoError(t, store.db.Model(&MCPToolLog{}).Count(&count).Error)
-	require.Equal(t, int64(DefaultWriterMaxBatchSize), count)
-}
-
 // TestInsertBatchSize_StaysUnderParameterLimit pins that the computed chunk size
 // keeps every multi-row INSERT under the smallest supported parameter limit.
 func TestInsertBatchSize_StaysUnderParameterLimit(t *testing.T) {
@@ -75,7 +49,7 @@ func TestInsertBatchSize_StaysUnderParameterLimit(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close(ctx) })
 
-	for _, model := range []any{&Log{}, &MCPToolLog{}} {
+	for _, model := range []any{&Log{}} {
 		size, columns := insertBatchSize(store.db, model)
 		require.Positive(t, size)
 		require.LessOrEqual(t, size*columns, maxInsertBindParams, "%T", model)
@@ -125,22 +99,6 @@ func TestBatchCreateIfNotExists_WriterSizedBatchPostgres(t *testing.T) {
 	var count int64
 	require.NoError(t, store.db.Model(&Log{}).Count(&count).Error)
 	require.Equal(t, int64(DefaultWriterMaxBatchSize), count)
-
-	// MCP tool logs stay under the limit at the default batch size (43 columns)
-	// but must also be chunked for any configured max_batch_size.
-	mcp := make([]*MCPToolLog, 2000)
-	for i := range mcp {
-		mcp[i] = &MCPToolLog{
-			ID:        fmt.Sprintf("pg-mcp-batch-%04d", i),
-			Timestamp: now,
-			ToolName:  "search_web",
-			Status:    "success",
-			CreatedAt: now,
-		}
-	}
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, mcp), "a 2000-row MCP tool log batch must not exceed the Postgres bind-parameter limit")
-	require.NoError(t, store.db.Model(&MCPToolLog{}).Count(&count).Error)
-	require.Equal(t, int64(2000), count)
 }
 
 // TestBatchUpdateSkipsMissingRows pins the semantics the logging plugin's

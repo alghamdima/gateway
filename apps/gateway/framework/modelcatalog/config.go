@@ -26,17 +26,8 @@ const (
 	// corrupted config and falls back to the default.
 	LiveModelsSyncDisabled = int64(0)
 
-	// MCPLibrarySyncDisabled is the sentinel for "never sync the MCP server
-	// catalog in the background". Mirrors LiveModelsSyncDisabled: 0 is a
-	// deliberate opt-out, a negative value is corrupted config that falls back
-	// to the default. Set this on an air-gapped deployment that does not ship a
-	// local catalog file, so the gateway stops dialing the default endpoint on
-	// every tick. An explicit force-sync from the UI still runs.
-	MCPLibrarySyncDisabled = int64(0)
-
-	ConfigLastPricingSyncKey    = "LastModelPricingSync"
-	ConfigLastParamsSyncKey     = "LastModelParametersSync"
-	ConfigLastMCPLibrarySyncKey = "LastMCPLibrarySync"
+	ConfigLastPricingSyncKey = "LastModelPricingSync"
+	ConfigLastParamsSyncKey  = "LastModelParametersSync"
 )
 
 // Config is the model pricing configuration.
@@ -44,12 +35,6 @@ type Config struct {
 	PricingURL          *string `json:"pricing_url,omitempty"`
 	PricingSyncInterval *int64  `json:"pricing_sync_interval,omitempty"` // seconds
 	ModelParametersURL  *string `json:"model_parameters_url,omitempty"`
-
-	// MCPLibraryURL overrides the endpoint the MCP server library catalog is
-	// synced from. Empty/nil uses DefaultMCPLibraryURL. Mirrors PricingURL: the
-	// default ships out of the box and the user can point it at a custom source.
-	MCPLibraryURL          *string `json:"mcp_library_url,omitempty"`
-	MCPLibrarySyncInterval *int64  `json:"mcp_library_sync_interval,omitempty"` // seconds
 
 	// LiveModelsSyncInterval is how often each provider's list-models response
 	// is re-fetched in the background, in seconds. Nil uses
@@ -62,12 +47,6 @@ type Config struct {
 	// is the transport's configuration channel, carried here to keep every
 	// catalog cadence in one place.
 	LiveModelsSyncInterval *int64 `json:"live_models_sync_interval,omitempty"` // seconds
-
-	// OpenAPIURL is the OpenAPI spec /v1/mcp builds its tools from: an http(s)
-	// URL, or a path relative to the app directory. Nil or empty uses the build's
-	// default spec. Like LiveModelsSyncInterval, nothing in this package acts on
-	// it; the HTTP server reads it.
-	OpenAPIURL *string `json:"openapi_url,omitempty"`
 }
 
 // Type re-exports so external callers can continue importing the legacy
@@ -116,9 +95,6 @@ const (
 	DefaultModelParametersURL     = datasheet.DefaultModelParametersURL
 	DefaultPricingTimeout         = datasheet.DefaultPricingTimeout
 	DefaultModelParametersTimeout = datasheet.DefaultModelParametersTimeout
-
-	DefaultMCPLibraryURL     = "https://getbifrost.ai/mcp-library"
-	DefaultMCPLibraryTimeout = 45 * time.Second
 )
 
 // syncWorkerTickerPeriod is the fixed interval at which the background sync worker

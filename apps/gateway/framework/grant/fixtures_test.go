@@ -25,12 +25,11 @@ type permitSpec struct {
 	IsExpired bool
 
 	ProviderPermits []schemas.ProviderPermit
-	MCPPermits      []schemas.MCPPermit
 }
 
 // newPermit builds a Permit from a named spec.
 func newPermit(spec permitSpec) *Permit {
-	return NewPermit(spec.Type, spec.ID, spec.Name, spec.IsActive, spec.IsExpired, spec.ProviderPermits, spec.MCPPermits)
+	return NewPermit(spec.Type, spec.ID, spec.Name, spec.IsActive, spec.IsExpired, spec.ProviderPermits)
 }
 
 // held wraps the permits a caller holds for NewAccess, in the order given. A nil entry is passed
@@ -95,15 +94,6 @@ func permitWithBlacklist(permitType PermitType, id, name, provider string, allow
 		BlacklistedModels: blocked,
 		KeyIDs:            []string{"*"},
 	}}, nil)
-}
-
-// permitWithTools builds a permit permitting the listed tools of one MCP client.
-func permitWithTools(permitType PermitType, id, name, client string, tools ...string) *Permit {
-	return NewPermit(permitType, id, name, true, false, nil, []schemas.MCPPermit{{
-		Client:     client + "-id",
-		ClientName: client,
-		Tools:      tools,
-	}})
 }
 
 func limitIDs(limits []schemas.Limit) []string {

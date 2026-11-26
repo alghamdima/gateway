@@ -48,11 +48,7 @@ type ModelCatalog struct {
 	// sheet pays the full-table capability scan once per generation, not per request.
 	maxOutputTokens *gencache.Cache[int]
 
-	// MCP library sync configuration (protected by syncMu)
-	mcpLibraryURL          string
-	mcpLibrarySyncInterval time.Duration
-	lastMCPLibrarySyncedAt time.Time
-	syncMu                 sync.RWMutex
+	syncMu sync.RWMutex
 
 	shouldSyncGate func(ctx context.Context) bool
 	afterSyncHook  func(ctx context.Context)
@@ -66,25 +62,6 @@ type ModelCatalog struct {
 	wg         sync.WaitGroup
 }
 
-// resolveMCPLibrarySyncInterval maps the configured MCP library sync interval
-// onto a duration. MCPLibrarySyncDisabled (0) is an explicit opt-out and is
-// returned as a zero duration, which every scheduling path below reads as
-// "never sync in the background". Nil or a negative value falls back to the
-// default cadence.
-func resolveMCPLibrarySyncInterval(config *Config) time.Duration {
-	if config == nil || config.MCPLibrarySyncInterval == nil {
-		return DefaultSyncInterval
-	}
-	switch val := *config.MCPLibrarySyncInterval; {
-	case val == MCPLibrarySyncDisabled:
-		return 0
-	case val < 0:
-		return DefaultSyncInterval
-	default:
-		return time.Duration(val) * time.Second
-	}
-}
-
 func Init(ctx context.Context, config *Config, configStore configstore.ConfigStore, logger schemas.Logger) (*ModelCatalog, error) {
 	pricingURL := DefaultPricingURL
 	if config != nil && config.PricingURL != nil {
@@ -94,11 +71,6 @@ func Init(ctx context.Context, config *Config, configStore configstore.ConfigSto
 	if config != nil && config.ModelParametersURL != nil && *config.ModelParametersURL != "" {
 		modelParametersURL = *config.ModelParametersURL
 	}
-	mcpLibraryURL := DefaultMCPLibraryURL
-	if config != nil && config.MCPLibraryURL != nil && *config.MCPLibraryURL != "" {
-		mcpLibraryURL = *config.MCPLibraryURL
-	}
-	mcpLibrarySyncInterval := resolveMCPLibrarySyncInterval(config)
 	syncInterval := DefaultSyncInterval
 	if config != nil && config.PricingSyncInterval != nil {
 		syncInterval = time.Duration(*config.PricingSyncInterval) * time.Second
@@ -109,8 +81,6 @@ func Init(ctx context.Context, config *Config, configStore configstore.ConfigSto
 	logger.Info("pricing sync interval set to %v (scheduler checks every %v)", syncInterval, syncWorkerTickerPeriod)
 
 	mc := &ModelCatalog{
-		mcpLibraryURL:          mcpLibraryURL,
-		mcpLibrarySyncInterval: mcpLibrarySyncInterval,
 		configStore:            configStore,
 		logger:                 logger,
 		distributedLockManager: configstore.NewDistributedLockManager(configStore, logger, configstore.WithDefaultTTL(30*time.Second)),
@@ -220,52 +190,6 @@ func Init(ctx context.Context, config *Config, configStore configstore.ConfigSto
 		if err := mc.datasheet.ReloadEntryOverrides(ctx); err != nil {
 			return nil, err
 		}
-
-		// MCP library catalog follows the datasheet bootstrap pattern: if the DB
-		// already has catalog rows, refresh from URL in the background; if it is
-		// empty, block startup until the first remote sync lands so the library page
-		// is populated immediately after boot. A disabled interval short-circuits
-		// both paths.
-		hasMCPLibraryData, err := mc.hasMCPLibraryData(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load initial MCP library data: %w", err)
-		}
-		switch {
-		case mcpLibrarySyncInterval == 0:
-			// Explicitly disabled (air-gapped deployments with no local catalog
-			// file). Skip the startup fetch entirely so boot does not wait on an
-			// endpoint that is unreachable by design. Whatever is already in the
-			// DB stays served, and a force-sync from the UI still works.
-			logger.Info("MCP library sync is disabled (mcp_library_sync_interval=0), skipping startup sync")
-		case hasMCPLibraryData:
-			logger.Info("existing MCP library data found in database, syncing from URL in background")
-			mc.wg.Add(1)
-			go func() {
-				defer mc.wg.Done()
-				if err := mc.withDistributedLock(mc.syncCtx, "model_catalog_mcp_library_startup_sync", 10, func() error {
-					return mc.syncMCPLibrary(mc.syncCtx)
-				}); err != nil {
-					mc.logger.Warn("background startup MCP library sync failed: %v", err)
-				} else {
-					mc.syncMu.Lock()
-					mc.lastMCPLibrarySyncedAt = time.Now()
-					mc.syncMu.Unlock()
-				}
-			}()
-		default:
-			// Empty DB: attempt a blocking sync so the library page is populated
-			// immediately after boot. Unlike pricing, a failure here is non-fatal
-			// — the background worker will retry on the next tick.
-			if err := mc.withDistributedLock(ctx, "model_catalog_mcp_library_startup_sync", 10, func() error {
-				return mc.syncMCPLibrary(ctx)
-			}); err != nil {
-				logger.Warn("initial MCP library sync failed (will retry in background): %v", err)
-			} else {
-				mc.syncMu.Lock()
-				mc.lastMCPLibrarySyncedAt = time.Now()
-				mc.syncMu.Unlock()
-			}
-		}
 	} else {
 		if err := mc.datasheet.LoadFromURLIntoMemory(ctx); err != nil {
 			return nil, fmt.Errorf("failed to load pricing data into memory: %w", err)
@@ -338,16 +262,6 @@ func (mc *ModelCatalog) UpdateSyncConfig(ctx context.Context, config *Config) er
 	if config != nil && config.ModelParametersURL != nil && *config.ModelParametersURL != "" {
 		modelParametersURL = *config.ModelParametersURL
 	}
-	mcpLibraryURL := DefaultMCPLibraryURL
-	if config != nil && config.MCPLibraryURL != nil && *config.MCPLibraryURL != "" {
-		mcpLibraryURL = *config.MCPLibraryURL
-	}
-	mcpLibrarySyncInterval := resolveMCPLibrarySyncInterval(config)
-	mc.syncMu.Lock()
-	mc.mcpLibraryURL = mcpLibraryURL
-	mc.mcpLibrarySyncInterval = mcpLibrarySyncInterval
-	mc.syncMu.Unlock()
-
 	syncInterval := DefaultSyncInterval
 	if config != nil && config.PricingSyncInterval != nil {
 		syncInterval = time.Duration(*config.PricingSyncInterval) * time.Second
@@ -475,15 +389,11 @@ func (mc *ModelCatalog) syncWorker(ctx context.Context) {
 
 func (mc *ModelCatalog) syncTick(ctx context.Context) {
 	pricingDue := time.Since(mc.datasheet.LastSyncedAt()) >= mc.datasheet.SyncInterval()
-	mcpLibraryDue := mc.isMCPLibrarySyncDue()
-	if !pricingDue && !mcpLibraryDue {
+	if !pricingDue {
 		return
 	}
 	mc.logger.Debug("starting model catalog background sync")
 
-	// Pricing and MCP library use separate distributed locks so their
-	// independent cadences don't block each other.
-	//
 	// A node whose gate rejects the pricing sync (a non-leader in cluster mode)
 	// skips it before taking the lock and neither fires the after-sync hook nor
 	// marks itself synced. Firing the hook there made every node broadcast a
@@ -541,24 +451,6 @@ func (mc *ModelCatalog) syncTick(ctx context.Context) {
 				return paramsErr
 			}); err != nil {
 				mc.logger.Error("failed to run pricing sync: %v", err)
-			}
-		}()
-	}
-	if mcpLibraryDue {
-		outerWg.Add(1)
-		go func() {
-			defer outerWg.Done()
-			if err := mc.withDistributedLock(ctx, "model_catalog_mcp_library_sync", 10, func() error {
-				if err := mc.syncMCPLibrary(ctx); err != nil {
-					mc.logger.Error("background MCP library sync failed: %v", err)
-					return err
-				}
-				mc.syncMu.Lock()
-				mc.lastMCPLibrarySyncedAt = time.Now()
-				mc.syncMu.Unlock()
-				return nil
-			}); err != nil {
-				mc.logger.Error("failed to run MCP library sync: %v", err)
 			}
 		}()
 	}
@@ -635,42 +527,6 @@ func (mc *ModelCatalog) withDistributedLock(ctx context.Context, key string, ret
 // and background sync.
 func (mc *ModelCatalog) hasPricingData() bool {
 	return len(mc.datasheet.DatasheetProviders()) > 0
-}
-
-func (mc *ModelCatalog) hasMCPLibraryData(ctx context.Context) (bool, error) {
-	if mc.configStore == nil {
-		return false, nil
-	}
-	_, totalCount, err := mc.configStore.GetMCPLibraryPaginated(ctx, configstore.MCPLibraryQueryParams{Limit: 1})
-	if err != nil {
-		return false, err
-	}
-	return totalCount > 0, nil
-}
-
-func (mc *ModelCatalog) isMCPLibrarySyncDue() bool {
-	if mc.configStore == nil {
-		return false
-	}
-	mc.syncMu.RLock()
-	lastSyncedAt := mc.lastMCPLibrarySyncedAt
-	syncInterval := mc.mcpLibrarySyncInterval
-	mc.syncMu.RUnlock()
-	return mcpLibrarySyncDue(lastSyncedAt, syncInterval)
-}
-
-// mcpLibrarySyncDue decides whether the background worker should run a catalog
-// sync. Split out from isMCPLibrarySyncDue so the scheduling rules are testable
-// without a config store. A zero interval is the MCPLibrarySyncDisabled opt-out;
-// a negative one is corrupted state that falls back to the default cadence.
-func mcpLibrarySyncDue(lastSyncedAt time.Time, syncInterval time.Duration) bool {
-	if syncInterval == 0 {
-		return false
-	}
-	if syncInterval < 0 {
-		syncInterval = DefaultSyncInterval
-	}
-	return lastSyncedAt.IsZero() || time.Since(lastSyncedAt) >= syncInterval
 }
 
 // knownProviders returns the union of providers seen by any store. Used by

@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/maximhq/bifrost/core/mcp"
 	"github.com/maximhq/bifrost/core/network"
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -411,20 +410,6 @@ func stampRequestedRoute(ctx *schemas.BifrostContext, requested schemas.Route) {
 	}
 	ctx.SetValue(schemas.BifrostContextKeyRequestedProvider, requested.Provider)
 	ctx.SetValue(schemas.BifrostContextKeyRequestedModel, model)
-}
-
-// agentContinuationRoute returns the route that served the first turn of the MCP agent loop
-// this request continues, or nil when the request is not an agent-loop continuation.
-func agentContinuationRoute(ctx *schemas.BifrostContext) *schemas.RoutingInfo {
-	route, _ := ctx.Value(schemas.BifrostContextKeyMCPAgentServedRoute).(*schemas.RoutingInfo)
-	return route
-}
-
-// requestedRouteFromContext reads back the route stampRequestedRoute recorded.
-func requestedRouteFromContext(ctx *schemas.BifrostContext) schemas.Route {
-	provider, _ := ctx.Value(schemas.BifrostContextKeyRequestedProvider).(schemas.ModelProvider)
-	model, _ := ctx.Value(schemas.BifrostContextKeyRequestedModel).(string)
-	return schemas.Route{Provider: provider, Model: model}
 }
 
 // layerFallbackIdentity marks an attempt's routing info as a fallback's when the request is on one,
@@ -888,13 +873,9 @@ func sanitizeSpanName(name string) string {
 // one plugin. Building them with Sprintf on every hook invocation costs ~2
 // allocs per span at request rate; plugin names are static, so cache them.
 type pluginSpanNameSet struct {
-	prehook            string
-	prerequesthook     string
-	posthook           string
-	mcpPrehook         string
-	mcpPosthook        string
-	mcpConnectPrehook  string
-	mcpConnectPosthook string
+	prehook        string
+	prerequesthook string
+	posthook       string
 }
 
 // pluginSpanNameCache maps plugin name -> *pluginSpanNameSet. Bounded by the
@@ -907,23 +888,14 @@ func pluginSpanNamesFor(name string) *pluginSpanNameSet {
 	}
 	s := sanitizeSpanName(name)
 	set := &pluginSpanNameSet{
-		prehook:            "plugin." + s + ".prehook",
-		prerequesthook:     "plugin." + s + ".prerequesthook",
-		posthook:           "plugin." + s + ".posthook",
-		mcpPrehook:         "plugin." + s + ".mcp_prehook",
-		mcpPosthook:        "plugin." + s + ".mcp_posthook",
-		mcpConnectPrehook:  "plugin." + s + ".mcp_connect_prehook",
-		mcpConnectPosthook: "plugin." + s + ".mcp_connect_posthook",
+		prehook:        "plugin." + s + ".prehook",
+		prerequesthook: "plugin." + s + ".prerequesthook",
+		posthook:       "plugin." + s + ".posthook",
 	}
 	if v, loaded := pluginSpanNameCache.LoadOrStore(name, set); loaded {
 		return v.(*pluginSpanNameSet)
 	}
 	return set
-}
-
-// IsCodemodeTool returns true if the given tool name is a codemode tool.
-func IsCodemodeTool(toolName string) bool {
-	return mcp.IsCodeModeTool(toolName)
 }
 
 // isPromptOptionalImageEditType returns true for edit task types that do not require a text prompt.

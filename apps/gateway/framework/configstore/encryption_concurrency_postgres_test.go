@@ -2,7 +2,6 @@ package configstore
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -10,12 +9,10 @@ import (
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
-	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -45,104 +42,6 @@ func newEncryptionPodStore(t *testing.T) *RDBConfigStore {
 	}
 	store.refreshPoolFn = func(ctx context.Context) error { return nil }
 	return store
-}
-
-// TestEncryptPlaintextOAuthConfigs_WaitsForHolderThenConverges holds every row
-// under an open transaction and asserts the walk queues behind the holder rather
-// than skipping past it. Each row is written in its own transaction, so the wait
-// is one row long and no lock is held across another, which is what keeps the
-// blocking design deadlock-free while still leaving nothing plaintext.
-func TestEncryptPlaintextOAuthConfigs_WaitsForHolderThenConverges(t *testing.T) {
-	store := setupPostgresDeadlockStore(t)
-	seedPlaintextOAuthConfigs(t, store.DB(), 20, "secret-")
-
-	holder := newEncryptionPodStore(t)
-	tx := holder.DB().Begin()
-	require.NoError(t, tx.Error)
-
-	var held []tables.TableOauthConfig
-	require.NoError(t, tx.Clauses(clause.Locking{Strength: "UPDATE"}).Find(&held).Error)
-	require.Len(t, held, 20, "the holder must own every row for this to prove anything")
-
-	// Release mid-walk. A skipping walk would already have run past these rows
-	// and reported success; a blocking one picks them all up.
-	time.AfterFunc(2*time.Second, func() { _ = tx.Rollback() })
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	other := newEncryptionPodStore(t)
-	count, err := other.encryptPlaintextOAuthConfigs(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 20, count, "rows held at claim time must still be encrypted, not skipped")
-	assert.Zero(t, plaintextOAuthConfigCount(t, store.DB()),
-		"the walk must not report done while rows are still plaintext")
-}
-
-// TestEncryptPlaintextOAuthConfigs_ConcurrentPodsDoNotDeadlock reproduces the
-// reported startup crash: several nodes booting at once against the same table.
-// Unordered batches let two nodes take the same rows in opposite orders, which
-// Postgres resolves by killing one with SQLSTATE 40P01 — a fatal error at boot.
-func TestEncryptPlaintextOAuthConfigs_ConcurrentPodsDoNotDeadlock(t *testing.T) {
-	store := setupPostgresDeadlockStore(t)
-
-	const (
-		pods  = 5
-		total = encryptionBatchSize * 4
-	)
-	seedPlaintextOAuthConfigs(t, store.DB(), total, "secret-")
-
-	stores := make([]*RDBConfigStore, pods)
-	for i := range stores {
-		stores[i] = newEncryptionPodStore(t)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	start := make(chan struct{})
-	counts := make(chan int, pods)
-	errs := make(chan error, pods)
-	var wg sync.WaitGroup
-	for _, s := range stores {
-		wg.Add(1)
-		go func(s *RDBConfigStore) {
-			defer wg.Done()
-			<-start
-			count, err := s.encryptPlaintextOAuthConfigs(ctx)
-			counts <- count
-			errs <- err
-		}(s)
-	}
-	close(start)
-	wg.Wait()
-	close(counts)
-	close(errs)
-
-	for err := range errs {
-		if isPostgresDeadlock(err) {
-			t.Fatalf("startup encryption deadlocked across nodes: %v", err)
-		}
-		require.NoError(t, err)
-	}
-
-	// Every row is claimed by exactly one node, so the per-node counts partition
-	// the table rather than overlapping.
-	claimed := 0
-	for c := range counts {
-		claimed += c
-	}
-	assert.Equal(t, total, claimed, "each row should be encrypted by exactly one node")
-
-	var remaining int64
-	require.NoError(t, store.DB().Table("oauth_configs").
-		Where("encryption_status = ? OR encryption_status IS NULL OR encryption_status = ''", encryptionStatusPlainText).
-		Count(&remaining).Error)
-	assert.Zero(t, remaining)
-
-	var found tables.TableOauthConfig
-	require.NoError(t, store.DB().Where("id = ?", oauthConfigID(total-1)).First(&found).Error)
-	assert.Equal(t, fmt.Sprintf("secret-%d", total-1), found.ClientSecret.GetValue())
 }
 
 // mockVaultHook installs a vault store hook that sleeps for latency, and

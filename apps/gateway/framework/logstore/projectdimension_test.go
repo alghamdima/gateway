@@ -63,27 +63,18 @@ func TestProjectFilterNarrowsTheRawQuery(t *testing.T) {
 
 func TestCorrelationFiltersAreExactScalars(t *testing.T) {
 	s := newProjectDimensionStore(t)
-	mcpDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	require.NoError(t, mcpDB.AutoMigrate(&MCPToolLog{}))
-	mcpStore := &RDBLogStore{db: mcpDB, logger: bifrost.NewDefaultLogger(schemas.LogLevelInfo)}
 
 	for _, row := range []struct{ id, session, agent, roundTrip string }{
 		{"one", "session-1", "agent-1", "rt-1"},
 		{"two", "session-10", "agent-10", "rt-10"},
 	} {
-		session, agent, roundTrip := row.session, row.agent, row.roundTrip
+		session, agent := row.session, row.agent
 		require.NoError(t, s.db.Create(&Log{ID: row.id, Status: "success", SessionID: &session, AgentCorrelationID: &agent}).Error)
-		require.NoError(t, mcpDB.Create(&MCPToolLog{ID: row.id, ToolName: "tool", SessionID: &session, AgentCorrelationID: &agent, RoundTripID: &roundTrip}).Error)
 	}
 
-	var llmCount, mcpCount, roundTripCount int64
+	var llmCount int64
 	require.NoError(t, s.applyFilters(s.db.Model(&Log{}), SearchFilters{AgentCorrelationID: "agent-1"}).Count(&llmCount).Error)
-	require.NoError(t, mcpStore.applyMCPFilters(mcpDB.Model(&MCPToolLog{}), MCPToolLogSearchFilters{SessionID: "session-1", AgentCorrelationID: "agent-1"}).Count(&mcpCount).Error)
-	require.NoError(t, mcpStore.applyMCPFilters(mcpDB.Model(&MCPToolLog{}), MCPToolLogSearchFilters{RoundTripID: "rt-1"}).Count(&roundTripCount).Error)
 	assert.EqualValues(t, 1, llmCount)
-	assert.EqualValues(t, 1, mcpCount)
-	assert.EqualValues(t, 1, roundTripCount, "round_trip_id matches exactly, as the other correlation ids do")
 }
 
 // The project is stored as the resolved id plus its display name, so a row still reads correctly

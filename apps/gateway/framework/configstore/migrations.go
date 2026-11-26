@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/google/uuid"
 	bifrost "github.com/maximhq/bifrost/core"
@@ -297,25 +296,16 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_team_source_id_column"}, run: migrationAddTeamSourceIDColumn},
 	{IDs: []string{"add_key_name_column"}, run: migrationAddKeyNameColumn},
 	{IDs: []string{"add_framework_configs_table"}, run: migrationAddFrameworkConfigsTable},
-	{IDs: []string{"cleanup_mcp_client_tools_config"}, run: migrationCleanupMCPClientToolsConfig},
-	{IDs: []string{"add_vk_mcp_configs_table"}, run: migrationAddVirtualKeyMCPConfigsTable},
 	{IDs: []string{"update_plugins_table_for_custom_plugins"}, run: migrationAddPluginPathColumn},
 	{IDs: []string{"add_provider_config_budget_rate_limit"}, run: migrationAddProviderConfigBudgetRateLimit},
 	{IDs: []string{"add_sessions_table"}, run: migrationAddSessionsTable},
-	{IDs: []string{"add_headers_json_column_into_mcp_client"}, run: migrationAddHeadersJSONColumnIntoMCPClient},
 	{IDs: []string{"add_disable_content_logging_column"}, run: migrationAddDisableContentLoggingColumn},
-	{IDs: []string{"add_mcp_client_id_column"}, run: migrationAddMCPClientIDColumn},
 	{IDs: []string{"add_vertex_project_number_column"}, run: migrationAddVertexProjectNumberColumn},
 	{IDs: []string{"add_vertex_deployments_json_column"}, run: migrationAddVertexDeploymentsJSONColumn},
 	{IDs: []string{"add_and_fill_provider_column_in_key_table"}, run: migrationMissingProviderColumnInKeyTable},
-	{IDs: []string{"add_tools_to_auto_execute_json_column"}, run: migrationAddToolsToAutoExecuteJSONColumn},
-	{IDs: []string{"add_is_code_mode_client_column"}, run: migrationAddIsCodeModeClientColumn},
 	{IDs: []string{"add_log_retention_days_column"}, run: migrationAddLogRetentionDaysColumn},
 	{IDs: []string{"add_enabled_column_to_key_table"}, run: migrationAddEnabledColumnToKeyTable},
 	{IDs: []string{"update_model_pricing_table_to_add_cache_and_batch_pricing"}, run: migrationAddBatchAndCachePricingColumns},
-	{IDs: []string{"add_mcp_agent_depth_and_mcp_tool_execution_timeout_columns"}, run: migrationAddMCPAgentDepthAndMCPToolExecutionTimeoutColumns},
-	{IDs: []string{"add_mcp_code_mode_binding_level_column"}, run: migrationAddMCPCodeModeBindingLevelColumn},
-	{IDs: []string{"normalize_mcp_client_names"}, run: migrationNormalizeMCPClientNames},
 	{IDs: []string{"move_keys_to_provider_config"}, run: migrationMoveKeysToProviderConfig},
 	{IDs: []string{"add_plugin_version_column"}, run: migrationAddPluginVersionColumn},
 	{IDs: []string{"add_send_back_raw_request_columns"}, run: migrationAddSendBackRawRequestColumns},
@@ -332,12 +322,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_provider_governance_columns"}, run: migrationAddProviderGovernanceColumns},
 	{IDs: []string{"add_allowed_headers_json_column"}, run: migrationAddAllowedHeadersJSONColumn},
 	{IDs: []string{"add_disable_db_pings_in_health_column"}, run: migrationAddDisableDBPingsInHealthColumn},
-	{IDs: []string{"add_is_ping_available_column"}, run: migrationAddIsPingAvailableColumnToMCPClientTable},
-	{IDs: []string{"add_tool_pricing_json_column"}, run: migrationAddToolPricingJSONColumn},
-	{IDs: []string{"remove_server_prefix_from_mcp_tools"}, run: migrationRemoveServerPrefixFromMCPTools},
-	{IDs: []string{"add_oauth_tables"}, run: migrationAddOAuthTables},
-	{IDs: []string{"add_tool_sync_interval_columns"}, run: migrationAddToolSyncIntervalColumns},
-	{IDs: []string{"add_mcp_client_config_to_oauth_config"}, run: migrationAddMCPClientConfigToOAuthConfig},
 	{IDs: []string{"add_routing_rules_table"}, run: migrationAddRoutingRulesTable},
 	{IDs: []string{"add_base_model_pricing_column"}, run: migrationAddBaseModelPricingColumn},
 	{IDs: []string{"add_azure_scopes_column"}, run: migrationAddAzureScopesColumn},
@@ -368,12 +352,8 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_allow_all_keys_to_provider_config"}, run: migrationAddAllowAllKeysToProviderConfig},
 	{IDs: []string{"add_vk_provider_config_blacklisted_models_column"}, run: migrationAddVirtualKeyBlacklistedModelsColumn},
 	{IDs: []string{"backfill_empty_virtual_key_configs"}, run: migrationBackfillEmptyVirtualKeyConfigs},
-	{IDs: []string{"add_mcp_disable_auto_tool_inject_column"}, run: migrationAddMCPDisableAutoToolInjectColumn},
-	{IDs: []string{"add_mcp_enable_temp_token_auth_column"}, run: migrationAddMCPEnableTempTokenAuthColumn},
 	{IDs: []string{"backfill_allowed_models_wildcard"}, run: migrationBackfillAllowedModelsWildcard},
-	{IDs: []string{"add_mcp_client_allowed_extra_headers_json_column"}, run: migrationAddMCPClientAllowedExtraHeadersJSONColumn},
 	{IDs: []string{"make_base_pricing_columns_nullable"}, run: migrationMakeBasePricingColumnsNullable},
-	{IDs: []string{"add_allow_on_all_virtual_keys_column"}, run: migrationAddAllowOnAllVirtualKeysColumn},
 	{IDs: []string{"add_open_ai_config_json_column"}, run: migrationAddOpenAIConfigJSONColumn},
 	{IDs: []string{"add_key_blacklisted_models_json_column"}, run: migrationAddKeyBlacklistedModelsJSONColumn},
 	{IDs: []string{"add_chain_rule_column_to_routing_rules"}, run: migrationAddChainRuleColumnToRoutingRules},
@@ -384,8 +364,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_model_capability_columns"}, run: migrationAddModelCapabilityColumns},
 	{IDs: []string{"add_ollama_sgl_config_columns"}, run: migrationAddOllamaSGLConfigColumns},
 	{IDs: []string{"add_multi_budget_tables"}, run: migrationAddMultiBudgetTables},
-	{IDs: []string{"add_per_user_oauth_tables"}, run: migrationAddPerUserOAuthTables},
-	{IDs: []string{"add_mcp_client_discovered_tools_columns"}, run: migrationAddMCPClientDiscoveredToolsColumns},
 	{IDs: []string{"add_whitelisted_routes_json_column"}, run: migrationAddWhitelistedRoutesJSONColumn},
 	{IDs: []string{"replace_enable_litellm_with_compat_columns"}, run: migrationReplaceEnableLiteLLMWithCompatColumns},
 	{IDs: []string{"add_model_pricing_unique_index"}, run: migrationAddModelPricingUniqueIndex},
@@ -396,22 +374,12 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"migrate_calendar_aligned"}, run: migrateCalendarAlignedToBudgetsAndRateLimitsTable},
 	{IDs: []string{"add_team_budgets_to_budgets_table"}, run: migrationAddTeamBudgetsToBudgetsTable},
 	{IDs: []string{"add_ocr_pricing_columns"}, run: migrationAddOCRPricingColumns},
-	{IDs: []string{"convert_mcp_client_tool_sync_interval_minutes_to_seconds"}, run: migrationConvertMCPClientToolSyncIntervalMinutesToSeconds},
-	{IDs: []string{"add_mcp_external_base_url_column"}, run: migrationAddMCPExternalBaseURLColumn},
-	{IDs: []string{"split_mcp_external_base_url_into_server_client"}, run: migrationSplitMCPExternalBaseURL},
-	{IDs: []string{"make_oauth_token_expiry_nullable"}, run: migrationMakeOAuthTokenExpiryNullable},
 	{IDs: []string{"add_allow_per_request_content_storage_override_column"}, run: migrationAddAllowPerRequestContentStorageOverrideColumn},
 	{IDs: []string{"add_retain_content_in_object_storage_column"}, run: migrationAddRetainContentInObjectStorageColumn},
 	{IDs: []string{"add_allow_per_request_raw_override_column"}, run: migrationAddAllowPerRequestRawOverrideColumn},
-	{IDs: []string{"add_mcp_client_disabled_column"}, run: migrationAddMCPClientDisabledColumn},
 	{IDs: []string{"gov_unique_team_names"}, run: migrationUniqueTeamNames},
 	{IDs: []string{"drop_allow_direct_keys_column"}, run: migrationDropAllowDirectKeysColumn},
 	{IDs: []string{"drop_allow_direct_keys_column_ddl"}, run: migrationDropAllowDirectKeysColumnDDL},
-	{IDs: []string{"add_oauth_auth_mode_columns"}, run: migrationAddOAuthAuthModeColumns},
-	{IDs: []string{"replace_oauth_session_token_with_session_id"}, run: migrationReplaceOauthSessionTokenWithSessionID},
-	{IDs: []string{"drop_legacy_oauth_server_tables"}, run: migrationDropLegacyOAuthServerTables},
-	{IDs: []string{"drop_non_vk_oauth_user_rows"}, run: migrationDropNonVKOauthUserRows},
-	{IDs: []string{"drop_mcp_external_server_url_column"}, run: migrationDropMCPExternalServerURL},
 	{IDs: []string{"add_team_calendar_aligned_column"}, run: migrationAddTeamCalendarAlignedColumn},
 	{IDs: []string{"drop_legacy_calendar_aligned_columns"}, run: migrationDropLegacyCalendarAlignedColumns},
 	{IDs: []string{"add_vk_access_profile_id_column"}, run: migrationAddVKAccessProfileIDColumn},
@@ -420,15 +388,10 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_framework_config_hash_column"}, run: migrationAddFrameworkConfigHashColumn},
 	{IDs: []string{"add_model_parameters_url_column"}, run: migrationAddModelParametersURLColumn},
 	{IDs: []string{"add_client_config_metadata_json_column"}, run: migrationAddClientConfigMetadataColumn},
-	{IDs: []string{"add_temp_tokens_table"}, run: migrationAddTempTokensTable},
 	{IDs: []string{"backfill_vk_provider_config_blacklisted_models"}, run: migrationBackfillVirtualKeyBlacklistedModels},
 	{IDs: []string{"add_created_by_user_id_column_for_virtual_keys"}, run: migrationAddCreatedByUserIDColumnForVirtualKeys},
 	{IDs: []string{"re_add_allow_direct_keys_column"}, run: migrationReAddAllowDirectKeysColumn},
-	{IDs: []string{"refresh_config_hash_after_mcp_external_server_url_removal"}, run: migrationRefreshConfigHashAfterMCPExternalServerURLRemoval},
 	{IDs: []string{"drop_azure_api_version_column"}, run: migrationDropAzureAPIVersionColumn},
-	{IDs: []string{"add_mcp_per_user_header_credentials_table"}, run: migrationAddPerUserHeadersTables},
-	{IDs: []string{"add_mcp_per_user_header_flows_table"}, run: migrationAddPerUserHeadersFlowsTable},
-	{IDs: []string{"add_mcp_client_tls_config_json_column"}, run: migrationAddMCPClientTLSConfigColumn},
 	{IDs: []string{"add_additional_attributes_to_pricing"}, run: migrationAddAdditionalAttributesToPricing},
 	{IDs: []string{"add_model_config_scope_columns"}, run: migrationAddModelConfigScopeColumns},
 	{IDs: []string{"migrate_provider_governance_to_model_configs"}, run: migrationMigrateProviderGovernanceToModelConfigs},
@@ -439,19 +402,13 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_customer_calendar_aligned_column"}, run: migrationAddCustomerCalendarAlignedColumn},
 	{IDs: []string{"add_customer_budgets_to_budgets_table"}, run: migrationAddCustomerBudgetsToBudgetsTable},
 	{IDs: []string{"add_model_config_budgets_fk_constraint"}, run: migrationAddModelConfigBudgetsFKConstraint},
-	{IDs: []string{"add_mcp_library_table"}, run: migrationAddMCPLibraryTable},
-	{IDs: []string{"add_mcp_library_config_columns"}, run: migrationAddMCPLibraryConfigColumns},
-	{IDs: []string{"add_mcp_library_source_columns"}, run: migrationAddMCPLibrarySourceColumns},
 	{IDs: []string{"add_fast_mode_pricing_columns"}, run: migrationAddFastModePricingColumns},
 	{IDs: []string{"add_customer_name_unique_constraint_dedup", "add_customer_name_unique_constraint_index"}, run: migrationAddCustomerNameUniqueConstraint},
 	{IDs: []string{"null_legacy_customer_budget_id_refs"}, run: migrationNullLegacyCustomerBudgetID},
 	{IDs: []string{"add_skills_repo_tables"}, run: migrationAddSkillsRepoTables},
-	{IDs: []string{"add_oauth2_server_tables"}, run: migrationAddOAuth2ServerTables},
-	{IDs: []string{"add_oauth2_issuance_tables"}, run: migrationAddOAuth2IssuanceTables},
 	{IDs: []string{"add_dump_errors_in_console_logs_column"}, run: migrationAddDumpErrorsInConsoleLogsColumn},
 	{IDs: []string{"add_bedrock_mantle_key_columns"}, run: migrationAddBedrockMantleKeyColumns},
 	{IDs: []string{"add_model_pricing_is_deprecated_column"}, run: migrationAddModelPricingIsDeprecatedColumn},
-	{IDs: []string{"add_mcp_client_tool_execution_timeout_column"}, run: migrationAddMCPClientToolExecutionTimeoutColumn},
 	{IDs: []string{"add_virtual_key_expires_at_column"}, run: migrationAddVirtualKeyExpiresAtColumn},
 	{IDs: []string{"add_virtual_key_delete_after_expire_column"}, run: migrationAddVirtualKeyDeleteAfterExpireColumn},
 	{IDs: []string{"add_client_config_delete_expired_virtual_keys_column"}, run: migrationAddClientConfigDeleteExpiredVirtualKeysColumn},
@@ -465,7 +422,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"repair_bare_wildcard_allowed_models"}, run: migrationRepairBareWildcardAllowedModels},
 	{IDs: []string{"add_bedrock_project_id_columns"}, run: migrationAddBedrockProjectIDColumns},
 	{IDs: []string{"add_dual_credential_conflict_behavior_column"}, run: migrationAddDualCredentialConflictBehaviorColumn},
-	{IDs: []string{"add_oauth_config_resource_column"}, run: migrationAddOauthConfigResourceColumn},
 	{IDs: []string{"add_use_anthropic_endpoints_column"}, run: migrationAddUseAnthropicEndpointsColumn},
 	{IDs: []string{"add_bedrock_batch_role_arn_column"}, run: migrationAddBedrockBatchRoleARNColumn},
 	{IDs: []string{"add_budget_override_columns"}, run: migrationAddBudgetOverrideColumns},
@@ -473,14 +429,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_live_models_sync_interval_column"}, run: migrationAddLiveModelsSyncIntervalColumn},
 	{IDs: []string{"add_pricing_override_user_id_column"}, run: migrationAddPricingOverrideUserIDColumn},
 	{IDs: []string{"add_budget_reset_config_column"}, run: migrationAddBudgetResetConfigColumn},
-	{IDs: []string{"add_mcp_client_pending_oauth_config_json_column"}, run: migrationAddMCPClientPendingOAuthConfigJSONColumn},
-	{IDs: []string{"merge_oauth_token_tables"}, run: migrationMergeOauthTokenTables},
-	{IDs: []string{"create_mcp_oauth_flows_table"}, run: migrationCreateMCPOauthFlowsTable},
-	{IDs: []string{"drop_oauth_config_pkce_columns"}, run: migrationDropOauthConfigPKCEColumns},
-	{IDs: []string{"drop_oauth_config_token_id_column"}, run: migrationDropOauthConfigTokenIDColumn},
-	{IDs: []string{"add_mcp_admin_auth_mode_indexes"}, run: migrationAddMCPAdminAuthModeIndexes},
-	{IDs: []string{"add_mcp_client_token_exchange_json_column"}, run: migrationAddMCPClientTokenExchangeJSONColumn},
-	{IDs: []string{"add_needs_session_stickiness_column"}, run: migrationAddNeedsSessionStickinessColumn},
 	{IDs: []string{"add_bedrock_endpoints_columns"}, run: migrationAddBedrockEndpointsColumns},
 	{IDs: []string{"add_cost_per_request_pricing_column"}, run: migrationAddCostPerRequestPricingColumn},
 	{IDs: []string{"backfill_default_complexity_exemplars_v2"}, run: migrationBackfillDefaultComplexityExemplars},
@@ -493,16 +441,12 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_batch_jobs_attribution_columns"}, run: migrationAddBatchJobsAttributionColumns},
 	{IDs: []string{"add_vk_rotation_cooldown_columns"}, run: migrationAddVKRotationCooldownColumns},
 	{IDs: []string{"add_vk_rotation_cooldown_client_column"}, run: migrationAddVKRotationCooldownClientColumn},
-	{IDs: []string{"drop_legacy_oauth_user_fk_constraints"}, run: migrationDropLegacyOauthUserFKConstraints},
-	{IDs: []string{"add_virtual_mcp_tables"}, run: migrationAddVirtualMCPTables},
 	{IDs: []string{"add_video_resolution_pricing_columns"}, run: migrationAddVideoResolutionPricingColumns},
 	{IDs: []string{"add_provider_job_kind_columns", "swap_provider_job_indexes"}, run: migrationAddProviderJobKindColumns},
 	{IDs: []string{"add_compat_azure_deepseek_column"}, run: migrationAddCompatAzureDeepseekColumn},
 	{IDs: []string{"clear_plugin_config_hashes"}, run: migrationClearPluginConfigHashes},
-	{IDs: []string{"add_mcp_oauth_token_status_reason_column"}, run: migrationAddMCPOauthTokenStatusReasonColumn},
 	{IDs: []string{"add_databricks_key_config_columns"}, run: migrationAddDatabricksKeyConfigColumns},
 	{IDs: []string{"add_oauth_key_config_columns"}, run: migrationAddOAuthKeyConfigColumns},
-	{IDs: []string{"add_mcp_client_endpoint_slug"}, run: migrationAddMCPClientEndpointSlug},
 	{IDs: []string{"add_allow_all_providers_to_virtual_key"}, run: migrationAddAllowAllProvidersToVirtualKey},
 	{IDs: []string{"backfill_vk_allow_all_providers_hash"}, run: migrationBackfillVirtualKeyAllowAllProvidersHash},
 	{IDs: []string{"add_prompt_cache_json_column"}, run: migrationAddPromptCacheJSONColumn},
@@ -510,45 +454,32 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_use_openai_endpoints_column"}, run: migrationAddUseOpenAIEndpointsColumn},
 	{IDs: []string{"add_time_of_day_pricing_columns"}, run: migrationAddTimeOfDayPricingColumns},
 	{IDs: []string{"migrate_vk_standalone_limits_to_model_configs"}, run: migrationMigrateVKStandaloneLimitsToModelConfigs},
-	{IDs: []string{"widen_oauth2_client_controlled_columns"}, run: migrationWidenOAuth2ClientControlledColumns},
 	{IDs: []string{"add_virtual_key_business_unit_column"}, run: migrationAddVirtualKeyBusinessUnitColumn},
-	{IDs: []string{"add_mcp_discovered_instructions_column"}, run: migrationAddMCPDiscoveredInstructionsColumn},
-	{IDs: []string{"add_mcp_instruction_cap_columns"}, run: migrationAddMCPInstructionCapColumns},
-	{IDs: []string{"add_mcp_client_max_instructions_length_column"}, run: migrationAddMCPClientMaxInstructionsLengthColumn},
-	{IDs: []string{"add_mcp_client_require_public_target_column"}, run: migrationAddMCPClientRequirePublicTargetColumn},
 	{IDs: []string{"add_virtual_key_disable_content_logging_column"}, run: migrationAddVirtualKeyDisableContentLoggingColumn},
 	{IDs: []string{"add_ttft_timeout_ms_column_to_routing_targets"}, run: migrationAddTTFTTimeoutMsColumnToRoutingTargets},
 	{IDs: []string{"add_web_search_cost_per_request_column"}, run: migrationAddWebSearchCostPerRequestColumn},
 	{IDs: []string{"move_pricing_override_search_context_to_web_search"}, run: migrationMovePricingOverrideSearchContextToWebSearch},
 	{IDs: []string{"add_vk_provider_config_virtual_key_id_index"}, run: migrationAddVKProviderConfigVirtualKeyIDIndex},
 	{IDs: []string{"add_value_hash_and_token_hash_indexes"}, run: migrationAddValueHashAndTokenHashIndexes},
-	{IDs: []string{"add_vk_mcp_configs_mcp_client_id_index"}, run: migrationAddVKMCPConfigsMCPClientIDIndex},
 	{IDs: []string{"add_vk_provider_config_provider_and_key_indexes"}, run: migrationAddVKProviderConfigProviderAndKeyIndexes},
 	{IDs: []string{"add_virtual_keys_created_at_id_index"}, run: migrationAddVirtualKeysCreatedAtIDIndex},
 	{IDs: []string{"add_batch_jobs_due_index"}, run: migrationAddBatchJobsDueIndex},
-	{IDs: []string{"make_mcp_oauth_flows_state_unique"}, run: migrationMakeMCPOauthFlowsStateUnique},
 	{IDs: []string{"add_ultrafast_above_272k_pricing_columns"}, run: migrationAddUltrafastAbove272kPricingColumns},
 	{IDs: []string{"add_priority_above_272k_cache_creation_pricing_column"}, run: migrationAddPriorityAbove272kCacheCreationPricingColumn},
-	{IDs: []string{"add_mcp_code_mode_limits_client_column"}, run: migrationAddMCPCodeModeLimitsClientColumn},
 	{IDs: []string{"add_compat_force_reasoning_only_models_to_responses_column"}, run: migrationAddCompatForceReasoningOnlyModelsToResponsesColumn},
 	{IDs: []string{"backfill_compat_force_reasoning_only_models_to_responses"}, run: migrationBackfillCompatForceReasoningOnlyModelsToResponses},
 	{IDs: []string{"add_ignore_provider_cost_column"}, run: migrationAddIgnoreProviderCostColumn},
 	{IDs: []string{"add_100k_token_pricing_columns"}, run: migrationAdd100kTokenPricingColumns},
 	{IDs: []string{"add_decisions_pricing_columns"}, run: migrationAddDecisionsPricingColumns},
-	{IDs: []string{"add_injected_tools_json_column"}, run: migrationAddInjectedToolsJSONColumn},
 	{IDs: []string{"add_compat_convert_decision_to_responses_column"}, run: migrationAddCompatConvertDecisionToResponsesColumn},
 	{IDs: []string{"add_cloudflare_key_config_columns"}, run: migrationAddCloudflareKeyConfigColumns},
 	{IDs: []string{"move_config_json_vk_limits_to_model_configs"}, run: migrationMoveConfigJSONVKLimitsToModelConfigs},
-	{IDs: []string{"add_mcp_oauth_private_allowlist_column"}, run: migrationAddMCPOAuthPrivateAllowlistColumn},
 	{IDs: []string{"add_provider_objects_table"}, run: migrationAddProviderObjectsTable},
 	{IDs: []string{"add_batch_jobs_file_id_indexes"}, run: migrationAddBatchJobsFileIDIndexes},
 	{IDs: []string{"add_provider_objects_object_id_index"}, run: migrationAddProviderObjectsObjectIDIndex},
 	{IDs: []string{"add_client_config_enforce_vk_object_ownership_column"}, run: migrationAddClientConfigEnforceVKObjectOwnershipColumn},
-	{IDs: []string{"add_mcp_client_openapi_spec_column"}, run: migrationAddMCPClientOpenAPISpecColumn},
-	{IDs: []string{"add_mcp_client_openapi_config_json_column"}, run: migrationAddMCPClientOpenAPIConfigJSONColumn},
 	{IDs: []string{"add_client_config_extra_fields_placement_column"}, run: migrationAddClientConfigExtraFieldsPlacementColumn},
 	{IDs: []string{"add_skills_external_client_url_column"}, run: migrationAddSkillsExternalClientURLColumn},
-	{IDs: []string{"backfill_skills_external_client_url"}, run: migrationBackfillSkillsExternalClientURL},
 	{IDs: []string{"add_virtual_key_metadata_column"}, run: migrationAddVirtualKeyMetadataColumn},
 	{IDs: []string{"add_vertex_use_session_routing_column"}, run: migrationAddVertexUseSessionRoutingColumn},
 	{IDs: []string{"add_client_config_skip_access_profile_user_virtual_key_lifecycle_columns"}, run: migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns},
@@ -556,18 +487,9 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_azure_use_speech_endpoints_column"}, run: migrationAddAzureUseSpeechEndpointsColumn},
 	{IDs: []string{"add_azure_use_voice_live_endpoints_column"}, run: migrationAddAzureUseVoiceLiveEndpointsColumn},
 	{IDs: []string{"add_sagemaker_key_columns"}, run: migrationAddSageMakerKeyColumns},
-	{IDs: []string{"widen_oauth2_client_id_columns"}, run: migrationWidenOAuth2ClientIDColumns},
-	{IDs: []string{"add_oauth2_refresh_token_client_display_name_column"}, run: migrationAddOAuth2RefreshTokenClientDisplayNameColumn},
-	{IDs: []string{"add_mcp_max_protocol_version_columns"}, run: migrationAddMCPMaxProtocolVersionColumns},
-	{IDs: []string{"add_mcp_client_discovered_resources_prompts_columns"}, run: migrationAddMCPClientDiscoveredResourcesPromptsColumns},
-	{IDs: []string{"add_mcp_client_expose_lists_columns"}, run: migrationAddMCPClientExposeListsColumns},
-	{IDs: []string{"add_oauth_issuer_binding_columns"}, run: migrationAddOAuthIssuerBindingColumns},
-	{IDs: []string{"add_mcp_client_discovered_tool_details_column"}, run: migrationAddMCPClientDiscoveredToolDetailsColumn},
 	{IDs: []string{"add_video_token_pricing_column"}, run: migrationAddVideoTokenPricingColumn},
 	{IDs: []string{"add_voice_live_pricing_columns"}, run: migrationAddVoiceLivePricingColumns},
 	{IDs: []string{"add_anthropic_workload_identity_column"}, run: migrationAddAnthropicWorkloadIdentityColumn},
-	{IDs: []string{"add_mcp_per_user_discoveries"}, run: migrationAddMCPPerUserDiscoveries},
-	{IDs: []string{"add_mcp_client_pending_verification_column"}, run: migrationAddMCPClientPendingVerificationColumn},
 	{IDs: []string{"add_cache_creation_above_12hr_pricing_columns"}, run: migrationAddCacheCreationAbove12hrPricingColumns},
 	{IDs: []string{"add_datasheet_overrides_table"}, run: migrationAddDatasheetOverridesTable},
 	{IDs: []string{"add_usage_estimation_tokenizers_json_column"}, run: migrationAddUsageEstimationTokenizersJSONColumn},
@@ -578,15 +500,8 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_model_routers_table"}, run: migrationAddModelRoutersTable},
 	{IDs: []string{"add_model_router_targets_and_routing"}, run: migrationAddModelRouterTargetsAndRouting},
 	{IDs: []string{"add_model_router_suggestions_tier_columns"}, run: migrationAddModelRouterSuggestionTierColumns},
-	{IDs: []string{"add_mcp_client_server_type_on_slug_column"}, run: migrationAddMCPClientServerTypeOnSlugColumn},
-	{IDs: []string{"add_mcp_client_metadata_url_columns"}, run: migrationAddMCPClientMetadataURLColumns},
-	{IDs: []string{"add_client_config_mcp_openapi_max_spec_mb_column"}, run: migrationAddClientConfigMCPOpenAPIMaxSpecMBColumn},
-	{IDs: []string{"add_client_config_bifrost_url_and_bifrost_mcp_columns"}, run: migrationAddClientConfigBifrostURLAndBifrostMCPColumns},
 	{IDs: []string{"add_framework_config_openapi_url_column"}, run: migrationAddFrameworkConfigOpenAPIURLColumn},
 	{IDs: []string{"add_client_config_entity_access_profile_mode_column"}, run: migrationAddClientConfigEntityAccessProfileModeColumn},
-	{IDs: []string{"add_oauth2_authorize_requests_device_code_columns"}, run: migrationAddOAuth2AuthorizeRequestsDeviceCodeColumns},
-	{IDs: []string{"add_oauth2_authorize_requests_device_code_indexes"}, run: migrationAddOAuth2AuthorizeRequestsDeviceCodeIndexes},
-	{IDs: []string{"add_client_config_mcp_server_max_protocol_version_column"}, run: migrationAddClientConfigMCPServerMaxProtocolVersionColumn},
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -746,7 +661,6 @@ func migrationBackfillVirtualKeyAllowAllProvidersHash(ctx context.Context, db *g
 			if err := tx.
 				Preload("ProviderConfigs").
 				Preload("ProviderConfigs.Keys").
-				Preload("MCPConfigs").
 				Find(&virtualKeys).Error; err != nil {
 				return fmt.Errorf("failed to fetch virtual keys for hash recomputation: %w", err)
 			}
@@ -1405,24 +1319,6 @@ func migrationInit(ctx context.Context, db *gorm.DB, logger schemas.Logger) erro
 					return err
 				}
 			}
-			if !migrator.HasTable(&tables.TableOauthConfig{}) {
-				logger.Info("[configstore] %s: creating table TableOauthConfig", migrationName)
-				if err := migrator.CreateTable(&tables.TableOauthConfig{}); err != nil {
-					return err
-				}
-			}
-			if !migrator.HasTable(&tables.TableOauthToken{}) {
-				logger.Info("[configstore] %s: creating table TableOauthToken", migrationName)
-				if err := migrator.CreateTable(&tables.TableOauthToken{}); err != nil {
-					return err
-				}
-			}
-			if !migrator.HasTable(&tables.TableMCPClient{}) {
-				logger.Info("[configstore] %s: creating table TableMCPClient", migrationName)
-				if err := migrator.CreateTable(&tables.TableMCPClient{}); err != nil {
-					return err
-				}
-			}
 			if !migrator.HasTable(&tables.TableClientConfig{}) {
 				logger.Info("[configstore] %s: creating table TableClientConfig", migrationName)
 				if err := migrator.CreateTable(&tables.TableClientConfig{}); err != nil {
@@ -1530,10 +1426,6 @@ func migrationInit(ctx context.Context, db *gorm.DB, logger schemas.Logger) erro
 			}
 			logger.Info("[configstore] %s: dropping table TableModel", migrationName)
 			if err := migrator.DropTable(&tables.TableModel{}); err != nil {
-				return err
-			}
-			logger.Info("[configstore] %s: dropping table TableMCPClient", migrationName)
-			if err := migrator.DropTable(&tables.TableMCPClient{}); err != nil {
 				return err
 			}
 			logger.Info("[configstore] %s: dropping table TableClientConfig", migrationName)
@@ -1859,12 +1751,6 @@ func migrationDropAllowDirectKeysColumn(ctx context.Context, db *gorm.DB, logger
 					AllowedOrigins:                        cc.AllowedOrigins,
 					AllowedHeaders:                        cc.AllowedHeaders,
 					MaxRequestBodySizeMB:                  cc.MaxRequestBodySizeMB,
-					MCPAgentDepth:                         cc.MCPAgentDepth,
-					MCPToolExecutionTimeout:               cc.MCPToolExecutionTimeout,
-					MCPCodeModeBindingLevel:               cc.MCPCodeModeBindingLevel,
-					MCPToolSyncInterval:                   cc.MCPToolSyncInterval,
-					MCPDisableAutoToolInject:              cc.MCPDisableAutoToolInject,
-					MCPEnableTempTokenAuth:                cc.MCPEnableTempTokenAuth,
 					HeaderFilterConfig:                    cc.HeaderFilterConfig,
 					AsyncJobResultTTL:                     cc.AsyncJobResultTTL,
 					RequiredHeaders:                       cc.RequiredHeaders,
@@ -2123,310 +2009,6 @@ func migrationAddKeyNameColumn(ctx context.Context, db *gorm.DB, logger schemas.
 	return nil
 }
 
-// migrationCleanupMCPClientToolsConfig removes ToolsToSkipJSON column and converts empty ToolsToExecuteJSON to wildcard
-func migrationCleanupMCPClientToolsConfig(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "cleanup_mcp_client_tools_config"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			// Step 1: Remove ToolsToSkipJSON column if it exists (cleanup from old versions)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "tools_to_skip_json"); err != nil {
-				return fmt.Errorf("failed to drop tools_to_skip_json column: %w", err)
-			}
-
-			// Alternative column name variations that might exist
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "ToolsToSkipJSON"); err != nil {
-				return fmt.Errorf("failed to drop ToolsToSkipJSON column: %w", err)
-			}
-
-			// Step 2: Update empty ToolsToExecuteJSON arrays to wildcard ["*"]
-			// Convert "[]" (empty array) to "[\"*\"]" (wildcard array) for backward compatibility
-			updateSQL := `
-				UPDATE config_mcp_clients
-				SET tools_to_execute_json = '["*"]'
-				WHERE tools_to_execute_json = '[]' OR tools_to_execute_json = '' OR tools_to_execute_json IS NULL
-			`
-			if err := tx.Exec(updateSQL).Error; err != nil {
-				return fmt.Errorf("failed to update empty ToolsToExecuteJSON to wildcard: %w", err)
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// For rollback, we could add the column back, but since we're moving away from this
-			// functionality, we'll just revert the wildcard changes back to empty arrays
-			tx = tx.WithContext(ctx)
-
-			revertSQL := `
-				UPDATE config_mcp_clients
-				SET tools_to_execute_json = '[]'
-				WHERE tools_to_execute_json = '["*"]'
-			`
-			if err := tx.Exec(revertSQL).Error; err != nil {
-				return fmt.Errorf("failed to revert wildcard ToolsToExecuteJSON to empty arrays: %w", err)
-			}
-
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running MCP client tools cleanup migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddVirtualKeyMCPConfigsTable adds the virtual_key_mcp_configs table
-func migrationAddVirtualKeyMCPConfigsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_vk_mcp_configs_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasTable(&tables.TableVirtualKeyMCPConfig{}) {
-				logger.Info("[configstore] %s: creating table TableVirtualKeyMCPConfig", migrationName)
-				if err := migrator.CreateTable(&tables.TableVirtualKeyMCPConfig{}); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			logger.Info("[configstore] %s: dropping table TableVirtualKeyMCPConfig", migrationName)
-			if err := migrator.DropTable(&tables.TableVirtualKeyMCPConfig{}); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddVirtualMCPTables creates the Virtual MCP tables, reusing the
-// existing enterprise tool-group tables in place when present (no data
-// migration), and adds and backfills the new endpoint_slug column.
-func migrationAddVirtualMCPTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_virtual_mcp_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// Reuse the table if present (enterprise), else create it (fresh install).
-			if !mg.HasTable(&tables.TableVirtualMCP{}) {
-				logger.Info("[configstore] %s: creating table TableVirtualMCP", migrationName)
-				if err := mg.CreateTable(&tables.TableVirtualMCP{}); err != nil {
-					return err
-				}
-			}
-			if !mg.HasTable(&tables.TableVirtualKeyVirtualMCP{}) {
-				logger.Info("[configstore] %s: creating table TableVirtualKeyVirtualMCP", migrationName)
-				if err := mg.CreateTable(&tables.TableVirtualKeyVirtualMCP{}); err != nil {
-					return err
-				}
-			}
-
-			// Add endpoint_slug, backfill unique slugs, then the unique index (which
-			// must come after backfill de-duplicates).
-			if err := addColumnIfNotExists(tx, logger, &tables.TableVirtualMCP{}, "endpoint_slug"); err != nil {
-				return fmt.Errorf("failed to add endpoint_slug column: %w", err)
-			}
-			if err := backfillVirtualMCPEndpointSlugs(tx); err != nil {
-				return fmt.Errorf("failed to backfill endpoint slugs: %w", err)
-			}
-			if !mg.HasIndex(&tables.TableVirtualMCP{}, "EndpointSlug") {
-				if err := mg.CreateIndex(&tables.TableVirtualMCP{}, "EndpointSlug"); err != nil {
-					return fmt.Errorf("failed to create endpoint_slug index: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// backfillVirtualMCPEndpointSlugs gives every slug-less Virtual MCP a unique
-// slug from its name. No-ops on a fresh table.
-func backfillVirtualMCPEndpointSlugs(tx *gorm.DB) error {
-	var rows []tables.TableVirtualMCP
-	if err := tx.Where("endpoint_slug IS NULL OR endpoint_slug = ?", "").Find(&rows).Error; err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return nil
-	}
-
-	taken := map[string]bool{}
-	var existing []string
-	if err := tx.Model(&tables.TableVirtualMCP{}).
-		Where("endpoint_slug IS NOT NULL AND endpoint_slug <> ?", "").
-		Pluck("endpoint_slug", &existing).Error; err != nil {
-		return err
-	}
-	for _, s := range existing {
-		taken[s] = true
-	}
-
-	for i := range rows {
-		slug := uniqueSlug(Slugify(rows[i].Name), fmt.Sprintf("vmcp-%d", rows[i].ID), taken)
-		taken[slug] = true
-		if err := tx.Model(&tables.TableVirtualMCP{}).
-			Where("id = ?", rows[i].ID).
-			Update("endpoint_slug", slug).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// migrationAddMCPClientEndpointSlug adds and backfills endpoint_slug on config_mcp_clients. Runs after
-// add_virtual_mcp_tables so the backfill can seed uniqueness from existing Virtual MCP slugs.
-func migrationAddMCPClientEndpointSlug(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_endpoint_slug"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	// Column + backfill run transactionally; the backfill must de-duplicate before the unique index.
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "endpoint_slug"); err != nil {
-				return fmt.Errorf("failed to add endpoint_slug column: %w", err)
-			}
-			if err := backfillMCPClientEndpointSlugs(tx); err != nil {
-				return fmt.Errorf("failed to backfill MCP client endpoint slugs: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	// The unique index is built non-transactionally (UseTransaction=false) with CREATE UNIQUE INDEX
-	// CONCURRENTLY on postgres so it does not take a ShareLock that blocks writes to
-	// config_mcp_clients for the duration of the build. SQLite does not support CONCURRENTLY, so it
-	// uses the plain form. Idempotent via IF NOT EXISTS. The name matches gorm's uniqueIndex tag.
-	noTxOpts := *migrator.DefaultOptions
-	noTxOpts.UseTransaction = false
-	if err := RunSingleMigration(ctx, &noTxOpts, db, logger, &migrator.Migration{
-		ID: migrationName + "_index",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			var stmt string
-			if tx.Dialector.Name() == "sqlite" {
-				stmt = "CREATE UNIQUE INDEX IF NOT EXISTS idx_config_mcp_clients_endpoint_slug ON config_mcp_clients (endpoint_slug)"
-			} else {
-				stmt = "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_config_mcp_clients_endpoint_slug ON config_mcp_clients (endpoint_slug)"
-			}
-			return tx.Exec(stmt).Error
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return tx.Exec(`DROP INDEX IF EXISTS idx_config_mcp_clients_endpoint_slug`).Error
-		},
-	}); err != nil {
-		return fmt.Errorf("failed to create endpoint_slug index: %w", err)
-	}
-	return nil
-}
-
-// backfillMCPClientEndpointSlugs gives every slug-less MCP client a unique slug from its name. The
-// taken-set includes existing Virtual MCP slugs, since both serve at /mcp/<slug>. No-ops on a fresh table.
-func backfillMCPClientEndpointSlugs(tx *gorm.DB) error {
-	var rows []tables.TableMCPClient
-	if err := tx.Where("endpoint_slug IS NULL OR endpoint_slug = ?", "").Find(&rows).Error; err != nil {
-		return err
-	}
-	if len(rows) == 0 {
-		return nil
-	}
-
-	taken := map[string]bool{}
-	var clientSlugs, vmcpSlugs []string
-	if err := tx.Model(&tables.TableMCPClient{}).
-		Where("endpoint_slug IS NOT NULL AND endpoint_slug <> ?", "").
-		Pluck("endpoint_slug", &clientSlugs).Error; err != nil {
-		return err
-	}
-	if err := tx.Model(&tables.TableVirtualMCP{}).
-		Where("endpoint_slug IS NOT NULL AND endpoint_slug <> ?", "").
-		Pluck("endpoint_slug", &vmcpSlugs).Error; err != nil {
-		return err
-	}
-	for _, s := range clientSlugs {
-		taken[s] = true
-	}
-	for _, s := range vmcpSlugs {
-		taken[s] = true
-	}
-
-	for i := range rows {
-		slug := uniqueSlug(Slugify(rows[i].Name), fmt.Sprintf("mcp-%d", rows[i].ID), taken)
-		taken[slug] = true
-		if err := tx.Model(&tables.TableMCPClient{}).
-			Where("id = ?", rows[i].ID).
-			Update("endpoint_slug", slug).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Slugify lowercases a name and collapses non-alphanumeric runs to single
-// hyphens, trimmed at the ends.
-func Slugify(name string) string {
-	var b strings.Builder
-	prevHyphen := false
-	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-			prevHyphen = false
-			continue
-		}
-		if !prevHyphen {
-			b.WriteRune('-')
-			prevHyphen = true
-		}
-	}
-	return strings.Trim(b.String(), "-")
-}
-
-// uniqueSlug returns base, a numbered variant if base is taken, or fallback
-// (then numbered) when base is empty. taken records slugs already in use.
-func uniqueSlug(base, fallback string, taken map[string]bool) string {
-	if base == "" {
-		base = fallback
-	}
-	if !taken[base] {
-		return base
-	}
-	for n := 2; ; n++ {
-		cand := fmt.Sprintf("%s-%d", base, n)
-		if !taken[cand] {
-			return cand
-		}
-	}
-}
-
 // migrationAddProviderConfigBudgetRateLimit adds budget_id and rate_limit_id columns with proper foreign key constraints
 func migrationAddProviderConfigBudgetRateLimit(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_provider_config_budget_rate_limit"
@@ -2574,35 +2156,6 @@ func migrationAddSessionsTable(ctx context.Context, db *gorm.DB, logger schemas.
 	return nil
 }
 
-// migrationAddHeadersJSONColumnIntoMCPClient adds the headers_json column to the mcp_client table
-func migrationAddHeadersJSONColumnIntoMCPClient(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_headers_json_column_into_mcp_client"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "headers_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "headers_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddDisableContentLoggingColumn adds the disable_content_logging column to the client config table
 func migrationAddDisableContentLoggingColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_disable_content_logging_column"
@@ -2628,77 +2181,6 @@ func migrationAddDisableContentLoggingColumn(ctx context.Context, db *gorm.DB, l
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientIDColumn adds the client_id column to the mcp_clients table and populates unique client IDs
-func migrationAddMCPClientIDColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_id_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			if !migrator.HasColumn(&tables.TableMCPClient{}, "client_id") {
-				// Add the column as nullable first
-				if err := tx.Exec("ALTER TABLE config_mcp_clients ADD COLUMN client_id VARCHAR(255)").Error; err != nil {
-					return fmt.Errorf("failed to add client_id column: %w", err)
-				}
-
-				// Populate unique client_ids (UUIDs) for all existing MCP clients
-				var mcpClients []tables.TableMCPClient
-				if err := tx.Find(&mcpClients).Error; err != nil {
-					return fmt.Errorf("failed to fetch MCP clients: %w", err)
-				}
-
-				logger.Info("[configstore] %s: processing %d mcpClients", migrationName, len(mcpClients))
-				for _, client := range mcpClients {
-					// Generate a UUID for the client_id
-					clientID := uuid.New().String()
-
-					// Update the client with the generated client_id
-					if err := tx.Model(&client).Update("client_id", clientID).Error; err != nil {
-						return fmt.Errorf("failed to update MCP client %d with client_id %s: %w", client.ID, clientID, err)
-					}
-				}
-
-				// Create unique index on client_id
-				if err := tx.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_client_id ON config_mcp_clients (client_id)").Error; err != nil {
-					return fmt.Errorf("failed to create unique index on client_id: %w", err)
-				}
-				// Enforce NOT NULL in Postgres to guarantee ID presence on new rows
-				if tx.Dialector.Name() == "postgres" {
-					if err := tx.Exec("ALTER TABLE config_mcp_clients ALTER COLUMN client_id SET NOT NULL").Error; err != nil {
-						return fmt.Errorf("failed to set client_id NOT NULL: %w", err)
-					}
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			// Drop the unique index first to avoid orphaned index artifacts
-			if err := tx.Exec("DROP INDEX IF EXISTS idx_mcp_client_id").Error; err != nil {
-				return fmt.Errorf("failed to drop client_id index: %w", err)
-			}
-
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "client_id"); err != nil {
-				return fmt.Errorf("failed to drop client_id column: %w", err)
-			}
-
-			return nil
-		},
-	}})
-
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running MCP client_id migration: %s", err.Error())
 	}
 	return nil
 }
@@ -2831,78 +2313,6 @@ func migrationMissingProviderColumnInKeyTable(ctx context.Context, db *gorm.DB, 
 	return nil
 }
 
-// migrationAddToolsToAutoExecuteJSONColumn adds the tools_to_auto_execute_json column to the mcp_client table
-func migrationAddToolsToAutoExecuteJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_tools_to_auto_execute_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasColumn(&tables.TableMCPClient{}, "tools_to_auto_execute_json") {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "tools_to_auto_execute_json"); err != nil {
-					return err
-				}
-				// Initialize existing rows with empty array
-				if err := tx.Exec("UPDATE config_mcp_clients SET tools_to_auto_execute_json = '[]' WHERE tools_to_auto_execute_json IS NULL OR tools_to_auto_execute_json = ''").Error; err != nil {
-					return fmt.Errorf("failed to initialize tools_to_auto_execute_json: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "tools_to_auto_execute_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddIsCodeModeClientColumn adds the is_code_mode_client column to the config_mcp_clients table
-func migrationAddIsCodeModeClientColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_is_code_mode_client_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasColumn(&tables.TableMCPClient{}, "is_code_mode_client") {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "is_code_mode_client"); err != nil {
-					return err
-				}
-				// Initialize existing rows with false (default value)
-				if err := tx.Exec("UPDATE config_mcp_clients SET is_code_mode_client = false WHERE is_code_mode_client IS NULL").Error; err != nil {
-					return fmt.Errorf("failed to initialize is_code_mode_client: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "is_code_mode_client"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddLogRetentionDaysColumn adds the log_retention_days column to the client config table
 func migrationAddLogRetentionDaysColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_log_retention_days_column"
@@ -3010,207 +2420,6 @@ func migrationAddBatchAndCachePricingColumns(ctx context.Context, db *gorm.DB, l
 		},
 	}})
 	return m.Migrate()
-}
-
-func migrationAddMCPAgentDepthAndMCPToolExecutionTimeoutColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_agent_depth_and_mcp_tool_execution_timeout_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_agent_depth"); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_tool_execution_timeout"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_agent_depth"); err != nil {
-				return err
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_tool_execution_timeout"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPCodeModeBindingLevelColumn adds the mcp_code_mode_binding_level column to the client config table.
-// This column stores the code mode binding level preference (server or tool).
-func migrationAddMCPCodeModeBindingLevelColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_code_mode_binding_level_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_code_mode_binding_level"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_code_mode_binding_level"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// normalizeMCPClientName normalizes an MCP client name by:
-// 1. Replacing hyphens and spaces with underscores
-// 2. Removing leading digits
-// 3. Using a default name if the result is empty
-func normalizeMCPClientName(name string) string {
-	// Replace hyphens and spaces with underscores
-	normalized := strings.ReplaceAll(name, "-", "_")
-	normalized = strings.ReplaceAll(normalized, " ", "_")
-
-	// Remove leading digits
-	normalized = strings.TrimLeftFunc(normalized, func(r rune) bool {
-		return unicode.IsDigit(r)
-	})
-
-	// If name becomes empty after normalization, use a default name
-	if normalized == "" {
-		normalized = "mcp_client"
-	}
-
-	return normalized
-}
-
-// migrationNormalizeMCPClientNames normalizes MCP client names by:
-// 1. Replacing hyphens and spaces with underscores
-// 2. Removing leading digits
-// 3. Adding number suffix if name already exists
-func migrationNormalizeMCPClientNames(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "normalize_mcp_client_names"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			// Fetch all MCP clients
-			var mcpClients []tables.TableMCPClient
-			if err := tx.Find(&mcpClients).Error; err != nil {
-				return fmt.Errorf("failed to fetch MCP clients: %w", err)
-			}
-
-			// Track assigned names in memory to avoid transaction visibility issues
-			// and ensure we see all updates made during this migration
-			assignedNames := make(map[string]bool)
-
-			// Helper function to find a unique name
-			findUniqueName := func(baseName string, originalName string, excludeID uint, tx *gorm.DB, assignedNames map[string]bool) (string, error) {
-				// First check if base name is already assigned in this migration
-				if !assignedNames[baseName] {
-					// Also check database for existing names (excluding current client)
-					var existing tables.TableMCPClient
-					err := tx.Where("name = ? AND id != ?", baseName, excludeID).First(&existing).Error
-					if err == gorm.ErrRecordNotFound {
-						// Name is available
-						assignedNames[baseName] = true
-						// Log normalization even when no collision
-						if originalName != baseName {
-							logger.Info("MCP Client Name Normalized: '%s' -> '%s'", originalName, baseName)
-						}
-						return baseName, nil
-					} else if err != nil {
-						return "", fmt.Errorf("failed to check name availability: %w", err)
-					}
-				}
-
-				// Name exists (either assigned in this migration or in database), try with number suffix starting from 2
-				// (base name is conceptually "1", so collisions start from "2")
-				suffix := 2
-				const maxSuffix = 1000 // Safety limit to prevent infinite loops
-				for {
-					if suffix > maxSuffix {
-						return "", fmt.Errorf("could not find unique name after %d attempts for base name: %s", maxSuffix, baseName)
-					}
-					candidateName := baseName + strconv.Itoa(suffix)
-
-					// Check both in-memory map and database
-					if !assignedNames[candidateName] {
-						var existing tables.TableMCPClient
-						err := tx.Where("name = ? AND id != ?", candidateName, excludeID).First(&existing).Error
-						if err == gorm.ErrRecordNotFound {
-							// Found available name - log the transformation
-							assignedNames[candidateName] = true
-							logger.Info("MCP Client Name Normalized: '%s' -> '%s'", originalName, candidateName)
-							return candidateName, nil
-						} else if err != nil {
-							return "", fmt.Errorf("failed to check name availability: %w", err)
-						}
-					}
-					suffix++
-				}
-			}
-
-			// Process each client
-			logger.Info("[configstore] %s: processing %d mcpClients", migrationName, len(mcpClients))
-			for _, client := range mcpClients {
-				originalName := client.Name
-				needsUpdate := false
-
-				// Check if name needs normalization
-				if strings.Contains(originalName, "-") || strings.Contains(originalName, " ") {
-					needsUpdate = true
-				} else if len(originalName) > 0 && unicode.IsDigit(rune(originalName[0])) {
-					needsUpdate = true
-				}
-
-				if needsUpdate {
-					// Normalize the name
-					normalizedName := normalizeMCPClientName(originalName)
-
-					// Find a unique name (pass assignedNames map to track names in this migration)
-					uniqueName, err := findUniqueName(normalizedName, originalName, client.ID, tx, assignedNames)
-					if err != nil {
-						return fmt.Errorf("failed to find unique name for client %d (original: %s): %w", client.ID, originalName, err)
-					}
-
-					// Update the client name
-					if err := tx.Model(&client).Update("name", uniqueName).Error; err != nil {
-						return fmt.Errorf("failed to update MCP client %d name from %s to %s: %w", client.ID, originalName, uniqueName, err)
-					}
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Rollback is not possible as we don't store the original names
-			// This migration is one-way
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running MCP client name normalization migration: %s", err.Error())
-	}
-	return nil
 }
 
 // migrationMoveKeysToProviderConfig migrates keys from virtual key level to provider config level
@@ -3520,7 +2729,7 @@ func migrationAddVirtualKeyConfigHashColumn(ctx context.Context, db *gorm.DB, lo
 				}
 				// Pre-populate hashes for existing virtual keys
 				var virtualKeys []tables.TableVirtualKey
-				if err := tx.Preload("ProviderConfigs").Preload("ProviderConfigs.Keys").Preload("MCPConfigs").Find(&virtualKeys).Error; err != nil {
+				if err := tx.Preload("ProviderConfigs").Preload("ProviderConfigs.Keys").Find(&virtualKeys).Error; err != nil {
 					return fmt.Errorf("failed to fetch virtual keys for hash migration: %w", err)
 				}
 				logger.Info("[configstore] %s: processing %d virtualKeys", migrationName, len(virtualKeys))
@@ -3696,30 +2905,6 @@ func migrationAddAdditionalConfigHashColumns(ctx context.Context, db *gorm.DB, l
 				}
 			}
 
-			// Add config_hash to MCP clients table
-			if !migrator.HasColumn(&tables.TableMCPClient{}, "config_hash") {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "config_hash"); err != nil {
-					return err
-				}
-				// Pre-populate hashes for existing MCP clients
-				var mcpClients []tables.TableMCPClient
-				if err := tx.Find(&mcpClients).Error; err != nil {
-					return fmt.Errorf("failed to fetch MCP clients for hash migration: %w", err)
-				}
-				logger.Info("[configstore] %s: processing %d mcpClients", migrationName, len(mcpClients))
-				for _, mcp := range mcpClients {
-					if mcp.ConfigHash == "" {
-						hash, err := GenerateMCPClientHash(mcp)
-						if err != nil {
-							return fmt.Errorf("failed to generate hash for MCP client %s: %w", mcp.Name, err)
-						}
-						if err := tx.Model(&mcp).Update("config_hash", hash).Error; err != nil {
-							return fmt.Errorf("failed to update hash for MCP client %s: %w", mcp.Name, err)
-						}
-					}
-				}
-			}
-
 			// Add config_hash to plugins table
 			if !migrator.HasColumn(&tables.TablePlugin{}, "config_hash") {
 				if err := addColumnIfNotExists(tx, logger, &tables.TablePlugin{}, "config_hash"); err != nil {
@@ -3761,9 +2946,6 @@ func migrationAddAdditionalConfigHashColumns(ctx context.Context, db *gorm.DB, l
 				return err
 			}
 			if err := dropColumnIfExists(tx, logger, &tables.TableTeam{}, "config_hash"); err != nil {
-				return err
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "config_hash"); err != nil {
 				return err
 			}
 			if err := dropColumnIfExists(tx, logger, &tables.TablePlugin{}, "config_hash"); err != nil {
@@ -4123,467 +3305,6 @@ func migrationAddAzureClientIDAndClientSecretAndTenantIDColumns(ctx context.Cont
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running azure_client_id_and_client_secret_and_tenant_id migration: %s", err.Error())
-	}
-	return nil
-}
-
-func migrationAddToolPricingJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_tool_pricing_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "tool_pricing_json"); err != nil {
-				return fmt.Errorf("failed to add tool_pricing_json column: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "tool_pricing_json"); err != nil {
-				return fmt.Errorf("failed to drop tool_pricing_json column: %w", err)
-			}
-			return nil
-		},
-	}})
-	return m.Migrate()
-}
-
-// migrationRemoveServerPrefixFromMCPTools removes the server name prefix from tool names
-// in tools_to_execute_json, tools_to_auto_execute_json, and tool_pricing_json columns
-// in both config_mcp_clients and governance_virtual_key_mcp_configs tables.
-//
-// This migration converts:
-//   - tools_to_execute_json: ["calculator_add", "calculator_subtract"] → ["add", "subtract"]
-//   - tools_to_auto_execute_json: ["calculator_multiply"] → ["multiply"]
-//   - tool_pricing_json: {"calculator_add": 0.001, "calculator_subtract": 0.001} → {"add": 0.001, "subtract": 0.001}
-func migrationRemoveServerPrefixFromMCPTools(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "remove_server_prefix_from_mcp_tools"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	// Helper function to check if a tool name has a prefix matching the client name
-	// Handles both exact matches and legacy normalized forms
-	hasClientPrefix := func(toolName, clientName string) (bool, string) {
-		prefix := clientName + "_"
-		if strings.HasPrefix(toolName, prefix) {
-			return true, strings.TrimPrefix(toolName, prefix)
-		}
-		// Legacy prefix: normalize the substring before first underscore
-		if idx := strings.IndexByte(toolName, '_'); idx > 0 {
-			toolPrefix := toolName[:idx]
-			unprefixed := toolName[idx+1:]
-			if normalizeMCPClientName(toolPrefix) == clientName {
-				return true, unprefixed
-			}
-		}
-		return false, ""
-	}
-
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			// ============================================================
-			// Step 1: Migrate config_mcp_clients table
-			// ============================================================
-
-			// Fetch all MCP clients
-			var mcpClients []tables.TableMCPClient
-			if err := tx.Find(&mcpClients).Error; err != nil {
-				return fmt.Errorf("failed to fetch MCP clients: %w", err)
-			}
-
-			// Process each MCP client
-			logger.Info("[configstore] %s: processing %d mcpClients", migrationName, len(mcpClients))
-			for i := range mcpClients {
-				client := &mcpClients[i]
-				clientName := client.Name
-				needsUpdate := false
-
-				// Process tools_to_execute_json
-				var toolsToExecute []string
-				if client.ToolsToExecuteJSON != "" && client.ToolsToExecuteJSON != "null" {
-					if err := json.Unmarshal([]byte(client.ToolsToExecuteJSON), &toolsToExecute); err != nil {
-						return fmt.Errorf("failed to unmarshal tools_to_execute_json for client %s: %w", clientName, err)
-					}
-
-					// Strip prefix from each tool
-					updatedTools := make([]string, 0, len(toolsToExecute))
-					seenTools := make(map[string]bool)
-					for _, tool := range toolsToExecute {
-						// Check if tool has client prefix (handles both current and legacy normalized forms)
-						if hasPrefix, unprefixedTool := hasClientPrefix(tool, clientName); hasPrefix {
-							// Check for collision: if unprefixed tool already exists in the list
-							if seenTools[unprefixedTool] {
-								logger.Info("Collision detected when stripping prefix from tool '%s' for client '%s': unprefixed name '%s' already exists. Keeping unprefixed value.", tool, clientName, unprefixedTool)
-								needsUpdate = true
-								continue
-							}
-							seenTools[unprefixedTool] = true
-							updatedTools = append(updatedTools, unprefixedTool)
-							needsUpdate = true
-						} else {
-							// Tool already unprefixed or is wildcard "*"
-							if seenTools[tool] {
-								logger.Info("Duplicate tool name '%s' found for client '%s'. Keeping first occurrence.", tool, clientName)
-								continue
-							}
-							seenTools[tool] = true
-							updatedTools = append(updatedTools, tool)
-						}
-					}
-
-					// Update the JSON
-					if needsUpdate {
-						updatedJSON, err := json.Marshal(updatedTools)
-						if err != nil {
-							return fmt.Errorf("failed to marshal updated tools_to_execute for client %s: %w", clientName, err)
-						}
-						client.ToolsToExecuteJSON = string(updatedJSON)
-					}
-				}
-
-				// Process tools_to_auto_execute_json
-				var toolsToAutoExecute []string
-				if client.ToolsToAutoExecuteJSON != "" && client.ToolsToAutoExecuteJSON != "null" {
-					if err := json.Unmarshal([]byte(client.ToolsToAutoExecuteJSON), &toolsToAutoExecute); err != nil {
-						return fmt.Errorf("failed to unmarshal tools_to_auto_execute_json for client %s: %w", clientName, err)
-					}
-
-					// Strip prefix from each tool
-					updatedAutoTools := make([]string, 0, len(toolsToAutoExecute))
-					seenAutoTools := make(map[string]bool)
-					for _, tool := range toolsToAutoExecute {
-						// Check if tool has client prefix (handles both current and legacy normalized forms)
-						if hasPrefix, unprefixedTool := hasClientPrefix(tool, clientName); hasPrefix {
-							// Check for collision: if unprefixed tool already exists in the list
-							if seenAutoTools[unprefixedTool] {
-								logger.Info("Collision detected when stripping prefix from auto-execute tool '%s' for client '%s': unprefixed name '%s' already exists. Keeping unprefixed value.", tool, clientName, unprefixedTool)
-								needsUpdate = true
-								continue
-							}
-							seenAutoTools[unprefixedTool] = true
-							updatedAutoTools = append(updatedAutoTools, unprefixedTool)
-							needsUpdate = true
-						} else {
-							// Tool already unprefixed or is wildcard "*"
-							if seenAutoTools[tool] {
-								logger.Info("Duplicate auto-execute tool name '%s' found for client '%s'. Keeping first occurrence.", tool, clientName)
-								continue
-							}
-							seenAutoTools[tool] = true
-							updatedAutoTools = append(updatedAutoTools, tool)
-						}
-					}
-
-					// Update the JSON
-					if needsUpdate {
-						updatedJSON, err := json.Marshal(updatedAutoTools)
-						if err != nil {
-							return fmt.Errorf("failed to marshal updated tools_to_auto_execute for client %s: %w", clientName, err)
-						}
-						client.ToolsToAutoExecuteJSON = string(updatedJSON)
-					}
-				}
-
-				// Process tool_pricing_json
-				var toolPricing map[string]float64
-				if client.ToolPricingJSON != "" && client.ToolPricingJSON != "null" {
-					if err := json.Unmarshal([]byte(client.ToolPricingJSON), &toolPricing); err != nil {
-						return fmt.Errorf("failed to unmarshal tool_pricing_json for client %s: %w", clientName, err)
-					}
-
-					// Strip prefix from each tool name key
-					updatedPricing := make(map[string]float64)
-					for toolName, price := range toolPricing {
-						// Check if tool has client prefix (handles both current and legacy normalized forms)
-						if hasPrefix, unprefixedTool := hasClientPrefix(toolName, clientName); hasPrefix {
-							// Check for collision: if unprefixed key already exists
-							if existingPrice, exists := updatedPricing[unprefixedTool]; exists {
-								logger.Info("Collision detected when stripping prefix from pricing key '%s' for client '%s': unprefixed key '%s' already exists with price %.6f. Keeping existing unprefixed value (%.6f), discarding prefixed value (%.6f).", toolName, clientName, unprefixedTool, existingPrice, existingPrice, price)
-								needsUpdate = true
-								continue
-							}
-							updatedPricing[unprefixedTool] = price
-							needsUpdate = true
-						} else {
-							// Check for collision: if unprefixed key already exists (from a previously processed prefixed entry)
-							if existingPrice, exists := updatedPricing[toolName]; exists {
-								logger.Info("Collision detected for pricing key '%s' for client '%s': key already exists with price %.6f. Keeping first value (%.6f), discarding duplicate (%.6f).", toolName, clientName, existingPrice, existingPrice, price)
-								continue
-							}
-							updatedPricing[toolName] = price
-						}
-					}
-
-					// Update the JSON
-					if needsUpdate {
-						updatedJSON, err := json.Marshal(updatedPricing)
-						if err != nil {
-							return fmt.Errorf("failed to marshal updated tool_pricing for client %s: %w", clientName, err)
-						}
-						client.ToolPricingJSON = string(updatedJSON)
-					}
-				}
-
-				// Save the updated client if any changes were made
-				if needsUpdate {
-					// Use Model + Updates to ensure changes are persisted
-					result := tx.Model(&tables.TableMCPClient{}).Where("id = ?", client.ID).Updates(map[string]interface{}{
-						"tools_to_execute_json":      client.ToolsToExecuteJSON,
-						"tools_to_auto_execute_json": client.ToolsToAutoExecuteJSON,
-						"tool_pricing_json":          client.ToolPricingJSON,
-					})
-
-					if result.Error != nil {
-						return fmt.Errorf("failed to save updated MCP client %s: %w", clientName, result.Error)
-					}
-				}
-			}
-
-			// ============================================================
-			// Step 2: Migrate governance_virtual_key_mcp_configs table
-			// ============================================================
-
-			// Fetch all virtual key MCP configs with their associated MCP client
-			var vkMCPConfigs []tables.TableVirtualKeyMCPConfig
-			if err := tx.Preload("MCPClient").Find(&vkMCPConfigs).Error; err != nil {
-				return fmt.Errorf("failed to fetch virtual key MCP configs: %w", err)
-			}
-
-			// Process each VK MCP config
-			logger.Info("[configstore] %s: processing %d vkMCPConfigs", migrationName, len(vkMCPConfigs))
-			for i := range vkMCPConfigs {
-				vkConfig := &vkMCPConfigs[i]
-				if vkConfig.MCPClient.Name == "" {
-					// Skip if MCP client is not loaded
-					continue
-				}
-
-				clientName := vkConfig.MCPClient.Name
-				needsUpdate := false
-
-				// Process tools_to_execute (this is a JSON array stored in GORM's serializer format)
-				if len(vkConfig.ToolsToExecute) > 0 {
-					updatedTools := make([]string, 0, len(vkConfig.ToolsToExecute))
-					seen := make(map[string]bool, len(vkConfig.ToolsToExecute))
-
-					for _, tool := range vkConfig.ToolsToExecute {
-						var finalTool string
-						// Check if tool has client prefix (handles both current and legacy normalized forms)
-						if hasPrefix, unprefixedTool := hasClientPrefix(tool, clientName); hasPrefix {
-							finalTool = unprefixedTool
-						} else {
-							finalTool = tool
-						}
-
-						// Skip if we've already added this tool (collision detection)
-						if !seen[finalTool] {
-							seen[finalTool] = true
-							updatedTools = append(updatedTools, finalTool)
-						}
-					}
-
-					// Only update if the final list differs from the original
-					needsUpdate = len(updatedTools) != len(vkConfig.ToolsToExecute)
-					if !needsUpdate {
-						// Check if any tools actually changed
-						for j, tool := range vkConfig.ToolsToExecute {
-							if tool != updatedTools[j] {
-								needsUpdate = true
-								break
-							}
-						}
-					}
-
-					if needsUpdate {
-						vkConfig.ToolsToExecute = updatedTools
-					}
-				}
-
-				// Save the updated VK config if any changes were made
-				if needsUpdate {
-					if err := tx.Save(vkConfig).Error; err != nil {
-						return fmt.Errorf("failed to save updated VK MCP config ID %d: %w", vkConfig.ID, err)
-					}
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Rollback is complex because we need to re-add the prefix
-			// This requires knowing the client name for each tool
-			tx = tx.WithContext(ctx)
-
-			// ============================================================
-			// Step 1: Rollback config_mcp_clients table
-			// ============================================================
-
-			var mcpClients []tables.TableMCPClient
-			if err := tx.Find(&mcpClients).Error; err != nil {
-				return fmt.Errorf("failed to fetch MCP clients for rollback: %w", err)
-			}
-
-			logger.Info("[configstore] %s: processing %d mcpClients", migrationName, len(mcpClients))
-			for _, client := range mcpClients {
-				clientName := client.Name
-				needsUpdate := false
-
-				// Rollback tools_to_execute_json
-				var toolsToExecute []string
-				if client.ToolsToExecuteJSON != "" && client.ToolsToExecuteJSON != "null" {
-					if err := json.Unmarshal([]byte(client.ToolsToExecuteJSON), &toolsToExecute); err != nil {
-						return fmt.Errorf("failed to unmarshal tools_to_execute_json for rollback: %w", err)
-					}
-
-					prefixedTools := make([]string, 0, len(toolsToExecute))
-					for _, tool := range toolsToExecute {
-						// Skip wildcard
-						if tool == "*" {
-							prefixedTools = append(prefixedTools, tool)
-							continue
-						}
-						// Add prefix if not already present
-						prefix := clientName + "_"
-						if !strings.HasPrefix(tool, prefix) {
-							prefixedTools = append(prefixedTools, prefix+tool)
-							needsUpdate = true
-						} else {
-							prefixedTools = append(prefixedTools, tool)
-						}
-					}
-
-					if needsUpdate {
-						updatedJSON, err := json.Marshal(prefixedTools)
-						if err != nil {
-							return fmt.Errorf("failed to marshal rollback tools_to_execute: %w", err)
-						}
-						client.ToolsToExecuteJSON = string(updatedJSON)
-					}
-				}
-
-				// Rollback tools_to_auto_execute_json
-				var toolsToAutoExecute []string
-				if client.ToolsToAutoExecuteJSON != "" && client.ToolsToAutoExecuteJSON != "null" {
-					if err := json.Unmarshal([]byte(client.ToolsToAutoExecuteJSON), &toolsToAutoExecute); err != nil {
-						return fmt.Errorf("failed to unmarshal tools_to_auto_execute_json for rollback: %w", err)
-					}
-
-					prefixedAutoTools := make([]string, 0, len(toolsToAutoExecute))
-					for _, tool := range toolsToAutoExecute {
-						if tool == "*" {
-							prefixedAutoTools = append(prefixedAutoTools, tool)
-							continue
-						}
-						prefix := clientName + "_"
-						if !strings.HasPrefix(tool, prefix) {
-							prefixedAutoTools = append(prefixedAutoTools, prefix+tool)
-							needsUpdate = true
-						} else {
-							prefixedAutoTools = append(prefixedAutoTools, tool)
-						}
-					}
-
-					if needsUpdate {
-						updatedJSON, err := json.Marshal(prefixedAutoTools)
-						if err != nil {
-							return fmt.Errorf("failed to marshal rollback tools_to_auto_execute: %w", err)
-						}
-						client.ToolsToAutoExecuteJSON = string(updatedJSON)
-					}
-				}
-
-				// Rollback tool_pricing_json
-				var toolPricing map[string]float64
-				if client.ToolPricingJSON != "" && client.ToolPricingJSON != "null" {
-					if err := json.Unmarshal([]byte(client.ToolPricingJSON), &toolPricing); err != nil {
-						return fmt.Errorf("failed to unmarshal tool_pricing_json for rollback: %w", err)
-					}
-
-					prefixedPricing := make(map[string]float64)
-					for toolName, price := range toolPricing {
-						prefix := clientName + "_"
-						if !strings.HasPrefix(toolName, prefix) {
-							prefixedPricing[prefix+toolName] = price
-							needsUpdate = true
-						} else {
-							prefixedPricing[toolName] = price
-						}
-					}
-
-					if needsUpdate {
-						updatedJSON, err := json.Marshal(prefixedPricing)
-						if err != nil {
-							return fmt.Errorf("failed to marshal rollback tool_pricing: %w", err)
-						}
-						client.ToolPricingJSON = string(updatedJSON)
-					}
-				}
-
-				if needsUpdate {
-					if err := tx.Save(&client).Error; err != nil {
-						return fmt.Errorf("failed to save rollback MCP client: %w", err)
-					}
-				}
-			}
-
-			// ============================================================
-			// Step 2: Rollback governance_virtual_key_mcp_configs table
-			// ============================================================
-
-			var vkMCPConfigs []tables.TableVirtualKeyMCPConfig
-			if err := tx.Preload("MCPClient").Find(&vkMCPConfigs).Error; err != nil {
-				return fmt.Errorf("failed to fetch virtual key MCP configs for rollback: %w", err)
-			}
-
-			logger.Info("[configstore] %s: processing %d vkMCPConfigs", migrationName, len(vkMCPConfigs))
-			for _, vkConfig := range vkMCPConfigs {
-				if vkConfig.MCPClient.Name == "" {
-					continue
-				}
-
-				clientName := vkConfig.MCPClient.Name
-				needsUpdate := false
-
-				if len(vkConfig.ToolsToExecute) > 0 {
-					prefixedTools := make([]string, 0, len(vkConfig.ToolsToExecute))
-					for _, tool := range vkConfig.ToolsToExecute {
-						if tool == "*" {
-							prefixedTools = append(prefixedTools, tool)
-							continue
-						}
-						prefix := clientName + "_"
-						if !strings.HasPrefix(tool, prefix) {
-							prefixedTools = append(prefixedTools, prefix+tool)
-							needsUpdate = true
-						} else {
-							prefixedTools = append(prefixedTools, tool)
-						}
-					}
-
-					if needsUpdate {
-						vkConfig.ToolsToExecute = prefixedTools
-					}
-				}
-
-				if needsUpdate {
-					if err := tx.Save(&vkConfig).Error; err != nil {
-						return fmt.Errorf("failed to save rollback VK MCP config: %w", err)
-					}
-				}
-			}
-
-			return nil
-		},
-	}})
-
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running migration to remove server prefix from MCP tools: %s", err.Error())
 	}
 	return nil
 }
@@ -5320,82 +4041,6 @@ func migrationAddDumpErrorsInConsoleLogsColumn(ctx context.Context, db *gorm.DB,
 	return nil
 }
 
-// migrationAddIsPingAvailableColumnToMCPClientTable adds the is_ping_available column to the config_mcp_clients table
-func migrationAddIsPingAvailableColumnToMCPClientTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_is_ping_available_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasColumn(&tables.TableMCPClient{}, "is_ping_available") {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "is_ping_available"); err != nil {
-					return err
-				}
-				// Set default value for existing rows
-				if err := tx.Model(&tables.TableMCPClient{}).Where("is_ping_available IS NULL").Update("is_ping_available", true).Error; err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "is_ping_available"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running is_ping_available migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddNeedsSessionStickinessColumn adds the needs_session_stickiness
-// column to the config_mcp_clients table, backfilled true for every existing
-// row — preserves today's persistent-connection behavior for every
-// pre-existing shared client by default; only newly-opted-in clients get the
-// per-call model.
-func migrationAddNeedsSessionStickinessColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_needs_session_stickiness_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasColumn(&tables.TableMCPClient{}, "needs_session_stickiness") {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "needs_session_stickiness"); err != nil {
-					return err
-				}
-				// Set default value for existing rows
-				if err := tx.Model(&tables.TableMCPClient{}).Where("needs_session_stickiness IS NULL").Update("needs_session_stickiness", true).Error; err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "needs_session_stickiness"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running needs_session_stickiness migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddRoutingRulesTable adds the routing rules table for intelligent request routing
 func migrationAddRoutingRulesTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_routing_rules_table"
@@ -5431,186 +4076,6 @@ func migrationAddRoutingRulesTable(ctx context.Context, db *gorm.DB, logger sche
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while running routing_rules_table migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddOAuthTables creates the oauth_configs and oauth_tokens tables
-func migrationAddOAuthTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			// Create oauth_configs table FIRST (before adding FK columns that reference it)
-			if !migrator.HasTable(&tables.TableOauthConfig{}) {
-				logger.Info("[configstore] %s: creating table TableOauthConfig", migrationName)
-				if err := migrator.CreateTable(&tables.TableOauthConfig{}); err != nil {
-					return fmt.Errorf("failed to create oauth_configs table: %w", err)
-				}
-			}
-			// Create oauth_tokens table
-			if !migrator.HasTable(&tables.TableOauthToken{}) {
-				logger.Info("[configstore] %s: creating table TableOauthToken", migrationName)
-				if err := migrator.CreateTable(&tables.TableOauthToken{}); err != nil {
-					return fmt.Errorf("failed to create oauth_tokens table: %w", err)
-				}
-			}
-			// IF MCPClient table is not present, create it first
-			if !migrator.HasTable(&tables.TableMCPClient{}) {
-				logger.Info("[configstore] %s: creating table TableMCPClient", migrationName)
-				if err := migrator.CreateTable(&tables.TableMCPClient{}); err != nil {
-					return fmt.Errorf("failed to create mcp_clients table: %w", err)
-				}
-			}
-			// Now update MCPClient table to add auth_type, oauth_config_id columns
-			// (oauth_config_id has FK constraint to oauth_configs table created above)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "auth_type"); err != nil {
-				return fmt.Errorf("failed to add auth_type column: %w", err)
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "oauth_config_id"); err != nil {
-				return fmt.Errorf("failed to add oauth_config_id column: %w", err)
-			}
-			// Set default value for auth_type column
-			if err := tx.Model(&tables.TableMCPClient{}).Where("auth_type IS NULL").Update("auth_type", "headers").Error; err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Drop tables in reverse order
-			if migrator.HasTable(&tables.TableOauthToken{}) {
-				logger.Info("[configstore] %s: dropping table TableOauthToken", migrationName)
-				if err := migrator.DropTable(&tables.TableOauthToken{}); err != nil {
-					return fmt.Errorf("failed to drop oauth_tokens table: %w", err)
-				}
-			}
-
-			if migrator.HasTable(&tables.TableOauthConfig{}) {
-				logger.Info("[configstore] %s: dropping table TableOauthConfig", migrationName)
-				if err := migrator.DropTable(&tables.TableOauthConfig{}); err != nil {
-					return fmt.Errorf("failed to drop oauth_configs table: %w", err)
-				}
-			}
-
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running oauth tables migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddToolSyncIntervalColumns adds the tool_sync_interval columns to config_client and config_mcp_clients tables
-func migrationAddToolSyncIntervalColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_tool_sync_interval_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			// Add mcp_tool_sync_interval column to config_client table (global setting)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_tool_sync_interval"); err != nil {
-				return err
-			}
-			// Add tool_sync_interval column to config_mcp_clients table (per-client setting)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "tool_sync_interval"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_tool_sync_interval"); err != nil {
-				return err
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "tool_sync_interval"); err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running tool sync interval migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationConvertMCPClientToolSyncIntervalMinutesToSeconds converts legacy
-// config_mcp_clients.tool_sync_interval values from minutes to seconds.
-// Legacy storage used minutes; runtime now persists seconds to preserve
-// sub-minute precision. We only convert positive values; 0 means "use global"
-// and negative values mean "disabled".
-func migrationConvertMCPClientToolSyncIntervalMinutesToSeconds(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "convert_mcp_client_tool_sync_interval_minutes_to_seconds"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return tx.Exec(`
-				UPDATE config_mcp_clients
-				SET tool_sync_interval = tool_sync_interval * 60
-				WHERE tool_sync_interval > 0
-			`).Error
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			// Best-effort rollback for migrated rows.
-			return tx.Exec(`
-				UPDATE config_mcp_clients
-				SET tool_sync_interval = tool_sync_interval / 60
-				WHERE tool_sync_interval > 0
-				AND tool_sync_interval % 60 = 0
-			`).Error
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp client tool sync interval unit conversion migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientConfigToOAuthConfig adds the mcp_client_config_json column to oauth_configs table
-// This enables multi-instance support by storing pending MCP client config in the database
-// instead of in-memory, so OAuth callbacks can be handled by any server instance
-func migrationAddMCPClientConfigToOAuthConfig(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_config_to_oauth_config"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableOauthConfig{}, "mcp_client_config_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableOauthConfig{}, "mcp_client_config_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running mcp client config oauth migration: %s", err.Error())
 	}
 	return nil
 }
@@ -6086,40 +4551,7 @@ func migrationBackfillEmptyVirtualKeyConfigs(ctx context.Context, db *gorm.DB, l
 				}
 			}
 
-			// Step 2: Backfill MCPConfigs for VKs that have none
-			// Get all available MCP clients
-			var allMCPClients []tables.TableMCPClient
-			if err := tx.Find(&allMCPClients).Error; err != nil {
-				return fmt.Errorf("failed to query MCP clients: %w", err)
-			}
-
-			logger.Info("[configstore] %s: processing %d allVKs", migrationName, len(allVKs))
-			for _, vk := range allVKs {
-				// Check if this VK has any MCP configs
-				var mcpConfigCount int64
-				if err := tx.Model(&tables.TableVirtualKeyMCPConfig{}).Where("virtual_key_id = ?", vk.ID).Count(&mcpConfigCount).Error; err != nil {
-					return fmt.Errorf("failed to count MCP configs for VK %s: %w", vk.ID, err)
-				}
-
-				if mcpConfigCount == 0 && len(allMCPClients) > 0 {
-					// VK has no MCP configs - backfill with all available MCP clients with wildcard
-					logger.Info("[configstore] %s: processing %d allMCPClients", migrationName, len(allMCPClients))
-					for _, mcpClient := range allMCPClients {
-						mcpConfig := tables.TableVirtualKeyMCPConfig{
-							VirtualKeyID:   vk.ID,
-							MCPClientID:    mcpClient.ID,
-							ToolsToExecute: []string{"*"},
-						}
-						if err := tx.Create(&mcpConfig).Error; err != nil {
-							return fmt.Errorf("failed to create MCP config for VK %s, client %d: %w", vk.ID, mcpClient.ID, err)
-						}
-					}
-					modifiedVKIDs[vk.ID] = struct{}{}
-					logger.Info("[Migration] Backfilled VK '%s' with %d MCP client configs", vk.Name, len(allMCPClients))
-				}
-			}
-
-			// Step 3: Recompute and persist config_hash for every VK that was modified.
+			// Step 2: Recompute and persist config_hash for every VK that was modified.
 			// Without this, subsequent config-sync diff logic would see a stale hash and
 			// attempt to re-reconcile the VK (potentially undoing the backfill).
 			logger.Info("[configstore] %s: processing %d modifiedVKIDs", migrationName, len(modifiedVKIDs))
@@ -6128,7 +4560,6 @@ func migrationBackfillEmptyVirtualKeyConfigs(ctx context.Context, db *gorm.DB, l
 				if err := tx.
 					Preload("ProviderConfigs").
 					Preload("ProviderConfigs.Keys").
-					Preload("MCPConfigs").
 					First(&vk, "id = ?", vkID).Error; err != nil {
 					return fmt.Errorf("failed to reload VK %s for hash recomputation: %w", vkID, err)
 				}
@@ -6432,7 +4863,7 @@ func migrationReconcilePricingOverridesTable(ctx context.Context, db *gorm.DB, l
 	return nil
 }
 
-// migrationAddEncryptionColumns adds the encryption_status column to the config_keys, governance_virtual_keys, sessions, oauth_configs, oauth_tokens, config_mcp_clients, config_providers, config_vector_store, and config_plugins tables
+// migrationAddEncryptionColumns adds the encryption_status column to the config_keys, governance_virtual_keys, sessions, config_providers, config_vector_store, and config_plugins tables
 func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_encryption_columns"
 	logger.Info("[configstore] starting migration %s", migrationName)
@@ -6451,9 +4882,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 				{&tables.TableKey{}, []string{"encryption_status"}},
 				{&tables.TableVirtualKey{}, []string{"encryption_status", "value_hash"}},
 				{&tables.SessionsTable{}, []string{"encryption_status", "token_hash"}},
-				{&tables.TableOauthConfig{}, []string{"encryption_status"}},
-				{&tables.TableOauthToken{}, []string{"encryption_status"}},
-				{&tables.TableMCPClient{}, []string{"encryption_status"}},
 				{&tables.TableProvider{}, []string{"encryption_status"}},
 				{&tables.TableVectorStoreConfig{}, []string{"encryption_status"}},
 				{&tables.TablePlugin{}, []string{"encryption_status"}},
@@ -6472,9 +4900,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 				"config_keys",
 				"governance_virtual_keys",
 				"sessions",
-				"oauth_configs",
-				"oauth_tokens",
-				"config_mcp_clients",
 				"config_providers",
 				"config_vector_store",
 				"config_plugins",
@@ -6524,9 +4949,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 				{&tables.TableKey{}, []string{"encryption_status"}},
 				{&tables.TableVirtualKey{}, []string{"encryption_status", "value_hash"}},
 				{&tables.SessionsTable{}, []string{"encryption_status", "token_hash"}},
-				{&tables.TableOauthConfig{}, []string{"encryption_status"}},
-				{&tables.TableOauthToken{}, []string{"encryption_status"}},
-				{&tables.TableMCPClient{}, []string{"encryption_status"}},
 				{&tables.TableProvider{}, []string{"encryption_status"}},
 				{&tables.TableVectorStoreConfig{}, []string{"encryption_status"}},
 				{&tables.TablePlugin{}, []string{"encryption_status"}},
@@ -6623,20 +5045,6 @@ func migrationWidenEncryptedVarcharColumns(ctx context.Context, db *gorm.DB, log
 			if tx.Migrator().HasColumn(&tables.TableKey{}, "azure_api_version") {
 				if err := tx.Exec("ALTER TABLE config_keys ALTER COLUMN azure_api_version TYPE TEXT").Error; err != nil {
 					return fmt.Errorf("failed to widen column azure_api_version: %w", err)
-				}
-			}
-			// oauth_configs.code_verifier was later dropped by
-			// migrationDropOauthConfigPKCEColumns (the column moved to
-			// mcp_oauth_flows) — same guard as azure_api_version above. A
-			// deployment provisioned after that migration shipped never had
-			// this column at all: migrationAddOAuthTables creates
-			// oauth_configs from today's TableOauthConfig struct, which no
-			// longer declares CodeVerifier, so an unconditional ALTER here
-			// would fail with "column does not exist" on any such fresh
-			// install.
-			if tx.Migrator().HasColumn(&tables.TableOauthConfig{}, "code_verifier") {
-				if err := tx.Exec("ALTER TABLE oauth_configs ALTER COLUMN code_verifier TYPE TEXT").Error; err != nil {
-					return fmt.Errorf("failed to widen column oauth_configs.code_verifier: %w", err)
 				}
 			}
 
@@ -6769,7 +5177,6 @@ func migrationAddAllowAllKeysToProviderConfig(ctx context.Context, db *gorm.DB, 
 				if err := tx.
 					Preload("ProviderConfigs").
 					Preload("ProviderConfigs.Keys").
-					Preload("MCPConfigs").
 					First(&vk, "id = ?", vkID).Error; err != nil {
 					return fmt.Errorf("failed to reload VK %s for hash recomputation: %w", vkID, err)
 				}
@@ -6797,63 +5204,6 @@ func migrationAddAllowAllKeysToProviderConfig(ctx context.Context, db *gorm.DB, 
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running allow_all_keys migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPDisableAutoToolInjectColumn adds the mcp_disable_auto_tool_inject column to the client config table.
-// When true, MCP tools are not automatically injected into requests; only explicit context filters apply.
-func migrationAddMCPDisableAutoToolInjectColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_disable_auto_tool_inject_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_disable_auto_tool_inject"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_disable_auto_tool_inject"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp disable auto tool inject migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPEnableTempTokenAuthColumn adds the mcp_enable_temp_token_auth column to the client config table.
-func migrationAddMCPEnableTempTokenAuthColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_enable_temp_token_auth_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_enable_temp_token_auth"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_enable_temp_token_auth"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp enable temp token auth migration: %s", err.Error())
 	}
 	return nil
 }
@@ -7277,7 +5627,6 @@ func migrationBackfillAllowedModelsWildcard(ctx context.Context, db *gorm.DB, lo
 				if err := tx.
 					Preload("ProviderConfigs").
 					Preload("ProviderConfigs.Keys").
-					Preload("MCPConfigs").
 					First(&vk, "id = ?", vkID).Error; err != nil {
 					if err == gorm.ErrRecordNotFound {
 						// Orphaned provider config row — VK was deleted; skip.
@@ -7393,34 +5742,6 @@ func migrationRepairBareWildcardAllowedModels(ctx context.Context, db *gorm.DB, 
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running %s migration: %s", migrationName, err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientAllowedExtraHeadersJSONColumn adds the allowed_extra_headers_json column to the mcp_client table
-func migrationAddMCPClientAllowedExtraHeadersJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_allowed_extra_headers_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "allowed_extra_headers_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "allowed_extra_headers_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running add_mcp_client_allowed_extra_headers_json_column migration: %s", err.Error())
 	}
 	return nil
 }
@@ -7557,34 +5878,6 @@ func migrationMakeBasePricingColumnsNullable(ctx context.Context, db *gorm.DB, l
 	return nil
 }
 
-// migrationAddAllowOnAllVirtualKeysColumn adds the allow_on_all_virtual_keys column to the mcp_client table
-func migrationAddAllowOnAllVirtualKeysColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_allow_on_all_virtual_keys_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "allow_on_all_virtual_keys"); err != nil {
-				return fmt.Errorf("failed to add allow_on_all_virtual_keys column: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "allow_on_all_virtual_keys"); err != nil {
-				return fmt.Errorf("failed to drop allow_on_all_virtual_keys column: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running add_allow_on_all_virtual_keys_column migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddOpenAIConfigJSONColumn adds the open_ai_config_json column to the provider table
 func migrationAddOpenAIConfigJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_open_ai_config_json_column"
@@ -7642,29 +5935,6 @@ func migrationAddPromptCacheJSONColumn(ctx context.Context, db *gorm.DB, logger 
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error while running add_prompt_cache_json_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddInjectedToolsJSONColumn adds the injected_tools_json column to the
-// provider table, backing ProviderConfig.InjectedTools.
-func migrationAddInjectedToolsJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_injected_tools_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableProvider{}, "InjectedToolsJSON")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableProvider{}, "injected_tools_json")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running %s migration: %s", migrationName, err.Error())
 	}
 	return nil
 }
@@ -7890,12 +6160,6 @@ func migrationAddRoutingChainMaxDepthColumn(ctx context.Context, db *gorm.DB, lo
 						AllowedHeaders:                  cc.AllowedHeaders,
 						MaxRequestBodySizeMB:            cc.MaxRequestBodySizeMB,
 						HideDeletedVirtualKeysInFilters: cc.HideDeletedVirtualKeysInFilters,
-						MCPAgentDepth:                   cc.MCPAgentDepth,
-						MCPToolExecutionTimeout:         cc.MCPToolExecutionTimeout,
-						MCPCodeModeBindingLevel:         cc.MCPCodeModeBindingLevel,
-						MCPToolSyncInterval:             cc.MCPToolSyncInterval,
-						MCPDisableAutoToolInject:        cc.MCPDisableAutoToolInject,
-						MCPEnableTempTokenAuth:          cc.MCPEnableTempTokenAuth,
 						AsyncJobResultTTL:               cc.AsyncJobResultTTL,
 						LoggingHeaders:                  cc.LoggingHeaders,
 						RequiredHeaders:                 cc.RequiredHeaders,
@@ -8447,87 +6711,6 @@ func migrationAddModelConfigBudgetsFKConstraint(ctx context.Context, db *gorm.DB
 	return nil
 }
 
-// migrationAddPerUserOAuthTables adds the oauth_user_sessions and oauth_user_tokens tables
-func migrationAddPerUserOAuthTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_per_user_oauth_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasTable(&tables.TableOauthUserToken{}) {
-				logger.Info("[configstore] %s: creating table TableOauthUserToken", migrationName)
-				if err := mg.CreateTable(&tables.TableOauthUserToken{}); err != nil {
-					return fmt.Errorf("failed to create oauth_user_tokens table: %w", err)
-				}
-			}
-			if !mg.HasTable(&tables.TableOauthUserSession{}) {
-				logger.Info("[configstore] %s: creating table TableOauthUserSession", migrationName)
-				if err := mg.CreateTable(&tables.TableOauthUserSession{}); err != nil {
-					return fmt.Errorf("failed to create oauth_user_sessions table: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			for _, table := range []any{
-				&tables.TableOauthUserToken{},
-				&tables.TableOauthUserSession{},
-			} {
-				if mg.HasTable(table) {
-					logger.Info("[configstore] %s: dropping table %T", migrationName, table)
-					if err := mg.DropTable(table); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_per_user_oauth_tables migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationMakeOAuthTokenExpiryNullable makes expires_at nullable for OAuth token tables.
-func migrationMakeOAuthTokenExpiryNullable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "make_oauth_token_expiry_nullable"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasTable(&tables.TableOauthToken{}) && mg.HasColumn(&tables.TableOauthToken{}, "expires_at") {
-				if err := mg.AlterColumn(&tables.TableOauthToken{}, "ExpiresAt"); err != nil {
-					return fmt.Errorf("failed to alter oauth_tokens.expires_at to nullable: %w", err)
-				}
-			}
-			if mg.HasTable(&tables.TableOauthUserToken{}) && mg.HasColumn(&tables.TableOauthUserToken{}, "expires_at") {
-				if err := mg.AlterColumn(&tables.TableOauthUserToken{}, "ExpiresAt"); err != nil {
-					return fmt.Errorf("failed to alter oauth_user_tokens.expires_at to nullable: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Forward-only migration: making expiry nullable is intentionally non-destructive.
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running make_oauth_token_expiry_nullable migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddAllowPerRequestContentStorageOverrideColumn adds the allow_per_request_content_storage_override column to config_client.
 func migrationAddAllowPerRequestContentStorageOverrideColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_allow_per_request_content_storage_override_column"
@@ -8620,40 +6803,6 @@ func migrationAddAllowPerRequestRawOverrideColumn(ctx context.Context, db *gorm.
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running allow_per_request_raw_override migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientDiscoveredToolsColumns adds discovered_tools_json and tool_name_mapping_json columns to the mcp_client table
-func migrationAddMCPClientDiscoveredToolsColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_discovered_tools_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "discovered_tools_json"); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "tool_name_mapping_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "discovered_tools_json"); err != nil {
-				return err
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "tool_name_mapping_json"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_client_discovered_tools_columns migration: %s", err.Error())
 	}
 	return nil
 }
@@ -9318,144 +7467,6 @@ func migrationAddCostPerRequestPricingColumn(ctx context.Context, db *gorm.DB, l
 	return nil
 }
 
-func migrationAddMCPExternalBaseURLColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_external_base_url_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			// Use raw SQL — the Go field for this column has since been split into
-			// MCPExternalServerURL/MCPExternalClientURL by a follow-up migration, so
-			// we can no longer reference the original field name on the struct.
-			if !mg.HasColumn(&tables.TableClientConfig{}, "mcp_external_base_url") {
-				if err := tx.Exec("ALTER TABLE config_client ADD COLUMN mcp_external_base_url VARCHAR(512)").Error; err != nil {
-					return fmt.Errorf("failed to add mcp_external_base_url column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasColumn(&tables.TableClientConfig{}, "mcp_external_base_url") {
-				if err := tx.Exec("ALTER TABLE config_client DROP COLUMN mcp_external_base_url").Error; err != nil {
-					return fmt.Errorf("failed to drop mcp_external_base_url column: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_external_base_url_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-func migrationSplitMCPExternalBaseURL(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "split_mcp_external_base_url_into_server_client"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			// Use raw SQL — MCPExternalServerURL was removed from
-			// TableClientConfig in a later refactor, so mg.AddColumn (which
-			// looks up the column type from the struct tag) can no longer
-			// find the field on a fresh upgrade. Existing deployments that
-			// already ran this migration take the fast no-op path via
-			// HasColumn.
-			if !mg.HasColumn(&tables.TableClientConfig{}, "mcp_external_server_url") {
-				if err := tx.Exec("ALTER TABLE config_client ADD COLUMN mcp_external_server_url VARCHAR(512)").Error; err != nil {
-					return fmt.Errorf("failed to add mcp_external_server_url column: %w", err)
-				}
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "MCPExternalClientURL"); err != nil {
-				return fmt.Errorf("failed to add mcp_external_client_url column: %w", err)
-			}
-			// Backfill: existing deployments treated mcp_external_base_url as applying
-			// to both roles, so copy it into both new columns to preserve behavior.
-			if mg.HasColumn(&tables.TableClientConfig{}, "mcp_external_base_url") {
-				if err := tx.Exec(
-					"UPDATE config_client SET mcp_external_server_url = mcp_external_base_url, mcp_external_client_url = mcp_external_base_url WHERE mcp_external_base_url IS NOT NULL AND mcp_external_base_url != ''",
-				).Error; err != nil {
-					return fmt.Errorf("failed to backfill mcp_external_*_url columns: %w", err)
-				}
-				if err := tx.Exec("ALTER TABLE config_client DROP COLUMN mcp_external_base_url").Error; err != nil {
-					return fmt.Errorf("failed to drop mcp_external_base_url column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasColumn(&tables.TableClientConfig{}, "mcp_external_base_url") {
-				if err := tx.Exec("ALTER TABLE config_client ADD COLUMN mcp_external_base_url VARCHAR(512)").Error; err != nil {
-					return fmt.Errorf("failed to recreate mcp_external_base_url column: %w", err)
-				}
-			}
-			if mg.HasColumn(&tables.TableClientConfig{}, "mcp_external_server_url") {
-				if err := tx.Exec(
-					"UPDATE config_client SET mcp_external_base_url = mcp_external_server_url WHERE mcp_external_server_url IS NOT NULL AND mcp_external_server_url != ''",
-				).Error; err != nil {
-					return fmt.Errorf("failed to backfill mcp_external_base_url from mcp_external_server_url: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_external_server_url"); err != nil {
-					return fmt.Errorf("failed to drop mcp_external_server_url column: %w", err)
-				}
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_external_client_url"); err != nil {
-				return fmt.Errorf("failed to drop mcp_external_client_url column: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running split_mcp_external_base_url_into_server_client migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientDisabledColumn adds the disabled column to the config_mcp_clients table
-func migrationAddMCPClientDisabledColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_disabled_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasColumn(&tables.TableMCPClient{}, "disabled") {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "disabled"); err != nil {
-					return fmt.Errorf("failed to add disabled column: %w", err)
-				}
-				// Initialize existing rows with false (default value)
-				if err := tx.Exec("UPDATE config_mcp_clients SET disabled = false WHERE disabled IS NULL").Error; err != nil {
-					return fmt.Errorf("failed to initialize disabled column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "disabled"); err != nil {
-				return fmt.Errorf("failed to drop disabled column: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_client_disabled_column migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationUniqueTeamNames deduplicates governance_teams.name and adds a unique
 // index. Duplicate rows (same name, different ID) have a short UUID suffix
 // appended so no data is lost. The struct tag uniqueIndex makes GORM enforce
@@ -9520,504 +7531,6 @@ func migrationUniqueTeamNames(ctx context.Context, db *gorm.DB, logger schemas.L
 	})
 }
 
-// migrationAddOAuthAuthModeColumns adds the AuthMode/Status/FlowMode discriminator
-// columns to the per-user OAuth tables, backfills them from existing identity
-// column population, drops the legacy non-unique composite indexes on
-// oauth_user_tokens, and creates partial unique indexes (one per identity
-// dimension).
-func migrationAddOAuthAuthModeColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth_auth_mode_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// 1) oauth_user_tokens: add status + auth_mode
-			if mg.HasTable(&tables.TableOauthUserToken{}) {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableOauthUserToken{}, "Status"); err != nil {
-					return fmt.Errorf("add status to oauth_user_tokens: %w", err)
-				}
-				if !mg.HasColumn(&tables.TableOauthUserToken{}, "auth_mode") {
-					logger.Info("[configstore] %s: adding column auth_mode to TableOauthUserToken", migrationName)
-					// Add as nullable first — mg.AddColumn would derive
-					// NOT NULL from the struct tag and fail on tables with
-					// existing rows. The backfill below populates every
-					// row, then we tighten to NOT NULL on Postgres.
-					if err := tx.Exec(`ALTER TABLE oauth_user_tokens ADD COLUMN auth_mode VARCHAR(20)`).Error; err != nil {
-						return fmt.Errorf("add auth_mode to oauth_user_tokens: %w", err)
-					}
-				}
-				// Backfill auth_mode from whichever identity column is populated.
-				// Priority: user_id > virtual_key_id > session column. The session
-				// column was renamed in a later migration (session_token_hash →
-				// session_id), so the SQL has to adapt: a fresh DB starts on the
-				// new schema and never had session_token_hash; an existing DB
-				// hasn't been through the rename yet and still has it.
-				sessionCol := ""
-				switch {
-				case mg.HasColumn(&tables.TableOauthUserToken{}, "session_token_hash"):
-					sessionCol = "session_token_hash"
-				case mg.HasColumn(&tables.TableOauthUserToken{}, "session_id"):
-					sessionCol = "session_id"
-				}
-				var backfillSQL string
-				// Priority is vk → user → session. vk wins over user so that a
-				// legacy row carrying both identity columns survives as a
-				// vk-mode binding through migrationDropNonVKOauthUserRows,
-				// which is the binding type this refactor is meant to keep.
-				if sessionCol != "" {
-					backfillSQL = `
-						UPDATE oauth_user_tokens
-						SET auth_mode = CASE
-							WHEN virtual_key_id IS NOT NULL AND virtual_key_id != '' THEN 'vk'
-							WHEN user_id IS NOT NULL AND user_id != '' THEN 'user'
-							WHEN ` + sessionCol + ` IS NOT NULL AND ` + sessionCol + ` != '' THEN 'session'
-							ELSE NULL
-						END
-					`
-				} else {
-					backfillSQL = `
-						UPDATE oauth_user_tokens
-						SET auth_mode = CASE
-							WHEN virtual_key_id IS NOT NULL AND virtual_key_id != '' THEN 'vk'
-							WHEN user_id IS NOT NULL AND user_id != '' THEN 'user'
-							ELSE NULL
-						END
-					`
-				}
-				if err := tx.Exec(backfillSQL).Error; err != nil {
-					return fmt.Errorf("backfill oauth_user_tokens.auth_mode: %w", err)
-				}
-				// Identity-less rows can't satisfy any (mode, identity, mcp_client)
-				// lookup, so they're dead data. Drop them now — leaving them as
-				// 'vk' would let them sneak past migrationDropNonVKOauthUserRows
-				// later in the chain and pollute the sessions UI.
-				if err := tx.Exec(`DELETE FROM oauth_user_tokens WHERE auth_mode IS NULL`).Error; err != nil {
-					return fmt.Errorf("delete identity-less oauth_user_tokens rows: %w", err)
-				}
-				// Tighten the constraint on Postgres now that every row has
-				// a value. SQLite doesn't support ALTER COLUMN SET NOT NULL;
-				// app-level validation (BeforeSave) enforces non-empty
-				// AuthMode there instead.
-				if tx.Dialector.Name() == "postgres" {
-					if err := tx.Exec(`ALTER TABLE oauth_user_tokens ALTER COLUMN auth_mode SET NOT NULL`).Error; err != nil {
-						return fmt.Errorf("set oauth_user_tokens.auth_mode NOT NULL: %w", err)
-					}
-				}
-				// Ensure status is populated for legacy rows.
-				if err := tx.Exec(`UPDATE oauth_user_tokens SET status = 'active' WHERE status IS NULL OR status = ''`).Error; err != nil {
-					return fmt.Errorf("backfill oauth_user_tokens.status: %w", err)
-				}
-
-				// Drop legacy non-unique composite indexes. Replaced by partial unique indexes below.
-				if mg.HasIndex(&tables.TableOauthUserToken{}, "idx_vk_mcp") {
-					logger.Info("[configstore] %s: dropping index idx_vk_mcp on TableOauthUserToken", migrationName)
-					if err := mg.DropIndex(&tables.TableOauthUserToken{}, "idx_vk_mcp"); err != nil {
-						return fmt.Errorf("drop idx_vk_mcp: %w", err)
-					}
-				}
-				if mg.HasIndex(&tables.TableOauthUserToken{}, "idx_user_mcp") {
-					logger.Info("[configstore] %s: dropping index idx_user_mcp on TableOauthUserToken", migrationName)
-					if err := mg.DropIndex(&tables.TableOauthUserToken{}, "idx_user_mcp"); err != nil {
-						return fmt.Errorf("drop idx_user_mcp: %w", err)
-					}
-				}
-
-				// Dedupe legacy bindings before flipping the indexes to UNIQUE.
-				// idx_user_mcp / idx_vk_mcp were non-unique up to this migration,
-				// and the OAuth-server consent flow we ripped out could write
-				// multiple rows for the same (identity, mcp_client_id). Without
-				// this pass the CREATE UNIQUE INDEX below would abort on the
-				// first duplicate. Keep the newest row per group (highest
-				// updated_at, breaking ties on id) so the live credential
-				// survives and stale duplicates are deleted.
-				dedupeStmts := []string{
-					`DELETE FROM oauth_user_tokens
-						WHERE id IN (
-							SELECT id FROM (
-								SELECT id,
-									ROW_NUMBER() OVER (
-										PARTITION BY user_id, mcp_client_id
-										ORDER BY updated_at DESC, id DESC
-									) AS rn
-								FROM oauth_user_tokens
-								WHERE auth_mode = 'user' AND user_id IS NOT NULL AND user_id != ''
-							) ranked
-							WHERE rn > 1
-						)`,
-					`DELETE FROM oauth_user_tokens
-						WHERE id IN (
-							SELECT id FROM (
-								SELECT id,
-									ROW_NUMBER() OVER (
-										PARTITION BY virtual_key_id, mcp_client_id
-										ORDER BY updated_at DESC, id DESC
-									) AS rn
-								FROM oauth_user_tokens
-								WHERE auth_mode = 'vk' AND virtual_key_id IS NOT NULL AND virtual_key_id != ''
-							) ranked
-							WHERE rn > 1
-						)`,
-				}
-				if sessionCol != "" {
-					dedupeStmts = append(dedupeStmts,
-						`DELETE FROM oauth_user_tokens
-							WHERE id IN (
-								SELECT id FROM (
-									SELECT id,
-										ROW_NUMBER() OVER (
-											PARTITION BY `+sessionCol+`, mcp_client_id
-											ORDER BY updated_at DESC, id DESC
-										) AS rn
-									FROM oauth_user_tokens
-									WHERE auth_mode = 'session' AND `+sessionCol+` IS NOT NULL AND `+sessionCol+` != ''
-								) ranked
-								WHERE rn > 1
-							)`,
-					)
-				}
-				logger.Info("[configstore] %s: processing %d dedupeStmts", migrationName, len(dedupeStmts))
-				for _, stmt := range dedupeStmts {
-					if err := tx.Exec(stmt).Error; err != nil {
-						return fmt.Errorf("dedupe legacy oauth_user_tokens bindings: %w", err)
-					}
-				}
-
-				// Partial unique indexes (one per identity dimension), each
-				// scoped by auth_mode to match the dedupe pass above. Without
-				// the auth_mode predicate, a legacy row that carries both
-				// (e.g.) user_id and virtual_key_id would participate in two
-				// uniqueness domains and could collide with rows that own a
-				// different mode. Both Postgres and SQLite (3.8+) support
-				// WHERE on indexes. Use whichever session column exists
-				// (legacy session_token_hash vs renamed session_id);
-				// migrationReplaceOauthSessionTokenWithSessionID later drops +
-				// recreates the session index on session_id anyway.
-				partialUniques := []string{
-					`CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_tokens_user_mcp
-						ON oauth_user_tokens (user_id, mcp_client_id)
-						WHERE auth_mode = 'user' AND user_id IS NOT NULL AND user_id != ''`,
-					`CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_tokens_vk_mcp
-						ON oauth_user_tokens (virtual_key_id, mcp_client_id)
-						WHERE auth_mode = 'vk' AND virtual_key_id IS NOT NULL AND virtual_key_id != ''`,
-				}
-				if sessionCol != "" {
-					partialUniques = append(partialUniques,
-						`CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_tokens_session_mcp
-							ON oauth_user_tokens (`+sessionCol+`, mcp_client_id)
-							WHERE auth_mode = 'session' AND `+sessionCol+` IS NOT NULL AND `+sessionCol+` != ''`,
-					)
-				}
-				logger.Info("[configstore] %s: processing %d partialUniques", migrationName, len(partialUniques))
-				for _, stmt := range partialUniques {
-					if err := tx.Exec(stmt).Error; err != nil {
-						return fmt.Errorf("create partial unique index on oauth_user_tokens: %w", err)
-					}
-				}
-
-				// Partial index on orphaned rows to keep the sessions-tab "orphaned" query cheap.
-				if err := tx.Exec(`
-					CREATE INDEX IF NOT EXISTS idx_oauth_user_tokens_orphaned
-						ON oauth_user_tokens (status)
-						WHERE status = 'orphaned'
-				`).Error; err != nil {
-					return fmt.Errorf("create orphaned-status index: %w", err)
-				}
-			}
-
-			// 2) oauth_user_sessions: add flow_mode
-			if mg.HasTable(&tables.TableOauthUserSession{}) {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableOauthUserSession{}, "FlowMode"); err != nil {
-					return fmt.Errorf("add flow_mode to oauth_user_sessions: %w", err)
-				}
-				// Same vk → user precedence as the token backfill above so
-				// migrationDropNonVKOauthUserRows preserves dual-identity rows.
-				if err := tx.Exec(`
-					UPDATE oauth_user_sessions
-					SET flow_mode = CASE
-						WHEN virtual_key_id IS NOT NULL AND virtual_key_id != '' THEN 'vk'
-						WHEN user_id IS NOT NULL AND user_id != '' THEN 'user'
-						ELSE 'none'
-					END
-				`).Error; err != nil {
-					return fmt.Errorf("backfill oauth_user_sessions.flow_mode: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// Drop partial unique + orphan indexes.
-			for _, name := range []string{
-				"idx_oauth_user_tokens_user_mcp",
-				"idx_oauth_user_tokens_vk_mcp",
-				"idx_oauth_user_tokens_session_mcp",
-				"idx_oauth_user_tokens_orphaned",
-			} {
-				if err := tx.Exec("DROP INDEX IF EXISTS " + name).Error; err != nil {
-					return fmt.Errorf("drop %s: %w", name, err)
-				}
-			}
-
-			// Restore legacy composite non-unique indexes.
-			if mg.HasTable(&tables.TableOauthUserToken{}) {
-				if err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_vk_mcp ON oauth_user_tokens (virtual_key_id, mcp_client_id)`).Error; err != nil {
-					return fmt.Errorf("restore idx_vk_mcp: %w", err)
-				}
-				if err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_user_mcp ON oauth_user_tokens (user_id, mcp_client_id)`).Error; err != nil {
-					return fmt.Errorf("restore idx_user_mcp: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserToken{}, "Status"); err != nil {
-					return fmt.Errorf("drop status from oauth_user_tokens: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserToken{}, "AuthMode"); err != nil {
-					return fmt.Errorf("drop auth_mode from oauth_user_tokens: %w", err)
-				}
-			}
-			if mg.HasTable(&tables.TableOauthUserSession{}) && mg.HasColumn(&tables.TableOauthUserSession{}, "flow_mode") {
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserSession{}, "FlowMode"); err != nil {
-					return fmt.Errorf("drop flow_mode from oauth_user_sessions: %w", err)
-				}
-			}
-
-			return nil
-		},
-	})
-}
-
-// migrationReplaceOauthSessionTokenWithSessionID switches both
-// oauth_user_sessions and oauth_user_tokens from the legacy SessionToken +
-// SessionTokenHash pair (server-issued bearer credential, SHA-256 hashed for
-// the lookup column) to a single plaintext SessionID column.
-//
-// Why the change: session-mode identity is now caller-asserted via the
-// x-bf-mcp-session-id header (same trust model as a VK value). It's no longer
-// a Bifrost-issued bearer token, so hashing buys nothing and the unique index
-// on session_token_hash was conflating "uniqueness of token value" with
-// "uniqueness of binding" — the latter is now enforced at the application
-// layer by the (mode, identity, mcp_client_id) lookup in
-// InitiateUserOAuthFlow and CreateOauthToken.
-//
-// Order: add SessionID first, then drop the legacy columns + their indexes.
-// No data backfill: existing rows are dev-only test data; production hasn't
-// landed yet.
-func migrationReplaceOauthSessionTokenWithSessionID(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "replace_oauth_session_token_with_session_id"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// 1) oauth_user_sessions: add session_id, drop legacy columns + index.
-			if mg.HasTable(&tables.TableOauthUserSession{}) {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableOauthUserSession{}, "SessionID"); err != nil {
-					return fmt.Errorf("add session_id to oauth_user_sessions: %w", err)
-				}
-				// The legacy session_token_hash column had a uniqueIndex declared
-				// via gorm tag; GORM names it something like
-				// "idx_oauth_user_sessions_session_token_hash". DROP COLUMN drops
-				// the dependent index on Postgres/SQLite, but be explicit on
-				// Postgres for safety.
-				if err := tx.Exec("DROP INDEX IF EXISTS idx_oauth_user_sessions_session_token_hash").Error; err != nil {
-					return fmt.Errorf("drop legacy session_token_hash index on oauth_user_sessions: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserSession{}, "session_token_hash"); err != nil {
-					return fmt.Errorf("drop session_token_hash from oauth_user_sessions: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserSession{}, "session_token"); err != nil {
-					return fmt.Errorf("drop session_token from oauth_user_sessions: %w", err)
-				}
-			}
-
-			// 2) oauth_user_tokens: same dance plus drop the partial unique index
-			// idx_oauth_user_tokens_session_mcp created by the prior migration —
-			// its key column (session_token_hash) is being removed.
-			if mg.HasTable(&tables.TableOauthUserToken{}) {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableOauthUserToken{}, "SessionID"); err != nil {
-					return fmt.Errorf("add session_id to oauth_user_tokens: %w", err)
-				}
-				if err := tx.Exec("DROP INDEX IF EXISTS idx_oauth_user_tokens_session_mcp").Error; err != nil {
-					return fmt.Errorf("drop legacy idx_oauth_user_tokens_session_mcp: %w", err)
-				}
-				if err := tx.Exec("DROP INDEX IF EXISTS idx_oauth_user_tokens_session_token_hash").Error; err != nil {
-					return fmt.Errorf("drop legacy session_token_hash index on oauth_user_tokens: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserToken{}, "session_token_hash"); err != nil {
-					return fmt.Errorf("drop session_token_hash from oauth_user_tokens: %w", err)
-				}
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthUserToken{}, "session_token"); err != nil {
-					return fmt.Errorf("drop session_token from oauth_user_tokens: %w", err)
-				}
-
-				// Replace the partial unique index with one keyed on the new
-				// column. Scope by auth_mode = 'session' to match the
-				// mode-scoped uniqueness set up for user / vk in
-				// migrationAddOAuthAuthModeColumns; without it, a row that
-				// carries both session_id and another identity column could
-				// participate in two uniqueness domains.
-				if err := tx.Exec(`
-					CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_user_tokens_session_mcp
-						ON oauth_user_tokens (session_id, mcp_client_id)
-						WHERE auth_mode = 'session' AND session_id IS NOT NULL AND session_id != ''
-				`).Error; err != nil {
-					return fmt.Errorf("create idx_oauth_user_tokens_session_mcp on session_id: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// Drop the new partial unique index keyed on session_id.
-			if err := tx.Exec("DROP INDEX IF EXISTS idx_oauth_user_tokens_session_mcp").Error; err != nil {
-				return fmt.Errorf("drop idx_oauth_user_tokens_session_mcp: %w", err)
-			}
-
-			// Re-add legacy columns via raw DDL. The typed struct fields no
-			// longer exist, so we can't use mg.AddColumn. Best-effort
-			// schema-only rollback; original session tokens are gone, so
-			// callers depending on this data would need their own recovery.
-			for _, tableName := range []string{"oauth_user_sessions", "oauth_user_tokens"} {
-				if err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN session_token VARCHAR(255)", tableName)).Error; err != nil {
-					// Ignore "column already exists" / dialect quirks.
-					_ = err
-				}
-				if err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN session_token_hash VARCHAR(64)", tableName)).Error; err != nil {
-					_ = err
-				}
-			}
-			for _, model := range []interface{}{&tables.TableOauthUserSession{}, &tables.TableOauthUserToken{}} {
-				if mg.HasTable(model) && mg.HasColumn(model, "session_id") {
-					if err := dropColumnIfExists(tx, logger, model, "SessionID"); err != nil {
-						return fmt.Errorf("drop session_id from %T: %w", model, err)
-					}
-				}
-			}
-
-			return nil
-		},
-	})
-}
-
-// migrationDropLegacyOAuthServerTables drops the four tables that backed the
-// MCP-gateway-OAuth-server flow (Bifrost acting as an OAuth Authorization
-// Server to upstream MCP clients), plus the gateway_session_id column on
-// oauth_user_sessions that linked them. Bifrost is now strictly an OAuth
-// *client* to upstream providers; the server-side flow was replaced by the
-// x-bf-mcp-session-id header model (see migrationReplaceOauthSessionTokenWithSessionID).
-//
-// Tables removed:
-//   - oauth_per_user_clients       (dynamic client registration)
-//   - oauth_per_user_sessions      (Bifrost-issued bearer tokens for MCP clients)
-//   - oauth_per_user_codes         (authorization codes)
-//   - oauth_per_user_pending_flows (in-flight consent state)
-//
-// No data preservation needed: the flow that wrote these rows no longer exists
-// in the code, so any rows present are orphans referring to a removed code path.
-// Rollback recreates the tables empty (best-effort schema-only; original data
-// is gone).
-func migrationDropLegacyOAuthServerTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_legacy_oauth_server_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			// Drop the gateway_session_id column on oauth_user_sessions first,
-			// since the table dropped below (oauth_per_user_sessions) was its
-			// logical pairing. DROP COLUMN with IF EXISTS is supported by
-			// Postgres but not SQLite — fall back to checking via Migrator.
-			mg := tx.Migrator()
-			if mg.HasTable("oauth_user_sessions") && mg.HasColumn("oauth_user_sessions", "gateway_session_id") {
-				if err := tx.Exec("ALTER TABLE oauth_user_sessions DROP COLUMN gateway_session_id").Error; err != nil {
-					return fmt.Errorf("drop gateway_session_id from oauth_user_sessions: %w", err)
-				}
-			}
-
-			for _, table := range []string{
-				"oauth_per_user_codes",
-				"oauth_per_user_pending_flows",
-				"oauth_per_user_sessions",
-				"oauth_per_user_clients",
-			} {
-				if err := tx.Exec("DROP TABLE IF EXISTS " + table).Error; err != nil {
-					return fmt.Errorf("drop %s: %w", table, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Irreversible. The four oauth_per_user_* tables backed the
-			// Bifrost-as-OAuth-server flow; their original schemas (dynamic
-			// client metadata, hashed bearer tokens, authorization codes,
-			// PKCE state) cannot be reconstructed from the live oauth_user_*
-			// tables. A "best-effort" stub Rollback that re-creates empty
-			// tables with just an id column would let downgrades report
-			// success against a schema the pre-refactor code path cannot use,
-			// and the application would then fail on first access. Fail loud
-			// instead so the operator knows a true rollback requires a backup
-			// restore.
-			return fmt.Errorf("drop_legacy_oauth_server_tables is irreversible: restore from backup to recover the pre-refactor schema")
-		},
-	})
-}
-
-// migrationDropNonVKOauthUserRows hard-deletes user-mode and session-mode rows
-// from oauth_user_tokens and oauth_user_sessions. Only vk-mode rows survive the
-// refactor: their (virtual_key, mcp_client) binding is stable across the change.
-// User-mode and session-mode semantics changed when Bifrost stopped acting as
-// an OAuth server (see migrationDropLegacyOAuthServerTables); the prior rows
-// are stale credentials that wouldn't satisfy a lookup under the new flow.
-// Affected users / clients re-authenticate fresh — the alternative is carrying
-// forward dead state that surfaces in the sessions UI but can never refresh.
-func migrationDropNonVKOauthUserRows(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_non_vk_oauth_user_rows"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			// `!= 'vk'` alone doesn't match NULL in SQL three-valued logic.
-			// Rolling-upgrade writes from older replicas, or any row that
-			// somehow slipped past the auth_mode/flow_mode backfill, could
-			// still carry a NULL discriminator — explicitly include those so
-			// stale user/session state can't survive the cleanup.
-			if mg.HasTable("oauth_user_tokens") {
-				if err := tx.Exec("DELETE FROM oauth_user_tokens WHERE auth_mode IS NULL OR auth_mode != 'vk'").Error; err != nil {
-					return fmt.Errorf("delete non-vk oauth_user_tokens: %w", err)
-				}
-			}
-			if mg.HasTable("oauth_user_sessions") {
-				if err := tx.Exec("DELETE FROM oauth_user_sessions WHERE flow_mode IS NULL OR flow_mode != 'vk'").Error; err != nil {
-					return fmt.Errorf("delete non-vk oauth_user_sessions: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// No-op: the dropped rows are unrecoverable. Users on user/session
-			// modes re-authenticate after rollback the same way they would
-			// after the forward migration.
-			return nil
-		},
-	})
-}
-
 // migrationAddSkillsExternalClientURLColumn adds the public marketplace URL setting.
 // DDL runs separately from the backfill so its exclusive lock is released before updating rows.
 func migrationAddSkillsExternalClientURLColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -10028,212 +7541,6 @@ func migrationAddSkillsExternalClientURLColumn(ctx context.Context, db *gorm.DB,
 		},
 		Rollback: func(tx *gorm.DB) error {
 			return fmt.Errorf("add_skills_external_client_url_column is non-rollbackable: dropping it would discard marketplace configuration")
-		},
-	})
-}
-
-// migrationBackfillSkillsExternalClientURL seeds the marketplace URL from the current MCP client URL.
-// Existing skills overrides win, and the MCP setting remains unchanged.
-func migrationBackfillSkillsExternalClientURL(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: "backfill_skills_external_client_url",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if !tx.Migrator().HasColumn("config_client", "mcp_external_client_url") {
-				return nil
-			}
-			var rows []struct {
-				ID                   uint
-				MCPExternalClientURL string
-			}
-			if err := tx.Table("config_client").Select("id, mcp_external_client_url").Where("(skills_external_client_url IS NULL OR skills_external_client_url = '') AND mcp_external_client_url IS NOT NULL AND mcp_external_client_url != ''").Find(&rows).Error; err != nil {
-				return err
-			}
-			for _, row := range rows {
-				value := schemas.NewSecretVar(row.MCPExternalClientURL).GetValue()
-				if value == "" || ValidatePublicBaseURL(value) != nil {
-					continue
-				}
-				if err := tx.Table("config_client").Where("id = ?", row.ID).Update("skills_external_client_url", row.MCPExternalClientURL).Error; err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return fmt.Errorf("backfill_skills_external_client_url is non-rollbackable: migrated marketplace configuration must be preserved")
-		},
-	})
-}
-
-// migrationDropMCPExternalServerURL drops the mcp_external_server_url column
-// from config_client. This URL was used to advertise Bifrost as an OAuth
-// authorization server (.well-known endpoints, WWW-Authenticate header on
-// /mcp). Bifrost no longer acts as an OAuth server (see
-// migrationDropLegacyOAuthServerTables), so the column is dead.
-//
-// Hash recompute is handled separately by
-// migrationRefreshConfigHashAfterMCPExternalServerURLRemoval so this migration
-// holds the AccessExclusiveLock only for the brief catalog update.
-//
-// The companion mcp_external_client_url column is retained — it's still used
-// as the redirect_uri base when Bifrost acts as an OAuth *client* to upstream
-// MCP servers.
-func migrationDropMCPExternalServerURL(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_mcp_external_server_url_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasTable("config_client") && mg.HasColumn("config_client", "mcp_external_server_url") {
-				if err := tx.Exec("ALTER TABLE config_client DROP COLUMN mcp_external_server_url").Error; err != nil {
-					return fmt.Errorf("drop mcp_external_server_url from config_client: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			// Best-effort: re-add the column (empty values; no data to restore).
-			_ = tx.Exec("ALTER TABLE config_client ADD COLUMN mcp_external_server_url VARCHAR(512)").Error
-			return nil
-		},
-	})
-}
-
-// migrationRefreshConfigHashAfterMCPExternalServerURLRemoval recomputes
-// config_hash for every config_client row after MCPExternalServerURL was
-// removed from GenerateClientConfigHash. Without this refresh, every stored
-// hash that was computed while the field was still mixed in would mismatch
-// on first startup and trigger spurious config-reload cycles.
-//
-// The actual DROP COLUMN is handled by migrationDropMCPExternalServerURL so
-// that the DDL (AccessExclusiveLock) never shares a transaction with the
-// SELECT + UPDATE on the same table — that combination was observed to lock
-// config_client indefinitely on contended Postgres instances. See the same
-// split for migrationDropAllowDirectKeysColumn.
-func migrationRefreshConfigHashAfterMCPExternalServerURLRemoval(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "refresh_config_hash_after_mcp_external_server_url_removal"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasTable("config_client") {
-				return nil
-			}
-			// Unconditional recompute — don't gate on the legacy column still
-			// existing. The migrator framework's migrator_meta tracking
-			// ensures this runs exactly once per DB, so re-stamping the same
-			// hash on a fresh DB (where there's nothing to fix) is harmless.
-			// Gating on the legacy column would make ordering brittle: any
-			// reordering that drops the column before this runs would silently
-			// turn the refresh into a no-op and leave stale hashes behind.
-			// Read via an explicit column projection rather than GORM's default
-			// Find (SELECT *). Earlier migrations in this same run add and drop
-			// config_client columns; reusing a cached SELECT * plan whose
-			// projection has since drifted is what trips PostgreSQL's "cached
-			// plan must not change result type" (SQLSTATE 0A000), an error that
-			// is unrecoverable inside a migration's transaction. An explicit
-			// column list is a distinct, previously-uncached query: it prepares
-			// fresh against the current schema and has a fixed result type. Same
-			// class of guard as migrate_calendar_aligned.
-			//
-			// Derive the projection from the LIVE table columns intersected with
-			// the struct, not from the struct alone. TableClientConfig can be
-			// ahead of applied DDL: a declared column (e.g.
-			// dump_errors_in_console_logs, added by a later migration step) does
-			// not exist yet on upgrade, and naming a missing column in the SELECT
-			// fails with 42703. Intersecting with the columns that physically
-			// exist makes that impossible for any current or future column. Keep
-			// the read on .Find (not a raw Scan) so the AfterFind hook still
-			// deserializes the *_json columns into the virtual fields the hash
-			// depends on; a raw Scan bypasses AfterFind and would corrupt them.
-			existingCols, err := mg.ColumnTypes(&tables.TableClientConfig{})
-			if err != nil {
-				return fmt.Errorf("inspect config_client columns for hash recompute: %w", err)
-			}
-			present := make(map[string]struct{}, len(existingCols))
-			for _, ct := range existingCols {
-				present[ct.Name()] = struct{}{}
-			}
-			schemaStmt := &gorm.Statement{DB: tx}
-			if err := schemaStmt.Parse(&tables.TableClientConfig{}); err != nil {
-				return fmt.Errorf("parse config_client schema for hash recompute: %w", err)
-			}
-			projection := make([]string, 0, len(schemaStmt.Schema.DBNames))
-			for _, name := range schemaStmt.Schema.DBNames {
-				if _, ok := present[name]; ok {
-					projection = append(projection, name)
-				}
-			}
-			if len(projection) == 0 {
-				logger.Info("[configstore] %s: no columns in common between config_client and TableClientConfig, skipping hash recompute", migrationName)
-				return nil
-			}
-			var clientConfigs []tables.TableClientConfig
-			if err := tx.Model(&tables.TableClientConfig{}).
-				Select(projection).
-				Find(&clientConfigs).Error; err != nil {
-				return fmt.Errorf("fetch client configs for hash recompute: %w", err)
-			}
-			logger.Info("[configstore] %s: processing %d clientConfigs", migrationName, len(clientConfigs))
-			for _, cc := range clientConfigs {
-				if cc.ConfigHash == "" {
-					continue
-				}
-				clientConfig := ClientConfig{
-					DropExcessRequests:                    cc.DropExcessRequests,
-					InitialPoolSize:                       cc.InitialPoolSize,
-					PrometheusLabels:                      cc.PrometheusLabels,
-					EnableLogging:                         cc.EnableLogging,
-					DisableContentLogging:                 cc.DisableContentLogging,
-					AllowPerRequestContentStorageOverride: cc.AllowPerRequestContentStorageOverride,
-					AllowPerRequestRawOverride:            cc.AllowPerRequestRawOverride,
-					DisableDBPingsInHealth:                cc.DisableDBPingsInHealth,
-					LogRetentionDays:                      cc.LogRetentionDays,
-					EnforceAuthOnInference:                cc.EnforceAuthOnInference,
-					AllowedOrigins:                        cc.AllowedOrigins,
-					AllowedHeaders:                        cc.AllowedHeaders,
-					MaxRequestBodySizeMB:                  cc.MaxRequestBodySizeMB,
-					MCPAgentDepth:                         cc.MCPAgentDepth,
-					MCPToolExecutionTimeout:               cc.MCPToolExecutionTimeout,
-					MCPCodeModeBindingLevel:               cc.MCPCodeModeBindingLevel,
-					MCPToolSyncInterval:                   cc.MCPToolSyncInterval,
-					MCPDisableAutoToolInject:              cc.MCPDisableAutoToolInject,
-					MCPEnableTempTokenAuth:                cc.MCPEnableTempTokenAuth,
-					MCPExternalClientURL:                  schemas.NewSecretVar(cc.MCPExternalClientURL),
-					HeaderFilterConfig:                    cc.HeaderFilterConfig,
-					AsyncJobResultTTL:                     cc.AsyncJobResultTTL,
-					RequiredHeaders:                       cc.RequiredHeaders,
-					LoggingHeaders:                        cc.LoggingHeaders,
-					WhitelistedRoutes:                     cc.WhitelistedRoutes,
-					HideDeletedVirtualKeysInFilters:       cc.HideDeletedVirtualKeysInFilters,
-					RoutingChainMaxDepth:                  cc.RoutingChainMaxDepth,
-					Compat: CompatConfig{
-						ConvertTextToChat:      cc.CompatConvertTextToChat,
-						ConvertChatToResponses: cc.CompatConvertChatToResponses,
-						ShouldDropParams:       cc.CompatShouldDropParams,
-						ShouldConvertParams:    cc.CompatShouldConvertParams,
-					},
-				}
-				newHash, err := clientConfig.GenerateClientConfigHash()
-				if err != nil {
-					return fmt.Errorf("regenerate config hash for client config %d: %w", cc.ID, err)
-				}
-				if err := tx.Model(&cc).Update("config_hash", newHash).Error; err != nil {
-					return fmt.Errorf("update config_hash for client config %d: %w", cc.ID, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return nil
 		},
 	})
 }
@@ -10379,43 +7686,6 @@ func migrationAddFrameworkConfigHashColumn(ctx context.Context, db *gorm.DB, log
 	return nil
 }
 
-// migrationAddTempTokensTable creates the temp_tokens table that backs the
-// temptoken service.
-func migrationAddTempTokensTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_temp_tokens_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			if !mig.HasTable(&tables.TempToken{}) {
-				logger.Info("[configstore] %s: creating table TempToken", migrationName)
-				if err := mig.CreateTable(&tables.TempToken{}); err != nil {
-					return fmt.Errorf("failed to create temp_tokens table: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			if mig.HasTable(&tables.TempToken{}) {
-				logger.Info("[configstore] %s: dropping table TempToken", migrationName)
-				if err := mig.DropTable(&tables.TempToken{}); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_temp_tokens_table migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddVirtualKeyBlacklistedModelsColumn adds the blacklisted_models JSON column
 // to governance_virtual_key_provider_configs, matching the provider-key blacklist pattern.
 // This migration performs the DDL only. The data backfill and config_hash recompute are
@@ -10470,7 +7740,6 @@ func migrationBackfillVirtualKeyBlacklistedModels(ctx context.Context, db *gorm.
 			if err := tx.
 				Preload("ProviderConfigs").
 				Preload("ProviderConfigs.Keys").
-				Preload("MCPConfigs").
 				Find(&virtualKeys).Error; err != nil {
 				return fmt.Errorf("failed to fetch virtual keys for hash recomputation: %w", err)
 			}
@@ -10557,151 +7826,6 @@ func migrationDropVKAccessProfileIDColumn(ctx context.Context, db *gorm.DB, logg
 	return nil
 }
 
-// migrationAddPerUserHeadersTables creates the mcp_per_user_header_credentials
-// table and adds the per_user_header_keys_json column to config_mcp_clients.
-// Mirrors the partial-unique-index pattern from
-// migrationAddOAuthAuthModeColumns so the per-user-headers credentials are
-// keyed by (auth_mode, identity, mcp_client_id) the same way per-user OAuth
-// tokens are. Forward-only on data — no rows exist yet.
-func migrationAddPerUserHeadersTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_per_user_header_credentials_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// 1) config_mcp_clients.per_user_header_keys_json (admin-defined
-			//    schema of required header names; nullable / empty for all
-			//    other auth types).
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "PerUserHeaderKeysJSON"); err != nil {
-				return fmt.Errorf("add per_user_header_keys_json column to config_mcp_clients: %w", err)
-			}
-
-			// 2) mcp_per_user_header_credentials table.
-			if !mg.HasTable(&tables.TableMCPPerUserHeaderCredential{}) {
-				logger.Info("[configstore] %s: creating table TableMCPPerUserHeaderCredential", migrationName)
-				if err := mg.CreateTable(&tables.TableMCPPerUserHeaderCredential{}); err != nil {
-					return fmt.Errorf("create mcp_per_user_header_credentials table: %w", err)
-				}
-			}
-
-			// 3) Partial unique indexes per auth_mode — matches the
-			//    oauth_user_tokens layout so the cascade / orphan logic stays
-			//    parallel.
-			partialUniques := []string{
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_per_user_header_credentials_user_mcp
-					ON mcp_per_user_header_credentials (user_id, mcp_client_id)
-					WHERE auth_mode = 'user' AND user_id IS NOT NULL AND user_id != ''`,
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_per_user_header_credentials_vk_mcp
-					ON mcp_per_user_header_credentials (virtual_key_id, mcp_client_id)
-					WHERE auth_mode = 'vk' AND virtual_key_id IS NOT NULL AND virtual_key_id != ''`,
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_per_user_header_credentials_session_mcp
-					ON mcp_per_user_header_credentials (session_id, mcp_client_id)
-					WHERE auth_mode = 'session' AND session_id IS NOT NULL AND session_id != ''`,
-			}
-			logger.Info("[configstore] %s: processing %d partialUniques", migrationName, len(partialUniques))
-			for _, stmt := range partialUniques {
-				if err := tx.Exec(stmt).Error; err != nil {
-					return fmt.Errorf("create partial unique index on mcp_per_user_header_credentials: %w", err)
-				}
-			}
-
-			// 4) Status-scoped partial indexes for cheap UI / cleanup queries.
-			statusIndexes := []string{
-				`CREATE INDEX IF NOT EXISTS idx_mcp_per_user_header_credentials_orphaned
-					ON mcp_per_user_header_credentials (status)
-					WHERE status = 'orphaned'`,
-				`CREATE INDEX IF NOT EXISTS idx_mcp_per_user_header_credentials_needs_update
-					ON mcp_per_user_header_credentials (mcp_client_id)
-					WHERE status = 'needs_update'`,
-			}
-			logger.Info("[configstore] %s: processing %d statusIndexes", migrationName, len(statusIndexes))
-			for _, stmt := range statusIndexes {
-				if err := tx.Exec(stmt).Error; err != nil {
-					return fmt.Errorf("create status partial index on mcp_per_user_header_credentials: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			for _, name := range []string{
-				"idx_mcp_per_user_header_credentials_user_mcp",
-				"idx_mcp_per_user_header_credentials_vk_mcp",
-				"idx_mcp_per_user_header_credentials_session_mcp",
-				"idx_mcp_per_user_header_credentials_orphaned",
-				"idx_mcp_per_user_header_credentials_needs_update",
-			} {
-				if err := tx.Exec("DROP INDEX IF EXISTS " + name).Error; err != nil {
-					return fmt.Errorf("drop %s: %w", name, err)
-				}
-			}
-			if mg.HasTable(&tables.TableMCPPerUserHeaderCredential{}) {
-				logger.Info("[configstore] %s: dropping table TableMCPPerUserHeaderCredential", migrationName)
-				if err := mg.DropTable(&tables.TableMCPPerUserHeaderCredential{}); err != nil {
-					return fmt.Errorf("drop mcp_per_user_header_credentials: %w", err)
-				}
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "PerUserHeaderKeysJSON"); err != nil {
-				return fmt.Errorf("drop per_user_header_keys_json column from config_mcp_clients: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_per_user_header_credentials_table migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddPerUserHeadersFlowsTable creates the
-// mcp_per_user_header_flows table. Pending submission flow rows that
-// mirror oauth_user_sessions for the per-user-headers surface — the
-// resolver creates one when the inline-401 fires; the submit endpoint
-// deletes the row on success; the sweep worker reaps expired pending
-// rows. Lives in its own migration so it can land on DBs that already
-// applied migrationAddPerUserHeadersTables (which only created the
-// credentials table).
-func migrationAddPerUserHeadersFlowsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_per_user_header_flows_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasTable(&tables.TableMCPPerUserHeaderFlow{}) {
-				logger.Info("[configstore] %s: creating table TableMCPPerUserHeaderFlow", migrationName)
-				if err := mg.CreateTable(&tables.TableMCPPerUserHeaderFlow{}); err != nil {
-					return fmt.Errorf("create mcp_per_user_header_flows table: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasTable(&tables.TableMCPPerUserHeaderFlow{}) {
-				logger.Info("[configstore] %s: dropping table TableMCPPerUserHeaderFlow", migrationName)
-				if err := mg.DropTable(&tables.TableMCPPerUserHeaderFlow{}); err != nil {
-					return fmt.Errorf("drop mcp_per_user_header_flows: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_per_user_header_flows_table migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddCreatedByUserIDColumnForVirtualKeys adds the created_by_user_id column to the governance_virtual_keys table.
 func migrationAddCreatedByUserIDColumnForVirtualKeys(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_created_by_user_id_column_for_virtual_keys"
@@ -10766,83 +7890,6 @@ func migrationDropAzureAPIVersionColumn(ctx context.Context, db *gorm.DB, logger
 	return nil
 }
 
-// migrationAddMCPClientPendingOAuthConfigJSONColumn adds the
-// pending_oauth_config_json column to config_mcp_clients. It stashes the
-// inline `oauth_config` block declared in config.json for shared-OAuth MCP
-// clients (auth_type='oauth') that have not yet been authorized by an admin.
-// The column is read at admin-click time by the initiate-verification
-// endpoint and cleared by the complete-oauth endpoint once authorization
-// succeeds.
-func migrationAddMCPClientPendingOAuthConfigJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_pending_oauth_config_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			if !mig.HasColumn(&tables.TableMCPClient{}, "pending_oauth_config_json") {
-				if err := mig.AddColumn(&tables.TableMCPClient{}, "pending_oauth_config_json"); err != nil {
-					return fmt.Errorf("failed to add pending_oauth_config_json column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			if mig.HasColumn(&tables.TableMCPClient{}, "pending_oauth_config_json") {
-				if err := mig.DropColumn(&tables.TableMCPClient{}, "pending_oauth_config_json"); err != nil {
-					return fmt.Errorf("failed to drop pending_oauth_config_json column: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_client_pending_oauth_config_json_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientTokenExchangeJSONColumn adds the token_exchange_json
-// column to config_mcp_clients: the audience/scopes/fallback scoping block
-// for auth_type='token_exchange' clients. NULL for all other auth types; the
-// block carries no credentials.
-func migrationAddMCPClientTokenExchangeJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_token_exchange_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			if !mig.HasColumn(&tables.TableMCPClient{}, "token_exchange_json") {
-				if err := mig.AddColumn(&tables.TableMCPClient{}, "token_exchange_json"); err != nil {
-					return fmt.Errorf("failed to add token_exchange_json column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			if mig.HasColumn(&tables.TableMCPClient{}, "token_exchange_json") {
-				if err := mig.DropColumn(&tables.TableMCPClient{}, "token_exchange_json"); err != nil {
-					return fmt.Errorf("failed to drop token_exchange_json column: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_client_token_exchange_json_column migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationReAddAllowDirectKeysColumn re-adds the allow_direct_keys column to config_client.
 // The column was originally added then dropped in v1.5.0 when the direct key bypass feature
 // was removed. It is re-added here as the feature is being restored with header-gated access.
@@ -10871,38 +7918,6 @@ func migrationReAddAllowDirectKeysColumn(ctx context.Context, db *gorm.DB, logge
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running re_add_allow_direct_keys_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientTLSConfigColumn adds the tls_config_json column to the config_mcp_clients table.
-func migrationAddMCPClientTLSConfigColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_tls_config_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if !tx.Migrator().HasColumn(&tables.TableMCPClient{}, "tls_config_json") {
-				if err := tx.Exec("ALTER TABLE config_mcp_clients ADD COLUMN tls_config_json TEXT").Error; err != nil {
-					return fmt.Errorf("failed to add tls_config_json column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if tx.Migrator().HasColumn(&tables.TableMCPClient{}, "tls_config_json") {
-				if err := tx.Exec("ALTER TABLE config_mcp_clients DROP COLUMN tls_config_json").Error; err != nil {
-					return fmt.Errorf("failed to drop tls_config_json column: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_client_tls_config_json_column migration: %s", err.Error())
 	}
 	return nil
 }
@@ -11238,82 +8253,6 @@ func migrationNullLegacyCustomerBudgetID(ctx context.Context, db *gorm.DB, logge
 	return nil
 }
 
-// migrationAddMCPLibraryTable creates the mcp_library table, the synced-only
-// catalog of discoverable MCP servers. Rows are populated from the external MCP
-// library datasheet on a configurable interval (mirroring the model-pricing
-// sync), so this migration only stands up the schema; no rows exist yet.
-func migrationAddMCPLibraryTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_library_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasTable(&tables.TableMCPLibrary{}) {
-				logger.Info("[configstore] %s: creating table TableMCPLibrary", migrationName)
-				if err := mg.CreateTable(&tables.TableMCPLibrary{}); err != nil {
-					return fmt.Errorf("create mcp_library table: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasTable(&tables.TableMCPLibrary{}) {
-				logger.Info("[configstore] %s: dropping table TableMCPLibrary", migrationName)
-				if err := mg.DropTable(&tables.TableMCPLibrary{}); err != nil {
-					return fmt.Errorf("drop mcp_library table: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_library_table migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPLibraryConfigColumns adds the mcp_library_url and
-// mcp_library_sync_interval columns to framework_configs. These store the sync
-// source + interval for the MCP server library catalog, mirroring pricing_url /
-// pricing_sync_interval. Idempotent via HasColumn guards.
-func migrationAddMCPLibraryConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_library_config_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &tables.TableFrameworkConfig{}, "MCPLibraryURL"); err != nil {
-				return fmt.Errorf("add mcp_library_url column: %w", err)
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableFrameworkConfig{}, "MCPLibrarySyncInterval"); err != nil {
-				return fmt.Errorf("add mcp_library_sync_interval column: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableFrameworkConfig{}, "MCPLibraryURL"); err != nil {
-				return fmt.Errorf("drop mcp_library_url column: %w", err)
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableFrameworkConfig{}, "MCPLibrarySyncInterval"); err != nil {
-				return fmt.Errorf("drop mcp_library_sync_interval column: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_library_config_columns migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddLiveModelsSyncIntervalColumn adds the live_models_sync_interval
 // column to framework_configs. It stores how often each provider's list-models
 // response is re-fetched in the background, in seconds, with 0 meaning the
@@ -11341,57 +8280,6 @@ func migrationAddLiveModelsSyncIntervalColumn(ctx context.Context, db *gorm.DB, 
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running add_live_models_sync_interval_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPLibrarySourceColumns adds the source and deleted_at columns to
-// mcp_library. `source` marks a row as remote-synced or org-internal ("custom")
-// so the sync can protect custom rows; `deleted_at` is a soft-delete tombstone
-// so a user-hidden row (remote or custom) is never resurrected by the next sync.
-// Idempotent via HasColumn guards.
-func migrationAddMCPLibrarySourceColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_library_source_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPLibrary{}, "Source"); err != nil {
-				return fmt.Errorf("add source column: %w", err)
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPLibrary{}, "DeletedAt"); err != nil {
-				return fmt.Errorf("add deleted_at column: %w", err)
-			}
-			// Create indexes on the new columns (AddColumn doesn't create indexes
-			// from struct tags). `deleted_at IS NULL` is the leading predicate on
-			// every paginated library query, so the index avoids a full table scan.
-			if !mg.HasIndex(&tables.TableMCPLibrary{}, "idx_mcp_library_source") {
-				logger.Info("[configstore] %s: creating index Source on TableMCPLibrary", migrationName)
-				if err := mg.CreateIndex(&tables.TableMCPLibrary{}, "Source"); err != nil {
-					return fmt.Errorf("create index on mcp_library.source: %w", err)
-				}
-			}
-			if !mg.HasIndex(&tables.TableMCPLibrary{}, "idx_mcp_library_deleted_at") {
-				logger.Info("[configstore] %s: creating index DeletedAt on TableMCPLibrary", migrationName)
-				if err := mg.CreateIndex(&tables.TableMCPLibrary{}, "DeletedAt"); err != nil {
-					return fmt.Errorf("create index on mcp_library.deleted_at: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Rollback is intentionally a no-op: dropping `source` and
-			// `deleted_at` would destroy custom-row protection markers and
-			// soft-delete tombstones, letting the next sync resurrect rows the
-			// user hid. This migration is one-way.
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_mcp_library_source_columns migration: %s", err.Error())
 	}
 	return nil
 }
@@ -11482,178 +8370,6 @@ func migrationAddCustomerNameUniqueConstraint(ctx context.Context, db *gorm.DB, 
 			return tx.Exec("DROP INDEX IF EXISTS " + idxName).Error
 		},
 	})
-}
-
-func migrationAddOAuth2ServerTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth2_server_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{
-		{
-			ID: migrationName,
-			Migrate: func(tx *gorm.DB) error {
-				tx = tx.WithContext(ctx)
-				mg := tx.Migrator()
-				if !mg.HasColumn(&tables.TableClientConfig{}, "mcp_server_auth_mode") {
-					if err := mg.AddColumn(&tables.TableClientConfig{}, "MCPServerAuthMode"); err != nil {
-						return fmt.Errorf("add mcp_server_auth_mode column: %w", err)
-					}
-				}
-				if !mg.HasColumn(&tables.TableClientConfig{}, "oauth2_server_config_json") {
-					if err := mg.AddColumn(&tables.TableClientConfig{}, "OAuth2ServerConfigJSON"); err != nil {
-						return fmt.Errorf("add oauth2_server_config_json column: %w", err)
-					}
-				}
-				return nil
-			},
-			Rollback: func(tx *gorm.DB) error {
-				tx = tx.WithContext(ctx)
-				mg := tx.Migrator()
-				if mg.HasColumn(&tables.TableClientConfig{}, "oauth2_server_config_json") {
-					if err := mg.DropColumn(&tables.TableClientConfig{}, "OAuth2ServerConfigJSON"); err != nil {
-						return fmt.Errorf("drop oauth2_server_config_json column: %w", err)
-					}
-				}
-				if mg.HasColumn(&tables.TableClientConfig{}, "mcp_server_auth_mode") {
-					if err := mg.DropColumn(&tables.TableClientConfig{}, "MCPServerAuthMode"); err != nil {
-						return fmt.Errorf("drop mcp_server_auth_mode column: %w", err)
-					}
-				}
-				return nil
-			},
-		},
-	})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-func migrationAddOAuth2IssuanceTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth2_issuance_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasTable(&tables.TableOAuth2Client{}) {
-				if err := mg.CreateTable(&tables.TableOAuth2Client{}); err != nil {
-					return fmt.Errorf("create oauth2_clients table: %w", err)
-				}
-			}
-			if !mg.HasTable(&tables.TableOAuth2AuthorizeRequest{}) {
-				if err := mg.CreateTable(&tables.TableOAuth2AuthorizeRequest{}); err != nil {
-					return fmt.Errorf("create oauth2_authorize_requests table: %w", err)
-				}
-			}
-			if !mg.HasTable(&tables.TableOAuth2RefreshToken{}) {
-				if err := mg.CreateTable(&tables.TableOAuth2RefreshToken{}); err != nil {
-					return fmt.Errorf("create oauth2_refresh_tokens table: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			// Drop in reverse creation order.
-			if mg.HasTable(&tables.TableOAuth2RefreshToken{}) {
-				if err := mg.DropTable(&tables.TableOAuth2RefreshToken{}); err != nil {
-					return fmt.Errorf("drop oauth2_refresh_tokens table: %w", err)
-				}
-			}
-			if mg.HasTable(&tables.TableOAuth2AuthorizeRequest{}) {
-				if err := mg.DropTable(&tables.TableOAuth2AuthorizeRequest{}); err != nil {
-					return fmt.Errorf("drop oauth2_authorize_requests table: %w", err)
-				}
-			}
-			if mg.HasTable(&tables.TableOAuth2Client{}) {
-				if err := mg.DropTable(&tables.TableOAuth2Client{}); err != nil {
-					return fmt.Errorf("drop oauth2_clients table: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationWidenOAuth2ClientControlledColumns widens the OAuth2 authorization
-// server columns whose values come from the client, from varchar to text:
-// oauth2_authorize_requests.state and .scope, oauth2_clients.client_name and
-// .scope, and oauth2_refresh_tokens.scope (the registered scope flows unchanged
-// into the latter two). RFC 6749 §4.1.1 puts no bound on state and §3.3 none on
-// scope; RFC 7591 §2 bounds neither client_name nor scope. Clients do pack
-// connector context into state, and on Postgres the varchar(512) bound turned every such
-// /oauth2/authorize call into an opaque server_error — SQLite never enforced it.
-// The request header block (server.read_buffer_size) remains the effective upper
-// bound. Postgres-only: SQLite has no ALTER COLUMN TYPE and needs none. Fresh
-// installs already create these columns as text from the struct tags, so the
-// ALTERs are harmless no-ops there.
-func migrationWidenOAuth2ClientControlledColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "widen_oauth2_client_controlled_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if tx.Dialector.Name() != "postgres" {
-				return nil
-			}
-			targets := []struct {
-				model  any
-				table  string
-				column string
-			}{
-				{&tables.TableOAuth2AuthorizeRequest{}, "oauth2_authorize_requests", "state"},
-				{&tables.TableOAuth2AuthorizeRequest{}, "oauth2_authorize_requests", "scope"},
-				{&tables.TableOAuth2Client{}, "oauth2_clients", "client_name"},
-				{&tables.TableOAuth2Client{}, "oauth2_clients", "scope"},
-				{&tables.TableOAuth2RefreshToken{}, "oauth2_refresh_tokens", "scope"},
-			}
-			for _, target := range targets {
-				if !tx.Migrator().HasColumn(target.model, target.column) {
-					continue
-				}
-				stmt := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE TEXT", target.table, target.column)
-				if err := tx.Exec(stmt).Error; err != nil {
-					return fmt.Errorf("failed to widen column %s.%s: %w", target.table, target.column, err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-func migrationAddMCPClientToolExecutionTimeoutColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_tool_execution_timeout_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "tool_execution_timeout")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "tool_execution_timeout")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
 }
 
 // migrationAddSidekiqPartitioningKeyColumn adds the nullable partitioning_key column and
@@ -11798,72 +8514,6 @@ func migrationAddClientConfigEnforceVKObjectOwnershipColumn(ctx context.Context,
 		Rollback: func(tx *gorm.DB) error {
 			tx = tx.WithContext(ctx)
 			return dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "enforce_vk_object_ownership")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddClientConfigBifrostURLAndBifrostMCPColumns adds bifrost_url and
-// bifrost_mcp_allow_writes to config_client. Both are nullable or empty by default,
-// which reads as unset (no Bifrost URL, writes on), so existing rows need no
-// backfill and a rolled-back binary ignores the columns.
-func migrationAddClientConfigBifrostURLAndBifrostMCPColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_client_config_bifrost_url_and_bifrost_mcp_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	columns := []string{"bifrost_url", "bifrost_mcp_allow_writes"}
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, column := range columns {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, column := range columns {
-				if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddClientConfigMCPOpenAPIMaxSpecMBColumn adds mcp_openapi_max_spec_mb to
-// config_client. It defaults to 0, which reads as the built-in 32 MiB limit, so existing rows
-// need no backfill and a rolled-back binary ignores the column.
-func migrationAddClientConfigMCPOpenAPIMaxSpecMBColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_client_config_mcp_openapi_max_spec_mb_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_openapi_max_spec_mb")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "mcp_openapi_max_spec_mb")
 		},
 	}})
 	if err := m.Migrate(); err != nil {
@@ -12090,30 +8740,6 @@ func migrationAddSidekiqKindStatusCreatedIndex(ctx context.Context, db *gorm.DB,
 	return nil
 }
 
-// migrationAddOauthConfigResourceColumn adds the RFC 8707 resource indicator to
-// outbound MCP OAuth configs so authorization, token exchange, and refresh stay
-// bound to the same protected MCP resource.
-func migrationAddOauthConfigResourceColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth_config_resource_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableOauthConfig{}, "resource")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableOauthConfig{}, "resource")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
 // migrationAddBudgetResetConfigColumn adds the reset_config_json column to
 // governance_budgets.
 //
@@ -12230,572 +8856,6 @@ func migrationAddPricingOverrideUserIDColumn(ctx context.Context, db *gorm.DB, l
 		return fmt.Errorf("error while running pricing override user_id column migration: %s", err.Error())
 	}
 	return nil
-}
-
-// migrationMergeOauthTokenTables introduces mcp_oauth_tokens, a new table
-// that from this point on is the single home for every holder of an MCP
-// OAuth credential — the shared client credential (auth_mode='shared') and
-// every per-identity credential (auth_mode 'user'|'vk'|'session') alike —
-// instead of splitting shared and per-user credentials across the two older
-// tables ('oauth_tokens', 'oauth_user_tokens') with diverging maturity.
-//
-// This does not ALTER either older table. It creates mcp_oauth_tokens fresh
-// (already carrying every column + constraint TableMCPOauthToken declares,
-// so no nullable-first/backfill/tighten dance is needed the way an in-place
-// ALTER would require), then populates it with two INSERT...SELECT passes —
-// one deriving shared rows out of oauth_tokens' old shared-only shape, one
-// copying oauth_user_tokens' per-identity rows field-for-field.
-//
-// oauth_tokens and oauth_user_tokens are left completely untouched and
-// undropped by this migration. Neither is read or written by any code path
-// as of this migration — every current read/write site targets
-// mcp_oauth_tokens exclusively. Both older tables are kept solely as a
-// rollback safety net (dropping them here would make this migration
-// irreversible for anyone who needs to back out) and will be dropped in a
-// future MAJOR version once the new table has proven itself in production.
-func migrationMergeOauthTokenTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "merge_oauth_token_tables"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// 1) Create mcp_oauth_tokens if it doesn't already exist. Unlike
-			// oauth_tokens/oauth_user_tokens, no earlier bootstrap step ever
-			// creates this table under this name — mcp_oauth_tokens is wholly
-			// new as of this migration, so this check is normally true on
-			// every deployment that reaches this step. The two INSERT...SELECT
-			// passes below then populate it from whatever legacy data happens
-			// to be present.
-			if !mg.HasTable(&tables.TableMCPOauthToken{}) {
-				logger.Info("[configstore] %s: creating table TableMCPOauthToken", migrationName)
-				if err := mg.CreateTable(&tables.TableMCPOauthToken{}); err != nil {
-					return fmt.Errorf("create mcp_oauth_tokens table: %w", err)
-				}
-			}
-
-			// 2) Backfill from the old shared-only oauth_tokens table
-			// (TableOauthToken — still created on a fresh install by the
-			// historical bootstrap migrations, just empty in that case, same
-			// as oauth_user_tokens below). The bulk copy itself still goes
-			// through raw table/column references rather than TableOauthToken:
-			// GORM has no native cross-table INSERT...SELECT, and the target
-			// column set diverges from the source struct's field set (derived
-			// auth_mode/mcp_client_id/oauth_config_id, see below), so a
-			// struct-based read-then-write loop would just be a slower,
-			// more allocation-heavy version of the same SQL. auth_mode='shared'
-			// and status='active' are derived rather than read, matching what
-			// every row in this table has always implicitly meant — oauth_tokens
-			// held nothing else. Deriving oauth_config_id and mcp_client_id
-			// inline (rather than via a follow-up UPDATE, as an in-place ALTER
-			// approach would need) is possible because both are pure functions
-			// of the source row: oauth_config_id from the oauth_configs row
-			// that still points at this token via the legacy TokenID shortcut
-			// (retired in a later migration, once every read site moves off
-			// it), and mcp_client_id by walking that same join one step
-			// further to the MCP client. A row whose oauth_config was deleted
-			// before the DeleteMCPClientConfig orphan-cleanup fix (elsewhere
-			// in this PR) has no derivable client/config and gets '' for both
-			// rather than being excluded — see the MCPClientID field comment
-			// on TableMCPOauthToken.
-			if mg.HasTable(&tables.TableOauthToken{}) {
-				// oauth_configs.token_id (the legacy FK shortcut this
-				// derivation reads) is itself dropped by a later migration in
-				// this chain (migrationDropOauthConfigTokenIDColumn). A fresh
-				// install's earlier CreateTable(&tables.TableOauthConfig{})
-				// call already builds the table from today's TokenID-free Go
-				// struct, so the column never exists at all on such an
-				// install — same guard shape (HasColumn before referencing a
-				// since-retired column in raw SQL) as
-				// migrationWidenEncryptedVarcharColumns uses for
-				// code_verifier elsewhere in this file, for the identical
-				// reason. When the column is absent there is nothing to
-				// derive mcp_client_id/oauth_config_id from; both fall back
-				// to '', the same tolerated-empty shape the COALESCE below
-				// already produces for a row whose oauth_config was deleted
-				// or never linked (see the MCPClientID field comment on
-				// TableMCPOauthToken).
-				backfillSQL := `
-					INSERT INTO mcp_oauth_tokens (
-						id, auth_mode, mcp_client_id, oauth_config_id, session_id,
-						virtual_key_id, user_id, status, access_token, refresh_token,
-						token_type, expires_at, scopes, last_refreshed_at,
-						encryption_status, created_at, updated_at
-					)
-					SELECT
-						oauth_tokens.id,
-						'shared',
-						COALESCE((
-							SELECT config_mcp_clients.client_id FROM config_mcp_clients
-							JOIN oauth_configs ON oauth_configs.id = config_mcp_clients.oauth_config_id
-							WHERE oauth_configs.token_id = oauth_tokens.id
-						), ''),
-						COALESCE((
-							SELECT oauth_configs.id FROM oauth_configs
-							WHERE oauth_configs.token_id = oauth_tokens.id
-						), ''),
-						'',
-						NULL,
-						NULL,
-						'active',
-						oauth_tokens.access_token,
-						oauth_tokens.refresh_token,
-						oauth_tokens.token_type,
-						oauth_tokens.expires_at,
-						oauth_tokens.scopes,
-						oauth_tokens.last_refreshed_at,
-						oauth_tokens.encryption_status,
-						oauth_tokens.created_at,
-						oauth_tokens.updated_at
-					FROM oauth_tokens
-					WHERE NOT EXISTS (SELECT 1 FROM mcp_oauth_tokens WHERE mcp_oauth_tokens.id = oauth_tokens.id)
-				`
-				if !mg.HasColumn(&tables.TableOauthConfig{}, "token_id") {
-					backfillSQL = `
-						INSERT INTO mcp_oauth_tokens (
-							id, auth_mode, mcp_client_id, oauth_config_id, session_id,
-							virtual_key_id, user_id, status, access_token, refresh_token,
-							token_type, expires_at, scopes, last_refreshed_at,
-							encryption_status, created_at, updated_at
-						)
-						SELECT
-							oauth_tokens.id,
-							'shared',
-							'',
-							'',
-							'',
-							NULL,
-							NULL,
-							'active',
-							oauth_tokens.access_token,
-							oauth_tokens.refresh_token,
-							oauth_tokens.token_type,
-							oauth_tokens.expires_at,
-							oauth_tokens.scopes,
-							oauth_tokens.last_refreshed_at,
-							oauth_tokens.encryption_status,
-							oauth_tokens.created_at,
-							oauth_tokens.updated_at
-						FROM oauth_tokens
-						WHERE NOT EXISTS (SELECT 1 FROM mcp_oauth_tokens WHERE mcp_oauth_tokens.id = oauth_tokens.id)
-					`
-				}
-				if err := tx.Exec(backfillSQL).Error; err != nil {
-					return fmt.Errorf("backfill mcp_oauth_tokens from oauth_tokens: %w", err)
-				}
-			}
-
-			// 3) Copy every oauth_user_tokens row into mcp_oauth_tokens,
-			// field for field — again via raw table references (the column
-			// set here matches TableOauthUserToken's one-for-one, but a
-			// struct-based read-all/write-all loop still buys nothing over a
-			// single SQL statement for what is fundamentally a bulk copy).
-			// Guarded on existence for the same from-scratch-install reason
-			// as step 2 (oauth_user_tokens IS still created on a fresh
-			// install by the historical migration that first introduced it,
-			// just empty). No dedupe pass is needed for these rows the way
-			// step 4 below dedupes the shared rows from step 2: the (mode,
-			// identity, mcp_client_id) uniqueness this copy relies on was
-			// already enforced on oauth_user_tokens itself by the partial
-			// unique indexes migrationAddOAuthAuthModeColumns created earlier
-			// in this migration chain, so a straight field-for-field copy
-			// can't introduce a collision that didn't already exist there.
-			if mg.HasTable(&tables.TableOauthUserToken{}) {
-				if err := tx.Exec(`
-					INSERT INTO mcp_oauth_tokens (
-						id, auth_mode, mcp_client_id, oauth_config_id, session_id,
-						virtual_key_id, user_id, status, access_token, refresh_token,
-						token_type, expires_at, scopes, last_refreshed_at,
-						encryption_status, created_at, updated_at
-					)
-					SELECT
-						id, auth_mode, mcp_client_id, oauth_config_id, session_id,
-						virtual_key_id, user_id, status, access_token, refresh_token,
-						token_type, expires_at, scopes, last_refreshed_at,
-						encryption_status, created_at, updated_at
-					FROM oauth_user_tokens
-					WHERE NOT EXISTS (SELECT 1 FROM mcp_oauth_tokens WHERE mcp_oauth_tokens.id = oauth_user_tokens.id)
-				`).Error; err != nil {
-					return fmt.Errorf("copy oauth_user_tokens into mcp_oauth_tokens: %w", err)
-				}
-			}
-
-			// 4) Dedupe shared-mode mcp_client_id collisions the backfill in
-			// step 2 may have introduced, before the partial unique index
-			// created in step 5 below can reject them. Normally there's at
-			// most one 'shared' row per client (oauth_configs.token_id is
-			// 1:1 with the client's oauth_config_id), but the
-			// shared-client-delete orphan leak fixed elsewhere in this PR
-			// (DeleteMCPClientConfig never cleaned up the shared
-			// oauth_tokens row) means a stale orphaned row can share
-			// mcp_client_id with a since-recreated client's current row.
-			// Keep the newest row per group (highest updated_at, ties
-			// broken by id) so the live credential survives, mirroring the
-			// dedupe pass in migrationAddOAuthAuthModeColumns above. This
-			// must run before the partial unique indexes are created —
-			// creating them first (as an earlier version of this migration
-			// did) would let the very collision this step exists to clean
-			// up abort the INSERT in step 2 and roll back the whole
-			// migration transaction.
-			if err := tx.Exec(`
-				DELETE FROM mcp_oauth_tokens
-				WHERE id IN (
-					SELECT id FROM (
-						SELECT id,
-							ROW_NUMBER() OVER (
-								PARTITION BY mcp_client_id
-								ORDER BY updated_at DESC, id DESC
-							) AS rn
-						FROM mcp_oauth_tokens
-						WHERE auth_mode = 'shared' AND mcp_client_id IS NOT NULL AND mcp_client_id != ''
-					) ranked
-					WHERE rn > 1
-				)
-			`).Error; err != nil {
-				return fmt.Errorf("dedupe shared mcp_oauth_tokens by mcp_client_id: %w", err)
-			}
-
-			// 5) Partial unique indexes — one per auth_mode. Created last,
-			// after the backfills and the dedupe pass above, so the
-			// collision step 4 cleans up can't abort those INSERTs. 'shared'
-			// is new (nothing enforced one-shared-token-per-client before
-			// this table existed, since the link only ever existed
-			// one-directionally via oauth_configs.token_id); user/vk/session
-			// mirror the scheme migrationAddOAuthAuthModeColumns set up on
-			// oauth_user_tokens.
-			partialUniques := []string{
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_shared_mcp
-					ON mcp_oauth_tokens (mcp_client_id)
-					WHERE auth_mode = 'shared' AND mcp_client_id IS NOT NULL AND mcp_client_id != ''`,
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_user_mcp
-					ON mcp_oauth_tokens (user_id, mcp_client_id)
-					WHERE auth_mode = 'user' AND user_id IS NOT NULL AND user_id != ''`,
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_vk_mcp
-					ON mcp_oauth_tokens (virtual_key_id, mcp_client_id)
-					WHERE auth_mode = 'vk' AND virtual_key_id IS NOT NULL AND virtual_key_id != ''`,
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_session_mcp
-					ON mcp_oauth_tokens (session_id, mcp_client_id)
-					WHERE auth_mode = 'session' AND session_id IS NOT NULL AND session_id != ''`,
-			}
-			for _, stmt := range partialUniques {
-				if err := tx.Exec(stmt).Error; err != nil {
-					return fmt.Errorf("create partial unique index on mcp_oauth_tokens: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Deliberately does NOT drop mcp_oauth_tokens. oauth_tokens and
-			// oauth_user_tokens were never written to by Migrate above, so
-			// rolling back the schema doesn't need to repair them — but
-			// every OAuth read/write path targets mcp_oauth_tokens
-			// exclusively from this migration onward, so any token created
-			// or refreshed after it ran lives only in this table. Dropping
-			// it here would silently destroy those credentials and force
-			// every affected holder to re-authorize. Leaving the table in
-			// place makes this rollback schema-only, not fully symmetric
-			// with Migrate, but it's the non-destructive choice.
-			logger.Info("[configstore] %s: rollback leaves table TableMCPOauthToken in place (see comment)", migrationName)
-			return nil
-		},
-	})
-}
-
-// migrationCreateMCPOauthFlowsTable creates mcp_oauth_flows, the table
-// backing TableMCPOauthFlow, and backfills it from the legacy
-// oauth_user_sessions table (TableOauthUserSession). Same overall shape as
-// migrationMergeOauthTokenTables above, simplified: there is only one source
-// table here, and flow_mode already exists on it (added by an earlier
-// migration), so nothing needs deriving the way auth_mode did for the
-// shared-token backfill.
-func migrationCreateMCPOauthFlowsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "create_mcp_oauth_flows_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// 1) Create mcp_oauth_flows if it doesn't already exist. Wholly
-			// new as of this migration, same as mcp_oauth_tokens before it —
-			// this check is normally true on every deployment that reaches
-			// this step. TableMCPOauthFlow.State now declares
-			// uniqueIndex:idx_mcp_oauth_flows_state, so CreateTable builds the
-			// unique index before the backfill in step 2. That cannot collide:
-			// oauth_user_sessions.state carries its own uniqueIndex, so a
-			// straight copy of already-distinct values into an empty table
-			// stays distinct. The tag used to declare a plain index under the
-			// same name, which turned step 3 into a no-op and left state
-			// non-unique; migrationMakeMCPOauthFlowsStateUnique repairs those
-			// databases.
-			if !mg.HasTable(&tables.TableMCPOauthFlow{}) {
-				logger.Info("[configstore] %s: creating table TableMCPOauthFlow", migrationName)
-				if err := mg.CreateTable(&tables.TableMCPOauthFlow{}); err != nil {
-					return fmt.Errorf("create mcp_oauth_flows table: %w", err)
-				}
-			}
-
-			// 2) Backfill from oauth_user_sessions — a straight field-for-
-			// field copy. Raw table references rather than
-			// TableOauthUserSession model reads: GORM has no native
-			// cross-table INSERT...SELECT, and this is a bulk copy where a
-			// struct-based read-all/write-all loop buys nothing over one SQL
-			// statement. Guarded on table existence for the same
-			// fresh-install reason as mcp_oauth_tokens's backfill
-			// (oauth_user_sessions is still created — empty — by the
-			// historical migration that introduced it).
-			if mg.HasTable(&tables.TableOauthUserSession{}) {
-				if err := tx.Exec(`
-					INSERT INTO mcp_oauth_flows (
-						id, mcp_client_id, oauth_config_id, state, redirect_uri,
-						code_verifier, session_id, virtual_key_id, user_id,
-						flow_mode, status, encryption_status, expires_at,
-						created_at, updated_at
-					)
-					SELECT
-						id, mcp_client_id, oauth_config_id, state, redirect_uri,
-						code_verifier, session_id, virtual_key_id, user_id,
-						flow_mode, status, encryption_status, expires_at,
-						created_at, updated_at
-					FROM oauth_user_sessions
-					WHERE NOT EXISTS (SELECT 1 FROM mcp_oauth_flows WHERE mcp_oauth_flows.id = oauth_user_sessions.id)
-				`).Error; err != nil {
-					return fmt.Errorf("backfill mcp_oauth_flows from oauth_user_sessions: %w", err)
-				}
-			}
-
-			// 3) Unique index on state. A no-op when CreateTable already built
-			// it from the struct tag; see the note in step 1.
-			if err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_oauth_flows_state ON mcp_oauth_flows (state)`).Error; err != nil {
-				return fmt.Errorf("create unique index on mcp_oauth_flows.state: %w", err)
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			// mcp_oauth_flows is wholly new as of this migration, so rolling
-			// back simply drops it — oauth_user_sessions was never written
-			// to by Migrate above and needs no repair.
-			if mg.HasTable(&tables.TableMCPOauthFlow{}) {
-				logger.Info("[configstore] %s: dropping table TableMCPOauthFlow", migrationName)
-				if err := mg.DropTable(&tables.TableMCPOauthFlow{}); err != nil {
-					return fmt.Errorf("drop mcp_oauth_flows table: %w", err)
-				}
-			}
-
-			return nil
-		},
-	})
-}
-
-// migrationDropOauthConfigPKCEColumns drops the CSRF-state and PKCE columns
-// (state, code_verifier, code_challenge, expires_at) from oauth_configs.
-// Once InitiateOAuthFlow/CompleteOAuthFlow write these onto mcp_oauth_flows
-// instead (see the preceding migration and the application-code change that
-// shipped alongside it), nothing populates them on oauth_configs any
-// longer — and state/expires_at are NOT NULL at the DB level, so leaving the
-// columns in place would fail every future INSERT into oauth_configs the
-// moment the Go struct stops setting them. Dropped outright rather than just
-// relaxing the NOT NULL constraints and the unique index on state: nothing
-// reads these columns once the write side stops, so keeping them around as
-// dead weight buys nothing and only adds confusion for anyone inspecting the
-// table later. dropColumnIfExists (see its doc comment) handles both
-// Postgres and SQLite, including a column that still carries an index —
-// Postgres drops a dependent index automatically as part of DROP COLUMN, and
-// GORM's own SQLite migrator (the non-Postgres fallback path) rebuilds the
-// table without the column and its index rather than emitting a bare ALTER
-// TABLE DROP COLUMN (which SQLite refuses when an index still references the
-// column being dropped).
-//
-// The preceding migration only backfills mcp_oauth_flows from
-// oauth_user_sessions; any admin-mode flow with its state/code_verifier
-// still on oauth_configs at upgrade time is not carried forward, so an
-// in-flight admin authorize attempt spanning the upgrade fails its callback
-// with "flow not found" and must be re-initiated. That is a reasonable
-// tradeoff for the short window these columns typically live in, but it is
-// a real forward-migration consequence, not just a rollback non-issue.
-func migrationDropOauthConfigPKCEColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_oauth_config_pkce_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db.WithContext(ctx), migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			if !mg.HasTable(&tables.TableOauthConfig{}) {
-				return nil
-			}
-
-			for _, column := range []string{"state", "code_verifier", "code_challenge", "expires_at"} {
-				if err := dropColumnIfExists(tx, logger, &tables.TableOauthConfig{}, column); err != nil {
-					return fmt.Errorf("drop oauth_configs.%s column: %w", column, err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Forward-only: the dropped columns carried no data worth
-			// resurrecting. CSRF state and PKCE verifiers only ever mattered
-			// for the lifetime of a single in-flight flow (now tracked on
-			// mcp_oauth_flows instead, untouched by this migration), and
-			// expires_at's meaning moved there too. Re-adding empty columns
-			// would not restore anything a rollback needs.
-			return nil
-		},
-	}})
-	// SQLite workaround — same reasoning as migrationAddCustomerBudgetsToBudgetsTable:
-	// GORM's SQLite DropColumn rebuilds oauth_configs via DROP+RENAME, which fails
-	// when config_mcp_clients.oauth_config_id holds an FK into it and foreign_keys is
-	// ON. PRAGMA foreign_keys cannot change inside a transaction, so disable it on a
-	// pinned single connection before the migrator opens its transaction, then restore it.
-	if db.Dialector.Name() == "sqlite" {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return fmt.Errorf("failed to get underlying sql.DB: %w", err)
-		}
-		prevMaxOpenConns := sqlDB.Stats().MaxOpenConnections
-		sqlDB.SetMaxOpenConns(1)
-		defer sqlDB.SetMaxOpenConns(prevMaxOpenConns)
-
-		if err := db.Exec("PRAGMA foreign_keys = OFF").Error; err != nil {
-			return fmt.Errorf("failed to disable SQLite foreign keys: %w", err)
-		}
-		defer func() {
-			if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
-				log.Fatalf("[Migration] FATAL: failed to re-enable SQLite foreign keys: %v", err)
-			}
-		}()
-	}
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running drop_oauth_config_pkce_columns migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationDropOauthConfigTokenIDColumn drops the token_id column from
-// oauth_configs. TokenID was an FK shortcut onto the single shared-mode
-// token row, populated once by CompleteOAuthFlow and read by every
-// shared-token lookup thereafter. Once every read site resolves the token
-// row via (oauth_config_id, auth_mode='shared') on mcp_oauth_tokens instead
-// (see the application-code change that shipped alongside this migration),
-// nothing populates or reads token_id any longer. Unlike the PKCE columns
-// dropped by the preceding migration, token_id was never NOT NULL at the DB
-// level, so there's no constraint to relax first — dropping it outright is
-// safe the moment the write side stops.
-func migrationDropOauthConfigTokenIDColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_oauth_config_token_id_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db.WithContext(ctx), migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-
-			if !mg.HasTable(&tables.TableOauthConfig{}) {
-				return nil
-			}
-
-			return dropColumnIfExists(tx, logger, &tables.TableOauthConfig{}, "token_id")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Forward-only: token_id was a pure FK shortcut with no data
-			// meaning of its own once the token row is reachable via
-			// (oauth_config_id, auth_mode) on mcp_oauth_tokens — re-adding an
-			// empty column would not restore anything a rollback needs.
-			return nil
-		},
-	}})
-	// SQLite workaround — same reasoning as migrationDropOauthConfigPKCEColumns:
-	// GORM's SQLite DropColumn rebuilds oauth_configs via DROP+RENAME, which fails
-	// when config_mcp_clients.oauth_config_id holds an FK into it and foreign_keys is
-	// ON. PRAGMA foreign_keys cannot change inside a transaction, so disable it on a
-	// pinned single connection before the migrator opens its transaction, then restore it.
-	if db.Dialector.Name() == "sqlite" {
-		sqlDB, err := db.DB()
-		if err != nil {
-			return fmt.Errorf("failed to get underlying sql.DB: %w", err)
-		}
-		prevMaxOpenConns := sqlDB.Stats().MaxOpenConnections
-		sqlDB.SetMaxOpenConns(1)
-		defer sqlDB.SetMaxOpenConns(prevMaxOpenConns)
-
-		if err := db.Exec("PRAGMA foreign_keys = OFF").Error; err != nil {
-			return fmt.Errorf("failed to disable SQLite foreign keys: %w", err)
-		}
-		defer func() {
-			if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
-				log.Fatalf("[Migration] FATAL: failed to re-enable SQLite foreign keys: %v", err)
-			}
-		}()
-	}
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running drop_oauth_config_token_id_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPAdminAuthModeIndexes adds partial unique indexes for
-// auth_mode='admin' rows on mcp_oauth_tokens and mcp_per_user_header_credentials,
-// mirroring each table's existing partial unique indexes for its other
-// auth_mode values (see idx_mcp_oauth_tokens_shared_mcp and the
-// idx_mcp_per_user_header_credentials_{user,vk,session}_mcp trio). An
-// 'admin'-mode row is the retained bootstrap-verification credential for a
-// per_user_oauth/per_user_headers MCP client — exactly one per mcp_client_id,
-// used only for periodic tool-discovery refresh, never real end-user calls.
-func migrationAddMCPAdminAuthModeIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_admin_auth_mode_indexes"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasTable(&tables.TableMCPOauthToken{}) {
-				if err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_admin_mcp
-					ON mcp_oauth_tokens (mcp_client_id)
-					WHERE auth_mode = 'admin' AND mcp_client_id IS NOT NULL AND mcp_client_id != ''`).Error; err != nil {
-					return fmt.Errorf("create admin partial unique index on mcp_oauth_tokens: %w", err)
-				}
-			}
-			if mg.HasTable(&tables.TableMCPPerUserHeaderCredential{}) {
-				if err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_per_user_header_credentials_admin_mcp
-					ON mcp_per_user_header_credentials (mcp_client_id)
-					WHERE auth_mode = 'admin' AND mcp_client_id IS NOT NULL AND mcp_client_id != ''`).Error; err != nil {
-					return fmt.Errorf("create admin partial unique index on mcp_per_user_header_credentials: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasTable(&tables.TableMCPOauthToken{}) {
-				if err := tx.Exec(`DROP INDEX IF EXISTS idx_mcp_oauth_tokens_admin_mcp`).Error; err != nil {
-					return fmt.Errorf("drop admin partial unique index on mcp_oauth_tokens: %w", err)
-				}
-			}
-			if mg.HasTable(&tables.TableMCPPerUserHeaderCredential{}) {
-				if err := tx.Exec(`DROP INDEX IF EXISTS idx_mcp_per_user_header_credentials_admin_mcp`).Error; err != nil {
-					return fmt.Errorf("drop admin partial unique index on mcp_per_user_header_credentials: %w", err)
-				}
-			}
-			return nil
-		},
-	})
 }
 
 // migrationAddBedrockEndpointsColumns adds the bedrock_endpoints_json and
@@ -13255,44 +9315,6 @@ func migrationAddModelRouterSuggestionTierColumns(ctx context.Context, db *gorm.
 	return nil
 }
 
-// migrationAddMCPClientMetadataURLColumns adds the hosted Client ID Metadata Document URL setting and
-// the marker for oauth configs whose client_id is Bifrost's own document. Existing configs stay unmarked
-// and are recognised by the document's path under their callback base.
-func migrationAddMCPClientMetadataURLColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_metadata_url_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	columns := []struct {
-		model  any
-		column string
-	}{
-		{&tables.TableClientConfig{}, "mcp_client_metadata_url"},
-		{&tables.TableOauthConfig{}, "client_metadata_document"},
-	}
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, c := range columns {
-				if err := addColumnIfNotExists(tx, logger, c.model, c.column); err != nil {
-					return fmt.Errorf("failed to add %s column: %w", c.column, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("%s is non-rollbackable: dropping it would discard the hosted document URL and which configs use Bifrost's document", migrationName)
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
 func appendMissingDefaultComplexityExemplars(config *ComplexityAnalyzerConfig, defaults ComplexityEditableKeywordConfig) int {
 	type tierPhrases struct {
 		values   *[]string
@@ -13532,86 +9554,6 @@ func migrationAddImageSizeQualityPricingColumns(ctx context.Context, db *gorm.DB
 	return nil
 }
 
-// migrationDropLegacyOauthUserFKConstraints drops the real foreign key constraints
-// GORM created on oauth_user_tokens and oauth_user_sessions for their MCPClient and
-// VirtualKey preload relations. Both relations were always meant to be display-only
-// (their comments said so from the start), but the struct tags never carried
-// "-:migration" (or even "constraint:-") to tell GORM that, so
-// migrationAddPerUserOAuthTables's mg.CreateTable created a real
-// fk_oauth_user_tokens_mcp_client / fk_oauth_user_tokens_virtual_key /
-// fk_oauth_user_sessions_mcp_client / fk_oauth_user_sessions_virtual_key constraint
-// on every deployment that ever ran it.
-//
-// This went unnoticed for a long time because DeleteMCPClientConfig used to
-// explicitly delete matching oauth_user_tokens (and, before the flow-table merge,
-// oauth_user_sessions) rows before deleting the client, so the constraint was never
-// actually violated in practice. migrationMergeOauthTokenTables (and the flow-table
-// merge before it) replaced that with a delete against the new mcp_oauth_tokens /
-// mcp_oauth_flows tables only, reasoning that the old tables are "no longer read or
-// written by any application code" — true for new activity, but the old tables'
-// pre-merge rows were only ever copied forward, never deleted from the source (see
-// that migration's own comment: both older tables are "left completely untouched
-// and undropped... kept solely as a rollback safety net"). Any MCP client that had
-// per-user OAuth activity before its merge migration ran keeps an orphaned-but-still-
-// enforced row in the old table, and deleting that client now fails outright on the
-// live constraint.
-//
-// This migration removes only the constraints, not the tables or their rows: the
-// rollback safety net the merge migrations already committed to stays intact, this
-// just stops it from blocking an otherwise-ordinary delete. The struct tags are
-// fixed alongside this (see TableOauthUserToken/TableOauthUserSession) so a fresh
-// install never creates these constraints in the first place.
-func migrationDropLegacyOauthUserFKConstraints(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_legacy_oauth_user_fk_constraints"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	type constraintTarget struct {
-		model any
-		field string
-	}
-	targets := []constraintTarget{
-		{&tables.TableOauthUserToken{}, "MCPClient"},
-		{&tables.TableOauthUserToken{}, "VirtualKey"},
-		{&tables.TableOauthUserSession{}, "MCPClient"},
-		{&tables.TableOauthUserSession{}, "VirtualKey"},
-	}
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			for _, target := range targets {
-				if !mig.HasConstraint(target.model, target.field) {
-					continue
-				}
-				if err := mig.DropConstraint(target.model, target.field); err != nil {
-					return fmt.Errorf("failed to drop %s constraint on %T: %w", target.field, target.model, err)
-				}
-			}
-			return nil
-		},
-		// Recreates the constraints the forward migration dropped. Schema-only:
-		// neither direction touches a row in either table.
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mig := tx.Migrator()
-			for _, target := range targets {
-				if mig.HasConstraint(target.model, target.field) {
-					continue
-				}
-				if err := mig.CreateConstraint(target.model, target.field); err != nil {
-					return fmt.Errorf("failed to recreate %s constraint on %T: %w", target.field, target.model, err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %s", migrationName, err.Error())
-	}
-	return nil
-}
-
 // migrationAddProviderJobKindColumns generalises batch_jobs from a batch-only
 // table to one holding every provider-side job kind.
 //
@@ -13839,32 +9781,6 @@ func postgresIndexIsValid(tx *gorm.DB, table, index string) (bool, error) {
 		WHERE pc.relname = ? AND ic.relname = ? AND pg_catalog.pg_table_is_visible(pc.oid)
 	`, table, index).Scan(&valid).Error
 	return valid, err
-}
-
-// migrationAddMCPOauthTokenStatusReasonColumn adds mcp_oauth_tokens.status_reason:
-// the explanation behind a row's Status leaving 'active' (the provider's
-// refresh rejection, a credential rotation, a failed admin exchange), which
-// the credential block and the client's connection-failure record surface
-// so an admin can tell a revoked grant from a misconfigured client. Nullable
-// text, no backfill: rows that are already needs_reauth simply have no
-// recorded reason until their next transition.
-func migrationAddMCPOauthTokenStatusReasonColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_oauth_token_status_reason_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableMCPOauthToken{}, "status_reason")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableMCPOauthToken{}, "status_reason")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running %s migration: %s", migrationName, err.Error())
-	}
-	return nil
 }
 
 // migrationAddDatabricksKeyConfigColumns adds the Databricks per-key columns: the workspace
@@ -14564,65 +10480,6 @@ func migrationAddTTFTTimeoutMsColumnToRoutingTargets(ctx context.Context, db *go
 	return nil
 }
 
-// migrationAddMCPDiscoveredInstructionsColumn adds the discovered_instructions column to the
-// MCP client table. Per-call auth types (per-user OAuth, per-user headers, token exchange) hold
-// no persistent connection, so — exactly like discovered_tools_json beside it — their
-// instructions have to survive a restart here or be lost until the next admin verification.
-func migrationAddMCPDiscoveredInstructionsColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_discovered_instructions_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "discovered_instructions")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "discovered_instructions")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp discovered instructions migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPInstructionCapColumns adds the two byte bounds on forwarded MCP instructions to
-// the client config table. Both default to 0, which the core reads as "use the built-in default",
-// so existing rows keep exactly the limits they ran with before.
-func migrationAddMCPInstructionCapColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_instruction_cap_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range []string{"mcp_max_instructions_per_client", "mcp_max_instructions_total"} {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range []string{"mcp_max_instructions_per_client", "mcp_max_instructions_total"} {
-				if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp instruction cap migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddWebSearchCostPerRequestColumn adds web_search_cost_per_request, seeded from search_context_cost_per_query.
 func migrationAddWebSearchCostPerRequestColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_web_search_cost_per_request_column"
@@ -14705,109 +10562,6 @@ func migrationMovePricingOverrideSearchContextToWebSearch(ctx context.Context, d
 		return fmt.Errorf("error running %s migration: %s", migrationName, err.Error())
 	}
 	return nil
-}
-
-// migrationAddMCPClientMaxInstructionsLengthColumn adds the per-client instruction byte cap to
-// the MCP client table. Defaults to 0, which means "use the global cap", so existing clients
-// keep exactly the limit they ran with before.
-func migrationAddMCPClientMaxInstructionsLengthColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_max_instructions_length_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "max_instructions_length")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "max_instructions_length")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp client max instructions length migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientRequirePublicTargetColumn adds the flag recording that an MCP client
-// was registered over the management API with no credential check, which restricts every
-// later dial to public addresses. Defaults to false: existing rows keep the dial policy they
-// ran with, since nothing on record says how they were registered.
-func migrationAddMCPClientRequirePublicTargetColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_require_public_target_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "require_public_target")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "require_public_target")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp client require public target migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPClientOpenAPISpecColumn adds config_mcp_clients.openapi_spec, the raw
-// OpenAPI document of an openapi-type client. Plaintext (no secrets) and large, hence a
-// column of its own. NULL/empty for every other connection type, so no backfill.
-func migrationAddMCPClientOpenAPISpecColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_openapi_spec_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "openapi_spec")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return rollbackMCPClientOpenAPISpecColumn(tx.WithContext(ctx))
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp client openapi spec migration: %s", err.Error())
-	}
-	return nil
-}
-
-func rollbackMCPClientOpenAPISpecColumn(*gorm.DB) error {
-	return fmt.Errorf("add_mcp_client_openapi_spec_column is non-rollbackable: dropping openapi_spec would permanently delete the only stored copy of every openapi client's document; the column is additive and older binaries safely ignore it")
-}
-
-// migrationAddMCPClientOpenAPIConfigJSONColumn adds config_mcp_clients.openapi_config_json:
-// the base URL, security credentials, options and server-computed metadata of an
-// openapi-type client, encrypted at rest like the other credential-bearing columns.
-func migrationAddMCPClientOpenAPIConfigJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_openapi_config_json_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "openapi_config_json")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return rollbackMCPClientOpenAPIConfigJSONColumn(tx.WithContext(ctx))
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp client openapi config json migration: %s", err.Error())
-	}
-	return nil
-}
-
-func rollbackMCPClientOpenAPIConfigJSONColumn(*gorm.DB) error {
-	return fmt.Errorf("add_mcp_client_openapi_config_json_column is non-rollbackable: dropping openapi_config_json would permanently delete every openapi client's base URL and stored credentials; the column is additive and older binaries safely ignore it")
 }
 
 // postgresIndexOnTable looks up index name among the indexes of table (the
@@ -15213,31 +10967,6 @@ func valueHashAndTokenHashIndexesMigration(ctx context.Context, migrationName st
 	}
 }
 
-// migrationAddVKMCPConfigsMCPClientIDIndex indexes
-// governance_virtual_key_mcp_configs.mcp_client_id. The only other index is
-// UNIQUE(virtual_key_id, mcp_client_id), which cannot serve a lookup by client, so
-// deleting or reconciling one MCP client scanned every VK assignment row.
-func migrationAddVKMCPConfigsMCPClientIDIndex(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_vk_mcp_configs_mcp_client_id_index"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	noTxOpts := *migrator.DefaultOptions
-	noTxOpts.UseTransaction = false
-	if err := RunSingleMigration(ctx, &noTxOpts, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return ensureIndexConcurrently(tx.WithContext(ctx), "governance_virtual_key_mcp_configs",
-				"idx_vk_mcp_configs_mcp_client_id", "mcp_client_id", false)
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropIndexConcurrently(tx.WithContext(ctx), "governance_virtual_key_mcp_configs", "idx_vk_mcp_configs_mcp_client_id")
-		},
-	}); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
 // migrationAddVKProviderConfigProviderAndKeyIndexes indexes
 // governance_virtual_key_provider_configs.provider and
 // governance_virtual_key_provider_config_keys.table_key_id. Provider updates and
@@ -15372,176 +11101,6 @@ func batchJobsDueIndexMigration(ctx context.Context, migrationName string) *migr
 	}
 }
 
-// oauthFlowStateIndex is the lookup index on mcp_oauth_flows.state, and
-// oauthFlowStateTempIndex the UNIQUE index built beside it before the swap.
-const (
-	oauthFlowStateIndex     = "idx_mcp_oauth_flows_state"
-	oauthFlowStateTempIndex = "idx_mcp_oauth_flows_state_unique"
-)
-
-// indexState describes one index as the state-uniqueness migration needs it.
-type indexState struct {
-	exists bool
-	unique bool
-	valid  bool
-	method string // Postgres access method ("btree", "hash", ...); "" on SQLite
-}
-
-// describeIndex reports whether index name exists on table, whether it is
-// UNIQUE, (on Postgres) whether it is valid, and its access method. SQLite
-// indexes are always valid.
-func describeIndex(tx *gorm.DB, table, name string) (indexState, error) {
-	if tx.Dialector.Name() == "postgres" {
-		var row struct {
-			Count  int64
-			Unique bool
-			Valid  bool
-			Method string
-		}
-		err := tx.Raw(`
-			SELECT COUNT(*) AS count, COALESCE(bool_and(pi.indisunique), false) AS "unique", COALESCE(bool_and(pi.indisvalid), false) AS valid, COALESCE(MAX(am.amname), '') AS method
-			FROM pg_class pc
-			JOIN pg_index pi ON pi.indrelid = pc.oid
-			JOIN pg_class ic ON ic.oid = pi.indexrelid
-			JOIN pg_am am ON am.oid = ic.relam
-			WHERE pc.relname = ? AND ic.relname = ? AND pg_catalog.pg_table_is_visible(pc.oid)
-		`, table, name).Scan(&row).Error
-		return indexState{exists: row.Count > 0, unique: row.Unique, valid: row.Valid, method: row.Method}, err
-	}
-	var rows []struct {
-		Name   string
-		Unique int
-	}
-	if err := tx.Raw(fmt.Sprintf("PRAGMA index_list(%s)", table)).Scan(&rows).Error; err != nil {
-		return indexState{}, err
-	}
-	for _, r := range rows {
-		if r.Name == name {
-			return indexState{exists: true, unique: r.Unique == 1, valid: true}, nil
-		}
-	}
-	return indexState{}, nil
-}
-
-// renameOauthFlowStateTempIndex gives the built UNIQUE temp index the final
-// name. Postgres renames it in place, a catalog-only change. SQLite has no
-// ALTER INDEX ... RENAME, so it builds the final UNIQUE index (cheap: flows are
-// short-lived and few) and drops the temp one.
-func renameOauthFlowStateTempIndex(tx *gorm.DB) error {
-	if tx.Dialector.Name() == "postgres" {
-		return tx.Exec(fmt.Sprintf("ALTER INDEX %s RENAME TO %s", oauthFlowStateTempIndex, oauthFlowStateIndex)).Error
-	}
-	if err := tx.Exec(fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON mcp_oauth_flows (state)", oauthFlowStateIndex)).Error; err != nil {
-		return err
-	}
-	return tx.Exec(fmt.Sprintf("DROP INDEX IF EXISTS %s", oauthFlowStateTempIndex)).Error
-}
-
-// keepNonUniqueOauthFlowState is the duplicate fallback: it logs the duplicate
-// count, drops any leftover temp index, and makes sure the non-unique lookup
-// index still exists, so OAuth callbacks keep an indexed lookup by state.
-func keepNonUniqueOauthFlowState(tx *gorm.DB, logger schemas.Logger, dups int64) error {
-	logger.Warn("[configstore] mcp_oauth_flows has %d duplicated state values; keeping the non-unique %s. To enforce uniqueness, remove the duplicated rows, delete the migrations row with id make_mcp_oauth_flows_state_unique, and restart: the migration then runs again.",
-		dups, oauthFlowStateIndex)
-	if err := dropIndexConcurrently(tx, "mcp_oauth_flows", oauthFlowStateTempIndex); err != nil {
-		return fmt.Errorf("drop index %s: %w", oauthFlowStateTempIndex, err)
-	}
-	return ensureIndexConcurrently(tx, "mcp_oauth_flows", oauthFlowStateIndex, "state", false)
-}
-
-// makeOauthFlowStateUnique converts idx_mcp_oauth_flows_state to UNIQUE without
-// blocking writes: it builds a UNIQUE temp index concurrently, drops the old
-// index, and renames the temp one into place. Each step is detected on re-entry,
-// so a run interrupted between the drop and the rename finishes on the next start.
-// Before checking for duplicates it deletes the expired pending or claiming
-// copies of duplicated states, rows DeleteExpiredOauthUserSessions would delete
-// anyway. Any duplicate left after that keeps the non-unique index (see
-// keepNonUniqueOauthFlowState) instead of failing startup.
-func makeOauthFlowStateUnique(tx *gorm.DB, logger schemas.Logger) error {
-	const table = "mcp_oauth_flows"
-	if !tx.Migrator().HasTable(table) {
-		return nil
-	}
-	final, err := describeIndex(tx, table, oauthFlowStateIndex)
-	if err != nil {
-		return fmt.Errorf("inspect index %s: %w", oauthFlowStateIndex, err)
-	}
-	if final.exists && final.unique && final.valid {
-		return dropIndexConcurrently(tx, "mcp_oauth_flows", oauthFlowStateTempIndex)
-	}
-	temp, err := describeIndex(tx, table, oauthFlowStateTempIndex)
-	if err != nil {
-		return fmt.Errorf("inspect index %s: %w", oauthFlowStateTempIndex, err)
-	}
-	if !final.exists && temp.exists && temp.unique && temp.valid {
-		return renameOauthFlowStateTempIndex(tx)
-	}
-
-	if err := tx.Exec(`DELETE FROM mcp_oauth_flows
-		WHERE expires_at < ? AND status IN ('pending', 'claiming')
-		AND state IN (SELECT state FROM mcp_oauth_flows GROUP BY state HAVING COUNT(*) > 1)`, time.Now()).Error; err != nil {
-		return fmt.Errorf("delete expired duplicate oauth flows: %w", err)
-	}
-	dups, err := countDuplicateHashes(tx, table, "state")
-	if err != nil {
-		return fmt.Errorf("count duplicate mcp_oauth_flows.state: %w", err)
-	}
-	if dups > 0 {
-		return keepNonUniqueOauthFlowState(tx, logger, dups)
-	}
-	if buildErr := ensureIndexConcurrently(tx, table, oauthFlowStateTempIndex, "state", true); buildErr != nil {
-		// A concurrent writer can add a duplicate between the count and the build.
-		// Only a real duplicate justifies the fallback.
-		dups, err = countDuplicateHashes(tx, table, "state")
-		if err != nil || dups == 0 {
-			return fmt.Errorf("create unique index %s: %w", oauthFlowStateTempIndex, buildErr)
-		}
-		return keepNonUniqueOauthFlowState(tx, logger, dups)
-	}
-	if final.exists {
-		if err := dropIndexConcurrently(tx, "mcp_oauth_flows", oauthFlowStateIndex); err != nil {
-			return fmt.Errorf("drop index %s: %w", oauthFlowStateIndex, err)
-		}
-	}
-	return renameOauthFlowStateTempIndex(tx)
-}
-
-// migrationMakeMCPOauthFlowsStateUnique makes mcp_oauth_flows.state UNIQUE on
-// databases where it is not. The state column's struct tag used to declare a
-// plain index named idx_mcp_oauth_flows_state, so CreateTable built it
-// non-unique and the later CREATE UNIQUE INDEX IF NOT EXISTS of the same name in
-// migrationCreateMCPOauthFlowsTable was a no-op: one CSRF state could map to
-// more than one flow. See makeOauthFlowStateUnique for the concurrent swap and
-// the duplicate fallback. Rollback refuses with an error: the migration deletes
-// expired duplicate pending/claiming flows and swaps in a UNIQUE index, and
-// neither can be restored.
-func migrationMakeMCPOauthFlowsStateUnique(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "make_mcp_oauth_flows_state_unique"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	noTxOpts := *migrator.DefaultOptions
-	noTxOpts.UseTransaction = false
-	if err := RunSingleMigration(ctx, &noTxOpts, db, logger, mcpOauthFlowsStateUniqueMigration(ctx, migrationName, logger)); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// mcpOauthFlowsStateUniqueMigration builds the migration applied by
-// migrationMakeMCPOauthFlowsStateUnique, so tests exercise the same Migrate and
-// Rollback callbacks the upgrade runs.
-func mcpOauthFlowsStateUniqueMigration(ctx context.Context, migrationName string, logger schemas.Logger) *migrator.Migration {
-	return &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return makeOauthFlowStateUnique(tx.WithContext(ctx), logger)
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("%s is non-rollbackable: it deletes expired duplicate pending/claiming oauth flows and replaces the state index with a UNIQUE one, and neither can be restored", migrationName)
-		},
-	}
-}
-
 // migrationAddVertexAWSWorkloadIdentityColumn adds the vertex_aws_workload_identity_json column to
 // the config_keys table. It holds the JSON-serialized aws_workload_identity block of a Vertex key
 // (GCP Workload Identity Federation from an AWS identity), encrypted like the other key secrets.
@@ -15605,62 +11164,6 @@ func migrationAddPriorityAbove272kCacheCreationPricingColumn(ctx context.Context
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running %s migration: %s", migrationName, err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPCodeModeLimitsClientColumn adds the mcp_code_mode_limits_json
-// column to config_client.
-func migrationAddMCPCodeModeLimitsClientColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_code_mode_limits_client_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasColumn(&tables.TableClientConfig{}, "mcp_code_mode_limits_json") {
-				if err := mg.AddColumn(&tables.TableClientConfig{}, "MCPCodeModeLimitsJSON"); err != nil {
-					return fmt.Errorf("add mcp_code_mode_limits_json column: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasColumn(&tables.TableClientConfig{}, "mcp_code_mode_limits_json") {
-				if err := mg.DropColumn(&tables.TableClientConfig{}, "MCPCodeModeLimitsJSON"); err != nil {
-					return fmt.Errorf("drop mcp_code_mode_limits_json column: %w", err)
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp code mode limits client column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPOAuthPrivateAllowlistColumn adds the mcp_oauth_private_allowlist_json
-// column to config_client.
-func migrationAddMCPOAuthPrivateAllowlistColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_oauth_private_allowlist_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "mcp_oauth_private_allowlist_json")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "mcp_oauth_private_allowlist_json")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running mcp oauth private allowlist column migration: %s", err.Error())
 	}
 	return nil
 }
@@ -16103,323 +11606,6 @@ func migrationAddSageMakerKeyColumns(ctx context.Context, db *gorm.DB, logger sc
 	return nil
 }
 
-// migrationAddOAuth2RefreshTokenClientDisplayNameColumn adds oauth2_refresh_tokens.client_display_name,
-// the client_name a grant was consented under. Existing grants keep NULL and list by their client row.
-func migrationAddOAuth2RefreshTokenClientDisplayNameColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth2_refresh_token_client_display_name_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &tables.TableOAuth2RefreshToken{}, "client_display_name")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableOAuth2RefreshToken{}, "client_display_name")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationWidenOAuth2ClientIDColumns lets oauth2_authorize_requests.client_id and
-// oauth2_refresh_tokens.client_id hold a Client ID Metadata Document URL of any length: the
-// columns become text and their btree indexes, capped at ~2.7KB per entry, become hash indexes.
-// Postgres-only: SQLite enforces neither bound.
-//
-// Nothing holds a lock for long on a large table: the type change needs no rewrite (varchar to
-// text is binary-coercible) and runs under a bounded lock wait; the hash index is built
-// concurrently beside the old btree, which keeps serving lookups, then swapped in under the name
-// the model declares (were it missing, auto-migration would recreate a btree). It runs outside a
-// transaction, and an interrupted run is finished by the next one.
-func migrationWidenOAuth2ClientIDColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "widen_oauth2_client_id_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	noTxOpts := *migrator.DefaultOptions
-	noTxOpts.UseTransaction = false
-	if err := RunSingleMigration(ctx, &noTxOpts, db, logger, widenOAuth2ClientIDColumnsMigration(ctx, migrationName)); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// widenOAuth2ClientIDColumnsMigration builds the migration applied by
-// migrationWidenOAuth2ClientIDColumns, so tests exercise the same Migrate and Rollback callbacks
-// the upgrade runs.
-func widenOAuth2ClientIDColumnsMigration(ctx context.Context, migrationName string) *migrator.Migration {
-	return &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if tx.Dialector.Name() != "postgres" {
-				return nil
-			}
-			for _, table := range []string{"oauth2_authorize_requests", "oauth2_refresh_tokens"} {
-				if err := widenOAuth2ClientIDColumn(tx, table); err != nil {
-					return fmt.Errorf("failed to widen %s.client_id: %w", table, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("%s is non-rollbackable: client_id values longer than varchar(255) may already be stored", migrationName)
-		},
-	}
-}
-
-// widenOAuth2ClientIDColumn makes table.client_id text with a hash index; see
-// migrationWidenOAuth2ClientIDColumns.
-func widenOAuth2ClientIDColumn(tx *gorm.DB, table string) error {
-	if !tx.Migrator().HasColumn(table, "client_id") {
-		return nil
-	}
-	if err := ExecWithBoundedLock(tx, table+".client_id", fmt.Sprintf("ALTER TABLE %s ALTER COLUMN client_id TYPE TEXT", table)); err != nil {
-		return err
-	}
-	index := "idx_" + table + "_client_id"
-	building := index + "_hash"
-	final, err := describeIndex(tx, table, index)
-	if err != nil {
-		return fmt.Errorf("inspect index %s: %w", index, err)
-	}
-	if final.exists && final.valid && final.method == "hash" {
-		return dropIndexConcurrently(tx, table, building)
-	}
-	if err := ensureIndexConcurrentlyUsing(tx, table, building, "hash", "client_id", "", false); err != nil {
-		return err
-	}
-	if err := dropIndexConcurrently(tx, table, index); err != nil {
-		return err
-	}
-	qualified, _, found, err := postgresIndexOnTable(tx, table, building)
-	if err != nil || !found {
-		return err
-	}
-	return ExecWithBoundedLock(tx, "index "+index, fmt.Sprintf("ALTER INDEX %s RENAME TO %s", qualified, index))
-}
-
-// migrationAddMCPMaxProtocolVersionColumns adds the global and per-client MCP max protocol version.
-// A deployment that already has MCP clients gets a global cap of 2025-06-18, the version every
-// client negotiated before the setting existed, so upgrading changes nothing until an admin lifts
-// it. A deployment with none starts uncapped.
-func migrationAddMCPMaxProtocolVersionColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_max_protocol_version_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{mcpMaxProtocolVersionColumnsMigration(ctx, migrationName, logger)})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// mcpMaxProtocolVersionColumnsMigration builds the migration applied by
-// migrationAddMCPMaxProtocolVersionColumns, so tests exercise the same callbacks the upgrade runs.
-func mcpMaxProtocolVersionColumnsMigration(ctx context.Context, migrationName string, logger schemas.Logger) *migrator.Migration {
-	return &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_max_protocol_version"); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "max_protocol_version"); err != nil {
-				return err
-			}
-			var existing int64
-			if err := tx.Table("config_mcp_clients").Count(&existing).Error; err != nil {
-				return fmt.Errorf("failed to count MCP clients: %w", err)
-			}
-			if existing == 0 {
-				return nil
-			}
-			return tx.Table("config_client").Where("mcp_max_protocol_version IS NULL OR mcp_max_protocol_version = ''").
-				UpdateColumn("mcp_max_protocol_version", schemas.MCPProtocolVersion20250618).Error
-		},
-		// Dropping the columns would delete every protocol cap an admin configured.
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("%s is non-rollbackable: dropping the columns would delete every configured global and per-server MCP protocol cap; they are additive and older binaries ignore them", migrationName)
-		},
-	}
-}
-
-// migrationAddClientConfigMCPServerMaxProtocolVersionColumn adds the cap on the protocol version
-// Bifrost's own /mcp serves. Existing rows read "", which is uncapped, as before.
-func migrationAddClientConfigMCPServerMaxProtocolVersionColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_client_config_mcp_server_max_protocol_version_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "mcp_server_max_protocol_version")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Reversible: without the column /mcp serves every version, as before.
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "mcp_server_max_protocol_version")
-		},
-	})
-}
-
-var mcpClientDiscoveredListColumns = []string{"discovered_resources_json", "discovered_resource_templates_json", "discovered_prompts_json"}
-
-// migrationAddMCPClientDiscoveredResourcesPromptsColumns adds the config_mcp_clients columns that
-// persist an MCP client's discovered resources, resource templates and prompts.
-func migrationAddMCPClientDiscoveredResourcesPromptsColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_discovered_resources_prompts_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, column := range mcpClientDiscoveredListColumns {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			for _, column := range mcpClientDiscoveredListColumns {
-				if err := dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableMCPClient{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddMCPClientExposeListsColumns adds the prompts and resources allow-lists. Existing rows
-// keep them empty, which exposes everything, as before.
-func migrationAddMCPClientExposeListsColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_expose_lists_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{mcpClientExposeListsColumnsMigration(ctx, migrationName, logger)})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// mcpClientExposeListsColumnsMigration builds the migration applied by
-// migrationAddMCPClientExposeListsColumns, so tests exercise the same callbacks the upgrade runs.
-func mcpClientExposeListsColumnsMigration(ctx context.Context, migrationName string, logger schemas.Logger) *migrator.Migration {
-	return &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, column := range []string{"prompts_to_expose_json", "resources_to_expose_json"} {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		// Dropping the columns would silently serve everything an admin restricted.
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("%s is non-rollbackable: dropping the allow-lists would expose every prompt and resource they restrict", migrationName)
-		},
-	}
-}
-
-// migrationAddOAuthIssuerBindingColumns adds the issuer columns to oauth configs and flows. Existing
-// rows stay unbound until their next sign-in.
-func migrationAddOAuthIssuerBindingColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth_issuer_binding_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	columns := []struct {
-		model   any
-		columns []string
-	}{
-		{&tables.TableOauthConfig{}, []string{"issuer", "iss_parameter_supported", "dynamically_registered"}},
-		{&tables.TableMCPOauthFlow{}, []string{"issuer", "iss_parameter_supported"}},
-	}
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, table := range columns {
-				for _, column := range table.columns {
-					if err := addColumnIfNotExists(tx, logger, table.model, column); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			for _, table := range columns {
-				for _, column := range table.columns {
-					if err := dropColumnIfExists(tx.WithContext(ctx), logger, table.model, column); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddMCPClientDiscoveredToolDetailsColumn adds the column that persists discovered tools'
-// annotations, titles, icons and output schemas. Existing rows fill it at their next discovery.
-func migrationAddMCPClientDiscoveredToolDetailsColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_discovered_tool_details_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "discovered_tool_details_json")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableMCPClient{}, "discovered_tool_details_json")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
 // voiceLivePricingColumns are the Azure Voice Live rate columns on governance_model_pricing.
 var voiceLivePricingColumns = []string{
 	"input_cost_per_token_voice_live",
@@ -16466,135 +11652,6 @@ func migrationAddVoiceLivePricingColumns(ctx context.Context, db *gorm.DB, logge
 // the columns hold operator-set rates.
 func rollbackVoiceLivePricingColumns(context.Context, *gorm.DB, schemas.Logger) error {
 	return fmt.Errorf("add_voice_live_pricing_columns is non-rollbackable: dropping the _voice_live columns would permanently delete every Voice Live rate an operator has set, and Voice Live turns would silently bill at the normal rates; the columns are additive and older binaries safely ignore them")
-}
-
-// migrationAddMCPPerUserDiscoveries adds config_mcp_clients.per_user_discovery
-// and creates the mcp_per_user_discoveries table, keyed by (auth_mode,
-// identity, mcp_client_id) for user and virtual-key callers with the same
-// partial-unique-index pattern as mcp_per_user_header_credentials, so a
-// caller's discovery and the credential it was made with share one binding
-// shape, and indexed by (mcp_client_id, discovery_hash) for grouping a
-// client's callers by the discovery they hold. Forward-only on data — no rows
-// exist yet.
-func migrationAddMCPPerUserDiscoveries(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_per_user_discoveries"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			mg := tx.Migrator()
-
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "PerUserDiscovery"); err != nil {
-				return fmt.Errorf("add per_user_discovery column to config_mcp_clients: %w", err)
-			}
-
-			if !mg.HasTable(&tables.TableMCPPerUserDiscovery{}) {
-				logger.Info("[configstore] %s: creating table TableMCPPerUserDiscovery", migrationName)
-				if err := mg.CreateTable(&tables.TableMCPPerUserDiscovery{}); err != nil {
-					return fmt.Errorf("create mcp_per_user_discoveries table: %w", err)
-				}
-			}
-
-			partialUniques := []string{
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_per_user_discoveries_user_mcp
-					ON mcp_per_user_discoveries (user_id, mcp_client_id)
-					WHERE auth_mode = 'user' AND user_id IS NOT NULL AND user_id != ''`,
-				`CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_per_user_discoveries_vk_mcp
-					ON mcp_per_user_discoveries (virtual_key_id, mcp_client_id)
-					WHERE auth_mode = 'vk' AND virtual_key_id IS NOT NULL AND virtual_key_id != ''`,
-			}
-			for _, stmt := range partialUniques {
-				if err := tx.Exec(stmt).Error; err != nil {
-					return fmt.Errorf("create partial unique index on mcp_per_user_discoveries: %w", err)
-				}
-			}
-			if err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_mcp_per_user_discoveries_client_hash
-				ON mcp_per_user_discoveries (mcp_client_id, discovery_hash)`).Error; err != nil {
-				return fmt.Errorf("create client and hash index on mcp_per_user_discoveries: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			for _, name := range []string{
-				"idx_mcp_per_user_discoveries_user_mcp",
-				"idx_mcp_per_user_discoveries_vk_mcp",
-				"idx_mcp_per_user_discoveries_client_hash",
-			} {
-				if err := tx.Exec("DROP INDEX IF EXISTS " + name).Error; err != nil {
-					return fmt.Errorf("drop %s: %w", name, err)
-				}
-			}
-			if mg.HasTable(&tables.TableMCPPerUserDiscovery{}) {
-				if err := mg.DropTable(&tables.TableMCPPerUserDiscovery{}); err != nil {
-					return fmt.Errorf("drop mcp_per_user_discoveries: %w", err)
-				}
-			}
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "PerUserDiscovery"); err != nil {
-				return fmt.Errorf("drop per_user_discovery column from config_mcp_clients: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddMCPClientPendingVerificationColumn adds
-// config_mcp_clients.pending_verification, the explicit record that a client
-// still needs its one-time admin step, and backfills it from the signals the
-// runtime used to infer that from: an OAuth client still carrying its
-// bootstrap stash, and a per_user_headers or token_exchange client (not
-// openapi, which has nothing upstream to verify) that never stored the tools
-// its verification discovers. Every other row stays false. Clients without
-// per_user_discovery are still read from those signals for now (see
-// TableMCPClient.AwaitsAdminVerification); the backfill keeps the column right
-// for when that read moves to it.
-func migrationAddMCPClientPendingVerificationColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_pending_verification_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "PendingVerification"); err != nil {
-				return fmt.Errorf("add pending_verification column to config_mcp_clients: %w", err)
-			}
-			if err := tx.Model(&tables.TableMCPClient{}).
-				Where("(auth_type IN ? AND pending_oauth_config_json IS NOT NULL AND pending_oauth_config_json != '') OR "+
-					"(auth_type IN ? AND connection_type != ? AND (discovered_tools_json IS NULL OR discovered_tools_json = '' OR discovered_tools_json = 'null'))",
-					[]string{string(schemas.MCPAuthTypeOauth), string(schemas.MCPAuthTypePerUserOauth)},
-					[]string{string(schemas.MCPAuthTypePerUserHeaders), string(schemas.MCPAuthTypeTokenExchange)},
-					string(schemas.MCPConnectionTypeOpenAPI)).
-				Update("pending_verification", true).Error; err != nil {
-				return fmt.Errorf("backfill pending_verification on config_mcp_clients: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "PendingVerification"); err != nil {
-				return fmt.Errorf("drop pending_verification column from config_mcp_clients: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
 }
 
 // migrationAddCacheCreationAbove12hrPricingColumns adds OpenAI 12h cache-write rates by service tier and 272k tier.
@@ -16808,38 +11865,6 @@ func migrationAddComplexitySuggestionSchedulesTable(ctx context.Context, db *gor
 	return nil
 }
 
-// migrationAddMCPClientServerTypeOnSlugColumn adds the server_type_on_slug column to config_mcp_clients.
-// Existing rows take the empty default, which inherits is_code_mode_client: today's behavior.
-func migrationAddMCPClientServerTypeOnSlugColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_mcp_client_server_type_on_slug_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableMCPClient{}, "ServerTypeOnSlug"); err != nil {
-				return fmt.Errorf("add server_type_on_slug column to config_mcp_clients: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableMCPClient{}, "ServerTypeOnSlug"); err != nil {
-				return fmt.Errorf("drop server_type_on_slug column from config_mcp_clients: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
 // migrationAddFrameworkConfigOpenAPIURLColumn adds openapi_url to framework_configs.
 // NULL reads as unset (the build's default spec), so existing rows need no backfill
 // and a rolled-back binary ignores the column.
@@ -16892,95 +11917,4 @@ func migrationAddClientConfigEntityAccessProfileModeColumn(ctx context.Context, 
 		return fmt.Errorf("error running %s migration: %w", migrationName, err)
 	}
 	return nil
-}
-
-// oauth2AuthorizeRequestsDeviceCodeColumns are the device-grant columns and their tag index names.
-var oauth2AuthorizeRequestsDeviceCodeColumns = []struct{ column, index string }{
-	{"device_code_hash", "idx_oauth2_authorize_requests_device_code_hash"},
-	{"user_code_hash", "idx_oauth2_authorize_requests_user_code_hash"},
-}
-
-// migrationAddOAuth2AuthorizeRequestsDeviceCodeColumns adds the nullable device-grant columns to
-// oauth2_authorize_requests, with a bounded lock wait. Indexes come from the next migration.
-func migrationAddOAuth2AuthorizeRequestsDeviceCodeColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth2_authorize_requests_device_code_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{oauth2AuthorizeRequestsDeviceCodeColumnsMigration(ctx, migrationName, logger)})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// oauth2AuthorizeRequestsDeviceCodeColumnsMigration is the column migration, shared with tests.
-func oauth2AuthorizeRequestsDeviceCodeColumnsMigration(ctx context.Context, id string, logger schemas.Logger) *migrator.Migration {
-	return &migrator.Migration{
-		ID: id,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, c := range oauth2AuthorizeRequestsDeviceCodeColumns {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableOAuth2AuthorizeRequest{}, c.column); err != nil {
-					return fmt.Errorf("failed to add column %s: %w", c.column, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// Only short-lived sign-in state; nothing durable is lost.
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			for _, c := range oauth2AuthorizeRequestsDeviceCodeColumns {
-				if err := dropColumnIfExists(tx, logger, &tables.TableOAuth2AuthorizeRequest{}, c.column); err != nil {
-					return fmt.Errorf("failed to drop column %s: %w", c.column, err)
-				}
-			}
-			return nil
-		},
-	}
-}
-
-// migrationAddOAuth2AuthorizeRequestsDeviceCodeIndexes builds the device-grant unique indexes
-// concurrently (no transaction), so upgrades never block writes.
-func migrationAddOAuth2AuthorizeRequestsDeviceCodeIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_oauth2_authorize_requests_device_code_indexes"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	noTxOpts := *migrator.DefaultOptions
-	noTxOpts.UseTransaction = false
-	if err := RunSingleMigration(ctx, &noTxOpts, db, logger, oauth2AuthorizeRequestsDeviceCodeIndexesMigration(ctx, migrationName)); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// oauth2AuthorizeRequestsDeviceCodeIndexesMigration is the index migration, shared with tests.
-func oauth2AuthorizeRequestsDeviceCodeIndexesMigration(ctx context.Context, id string) *migrator.Migration {
-	const table = "oauth2_authorize_requests"
-	return &migrator.Migration{
-		ID: id,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, c := range oauth2AuthorizeRequestsDeviceCodeColumns {
-				if err := ensureIndexConcurrently(tx, table, c.index, c.column, true); err != nil {
-					return fmt.Errorf("failed to create index on %s: %w", c.column, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, c := range oauth2AuthorizeRequestsDeviceCodeColumns {
-				if err := dropIndexConcurrently(tx, table, c.index); err != nil {
-					return fmt.Errorf("failed to drop index on %s: %w", c.column, err)
-				}
-			}
-			return nil
-		},
-	}
 }

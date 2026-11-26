@@ -805,7 +805,7 @@ func codexGovernedFixture(t *testing.T, enforceAuth, allowDirectKeys bool) *code
 	expiredAt := time.Now().Add(-time.Hour)
 	expired.ExpiresAt = &expiredAt
 	plugin, err := governance.Init(t.Context(), nil, bifrost.NewNoOpLogger(), nil,
-		&configstore.GovernanceConfig{VirtualKeys: []configtables.TableVirtualKey{virtualKey("codex-a"), virtualKey("codex-b"), inactive, expired}}, nil, nil, scribeInMemoryStore{config})
+		&configstore.GovernanceConfig{VirtualKeys: []configtables.TableVirtualKey{virtualKey("codex-a"), virtualKey("codex-b"), inactive, expired}}, nil, scribeInMemoryStore{config})
 	require.NoError(t, err)
 	return newCodexRelayFixtureWith(t, config, codexFixtureOptions{store: testWSHandlerStore{allowDirectKeys: allowDirectKeys}, plugins: []schemas.LLMPlugin{plugin}})
 }

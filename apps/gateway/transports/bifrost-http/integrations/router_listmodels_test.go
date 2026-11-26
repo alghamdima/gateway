@@ -104,7 +104,7 @@ func TestGrantedProvidersShapeMatchesWhatTheRouterPublishes(t *testing.T) {
 		// A provider granted no model at all is still asked: the fan-out decides who can
 		// serve the request, and the response is filtered per model afterwards.
 		{Provider: "anthropic"},
-	}, nil)
+	})
 	access := grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
 
 	granted := access.GrantedProvidersForModel("")

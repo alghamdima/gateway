@@ -28,7 +28,7 @@ func (sessionLoggingStore) ListUserAgentMappings(context.Context, bool) ([]logst
 
 func TestSessionLoggingHeaders(t *testing.T) {
 	loggingHeaders := []string{"x-custom-*", "x-exact"}
-	plugin, err := logging.Init(context.Background(), &logging.Config{LoggingHeaders: &loggingHeaders}, &mockLogger{}, sessionLoggingStore{}, nil, nil, nil)
+	plugin, err := logging.Init(context.Background(), &logging.Config{LoggingHeaders: &loggingHeaders}, &mockLogger{}, sessionLoggingStore{}, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 	var entries []*logstore.Log

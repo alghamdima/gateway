@@ -63,7 +63,6 @@ func parityBackends(t *testing.T) map[string]LogStore {
 	// never recreated, so matViewsReady stays false and every Postgres query
 	// takes the raw-table path (the honest comparison target).
 	dropAllManagedMatViews(db)
-	require.NoError(t, db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS logs CASCADE").Error)
 	require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)
@@ -244,22 +243,6 @@ func paritySpecs() []parityLogSpec {
 		{id: "p13", offsetSec: 13, object: "chat.completion", provider: "openai", model: "gpt-4o-mini", status: "success",
 			teamID: strPtrP("t4"), customerID: strPtrP("c3"), buID: strPtrP("b3"), userID: strPtrP("u6"),
 			cost: f64PtrP(0.1), latency: f64PtrP(35), tokens: [3]int{5, 5, 10}},
-	}
-}
-
-func parityMCPLogs(base time.Time) []*MCPToolLog {
-	mk := func(id string, offsetSec int, tool, label, status string, latency, cost *float64, vkID, vkName *string) *MCPToolLog {
-		ts := base.Add(-time.Duration(offsetSec) * time.Second)
-		return &MCPToolLog{
-			ID: id, Timestamp: ts, ToolName: tool, ServerLabel: label, Status: status,
-			Latency: latency, Cost: cost, VirtualKeyID: vkID, VirtualKeyName: vkName, CreatedAt: ts,
-		}
-	}
-	return []*MCPToolLog{
-		mk("m1", 95, "search_web", "srv1", "success", f64PtrP(120), f64PtrP(0.01), strPtrP("vk1"), strPtrP("VK One")),
-		mk("m2", 85, "search_web", "srv2", "error", f64PtrP(80), nil, strPtrP("vk2"), strPtrP("VK Two")),
-		mk("m3", 75, "calculator", "srv1", "success", f64PtrP(30), f64PtrP(0.002), strPtrP("vk1"), strPtrP("VK One")),
-		mk("m4", 65, "calculator", "srv1", "processing", nil, nil, nil, nil),
 	}
 }
 
@@ -463,18 +446,6 @@ func logProjection(l *Log) map[string]any {
 	}
 }
 
-func mcpProjection(logs []MCPToolLog) []map[string]any {
-	out := make([]map[string]any, 0, len(logs))
-	for _, l := range logs {
-		out = append(out, map[string]any{
-			"id": l.ID, "ts_ms": l.Timestamp.UnixMilli(), "tool": l.ToolName,
-			"label": l.ServerLabel, "status": l.Status, "latency": l.Latency,
-			"cost": l.Cost, "virtual_key_id": l.VirtualKeyID,
-		})
-	}
-	return out
-}
-
 func asyncJobProjection(j *AsyncJob) map[string]any {
 	out := map[string]any{
 		"id": j.ID, "status": j.Status, "request_type": j.RequestType,
@@ -502,19 +473,6 @@ func remainingLogIDs(ctx context.Context, s LogStore) (any, error) {
 	return ids, nil
 }
 
-func remainingMCPIDs(ctx context.Context, s LogStore) (any, error) {
-	r, err := s.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 100, SortBy: "timestamp", Order: "desc"})
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]string, 0, len(r.Logs))
-	for _, l := range r.Logs {
-		ids = append(ids, l.ID)
-	}
-	sort.Strings(ids)
-	return ids, nil
-}
-
 func TestLogStoreParity(t *testing.T) {
 	stores := parityBackends(t)
 	ctx := context.Background()
@@ -536,14 +494,7 @@ func TestLogStoreParity(t *testing.T) {
 		for _, spec := range specs[2:] {
 			rest = append(rest, spec.toLog(base))
 		}
-		if err := s.BatchCreateIfNotExists(ctx, rest); err != nil {
-			return err
-		}
-		mcp := parityMCPLogs(base)
-		if err := s.CreateMCPToolLog(ctx, mcp[0]); err != nil {
-			return err
-		}
-		return s.BatchCreateMCPToolLogsIfNotExists(ctx, mcp[1:])
+		return s.BatchCreateIfNotExists(ctx, rest)
 	})
 
 	t.Run("Ping", func(t *testing.T) {
@@ -922,82 +873,6 @@ func TestLogStoreParity(t *testing.T) {
 		}
 	})
 
-	t.Run("MCP", func(t *testing.T) {
-		mcpWindow := MCPToolLogSearchFilters{StartTime: timePtrP(windowStart), EndTime: timePtrP(windowEnd)}
-		mcpPage := PaginationOptions{Limit: 50, SortBy: "timestamp", Order: "desc"}
-		calls := map[string]func(context.Context, LogStore) (any, error){
-			"search": func(ctx context.Context, s LogStore) (any, error) {
-				r, err := s.SearchMCPToolLogs(ctx, mcpWindow, mcpPage)
-				if err != nil {
-					return nil, err
-				}
-				return map[string]any{"total": r.Pagination.TotalCount, "logs": mcpProjection(r.Logs)}, nil
-			},
-			"search_filtered": func(ctx context.Context, s LogStore) (any, error) {
-				r, err := s.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{ToolNames: []string{"search_web"}, Status: []string{"success", "error"}}, mcpPage)
-				if err != nil {
-					return nil, err
-				}
-				return map[string]any{"total": r.Pagination.TotalCount, "logs": mcpProjection(r.Logs)}, nil
-			},
-			"stats": func(ctx context.Context, s LogStore) (any, error) { return s.GetMCPToolLogStats(ctx, mcpWindow) },
-			"histogram": func(ctx context.Context, s LogStore) (any, error) {
-				return s.GetMCPHistogram(ctx, mcpWindow, 60)
-			},
-			"cost_histogram": func(ctx context.Context, s LogStore) (any, error) {
-				return s.GetMCPCostHistogram(ctx, mcpWindow, 60)
-			},
-			"top_tools": func(ctx context.Context, s LogStore) (any, error) { return s.GetMCPTopTools(ctx, mcpWindow, 10) },
-			"tool_names": func(ctx context.Context, s LogStore) (any, error) {
-				v, err := s.GetAvailableToolNames(ctx, 50, "")
-				if err != nil {
-					return nil, err
-				}
-				sort.Strings(v)
-				return v, nil
-			},
-			"server_labels": func(ctx context.Context, s LogStore) (any, error) {
-				v, err := s.GetAvailableServerLabels(ctx, 50, "")
-				if err != nil {
-					return nil, err
-				}
-				sort.Strings(v)
-				return v, nil
-			},
-			"virtual_keys": func(ctx context.Context, s LogStore) (any, error) {
-				logs, err := s.GetAvailableMCPVirtualKeys(ctx, 50, "")
-				if err != nil {
-					return nil, err
-				}
-				type vk struct{ ID, Name string }
-				out := make([]vk, 0, len(logs))
-				for _, l := range logs {
-					pair := vk{}
-					if l.VirtualKeyID != nil {
-						pair.ID = *l.VirtualKeyID
-					}
-					if l.VirtualKeyName != nil {
-						pair.Name = *l.VirtualKeyName
-					}
-					out = append(out, pair)
-				}
-				sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-				return out, nil
-			},
-			"find": func(ctx context.Context, s LogStore) (any, error) {
-				l, err := s.FindMCPToolLog(ctx, "m1")
-				if err != nil {
-					return nil, err
-				}
-				return mcpProjection([]MCPToolLog{*l}), nil
-			},
-			"has_logs": func(ctx context.Context, s LogStore) (any, error) { return s.HasMCPToolLogs(ctx) },
-		}
-		for name, call := range calls {
-			t.Run(name, func(t *testing.T) { assertParity(t, stores, 1e-3, call) })
-		}
-	})
-
 	t.Run("NodeUsage", func(t *testing.T) {
 		// inc_number is Postgres-assigned and NULL elsewhere, so the cursor's
 		// IncNumber field is excluded; everything the budget reconciler
@@ -1095,29 +970,6 @@ func TestLogStoreParity(t *testing.T) {
 				return costs, nil
 			})
 		})
-		t.Run("update_mcp_map_and_struct", func(t *testing.T) {
-			runOnAll(t, stores, func(ctx context.Context, s LogStore) error {
-				if err := s.UpdateMCPToolLog(ctx, "m3", map[string]interface{}{"status": "error", "latency": 45.0}); err != nil {
-					return err
-				}
-				return s.UpdateMCPToolLog(ctx, "m2", &MCPToolLog{Status: "success", Cost: f64PtrP(0.02)})
-			})
-			assertParity(t, stores, 1e-6, func(ctx context.Context, s LogStore) (any, error) {
-				var out []map[string]any
-				for _, id := range []string{"m2", "m3"} {
-					l, err := s.FindMCPToolLog(ctx, id)
-					if err != nil {
-						return nil, err
-					}
-					out = append(out, mcpProjection([]MCPToolLog{*l})...)
-				}
-				return out, nil
-			})
-			for name, s := range stores {
-				err := s.UpdateMCPToolLog(ctx, "missing-id", map[string]interface{}{"status": "success"})
-				assert.ErrorIs(t, err, ErrNotFound, name)
-			}
-		})
 	})
 
 	// --- Phase: async jobs ---
@@ -1212,23 +1064,6 @@ func TestLogStoreParity(t *testing.T) {
 				return s.DeleteLogsBatch(ctx, base.Add(-45*time.Second), 100)
 			})
 			assertParity(t, stores, 1e-6, remainingLogIDs)
-		})
-		t.Run("flush_mcp", func(t *testing.T) {
-			// m4 is the only processing MCP row; FlushMCPToolLogs drops it.
-			runOnAll(t, stores, func(ctx context.Context, s LogStore) error {
-				return s.FlushMCPToolLogs(ctx, base)
-			})
-			assertParity(t, stores, 1e-6, remainingMCPIDs)
-		})
-		t.Run("delete_mcp", func(t *testing.T) {
-			runOnAll(t, stores, func(ctx context.Context, s LogStore) error {
-				return s.DeleteMCPToolLogs(ctx, []string{"m1"})
-			})
-			for name, s := range stores {
-				_, err := s.FindMCPToolLog(ctx, "m1")
-				assert.ErrorIs(t, err, ErrNotFound, name)
-			}
-			assertParity(t, stores, 1e-6, remainingMCPIDs)
 		})
 	})
 

@@ -59,7 +59,6 @@ type uploadKind uint8
 
 const (
 	uploadKindLog uploadKind = iota
-	uploadKindMCP
 	// uploadKindLogMerge overlays the payload onto the object the row already
 	// has (BatchUpdate's reconcile of a late completion) instead of replacing it.
 	uploadKindLogMerge
@@ -82,7 +81,7 @@ type uploadWork struct {
 //
 // Method routing:
 //   - Delegated directly (40+ methods): all analytics, search, histogram, ranking,
-//     distinct, MCP, async job methods
+//     distinct, async job methods
 //   - Intercepted: Create, CreateIfNotExists, BatchCreateIfNotExists, FindByID,
 //     Update, DeleteLog, DeleteLogs, DeleteLogsBatch, Close
 type HybridLogStore struct {
@@ -226,19 +225,6 @@ func (h *HybridLogStore) processUpload(work *uploadWork) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	switch work.kind {
-	case uploadKindMCP:
-		current, err := h.inner.FindMCPToolLog(ctx, work.logID)
-		if err != nil {
-			h.logger.Warn("objectstore: failed to check MCP tool log %s before upload: %v", work.logID, err)
-			h.droppedUploads.Add(1)
-			return
-		}
-		if work.status != "" && current.Status != work.status {
-			return
-		}
-	}
-
 	realtimeCorrection := work.kind == uploadKindLogMerge && gjson.GetBytes(work.payload, realtimeInputCorrectionField).Exists()
 	if work.kind == uploadKindLogMerge {
 		merged, ok := h.mergeIntoStoredObject(ctx, work)
@@ -283,13 +269,7 @@ func (h *HybridLogStore) processUpload(work *uploadWork) {
 	// exponential backoff to avoid orphaning the uploaded object.
 	for attempt := 0; attempt < 3; attempt++ {
 		dbCtx, dbCancel := context.WithTimeout(withLogTimestamp(context.Background(), work.timestamp), 10*time.Second)
-		var err error
-		switch work.kind {
-		case uploadKindMCP:
-			err = h.inner.UpdateMCPToolLog(dbCtx, work.logID, map[string]interface{}{"has_object": true})
-		default:
-			err = h.inner.Update(dbCtx, work.logID, map[string]interface{}{"has_object": true})
-		}
+		err := h.inner.Update(dbCtx, work.logID, map[string]interface{}{"has_object": true})
 		dbCancel()
 		if err == nil {
 			return
@@ -305,12 +285,7 @@ func (h *HybridLogStore) processUpload(work *uploadWork) {
 
 // markTable is the table whose has_object column an upload of kind sets.
 func markTable(kind uploadKind) string {
-	switch kind {
-	case uploadKindMCP:
-		return "mcp_tool_logs"
-	default:
-		return "logs"
-	}
+	return "logs"
 }
 
 // markWorker batches has_object flips for a hasObjectMarker store. A failed
@@ -521,10 +496,6 @@ func (h *HybridLogStore) setObjectFormat(format, compression string) {
 
 func (h *HybridLogStore) logKey(timestamp time.Time, logID string) string {
 	return objectKey(h.prefix, "logs", timestamp, logID, h.objectExt)
-}
-
-func (h *HybridLogStore) mcpToolKey(timestamp time.Time, logID string) string {
-	return objectKey(h.prefix, "mcp-logs", timestamp, logID, h.objectExt)
 }
 
 // alternateKey returns the same object path in the other format (.parquet
@@ -951,43 +922,6 @@ func (h *HybridLogStore) hydrateLog(ctx context.Context, log *Log, requestedFiel
 	pruneUnrequestedPayloadFields(log, requestedFields)
 }
 
-// hydrateMCPToolLog fetches the offloaded payload from object storage and
-// merges it into the MCPToolLog. It is a no-op when log is nil or HasObject
-// is false. Errors from the underlying object-store fetch are returned to the
-// caller (unlike hydrateLog, MCP tool log payloads are not optional).
-func (h *HybridLogStore) hydrateMCPToolLog(ctx context.Context, log *MCPToolLog) error {
-	if log == nil || !log.HasObject {
-		return nil
-	}
-	return h.hydrateMCPToolLogFromObject(ctx, log)
-}
-
-// hydrateMCPToolLogFromObject unconditionally fetches the payload from object
-// storage (skipping the HasObject check) and merges it into the log. Used on
-// the update path where the payload must be loaded even when has_object has
-// not yet been set on the DB row.
-func (h *HybridLogStore) hydrateMCPToolLogFromObject(ctx context.Context, log *MCPToolLog) error {
-	_, err := h.hydrateMCPToolLogFromObjectKey(ctx, log)
-	return err
-}
-
-// hydrateMCPToolLogFromObjectKey is hydrateMCPToolLogFromObject that also
-// returns the key the payload was read from ("" when log is nil).
-func (h *HybridLogStore) hydrateMCPToolLogFromObjectKey(ctx context.Context, log *MCPToolLog) (string, error) {
-	if log == nil {
-		return "", nil
-	}
-	key := h.mcpToolKey(log.Timestamp, log.ID)
-	data, found, err := h.getPayload(ctx, key)
-	if err != nil {
-		return "", fmt.Errorf("objectstore: fetch MCP tool log payload for %s: %w", log.ID, err)
-	}
-	if mergeErr := MergeMCPToolLogPayloadFromJSON(log, data); mergeErr != nil {
-		return "", fmt.Errorf("objectstore: merge MCP tool log payload for %s: %w", log.ID, mergeErr)
-	}
-	return found, nil
-}
-
 // Update passes the update through to the inner store for index/scalar field
 // updates. Payload-field changes are not re-offloaded here; the logging
 // plugin owns that path and calls processUpload directly when it needs to.
@@ -1062,12 +996,6 @@ func (h *HybridLogStore) DeleteLogsBatch(ctx context.Context, cutoff time.Time, 
 // RetentionInterval forwards to the inner store.
 func (h *HybridLogStore) RetentionInterval() time.Duration {
 	return h.inner.RetentionInterval()
-}
-
-// DeleteMCPToolLogsBatch deletes old MCP tool log rows in batches. Like
-// DeleteLogsBatch, object-store entries are left to the bucket lifecycle policy.
-func (h *HybridLogStore) DeleteMCPToolLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (int64, error) {
-	return h.inner.DeleteMCPToolLogsBatch(ctx, cutoff, batchSize)
 }
 
 // Close shuts the store down cleanly: marks the store closed (so further
@@ -1755,486 +1683,6 @@ func (h *HybridLogStore) ListUserAgentMappings(ctx context.Context, activeOnly b
 // metadata keys (and their distinct values) matching query, capped at limit.
 func (h *HybridLogStore) GetDistinctMetadataKeys(ctx context.Context, limit int, query string) (map[string][]string, error) {
 	return h.inner.GetDistinctMetadataKeys(ctx, limit, query)
-}
-
-// MCP Tool Log analytics methods are delegated directly. Detail/write paths
-// below offload full MCP log objects while keeping DB rows lightweight.
-
-// GetMCPHistogram delegates to the inner store and returns an MCP tool-call
-// count histogram bucketed by bucketSizeSeconds.
-func (h *HybridLogStore) GetMCPHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*MCPHistogramResult, error) {
-	return h.inner.GetMCPHistogram(ctx, filters, bucketSizeSeconds)
-}
-
-// GetMCPLatencyHistogram delegates to the inner store.
-func (h *HybridLogStore) GetMCPLatencyHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*LatencyHistogramResult, error) {
-	return h.inner.GetMCPLatencyHistogram(ctx, filters, bucketSizeSeconds)
-}
-
-// GetMCPCostHistogram returns the cost histogram for MCP tool logs.
-func (h *HybridLogStore) GetMCPCostHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*MCPCostHistogramResult, error) {
-	return h.inner.GetMCPCostHistogram(ctx, filters, bucketSizeSeconds)
-}
-
-// GetMCPTopTools returns the top tools used in MCP tool logs.
-func (h *HybridLogStore) GetMCPTopTools(ctx context.Context, filters MCPToolLogSearchFilters, limit int) (*MCPTopToolsResult, error) {
-	return h.inner.GetMCPTopTools(ctx, filters, limit)
-}
-
-// GetMCPToolCountsByDimension delegates to the inner store and returns each
-// entity's distinct tool count.
-func (h *HybridLogStore) GetMCPToolCountsByDimension(ctx context.Context, filters MCPToolLogSearchFilters, dimension RankingDimension) (map[string]int, error) {
-	return h.inner.GetMCPToolCountsByDimension(ctx, filters, dimension)
-}
-
-// applyMCPToolLogUpdate applies the updates from an entry to the target MCPToolLog entry.
-func applyMCPToolLogUpdate(target *MCPToolLog, entry any) error {
-	switch v := entry.(type) {
-	case map[string]interface{}:
-		return applyMCPToolLogUpdateMap(target, v)
-	case *MCPToolLog:
-		if v == nil {
-			return nil
-		}
-		update := *v
-		if err := update.SerializeFields(); err != nil {
-			return err
-		}
-		return applyMCPToolLogUpdateStruct(target, &update)
-	case MCPToolLog:
-		update := v
-		if err := update.SerializeFields(); err != nil {
-			return err
-		}
-		return applyMCPToolLogUpdateStruct(target, &update)
-	default:
-		return nil
-	}
-}
-
-// applyMCPToolLogUpdateMap applies the updates from a map to the target MCPToolLog entry.
-func applyMCPToolLogUpdateMap(target *MCPToolLog, updates map[string]interface{}) error {
-	for key, value := range updates {
-		switch key {
-		case "request_id":
-			if v, ok := value.(string); ok {
-				target.RequestID = v
-			}
-		case "llm_request_id":
-			if v, ok := value.(string); ok {
-				target.LLMRequestID = &v
-			}
-		case "tool_name":
-			if v, ok := value.(string); ok {
-				target.ToolName = v
-			}
-		case "server_label":
-			if v, ok := value.(string); ok {
-				target.ServerLabel = v
-			}
-		case "virtual_key_id":
-			if v, ok := value.(string); ok {
-				target.VirtualKeyID = &v
-			}
-		case "virtual_key_name":
-			if v, ok := value.(string); ok {
-				target.VirtualKeyName = &v
-			}
-		case "arguments":
-			if v, ok := value.(string); ok {
-				target.Arguments = v
-				target.ArgumentsParsed = nil
-			}
-		case "result":
-			if v, ok := value.(string); ok {
-				target.Result = v
-				target.ResultParsed = nil
-			}
-		case "error_details":
-			if v, ok := value.(string); ok {
-				target.ErrorDetails = v
-				target.ErrorDetailsParsed = nil
-			}
-		case "metadata":
-			if v, ok := value.(string); ok {
-				target.Metadata = v
-				target.MetadataParsed = nil
-			}
-		case "redaction_mapping":
-			if v, ok := value.(string); ok {
-				target.RedactionMapping = v
-			}
-		case "latency":
-			if v, ok := numericToFloat64(value); ok {
-				target.Latency = &v
-			}
-		case "cost":
-			if v, ok := numericToFloat64(value); ok {
-				target.Cost = &v
-			}
-		case "status":
-			if v, ok := value.(string); ok {
-				target.Status = v
-			}
-		}
-	}
-	return target.DeserializeFields()
-}
-
-// applyMCPToolLogUpdateStruct applies the updates from a MCPToolLog struct to the target MCPToolLog entry.
-func applyMCPToolLogUpdateStruct(target *MCPToolLog, update *MCPToolLog) error {
-	if update.RequestID != "" {
-		target.RequestID = update.RequestID
-	}
-	if update.LLMRequestID != nil {
-		target.LLMRequestID = update.LLMRequestID
-	}
-	if !update.Timestamp.IsZero() {
-		target.Timestamp = update.Timestamp
-	}
-	if update.ToolName != "" {
-		target.ToolName = update.ToolName
-	}
-	if update.ServerLabel != "" {
-		target.ServerLabel = update.ServerLabel
-	}
-	if update.VirtualKeyID != nil {
-		target.VirtualKeyID = update.VirtualKeyID
-	}
-	if update.VirtualKeyName != nil {
-		target.VirtualKeyName = update.VirtualKeyName
-	}
-	if update.Arguments != "" {
-		target.Arguments = update.Arguments
-		target.ArgumentsParsed = nil
-	}
-	if update.Result != "" {
-		target.Result = update.Result
-		target.ResultParsed = nil
-	}
-	if update.ErrorDetails != "" {
-		target.ErrorDetails = update.ErrorDetails
-		target.ErrorDetailsParsed = nil
-	}
-	if update.Latency != nil {
-		target.Latency = update.Latency
-	}
-	if update.Cost != nil {
-		target.Cost = update.Cost
-	}
-	if update.Status != "" {
-		target.Status = update.Status
-	}
-	if update.Metadata != "" {
-		target.Metadata = update.Metadata
-		target.MetadataParsed = nil
-	}
-	if update.RedactionMapping != "" {
-		target.RedactionMapping = update.RedactionMapping
-	}
-	if !update.CreatedAt.IsZero() {
-		target.CreatedAt = update.CreatedAt
-	}
-	return target.DeserializeFields()
-}
-
-// prepareMCPToolLogDBUpdates prepares a map of DB updates from a MCPToolLog entry.
-func prepareMCPToolLogDBUpdates(entry any) (map[string]any, error) {
-	switch v := entry.(type) {
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(v))
-		for key, value := range v {
-			switch key {
-			case "has_object":
-				continue
-			case "result", "error_details":
-				out[key] = ""
-			case "arguments":
-				if s, ok := value.(string); ok {
-					out[key] = marshalMCPPreviewString(truncateRunes(s, maxMCPToolInputPreviewRunes))
-				}
-			default:
-				out[key] = value
-			}
-		}
-		return out, nil
-	case *MCPToolLog:
-		if v == nil {
-			return nil, nil
-		}
-		return prepareMCPToolLogDBUpdatesFromStruct(*v)
-	case MCPToolLog:
-		return prepareMCPToolLogDBUpdatesFromStruct(v)
-	default:
-		return nil, nil
-	}
-}
-
-// prepareMCPToolLogDBUpdatesFromStruct prepares a map of DB updates from a MCPToolLog struct.
-func prepareMCPToolLogDBUpdatesFromStruct(update MCPToolLog) (map[string]any, error) {
-	if err := update.SerializeFields(); err != nil {
-		return nil, err
-	}
-	PrepareMCPToolDBEntry(&update)
-	out := make(map[string]any)
-	if update.RequestID != "" {
-		out["request_id"] = update.RequestID
-	}
-	if update.LLMRequestID != nil {
-		out["llm_request_id"] = *update.LLMRequestID
-	}
-	if !update.Timestamp.IsZero() {
-		out["timestamp"] = update.Timestamp
-	}
-	if update.ToolName != "" {
-		out["tool_name"] = update.ToolName
-	}
-	if update.ServerLabel != "" {
-		out["server_label"] = update.ServerLabel
-	}
-	if update.VirtualKeyID != nil {
-		out["virtual_key_id"] = *update.VirtualKeyID
-	}
-	if update.VirtualKeyName != nil {
-		out["virtual_key_name"] = *update.VirtualKeyName
-	}
-	if update.Arguments != "" {
-		out["arguments"] = update.Arguments
-	}
-	if update.Latency != nil {
-		out["latency"] = *update.Latency
-	}
-	if update.Cost != nil {
-		out["cost"] = *update.Cost
-	}
-	if update.Status != "" {
-		out["status"] = update.Status
-	}
-	if update.Metadata != "" {
-		out["metadata"] = update.Metadata
-	}
-	if update.RedactionMapping != "" {
-		out["redaction_mapping"] = update.RedactionMapping
-	}
-	if !update.CreatedAt.IsZero() {
-		out["created_at"] = update.CreatedAt
-	}
-	return out, nil
-}
-
-// numericToFloat64 converts a numeric value to a float64, returning the value and a success flag.
-func numericToFloat64(value any) (float64, bool) {
-	switch v := value.(type) {
-	case float64:
-		return v, true
-	case float32:
-		return float64(v), true
-	case int:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	default:
-		return 0, false
-	}
-}
-
-// marshalMCPPreviewString marshals a string into a JSON string for use as an MCP preview field.
-func marshalMCPPreviewString(s string) string {
-	data, err := sonic.Marshal(s)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
-// CreateMCPToolLog creates a new MCP tool log in the DB and enqueues it for offload to object storage.
-func (h *HybridLogStore) CreateMCPToolLog(ctx context.Context, entry *MCPToolLog) error {
-	payload, err := MarshalMCPToolLogPayload(entry)
-	if err != nil {
-		return fmt.Errorf("logstore: serialize MCP tool log before offload: %w", err)
-	}
-	tags := BuildMCPToolTags(entry)
-
-	dbEntry := *entry
-	PrepareMCPToolDBEntry(&dbEntry)
-	if err := h.inner.CreateMCPToolLog(ctx, &dbEntry); err != nil {
-		return err
-	}
-	h.enqueueRawUpload(entry.ID, entry.Timestamp, h.mcpToolKey(entry.Timestamp, entry.ID), uploadKindMCP, entry.Status, payload, tags)
-	return nil
-}
-
-// BatchCreateMCPToolLogsIfNotExists creates MCP tool logs in the DB and enqueues them for offload to object storage, if they do not already exist.
-func (h *HybridLogStore) BatchCreateMCPToolLogsIfNotExists(ctx context.Context, entries []*MCPToolLog) error {
-	if len(entries) == 0 {
-		return nil
-	}
-	type pendingUpload struct {
-		logID     string
-		timestamp time.Time
-		status    string
-		payload   []byte
-		tags      map[string]string
-	}
-	var uploads []pendingUpload
-
-	dbEntries := make([]*MCPToolLog, 0, len(entries))
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		payload, err := MarshalMCPToolLogPayload(entry)
-		if err != nil {
-			return fmt.Errorf("logstore: serialize MCP tool log before offload: %w", err)
-		}
-		dbEntry := *entry
-		PrepareMCPToolDBEntry(&dbEntry)
-		dbEntries = append(dbEntries, &dbEntry)
-		uploads = append(uploads, pendingUpload{
-			logID:     entry.ID,
-			timestamp: entry.Timestamp,
-			status:    entry.Status,
-			payload:   payload,
-			tags:      BuildMCPToolTags(entry),
-		})
-	}
-
-	if len(dbEntries) == 0 {
-		return nil
-	}
-	if err := h.inner.BatchCreateMCPToolLogsIfNotExists(ctx, dbEntries); err != nil {
-		return err
-	}
-
-	for _, u := range uploads {
-		h.enqueueRawUpload(u.logID, u.timestamp, h.mcpToolKey(u.timestamp, u.logID), uploadKindMCP, u.status, u.payload, u.tags)
-	}
-	return nil
-}
-
-// FindMCPToolLog finds an MCP tool log by its ID and hydrates it with any associated object storage data.
-func (h *HybridLogStore) FindMCPToolLog(ctx context.Context, id string) (*MCPToolLog, error) {
-	log, err := h.inner.FindMCPToolLog(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := h.hydrateMCPToolLog(ctx, log); err != nil {
-		h.logger.Warn("%v", err)
-	}
-	return log, nil
-}
-
-// UpdateMCPToolLog updates an existing MCP tool log with the given ID using the provided entry data.
-func (h *HybridLogStore) UpdateMCPToolLog(ctx context.Context, id string, entry any) error {
-	current, err := h.inner.FindMCPToolLog(ctx, id)
-	if err != nil {
-		return err
-	}
-	foundKey, err := h.hydrateMCPToolLogFromObjectKey(ctx, current)
-	if err != nil {
-		return err
-	}
-	if err := applyMCPToolLogUpdate(current, entry); err != nil {
-		return err
-	}
-
-	dbUpdates, err := prepareMCPToolLogDBUpdates(entry)
-	if err != nil {
-		return err
-	}
-	if len(dbUpdates) > 0 {
-		if err := h.inner.UpdateMCPToolLog(ctx, id, dbUpdates); err != nil {
-			return err
-		}
-	}
-
-	payload, err := MarshalMCPToolLogPayload(current)
-	if err != nil {
-		return fmt.Errorf("logstore: serialize MCP tool log update before offload: %w", err)
-	}
-	key := h.mcpToolKey(current.Timestamp, current.ID)
-	staleKey := ""
-	if foundKey != key {
-		staleKey = foundKey
-	}
-	h.enqueueReplacingUpload(current.ID, current.Timestamp, key, staleKey, uploadKindMCP, current.Status, payload, BuildMCPToolTags(current))
-	return nil
-}
-
-// SearchMCPToolLogs searches for MCP tool logs that match the given filters and returns the results.
-func (h *HybridLogStore) SearchMCPToolLogs(ctx context.Context, filters MCPToolLogSearchFilters, pagination PaginationOptions) (*MCPToolLogSearchResult, error) {
-	return h.inner.SearchMCPToolLogs(ctx, filters, pagination)
-}
-
-// GetMCPToolLogStats returns statistics about MCP tool logs that match the given filters.
-func (h *HybridLogStore) GetMCPToolLogStats(ctx context.Context, filters MCPToolLogSearchFilters) (*MCPToolLogStats, error) {
-	return h.inner.GetMCPToolLogStats(ctx, filters)
-}
-
-// HasMCPToolLogs returns whether there are any MCP tool logs in the store.
-func (h *HybridLogStore) HasMCPToolLogs(ctx context.Context) (bool, error) {
-	return h.inner.HasMCPToolLogs(ctx)
-}
-
-// DeleteMCPToolLogs deletes MCP tool logs with the given IDs, including any associated object storage objects.
-func (h *HybridLogStore) DeleteMCPToolLogs(ctx context.Context, ids []string) error {
-	var keys []string
-	for _, id := range ids {
-		log, findErr := h.inner.FindMCPToolLog(ctx, id)
-		if findErr != nil && !errors.Is(findErr, ErrNotFound) {
-			return findErr
-		}
-		if log != nil && log.HasObject {
-			keys = append(keys, h.withAlternateKeys(h.mcpToolKey(log.Timestamp, log.ID))...)
-		}
-	}
-	if err := h.inner.DeleteMCPToolLogs(ctx, ids); err != nil {
-		return err
-	}
-	if len(keys) > 0 {
-		if delErr := h.objects.DeleteBatch(ctx, keys); delErr != nil {
-			h.logger.Warn("objectstore: failed to batch delete %d MCP tool log objects: %v", len(keys), delErr)
-		}
-	}
-	return nil
-}
-
-// FlushMCPToolLogs flushes MCP tool logs that are older than the given time.
-func (h *HybridLogStore) FlushMCPToolLogs(ctx context.Context, since time.Time) error {
-	return h.inner.FlushMCPToolLogs(ctx, since)
-}
-
-// GetAvailableToolNames returns a list of tool names that match the given query.
-func (h *HybridLogStore) GetAvailableToolNames(ctx context.Context, limit int, query string) ([]string, error) {
-	return h.inner.GetAvailableToolNames(ctx, limit, query)
-}
-
-// GetAvailableMCPUserAgents returns distinct raw User-Agent strings from MCP tool logs.
-func (h *HybridLogStore) GetAvailableMCPUserAgents(ctx context.Context, limit int, query string) ([]string, error) {
-	return h.inner.GetAvailableMCPUserAgents(ctx, limit, query)
-}
-
-// GetAvailableMCPApps delegates to the inner store and returns distinct backend-
-// detected app labels from MCP tool logs.
-func (h *HybridLogStore) GetAvailableMCPApps(ctx context.Context, limit int, query string) ([]string, error) {
-	return h.inner.GetAvailableMCPApps(ctx, limit, query)
-}
-
-// GetAvailableServerLabels returns a list of server labels that match the given query.
-func (h *HybridLogStore) GetAvailableServerLabels(ctx context.Context, limit int, query string) ([]string, error) {
-	return h.inner.GetAvailableServerLabels(ctx, limit, query)
-}
-
-// GetAvailableMCPVirtualKeys returns a list of MCP tool log virtual keys that match the given query.
-func (h *HybridLogStore) GetAvailableMCPVirtualKeys(ctx context.Context, limit int, query string) ([]MCPToolLog, error) {
-	return h.inner.GetAvailableMCPVirtualKeys(ctx, limit, query)
-}
-
-// GetDistinctMCPKeyPairs delegates to the inner store.
-func (h *HybridLogStore) GetDistinctMCPKeyPairs(ctx context.Context, idCol, nameCol string, limit int, query string) ([]KeyPairResult, error) {
-	return h.inner.GetDistinctMCPKeyPairs(ctx, idCol, nameCol, limit, query)
 }
 
 // Async Job methods — delegated directly.

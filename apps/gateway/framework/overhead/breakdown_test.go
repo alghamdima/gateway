@@ -199,22 +199,22 @@ func TestComputeOverheadBreakdown_CorePhases(t *testing.T) {
 	}
 }
 
-// A plugin span that itself contains a nested child (e.g. an MCP round-trip) counts
+// A plugin span that itself contains a nested child (e.g. a nested call) counts
 // only its self-time: the plugin's own wall duration minus the child's.
 func TestComputeOverheadBreakdown_SelfTimeExcludesChildren(t *testing.T) {
 	base := time.Now()
 	trace := &schemas.Trace{Spans: []*schemas.Span{
 		span(base, "root", "", "/v1/chat/completions", schemas.SpanKindHTTPRequest, 0, 100),
-		span(base, "pre", "root", "plugin.mcp.prehook", schemas.SpanKindPlugin, 0, 40),
-		// MCP round-trip nested under the plugin: subtracted from the plugin's self-time.
-		span(base, "tool", "pre", "mcp.execute", schemas.SpanKindMCPTool, 5, 35),
+		span(base, "pre", "root", "plugin.example.prehook", schemas.SpanKindPlugin, 0, 40),
+		// A call nested under the plugin: subtracted from the plugin's self-time.
+		span(base, "nested", "pre", "nested.call", schemas.SpanKindInternal, 5, 35),
 	}}
 
 	// No overhead total supplied: only measured self-time, no core bucket.
 	got := bucketMap(t, trace, 0, false)
 	// plugin wall 40ms minus 30ms child = 10ms self-time.
-	if got["plugin.mcp"] != 10000 {
-		t.Errorf("plugin.mcp = %v us, want 10000", got["plugin.mcp"])
+	if got["plugin.example"] != 10000 {
+		t.Errorf("plugin.example = %v us, want 10000", got["plugin.example"])
 	}
 	if _, ok := got["scheduling"]; ok {
 		t.Error("no core bucket without an overhead total")

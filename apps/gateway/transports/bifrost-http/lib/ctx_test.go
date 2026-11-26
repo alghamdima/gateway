@@ -1798,7 +1798,7 @@ func newGateway(t *testing.T, u *gwUpstream, setup gwSetup) *gateway {
 		}
 	}
 	governanceConfig := setup.governance
-	governancePlugin, err := governance.Init(ctx, &governance.Config{}, logger, nil, &governanceConfig, setup.catalog, nil, gwProviders{config: config})
+	governancePlugin, err := governance.Init(ctx, &governance.Config{}, logger, nil, &governanceConfig, setup.catalog, gwProviders{config: config})
 	if err != nil {
 		t.Fatalf("governance.Init: %v", err)
 	}

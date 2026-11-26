@@ -15,7 +15,7 @@ import (
 // TestRealtimeAttributionPersistsAcrossTurns exercises both hooks and the async writer.
 func TestRealtimeAttributionPersistsAcrossTurns(t *testing.T) {
 	store := newTestStore(t)
-	p, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	p, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close(context.Background())) })
 	g := grant.New()

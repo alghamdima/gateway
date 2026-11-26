@@ -16,7 +16,6 @@ import (
 type usageParityStore struct {
 	store     *RDBLogStore
 	create    func(t *testing.T, entry *Log)
-	createMCP func(t *testing.T, entry *MCPToolLog)
 }
 
 // usageParityStores runs fn against SQLite, Postgres and ClickHouse, skipping a
@@ -28,10 +27,6 @@ func usageParityStores(t *testing.T, fn func(t *testing.T, s usageParityStore)) 
 			create: func(t *testing.T, entry *Log) {
 				t.Helper()
 				require.NoError(t, store.Create(context.Background(), entry))
-			},
-			createMCP: func(t *testing.T, entry *MCPToolLog) {
-				t.Helper()
-				require.NoError(t, store.CreateMCPToolLog(context.Background(), entry))
 			},
 		}
 	}
@@ -297,56 +292,6 @@ func TestDimensionModelUsageMatchesPerEntityModelRankings(t *testing.T) {
 		assert.Equal(t, wantKeys, inPage, "no extra groups for the requested units")
 		assert.Equal(t, inPage, len(gotByKey), "only the requested units are returned")
 		assert.Contains(t, gotByKey, key{"bu-a", "claude", "anthropic"})
-	})
-}
-
-// TestMCPToolCountsByDimensionMatchesTopTools checks one grouped read gives every
-// entity the distinct tool count that one GetMCPTopTools call per entity gives.
-func TestMCPToolCountsByDimensionMatchesTopTools(t *testing.T) {
-	usageParityStores(t, func(t *testing.T, s usageParityStore) {
-		now := time.Now().UTC().Truncate(time.Second)
-		start, end := now.Add(-time.Hour), now.Add(time.Hour)
-		n := 0
-		add := func(unit, tool, status string, ts time.Time) {
-			n++
-			id := fmt.Sprintf("mcp-%d", n)
-			s.createMCP(t, &MCPToolLog{ID: id, RequestID: id, Timestamp: ts, CreatedAt: ts, ToolName: tool, Status: status, BusinessUnitID: &unit})
-		}
-		add("bu-a", "search", "success", now)
-		add("bu-a", "search", "success", now)
-		add("bu-a", "fetch", "error", now)
-		add("bu-a", "write", "processing", now)
-		add("bu-a", "old", "success", now.Add(-3*time.Hour))
-		add("bu-b", "search", "success", now)
-		add("bu-c", "search", "success", now)
-
-		ctx := context.Background()
-		ids := []string{"bu-a", "bu-b"}
-		filters := MCPToolLogSearchFilters{StartTime: &start, EndTime: &end, BusinessUnitIDs: ids}
-		got, err := s.store.GetMCPToolCountsByDimension(ctx, filters, RankingDimensionBusinessUnit)
-		require.NoError(t, err)
-		for _, id := range ids {
-			single := filters
-			single.BusinessUnitIDs = []string{id}
-			top, err := s.store.GetMCPTopTools(ctx, single, 100)
-			require.NoError(t, err)
-			assert.Equal(t, len(top.Tools), got[id], id)
-		}
-		assert.Equal(t, 2, got["bu-a"], "processing and out-of-window calls are not counted")
-		assert.NotContains(t, got, "bu-c", "units outside the filter are not read")
-
-		// Without an id filter the read groups every owner, so the ceiling must hide
-		// the owners the caller may not be shown.
-		unfiltered := MCPToolLogSearchFilters{StartTime: &start, EndTime: &end}
-		all, err := s.store.GetMCPToolCountsByDimension(ctx, unfiltered, RankingDimensionBusinessUnit)
-		require.NoError(t, err)
-		assert.Contains(t, all, "bu-c", "no ceiling, every owner is counted")
-		bounded, err := s.store.GetMCPToolCountsByDimension(withCeiling(ctx, "business_unit_id", "bu-a"), unfiltered, RankingDimensionBusinessUnit)
-		require.NoError(t, err)
-		assert.Equal(t, map[string]int{"bu-a": 2}, bounded, "owners outside the ceiling are not named")
-
-		_, err = s.store.GetMCPToolCountsByDimension(ctx, filters, RankingDimensionVirtualKey)
-		assert.Error(t, err, "MCP tool logs carry no virtual key dimension reader")
 	})
 }
 

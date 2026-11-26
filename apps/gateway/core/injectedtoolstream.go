@@ -487,44 +487,6 @@ func chainInjectedStream(ctx *schemas.BifrostContext, turns injectedStreamTurns,
 	return out, nil
 }
 
-// startInjectedChatStream serves a streaming chat attempt whose provider injects tools.
-func (bifrost *Bifrost) startInjectedChatStream(ctx *schemas.BifrostContext, provider schemas.Provider, config *schemas.ProviderConfig, key schemas.Key, original *schemas.BifrostChatRequest, set *injectedToolSet, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context)) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	session := newInjectedChatStream(set)
-	turn := applyInjectedToolsChat(original, set)
-	return chainInjectedStream(ctx, injectedStreamTurns{
-		process: func(result *schemas.BifrostResponse, final bool) ([]clientEmit, bool) {
-			if result.ChatResponse == nil {
-				return nil, false
-			}
-			var emits []clientEmit
-			for _, emit := range session.onChunk(result.ChatResponse, final) {
-				emits = append(emits, clientEmit{result: &schemas.BifrostResponse{ChatResponse: emit.resp}, terminal: emit.terminal})
-			}
-			return emits, true
-		},
-		continues: session.continues,
-		usage:     func() *schemas.BifrostLLMUsage { return session.usage },
-		advance: func() {
-			assistant, injected := session.endTurn()
-			results := executeInjectedCalls(injected, func(call schemas.ChatAssistantMessageToolCall) *schemas.ChatMessage {
-				return bifrost.executeInjectedCall(ctx, set, call)
-			})
-			next := *turn
-			next.Params = relaxForcedChatChoice(turn.Params)
-			next.Input = make([]schemas.ChatMessage, 0, len(turn.Input)+1+len(results))
-			next.Input = append(next.Input, turn.Input...)
-			next.Input = append(next.Input, assistant)
-			for _, result := range results {
-				next.Input = append(next.Input, *result)
-			}
-			turn = &next
-		},
-		dispatch: func(runner schemas.PostHookRunner, finalizer func(context.Context)) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-			return bifrost.dispatchChatStream(ctx, provider, config, key, turn, runner, finalizer)
-		},
-	}, postHookRunner, postHookSpanFinalizer)
-}
-
 // startInjectedResponsesStream serves a streaming Responses attempt whose provider
 // injects tools.
 func (bifrost *Bifrost) startInjectedResponsesStream(ctx *schemas.BifrostContext, provider schemas.Provider, config *schemas.ProviderConfig, key schemas.Key, original *schemas.BifrostResponsesRequest, set *injectedToolSet, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context)) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {

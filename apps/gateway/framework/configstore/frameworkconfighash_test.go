@@ -52,23 +52,6 @@ func TestGenerateFrameworkConfigHash_NilLiveIntervalPreservesLegacyDigest(t *tes
 		}
 	})
 
-	t.Run("mcp payload is unchanged by a nil live interval", func(t *testing.T) {
-		mcpURL := "https://example.com/mcp.json"
-		mcpInterval := int64(86400)
-
-		mcpOnly, err := GenerateFrameworkConfigHash(&pricingURL, &modelParamsURL, &syncInterval, FrameworkConfigHashOptions{
-			MCPLibraryURL:          &mcpURL,
-			MCPLibrarySyncInterval: &mcpInterval,
-		})
-		if err != nil {
-			t.Fatalf("GenerateFrameworkConfigHash returned error: %v", err)
-		}
-		const want = "8dbe17439dad62ba0ac9d63bd2dbe6413ad46749c7d18739887c29a6a7cb5652"
-		if mcpOnly != want {
-			t.Fatalf("mcp payload digest changed.\n got: %s\nwant: %s\n\nExisting deployments with mcp_library_* in config.json rely on this digest staying stable.", mcpOnly, want)
-		}
-	})
-
 	t.Run("setting the live interval does change the digest", func(t *testing.T) {
 		// The flip side of the contract: an operator editing the value in
 		// config.json must be detected as a file change.
@@ -88,24 +71,6 @@ func TestGenerateFrameworkConfigHash_NilLiveIntervalPreservesLegacyDigest(t *tes
 		}
 	})
 
-	t.Run("a nil openapi_url leaves both payloads unchanged and a set one changes them", func(t *testing.T) {
-		mcpURL := "https://example.com/mcp.json"
-		mcpInterval := int64(86400)
-		withNil, err := GenerateFrameworkConfigHash(&pricingURL, &modelParamsURL, &syncInterval, FrameworkConfigHashOptions{
-			MCPLibraryURL:          &mcpURL,
-			MCPLibrarySyncInterval: &mcpInterval,
-			OpenAPIURL:             nil,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, "8dbe17439dad62ba0ac9d63bd2dbe6413ad46749c7d18739887c29a6a7cb5652", withNil, "a nil openapi_url must not shift the mcp payload digest")
-
-		openAPIURL := "specs/openapi.json"
-		base, err := GenerateFrameworkConfigHash(&pricingURL, &modelParamsURL, &syncInterval)
-		require.NoError(t, err)
-		withOpenAPI, err := GenerateFrameworkConfigHash(&pricingURL, &modelParamsURL, &syncInterval, FrameworkConfigHashOptions{OpenAPIURL: &openAPIURL})
-		require.NoError(t, err)
-		assert.NotEqual(t, base, withOpenAPI, "setting openapi_url in config.json must register as a file change")
-	})
 }
 
 // ruleWithFallbacks decodes a routing fixture through the persisted fallback wire format.

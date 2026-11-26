@@ -26,9 +26,6 @@ func InferPluginTypes(plugin schemas.BasePlugin) []schemas.PluginType {
 	if _, ok := plugin.(schemas.LLMPlugin); ok {
 		types = append(types, schemas.PluginTypeLLM)
 	}
-	if _, ok := plugin.(schemas.MCPPlugin); ok {
-		types = append(types, schemas.PluginTypeMCP)
-	}
 	if _, ok := plugin.(schemas.HTTPTransportPlugin); ok {
 		types = append(types, schemas.PluginTypeHTTP)
 	}
@@ -125,7 +122,7 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 			return nil, fmt.Errorf("failed to marshal logging plugin config: %w", err)
 		}
 		return logging.Init(ctx, loggingConfig, logger, bifrostConfig.LogsStore,
-			bifrostConfig.ConfigStore, bifrostConfig.ModelCatalog, bifrostConfig.MCPCatalog)
+			bifrostConfig.ConfigStore, bifrostConfig.ModelCatalog)
 
 	case governance.PluginName:
 		governanceConfig, err := MarshalPluginConfig[governance.Config](pluginConfig)
@@ -134,8 +131,7 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 		}
 		inMemoryStore := &GovernanceInMemoryStore{Config: bifrostConfig}
 		governancePlugin, err := governance.Init(ctx, governanceConfig, logger, bifrostConfig.ConfigStore,
-			bifrostConfig.GovernanceConfig, bifrostConfig.ModelCatalog,
-			bifrostConfig.MCPCatalog, inMemoryStore)
+			bifrostConfig.GovernanceConfig, bifrostConfig.ModelCatalog, inMemoryStore)
 		if err != nil {
 			return nil, err
 		}
@@ -275,9 +271,8 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	// 4. Governance (if enabled and not enterprise)
 	if ctx.Value(schemas.BifrostContextKeyIsEnterprise) == nil {
 		config := &governance.Config{
-			IsVkMandatory:         &s.Config.ClientConfig.EnforceAuthOnInference,
-			RequiredHeaders:       &s.Config.ClientConfig.RequiredHeaders,
-			DisableAutoToolInject: &s.Config.ClientConfig.MCPDisableAutoToolInject,
+			IsVkMandatory:   &s.Config.ClientConfig.EnforceAuthOnInference,
+			RequiredHeaders: &s.Config.ClientConfig.RequiredHeaders,
 
 			ObjectOwnershipEnforced: s.Config.ShouldEnforceVKObjectOwnership,
 		}

@@ -267,18 +267,6 @@ func TestAuditChange_VirtualKeyDeleteSnapshotIncludesBudgets(t *testing.T) {
 	}
 }
 
-// auditVKUpdateStore serves the MCP update handler's VK assignment read with no rows.
-// auditVKUpdateStore fails the VK assignment step's read, which runs after the
-// client write has committed.
-type auditVKUpdateStore struct {
-	mockUpdateConfigStore
-}
-
-// GetVirtualKeyMCPConfigsByMCPClientID fails, as a store outage would.
-func (s *auditVKUpdateStore) GetVirtualKeyMCPConfigsByMCPClientID(context.Context, uint) ([]configstoreTables.TableVirtualKeyMCPConfig, error) {
-	return nil, errors.New("store unavailable")
-}
-
 // TestAuditChange_MCPClientUpdateRecordedWhenVKAssignmentFails pins that an
 // update whose client write committed is audited even when the VK assignment
 // step after it fails, and that the after snapshot keeps the fields the handler
@@ -294,7 +282,6 @@ func TestAuditChange_MCPClientUpdateRecordedWhenVKAssignmentFails(t *testing.T) 
 		AuthType:       schemas.MCPAuthTypeNone,
 	}
 	store := &lib.Config{
-		MCPConfig:    &schemas.MCPConfig{ClientConfigs: []*schemas.MCPClientConfig{existing}},
 		ClientConfig: &configstore.ClientConfig{},
 	}
 	cfgStore := &auditVKUpdateStore{}
@@ -326,11 +313,6 @@ func TestAuditChange_MCPClientUpdateRecordedWhenVKAssignmentFails(t *testing.T) 
 	}
 }
 
-// failingRemoveMCPManager fails the runtime removal after the row is deleted.
-type failingRemoveMCPManager struct {
-	MCPManager
-}
-
 func (failingRemoveMCPManager) RemoveMCPClient(context.Context, string) error {
 	return errors.New("runtime removal failed")
 }
@@ -339,7 +321,7 @@ func (failingRemoveMCPManager) RemoveMCPClient(context.Context, string) error {
 // delete is audited once the row is gone, even when the runtime removal fails.
 func TestAuditChange_MCPClientDeleteRecordedWhenRuntimeRemovalFails(t *testing.T) {
 	SetLogger(&mockLogger{})
-	cfgStore := newRealOAuth2Store(t)
+	cfgStore := newRealConfigStore(t)
 	if err := cfgStore.CreateMCPClientConfig(context.Background(), &schemas.MCPClientConfig{
 		ID:               "mcp-audit-delete",
 		Name:             "audit_delete",

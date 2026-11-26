@@ -126,7 +126,6 @@ type ProviderResponse struct {
 	CustomProviderConfig     *schemas.CustomProviderConfig    `json:"custom_provider_config,omitempty"` // Custom provider configuration
 	OpenAIConfig             *schemas.OpenAIConfig            `json:"openai_config,omitempty"`          // OpenAI-specific configuration
 	PromptCache              *schemas.PromptCacheConfig       `json:"prompt_cache,omitempty"`           // Prompt-cache breakpoint injection
-	InjectedTools            []schemas.InjectedTool           `json:"injected_tools,omitempty"`         // MCP tools injected and auto-executed server side
 	Passthrough              *schemas.PassthroughPolicy       `json:"passthrough,omitempty"`            // Routes the HTTP passthrough endpoints may forward
 	ProviderStatus           ProviderStatus                   `json:"provider_status"`                  // Health/initialization status of the provider
 	Status                   string                           `json:"status,omitempty"`                 // Operational status (e.g., list_models_failed)
@@ -182,10 +181,9 @@ type providerCreatePayload struct {
 	StoreRawRequestResponse  *bool                             `json:"store_raw_request_response,omitempty"`
 	IgnoreProviderCost       *bool                             `json:"ignore_provider_cost,omitempty"`
 	CustomProviderConfig     *schemas.CustomProviderConfig     `json:"custom_provider_config,omitempty"`
-	OpenAIConfig             *schemas.OpenAIConfig             `json:"openai_config,omitempty"`  // OpenAI-specific configuration
-	PromptCache              *schemas.PromptCacheConfig        `json:"prompt_cache,omitempty"`   // Prompt-cache breakpoint injection
-	InjectedTools            []schemas.InjectedTool            `json:"injected_tools,omitempty"` // MCP tools injected and auto-executed server side
-	Passthrough              *schemas.PassthroughPolicy        `json:"passthrough,omitempty"`    // Routes the HTTP passthrough endpoints may forward
+	OpenAIConfig             *schemas.OpenAIConfig             `json:"openai_config,omitempty"` // OpenAI-specific configuration
+	PromptCache              *schemas.PromptCacheConfig        `json:"prompt_cache,omitempty"`  // Prompt-cache breakpoint injection
+	Passthrough              *schemas.PassthroughPolicy        `json:"passthrough,omitempty"`   // Routes the HTTP passthrough endpoints may forward
 }
 
 type providerUpdatePayload struct {
@@ -197,10 +195,9 @@ type providerUpdatePayload struct {
 	StoreRawRequestResponse  *bool                            `json:"store_raw_request_response,omitempty"`
 	IgnoreProviderCost       *bool                            `json:"ignore_provider_cost,omitempty"`
 	CustomProviderConfig     *schemas.CustomProviderConfig    `json:"custom_provider_config,omitempty"`
-	OpenAIConfig             *schemas.OpenAIConfig            `json:"openai_config,omitempty"`  // OpenAI-specific configuration
-	PromptCache              *schemas.PromptCacheConfig       `json:"prompt_cache,omitempty"`   // Prompt-cache breakpoint injection
-	InjectedTools            []schemas.InjectedTool           `json:"injected_tools,omitempty"` // MCP tools injected and auto-executed server side
-	Passthrough              *schemas.PassthroughPolicy       `json:"passthrough,omitempty"`    // Routes the HTTP passthrough endpoints may forward
+	OpenAIConfig             *schemas.OpenAIConfig            `json:"openai_config,omitempty"` // OpenAI-specific configuration
+	PromptCache              *schemas.PromptCacheConfig       `json:"prompt_cache,omitempty"`  // Prompt-cache breakpoint injection
+	Passthrough              *schemas.PassthroughPolicy       `json:"passthrough,omitempty"`   // Routes the HTTP passthrough endpoints may forward
 }
 
 // applyProviderConfigUpdates copies onto config only the nested config blocks the
@@ -237,9 +234,6 @@ func applyProviderConfigUpdates(config *configstore.ProviderConfig, payload *pro
 	}
 	if carried("prompt_cache") {
 		config.PromptCache = payload.PromptCache
-	}
-	if carried("injected_tools") {
-		config.InjectedTools = payload.InjectedTools
 	}
 	if carried("passthrough") {
 		config.Passthrough = payload.Passthrough
@@ -372,13 +366,9 @@ func (h *ProviderHandler) getProvider(ctx *fasthttp.RequestCtx) {
 // addProvider handles POST /api/providers - Add a new provider
 // NOTE: This only gets called when a new custom provider is added
 // sendPayloadDecodeError rejects a provider write body the typed payload cannot decode.
-// An injected_tools value of the wrong shape (the old object form, a non-array) is one
-// such body, and its own message says what to fix instead of a generic one.
+// A passthrough value of the wrong shape is one such body, and its own message says
+// what to fix instead of a generic one.
 func sendPayloadDecodeError(ctx *fasthttp.RequestCtx) {
-	if err := lib.ValidateInjectedToolsBody(ctx.PostBody()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid injected tools config: %v", err))
-		return
-	}
 	if err := lib.ValidatePassthroughBody(ctx.PostBody()); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid passthrough config: %v", err))
 		return
@@ -483,7 +473,6 @@ func (h *ProviderHandler) addProvider(ctx *fasthttp.RequestCtx) {
 		CustomProviderConfig:     payload.CustomProviderConfig,
 		OpenAIConfig:             payload.OpenAIConfig,
 		PromptCache:              payload.PromptCache,
-		InjectedTools:            payload.InjectedTools,
 		Passthrough:              payload.Passthrough,
 	}
 	if requireGenuineAuthForInterception(ctx, configstore.ProviderConfig{}, config) {
@@ -499,14 +488,6 @@ func (h *ProviderHandler) addProvider(ctx *fasthttp.RequestCtx) {
 	// and then rejected by the provider at request time instead.
 	if err := lib.ValidatePromptCache(config.PromptCache); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid prompt cache config: %v", err))
-		return
-	}
-	if err := lib.ValidateInjectedToolsBody(ctx.PostBody()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid injected tools config: %v", err))
-		return
-	}
-	if err := lib.ValidateInjectedTools(config.InjectedTools, h.inMemoryStore.GetMCPClientNames()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid injected tools config: %v", err))
 		return
 	}
 	if err := lib.ValidatePassthroughBody(ctx.PostBody()); err != nil {
@@ -647,7 +628,6 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 		CustomProviderConfig:     oldConfigRaw.CustomProviderConfig,
 		OpenAIConfig:             oldConfigRaw.OpenAIConfig,
 		PromptCache:              oldConfigRaw.PromptCache,
-		InjectedTools:            oldConfigRaw.InjectedTools,
 		Passthrough:              oldConfigRaw.Passthrough,
 		StoreRawRequestResponse:  oldConfigRaw.StoreRawRequestResponse,
 		IgnoreProviderCost:       oldConfigRaw.IgnoreProviderCost,
@@ -678,14 +658,6 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 	}
 	if err := lib.ValidatePromptCache(payload.PromptCache); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid prompt cache config: %v", err))
-		return
-	}
-	if err := lib.ValidateInjectedToolsBody(ctx.PostBody()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid injected tools config: %v", err))
-		return
-	}
-	if err := lib.ValidateInjectedTools(payload.InjectedTools, h.inMemoryStore.GetMCPClientNames()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid injected tools config: %v", err))
 		return
 	}
 	if err := lib.ValidatePassthroughBody(ctx.PostBody()); err != nil {
@@ -1784,7 +1756,6 @@ func (h *ProviderHandler) getProviderResponseFromConfig(provider schemas.ModelPr
 		CustomProviderConfig:     config.CustomProviderConfig,
 		OpenAIConfig:             config.OpenAIConfig,
 		PromptCache:              config.PromptCache,
-		InjectedTools:            config.InjectedTools,
 		Passthrough:              config.Passthrough,
 		ProviderStatus:           status,
 		Status:                   config.Status,

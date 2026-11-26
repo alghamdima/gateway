@@ -31,7 +31,6 @@ const (
 	ErrorTypePolicyAccessDenied    ErrorType = "policy_access_denied"
 	ErrorTypePolicyBudgetExceeded  ErrorType = "policy_budget_exceeded"
 	ErrorTypePolicyRateLimited     ErrorType = "policy_rate_limited"
-	ErrorTypePolicyToolBlocked     ErrorType = "policy_tool_blocked"
 
 	// provider: the upstream failed or refused.
 	ErrorTypeProviderAuthFailed           ErrorType = "provider_auth_failed"
@@ -72,7 +71,6 @@ var ErrorTypes = []ErrorType{
 	ErrorTypePolicyAccessDenied,
 	ErrorTypePolicyBudgetExceeded,
 	ErrorTypePolicyRateLimited,
-	ErrorTypePolicyToolBlocked,
 	ErrorTypeProviderAuthFailed,
 	ErrorTypeProviderBilling,
 	ErrorTypeProviderRateLimited,

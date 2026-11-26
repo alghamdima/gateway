@@ -157,40 +157,6 @@ func TestInListLimitDeleteModelConfigsWhere(t *testing.T) {
 	}
 }
 
-// TestInListLimitMCPSessionFilters pins that the MCP sessions list accepts
-// search-resolved, user-filter and virtual-key-filter id lists larger than the
-// bind-parameter limit and still matches the one real row inside them.
-func TestInListLimitMCPSessionFilters(t *testing.T) {
-	for _, ns := range inListLimitStores(t) {
-		t.Run(ns.name, func(t *testing.T) {
-			ctx := context.Background()
-			db := ns.db
-			client := tables.TableMCPClient{ClientID: "client-inlist", Name: "inlist-client", ConnectionType: "http", AuthType: "per_user_oauth"}
-			require.NoError(t, db.Create(&client).Error)
-			userID := "user-real"
-			require.NoError(t, db.Create(&tables.TableMCPOauthToken{
-				ID: "tok-1", AuthMode: "user", MCPClientID: client.ClientID, OauthConfigID: "cfg-1",
-				UserID: &userID, Status: "active", AccessToken: "x", TokenType: "Bearer", CreatedAt: time.Now(),
-			}).Error)
-
-			ids := append(inListSyntheticIDs("user", inListOverLimit), userID)
-
-			tokens, err := ns.store.ListOauthUserTokens(ctx, MCPSessionsFilterParams{Search: "no-such-needle", MatchedUserIDs: ids})
-			require.NoError(t, err)
-			require.Len(t, tokens, 1)
-			require.Equal(t, "tok-1", tokens[0].ID)
-
-			tokens, err = ns.store.ListOauthUserTokens(ctx, MCPSessionsFilterParams{UserIDs: ids})
-			require.NoError(t, err)
-			require.Len(t, tokens, 1)
-
-			tokens, err = ns.store.ListOauthUserTokens(ctx, MCPSessionsFilterParams{VirtualKeyIDs: inListSyntheticIDs("vk", inListOverLimit)})
-			require.NoError(t, err)
-			require.Empty(t, tokens)
-		})
-	}
-}
-
 // inListSeedVirtualKeys inserts count virtual keys with ids vk-1000001.. sharing one
 // created_at, so the default (created_at, id) order is the id order.
 func inListSeedVirtualKeys(t *testing.T, db *gorm.DB, count int) {

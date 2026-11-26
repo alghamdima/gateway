@@ -923,11 +923,6 @@ const (
 	SpanKindLLMCall SpanKind = "llm.call"
 	// SpanKindPlugin represents plugin execution (PreLLMHook/PostLLMHook)
 	SpanKindPlugin SpanKind = "plugin"
-	// SpanKindMCPTool represents an MCP tool invocation
-	SpanKindMCPTool SpanKind = "mcp.tool"
-	// SpanKindMCPClient represents an MCP client lifecycle operation (connect/ping/list_tools).
-	// These run in the background per-client and are not part of an LLM request flow.
-	SpanKindMCPClient SpanKind = "mcp.client"
 	// SpanKindRetry represents a retry attempt
 	SpanKindRetry SpanKind = "retry"
 	// SpanKindFallback represents a fallback to another provider
@@ -1048,7 +1043,6 @@ const (
 	// without being produced by the model. Not reconcilable against a provider
 	// invoice, so worth slicing separately.
 	AttrBifrostCostGuardrail     = "bifrost.cost.additional.guardrail"
-	AttrBifrostCostMCP           = "bifrost.cost.additional.mcp"
 	AttrBifrostCostSemanticCache = "bifrost.cost.additional.semantic_cache"
 	AttrBifrostCostRouting       = "bifrost.cost.additional.routing"
 	// OTel GenAI spec keys for cache tokens (flat namespace).
@@ -1179,27 +1173,12 @@ const (
 	AttrOutputTokenDetailsCite         = "gen_ai.usage.output_token_details.citation_tokens"
 	AttrOutputTokenDetailsSearch       = "gen_ai.usage.output_token_details.num_search_queries"
 
-	// Tool execution attributes (OTel GenAI spec) used on MCP tool spans.
+	// Tool execution attributes (OTel GenAI spec).
 	AttrToolName          = "gen_ai.tool.name"
 	AttrToolCallID        = "gen_ai.tool.call.id"
 	AttrToolCallArguments = "gen_ai.tool.call.arguments"
 	AttrToolCallResult    = "gen_ai.tool.call.result"
 	AttrToolType          = "gen_ai.tool.type"
-
-	// OTel MCP semconv attributes on mcp.client spans, read by the duration metric.
-	AttrMCPMethodName    = "mcp.method.name"   // e.g. tools/call, tools/list, ping
-	AttrNetworkTransport = "network.transport" // pipe (stdio) | tcp (http/sse)
-
-	// Tool-execution latency (ms) — the raw CallTool round-trip — so the duration metric
-	// measures it, not span wall-time (which covers the PostHooks). Bifrost-namespaced; not
-	// OTel MCP semconv.
-	AttrBifrostMCPToolDurationMs = "bifrost.mcp.tool.duration_ms"
-
-	// MCP client this span talked to; the span name carries it only as a composite.
-	AttrBifrostMCPClientName = "bifrost.mcp.client.name"
-
-	// A tool call that reported failure in its result; the span status stays ok.
-	AttrBifrostMCPToolIsError = "bifrost.mcp.tool.is_error"
 
 	// =====================================================================
 	// Bifrost-namespaced attributes (bifrost.*)

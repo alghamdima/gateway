@@ -579,7 +579,6 @@ func appendCostAttributes(attrs map[string]any, cost *BifrostCost) {
 	}
 	if d := cost.AdditionalCostDetails; d != nil {
 		setIfNonZero(attrs, AttrBifrostCostGuardrail, d.GuardrailCost)
-		setIfNonZero(attrs, AttrBifrostCostMCP, d.MCPCost)
 		setIfNonZero(attrs, AttrBifrostCostSemanticCache, d.SemanticCacheCost)
 		setIfNonZero(attrs, AttrBifrostCostRouting, d.RoutingCost)
 	}

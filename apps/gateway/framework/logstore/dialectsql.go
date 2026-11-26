@@ -2,7 +2,6 @@ package logstore
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -106,16 +105,6 @@ func dimensionFanoutFrom(dialect, idCol string) (string, bool) {
 		return clickhouseDimensionFanoutFrom(arrIDs, arrNames, idCol, scalarName), true
 	}
 	return "", false
-}
-
-// mcpDimensionFanoutFrom is dimensionFanoutFrom over mcp_tool_logs, which carries the same scalar and
-// JSON-array team, customer and business unit columns as logs.
-func mcpDimensionFanoutFrom(dialect, idCol string) (string, bool) {
-	from, ok := dimensionFanoutFrom(dialect, idCol)
-	if !ok {
-		return "", false
-	}
-	return strings.ReplaceAll(from, "FROM logs", "FROM mcp_tool_logs"), true
 }
 
 // sqliteDimensionFanoutFrom builds the SQLite fan-out subquery using the JSON1

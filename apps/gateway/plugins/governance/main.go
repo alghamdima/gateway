@@ -23,7 +23,6 @@ import (
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/grant"
 	"github.com/maximhq/bifrost/framework/jobaccounting"
-	"github.com/maximhq/bifrost/framework/mcpcatalog"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 )
 
@@ -82,10 +81,9 @@ func LegacyLimitsGovernedBy(ctx context.Context, holderKind, holderID string) (s
 
 // Config is the configuration for the governance plugin
 type Config struct {
-	IsVkMandatory         *bool     `json:"is_vk_mandatory"`
-	RequiredHeaders       *[]string `json:"required_headers"` // Pointer to live config slice; changes are reflected immediately without restart
-	IsEnterprise          bool      `json:"is_enterprise"`
-	DisableAutoToolInject *bool     `json:"disable_auto_tool_inject"`
+	IsVkMandatory   *bool     `json:"is_vk_mandatory"`
+	RequiredHeaders *[]string `json:"required_headers"` // Pointer to live config slice; changes are reflected immediately without restart
+	IsEnterprise    bool      `json:"is_enterprise"`
 	// Reports the live client.enforce_vk_object_ownership; nil means on
 	ObjectOwnershipEnforced func() bool `json:"-"`
 }
@@ -100,10 +98,6 @@ type Config struct {
 type InMemoryStore interface {
 	GetConfiguredProviders() map[schemas.ModelProvider]configstore.ProviderConfig
 	GetConfiguredProviderNames() []string
-	GetMCPClientsAllowedByDefault() map[string]string // clientID → clientName
-	GetMCPClientNames() map[string]string             // clientID → clientName, every client
-	// GetMCPClientBySlug resolves a client by its endpoint slug (for serving one client at /mcp/<slug>).
-	GetMCPClientBySlug(slug string) (clientID, clientName string, ok bool)
 }
 
 // singleProviderStore is an InMemoryStore that can hand back one provider's configuration without
@@ -142,8 +136,6 @@ type BaseGovernancePlugin interface {
 	HTTPTransportPostHook(ctx *schemas.BifrostContext, req *schemas.HTTPRequest, resp *schemas.HTTPResponse) error
 	PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error)
 	PostLLMHook(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, err *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error)
-	PreMCPHook(ctx *schemas.BifrostContext, req *schemas.BifrostMCPRequest) (*schemas.BifrostMCPRequest, *schemas.MCPPluginShortCircuit, error)
-	PostMCPHook(ctx *schemas.BifrostContext, resp *schemas.BifrostMCPResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostMCPResponse, *schemas.BifrostError, error)
 	Cleanup() error
 	GetGovernanceStore() GovernanceStore
 	// Routing collaboration: the routing plugin calls these after evaluating routing rules,
@@ -184,7 +176,6 @@ type GovernancePlugin struct {
 	// Dependencies
 	configStore  configstore.ConfigStore
 	modelCatalog *modelcatalog.ModelCatalog
-	mcpCatalog   *mcpcatalog.MCPCatalog
 	logger       schemas.Logger
 
 	// Transport dependencies
@@ -192,10 +183,9 @@ type GovernancePlugin struct {
 
 	cfgMutex sync.RWMutex
 
-	isVkMandatory         *bool
-	requiredHeaders       *[]string // pointer to live config slice; lowercased at check time
-	isEnterprise          bool
-	disableAutoToolInject *bool
+	isVkMandatory   *bool
+	requiredHeaders *[]string // pointer to live config slice; lowercased at check time
+	isEnterprise    bool
 
 	objectOwnershipEnforcedFn func() bool
 }
@@ -246,7 +236,6 @@ func Init(
 	configStore configstore.ConfigStore,
 	governanceConfig *configstore.GovernanceConfig,
 	modelCatalog *modelcatalog.ModelCatalog,
-	mcpCatalog *mcpcatalog.MCPCatalog,
 	inMemoryStore InMemoryStore,
 ) (*GovernancePlugin, error) {
 	if configStore == nil {
@@ -255,19 +244,14 @@ func Init(
 	if modelCatalog == nil {
 		logger.Warn("governance plugin requires model catalog to calculate cost, all LLM cost calculations will be skipped.")
 	}
-	if mcpCatalog == nil {
-		logger.Warn("governance plugin requires MCP catalog to calculate cost, all MCP cost calculations will be skipped.")
-	}
 
 	// Handle nil config - use safe defaults
 	var isVkMandatory *bool
 	var requiredHeaders *[]string
-	var disableAutoToolInject *bool
 	var objectOwnershipEnforcedFn func() bool
 	if config != nil {
 		isVkMandatory = config.IsVkMandatory
 		requiredHeaders = config.RequiredHeaders
-		disableAutoToolInject = config.DisableAutoToolInject
 		objectOwnershipEnforcedFn = config.ObjectOwnershipEnforced
 	}
 
@@ -287,21 +271,19 @@ func Init(
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	plugin := &GovernancePlugin{
-		ctx:                   ctx,
-		cancelFunc:            cancelFunc,
-		store:                 governanceStore,
-		resolver:              resolver,
-		tracker:               tracker,
-		configStore:           configStore,
-		modelCatalog:          modelCatalog,
-		mcpCatalog:            mcpCatalog,
-		logger:                logger,
-		isVkMandatory:         isVkMandatory,
-		cfgMutex:              sync.RWMutex{},
-		requiredHeaders:       requiredHeaders,
-		isEnterprise:          config != nil && config.IsEnterprise,
-		disableAutoToolInject: disableAutoToolInject,
-		inMemoryStore:         inMemoryStore,
+		ctx:             ctx,
+		cancelFunc:      cancelFunc,
+		store:           governanceStore,
+		resolver:        resolver,
+		tracker:         tracker,
+		configStore:     configStore,
+		modelCatalog:    modelCatalog,
+		logger:          logger,
+		isVkMandatory:   isVkMandatory,
+		cfgMutex:        sync.RWMutex{},
+		requiredHeaders: requiredHeaders,
+		isEnterprise:    config != nil && config.IsEnterprise,
+		inMemoryStore:   inMemoryStore,
 
 		objectOwnershipEnforcedFn: objectOwnershipEnforcedFn,
 	}
@@ -327,7 +309,6 @@ func InitFromStore(
 	governanceStore GovernanceStore,
 	configStore configstore.ConfigStore,
 	modelCatalog *modelcatalog.ModelCatalog,
-	mcpCatalog *mcpcatalog.MCPCatalog,
 	inMemoryStore InMemoryStore,
 ) (*GovernancePlugin, error) {
 	if configStore == nil {
@@ -336,42 +317,35 @@ func InitFromStore(
 	if modelCatalog == nil {
 		logger.Warn("governance plugin requires model catalog to calculate cost, all cost calculations will be skipped.")
 	}
-	if mcpCatalog == nil {
-		logger.Warn("governance plugin requires MCP catalog to calculate cost, all MCP cost calculations will be skipped.")
-	}
 	if governanceStore == nil {
 		return nil, fmt.Errorf("governance store is nil")
 	}
 	// Handle nil config - use safe defaults
 	var isVkMandatory *bool
 	var requiredHeaders *[]string
-	var disableAutoToolInject *bool
 	var objectOwnershipEnforcedFn func() bool
 	if config != nil {
 		isVkMandatory = config.IsVkMandatory
 		requiredHeaders = config.RequiredHeaders
-		disableAutoToolInject = config.DisableAutoToolInject
 		objectOwnershipEnforcedFn = config.ObjectOwnershipEnforced
 	}
 	resolver := NewBudgetResolver(governanceStore, modelCatalog, logger, inMemoryStore)
 	tracker := NewUsageTracker(ctx, governanceStore, resolver, configStore, logger)
 	ctx, cancelFunc := context.WithCancel(ctx)
 	plugin := &GovernancePlugin{
-		ctx:                   ctx,
-		cancelFunc:            cancelFunc,
-		store:                 governanceStore,
-		resolver:              resolver,
-		tracker:               tracker,
-		configStore:           configStore,
-		modelCatalog:          modelCatalog,
-		mcpCatalog:            mcpCatalog,
-		logger:                logger,
-		inMemoryStore:         inMemoryStore,
-		isVkMandatory:         isVkMandatory,
-		cfgMutex:              sync.RWMutex{},
-		requiredHeaders:       requiredHeaders,
-		isEnterprise:          config != nil && config.IsEnterprise,
-		disableAutoToolInject: disableAutoToolInject,
+		ctx:             ctx,
+		cancelFunc:      cancelFunc,
+		store:           governanceStore,
+		resolver:        resolver,
+		tracker:         tracker,
+		configStore:     configStore,
+		modelCatalog:    modelCatalog,
+		logger:          logger,
+		inMemoryStore:   inMemoryStore,
+		isVkMandatory:   isVkMandatory,
+		cfgMutex:        sync.RWMutex{},
+		requiredHeaders: requiredHeaders,
+		isEnterprise:    config != nil && config.IsEnterprise,
 
 		objectOwnershipEnforcedFn: objectOwnershipEnforcedFn,
 	}
@@ -893,31 +867,6 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 		result = p.resolver.evaluateLimits(ctx, evaluationRequest, limits)
 	}
 
-	// Check the actual MCP tools injected into the request against what the request may reach.
-	// BifrostContextKeyMCPAddedTools is populated by AddToolsToRequest (which runs before
-	// PreLLMHook), so it contains the real expanded tool names (e.g. "youtube-search") rather
-	// than raw header patterns (e.g. "youtube-*"), giving us exact per-tool validation.
-	if result.Decision == DecisionAllow && access != nil {
-		if addedTools, ok := ctx.Value(schemas.BifrostContextKeyMCPAddedTools).([]string); ok && len(addedTools) > 0 {
-			var disallowed []string
-			var deniedBy []schemas.Permit
-			for _, tool := range addedTools {
-				if !access.IsMCPToolAllowed(tool) {
-					disallowed = append(disallowed, tool)
-					if deniedBy == nil {
-						deniedBy = access.DeniedPermitsForMCPTool(tool)
-					}
-				}
-			}
-			if len(disallowed) > 0 {
-				result = &EvaluationResult{
-					Decision: DecisionMCPToolBlocked,
-					Reason:   denialReason(fmt.Sprintf("MCP tools not allowed: %s", strings.Join(disallowed, ", ")), deniedBy),
-				}
-			}
-		}
-	}
-
 	return p.decide(ctx, result)
 }
 
@@ -1014,9 +963,6 @@ func (p *GovernancePlugin) decide(ctx *schemas.BifrostContext, result *Evaluatio
 
 	case DecisionBudgetExceeded:
 		return result, refusal(result, 402, schemas.ErrorTypePolicyBudgetExceeded)
-
-	case DecisionMCPToolBlocked:
-		return result, refusal(result, 403, schemas.ErrorTypePolicyToolBlocked)
 
 	case DecisionAccessUnresolved:
 		// A wiring fault, not a policy decision: the request reached evaluation without the grant
@@ -1230,8 +1176,7 @@ func (p *GovernancePlugin) PreRequestHook(ctx *schemas.BifrostContext, req *sche
 
 	// The request's provider is a fact access resolution needs to apply provider-scoped grants, and it
 	// rides on the request, not the context. Stamp it before resolving so the resolved access reflects
-	// it. The /mcp path carries no request model and never stamps this, so a provider-scoped grant
-	// stays inert there, which is the intended behaviour.
+	// it.
 	if provider, _, _ := req.GetRequestFields(); provider != "" {
 		ctx.SetValue(schemas.BifrostContextKeyGovernanceRequestProvider, string(provider))
 	}
@@ -1250,25 +1195,6 @@ func (p *GovernancePlugin) PreRequestHook(ctx *schemas.BifrostContext, req *sche
 	// source. Nothing is refused here: this hook only stamps and prunes, and the funnel refuses.
 	if access == nil || unusablePermit(access) != nil {
 		return nil
-	}
-
-	// A caller-provided include-tools list can only narrow the virtual key's
-	// tool grant, never expand it — prune entries the key does not allow.
-	includeToolsProvided := p.pruneMCPIncludeToolsFromContext(ctx, access)
-
-	p.cfgMutex.RLock()
-	autoInjectDisabled := p.disableAutoToolInject != nil && *p.disableAutoToolInject
-	p.cfgMutex.RUnlock()
-	// An include-clients filter opts the request into tool injection even when
-	// auto-injection is disabled (see ParseAndAddToolsToRequest in core/mcp), so
-	// the key's allowlist must be stamped on every path where injection can run.
-	includeClientsPresent := ctx.Value(schemas.MCPContextKeyIncludeClients) != nil
-	if !includeToolsProvided && (!autoInjectDisabled || includeClientsPresent) {
-		// An access that lists nothing because it grants nothing stamps an empty list, which
-		// downstream reads as no tool being permitted: that is the answer, and it belongs on ctx.
-		if tools := access.MCPToolIncludeList(); tools != nil {
-			ctx.SetValue(schemas.MCPContextKeyIncludeTools, tools)
-		}
 	}
 
 	return nil
@@ -1840,278 +1766,6 @@ func (p *GovernancePlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 	}
 
 	return result, err, nil
-}
-
-// PreMCPHook intercepts MCP tool execution requests before they are processed (governance decision point)
-// Parameters:
-//   - ctx: The Bifrost context
-//   - req: The Bifrost MCP request to be processed
-//
-// Returns:
-//   - *schemas.BifrostMCPRequest: The processed request
-//   - *schemas.MCPPluginShortCircuit: The plugin short circuit if the request is not allowed
-//   - error: Any error that occurred during processing
-func (p *GovernancePlugin) PreMCPHook(ctx *schemas.BifrostContext, req *schemas.BifrostMCPRequest) (*schemas.BifrostMCPRequest, *schemas.MCPPluginShortCircuit, error) {
-	toolName := req.GetToolName()
-
-	// Skip everything but tool executions and prompt or resource reads
-	isRead := req.RequestType.IsPromptOrResourceRead()
-	if !req.RequestType.IsExecuteTool() && !isRead {
-		return req, nil, nil
-	}
-
-	// Validate required headers are present
-	if headerErr := p.validateRequiredHeaders(ctx); headerErr != nil {
-		return req, &schemas.MCPPluginShortCircuit{Error: headerErr}, nil
-	}
-
-	// Create request context for evaluation (MCP requests don't have provider/model)
-	evaluationRequest := &EvaluationRequest{
-		RequestType: schemas.MCPToolExecutionRequest,
-	}
-
-	// Evaluate governance using common function
-	_, bifrostError := p.Evaluate(ctx, evaluationRequest)
-
-	// Convert BifrostError to MCPPluginShortCircuit if needed
-	if bifrostError != nil {
-		return req, &schemas.MCPPluginShortCircuit{
-			Error: bifrostError,
-		}, nil
-	}
-
-	// A read has no tool to check: it may reach only the servers the access grants. Stamp the access's
-	// tool list, as /mcp does before core; core checks the server it picked against it after the hooks,
-	// so a direct Go caller is held to the grant too.
-	if isRead {
-		p.stampMCPToolAccessForCodemode(ctx)
-		return req, nil, nil
-	}
-
-	// Codemode meta-tools are evaluated like any tool call, so a caller who may not
-	// use tools at all is refused them too. They are in no grant's tool list, so
-	// the per-tool check below does not apply; instead their discovery side
-	// (listToolFiles, readToolFile, getToolDocs) enumerates tools through
-	// GetToolPerClient(ctx), which only sees what ctx carries, so the access's tool
-	// allow-list is stamped to scope that enumeration to the grant, exactly as the
-	// LLM path and /mcp do.
-	if bifrost.IsCodemodeTool(toolName) {
-		p.stampMCPToolAccessForCodemode(ctx)
-		return req, nil, nil
-	}
-
-	// The one question evaluation cannot answer: this specific tool. Evaluation checks the tools already
-	// injected into the request, which is not the tool being executed now, so the execution-time
-	// allow-list is enforced here.
-	//
-	// Whether the caller may be here at all is not rechecked. Evaluation has already refused a credential
-	// that resolves to nothing, one that is inactive and one that has expired, reading each off the grant
-	// since asking the key again would answer the same question from a second source, and the two could
-	// disagree. What is left is a question about the tool, which the access answers whatever granted it.
-	// A request carrying no access is unrestricted and may execute any tool, as it always could.
-	access := ctx.Grant().Access()
-	if access != nil && !mcpToolCallAllowed(ctx, req, access) {
-		ctx.SetValue(governanceRejectedContextKey, true)
-		return req, &schemas.MCPPluginShortCircuit{Error: &schemas.BifrostError{
-			Type:       bifrost.Ptr(string(DecisionMCPToolBlocked)),
-			StatusCode: bifrost.Ptr(403),
-			Error: &schemas.ErrorField{
-				Message: denialReason(fmt.Sprintf("MCP tool '%s' is not allowed", toolName), access.DeniedPermitsForMCPTool(toolName)),
-			},
-		}}, nil
-	}
-
-	return req, nil, nil
-}
-
-// stampMCPToolAccessForCodemode narrows the request's MCP include-tools list to
-// the access's grant before a codemode meta-tool runs. A caller-provided list
-// can only narrow the grant, never expand it; with none provided the grant
-// itself is stamped. A request carrying no access is unrestricted and is left
-// untouched, as it is everywhere else. A credential that resolves to nothing,
-// or a context access cannot be resolved for at all (no grant installed), gets
-// an empty list; evaluation refuses both before this runs, so that list only
-// fails closed should it ever be reached.
-func (p *GovernancePlugin) stampMCPToolAccessForCodemode(ctx *schemas.BifrostContext) {
-	access, err := p.ResolveAccess(ctx)
-	if err != nil {
-		if ctx != nil {
-			ctx.SetValue(schemas.MCPContextKeyIncludeTools, []string{})
-		}
-		return
-	}
-	if access == nil {
-		if presentedGrantBearingCredential(ctx) {
-			ctx.SetValue(schemas.MCPContextKeyIncludeTools, []string{})
-		}
-		return
-	}
-	if p.pruneMCPIncludeToolsFromContext(ctx, access) {
-		return
-	}
-	if tools := access.MCPToolIncludeList(); tools != nil {
-		ctx.SetValue(schemas.MCPContextKeyIncludeTools, tools)
-	}
-}
-
-// PostMCPHook processes the MCP response and updates usage tracking (business logic execution)
-// Parameters:
-//   - ctx: The Bifrost context
-//   - resp: The Bifrost MCP response to be processed
-//   - bifrostErr: The Bifrost error to be processed
-//
-// Returns:
-//   - *schemas.BifrostMCPResponse: The processed response
-//   - *schemas.BifrostError: The processed error
-//   - error: Any error that occurred during processing
-func (p *GovernancePlugin) PostMCPHook(ctx *schemas.BifrostContext, resp *schemas.BifrostMCPResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostMCPResponse, *schemas.BifrostError, error) {
-	if _, ok := ctx.Value(governanceRejectedContextKey).(bool); ok {
-		return resp, bifrostErr, nil
-	}
-
-	// Skip non tool-execute envelopes. The MCP gate stamps MCPRequestType on both
-	// the success response (BifrostMCPResponse.ExtraFields) and the error
-	// (BifrostError.ExtraFields), so a single check covers both paths.
-	mcpReqType := schemas.MCPRequestType("")
-	if resp != nil {
-		mcpReqType = resp.ExtraFields.MCPRequestType
-	} else if bifrostErr != nil {
-		mcpReqType = bifrostErr.ExtraFields.MCPRequestType
-	}
-	if !mcpReqType.IsExecuteTool() && !mcpReqType.IsPromptOrResourceRead() {
-		return resp, bifrostErr, nil
-	}
-
-	requestID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyRequestID)
-	billingNonce := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyBillingNonce)
-
-	// Determine if request was successful
-	success := (resp != nil && bifrostErr == nil)
-
-	// Skip usage tracking for codemode tools
-	if success && resp != nil && bifrost.IsCodemodeTool(resp.ExtraFields.ToolName) {
-		return resp, bifrostErr, nil
-	}
-
-	// Calculate MCP tool cost from catalog if available
-	var toolCost float64
-	if success && resp != nil && p.mcpCatalog != nil && resp.ExtraFields.ClientName != "" && resp.ExtraFields.ToolName != "" {
-		// Use separate client name and tool name fields
-		if pricingEntry, ok := p.mcpCatalog.GetPricingData(resp.ExtraFields.ClientName, resp.ExtraFields.ToolName); ok {
-			toolCost = pricingEntry.CostPerExecution
-			p.logger.Debug("MCP tool cost for %s.%s: $%.6f", resp.ExtraFields.ClientName, resp.ExtraFields.ToolName, toolCost)
-		}
-	}
-
-	// Create usage update for tracker (business logic) - MCP requests track request count and tool cost.
-	//
-	// Tool execution names no provider and no model, so what it answers to is whatever funds the
-	// holder, read from the limits settled when the tool call was evaluated, the same list that
-	// admitted it.
-	//
-	// Not gated on a credential. Skipping accounting when no key was presented would mean a request
-	// the deployment does charge for goes unbilled, and asking the key here would be a second answer
-	// to a question the grant already settled.
-	var budgets, rateLimits []schemas.Limit
-	if limits := ctx.Grant().Limits(); limits != nil {
-		budgets, rateLimits = limits.Budgets(), limits.RateLimits()
-	}
-	if bifrost.GetBoolFromContext(ctx, schemas.BifrostContextKeySkipVirtualKeyUsageTracking) {
-		// The holder's usage is not being counted; what the deployment and the user answer to still is.
-		budgets = grant.LimitsFrom(budgets, untrackedHolderKinds...)
-		rateLimits = grant.LimitsFrom(rateLimits, untrackedHolderKinds...)
-	}
-	// Record what the call answered to, the way PostLLMHook does for inference. The logging plugin
-	// reads these keys when it completes the tool log, so a tool call is attributable to the same
-	// budgets and rate limits it was billed against.
-	if budgetIDs := limitIDsOf(budgets); len(budgetIDs) > 0 {
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceBudgetIDs, budgetIDs)
-	}
-	if rateLimitIDs := limitIDsOf(rateLimits); len(rateLimitIDs) > 0 {
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceRateLimitIDs, rateLimitIDs)
-	}
-	usageUpdate := &UsageUpdate{
-		Success:      success,
-		Cost:         toolCost,
-		RequestID:    requestID,
-		BillingNonce: billingNonce,
-		IsStreaming:  false,
-		IsFinalChunk: true,
-		HasUsageData: toolCost > 0, // Has usage data if we have a cost
-		Budgets:      budgets,
-		RateLimits:   rateLimits,
-	}
-
-	// Queue usage update asynchronously using tracker
-	p.wg.Add(1)
-	go func() {
-		defer p.wg.Done()
-		p.tracker.UpdateUsage(p.ctx, usageUpdate)
-	}()
-
-	return resp, bifrostErr, nil
-}
-
-// PreMCPConnectionHook resolves the caller's identity onto the BifrostContext
-// before the connect-plugin gate releases control to the credential-store
-// resolver. This is the only point in the MCP connect lifecycle where we can
-// turn the raw x-bf-vk header into the resolved VK row ID — anything later
-// (PreMCPHook / PostMCPHook) runs after the resolver has already needed that
-// row ID, and per-user auth types (per_user_oauth, per_user_headers) key
-// their stored credentials by it.
-//
-// The hook is intentionally narrow: it ONLY populates the identity context
-// keys (VK row ID, name, team / customer fan-out). Policy checks (budget,
-// rate limit, tool allow-list) stay on PreMCPHook for the actual CallTool —
-// Connect is transport setup, not the gated operation.
-//
-// No short-circuit returned even when the VK isn't recognized: bad-VK
-// rejection belongs on the tool-call path so the caller gets a stable
-// error format. An unknown VK here simply leaves the row ID empty, and the
-// resolver will surface the "requires an identity" error itself.
-func (p *GovernancePlugin) PreMCPConnectionHook(ctx *schemas.BifrostContext, req *schemas.BifrostMCPConnectRequest) (*schemas.BifrostMCPConnectRequest, *schemas.MCPConnectionShortCircuit, error) {
-	virtualKeyValue := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyVirtualKey)
-	if virtualKeyValue == "" {
-		return req, nil, nil
-	}
-	vk, ok := p.store.GetVirtualKey(ctx, virtualKeyValue)
-	if !ok || vk == nil {
-		// Unknown VK — leave identity unset; the resolver will surface the
-		// appropriate error on the per-user auth path. For shared-connection
-		// auth types this is a no-op (they don't read these keys).
-		return req, nil, nil
-	}
-	ctx.SetValue(schemas.BifrostContextKeyGovernanceVirtualKeyID, vk.ID)
-	ctx.SetValue(schemas.BifrostContextKeyGovernanceVirtualKeyName, vk.Name)
-	// A tool call opens its connection after the request's access was resolved, and a decision
-	// already on the context came from that resolution, which may have applied a project that
-	// overrides the key's. Stamping the key's own decision again would put it back over the
-	// project's, on the context and on the root span.
-	if _, resolved := ctx.Value(schemas.BifrostContextKeyGovernanceDisableContentLogging).(bool); !resolved {
-		stampVirtualKeyContentLogging(ctx, vk)
-	}
-	stampVirtualKeyMetadata(ctx, vk)
-	if vk.Team != nil {
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceTeamID, vk.Team.ID)
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceTeamName, vk.Team.Name)
-		if vk.Team.Customer != nil {
-			ctx.SetValue(schemas.BifrostContextKeyGovernanceCustomerID, vk.Team.Customer.ID)
-			ctx.SetValue(schemas.BifrostContextKeyGovernanceCustomerName, vk.Team.Customer.Name)
-		}
-	}
-	if vk.Customer != nil {
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceCustomerID, vk.Customer.ID)
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceCustomerName, vk.Customer.Name)
-	}
-	return req, nil, nil
-}
-
-// PostMCPConnectionHook is a pass-through; the identity resolution that
-// PreMCPConnectionHook performs is observation-only and has no post-connect
-// cleanup. Implementing this satisfies MCPConnectionPlugin so the typed
-// PreMCPConnectionHook is dispatched by the plugin pipeline.
-func (p *GovernancePlugin) PostMCPConnectionHook(ctx *schemas.BifrostContext, resp *schemas.BifrostMCPConnectResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostMCPConnectResponse, *schemas.BifrostError, error) {
-	return resp, bifrostErr, nil
 }
 
 // Cleanup shuts down all components gracefully

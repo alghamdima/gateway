@@ -10,7 +10,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -423,14 +422,6 @@ const (
 	ChatToolTypeCustom   ChatToolType = "custom"
 )
 
-type MCPToolAnnotations struct {
-	Title           string `json:"title,omitempty"`           // Human-readable title for the tool
-	ReadOnlyHint    *bool  `json:"readOnlyHint,omitempty"`    // If true, the tool does not modify its environment
-	DestructiveHint *bool  `json:"destructiveHint,omitempty"` // If true, the tool may perform destructive updates
-	IdempotentHint  *bool  `json:"idempotentHint,omitempty"`  // If true, repeated calls with same args have no additional effect
-	OpenWorldHint   *bool  `json:"openWorldHint,omitempty"`   // If true, the tool interacts with external entities
-}
-
 // ChatTool represents a tool definition.
 //
 // Three shapes coexist under this type:
@@ -452,12 +443,10 @@ type MCPToolAnnotations struct {
 //   - On unmarshal, tolerantly accept whatever JSON shape comes in, then
 //     normalize the decoded struct so downstream code sees a canonical shape.
 type ChatTool struct {
-	Type         ChatToolType        `json:"type"`
-	Function     *ChatToolFunction   `json:"function,omitempty"`      // Function definition (shape 1)
-	Custom       *ChatToolCustom     `json:"custom,omitempty"`        // Custom tool definition (shape 2)
-	CacheControl *CacheControl       `json:"cache_control,omitempty"` // Cache control for the tool
-	Annotations  *MCPToolAnnotations `json:"-"`                       // MCP tool annotations (Bifrost-internal, never forwarded to providers)
-	MCP          *MCPToolMetadata    `json:"-"`                       // MCP title, icons and output schema (Bifrost-internal)
+	Type         ChatToolType      `json:"type"`
+	Function     *ChatToolFunction `json:"function,omitempty"`      // Function definition (shape 1)
+	Custom       *ChatToolCustom   `json:"custom,omitempty"`        // Custom tool definition (shape 2)
+	CacheControl *CacheControl     `json:"cache_control,omitempty"` // Cache control for the tool
 
 	// Anthropic-native tool flags promoted to the neutral layer. All optional;
 	// ignored by providers that don't support them. Gating per ProviderFeatures
@@ -1677,11 +1666,6 @@ type ChatToolMessage struct {
 	// OpenAI-wire converters strip it before serialization so providers that
 	// reject unknown message parameters never see it.
 	IsError *bool `json:"is_error,omitempty"`
-
-	mcpResult        *mcp.CallToolResult // the MCP server's own result; see SetMCPResult
-	mcpResultIsText  bool                // whether the content made from it is mcpResultText
-	mcpResultText    string              // that text, copied so in-place edits show
-	mcpResultContent []string            // else its content blocks, as toolContentFields lists them
 }
 
 // ChatAssistantMessage represents a message in a chat conversation.
@@ -2779,7 +2763,6 @@ type OutputCostDetails struct {
 // category. Extend with new fields as more such cost sources are billed.
 type AdditionalCostDetails struct {
 	GuardrailCost     float64 `json:"guardrail_cost,omitempty"`      // Guardrail judge-call cost
-	MCPCost           float64 `json:"mcp_cost,omitempty"`            // MCP tool-execution cost
 	SemanticCacheCost float64 `json:"semantic_cache_cost,omitempty"` // Semantic-cache embedding-lookup cost
 	// RoutingCost is the cost of the internal classification calls the routing
 	// plugin makes for a request, covering every such call the request opted into
@@ -2924,7 +2907,6 @@ func (a *AdditionalCostDetails) deepCopy() *AdditionalCostDetails {
 	}
 	return &AdditionalCostDetails{
 		GuardrailCost:     a.GuardrailCost,
-		MCPCost:           a.MCPCost,
 		SemanticCacheCost: a.SemanticCacheCost,
 		RoutingCost:       a.RoutingCost,
 	}
@@ -2993,7 +2975,6 @@ func (a *AdditionalCostDetails) add(b *AdditionalCostDetails) *AdditionalCostDet
 	}
 	return &AdditionalCostDetails{
 		GuardrailCost:     a.GuardrailCost + b.GuardrailCost,
-		MCPCost:           a.MCPCost + b.MCPCost,
 		SemanticCacheCost: a.SemanticCacheCost + b.SemanticCacheCost,
 		RoutingCost:       a.RoutingCost + b.RoutingCost,
 	}

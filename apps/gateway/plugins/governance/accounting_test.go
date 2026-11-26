@@ -201,7 +201,7 @@ func TestAccounting_FailedPrimaryThenSuccessfulFallbackBothBilled(t *testing.T) 
 		RateLimits:  []configstoreTables.TableRateLimit{*rl},
 	}, nil, nil)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -464,7 +464,7 @@ func TestAccounting_ChargesExactlyWhatWasChecked(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -538,7 +538,7 @@ func governedPassthroughFixture(t *testing.T) (*GovernancePlugin, GovernanceStor
 	require.NoError(t, err)
 
 	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)},
-		logger, store, nil, nil, nil, nil)
+		logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 	return plugin, store
@@ -871,7 +871,7 @@ func TestAccounting_SessionContinuationSkipsRequestLimits(t *testing.T) {
 		RateLimits:  []configstoreTables.TableRateLimit{*rateLimit},
 	}, nil, nil)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	admission := resolverCtx(store, "sk-bf-live")

@@ -18,7 +18,6 @@ var allRefusalDecisions = []Decision{
 	DecisionTokenLimited,
 	DecisionRequestLimited,
 	DecisionBudgetExceeded,
-	DecisionMCPToolBlocked,
 }
 
 // The status code cannot tell these apart: three decisions answer 403, and our 429
@@ -62,7 +61,6 @@ func TestRefusalsDeclareTheIntendedErrorType(t *testing.T) {
 		DecisionRateLimited:     schemas.ErrorTypePolicyRateLimited,
 		DecisionTokenLimited:    schemas.ErrorTypePolicyRateLimited,
 		DecisionRequestLimited:  schemas.ErrorTypePolicyRateLimited,
-		DecisionMCPToolBlocked:  schemas.ErrorTypePolicyToolBlocked,
 		// Not a policy refusal: the deployment is misassembled, not the caller.
 		DecisionAccessUnresolved: schemas.ErrorTypeBifrostInternal,
 	} {

@@ -14,10 +14,9 @@ import (
 
 func TestNewPermit(t *testing.T) {
 	providerPermits := []schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-1"}}}
-	mcpPermits := []schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: []string{"*"}}}
 
 	t.Run("what it was built from is what the getters return", func(t *testing.T) {
-		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, true, providerPermits, mcpPermits)
+		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, true, providerPermits)
 
 		assert.Equal(t, string(PermitVirtualKey), permit.Type())
 		assert.Equal(t, "vk1", permit.ID())
@@ -25,44 +24,37 @@ func TestNewPermit(t *testing.T) {
 		assert.True(t, permit.IsActive())
 		assert.True(t, permit.IsExpired())
 		assert.Equal(t, providerPermits, permit.ProviderPermits())
-		assert.Equal(t, mcpPermits, permit.MCPPermits())
 	})
 
 	t.Run("the lists are copied", func(t *testing.T) {
 		// A resolver that keeps its slices cannot alter what an attempt was admitted under.
 		mine := append([]schemas.ProviderPermit(nil), providerPermits...)
-		myTools := append([]schemas.MCPPermit(nil), mcpPermits...)
-		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, false, mine, myTools)
+		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, false, mine)
 
 		mine[0].Provider = "mutated"
-		myTools[0].ClientName = "mutated"
 
 		assert.Equal(t, "openai", permit.ProviderPermits()[0].Provider)
-		assert.Equal(t, "github", permit.MCPPermits()[0].ClientName)
 	})
 
 	t.Run("the copy goes deep, not just the outer list", func(t *testing.T) {
 		// Cloning the outer slice copies each entry's struct, but AllowedModels, BlacklistedModels,
-		// KeyIDs, Tools, and the value behind Weight are themselves shared unless copied too. A
+		// KeyIDs, and the value behind Weight are themselves shared unless copied too. A
 		// resolver mutating those after the permit was built must not alter what it already
 		// admitted.
 		weight := 0.4
 		allowedModels := []string{"gpt-4o"}
 		blacklistedModels := []string{"o3"}
 		keyIDs := []string{"key-1"}
-		tools := []string{"read_file"}
 		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, false,
 			[]schemas.ProviderPermit{{
 				Provider: "openai", AllowedModels: allowedModels, BlacklistedModels: blacklistedModels,
 				KeyIDs: keyIDs, Weight: &weight,
 			}},
-			[]schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: tools}},
 		)
 
 		allowedModels[0] = "mutated"
 		blacklistedModels[0] = "mutated"
 		keyIDs[0] = "mutated"
-		tools[0] = "mutated"
 		weight = 999
 
 		gotProvider := permit.ProviderPermits()[0]
@@ -72,7 +64,6 @@ func TestNewPermit(t *testing.T) {
 		require.NotNil(t, gotProvider.Weight)
 		assert.Equal(t, 0.4, *gotProvider.Weight)
 
-		assert.Equal(t, schemas.WhiteList{"read_file"}, permit.MCPPermits()[0].Tools)
 	})
 
 	t.Run("mutating what a getter returned does not alter what a later reader sees", func(t *testing.T) {
@@ -84,7 +75,6 @@ func TestNewPermit(t *testing.T) {
 			[]schemas.ProviderPermit{{
 				Provider: "openai", AllowedModels: []string{"gpt-4o"}, Weight: &weight,
 			}},
-			[]schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}}},
 		)
 
 		gotProvider := permit.ProviderPermits()
@@ -92,24 +82,17 @@ func TestNewPermit(t *testing.T) {
 		gotProvider[0].AllowedModels[0] = "mutated"
 		*gotProvider[0].Weight = 999
 
-		gotMCP := permit.MCPPermits()
-		gotMCP[0].Client = "mutated"
-		gotMCP[0].Tools[0] = "mutated"
-
 		again := permit.ProviderPermits()[0]
 		assert.Equal(t, "openai", again.Provider)
 		assert.Equal(t, schemas.WhiteList{"gpt-4o"}, again.AllowedModels)
 		require.NotNil(t, again.Weight)
 		assert.Equal(t, 0.4, *again.Weight)
 
-		assert.Equal(t, "github-id", permit.MCPPermits()[0].Client)
-		assert.Equal(t, schemas.WhiteList{"read_file"}, permit.MCPPermits()[0].Tools)
 	})
 
 	t.Run("no lists is no lists", func(t *testing.T) {
 		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, false, nil, nil)
 		assert.Empty(t, permit.ProviderPermits())
-		assert.Empty(t, permit.MCPPermits())
 	})
 }
 
@@ -127,13 +110,11 @@ func TestPermit_NilReceiver(t *testing.T) {
 	assert.False(t, permit.IsActive())
 	assert.False(t, permit.IsExpired())
 	assert.Nil(t, permit.ProviderPermits())
-	assert.Nil(t, permit.MCPPermits())
 
 	assert.True(t, isNilPermit(permit))
 	assert.True(t, isNilPermit(nil))
 	assert.False(t, allowsProvider(permit, "openai"))
 	assert.False(t, blacklistsModel(permit, "openai", "gpt-4o"))
-	assert.False(t, allowsTool(permit, "github-read_file"))
 	assert.False(t, allowsModelByName(permit, "openai", "gpt-4o"))
 	assert.Nil(t, providerPermitFor(permit, "openai"))
 	assert.Nil(t, weightedProviderPermitFor(permit, "openai"))
@@ -147,9 +128,6 @@ func TestPermit_NilReceiver(t *testing.T) {
 
 	// An empty list rather than nil: no tool may be executed, which a consumer must be able to
 	// tell from no answer at all.
-	entries := mcpEntries(permit)
-	assert.NotNil(t, entries)
-	assert.Empty(t, entries)
 }
 
 func TestAllowsModelByName(t *testing.T) {
@@ -274,117 +252,6 @@ func TestEachProviderPermit(t *testing.T) {
 			return true
 		})
 		assert.Equal(t, []string{"openai"}, seen)
-	})
-}
-
-// mcpEntries expands a permit's MCP permits into the tool patterns it permits. The rules that are
-// easy to get wrong: which MCP permit decides for a client, and what an unrestricted client
-// expands to.
-func TestMCPEntries(t *testing.T) {
-	t.Run("specific tools become one entry each", func(t *testing.T) {
-		permit := permitWithTools(PermitVirtualKey, "vk1", "Key", "github", "read_file", "list_issues")
-		assert.Equal(t, []string{"github-read_file", "github-list_issues"}, mcpEntries(permit))
-	})
-
-	t.Run("an unrestricted client becomes a single wildcard", func(t *testing.T) {
-		permit := permitWithTools(PermitVirtualKey, "vk1", "Key", "github", "*")
-		assert.Equal(t, []string{"github-*"}, mcpEntries(permit))
-	})
-
-	t.Run("a client granted no tool contributes nothing", func(t *testing.T) {
-		permit := permitWithTools(PermitVirtualKey, "vk1", "Key", "github")
-		assert.Empty(t, mcpEntries(permit))
-	})
-
-	t.Run("the first MCP permit holding a client decides for it", func(t *testing.T) {
-		// A second MCP permit for the same client cannot widen the first, which is what stops a
-		// permissive duplicate from reopening a narrowed client.
-		permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-			{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}},
-			{Client: "github-id", ClientName: "github", Tools: []string{"*"}},
-		}})
-		assert.Equal(t, []string{"github-read_file"}, mcpEntries(permit))
-	})
-
-	t.Run("a client is identified by its id, so a rename does not split it", func(t *testing.T) {
-		permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-			{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}},
-			{Client: "github-id", ClientName: "github-renamed", Tools: []string{"*"}},
-		}})
-		assert.Equal(t, []string{"github-read_file"}, mcpEntries(permit),
-			"the same client under two names is still one client")
-	})
-
-	t.Run("with no id, the name identifies the client", func(t *testing.T) {
-		permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-			{ClientName: "github", Tools: []string{"read_file"}},
-			{ClientName: "github", Tools: []string{"*"}},
-		}})
-		assert.Equal(t, []string{"github-read_file"}, mcpEntries(permit))
-	})
-
-	t.Run("an MCP permit naming no client is skipped", func(t *testing.T) {
-		// Its entries would be "-tool", which matches no client anywhere.
-		permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-			{Client: "orphan-id", Tools: []string{"read_file"}},
-			{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}},
-		}})
-		assert.Equal(t, []string{"github-read_file"}, mcpEntries(permit))
-	})
-
-	t.Run("an unnamed tool is skipped", func(t *testing.T) {
-		permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-			{Client: "github-id", ClientName: "github", Tools: []string{"read_file", "", "list_issues"}},
-		}})
-		assert.Equal(t, []string{"github-read_file", "github-list_issues"}, mcpEntries(permit))
-	})
-
-	t.Run("duplicate entries collapse", func(t *testing.T) {
-		permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-			{Client: "github-id", ClientName: "github", Tools: []string{"read_file", "read_file"}},
-		}})
-		assert.Equal(t, []string{"github-read_file"}, mcpEntries(permit))
-	})
-}
-
-// allowsTool answers for one pattern rather than expanding the whole list, and the two have to
-// agree. A wildcard pattern asks whether the client is granted anything at all.
-func TestAllowsTool(t *testing.T) {
-	permit := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk1", MCPPermits: []schemas.MCPPermit{
-		{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}},
-		{Client: "slack-id", ClientName: "slack", Tools: []string{"*"}},
-		{Client: "jira-id", ClientName: "jira", Tools: []string{}},
-		{Client: "orphan-id", Tools: []string{"*"}},
-	}})
-
-	assert.True(t, allowsTool(permit, "github-read_file"))
-	assert.False(t, allowsTool(permit, "github-delete_repo"))
-	assert.True(t, allowsTool(permit, "github-*"), "the client is granted some tool")
-
-	assert.True(t, allowsTool(permit, "slack-anything"), "an unrestricted client permits every tool")
-	assert.True(t, allowsTool(permit, "slack-*"))
-
-	assert.False(t, allowsTool(permit, "jira-create_issue"), "granted no tool")
-	assert.False(t, allowsTool(permit, "jira-*"))
-
-	assert.False(t, allowsTool(permit, "unknown-tool"), "client not held")
-	assert.False(t, allowsTool(permit, ""))
-	assert.False(t, allowsTool(permit, "github"), "a bare client name is not a tool pattern")
-
-	// An MCP permit naming no client can never match, so it cannot grant through the empty prefix.
-	assert.False(t, allowsTool(permit, "-read_file"))
-
-	t.Run("a client is identified by its id, so a rename does not split it, the same as mcpEntries", func(t *testing.T) {
-		// Names chosen so neither is a string-prefix of the other's tool patterns: the point is
-		// the stable id deciding precedence, not an incidental prefix match papering over it.
-		renamed := newPermit(permitSpec{Type: PermitVirtualKey, ID: "vk2", MCPPermits: []schemas.MCPPermit{
-			{Client: "acme-id", ClientName: "acme", Tools: []string{"read_file"}},
-			{Client: "acme-id", ClientName: "bigco", Tools: []string{"*"}},
-		}})
-		assert.True(t, allowsTool(renamed, "acme-read_file"), "the first entry for the client still grants what it grants")
-		assert.False(t, allowsTool(renamed, "acme-delete_repo"), "the first entry's narrower grant is not widened by the later, renamed one")
-		assert.False(t, allowsTool(renamed, "bigco-read_file"),
-			"the renamed entry never gets asked: the first entry already decided for this client, matching mcpEntries")
 	})
 }
 

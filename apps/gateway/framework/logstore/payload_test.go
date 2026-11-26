@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/objectstore"
 	"github.com/stretchr/testify/assert"
@@ -291,13 +290,11 @@ func TestHybridObjectKeysFollowFormat(t *testing.T) {
 	jsonKey := ObjectKey("bifrost", ts, "req_1")
 	parquetKey := "bifrost/logs/2026/04/03/14/req_1.parquet"
 	assert.Equal(t, jsonKey, h.logKey(ts, "req_1"), "json keeps the existing keys")
-	assert.Equal(t, MCPToolObjectKey("bifrost", ts, "mcp_1"), h.mcpToolKey(ts, "mcp_1"))
 	assert.Equal(t, parquetKey, h.alternateKey(jsonKey), "json keys fall back to parquet after a switch back")
 	assert.Equal(t, []string{jsonKey, parquetKey}, h.withAlternateKeys(jsonKey))
 
 	h.setObjectFormat(objectstore.FormatParquet, objectstore.CompressionSnappy)
 	assert.Equal(t, parquetKey, h.logKey(ts, "req_1"))
-	assert.Equal(t, "bifrost/mcp-logs/2026/04/03/14/mcp_1.parquet", h.mcpToolKey(ts, "mcp_1"))
 	assert.Equal(t, jsonKey, h.alternateKey(parquetKey))
 	assert.Equal(t, []string{parquetKey, jsonKey}, h.withAlternateKeys(parquetKey))
 	assert.Empty(t, h.alternateKey("bifrost/skills/abc"), "keys outside the payload formats have no alternate")
@@ -311,89 +308,6 @@ func TestHybridObjectKeysFollowFormat(t *testing.T) {
 	assert.Equal(t, objectstore.CompressionSnappy, h.parquetCompression)
 }
 
-func TestMCPToolObjectKey(t *testing.T) {
-	ts := time.Date(2026, 4, 3, 14, 0, 0, 0, time.UTC)
-	key := MCPToolObjectKey("bifrost", ts, "mcp_abc123")
-	assert.Equal(t, "bifrost/mcp-logs/2026/04/03/14/mcp_abc123.json.gz", key)
-}
-
-func TestMCPToolLogPayload_RoundTripFullLog(t *testing.T) {
-	vkID := "vk_123"
-	cost := 0.01
-	latency := 42.5
-	entry := &MCPToolLog{
-		ID:             "mcp-1",
-		RequestID:      "req-1",
-		LLMRequestID:   strPtr("llm-1"),
-		Timestamp:      time.Date(2026, 4, 3, 14, 0, 0, 0, time.UTC),
-		ToolName:       "search",
-		ServerLabel:    "docs",
-		VirtualKeyID:   &vkID,
-		VirtualKeyName: strPtr("prod-key"),
-		Latency:        &latency,
-		Cost:           &cost,
-		Status:         "success",
-		CreatedAt:      time.Date(2026, 4, 3, 14, 0, 1, 0, time.UTC),
-		ArgumentsParsed: map[string]any{
-			"query": "full input",
-		},
-		ResultParsed: map[string]any{
-			"ok": true,
-		},
-		ErrorDetailsParsed: &schemas.BifrostError{
-			IsBifrostError: true,
-			Error: &schemas.ErrorField{
-				Message: "stored for round trip",
-			},
-		},
-		MetadataParsed: map[string]interface{}{
-			"trace": "abc",
-		},
-		PluginLogs: `{"guardrails":[{"plugin_name":"guardrails","level":"info","message":"arguments redacted","timestamp":1}]}`,
-		RedactionData: &schemas.RedactionData{
-			ReversibleMappings: schemas.RedactionMapsByPhase{Input: map[string]string{"EMAIL-1": "private@example.com"}},
-		},
-		RedactionMapping: `plain:{"input":{"EMAIL-1":"private@example.com"}}`,
-	}
-
-	data, err := MarshalMCPToolLogPayload(entry)
-	require.NoError(t, err)
-	assert.NotContains(t, string(data), "private@example.com")
-
-	dbEntry := &MCPToolLog{HasObject: true, RedactionMapping: entry.RedactionMapping}
-	err = MergeMCPToolLogPayloadFromJSON(dbEntry, data)
-	require.NoError(t, err)
-
-	assert.True(t, dbEntry.HasObject)
-	assert.Equal(t, entry.ID, dbEntry.ID)
-	assert.Equal(t, entry.RequestID, dbEntry.RequestID)
-	assert.Equal(t, entry.ToolName, dbEntry.ToolName)
-	assert.Equal(t, entry.ServerLabel, dbEntry.ServerLabel)
-	assert.Equal(t, entry.Status, dbEntry.Status)
-	assert.Equal(t, "full input", dbEntry.ArgumentsParsed.(map[string]interface{})["query"])
-	assert.Equal(t, true, dbEntry.ResultParsed.(map[string]interface{})["ok"])
-	assert.Equal(t, "stored for round trip", dbEntry.ErrorDetailsParsed.Error.Message)
-	assert.Equal(t, "abc", dbEntry.MetadataParsed["trace"])
-	assert.Equal(t, entry.PluginLogs, dbEntry.PluginLogs)
-	assert.Equal(t, entry.RedactionMapping, dbEntry.RedactionMapping)
-	assert.Nil(t, dbEntry.RedactionData)
-}
-
-// TestMCPToolLogRedactionMappingJSONVisibility verifies only the authorized virtual mapping is API-visible.
-func TestMCPToolLogRedactionMappingJSONVisibility(t *testing.T) {
-	entry := &MCPToolLog{
-		RedactionMapping: `plain:{"input":{"EMAIL-1":"private@example.com"}}`,
-		RevealRedactionMapping: &schemas.RedactionMapsByPhase{
-			Input: map[string]string{"EMAIL-1": "revealed@example.com"},
-		},
-	}
-
-	data, err := sonic.Marshal(entry)
-	require.NoError(t, err)
-	assert.NotContains(t, string(data), "private@example.com")
-	assert.Contains(t, string(data), `"redaction_mapping":{"input":{"EMAIL-1":"revealed@example.com"}}`)
-}
-
 func marshalStrictV1TestPayload(t *testing.T, value any) *string {
 	t.Helper()
 	if value == nil {
@@ -403,56 +317,6 @@ func marshalStrictV1TestPayload(t *testing.T, value any) *string {
 	require.NoError(t, err)
 	body := string(data)
 	return &body
-}
-
-func TestPrepareMCPToolDBEntry_KeepsOnlyInputPreview(t *testing.T) {
-	longInput := ""
-	for i := 0; i < 260; i++ {
-		longInput += "a"
-	}
-	entry := &MCPToolLog{
-		ID:          "mcp-preview",
-		RequestID:   "req-preview",
-		Timestamp:   time.Date(2026, 4, 3, 14, 0, 0, 0, time.UTC),
-		ToolName:    "echo",
-		ServerLabel: "local",
-		Status:      "success",
-		ArgumentsParsed: map[string]any{
-			"input": longInput,
-		},
-		ResultParsed: map[string]any{
-			"secret": "large result",
-		},
-		ErrorDetailsParsed: &schemas.BifrostError{
-			IsBifrostError: true,
-			Error: &schemas.ErrorField{
-				Message: "large error",
-			},
-		},
-		MetadataParsed: map[string]interface{}{
-			"trace": "abc",
-		},
-		PluginLogs: `{"guardrails":[{"message":"arguments redacted"}]}`,
-	}
-
-	PrepareMCPToolDBEntry(entry)
-
-	assert.Equal(t, "mcp-preview", entry.ID)
-	assert.Equal(t, "req-preview", entry.RequestID)
-	assert.Equal(t, "echo", entry.ToolName)
-	assert.Equal(t, "local", entry.ServerLabel)
-	assert.Empty(t, entry.Result)
-	assert.Empty(t, entry.ErrorDetails)
-	assert.Nil(t, entry.ResultParsed)
-	assert.Nil(t, entry.ErrorDetailsParsed)
-	assert.NotEmpty(t, entry.Arguments)
-	assert.NotEmpty(t, entry.Metadata)
-	assert.Equal(t, `{"guardrails":[{"message":"arguments redacted"}]}`, entry.PluginLogs)
-
-	var preview string
-	require.NoError(t, sonic.Unmarshal([]byte(entry.Arguments), &preview))
-	assert.Len(t, []rune(preview), 200)
-	assert.Contains(t, preview, `"input":`)
 }
 
 func TestPayloadFieldNames(t *testing.T) {

@@ -438,37 +438,6 @@ func migrationClickHouseLogsTable(ctx context.Context, db *gorm.DB, cluster stri
 	return clickhouseReconcileTTL(ctx, db, "logs", cluster, chLogsTTL(retentionDays), logger)
 }
 
-// migrationClickHouseMCPToolLogsTable creates the mcp_tool_logs table and
-// reconciles it with the MCPToolLog struct.
-func migrationClickHouseMCPToolLogsTable(ctx context.Context, db *gorm.DB, cluster string, retentionDays int, logger schemas.Logger) error {
-	logger.Info("[logstore] clickhouse: creating table mcp_tool_logs")
-	opts := chTableOpts{
-		table:       "mcp_tool_logs",
-		partitionBy: "toYYYYMM(timestamp)",
-		orderBy:     "(timestamp, id)",
-		ttl:         chLogsTTL(retentionDays),
-		skipIndexes: []string{
-			"INDEX idx_mcp_logs_status status TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_mcp_logs_virtual_key_id virtual_key_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_mcp_logs_tool_name tool_name TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_mcp_logs_session_id session_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_mcp_logs_agent_correlation_id agent_correlation_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_mcp_logs_round_trip_id round_trip_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_mcp_logs_id id TYPE bloom_filter GRANULARITY 1",
-		},
-	}
-	if err := clickhouseCreateTable(ctx, db, &MCPToolLog{}, opts, cluster); err != nil {
-		return fmt.Errorf("clickhouse: create mcp_tool_logs table: %w", err)
-	}
-	if err := clickhouseReconcileColumns(ctx, db, &MCPToolLog{}, "mcp_tool_logs", cluster, logger); err != nil {
-		return err
-	}
-	if err := clickhouseReconcileSkipIndexes(ctx, db, "mcp_tool_logs", cluster, opts.skipIndexes, logger); err != nil {
-		return err
-	}
-	return clickhouseReconcileTTL(ctx, db, "mcp_tool_logs", cluster, chLogsTTL(retentionDays), logger)
-}
-
 // migrationClickHouseAsyncJobsTable creates the async_jobs table and reconciles
 // it with the AsyncJob struct. async_jobs is a small queue: a hard 7-day TTL on
 // created_at is a safety backstop (independent of the logs retention setting);
@@ -506,7 +475,6 @@ func migrationClickHouseUserAgentMappingsTable(ctx context.Context, db *gorm.DB,
 // mirroring logstoreMigrationSteps for the SQL stores.
 var clickhouseMigrationSteps = []clickhouseMigrationStep{
 	migrationClickHouseLogsTable,
-	migrationClickHouseMCPToolLogsTable,
 	migrationClickHouseAsyncJobsTable,
 	migrationClickHouseUserAgentMappingsTable,
 	migrationClickHouseComplexitySuggestionTables,

@@ -67,11 +67,6 @@ type GovernanceManager interface {
 	RemoveProvider(ctx context.Context, provider schemas.ModelProvider) error
 	UpsertPricingOverride(ctx context.Context, override *configstoreTables.TablePricingOverride) error
 	DeletePricingOverride(ctx context.Context, id string) error
-	// Virtual MCP cache refresh after a write, surgically per operation (mirrors the VK/team callbacks).
-	ReloadVirtualMCP(ctx context.Context, id uint) (*configstoreTables.TableVirtualMCP, error)
-	RemoveVirtualMCP(ctx context.Context, id uint) error
-	AttachVirtualMCPToVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error
-	DetachVirtualMCPFromVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error
 	// ReloadVirtualKeys reloads many virtual keys exactly as ReloadVirtualKey
 	// reloads one, from batched reads. Enterprise also propagates the reload to
 	// cluster peers. An error means nothing was reloaded, and the caller falls
@@ -381,10 +376,6 @@ type CreateVirtualKeyRequest struct {
 		ModelBudgets      []vkModelBudgetRequest  `json:"model_budgets,omitempty"`      // Per-model budgets/rate-limits under this provider
 		KeyIDs            schemas.WhiteList       `json:"key_ids,omitempty"`            // List of DBKey UUIDs to associate with this provider config
 	} `json:"provider_configs,omitempty"` // Empty means no providers allowed (deny-by-default)
-	MCPConfigs []struct {
-		MCPClientName  string            `json:"mcp_client_name" validate:"required"`
-		ToolsToExecute schemas.WhiteList `json:"tools_to_execute,omitempty"`
-	} `json:"mcp_configs,omitempty"` // Empty means no MCP clients allowed (deny-by-default)
 	TeamID     *string `json:"team_id,omitempty"`     // Mutually exclusive with CustomerID and BusinessUnitID
 	CustomerID *string `json:"customer_id,omitempty"` // Mutually exclusive with TeamID and BusinessUnitID
 	// BusinessUnitID is the third owner a key can have. Business units are an enterprise table this
@@ -437,11 +428,6 @@ type UpdateVirtualKeyRequest struct {
 		ModelBudgets      []vkModelBudgetUpdateRequest `json:"model_budgets,omitempty"`      // Per-model budgets/rate-limits under this provider (full desired set when provider_configs is supplied)
 		KeyIDs            schemas.WhiteList            `json:"key_ids,omitempty"`            // List of DBKey UUIDs to associate with this provider config
 	} `json:"provider_configs,omitempty"`
-	MCPConfigs []struct {
-		ID             *uint             `json:"id,omitempty"` // null for new entries
-		MCPClientName  string            `json:"mcp_client_name" validate:"required"`
-		ToolsToExecute schemas.WhiteList `json:"tools_to_execute,omitempty"`
-	} `json:"mcp_configs,omitempty"`
 	TeamID            schemas.OptionalJSON[string] `json:"team_id,omitempty"`
 	CustomerID        schemas.OptionalJSON[string] `json:"customer_id,omitempty"`
 	BusinessUnitID    schemas.OptionalJSON[string] `json:"business_unit_id,omitempty"`
@@ -2388,36 +2374,6 @@ func (h *GovernanceHandler) createVirtualKey(ctx *fasthttp.RequestCtx) {
 		}, vkGovProviders, true, nil); err != nil {
 			return err
 		}
-		if req.MCPConfigs != nil {
-			// Check for duplicate MCPClientName values before processing
-			seenMCPClientNames := make(map[string]bool)
-			for _, mc := range req.MCPConfigs {
-				if seenMCPClientNames[mc.MCPClientName] {
-					return &badRequestError{err: fmt.Errorf("duplicate mcp_client_name: %s", mc.MCPClientName)}
-				}
-				seenMCPClientNames[mc.MCPClientName] = true
-			}
-
-			for _, mc := range req.MCPConfigs {
-				if err := mc.ToolsToExecute.Validate(); err != nil {
-					return &badRequestError{err: fmt.Errorf("invalid tools_to_execute for mcp client %s: %w", mc.MCPClientName, err)}
-				}
-				mcpClient, err := h.configStore.GetMCPClientByName(ctx, mc.MCPClientName)
-				if errors.Is(err, configstore.ErrNotFound) {
-					return &badRequestError{err: fmt.Errorf("unknown mcp_client_name: %s", mc.MCPClientName)}
-				}
-				if err != nil {
-					return fmt.Errorf("failed to get MCP client: %w", err)
-				}
-				if err := h.configStore.CreateVirtualKeyMCPConfig(ctx, &configstoreTables.TableVirtualKeyMCPConfig{
-					VirtualKeyID:   vk.ID,
-					MCPClientID:    mcpClient.ID,
-					ToolsToExecute: mc.ToolsToExecute,
-				}, tx); err != nil {
-					return err
-				}
-			}
-		}
 		return nil
 	}); err != nil {
 		var badReqErr *badRequestError
@@ -2496,16 +2452,8 @@ func (h *GovernanceHandler) getVirtualKey(ctx *fasthttp.RequestCtx) {
 	h.applyAssignees(ctx, []*configstoreTables.TableVirtualKey{vk})
 	h.applyBusinessUnits(ctx, []*configstoreTables.TableVirtualKey{vk})
 
-	// The Virtual MCPs this key is assigned to, so the detail view can show and edit them.
-	vmcpIDs, err := h.configStore.GetVirtualMCPIDsForVirtualKey(ctx, vkID)
-	if err != nil {
-		SendError(ctx, 500, "Failed to retrieve virtual key")
-		return
-	}
-
 	SendJSON(ctx, map[string]interface{}{
-		"virtual_key":     vk,
-		"virtual_mcp_ids": vmcpIDs,
+		"virtual_key": vk,
 	})
 }
 
@@ -2981,87 +2929,6 @@ func (h *GovernanceHandler) updateVirtualKey(ctx *fasthttp.RequestCtx) {
 		if err := h.syncVKGovernanceToModelConfigs(ctx, tx, vk, top, vkGovProviders, req.ProviderConfigs != nil, usageReset); err != nil {
 			return err
 		}
-		if req.MCPConfigs != nil {
-			// Check for duplicate MCPClientName values among all configs before processing
-			seenMCPClientNames := make(map[string]bool)
-			for _, mc := range req.MCPConfigs {
-				if seenMCPClientNames[mc.MCPClientName] {
-					return &badRequestError{err: fmt.Errorf("duplicate mcp_client_name: %s", mc.MCPClientName)}
-				}
-				seenMCPClientNames[mc.MCPClientName] = true
-			}
-			// Get existing MCP configs for comparison
-			var existingMCPConfigs []configstoreTables.TableVirtualKeyMCPConfig
-			if err := tx.Where("virtual_key_id = ?", vk.ID).Find(&existingMCPConfigs).Error; err != nil {
-				return err
-			}
-			sort.Slice(existingMCPConfigs, func(i, j int) bool { return existingMCPConfigs[i].ID < existingMCPConfigs[j].ID })
-			sort.Slice(req.MCPConfigs, func(i, j int) bool {
-				if req.MCPConfigs[i].ID == nil && req.MCPConfigs[j].ID != nil {
-					return false
-				}
-				if req.MCPConfigs[i].ID != nil && req.MCPConfigs[j].ID == nil {
-					return true
-				}
-				if req.MCPConfigs[i].ID != nil && req.MCPConfigs[j].ID != nil && *req.MCPConfigs[i].ID != *req.MCPConfigs[j].ID {
-					return *req.MCPConfigs[i].ID < *req.MCPConfigs[j].ID
-				}
-				return req.MCPConfigs[i].MCPClientName < req.MCPConfigs[j].MCPClientName
-			})
-			// Create maps for easier lookup
-			existingMCPConfigsMap := make(map[uint]configstoreTables.TableVirtualKeyMCPConfig)
-			for _, config := range existingMCPConfigs {
-				existingMCPConfigsMap[config.ID] = config
-			}
-			requestMCPConfigsMap := make(map[uint]bool)
-			// Process new configs: create new ones and update existing ones
-			for _, mc := range req.MCPConfigs {
-				if err := mc.ToolsToExecute.Validate(); err != nil {
-					return &badRequestError{err: fmt.Errorf("invalid tools_to_execute for mcp client %s: %w", mc.MCPClientName, err)}
-				}
-				if mc.ID == nil {
-					mcpClient, err := h.configStore.GetMCPClientByName(ctx, mc.MCPClientName)
-					if errors.Is(err, configstore.ErrNotFound) {
-						return &badRequestError{err: fmt.Errorf("unknown mcp_client_name: %s", mc.MCPClientName)}
-					}
-					if err != nil {
-						return fmt.Errorf("failed to get MCP client: %w", err)
-					}
-					// Create new MCP config
-					if err := h.configStore.CreateVirtualKeyMCPConfig(ctx, &configstoreTables.TableVirtualKeyMCPConfig{
-						VirtualKeyID:   vk.ID,
-						MCPClientID:    mcpClient.ID,
-						ToolsToExecute: mc.ToolsToExecute,
-					}, tx); err != nil {
-						return err
-					}
-				} else {
-					// Update existing MCP config
-					existing, ok := existingMCPConfigsMap[*mc.ID]
-					if !ok {
-						return &badRequestError{err: fmt.Errorf("MCP config %d does not belong to this virtual key", *mc.ID)}
-					}
-					requestMCPConfigsMap[*mc.ID] = true
-					existing.ToolsToExecute = mc.ToolsToExecute
-					if err := h.configStore.UpdateVirtualKeyMCPConfig(ctx, &existing, tx); err != nil {
-						return err
-					}
-				}
-			}
-			// Delete MCP configs that are not in the request
-			mcpConfigIDs := make([]uint, 0, len(existingMCPConfigsMap))
-			for id := range existingMCPConfigsMap {
-				mcpConfigIDs = append(mcpConfigIDs, id)
-			}
-			sort.Slice(mcpConfigIDs, func(i, j int) bool { return mcpConfigIDs[i] < mcpConfigIDs[j] })
-			for _, id := range mcpConfigIDs {
-				if !requestMCPConfigsMap[id] {
-					if err := h.configStore.DeleteVirtualKeyMCPConfig(ctx, id, tx); err != nil {
-						return err
-					}
-				}
-			}
-		}
 
 		if rateLimitIDToDelete != "" {
 			if err := h.configStore.DeleteRateLimit(ctx, rateLimitIDToDelete, tx); err != nil {
@@ -3149,25 +3016,6 @@ func (h *GovernanceHandler) updateVirtualKey(ctx *fasthttp.RequestCtx) {
 				SendError(ctx, 500, "Virtual key updated but calendar alignment did not take effect")
 				return
 			}
-		}
-	}
-
-	// Per-user credential reconciliation when the VK's MCP allowlist
-	// changed. Mirrors the AP-propagation path: the store orphans /
-	// reactivates credentials keyed to this VK (vk-keyed creds) and to the
-	// VK's owner (user-keyed creds) against the new effective allowlist
-	// (explicit rows ∪ MCPs with AllowByDefault=true). A store without
-	// per-user credentials does nothing.
-	// Must run before ReloadVirtualKey: the reload also evicts this VK's
-	// cached OAuth tokens and header credentials, and an eviction that lands
-	// before these writes could be refilled from the pre-reconcile rows and
-	// then never dropped.
-	if req.MCPConfigs != nil && h.configStore != nil {
-		if err := h.configStore.ReconcileOauthAfterVKChange(ctx, vk.ID); err != nil {
-			logger.Error("reconcile OAuth credentials after VK %s update failed: %v", vk.ID, err)
-		}
-		if err := h.configStore.ReconcileMCPHeadersAfterVKChange(ctx, vk.ID); err != nil {
-			logger.Error("reconcile per-user-headers credentials after VK %s update failed: %v", vk.ID, err)
 		}
 	}
 

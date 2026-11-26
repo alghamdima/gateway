@@ -207,7 +207,7 @@ func runMigrationStepsWithRetry(ctx context.Context, db *gorm.DB, logger schemas
 	// blocker is almost always an old replica's long read, which an operator can
 	// cancel to let the migration through.
 	retry.Describe = func(ctx context.Context) string {
-		return postgresconn.DescribeTableLockHolders(ctx, db, "logs", "mcp_tool_logs")
+		return postgresconn.DescribeTableLockHolders(ctx, db, "logs")
 	}
 	for _, step := range steps {
 		if pendingSet != nil && !stepHasPendingID(step, pendingSet) {
@@ -252,12 +252,9 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_performance_indexes_v2"}, run: migrationAddPerformanceIndexesV2},
 	{IDs: []string{"logs_update_timestamp_format"}, run: migrationUpdateTimestampFormat},
 	{IDs: []string{"logs_add_raw_request_column"}, run: migrationAddRawRequestColumn},
-	{IDs: []string{"mcp_tool_logs_init"}, run: migrationCreateMCPToolLogsTable},
-	{IDs: []string{"mcp_tool_logs_add_cost_column"}, run: migrationAddCostColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_image_generation_output_column"}, run: migrationAddImageGenerationOutputColumn},
 	{IDs: []string{"logs_add_image_generation_input_column"}, run: migrationAddImageGenerationInputColumn},
 	{IDs: []string{"logs_add_routing_rule_id_and_routing_rule_name_columns"}, run: migrationAddRoutingRuleIDAndRoutingRuleNameColumns},
-	{IDs: []string{"mcp_tool_logs_add_virtual_key_columns"}, run: migrationAddVirtualKeyColumnsToMCPToolLogs},
 	{IDs: []string{"logs_add_routing_engine_used_column"}, run: migrationAddRoutingEngineUsedColumn},
 	{IDs: []string{"logs_add_routing_engines_used_column"}, run: migrationAddRoutingEnginesUsedColumn},
 	{IDs: []string{"logs_add_list_models_output_column"}, run: migrationAddListModelsOutputColumn},
@@ -265,7 +262,6 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_routing_engine_logs_column"}, run: migrationAddRoutingEngineLogsColumn},
 	{IDs: []string{"async_jobs_init"}, run: migrationCreateAsyncJobsTable},
 	{IDs: []string{"logs_add_metadata_column"}, run: migrationAddMetadataColumn},
-	{IDs: []string{"mcp_tool_logs_add_metadata_column"}, run: migrationAddMetadataColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_histogram_composite_indexes"}, run: migrationAddHistogramCompositeIndexes},
 	{IDs: []string{"logs_add_video_columns"}, run: migrationAddVideoColumns},
 	{IDs: []string{"logs_add_provider_histogram_index"}, run: migrationAddProviderHistogramIndex},
@@ -282,15 +278,12 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_governance_context_columns"}, run: migrationAddGovernanceContextColumns},
 	{IDs: []string{"logs_recreate_matviews_with_governance_columns"}, run: migrationRecreateMatViewsWithGovernanceColumns},
 	{IDs: []string{"logs_add_ocr_output_column"}, run: migrationAddOCROutputColumn},
-	{IDs: []string{"mcp_tool_logs_add_request_id_column"}, run: migrationAddRequestIDColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_has_object_column"}, run: migrationAddHasObjectColumn},
-	{IDs: []string{"mcp_tool_logs_add_has_object_column"}, run: migrationAddHasObjectColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_attempt_trail_column"}, run: migrationAddAttemptTrailColumn},
 	{IDs: []string{"logs_add_user_name_column"}, run: migrationAddUserNameColumn},
 	{IDs: []string{"logs_add_ocr_input_column"}, run: migrationAddOCRInputColumn},
 	{IDs: []string{"logs_add_stop_reason_column"}, run: migrationAddStopReasonColumn},
 	{IDs: []string{"logs_add_safe_jsonb_function"}, run: migrationAddSafeJsonbFunction},
-	{IDs: []string{"mcp_tool_logs_add_dac_columns"}, run: migrationAddDACColumnsToMCPToolLogs},
 	{IDs: []string{"logs_add_cluster_governance_columns"}, run: migrationAddClusterGovernanceColumns},
 	{IDs: []string{"logs_add_inc_number_column"}, run: migrationAddLogIncNumberColumn},
 	{IDs: []string{"logs_recreate_filter_users_matview"}, run: migrationRecreateFilterUsersMatView},
@@ -302,16 +295,12 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_recreate_filter_customers_matview_multivalue"}, run: migrationRecreateFilterCustomersMatView},
 	{IDs: []string{"logs_add_canonical_model_columns_v2"}, run: migrationAddCanonicalModelColumns},
 	{IDs: []string{"logs_add_redaction_mapping_column"}, run: migrationAddRedactionMappingColumn},
-	{IDs: []string{"mcp_tool_logs_add_redaction_mapping_column"}, run: migrationAddMCPRedactionMappingColumn},
 	{IDs: []string{"async_jobs_add_request_id_column"}, run: migrationAddAsyncJobRequestIDColumn},
 	{IDs: []string{"logs_add_content_hidden_column"}, run: migrationAddContentHiddenColumn},
 	{IDs: []string{"logs_add_server_side_fallback_model_column"}, run: migrationAddServerSideFallbackModelColumn},
 	{IDs: []string{"logs_add_billing_fidelity_columns"}, run: migrationAddBillingFidelityColumns},
 	{IDs: []string{"logs_add_user_agent_column"}, run: migrationAddUserAgentColumn},
-	{IDs: []string{"mcp_tool_logs_add_user_agent_column"}, run: migrationAddUserAgentColumnToMCPToolLogs},
 	{IDs: []string{"logs_recreate_matviews_with_app_column"}, run: migrationRecreateMatViewsWithUserAgentColumn},
-	{IDs: []string{"mcp_tool_logs_add_endpoint_columns"}, run: migrationAddEndpointColumnsToMCPToolLogs},
-	{IDs: []string{"mcp_tool_logs_add_plugin_logs_column"}, run: migrationAddMCPPluginLogsColumn},
 	{IDs: []string{"logs_add_video_edit_input_column"}, run: migrationAddVideoEditInputColumn},
 	{IDs: []string{"logs_add_upstream_and_overhead_latency_columns"}, run: migrationAddUpstreamAndOverheadLatencyColumns},
 	{IDs: []string{"logs_add_complexity_routing_columns"}, run: migrationAddComplexityRoutingColumns},
@@ -323,10 +312,8 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_overhead_breakdown_column"}, run: migrationAddOverheadBreakdownColumn},
 	{IDs: []string{"logs_add_video_debug_column"}, run: migrationAddVideoDebugColumn},
 	{IDs: []string{"logs_add_project_columns"}, run: migrationAddProjectColumns},
-	{IDs: []string{"mcp_tool_logs_add_project_columns"}, run: migrationAddProjectColumnsToMCPToolLogs},
 	{IDs: []string{"logs_add_served_model_column"}, run: migrationAddServedModelColumn},
 	{IDs: []string{"logs_add_tool_call_names_column"}, run: migrationAddToolCallNamesColumn},
-	{IDs: []string{"mcp_tool_logs_add_governance_snapshots"}, run: migrationAddMCPGovernanceSnapshots},
 	{IDs: []string{"logs_add_embedding_input_column"}, run: migrationAddEmbeddingInputColumn},
 	{IDs: []string{"logs_add_owner_timestamp_indexes"}, run: migrationAddOwnerTimestampIndexes},
 	{IDs: []string{"logs_add_ranking_name_timestamp_indexes"}, run: migrationAddRankingNameTimestampIndexes},
@@ -334,10 +321,8 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_correlation_columns"}, run: migrationAddCorrelationColumns},
 	{IDs: []string{"logs_add_matview_refresh_state_table"}, run: migrationAddMatViewRefreshStateTable},
 	{IDs: []string{"logs_add_is_passthrough_column"}, run: migrationAddIsPassthroughColumn},
-	{IDs: []string{"mcp_tool_logs_add_method_column"}, run: migrationAddMethodColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_client_ip_column"}, run: migrationAddClientIPColumn},
 	{IDs: []string{"logs_add_user_email_column"}, run: migrationAddUserEmailColumn},
-	{IDs: []string{"mcp_tool_logs_add_round_trip_id_column"}, run: migrationAddRoundTripIDColumnToMCPToolLogs},
 	{IDs: []string{"logs_add_model_routing_suggestion_tables"}, run: migrationAddComplexitySuggestionTables},
 	{IDs: []string{"logs_add_model_routing_columns"}, run: migrationAddModelRoutingColumns},
 	{IDs: []string{"logs_tune_retention_autovacuum"}, run: migrationTuneRetentionAutovacuum},
@@ -1208,137 +1193,6 @@ func migrationAddRawRequestColumn(ctx context.Context, db *gorm.DB, logger schem
 	return nil
 }
 
-// migrationCreateMCPToolLogsTable creates the mcp_tool_logs table for MCP tool execution logs
-func migrationCreateMCPToolLogsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_init"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			tableExists := migrator.HasTable(&MCPToolLog{})
-			if !tableExists {
-				logger.Info("[logstore] %s: creating table MCPToolLog", migrationName)
-				if err := migrator.CreateTable(&MCPToolLog{}); err != nil {
-					return err
-				}
-			}
-			if tx.Dialector.Name() == "postgres" && tableExists {
-				return nil
-			}
-
-			// Explicitly create indexes as declared in struct tags
-			if !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_llm_request_id") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_llm_request_id on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_llm_request_id"); err != nil {
-					return fmt.Errorf("failed to create index on llm_request_id: %w", err)
-				}
-			}
-
-			if !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_tool_name") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_tool_name on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_tool_name"); err != nil {
-					return fmt.Errorf("failed to create index on tool_name: %w", err)
-				}
-			}
-
-			if !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_server_label") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_server_label on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_server_label"); err != nil {
-					return fmt.Errorf("failed to create index on server_label: %w", err)
-				}
-			}
-
-			if !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_latency") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_latency on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_latency"); err != nil {
-					return fmt.Errorf("failed to create index on latency: %w", err)
-				}
-			}
-
-			if !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_status") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_status on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_status"); err != nil {
-					return fmt.Errorf("failed to create index on status: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			logger.Info("[logstore] %s: dropping table MCPToolLog", migrationName)
-			if err := migrator.DropTable(&MCPToolLog{}); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while creating mcp_tool_logs table: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddCostColumnToMCPToolLogs adds the cost column to the mcp_tool_logs table
-func migrationAddCostColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_cost_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Add cost column if it doesn't exist
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "cost"); err != nil {
-				return fmt.Errorf("failed to add cost column: %w", err)
-			}
-
-			// Create index on cost column
-			if tx.Dialector.Name() != "postgres" && !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_cost") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_cost on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_cost"); err != nil {
-					return fmt.Errorf("failed to create index on cost: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Drop index first
-			if migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_cost") {
-				logger.Info("[logstore] %s: dropping index idx_mcp_logs_cost on MCPToolLog", migrationName)
-				if err := migrator.DropIndex(&MCPToolLog{}, "idx_mcp_logs_cost"); err != nil {
-					return err
-				}
-			}
-
-			// Drop column
-			if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, "cost"); err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while adding cost column to mcp_tool_logs: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddImageGenerationOutputColumn adds the image_generation_output column to the logs table.
 func migrationAddImageGenerationOutputColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_image_generation_output_column"
@@ -1434,73 +1288,6 @@ func migrationAddRoutingRuleIDAndRoutingRuleNameColumns(ctx context.Context, db 
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while adding routing rule id and routing rule name columns: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddVirtualKeyColumnsToMCPToolLogs adds virtual_key_id and virtual_key_name columns to the mcp_tool_logs table
-func migrationAddVirtualKeyColumnsToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_virtual_key_columns"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Add virtual_key_id column if it doesn't exist
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "virtual_key_id"); err != nil {
-				return fmt.Errorf("failed to add virtual_key_id column: %w", err)
-			}
-
-			// Add virtual_key_name column if it doesn't exist
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "virtual_key_name"); err != nil {
-				return fmt.Errorf("failed to add virtual_key_name column: %w", err)
-			}
-
-			// Create index on virtual_key_id column
-			// A table created from the current struct tags already has the
-			// (virtual_key_id, timestamp) composite; see migrationAddOwnerTimestampIndexes.
-			if tx.Dialector.Name() != "postgres" && !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_vk_ts") && !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_virtual_key_id") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_virtual_key_id on MCPToolLog", migrationName)
-				if err := tx.Exec("CREATE INDEX IF NOT EXISTS idx_mcp_logs_virtual_key_id ON mcp_tool_logs(virtual_key_id)").Error; err != nil {
-					return fmt.Errorf("failed to create index on virtual_key_id: %w", err)
-				}
-			}
-
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-
-			// Drop index first
-			if migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_virtual_key_id") {
-				logger.Info("[logstore] %s: dropping index idx_mcp_logs_virtual_key_id on MCPToolLog", migrationName)
-				if err := migrator.DropIndex(&MCPToolLog{}, "idx_mcp_logs_virtual_key_id"); err != nil {
-					return err
-				}
-			}
-
-			// Drop virtual_key_name column
-			if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, "virtual_key_name"); err != nil {
-				return err
-			}
-
-			// Drop virtual_key_id column
-			if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, "virtual_key_id"); err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while adding virtual key columns to mcp_tool_logs: %s", err.Error())
 	}
 	return nil
 }
@@ -1832,107 +1619,6 @@ func migrationAddMetadataColumn(ctx context.Context, db *gorm.DB, logger schemas
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while adding metadata column: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMetadataColumnToMCPToolLogs adds the metadata column to the mcp_tool_logs table
-func migrationAddMetadataColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_metadata_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "metadata"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, "metadata"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while adding metadata column to mcp_tool_logs: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddRequestIDColumnToMCPToolLogs adds the request_id column to the mcp_tool_logs table.
-// This stores the original context request ID separately from the primary key (which is now a UUID),
-// enabling correct logging of parallel tool calls that share the same request ID.
-func migrationAddRequestIDColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_request_id_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = false
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "request_id"); err != nil {
-				return err
-			}
-
-			if tx.Dialector.Name() == "postgres" {
-				if err := execBatchedGormMaintenanceUpdate(tx, "mcp request_id backfill", `
-          WITH batch AS (
-            SELECT ctid
-            FROM mcp_tool_logs
-            WHERE request_id IS NULL OR request_id = ''
-            LIMIT ?
-            FOR UPDATE SKIP LOCKED
-          )
-          UPDATE mcp_tool_logs
-          SET request_id = id
-          FROM batch
-          WHERE mcp_tool_logs.ctid = batch.ctid
-        `); err != nil {
-					return err
-				}
-			} else {
-				result := tx.Exec("UPDATE mcp_tool_logs SET request_id = id WHERE request_id IS NULL OR request_id = ''")
-				if result.Error != nil {
-					return fmt.Errorf("failed to backfill mcp request_id values: %w", result.Error)
-				}
-			}
-			if tx.Dialector.Name() != "postgres" && !migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_request_id") {
-				logger.Info("[logstore] %s: creating index idx_mcp_logs_request_id on MCPToolLog", migrationName)
-				if err := migrator.CreateIndex(&MCPToolLog{}, "idx_mcp_logs_request_id"); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if migrator.HasIndex(&MCPToolLog{}, "idx_mcp_logs_request_id") {
-				logger.Info("[logstore] %s: dropping index idx_mcp_logs_request_id on MCPToolLog", migrationName)
-				if err := migrator.DropIndex(&MCPToolLog{}, "idx_mcp_logs_request_id"); err != nil {
-					return err
-				}
-			}
-			if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, "request_id"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while adding request_id column to mcp_tool_logs: %s", err.Error())
 	}
 	return nil
 }
@@ -2467,8 +2153,7 @@ func migrationAddDashboardEnhancements(ctx context.Context, db *gorm.DB, logger 
 
 // ensureDashboardEnhancements performs the expensive dashboard migration work that was
 // deferred from migrationAddDashboardEnhancements: backfilling cached_read_tokens from
-// the token_usage JSON, rebuilding the histogram covering index to include the new column,
-// and creating the MCP histogram covering index.
+// the token_usage JSON and rebuilding the histogram covering index to include the new column.
 //
 // This is intentionally separate so that the long-running UPDATE and index rebuild do not
 // block pod startup. Callers that want non-blocking behaviour should invoke this in a
@@ -2499,23 +2184,6 @@ func ensureDashboardEnhancements(ctx context.Context, conn *sql.Conn) error {
 		)`
 		if _, err := conn.ExecContext(ctx, createLogsIndexSQL); err != nil {
 			return fmt.Errorf("failed to create updated covering index: %w", err)
-		}
-	}
-
-	// Create MCP histogram covering index if missing or invalid.
-	mcpIndexValid, err := pgIndexValid(ctx, conn, "mcp_tool_logs", "idx_mcp_logs_histogram_cover")
-	if err != nil {
-		return err
-	}
-	if !mcpIndexValid {
-		if err := pgDropIndexConcurrently(ctx, conn, "idx_mcp_logs_histogram_cover"); err != nil {
-			return err
-		}
-		createMCPIndexSQL := `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_histogram_cover ON mcp_tool_logs(
-			status, timestamp, tool_name, server_label, virtual_key_id, cost
-		)`
-		if _, err := conn.ExecContext(ctx, createMCPIndexSQL); err != nil {
-			return fmt.Errorf("failed to create MCP histogram covering index: %w", err)
 		}
 	}
 
@@ -2580,10 +2248,7 @@ func migrationAddLogsAndDashboardPerformanceIndexes(ctx context.Context, db *gor
 			tx = tx.WithContext(ctx)
 			for _, indexName := range []string{
 				"idx_logs_content_summary_fts",
-				"idx_mcp_logs_arguments_fts",
-				"idx_mcp_logs_result_fts",
 				"idx_logs_routing_engines_arr",
-				"idx_mcp_logs_timestamp",
 			} {
 				if err := tx.Exec("DROP INDEX CONCURRENTLY IF EXISTS " + indexName).Error; err != nil {
 					return fmt.Errorf("failed to drop performance index %s: %w", indexName, err)
@@ -2687,57 +2352,12 @@ var performanceIndexes = []performanceIndexDef{
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_status_created_at ON logs(status, created_at)",
 	},
 	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_llm_request_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_llm_request_id ON mcp_tool_logs(llm_request_id)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_tool_name",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_tool_name ON mcp_tool_logs(tool_name)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_server_label",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_server_label ON mcp_tool_logs(server_label)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_latency",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_latency ON mcp_tool_logs(latency)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_status",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_status ON mcp_tool_logs(status)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_cost",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_cost ON mcp_tool_logs(cost)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_request_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_request_id ON mcp_tool_logs(request_id)",
-	},
-	{
 		table: "logs",
 		name:  "idx_logs_content_summary_fts",
 		// left() caps input characters to stay within to_tsvector's 1MB output limit.
 		// Use ftsInputCharLimit: even worst-case UTF-8 / high-lexeme content stays
 		// well under the 1,048,575-byte tsvector limit.
 		sql: fmt.Sprintf("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_content_summary_fts ON logs USING GIN (to_tsvector('simple', left(content_summary, %d))) WHERE content_summary IS NOT NULL", ftsInputCharLimit),
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_arguments_fts",
-		sql:   fmt.Sprintf("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_arguments_fts ON mcp_tool_logs USING GIN (to_tsvector('simple', left(arguments, %d))) WHERE arguments IS NOT NULL", ftsInputCharLimit),
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_result_fts",
-		sql:   fmt.Sprintf("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_result_fts ON mcp_tool_logs USING GIN (to_tsvector('simple', left(result, %d))) WHERE result IS NOT NULL", ftsInputCharLimit),
 	},
 	{
 		table: "logs",
@@ -2750,11 +2370,6 @@ var performanceIndexes = []performanceIndexDef{
 		// Backs the tool_call_names filter's array-overlap predicate; partial so
 		// the (dominant) rows that called no tools stay out of the index.
 		sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_tool_call_names_arr ON logs USING GIN (string_to_array(tool_call_names, ',')) WHERE tool_call_names IS NOT NULL",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_timestamp",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_timestamp ON mcp_tool_logs (timestamp)",
 	},
 	{
 		table: "logs",
@@ -2824,41 +2439,6 @@ var performanceIndexes = []performanceIndexDef{
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_agent_correlation_id ON logs(agent_correlation_id) WHERE agent_correlation_id IS NOT NULL",
 	},
 	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_session_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_session_id ON mcp_tool_logs(session_id) WHERE session_id IS NOT NULL",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_agent_correlation_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_agent_correlation_id ON mcp_tool_logs(agent_correlation_id) WHERE agent_correlation_id IS NOT NULL",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_round_trip_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_round_trip_id ON mcp_tool_logs(round_trip_id) WHERE round_trip_id IS NOT NULL",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_customer_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_customer_id ON mcp_tool_logs(customer_id)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_business_unit_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_business_unit_id ON mcp_tool_logs(business_unit_id)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_device_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_device_id ON mcp_tool_logs(device_id)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_source",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_source ON mcp_tool_logs(source)",
-	},
-	{
 		table: "logs",
 		name:  "idx_logs_user_agent",
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_user_agent ON logs(user_agent)",
@@ -2867,16 +2447,6 @@ var performanceIndexes = []performanceIndexDef{
 		table: "logs",
 		name:  "idx_logs_app",
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_app ON logs(app)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_user_agent",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_user_agent ON mcp_tool_logs(user_agent)",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_app",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_app ON mcp_tool_logs(app)",
 	},
 	{
 		table: "logs",
@@ -2892,11 +2462,6 @@ var performanceIndexes = []performanceIndexDef{
 		table: "logs",
 		name:  "idx_logs_cluster_node_inc_usage",
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_logs_cluster_node_inc_usage ON logs(cluster_node_id, status, inc_number) WHERE cluster_node_id IS NOT NULL AND inc_number IS NOT NULL",
-	},
-	{
-		table: "mcp_tool_logs",
-		name:  "idx_mcp_logs_project_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_project_id ON mcp_tool_logs(project_id)",
 	},
 }
 
@@ -2953,19 +2518,16 @@ func (d ownerTimestampIndexDef) createSQL() string {
 	return fmt.Sprintf("CREATE INDEX CONCURRENTLY IF NOT EXISTS %s ON %s(%s, timestamp)", d.name, d.table, d.column)
 }
 
-// ownerTimestampIndexes back the logs and MCP lists filtered by virtual key,
+// ownerTimestampIndexes back the logs list filtered by virtual key,
 // user or team and ordered by timestamp DESC with a LIMIT. A composite leading
 // on the owner column serves every equality lookup the single-column index
 // served, so the single-column index is dropped once the composite is valid.
-// The struct tags on Log and MCPToolLog define the same names, so fresh
+// The struct tags on Log define the same names, so fresh
 // installs build them with the table.
 var ownerTimestampIndexes = []ownerTimestampIndexDef{
 	{table: "logs", name: "idx_logs_vk_ts", column: "virtual_key_id", replaces: "idx_logs_virtual_key_id"},
 	{table: "logs", name: "idx_logs_user_ts", column: "user_id", replaces: "idx_logs_user_id"},
 	{table: "logs", name: "idx_logs_team_ts", column: "team_id", replaces: "idx_logs_team_id"},
-	{table: "mcp_tool_logs", name: "idx_mcp_logs_vk_ts", column: "virtual_key_id", replaces: "idx_mcp_logs_virtual_key_id"},
-	{table: "mcp_tool_logs", name: "idx_mcp_logs_user_ts", column: "user_id", replaces: "idx_mcp_logs_user_id"},
-	{table: "mcp_tool_logs", name: "idx_mcp_logs_team_ts", column: "team_id", replaces: "idx_mcp_logs_team_id"},
 }
 
 // rankingNameTimestampIndexes back the ranking name fallback: for each ranked id
@@ -3131,7 +2693,7 @@ func ensureOwnerTimestampIndexes(ctx context.Context, conn *sql.Conn, logger sch
 }
 
 // migrationAddOwnerTimestampIndexes swaps the single-column virtual_key_id,
-// user_id and team_id indexes on logs and mcp_tool_logs for (owner, timestamp)
+// user_id and team_id indexes on logs for (owner, timestamp)
 // composites on SQLite and other non-Postgres databases. Postgres builds the
 // same indexes CONCURRENTLY in the background (ensureOwnerTimestampIndexes),
 // because a plain CREATE INDEX there would block writes on a large table.
@@ -3207,10 +2769,7 @@ func runTimestampIndexMigration(ctx context.Context, db *gorm.DB, logger schemas
 }
 
 // ownerTimestampIndexModel returns the GORM model for an ownerTimestampIndexes table.
-func ownerTimestampIndexModel(table string) any {
-	if table == "mcp_tool_logs" {
-		return &MCPToolLog{}
-	}
+func ownerTimestampIndexModel(string) any {
 	return &Log{}
 }
 
@@ -3271,28 +2830,6 @@ func migrationAddPluginLogsColumn(ctx context.Context, db *gorm.DB, logger schem
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while adding plugin logs column: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMCPPluginLogsColumn adds the plugin_logs column to MCP tool logs.
-func migrationAddMCPPluginLogsColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_plugin_logs_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &MCPToolLog{}, "plugin_logs")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &MCPToolLog{}, "plugin_logs")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding MCP plugin logs column: %s", err.Error())
 	}
 	return nil
 }
@@ -3462,38 +2999,6 @@ func migrationAddHasObjectColumn(ctx context.Context, db *gorm.DB, logger schema
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while adding has_object column: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddHasObjectColumnToMCPToolLogs adds the has_object boolean column to the mcp_tool_logs table.
-// Used by the hybrid log store to track whether an MCP tool log's payload is stored in object storage.
-func migrationAddHasObjectColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_has_object_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "has_object"); err != nil {
-				return err
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, "has_object"); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while adding has_object column to mcp_tool_logs: %s", err.Error())
 	}
 	return nil
 }
@@ -3681,45 +3186,6 @@ func migrationAddProjectColumns(ctx context.Context, db *gorm.DB, logger schemas
 	return nil
 }
 
-// migrationAddProjectColumnsToMCPToolLogs is the same dimension on the tool log, so a tool call made
-// inside a project is attributable to it exactly as a model call is. Its index is likewise built by
-// ensurePerformanceIndexes rather than here.
-func migrationAddProjectColumnsToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_project_columns"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-
-	columns := []string{"project_id", "project_name"}
-
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range columns {
-				if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range columns {
-				if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding project columns to mcp tool logs: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddMultiTeamBusinessUnitColumns adds the JSON-array team and business-unit
 // id/name columns to logs.
 func migrationAddMultiTeamBusinessUnitColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -3853,64 +3319,6 @@ func migrationAddUserAgentColumn(ctx context.Context, db *gorm.DB, logger schema
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while adding user_agent column: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddUserAgentColumnToMCPToolLogs adds the user_agent and app columns to
-// the mcp_tool_logs table, mirroring migrationAddUserAgentColumn for MCP tool calls.
-//
-// Indexes on user_agent and app are built CONCURRENTLY by ensurePerformanceIndexes
-// (entries appended to performanceIndexes) so adding them does not block writes on
-// a populated table.
-func migrationAddUserAgentColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: "mcp_tool_logs_add_user_agent_column",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if !mg.HasColumn(&MCPToolLog{}, "user_agent") {
-				if err := mg.AddColumn(&MCPToolLog{}, "user_agent"); err != nil {
-					return err
-				}
-			}
-			if !mg.HasColumn(&MCPToolLog{}, "app") {
-				if err := mg.AddColumn(&MCPToolLog{}, "app"); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if mg.HasIndex(&MCPToolLog{}, "idx_mcp_logs_app") {
-				if err := mg.DropIndex(&MCPToolLog{}, "idx_mcp_logs_app"); err != nil {
-					return err
-				}
-			}
-			if mg.HasIndex(&MCPToolLog{}, "idx_mcp_logs_user_agent") {
-				if err := mg.DropIndex(&MCPToolLog{}, "idx_mcp_logs_user_agent"); err != nil {
-					return err
-				}
-			}
-			if mg.HasColumn(&MCPToolLog{}, "app") {
-				if err := mg.DropColumn(&MCPToolLog{}, "app"); err != nil {
-					return err
-				}
-			}
-			if mg.HasColumn(&MCPToolLog{}, "user_agent") {
-				if err := mg.DropColumn(&MCPToolLog{}, "user_agent"); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding user_agent column to mcp_tool_logs: %s", err.Error())
 	}
 	return nil
 }
@@ -4361,31 +3769,6 @@ func migrationAddRedactionMappingColumn(ctx context.Context, db *gorm.DB, logger
 	return nil
 }
 
-// migrationAddMCPRedactionMappingColumn adds the reversible redaction mapping
-// column to MCP tool logs while keeping its lifecycle coupled to the log row.
-func migrationAddMCPRedactionMappingColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_redaction_mapping_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &MCPToolLog{}, "redaction_mapping")
-		},
-		Rollback: func(*gorm.DB) error {
-			// No-op rollback: dropping the column would permanently destroy
-			// reveal data for already-redacted MCP logs.
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding MCP redaction_mapping column: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddSafeJsonbFunction installs a PL/pgSQL helper that the
 // /api/logs list query uses to extract the last element of input_history /
 // responses_input_history without aborting the whole query on a single bad row.
@@ -4446,90 +3829,6 @@ $$;`
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error while adding bifrost_safe_jsonb function: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddDACColumnsToMCPToolLogs adds user_id, team_id, customer_id,
-// and business_unit_id columns to mcp_tool_logs so DAC scope can apply the
-// same ownership predicates it does on the logs table. The columns are
-// nullable; pre-existing rows stay NULL and the DAC resolver fails closed
-// for non-admin principals against them.
-//
-// Indexes are built CONCURRENTLY by ensurePerformanceIndexes (entries appended
-// to performanceIndexes) so adding them does not block writes on a populated
-// table.
-func migrationAddDACColumnsToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_dac_columns"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-
-			for _, col := range []string{"user_id", "team_id", "customer_id", "business_unit_id"} {
-				if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return fmt.Errorf("failed to add %s column to mcp_tool_logs: %w", col, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range []string{"business_unit_id", "customer_id", "team_id", "user_id"} {
-				if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding DAC columns to mcp_tool_logs: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddEndpointColumnsToMCPToolLogs adds the endpoint-agent context
-// columns (device_id, app_key, decision, source) to the mcp_tool_logs table so
-// tool calls observed on developer machines by the Bifrost Edge agent can be
-// stored alongside gateway-proxied calls.
-//
-// Indexes on device_id and source are built CONCURRENTLY by
-// ensurePerformanceIndexes (entries appended to performanceIndexes) so adding
-// them does not block writes on a populated table.
-func migrationAddEndpointColumnsToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_endpoint_columns"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range []string{"device_id", "app_key", "decision", "source"} {
-				if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return fmt.Errorf("failed to add %s column to mcp_tool_logs: %w", col, err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range []string{"source", "decision", "app_key", "device_id"} {
-				if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding endpoint columns to mcp_tool_logs: %w", err)
 	}
 	return nil
 }
@@ -4832,8 +4131,8 @@ func migrationAddServerSideFallbackModelColumn(ctx context.Context, db *gorm.DB,
 	return nil
 }
 
-// migrationAddCorrelationColumns adds agent_correlation_id to logs and mcp_tool_logs, and session_id
-// to mcp_tool_logs. PostgreSQL gets the indexes from the background builder (performanceIndexes);
+// migrationAddCorrelationColumns adds agent_correlation_id to logs.
+// PostgreSQL gets the indexes from the background builder (performanceIndexes);
 // other dialects create them here.
 func migrationAddCorrelationColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	opts := *migrator.DefaultOptions
@@ -4858,8 +4157,6 @@ func correlationColumnsMigration(ctx context.Context, logger schemas.Logger) *mi
 				index string
 			}{
 				{&Log{}, "agent_correlation_id", "idx_logs_agent_correlation_id"},
-				{&MCPToolLog{}, "session_id", "idx_mcp_logs_session_id"},
-				{&MCPToolLog{}, "agent_correlation_id", "idx_mcp_logs_agent_correlation_id"},
 			} {
 				if err := addColumnIfNotExists(tx, logger, column.model, column.name); err != nil {
 					return err
@@ -4874,19 +4171,13 @@ func correlationColumnsMigration(ctx context.Context, logger schemas.Logger) *mi
 		},
 		Rollback: func(tx *gorm.DB) error {
 			tx = tx.WithContext(ctx)
-			// Two checks, because logs has a session_id of its own that this migration did not add.
-			if err := refuseRollbackWhileRecorded(tx, migrationName, []any{&Log{}, &MCPToolLog{}}, "agent_correlation_id"); err != nil {
-				return err
-			}
-			if err := refuseRollbackWhileRecorded(tx, migrationName, []any{&MCPToolLog{}}, "session_id"); err != nil {
+			if err := refuseRollbackWhileRecorded(tx, migrationName, []any{&Log{}}, "agent_correlation_id"); err != nil {
 				return err
 			}
 			for _, column := range []struct {
 				model any
 				name  string
 			}{
-				{&MCPToolLog{}, "agent_correlation_id"},
-				{&MCPToolLog{}, "session_id"},
 				{&Log{}, "agent_correlation_id"},
 			} {
 				if err := dropColumnIfExists(tx, logger, column.model, column.name); err != nil {
@@ -5035,62 +4326,6 @@ func migrationAddServedModelColumn(ctx context.Context, db *gorm.DB, logger sche
 	return nil
 }
 
-// migrationAddMCPGovernanceSnapshots gives the tool log the attribution shape the logs table already
-// has: a name recorded beside every governance id, and the multi-valued team / customer / business
-// unit sets, so a row says who made the call without a second lookup at read time.
-//
-// Structure only. Rows written before this keep their bare ids, as they do for every other column
-// added to this table; nothing here rewrites history. Indexes are left to ensurePerformanceIndexes,
-// and names are not indexed on the logs table either.
-func migrationAddMCPGovernanceSnapshots(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_governance_snapshots"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-
-	columns := []string{
-		"user_name", "team_name", "customer_name", "business_unit_name",
-		"team_ids", "team_names", "customer_ids", "customer_names",
-		"business_unit_ids", "business_unit_names", "budget_ids", "rate_limit_ids",
-	}
-
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			// Twelve ALTER TABLEs on a table that is being written to continuously.
-			// Without a bounded wait each one can sit behind a long-running log
-			// transaction holding ACCESS EXCLUSIVE, and startup stalls with it.
-			if err := boundDDLLockWait(tx); err != nil {
-				return err
-			}
-			for _, col := range columns {
-				if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := boundDDLLockWait(tx); err != nil {
-				return err
-			}
-			for i := len(columns) - 1; i >= 0; i-- {
-				if err := dropColumnIfExists(tx, logger, &MCPToolLog{}, columns[i]); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding governance snapshot columns to mcp tool logs: %s", err.Error())
-	}
-	return nil
-}
-
 // smallTableForPlainIndex decides when a logstore migration builds an index
 // without CONCURRENTLY; see postgresconn.TableIsSmall. A variable only so tests
 // can force the concurrent path.
@@ -5226,83 +4461,10 @@ func isPassthroughColumnMigration(ctx context.Context, logger schemas.Logger) *m
 	}
 }
 
-// migrationAddMethodColumnToMCPToolLogs adds the column naming a prompt or resource read; tool calls
-// leave it null, so existing rows need no backfill.
-func migrationAddMethodColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_method_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := boundDDLLockWait(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &MCPToolLog{}, "method")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &MCPToolLog{}, "method")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddRoundTripIDColumnToMCPToolLogs adds the column linking the rounds of an MCP gateway tool call
-// that asked its caller for input; other rows leave it null, so there is no backfill. Postgres builds its index
-// concurrently through performanceIndexes; other dialects create it here.
-func migrationAddRoundTripIDColumnToMCPToolLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "mcp_tool_logs_add_round_trip_id_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{roundTripIDColumnMigration(ctx, logger)})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// roundTripIDColumnMigration refuses its rollback while round_trip_id holds a value: the links between a call's
-// rounds cannot be recaptured once dropped.
-func roundTripIDColumnMigration(ctx context.Context, logger schemas.Logger) *migrator.Migration {
-	return &migrator.Migration{
-		ID: "mcp_tool_logs_add_round_trip_id_column",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := boundDDLLockWait(tx); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &MCPToolLog{}, "round_trip_id"); err != nil {
-				return err
-			}
-			if tx.Dialector.Name() != "postgres" && !tx.Migrator().HasIndex(&MCPToolLog{}, "idx_mcp_logs_round_trip_id") {
-				if err := tx.Migrator().CreateIndex(&MCPToolLog{}, "idx_mcp_logs_round_trip_id"); err != nil {
-					return fmt.Errorf("create idx_mcp_logs_round_trip_id index: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := refuseRollbackWhileRecorded(tx, "mcp_tool_logs_add_round_trip_id_column", []any{&MCPToolLog{}}, "round_trip_id"); err != nil {
-				return err
-			}
-			return dropColumnIfExists(tx, logger, &MCPToolLog{}, "round_trip_id")
-		},
-	}
-}
-
 // clientIPColumnModels are the log tables that carry client_ip.
-var clientIPColumnModels = []any{&Log{}, &MCPToolLog{}}
+var clientIPColumnModels = []any{&Log{}}
 
-// migrationAddClientIPColumn adds client_ip to logs and mcp_tool_logs.
+// migrationAddClientIPColumn adds client_ip to logs.
 func migrationAddClientIPColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	opts := *migrator.DefaultOptions
 	opts.UseTransaction = true
@@ -5389,9 +4551,9 @@ func refuseRollbackWhileRecorded(tx *gorm.DB, migrationID string, models []any, 
 }
 
 // userEmailColumnModels are the log tables that carry user_email.
-var userEmailColumnModels = []any{&Log{}, &MCPToolLog{}}
+var userEmailColumnModels = []any{&Log{}}
 
-// migrationAddUserEmailColumn adds user_email to logs and mcp_tool_logs.
+// migrationAddUserEmailColumn adds user_email to logs.
 func migrationAddUserEmailColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	opts := *migrator.DefaultOptions
 	opts.UseTransaction = true
@@ -5491,7 +4653,7 @@ func rollbackComplexitySuggestionTables(tx *gorm.DB) error {
 
 // retentionAutovacuumTables are the tables the retention cleaner deletes from on
 // a schedule (the keys of retentionAdvisoryLockKeys), in a fixed order.
-var retentionAutovacuumTables = []string{"logs", "mcp_tool_logs"}
+var retentionAutovacuumTables = []string{"logs"}
 
 // retentionAutovacuumOptions are the storage parameters set on each retention
 // table, written as Postgres reports them in pg_class.reloptions.

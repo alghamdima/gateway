@@ -230,27 +230,6 @@ func TestSearchLogs_LimitClamping(t *testing.T) {
 	assert.Equal(t, 5, len(result.Logs))
 }
 
-func TestSearchMCPToolLogs_LimitClamping(t *testing.T) {
-	store, db := setupPerfTestDB(t)
-	ctx := context.Background()
-	now := time.Now().UTC()
-
-	for i := 0; i < 5; i++ {
-		insertPerfMCPLog(t, db, mcpLogOpts{
-			ToolName: "search", ServerLabel: "s1", Timestamp: now,
-			VirtualKeyID: "vk-1", VirtualKeyName: "key-1",
-		})
-	}
-
-	result, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 0})
-	require.NoError(t, err)
-	assert.Equal(t, 5, len(result.Logs), "Limit=0 should be clamped")
-
-	result, err = store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 3})
-	require.NoError(t, err)
-	assert.Equal(t, 3, len(result.Logs))
-}
-
 func TestGetModelRankings_HasLimit(t *testing.T) {
 	store, db := setupPerfTestDB(t)
 	ctx := context.Background()
@@ -395,79 +374,6 @@ func TestGetDistinctStopReasons_TimeCutoff(t *testing.T) {
 	assert.Contains(t, stopReasons, "refusal")
 	assert.Contains(t, stopReasons, "content_filter")
 	assert.NotContains(t, stopReasons, "length")
-}
-
-func TestGetAvailableToolNames_TimeCutoff(t *testing.T) {
-	store, db := setupPerfTestDB(t)
-	ctx := context.Background()
-	now := time.Now().UTC()
-	recent := now.Add(-7 * 24 * time.Hour)
-	old := now.Add(-60 * 24 * time.Hour)
-
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "recent-tool", ServerLabel: "s1", Timestamp: recent,
-		VirtualKeyID: "vk-1", VirtualKeyName: "k1",
-	})
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "old-tool", ServerLabel: "s1", Timestamp: old,
-		VirtualKeyID: "vk-1", VirtualKeyName: "k1",
-	})
-
-	tools, err := store.GetAvailableToolNames(ctx, 1000, "")
-	require.NoError(t, err)
-	assert.Contains(t, tools, "recent-tool")
-	assert.NotContains(t, tools, "old-tool")
-}
-
-func TestGetAvailableServerLabels_TimeCutoff(t *testing.T) {
-	store, db := setupPerfTestDB(t)
-	ctx := context.Background()
-	now := time.Now().UTC()
-	recent := now.Add(-7 * 24 * time.Hour)
-	old := now.Add(-60 * 24 * time.Hour)
-
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "t1", ServerLabel: "recent-server", Timestamp: recent,
-		VirtualKeyID: "vk-1", VirtualKeyName: "k1",
-	})
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "t2", ServerLabel: "old-server", Timestamp: old,
-		VirtualKeyID: "vk-1", VirtualKeyName: "k1",
-	})
-
-	labels, err := store.GetAvailableServerLabels(ctx, 1000, "")
-	require.NoError(t, err)
-	assert.Contains(t, labels, "recent-server")
-	assert.NotContains(t, labels, "old-server")
-}
-
-func TestGetAvailableMCPVirtualKeys_TimeCutoff(t *testing.T) {
-	store, db := setupPerfTestDB(t)
-	ctx := context.Background()
-	now := time.Now().UTC()
-	recent := now.Add(-7 * 24 * time.Hour)
-	old := now.Add(-60 * 24 * time.Hour)
-
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "t1", ServerLabel: "s1", Timestamp: recent,
-		VirtualKeyID: "vk-recent", VirtualKeyName: "Recent VK",
-	})
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "t2", ServerLabel: "s1", Timestamp: old,
-		VirtualKeyID: "vk-old", VirtualKeyName: "Old VK",
-	})
-
-	keys, err := store.GetAvailableMCPVirtualKeys(ctx, 1000, "")
-	require.NoError(t, err)
-
-	var ids []string
-	for _, k := range keys {
-		if k.VirtualKeyID != nil {
-			ids = append(ids, *k.VirtualKeyID)
-		}
-	}
-	assert.Contains(t, ids, "vk-recent")
-	assert.NotContains(t, ids, "vk-old")
 }
 
 // ---------- Phase 3: Routing engine filter + indexes ----------
@@ -619,42 +525,6 @@ func TestContentSearch_Postgres(t *testing.T) {
 	}, PaginationOptions{Limit: 100})
 	require.NoError(t, err)
 	assert.Equal(t, 0, len(result.Logs))
-}
-
-func TestMCPContentSearch_Postgres(t *testing.T) {
-	store, db := setupPerfTestDB(t)
-	ctx := context.Background()
-	now := time.Now().UTC()
-
-	// Build indexes
-	conn := acquirePerfTestSQLConn(t, ctx, db)
-	err := ensurePerformanceIndexes(ctx, conn, testLogger{})
-	require.NoError(t, err)
-
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "search", ServerLabel: "s1", Timestamp: now,
-		VirtualKeyID: "vk-1", VirtualKeyName: "k1",
-		Arguments: `{"query": "weather in london"}`,
-		Result:    `{"temperature": 15}`,
-	})
-	insertPerfMCPLog(t, db, mcpLogOpts{
-		ToolName: "calc", ServerLabel: "s1", Timestamp: now,
-		VirtualKeyID: "vk-1", VirtualKeyName: "k1",
-		Arguments: `{"expression": "2+2"}`,
-		Result:    `{"answer": 4}`,
-	})
-
-	result, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{
-		ContentSearch: "london",
-	}, PaginationOptions{Limit: 100})
-	require.NoError(t, err)
-	assert.Equal(t, 1, len(result.Logs), "Should find 1 MCP log matching 'london'")
-
-	result, err = store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{
-		ContentSearch: "temperature",
-	}, PaginationOptions{Limit: 100})
-	require.NoError(t, err)
-	assert.Equal(t, 1, len(result.Logs), "Should find 1 MCP log matching 'temperature' in result")
 }
 
 // TestGetUserSpendMatViewPath checks that on Postgres with the matview ready, a window

@@ -307,10 +307,6 @@ func TestPostgresRetentionBatchYieldsWhileLockHeld(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRetentionBusy)
 	assert.Equal(t, int64(20), countLogs(t, db, "old-"))
 
-	other, err := store.DeleteMCPToolLogsBatch(context.Background(), cutoff, batchSize)
-	assert.NoError(t, err, "each table has its own lock")
-	assert.Zero(t, other)
-
 	require.NoError(t, holder.Commit().Error)
 	deleted, err := store.DeleteLogsBatch(context.Background(), cutoff, batchSize)
 	require.NoError(t, err)

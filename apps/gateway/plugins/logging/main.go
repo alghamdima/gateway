@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,12 +17,10 @@ import (
 
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
-	"github.com/maximhq/bifrost/core/mcp"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/jobaccounting"
 	"github.com/maximhq/bifrost/framework/logstore"
-	"github.com/maximhq/bifrost/framework/mcpcatalog"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/framework/overhead"
 	"github.com/maximhq/bifrost/framework/passthroughparse"
@@ -129,16 +126,6 @@ func redactionDataForLogging(ctx *schemas.BifrostContext, contentLoggingEnabled 
 
 // attachLogRedactionData copies guardrail redaction data into an LLM log entry.
 func attachLogRedactionData(ctx *schemas.BifrostContext, entry *logstore.Log, contentLoggingEnabled bool) {
-	if entry == nil {
-		return
-	}
-	if snapshot := redactionDataForLogging(ctx, contentLoggingEnabled); snapshot != nil {
-		entry.RedactionData = snapshot
-	}
-}
-
-// attachMCPLogRedactionData copies guardrail redaction data into an MCP tool log entry.
-func attachMCPLogRedactionData(ctx *schemas.BifrostContext, entry *logstore.MCPToolLog, contentLoggingEnabled bool) {
 	if entry == nil {
 		return
 	}
@@ -293,116 +280,6 @@ func governanceDecisionPending(ctx *schemas.BifrostContext) bool {
 	}
 	presented, _ := ctx.Value(schemas.BifrostContextKeyVirtualKey).(string)
 	return presented != ""
-}
-
-// applyMCPGovernanceFieldsToEntry stamps MCP log ownership from the request context. Every dimension,
-// id and name alike, is recorded by the entry itself so the inspect and ingest paths in enterprise
-// stamp identically without repeating the field list.
-func applyMCPGovernanceFieldsToEntry(ctx *schemas.BifrostContext, entry *logstore.MCPToolLog) {
-	if ctx == nil || entry == nil {
-		return
-	}
-	entry.ApplyGovernanceContext(ctx)
-}
-
-// responsesToolResultWithoutMedia is message with each image, file and audio block of its tool output
-// replaced by a placeholder naming it; message itself is never mutated.
-func responsesToolResultWithoutMedia(message *schemas.ResponsesMessage) *schemas.ResponsesMessage {
-	if message.ResponsesToolMessage == nil || message.ResponsesToolMessage.Output == nil {
-		return message
-	}
-	flattened, changed := schemas.FlattenResponsesToolResultMedia(message.ResponsesToolMessage.Output.ResponsesFunctionToolCallOutputBlocks)
-	if !changed {
-		return message
-	}
-	output := *message.ResponsesToolMessage.Output
-	output.ResponsesFunctionToolCallOutputBlocks = flattened
-	toolMessage := *message.ResponsesToolMessage
-	toolMessage.Output = &output
-	copied := *message
-	copied.ResponsesToolMessage = &toolMessage
-	return &copied
-}
-
-// resourceURIForLog is uri without its user info, query and fragment, where credentials ride. Commas
-// are percent-encoded (the same URI) because the log filters split tool names on them.
-func resourceURIForLog(uri string) string {
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return "[unparseable resource URI]"
-	}
-	if parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
-		parsed.User, parsed.RawQuery, parsed.ForceQuery, parsed.Fragment, parsed.RawFragment = nil, "", false, "", ""
-		uri = parsed.String()
-	}
-	return strings.ReplaceAll(uri, ",", "%2C")
-}
-
-func applyMCPCorrelationFieldsToEntry(ctx *schemas.BifrostContext, entry *logstore.MCPToolLog) {
-	if ctx == nil || entry == nil {
-		return
-	}
-	if sessionID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeySessionID); sessionID != "" {
-		entry.SessionID = &sessionID
-	}
-	if agentCorrelationID := requestHeaderFromContext(ctx, "x-bf-agent-correlation-id"); agentCorrelationID != "" {
-		agentCorrelationID = clampString(agentCorrelationID, maxPersistedAgentCorrelationIDLen)
-		entry.AgentCorrelationID = &agentCorrelationID
-	}
-}
-
-// applyMCPRoundTrip records an MCP multi round-trip on entry: an input_required round's status and what it
-// asked, the answers a retry carried (content-gated, like arguments), and round_trip_id, which every round
-// of one gateway tool call shares (see mcp.CallRoundTripID).
-func applyMCPRoundTrip(ctx *schemas.BifrostContext, entry *logstore.MCPToolLog, resp *schemas.BifrostMCPResponse, contentVisible bool) {
-	if carried, _ := ctx.Value(schemas.BifrostContextKeyMCPRoundTripID).(string); carried != "" {
-		entry.RoundTripID = &carried
-	}
-	if answers := mcp.InputResumptionForLog(ctx); answers != nil && contentVisible {
-		setMCPLogMetadata(entry, "input_responses", answers)
-	}
-	if resp == nil {
-		return
-	}
-	asked, ok := mcp.InputRequiredForLog(resp.ChatMessage)
-	if !ok {
-		return
-	}
-	entry.Status = logStatusInputRequired
-	entry.ResultParsed = nil
-	if asked == nil {
-		setMCPLogMetadata(entry, "retry_later", true)
-	} else if contentVisible {
-		entry.ResultParsed = asked
-	}
-	if entry.RoundTripID == nil {
-		id := mcp.CallRoundTripID(ctx)
-		entry.RoundTripID = &id
-	}
-}
-
-// applyMCPAppsMetadata marks an MCP call that involved MCP Apps: the caller hosts apps, the tool opens a
-// ui:// resource or is app-only, or the caller used the server's own tool name (as an app's code does).
-func applyMCPAppsMetadata(ctx *schemas.BifrostContext, entry *logstore.MCPToolLog) {
-	if mcp.CallerDeclaresApps(ctx) {
-		setMCPLogMetadata(entry, "mcp_apps", true)
-	}
-	if uri, _ := ctx.Value(schemas.BifrostContextKeyMCPToolUIResourceURI).(string); uri != "" {
-		setMCPLogMetadata(entry, "ui_resource_uri", resourceURIForLog(uri))
-	}
-	if appOnly, _ := ctx.Value(schemas.BifrostContextKeyMCPToolAppOnly).(bool); appOnly {
-		setMCPLogMetadata(entry, "app_only", true)
-	}
-	if name, _ := ctx.Value(schemas.BifrostContextKeyMCPRequestedToolName).(string); name != "" {
-		setMCPLogMetadata(entry, "requested_name", name)
-	}
-}
-
-func setMCPLogMetadata(entry *logstore.MCPToolLog, key string, value any) {
-	if entry.MetadataParsed == nil {
-		entry.MetadataParsed = map[string]interface{}{}
-	}
-	entry.MetadataParsed[key] = value
 }
 
 // scheduleDeferredUsageUpdate schedules a deferred usage update for the request.
@@ -1287,9 +1164,6 @@ type LogCallback func(ctx context.Context, logEntry *logstore.Log)
 // caller deleted, once the store has deleted them.
 type LogDeleteCallback func(ctx context.Context, ids []string)
 
-// MCPToolLogCallback is a function that gets called when a new MCP tool log entry is created or updated
-type MCPToolLogCallback func(*logstore.MCPToolLog)
-
 // Config controls logging plugin behavior.
 type Config struct {
 	DisableContentLogging        *bool                  `json:"disable_content_logging"`
@@ -1353,7 +1227,6 @@ type LoggerPlugin struct {
 	retainWarnOnce               sync.Once // Warns once when retention is configured without object storage
 	loggingHeaders               *[]string // Pointer to live config slice for headers to capture in metadata
 	pricingManager               *modelcatalog.ModelCatalog
-	mcpCatalog                   *mcpcatalog.MCPCatalog // MCP catalog for tool cost calculation
 	mu                           sync.Mutex
 	done                         chan struct{}
 	cleanupOnce                  sync.Once // Ensures cleanup only runs once
@@ -1365,8 +1238,7 @@ type LoggerPlugin struct {
 	logDeleteSubscribers         map[uint64]LogDeleteCallback
 	nextLogDeleteSubscriberID    uint64
 	batchUsageReporter           jobaccounting.UsageReporter
-	settlementTracer             schemas.Tracer     // tracer for settled batch/video cost spans; nil disables the bridge
-	mcpToolLogCallback           MCPToolLogCallback // Callback for MCP tool log entries
+	settlementTracer             schemas.Tracer // tracer for settled batch/video cost spans; nil disables the bridge
 	droppedRequests              atomic.Int64
 	droppedDuringMaintenance     atomic.Int64                   // Subset of droppedRequests dropped while the writer was paused for a logstore migration
 	writerPaused                 atomic.Bool                    // Set by batchWriter while it waits out another node's logstore migration
@@ -1378,8 +1250,6 @@ type LoggerPlugin struct {
 	evictedPartials              sync.Map                       // Maps requestID -> time.Time: partial rows persisted at eviction, awaiting reconcile in PostLLMHook
 	pendingClaimLocks            [pendingClaimShards]sync.Mutex // Striped by requestID; serializes eviction vs terminal PostLLMHook claiming a pending entry
 	pendingLogsToInject          sync.Map                       // Maps traceID -> *pendingInjectEntries (log entries to inject, supports multiple per trace)
-	pendingMCPLogsToInject       sync.Map                       // Maps mcpLogID -> *logstore.MCPToolLog (PreMCPHook input data awaiting PostMCPHook)
-	provisionalMCPArguments      sync.Map                       // Maps mcpLogID -> tool arguments captured before governance stamped the presented key or named project; attached in PostMCPHook only if content ends up visible
 	writerConfig                 logstore.WriterConfig          // Resolved async writer queue and batch settings
 	writeQueue                   chan *writeQueueEntry          // Buffered channel for batch write queue
 	closed                       atomic.Bool                    // Set during cleanup to prevent sends on closed writeQueue
@@ -1402,7 +1272,7 @@ type LoggerPlugin struct {
 // Init creates new logger plugin with given log store. batchStore is the
 // configstore-backed coordination store for delayed batch accounting; it may be
 // nil, which disables batch accounting.
-func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore logstore.LogStore, batchStore jobaccounting.SweepStore, pricingManager *modelcatalog.ModelCatalog, mcpCatalog *mcpcatalog.MCPCatalog) (*LoggerPlugin, error) {
+func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore logstore.LogStore, batchStore jobaccounting.SweepStore, pricingManager *modelcatalog.ModelCatalog) (*LoggerPlugin, error) {
 	if config == nil {
 		return nil, fmt.Errorf("config is required")
 	}
@@ -1411,9 +1281,6 @@ func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore 
 	}
 	if pricingManager == nil {
 		logger.Warn("logging plugin requires model catalog to calculate cost, all LLM cost calculations will be skipped.")
-	}
-	if mcpCatalog == nil {
-		logger.Warn("logging plugin requires MCP catalog to calculate cost, all MCP cost calculations will be skipped.")
 	}
 
 	writerConfig := config.Writer.WithDefaults()
@@ -1434,7 +1301,6 @@ func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore 
 		store:                        logsStore,
 		batchStore:                   batchStore,
 		pricingManager:               pricingManager,
-		mcpCatalog:                   mcpCatalog,
 		disableContentLogging:        config.DisableContentLogging,
 		retainContentInObjectStorage: config.RetainContentInObjectStorage,
 		objectStorageEnabled:         config.ObjectStorageEnabled,
@@ -1582,11 +1448,6 @@ func (p *LoggerPlugin) flushStaleProcessingLogs() {
 	// Delete LLM processing logs older than 30 minutes
 	if err := p.store.Flush(p.ctx, thirtyMinutesAgo); err != nil {
 		p.logger.Warn("failed to cleanup old processing LLM logs: %v", err)
-	}
-
-	// Delete MCP tool processing logs older than 30 minutes
-	if err := p.store.FlushMCPToolLogs(p.ctx, thirtyMinutesAgo); err != nil {
-		p.logger.Warn("failed to cleanup old processing MCP tool logs: %v", err)
 	}
 }
 
@@ -3225,347 +3086,6 @@ func appendPluginLogs(serialized string, logs []schemas.PluginLogEntry) string {
 }
 
 // MCP Plugin Interface Implementation
-
-// SetMCPToolLogCallback sets a callback function that will be called for each MCP tool log entry
-func (p *LoggerPlugin) SetMCPToolLogCallback(callback MCPToolLogCallback) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.mcpToolLogCallback = callback
-}
-
-// isMCPConnectCall reports whether core marked this call as a client's connect tool (see
-// bifrost.MCPToolCallKindOf). toolName may come with or without the client prefix: responses name
-// the tool the upstream way, requests and errors with the prefix.
-func isMCPConnectCall(ctx *schemas.BifrostContext, clientName, toolName string) bool {
-	if clientName == "" || toolName == "" {
-		return false
-	}
-	if !strings.HasPrefix(toolName, clientName+"-") {
-		toolName = clientName + "-" + toolName
-	}
-	return bifrost.MCPToolCallKindOf(ctx, clientName, toolName) == schemas.MCPToolCallKindConnect
-}
-
-// PreMCPHook is called before an MCP tool execution - creates initial log entry
-// Parameters:
-//   - ctx: The Bifrost context
-//   - req: The MCP request containing tool call information
-//
-// Returns:
-//   - *schemas.BifrostMCPRequest: The unmodified request
-//   - *schemas.MCPPluginShortCircuit: nil (no short-circuiting)
-//   - error: nil (errors are logged but don't fail the request)
-func (p *LoggerPlugin) PreMCPHook(ctx *schemas.BifrostContext, req *schemas.BifrostMCPRequest) (*schemas.BifrostMCPRequest, *schemas.MCPPluginShortCircuit, error) {
-	if ctx == nil {
-		p.logger.Error("context is nil in PreMCPHook")
-		return req, nil, nil
-	}
-
-	// Only log tool executions and prompt or resource reads
-	isRead := req.RequestType.IsPromptOrResourceRead()
-	if !req.RequestType.IsExecuteTool() && !isRead {
-		return req, nil, nil
-	}
-	// A call named like a client's connect tool is recorded here like any other: whether it is
-	// Bifrost's connect tool or an upstream tool of that name can depend on a caller that a policy
-	// plugin registered after logging names later. PostMCPHook drops a confirmed connect call.
-
-	requestID, ok := ctx.Value(schemas.BifrostContextKeyRequestID).(string)
-	if !ok || requestID == "" {
-		p.logger.Error("request-id not found in context or is empty in PreMCPHook")
-		return req, nil, nil
-	}
-
-	// Get parent request ID if this MCP call is part of a larger LLM request (using the MCP agent original request ID)
-	parentRequestID, _ := ctx.Value(schemas.BifrostMCPAgentOriginalRequestID).(string)
-
-	createdTimestamp := time.Now().UTC()
-
-	// Extract tool name and arguments from the request
-	var toolName string
-	var serverLabel string
-
-	fullToolName := req.GetToolName()
-	arguments := req.GetToolArguments()
-	if isRead {
-		serverLabel = req.ClientName
-		toolName = req.ReadTarget()
-		arguments = nil
-		if req.BifrostMCPGetPromptRequest != nil {
-			arguments = req.BifrostMCPGetPromptRequest.Arguments
-		}
-		// tool_name, stored whatever the content policy, holds the URI without credentials; the
-		// arguments, gated by that policy, keep it whole.
-		if req.BifrostMCPReadResourceRequest != nil {
-			toolName = resourceURIForLog(toolName)
-			arguments = map[string]string{"uri": req.BifrostMCPReadResourceRequest.URI}
-		}
-	}
-
-	// Extract server label from tool name (format: {client}-{tool_name})
-	// The first part before hyphen is the client/server label
-	if fullToolName != "" && !isRead {
-		if idx := strings.Index(fullToolName, "-"); idx > 0 {
-			serverLabel = fullToolName[:idx]
-			toolName = fullToolName[idx+1:]
-		} else {
-			toolName = fullToolName
-		}
-		switch toolName {
-		case mcp.ToolTypeListToolFiles, mcp.ToolTypeReadToolFile, mcp.ToolTypeExecuteToolCode:
-			if serverLabel == "" {
-				serverLabel = "codemode"
-			}
-		}
-	}
-	// Skip logging for codemode meta-tools. Check both the full name (bare,
-	// e.g. "executeToolCode") and the suffix after the client prefix (e.g.
-	// "myclient-executeToolCode") so PreMCP and PostMCP agree on what to skip
-	// and we never leave an orphan pending row to expire via the TTL path.
-	// Reads are never codemode: an upstream prompt may share one of those names.
-	if !isRead && (bifrost.IsCodemodeTool(fullToolName) || bifrost.IsCodemodeTool(toolName)) {
-		return req, nil, nil
-	}
-
-	// Use the per-tool-call unique MCP log ID (set by agent executor per goroutine) as the
-	// primary key. Fall back to requestID if not set (e.g. direct single tool call).
-	mcpLogID, ok := ctx.Value(schemas.BifrostContextKeyMCPLogID).(string)
-	if !ok || mcpLogID == "" {
-		mcpLogID = requestID
-	}
-
-	entry := &logstore.MCPToolLog{
-		ID:          mcpLogID,
-		RequestID:   requestID,
-		Timestamp:   createdTimestamp,
-		ToolName:    clampString(toolName, maxPersistedMCPToolNameLen),
-		ServerLabel: serverLabel,
-		Status:      "processing",
-		CreatedAt:   createdTimestamp,
-	}
-	if isRead {
-		method := req.RequestType.OTelMethodName()
-		entry.Method = &method
-	}
-
-	if parentRequestID != "" {
-		entry.LLMRequestID = &parentRequestID
-	}
-
-	applyMCPGovernanceFieldsToEntry(ctx, entry)
-	applyMCPCorrelationFieldsToEntry(ctx, entry)
-
-	// Capture the raw User-Agent of the calling client (stored verbatim; the UI
-	// maps it to a client app such as Claude Code, Codex, or Cursor).
-	if ua := userAgentFromContext(ctx); ua != "" {
-		entry.UserAgent = &ua
-		if app := p.detectAppFromUserAgent(ua); app != "" {
-			entry.App = &app
-		}
-	}
-	entry.ClientIP = optionalString(p.clientIPFromContext(ctx))
-
-	// Set arguments if content logging is enabled. Governance's PreMCPHook runs after ours, so a
-	// request that presents a virtual key or names a project governance has not stamped yet has no
-	// final content decision: hold the arguments aside instead of putting them on the pending entry,
-	// where the pre-hook callback and the stale-entry reaper would expose them. PostMCPHook attaches
-	// them once the policy is final; a stale entry never gets them.
-	// The hold does not depend on the current policy: a key or project that turns content on over a
-	// disabled client flag is entitled to its arguments once PostMCPHook sees the final decision.
-	if governanceDecisionPending(ctx) {
-		p.provisionalMCPArguments.Store(mcpLogID, arguments)
-	} else if p.contentLoggingEnabled(ctx) {
-		entry.ArgumentsParsed = arguments
-	}
-
-	// Capture configured logging headers and x-bf-lh-* headers into metadata
-	entry.MetadataParsed = mergeVirtualKeyMetadata(p.captureLoggingHeaders(ctx), ctx)
-
-	p.pendingMCPLogsToInject.Store(mcpLogID, entry)
-
-	p.mu.Lock()
-	callback := p.mcpToolLogCallback
-	p.mu.Unlock()
-	if callback != nil {
-		callback(entry)
-	}
-
-	return req, nil, nil
-}
-
-// PostMCPHook is called after an MCP tool execution - updates the log entry with results
-// Parameters:
-//   - ctx: The Bifrost context
-//   - resp: The MCP response containing tool execution result
-//   - bifrostErr: Any error that occurred during execution
-//
-// Returns:
-//   - *schemas.BifrostMCPResponse: The unmodified response
-//   - *schemas.BifrostError: The unmodified error
-//   - error: nil (errors are logged but don't fail the request)
-func (p *LoggerPlugin) PostMCPHook(ctx *schemas.BifrostContext, resp *schemas.BifrostMCPResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostMCPResponse, *schemas.BifrostError, error) {
-	if ctx == nil {
-		p.logger.Error("context is nil in PostMCPHook")
-		return resp, bifrostErr, nil
-	}
-
-	// Skip non tool-execute envelopes (Ping/ListTools). The MCP gate stamps
-	// MCPRequestType on both the success response and the error, so a single check
-	// covers both paths — no pending MCP log entry was created in PreMCPHook for
-	// anything but execute-tool requests.
-	mcpReqType := schemas.MCPRequestType("")
-	if resp != nil {
-		mcpReqType = resp.ExtraFields.MCPRequestType
-	} else if bifrostErr != nil {
-		mcpReqType = bifrostErr.ExtraFields.MCPRequestType
-	}
-	if !mcpReqType.IsExecuteTool() && !mcpReqType.IsPromptOrResourceRead() {
-		return resp, bifrostErr, nil
-	}
-	// A client's connect tool only signs the caller in and discovers their tools, and its result
-	// can carry the sign-in link, so its calls are not logged, whether they answered or failed. The
-	// caller is known by now, so the mark is settled. Only core can mark one, so an upstream tool
-	// named "connect" is still logged.
-	var connectCall bool
-	if mcpReqType.IsExecuteTool() {
-		var clientName, toolName string
-		if resp != nil {
-			clientName, toolName = resp.ExtraFields.ClientName, resp.ExtraFields.ToolName
-		} else {
-			clientName, toolName = bifrostErr.ExtraFields.MCPClientName, bifrostErr.ExtraFields.MCPToolName
-		}
-		connectCall = isMCPConnectCall(ctx, clientName, toolName)
-	}
-	// Skip logging for codemode tools (executeToolCode, listToolFiles, readToolFile)
-	if resp != nil && bifrost.IsCodemodeTool(resp.ExtraFields.ToolName) {
-		return resp, bifrostErr, nil
-	}
-
-	requestID, ok := ctx.Value(schemas.BifrostContextKeyRequestID).(string)
-	if !ok || requestID == "" {
-		p.logger.Error("request-id not found in context or is empty in PostMCPHook")
-		return resp, bifrostErr, nil
-	}
-
-	// Use the per-tool-call unique MCP log ID to find the correct log entry.
-	mcpLogID, ok := ctx.Value(schemas.BifrostContextKeyMCPLogID).(string)
-	if !ok || mcpLogID == "" {
-		mcpLogID = requestID
-	}
-
-	// A sign-in prompt is not a failed call: the caller still has to connect
-	// their account, and the sign-in link it carries must stay out of the store.
-	// Drop what PreMCPHook held so the stale sweeper does not write it either.
-	// The same goes for a connect call.
-	if connectCall || (bifrostErr != nil && bifrostErr.ExtraFields.MCPAuthRequired != nil) {
-		p.pendingMCPLogsToInject.Delete(mcpLogID)
-		p.provisionalMCPArguments.Delete(mcpLogID)
-		return resp, bifrostErr, nil
-	}
-
-	pendingVal, hasPending := p.pendingMCPLogsToInject.LoadAndDelete(mcpLogID)
-	var entry *logstore.MCPToolLog
-	if hasPending {
-		if pending, ok := pendingVal.(*logstore.MCPToolLog); ok {
-			entry = pending
-		}
-	}
-	if entry == nil {
-		entry = &logstore.MCPToolLog{
-			ID:        mcpLogID,
-			RequestID: requestID,
-			Timestamp: time.Now().UTC(),
-			Status:    "processing",
-			CreatedAt: time.Now().UTC(),
-		}
-	}
-
-	applyMCPGovernanceFieldsToEntry(ctx, entry)
-	// Governance's PreMCPHook, which stamps the virtual key, runs after ours.
-	entry.MetadataParsed = mergeVirtualKeyMetadata(entry.MetadataParsed, ctx)
-	// Resolved once here, after every pre-hook has run. PreMCPHook captured the arguments with
-	// whatever the context said at the time, and governance's PreMCPHook, which stamps the virtual
-	// key's or project's content decision, runs after ours; a decision that turns content off must
-	// take the arguments back out along with the result.
-	contentVisible := p.resolveContentPolicy(ctx).visible()
-	if held, ok := p.provisionalMCPArguments.LoadAndDelete(mcpLogID); ok && contentVisible {
-		entry.ArgumentsParsed = held
-	}
-	if !contentVisible {
-		entry.ArgumentsParsed = nil
-	}
-	applyMCPCorrelationFieldsToEntry(ctx, entry)
-	if resp != nil {
-		latency := float64(resp.ExtraFields.Latency)
-		entry.Latency = &latency
-		// Core may move a read to another server after the pre-hooks; log the one that answered.
-		if mcpReqType.IsPromptOrResourceRead() && resp.ExtraFields.ClientName != "" {
-			entry.ServerLabel = resp.ExtraFields.ClientName
-		}
-	}
-
-	success := resp != nil && bifrostErr == nil
-	if success && p.mcpCatalog != nil && resp.ExtraFields.ClientName != "" && resp.ExtraFields.ToolName != "" {
-		if pricingEntry, ok := p.mcpCatalog.GetPricingData(resp.ExtraFields.ClientName, resp.ExtraFields.ToolName); ok {
-			toolCost := pricingEntry.CostPerExecution
-			entry.Cost = &toolCost
-			p.logger.Debug("MCP tool cost for %s.%s: $%.6f", resp.ExtraFields.ClientName, resp.ExtraFields.ToolName, toolCost)
-		}
-	}
-
-	if bifrostErr != nil {
-		entry.Status = "error"
-		shouldStoreRaw, _ := ctx.Value(schemas.BifrostContextKeyShouldStoreRawInLogs).(bool)
-		entry.ErrorDetailsParsed = sanitizeErrorForLogging(bifrostErr, contentVisible, shouldStoreRaw)
-	} else if resp != nil {
-		entry.Status = "success"
-		// MCP tool logs have no hidden-content mode, so content is only
-		// stored when it is also visible.
-		if contentVisible {
-			var result interface{}
-			// Media a tool returned is logged as a placeholder, not as base64.
-			if resp.ChatMessage != nil {
-				message := *resp.ChatMessage
-				message.Content = schemas.FlattenToolResultMedia(resp.ChatMessage.Content, nil)
-				result = &message
-				if message.Content != nil && message.Content.ContentStr != nil {
-					var parsedContent interface{}
-					if err := sonic.Unmarshal([]byte(*message.Content.ContentStr), &parsedContent); err == nil {
-						result = parsedContent
-					}
-				}
-			} else if resp.ResponsesMessage != nil {
-				result = responsesToolResultWithoutMedia(resp.ResponsesMessage)
-			} else if resp.BifrostMCPGetPromptResponse != nil {
-				result = schemas.PromptForLog(resp.BifrostMCPGetPromptResponse.Prompt)
-			} else if resp.BifrostMCPReadResourceResponse != nil {
-				result = schemas.ResourceContentsForLog(resp.BifrostMCPReadResourceResponse.Resource)
-			}
-			if result != nil {
-				entry.ResultParsed = result
-			}
-		}
-	} else {
-		entry.Status = "error"
-		entry.ErrorDetailsParsed = &schemas.BifrostError{
-			IsBifrostError: true,
-			Error: &schemas.ErrorField{
-				Message: "MCP tool execution returned nil response",
-			},
-		}
-	}
-	applyMCPRoundTrip(ctx, entry, resp, contentVisible)
-	applyMCPAppsMetadata(ctx, entry)
-
-	p.mu.Lock()
-	callback := p.mcpToolLogCallback
-	p.mu.Unlock()
-	attachMCPLogRedactionData(ctx, entry, contentVisible)
-	entry.PluginLogs = serializePluginLogs(ctx.GetPluginLogs())
-	p.enqueueMCPToolLogEntry(entry, callback)
-
-	return resp, bifrostErr, nil
-}
 
 // captureRequestInput records a request's loggable input on data: the conversation (input history
 // or Responses input), params, tools and the per-kind inputs (embedding, speech, transcription,

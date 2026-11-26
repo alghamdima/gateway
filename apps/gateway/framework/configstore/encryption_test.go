@@ -35,12 +35,9 @@ func setupEncryptionTestStore(t testing.TB) (*RDBConfigStore, *gorm.DB) {
 	err = db.AutoMigrate(
 		&tables.TableKey{},
 		&tables.TableProvider{},
-		&tables.TableMCPClient{},
 		&tables.TablePlugin{},
 		&tables.TableVirtualKey{},
 		&tables.SessionsTable{},
-		&tables.TableOauthConfig{},
-		&tables.TableMCPOauthToken{},
 		&tables.TableVectorStoreConfig{},
 		&tables.TableBudget{},
 		&tables.TableRateLimit{},
@@ -49,9 +46,7 @@ func setupEncryptionTestStore(t testing.TB) (*RDBConfigStore, *gorm.DB) {
 		&tables.TableCustomer{},
 		&tables.TableTeam{},
 		&tables.TableClientConfig{},
-		&tables.TableVirtualKeyMCPConfig{},
 		&tables.TableModel{},
-		&tables.TempToken{},
 	)
 	require.NoError(t, err)
 
@@ -293,27 +288,6 @@ func TestEncryptPlaintextSessions(t *testing.T) {
 	assert.True(t, tokens["session-token-2"])
 }
 
-func TestEncryptPlaintextOAuthTokens(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO mcp_oauth_tokens (id, auth_mode, access_token, refresh_token, token_type, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'shared', ?, ?, 'Bearer', 'plain_text', ?, ?, ?)`,
-		"tok-batch-1", "access-1", "refresh-1", future, now, now)
-
-	count, err := store.encryptPlaintextOAuthTokens(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	var found tables.TableMCPOauthToken
-	require.NoError(t, db.First(&found, "id = ?", "tok-batch-1").Error)
-	assert.Equal(t, "access-1", found.AccessToken)
-	assert.Equal(t, "refresh-1", found.RefreshToken)
-}
-
 func TestEncryptPlaintextPlugins(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
 	ctx := context.Background()
@@ -462,59 +436,6 @@ func TestVirtualKeyPreviousValue_EncryptsAndDecryptsCorrectly(t *testing.T) {
 	assert.True(t, found.HasActivePreviousValue(now))
 }
 
-func TestEncryptPlaintextOAuthConfigs_EncryptsAndDecryptsCorrectly(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO oauth_configs (id, client_secret, redirect_uri, status, encryption_status, created_at, updated_at)
-		 VALUES (?, ?, ?, 'pending', 'plain_text', ?, ?)`,
-		"cfg-batch-1", "batch-client-secret", "https://example.com/cb", now, now)
-
-	count, err := store.encryptPlaintextOAuthConfigs(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	// Raw DB should have encrypted values
-	var raw map[string]any
-	db.Table("oauth_configs").Where("id = ?", "cfg-batch-1").Take(&raw)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.NotEqual(t, "batch-client-secret", raw["client_secret"])
-
-	// GORM hooks should decrypt on read
-	var found tables.TableOauthConfig
-	require.NoError(t, db.Where("id = ?", "cfg-batch-1").First(&found).Error)
-	assert.Equal(t, "batch-client-secret", found.ClientSecret.GetValue())
-}
-
-func TestEncryptPlaintextMCPClients_EncryptsAndDecryptsCorrectly(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO config_mcp_clients (client_id, name, connection_type, connection_string, headers_json, encryption_status, created_at, updated_at)
-		 VALUES (?, ?, 'sse', ?, ?, 'plain_text', ?, ?)`,
-		"mcp-batch-1", "batch-mcp", "https://mcp.example.com", `{"X-Api-Key":"secret-key"}`, now, now)
-
-	count, err := store.encryptPlaintextMCPClients(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	// Raw DB should have encrypted values
-	var raw map[string]any
-	db.Table("config_mcp_clients").Where("client_id = ?", "mcp-batch-1").Take(&raw)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.NotContains(t, raw["headers_json"], "secret-key")
-
-	// GORM hooks should decrypt on read
-	var found tables.TableMCPClient
-	require.NoError(t, db.Where("client_id = ?", "mcp-batch-1").First(&found).Error)
-	assert.Equal(t, "https://mcp.example.com", found.ConnectionString.GetValue())
-	assert.Equal(t, "secret-key", found.Headers["X-Api-Key"].Val)
-}
-
 func TestEncryptPlaintextProviderProxies_EncryptsAndDecryptsCorrectly(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
 	ctx := context.Background()
@@ -586,23 +507,6 @@ func TestEncryptPlaintextVectorStoreConfigs_SkipsEmptyConfig(t *testing.T) {
 	count, err := store.encryptPlaintextVectorStoreConfigs(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
-}
-
-func TestEncryptPlaintextMCPClients_SkipsEmptyFields(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-
-	// MCP client with no connection string and empty headers — nothing to encrypt
-	insertPlaintextRow(t, db,
-		`INSERT INTO config_mcp_clients (client_id, name, connection_type, headers_json, encryption_status, created_at, updated_at)
-		 VALUES (?, ?, 'stdio', '{}', 'plain_text', ?, ?)`,
-		"mcp-empty", "empty-mcp", now, now)
-
-	count, err := store.encryptPlaintextMCPClients(ctx)
-	require.NoError(t, err)
-	// Row is still processed (encryption_status changes) even if no fields are encrypted
-	assert.Equal(t, 1, count)
 }
 
 // ============================================================================
@@ -1255,25 +1159,6 @@ func TestEncryptPlaintextRows_EmptyDatabase(t *testing.T) {
 // OAuthConfigs skip when client_secret is empty
 // ============================================================================
 
-func TestEncryptPlaintextOAuthConfigs_SkipsEmptySecret(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO oauth_configs (id, client_secret, redirect_uri, status, encryption_status, created_at, updated_at)
-		 VALUES (?, '', ?, 'pending', 'plain_text', ?, ?)`,
-		"cfg-empty-secrets", "https://example.com/cb", now, now)
-
-	count, err := store.encryptPlaintextOAuthConfigs(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	var raw map[string]any
-	db.Table("oauth_configs").Where("id = ?", "cfg-empty-secrets").Take(&raw)
-	assert.Equal(t, "plain_text", raw["encryption_status"])
-}
-
 // ============================================================================
 // Hash computation during startup pass (sessions + virtual keys)
 // ============================================================================
@@ -1322,33 +1207,6 @@ func TestEncryptPlaintextVirtualKeys_HashComputedDuringStartup(t *testing.T) {
 // ============================================================================
 // MCP client env var connection string survives startup pass
 // ============================================================================
-
-func TestEncryptPlaintextMCPClients_SecretVarConnectionStringSurvivesStartup(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-
-	t.Setenv("TEST_MCP_URL", "https://mcp-env.example.com/sse")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO config_mcp_clients (client_id, name, connection_type, connection_string, headers_json, encryption_status, created_at, updated_at)
-		 VALUES (?, ?, 'sse', ?, '{}', 'plain_text', ?, ?)`,
-		"mcp-env-startup", "env-startup-mcp", "env.TEST_MCP_URL", now, now)
-
-	count, err := store.encryptPlaintextMCPClients(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	var raw map[string]any
-	db.Table("config_mcp_clients").Where("client_id = ?", "mcp-env-startup").Take(&raw)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.Equal(t, "env.TEST_MCP_URL", raw["connection_string"])
-
-	var found tables.TableMCPClient
-	require.NoError(t, db.Where("client_id = ?", "mcp-env-startup").First(&found).Error)
-	assert.Equal(t, "https://mcp-env.example.com/sse", found.ConnectionString.GetValue())
-	assert.True(t, found.ConnectionString.IsFromSecret())
-}
 
 // ============================================================================
 // Already-encrypted rows skipped for non-key tables
@@ -1403,31 +1261,6 @@ func TestEncryptPlaintextRows_SkipsAlreadyEncryptedVirtualKeys(t *testing.T) {
 // ============================================================================
 // OAuthTokens with empty refresh token during startup pass
 // ============================================================================
-
-func TestEncryptPlaintextOAuthTokens_EmptyRefreshToken(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO mcp_oauth_tokens (id, auth_mode, access_token, refresh_token, token_type, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'shared', ?, '', 'Bearer', 'plain_text', ?, ?, ?)`,
-		"tok-no-refresh", "access-only-startup", future, now, now)
-
-	count, err := store.encryptPlaintextOAuthTokens(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	var raw map[string]any
-	db.Table("mcp_oauth_tokens").Where("id = ?", "tok-no-refresh").Take(&raw)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-
-	var found tables.TableMCPOauthToken
-	require.NoError(t, db.First(&found, "id = ?", "tok-no-refresh").Error)
-	assert.Equal(t, "access-only-startup", found.AccessToken)
-	assert.Equal(t, "", found.RefreshToken)
-}
 
 // TestEncryptPlaintextKeys_VertexAWSWorkloadIdentity_EncryptsAndDecryptsCorrectly pins the
 // vertex_aws_workload_identity_json column: a plaintext row is encrypted by the startup pass

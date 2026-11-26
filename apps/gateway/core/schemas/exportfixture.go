@@ -46,7 +46,7 @@ func ExportFixtureCost() *BifrostCost {
 			ReasoningCost: 0.10, CitationCost: 0.03, SearchQueriesCost: 0.02,
 		},
 		AdditionalCostDetails: &AdditionalCostDetails{
-			GuardrailCost: 0.08, MCPCost: 0.06, SemanticCacheCost: 0.04, RoutingCost: 0.02,
+			GuardrailCost: 0.14, SemanticCacheCost: 0.04, RoutingCost: 0.02,
 		},
 	}
 }
@@ -303,7 +303,6 @@ const (
 	CostOutputSearch    CostCategory = "output.search_queries"
 
 	CostGuardrail     CostCategory = "additional.guardrail"
-	CostMCP           CostCategory = "additional.mcp"
 	CostSemanticCache CostCategory = "additional.semantic_cache"
 	CostRouting       CostCategory = "additional.routing"
 )
@@ -314,7 +313,7 @@ var costSides = map[CostCategory][]CostCategory{
 		CostInputCachedRead, CostInputCachedWrite, CostInputRequest},
 	CostOutput: {CostOutputText, CostOutputAudio, CostOutputImage,
 		CostOutputReasoning, CostOutputCitation, CostOutputSearch},
-	CostAdditional: {CostGuardrail, CostMCP, CostSemanticCache, CostRouting},
+	CostAdditional: {CostGuardrail, CostSemanticCache, CostRouting},
 }
 
 // AssertCostBreakdown reports every discrepancy between a connector's exported
@@ -340,7 +339,7 @@ func AssertCostBreakdown(lookup CostLookup) []string {
 		CostInputCachedRead: 0.04, CostInputCachedWrite: 0.03, CostInputRequest: 0.03,
 		CostOutputText: 0.20, CostOutputAudio: 0.10, CostOutputImage: 0.05,
 		CostOutputReasoning: 0.10, CostOutputCitation: 0.03, CostOutputSearch: 0.02,
-		CostGuardrail: 0.08, CostMCP: 0.06, CostSemanticCache: 0.04, CostRouting: 0.02,
+		CostGuardrail: 0.14, CostSemanticCache: 0.04, CostRouting: 0.02,
 	}
 
 	get := func(c CostCategory) (float64, bool) {
@@ -409,8 +408,8 @@ func CostAttributeLookup(attrs map[string]any) CostLookup {
 		CostOutputReasoning: AttrBifrostCostOutputReasoning,
 		CostOutputCitation:  AttrBifrostCostOutputCitation,
 		CostOutputSearch:    AttrBifrostCostOutputSearch,
-		CostGuardrail:       AttrBifrostCostGuardrail, CostMCP: AttrBifrostCostMCP,
-		CostSemanticCache: AttrBifrostCostSemanticCache, CostRouting: AttrBifrostCostRouting,
+		CostGuardrail:       AttrBifrostCostGuardrail,
+		CostSemanticCache:   AttrBifrostCostSemanticCache, CostRouting: AttrBifrostCostRouting,
 	}
 	return func(category CostCategory) (float64, bool) {
 		key, ok := keys[category]

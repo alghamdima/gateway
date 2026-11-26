@@ -83,7 +83,6 @@ type Permit struct {
 	isExpired  bool
 
 	providerPermits   []schemas.ProviderPermit
-	mcpPermits        []schemas.MCPPermit
 	allowAllProviders bool
 
 	level int
@@ -121,7 +120,6 @@ func NewPermit(
 	isActive bool,
 	isExpired bool,
 	providerPermits []schemas.ProviderPermit,
-	mcpPermits []schemas.MCPPermit,
 	opts ...PermitOption,
 ) *Permit {
 	p := &Permit{
@@ -131,7 +129,6 @@ func NewPermit(
 		isActive:        isActive,
 		isExpired:       isExpired,
 		providerPermits: cloneProviderPermits(providerPermits),
-		mcpPermits:      cloneMCPPermits(mcpPermits),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -152,16 +149,6 @@ func cloneProviderPermits(providerPermits []schemas.ProviderPermit) []schemas.Pr
 			weight := *cloned[i].Weight
 			cloned[i].Weight = &weight
 		}
-	}
-	return cloned
-}
-
-// cloneMCPPermits deep-copies each entry's Tools slice, for the same reason cloneProviderPermits
-// copies each entry's nested slices.
-func cloneMCPPermits(mcpPermits []schemas.MCPPermit) []schemas.MCPPermit {
-	cloned := slices.Clone(mcpPermits)
-	for i := range cloned {
-		cloned[i].Tools = slices.Clone(cloned[i].Tools)
 	}
 	return cloned
 }
@@ -210,14 +197,6 @@ func (p *Permit) ProviderPermits() []schemas.ProviderPermit {
 	return cloneProviderPermits(p.providerPermits)
 }
 
-// MCPPermits implements schemas.Permit. See ProviderPermits for why this returns a copy.
-func (p *Permit) MCPPermits() []schemas.MCPPermit {
-	if p == nil {
-		return nil
-	}
-	return cloneMCPPermits(p.mcpPermits)
-}
-
 // AllowsAllProviders implements schemas.Permit.
 func (p *Permit) AllowsAllProviders() bool {
 	return p != nil && p.allowAllProviders
@@ -264,45 +243,6 @@ func blacklistsModel(p schemas.Permit, provider string, model string) bool {
 		if pp.Provider == provider && pp.BlacklistedModels.IsBlocked(model) {
 			return true
 		}
-	}
-	return false
-}
-
-// allowsTool reports whether the permit permits toolPattern. The MCP permit that holds a client
-// decides for that client: a client with a permit here is never widened by another permit of the
-// same source.
-//
-// A client is identified by its stable id, the same as mcpEntries: a rename can leave two entries
-// for the same client under different names, and the first one still has to be the one that
-// decides, not whichever one the pattern's current name happens to match.
-func allowsTool(p schemas.Permit, toolPattern string) bool {
-	if isNilPermit(p) {
-		return false
-	}
-	handledClients := make(map[string]struct{})
-	for _, mp := range p.MCPPermits() {
-		clientName := mp.ClientName
-		if clientName == "" {
-			continue
-		}
-		clientKey := mp.Client
-		if clientKey == "" {
-			clientKey = clientName
-		}
-		if _, handled := handledClients[clientKey]; handled {
-			continue
-		}
-		handledClients[clientKey] = struct{}{}
-		if toolPattern != clientName+"-"+Wildcard && !strings.HasPrefix(toolPattern, clientName+"-") {
-			continue
-		}
-		if toolPattern == clientName+"-"+Wildcard {
-			return len(mp.Tools) > 0
-		}
-		if mp.Tools.IsUnrestricted() {
-			return true
-		}
-		return mp.Tools.Contains(strings.TrimPrefix(toolPattern, clientName+"-"))
 	}
 	return false
 }
@@ -400,42 +340,4 @@ func eachProviderPermit(p schemas.Permit, visit func(pp *schemas.ProviderPermit)
 		}
 	}
 	return true
-}
-
-// mcpEntries returns the tool patterns a permit permits, in MCP permit order, with duplicates
-// collapsed. The first MCP permit holding a client decides for that client.
-func mcpEntries(p schemas.Permit) []string {
-	if isNilPermit(p) {
-		return []string{}
-	}
-	mps := p.MCPPermits()
-	entries := newUniqueEntries(len(mps))
-	handledClients := make(map[string]struct{})
-	for _, mp := range mps {
-		if mp.ClientName == "" {
-			continue
-		}
-		clientKey := mp.Client
-		if clientKey == "" {
-			clientKey = mp.ClientName
-		}
-		if _, handled := handledClients[clientKey]; handled {
-			continue
-		}
-		handledClients[clientKey] = struct{}{}
-		if len(mp.Tools) == 0 {
-			continue
-		}
-		if mp.Tools.IsUnrestricted() {
-			entries.add(mp.ClientName + "-" + Wildcard)
-			continue
-		}
-		for _, tool := range mp.Tools {
-			if tool == "" {
-				continue
-			}
-			entries.add(mp.ClientName + "-" + tool)
-		}
-	}
-	return entries.list()
 }

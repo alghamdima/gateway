@@ -99,7 +99,6 @@ type ConfigManager interface {
 	UpdateSyncConfig(ctx context.Context) error
 	ForceReloadPricing(ctx context.Context) error
 	UpdateDropExcessRequests(ctx context.Context, value bool)
-	UpdateMCPToolManagerConfig(ctx context.Context, maxAgentDepth int, toolExecutionTimeoutInSeconds int, codeModeBindingLevel string, disableAutoToolInject bool, maxInstructionsPerClient int, maxInstructionsTotal int, codeModeLimits *schemas.MCPCodeModeLimits) error
 	ReloadPlugin(ctx context.Context, name string, path *string, pluginConfig any, placement *schemas.PluginPlacement, order *int) error
 	RemovePlugin(ctx context.Context, name string) error
 	ReloadProxyConfig(ctx context.Context, config *configstoreTables.GlobalProxyConfig) error
@@ -355,31 +354,12 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	}
 	clientConfigFields := requestFields.ClientConfig
 
-	// Validate MCP external URL overrides up front — the rest of this handler
-	// applies live mutations (drop-excess flag, MCP tool-manager reload, compat
-	// plugin reload, in-memory MCP config) before persisting, so a late
-	// rejection would leave the process in a partially-updated state.
-	if err := configstore.ValidatePublicBaseURL(payload.ClientConfig.MCPExternalClientURL.GetValue()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("mcp_external_client_url %v", err))
-		return
-	}
-	if err := lib.ValidateClientMetadataURL(payload.ClientConfig.MCPClientMetadataURL.GetValue()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("mcp_client_metadata_url %v", err))
-		return
-	}
+	// Validate URL overrides up front — the rest of this handler applies live
+	// mutations (drop-excess flag, compat plugin reload) before persisting, so a
+	// late rejection would leave the process in a partially-updated state.
 	if err := configstore.ValidatePublicBaseURL(payload.ClientConfig.SkillsExternalClientURL.GetValue()); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("skills_external_client_url %v", err))
 		return
-	}
-	if err := configstore.ValidatePublicBaseURL(payload.ClientConfig.BifrostURL.GetValue()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("bifrost_url %v", err))
-		return
-	}
-	if payload.FrameworkConfig.OpenAPIURL != nil {
-		if err := configstore.ValidateOpenAPIURL(*payload.FrameworkConfig.OpenAPIURL); err != nil {
-			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("openapi_url %v", err))
-			return
-		}
 	}
 
 	// enforce_vk_object_ownership is a plain bool that defaults to true, so a JSON null would
@@ -396,11 +376,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 			SendError(ctx, fasthttp.StatusBadRequest, field+" must be true or false")
 			return
 		}
-	}
-	// A JSON null would decode as 0 and silently reset the limit; an explicit 0 is the reset.
-	if raw, present := clientConfigFields["mcp_openapi_max_spec_mb"]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("mcp_openapi_max_spec_mb must be an integer between 0 (the default, 32) and %d", maxMCPOpenAPISpecMB))
-		return
 	}
 
 	// vk_rotation_cooldown bounds: negative is meaningless, and anything past 30
@@ -423,9 +398,9 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to get framework config from store: %v", err))
 		return
 	}
-	var storedPricingURL, storedModelParametersURL, storedMCPLibraryURL *string
+	var storedPricingURL, storedModelParametersURL *string
 	if frameworkConfig != nil {
-		storedPricingURL, storedModelParametersURL, storedMCPLibraryURL = frameworkConfig.PricingURL, frameworkConfig.ModelParametersURL, frameworkConfig.MCPLibraryURL
+		storedPricingURL, storedModelParametersURL = frameworkConfig.PricingURL, frameworkConfig.ModelParametersURL
 	}
 
 	// Validating framework config. An empty pricing_url or model_parameters_url
@@ -460,23 +435,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	// Validate MCP library catalog URL override (only when set, non-default and changed)
-	if payload.FrameworkConfig.MCPLibraryURL != nil && *payload.FrameworkConfig.MCPLibraryURL != "" && *payload.FrameworkConfig.MCPLibraryURL != modelcatalog.DefaultMCPLibraryURL &&
-		!sameAsStoredURL(*payload.FrameworkConfig.MCPLibraryURL, storedMCPLibraryURL) {
-		if err := checkURLAccessibility(*payload.FrameworkConfig.MCPLibraryURL); err != nil {
-			logger.Warn("failed to check the accessibility of the MCP library URL: %v", err)
-			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("failed to check the accessibility of the MCP library URL: %v", err))
-			return
-		}
-	}
-	// Checking the MCP library sync interval: 0 disables background sync, as in
-	// config.json; otherwise the same minimum the config schema enforces.
-	if v := payload.FrameworkConfig.MCPLibrarySyncInterval; v != nil && *v != modelcatalog.MCPLibrarySyncDisabled && *v < modelcatalog.MinimumPricingSyncIntervalSec {
-		msg := fmt.Sprintf("MCP library sync interval must be 0 (disabled) or at least %d seconds", modelcatalog.MinimumPricingSyncIntervalSec)
-		logger.Warn(msg)
-		SendError(ctx, fasthttp.StatusBadRequest, msg)
-		return
-	}
 	// Checking the live models sync interval. Unlike the intervals above, 0 is
 	// accepted: it is the documented way to turn the background refresher off.
 	if payload.FrameworkConfig.LiveModelsSyncInterval != nil {
@@ -539,149 +497,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	// Validate MCP auth-mode / OAuth2 server settings before any live mutation
-	// below (drop-excess flag, MCP tool-manager reload, compat plugin reload,
-	// in-memory MCP config). A late rejection would return 400 while runtime
-	// state had already changed but DB persistence was skipped, diverging
-	// in-memory, core, and DB state.
-
-	// Validate the inbound MCP auth mode against the allowed enum
-	// (config.schema.json is the source of truth: headers | both | oauth).
-	switch payload.ClientConfig.MCPServerAuthMode {
-	case "", configstoreTables.MCPServerAuthModeHeaders, configstoreTables.MCPServerAuthModeBoth, configstoreTables.MCPServerAuthModeOAuth:
-		// valid; empty means the field was omitted from a partial update
-	default:
-		SendError(ctx, fasthttp.StatusBadRequest, "mcp_server_auth_mode must be one of: headers, both, oauth")
-		return
-	}
-
-	// oauth2_server_config only applies when discovery is enabled (both | oauth).
-	// Evaluate against the effective mode so a partial update that supplies only
-	// the config cannot smuggle it in while the stored mode is headers.
-	effectiveAuthMode := payload.ClientConfig.MCPServerAuthMode
-	if effectiveAuthMode == "" {
-		effectiveAuthMode = currentConfig.MCPServerAuthMode
-	}
-	// The config API redacts plain telemetry header values; a value sent back still redacted
-	// keeps the stored one, as provider proxy and MCP credentials do.
-	restoreRedactedTelemetryHeaders(payload.ClientConfig.OAuth2ServerConfig, currentConfig.OAuth2ServerConfig)
-	// A redacted value that matched nothing (its collector's endpoint or the header's name
-	// changed) would be saved as the credential itself, so it must be typed again.
-	if endpoint, name, ok := unrestoredRedactedTelemetryHeader(payload.ClientConfig.OAuth2ServerConfig); ok {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("re-enter the value of the %s header for collector %s: a redacted value can only be kept as it is", name, endpoint))
-		return
-	}
-	effectiveOAuth2Config := currentConfig.OAuth2ServerConfig
-	if payload.ClientConfig.OAuth2ServerConfig != nil {
-		effectiveOAuth2Config = payload.ClientConfig.OAuth2ServerConfig
-		var previousRedirects []string
-		if currentConfig.OAuth2ServerConfig != nil {
-			previousRedirects = currentConfig.OAuth2ServerConfig.AllowedRedirectURIs
-		}
-		if isAuthBypassed(ctx) && !slices.Equal(previousRedirects, effectiveOAuth2Config.AllowedRedirectURIs) {
-			SendError(ctx, fasthttp.StatusForbidden, "changing allowed_redirect_uris requires an authenticated admin session")
-			return
-		}
-		if isAuthBypassed(ctx) && clientGatewayTelemetryDestinationsChanged(currentConfig.OAuth2ServerConfig, effectiveOAuth2Config) {
-			SendError(ctx, fasthttp.StatusForbidden, "changing client gateway telemetry destinations requires an authenticated admin session")
-			return
-		}
-		if isAuthBypassed(ctx) && clientGatewayEnabled(currentConfig.OAuth2ServerConfig, effectiveOAuth2Config) {
-			SendError(ctx, fasthttp.StatusForbidden, "enabling the client gateway requires an authenticated admin session")
-			return
-		}
-		if isAuthBypassed(ctx) && clientGatewayManagedSettingsChanged(currentConfig.OAuth2ServerConfig, effectiveOAuth2Config) {
-			SendError(ctx, fasthttp.StatusForbidden, "changing client gateway managed settings requires an authenticated admin session")
-			return
-		}
-		if isAuthBypassed(ctx) && clientGatewayTelemetryDropAttributesChanged(currentConfig.OAuth2ServerConfig, effectiveOAuth2Config) {
-			SendError(ctx, fasthttp.StatusForbidden, "changing client gateway telemetry drop_attributes requires an authenticated admin session")
-			return
-		}
-		for _, uri := range effectiveOAuth2Config.AllowedRedirectURIs {
-			if uri == configstoreTables.AllowAnyRedirectURI {
-				continue
-			}
-			// Entries match exactly, so a partial pattern would silently match nothing.
-			if strings.Contains(uri, "*") {
-				SendError(ctx, fasthttp.StatusBadRequest, `allowed_redirect_uris supports only a bare "*" wildcard`)
-				return
-			}
-			if !isAllowedRedirectScheme(uri) {
-				SendError(ctx, fasthttp.StatusBadRequest, "allowed_redirect_uris contains an invalid callback URI")
-				return
-			}
-		}
-	}
-
-	// disable_vk_identity only makes sense in oauth mode: in both mode virtual
-	// keys can still authenticate via headers, so suppressing them in the consent
-	// flow alone would be misleading. Evaluate the merged config so a partial
-	// update that switches the mode away from oauth (without resending the config)
-	// cannot leave a previously stored disable_vk_identity active.
-	if effectiveOAuth2Config != nil &&
-		effectiveOAuth2Config.DisableVKIdentity &&
-		effectiveAuthMode != configstoreTables.MCPServerAuthModeOAuth {
-		SendError(ctx, fasthttp.StatusBadRequest, "disable_vk_identity is only valid when mcp_server_auth_mode is oauth")
-		return
-	}
-
-	// Client gateways derive every URL and token claim they issue from
-	// issuer_url, independently of mcp_server_auth_mode, so they need one pinned
-	// just as OAuth discovery does below. Evaluated on the merged config so a
-	// partial update cannot clear the issuer while a gateway stays on.
-	if effectiveOAuth2Config.AnyClientGatewayEnabled() &&
-		(!effectiveOAuth2Config.IssuerURL.IsSet() || effectiveOAuth2Config.IssuerURL.GetValue() == "") {
-		SendError(ctx, fasthttp.StatusBadRequest, "oauth2_server_config.issuer_url must be set to a non-empty value when a client gateway (oauth2_server_config.gateways) is enabled")
-		return
-	}
-	if err := effectiveOAuth2Config.ValidateClientGateways(); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-		return
-	}
-
-	// Enabling discovery without a pinned issuer_url would leave every issuer
-	// reference (discovery documents, authorize redirect, JWT iss/aud) derived
-	// from the unauthenticated, per-request Host header - reject the write here
-	// rather than accepting it and requiring a restart to discover the
-	// misconfiguration (validateClientConfig enforces the same invariant at
-	// load time, for config.json and pre-existing DB rows).
-	if (effectiveAuthMode == configstoreTables.MCPServerAuthModeOAuth || effectiveAuthMode == configstoreTables.MCPServerAuthModeBoth) &&
-		(effectiveOAuth2Config == nil || !effectiveOAuth2Config.IssuerURL.IsSet() || effectiveOAuth2Config.IssuerURL.GetValue() == "") {
-		SendError(ctx, fasthttp.StatusBadRequest, "oauth2_server_config.issuer_url must be set to a non-empty value when mcp_server_auth_mode is oauth or both")
-		return
-	}
-
-	// Cap auth_code_ttl so a leaked one-time code can't stay valid for long.
-	// This is an unconditional invariant on the stored value — enforced in every
-	// mode (not just both | oauth), mirroring the load-time validateClientConfig
-	// check — so a save can never persist a value that would then fail boot on the
-	// next restart. A zero/omitted value falls back to the default at issuance and
-	// is left alone here.
-	if effectiveOAuth2Config != nil &&
-		effectiveOAuth2Config.AuthCodeTTL > configstoreTables.MaxAuthCodeTTL {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("auth_code_ttl must not exceed %d seconds (15 minutes)", configstoreTables.MaxAuthCodeTTL))
-		return
-	}
-
-	// The 'error' behavior rejects exactly the requests token_exchange
-	// clients rely on (an identity token alongside a virtual key), so the
-	// two settings are mutually exclusive — mirrored by the MCP client
-	// create path rejecting token_exchange while it is 'error'. Checked up
-	// front, alongside the other validations above: everything below this
-	// point applies live in-memory mutations before the DB write at the end
-	// of this handler, so a rejection here must happen before any of that
-	// runs — otherwise a 400 would leave runtime state changed with nothing
-	// persisted.
-	if payload.ClientConfig.DualCredentialConflictBehavior == configstoreTables.DualCredentialConflictBehaviorError && h.store.MCPConfig != nil {
-		for _, mcpClient := range h.store.MCPConfig.ClientConfigs {
-			if mcpClient.AuthType == schemas.MCPAuthTypeTokenExchange {
-				SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("dual_credential_conflict_behavior cannot be set to 'error' while MCP client %q uses auth_type 'token_exchange'; delete that client first or choose 'prefer_idp'/'prefer_vk'", mcpClient.Name))
-				return
-			}
-		}
-	}
-
 	// Only an omitted field keeps the stored placement; an explicit "" or null is a supplied
 	// value and must be one of the two placements like any other.
 	if _, present := clientConfigFields["extra_fields_placement"]; present &&
@@ -698,41 +513,11 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if err := validateMCPInstructionCaps(payload.ClientConfig.MCPMaxInstructionsPerClient, payload.ClientConfig.MCPMaxInstructionsTotal); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-		return
-	}
-	if mb := payload.ClientConfig.MCPOpenAPIMaxSpecMB; mb < 0 || mb > maxMCPOpenAPISpecMB {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("mcp_openapi_max_spec_mb must be between 0 (the default, 32) and %d", maxMCPOpenAPISpecMB))
-		return
-	}
 	if payload.ClientConfig.LogRetentionDays < 1 {
 		logger.Warn("log_retention_days must be at least 1")
 		SendError(ctx, fasthttp.StatusBadRequest, "log_retention_days must be at least 1")
 		return
 	}
-	if limits := payload.ClientConfig.MCPCodeModeLimits; limits != nil {
-		if err := limits.Validate(); err != nil {
-			SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-			return
-		}
-	}
-	// Omitted keeps the current allowlist. It widens what the MCP OAuth chain
-	// may reach, so only an authenticated admin may change it; resending the
-	// current value (the dashboard saves the whole client config) is fine.
-	_, allowlistSent := clientConfigFields["mcp_oauth_private_allowlist"]
-	allowlistChanged := allowlistSent && !slices.Equal(payload.ClientConfig.MCPOAuthPrivateAllowlist, currentConfig.MCPOAuthPrivateAllowlist)
-	if allowlistChanged {
-		if isAuthBypassed(ctx) {
-			SendError(ctx, fasthttp.StatusForbidden, "changing mcp_oauth_private_allowlist requires an authenticated admin session; enable dashboard authentication first")
-			return
-		}
-		if _, err := network.ValidatePrivateTargetAllowlist(payload.ClientConfig.MCPOAuthPrivateAllowlist); err != nil {
-			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("mcp_oauth_private_allowlist: %v", err))
-			return
-		}
-	}
-
 	// Omitted keeps the stored tokenizer families. Validated here, before any live
 	// mutation below, so a rejected name never leaves the runtime changed.
 	_, tokenizersSent := clientConfigFields["usage_estimation_tokenizers"]
@@ -743,17 +528,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 			SendError(ctx, fasthttp.StatusBadRequest, err.Error())
 			return
 		}
-	}
-
-	// Checked before any live change below. Omitted keeps the current cap, so a caller unaware of
-	// the field never lifts it; "auto" lifts it.
-	if err := setMCPProtocolCap("mcp_max_protocol_version", payload.ClientConfig.MCPMaxProtocolVersion, &updatedConfig.MCPMaxProtocolVersion); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-		return
-	}
-	if err := setMCPProtocolCap("mcp_server_max_protocol_version", payload.ClientConfig.MCPServerMaxProtocolVersion, &updatedConfig.MCPServerMaxProtocolVersion); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-		return
 	}
 
 	var restartReasons []string
@@ -768,69 +542,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// leaves the runtime on the families it had.
 	if tokenizersSent && !slices.Equal(tokenizers, currentConfig.UsageEstimationTokenizers) {
 		updatedConfig.UsageEstimationTokenizers = tokenizers
-	}
-
-	if payload.ClientConfig.MCPCodeModeBindingLevel != "" {
-		if payload.ClientConfig.MCPCodeModeBindingLevel != string(schemas.CodeModeBindingLevelServer) && payload.ClientConfig.MCPCodeModeBindingLevel != string(schemas.CodeModeBindingLevelTool) {
-			logger.Warn("mcp_code_mode_binding_level must be 'server' or 'tool'")
-			SendError(ctx, fasthttp.StatusBadRequest, "mcp_code_mode_binding_level must be 'server' or 'tool'")
-			return
-		}
-	}
-
-	shouldReloadMCPToolManagerConfig := false
-
-	// Only process MCPAgentDepth if explicitly provided (> 0) and different from current
-	if payload.ClientConfig.MCPAgentDepth > 0 && payload.ClientConfig.MCPAgentDepth != currentConfig.MCPAgentDepth {
-		updatedConfig.MCPAgentDepth = payload.ClientConfig.MCPAgentDepth
-		shouldReloadMCPToolManagerConfig = true
-	}
-
-	// Only process MCPToolExecutionTimeout if explicitly provided (> 0) and different from current
-	if payload.ClientConfig.MCPToolExecutionTimeout > 0 && payload.ClientConfig.MCPToolExecutionTimeout != currentConfig.MCPToolExecutionTimeout {
-		updatedConfig.MCPToolExecutionTimeout = payload.ClientConfig.MCPToolExecutionTimeout
-		shouldReloadMCPToolManagerConfig = true
-	}
-
-	if payload.ClientConfig.MCPCodeModeBindingLevel != "" && payload.ClientConfig.MCPCodeModeBindingLevel != currentConfig.MCPCodeModeBindingLevel {
-		updatedConfig.MCPCodeModeBindingLevel = payload.ClientConfig.MCPCodeModeBindingLevel
-		shouldReloadMCPToolManagerConfig = true
-	}
-
-	if payload.ClientConfig.MCPDisableAutoToolInject != currentConfig.MCPDisableAutoToolInject {
-		updatedConfig.MCPDisableAutoToolInject = payload.ClientConfig.MCPDisableAutoToolInject
-		shouldReloadMCPToolManagerConfig = true
-	}
-
-	// Empty means "not supplied" rather than "off", so an update that omits the field
-	// leaves the current mode alone instead of silently turning forwarding off.
-	// 0 is a real value here — it selects the built-in default — so these compare against the
-	// current value instead of using the > 0 guard the other numeric fields use.
-	if payload.ClientConfig.MCPMaxInstructionsPerClient != currentConfig.MCPMaxInstructionsPerClient {
-		updatedConfig.MCPMaxInstructionsPerClient = payload.ClientConfig.MCPMaxInstructionsPerClient
-		shouldReloadMCPToolManagerConfig = true
-	}
-	if payload.ClientConfig.MCPMaxInstructionsTotal != currentConfig.MCPMaxInstructionsTotal {
-		updatedConfig.MCPMaxInstructionsTotal = payload.ClientConfig.MCPMaxInstructionsTotal
-		shouldReloadMCPToolManagerConfig = true
-	}
-	// Omitted limits keep the current ones; {} resets every limit to its default.
-	if limits := payload.ClientConfig.MCPCodeModeLimits; limits != nil && (currentConfig.MCPCodeModeLimits == nil || *limits != *currentConfig.MCPCodeModeLimits) {
-		updatedConfig.MCPCodeModeLimits = limits
-		shouldReloadMCPToolManagerConfig = true
-	}
-	if err := validateGlobalToolSyncIntervalMinutes(payload.ClientConfig.MCPToolSyncInterval); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
-		return
-	}
-	// 0 means the built-in default, so compare against the current value
-	// instead of the > 0 guard used by other numeric fields.
-	if payload.ClientConfig.MCPToolSyncInterval != currentConfig.MCPToolSyncInterval {
-		updatedConfig.MCPToolSyncInterval = payload.ClientConfig.MCPToolSyncInterval
-	}
-	updatedConfig.MCPEnableTempTokenAuth = payload.ClientConfig.MCPEnableTempTokenAuth
-	if allowlistChanged {
-		updatedConfig.MCPOAuthPrivateAllowlist = payload.ClientConfig.MCPOAuthPrivateAllowlist
 	}
 
 	if !slices.Equal(payload.ClientConfig.PrometheusLabels, currentConfig.PrometheusLabels) {
@@ -910,21 +621,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	newCompat := payload.ClientConfig.Compat
 	shouldReloadCompat := newCompat != currentConfig.Compat
 	updatedConfig.Compat = newCompat
-	// Only update MCP fields if explicitly provided (non-zero) to avoid clearing stored values
-	if payload.ClientConfig.MCPAgentDepth > 0 {
-		updatedConfig.MCPAgentDepth = payload.ClientConfig.MCPAgentDepth
-	}
-	if payload.ClientConfig.MCPToolExecutionTimeout > 0 {
-		updatedConfig.MCPToolExecutionTimeout = payload.ClientConfig.MCPToolExecutionTimeout
-	}
-	// 0 is a valid value (the built-in default), so persist it when changed.
-	if payload.ClientConfig.MCPToolSyncInterval != currentConfig.MCPToolSyncInterval {
-		updatedConfig.MCPToolSyncInterval = payload.ClientConfig.MCPToolSyncInterval
-	}
-	// Only update MCPCodeModeBindingLevel if payload is non-empty to avoid clearing stored value
-	if payload.ClientConfig.MCPCodeModeBindingLevel != "" {
-		updatedConfig.MCPCodeModeBindingLevel = payload.ClientConfig.MCPCodeModeBindingLevel
-	}
 
 	// Only update AsyncJobResultTTL if explicitly provided (> 0) to avoid clearing stored value
 	if payload.ClientConfig.AsyncJobResultTTL > 0 {
@@ -969,11 +665,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	if _, present := clientConfigFields["skip_access_profile_user_virtual_key_deletion"]; present {
 		updatedConfig.SkipAccessProfileUserVirtualKeyDeletion = payload.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion
 	}
-	// Copied only when sent, so a partial save keeps the limit; 0 resets it to the default.
-	// The next spec load reads it, so no reload is needed.
-	if _, present := clientConfigFields["mcp_openapi_max_spec_mb"]; present {
-		updatedConfig.MCPOpenAPIMaxSpecMB = payload.ClientConfig.MCPOpenAPIMaxSpecMB
-	}
 	// Copied only when sent (validated up front), so a partial save keeps the stored entity access profile mode.
 	if _, present := clientConfigFields["entity_access_profile_mode"]; present {
 		updatedConfig.EntityAccessProfileMode = payload.ClientConfig.EntityAccessProfileMode
@@ -988,37 +679,10 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		updatedConfig.RoutingChainMaxDepth = payload.ClientConfig.RoutingChainMaxDepth
 	}
 
-	// Update external base URL for OAuth client redirect_uri (nil clears the override).
-	// Validation is performed up front in this handler so a failure here cannot leave the process in a partial state.
-	updatedConfig.MCPExternalClientURL = payload.ClientConfig.MCPExternalClientURL
-
 	// Preserve the stored URLs when an older or partial client omits
 	// the field. An explicit null still clears the override.
-	if _, present := clientConfigFields["mcp_client_metadata_url"]; present {
-		updatedConfig.MCPClientMetadataURL = payload.ClientConfig.MCPClientMetadataURL
-	}
 	if _, present := clientConfigFields["skills_external_client_url"]; present {
 		updatedConfig.SkillsExternalClientURL = payload.ClientConfig.SkillsExternalClientURL
-	}
-	// Copied only when sent, so a partial save keeps them; an empty value or null resets
-	// each to its default. The reload that follows the save rebuilds /v1/mcp.
-	if _, present := clientConfigFields["bifrost_url"]; present {
-		updatedConfig.BifrostURL = payload.ClientConfig.BifrostURL
-	}
-	if _, present := clientConfigFields["bifrost_mcp_allow_writes"]; present {
-		updatedConfig.BifrostMCPAllowWrites = payload.ClientConfig.BifrostMCPAllowWrites
-	}
-
-	// Only update each field when explicitly provided so partial /api/config
-	// payloads do not clear stored values (matches the MCP field handling above).
-	// The enum, disable_vk_identity, and auth_code_ttl validations for these
-	// fields run up front (before any live mutation) so a rejection can't leave
-	// runtime and DB state diverged.
-	if payload.ClientConfig.MCPServerAuthMode != "" {
-		updatedConfig.MCPServerAuthMode = payload.ClientConfig.MCPServerAuthMode
-	}
-	if payload.ClientConfig.OAuth2ServerConfig != nil {
-		updatedConfig.OAuth2ServerConfig = payload.ClientConfig.OAuth2ServerConfig
 	}
 
 	// Handle HeaderFilterConfig changes
@@ -1077,44 +741,12 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// Recorded at the commit point: the reload, framework and auth steps below
 	// can fail without undoing this write.
 	lib.RecordAuditChange(ctx, "config.updated", "config", "client_config", "client_config", before, updatedConfig.Redacted())
-	// Publish a saved allowlist change here rather than relying on the reload
-	// below: if its store read fails, a removed host would stay reachable.
-	if allowlistChanged {
-		if err := lib.ApplyMCPOAuthPrivateAllowlist(updatedConfig.MCPOAuthPrivateAllowlist); err != nil {
-			logger.Warn("failed to apply mcp_oauth_private_allowlist: %v", err)
-		}
-	}
 	// Reloading client config from config store
 	if err := h.configManager.ReloadClientConfigFromConfigStore(ctx); err != nil {
 		logger.Warn("failed to reload client config from config store: %v", err)
 		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to reload client config from config store: %v", err))
 		return
 	}
-	// MCP settings reach the runtime only once the save has persisted, so a
-	// rejected or failed save never leaves them ahead of the database.
-	// Reload MCP tool manager config with all current values in one call
-	if shouldReloadMCPToolManagerConfig && h.store.MCPConfig != nil {
-		if err := h.configManager.UpdateMCPToolManagerConfig(ctx, updatedConfig.MCPAgentDepth, updatedConfig.MCPToolExecutionTimeout, updatedConfig.MCPCodeModeBindingLevel, updatedConfig.MCPDisableAutoToolInject, updatedConfig.MCPMaxInstructionsPerClient, updatedConfig.MCPMaxInstructionsTotal, updatedConfig.MCPCodeModeLimits); err != nil {
-			logger.Warn(fmt.Sprintf("failed to update mcp tool manager config: %v", err))
-			SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to update mcp tool manager config: %v", err))
-			return
-		}
-	}
-	// Keep in-memory MCP config aligned with client-config-backed MCP settings.
-	if h.store.MCPConfig != nil {
-		if h.store.MCPConfig.ToolManagerConfig == nil {
-			h.store.MCPConfig.ToolManagerConfig = &schemas.MCPToolManagerConfig{}
-		}
-		h.store.MCPConfig.ToolManagerConfig.MaxAgentDepth = updatedConfig.MCPAgentDepth
-		h.store.MCPConfig.ToolManagerConfig.ToolExecutionTimeout = schemas.Duration(time.Duration(updatedConfig.MCPToolExecutionTimeout) * time.Second)
-		h.store.MCPConfig.ToolManagerConfig.CodeModeBindingLevel = schemas.CodeModeBindingLevel(updatedConfig.MCPCodeModeBindingLevel)
-		h.store.MCPConfig.ToolManagerConfig.DisableAutoToolInject = updatedConfig.MCPDisableAutoToolInject
-		h.store.MCPConfig.ToolManagerConfig.MaxInstructionsPerClient = updatedConfig.MCPMaxInstructionsPerClient
-		h.store.MCPConfig.ToolManagerConfig.MaxInstructionsTotal = updatedConfig.MCPMaxInstructionsTotal
-		h.store.MCPConfig.ToolManagerConfig.CodeModeLimits = updatedConfig.MCPCodeModeLimits
-		h.store.MCPConfig.ToolManagerConfig.OAuthPrivateAllowlist = updatedConfig.MCPOAuthPrivateAllowlist
-	}
-
 	// if framework config is nil, we will use the default pricing config
 	if frameworkConfig == nil {
 		frameworkConfig = &configstoreTables.TableFrameworkConfig{
@@ -1122,8 +754,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 			PricingURL:             bifrost.Ptr(modelcatalog.DefaultPricingURL),
 			PricingSyncInterval:    bifrost.Ptr(int64(modelcatalog.DefaultSyncInterval.Seconds())),
 			ModelParametersURL:     bifrost.Ptr(modelcatalog.DefaultModelParametersURL),
-			MCPLibraryURL:          bifrost.Ptr(modelcatalog.DefaultMCPLibraryURL),
-			MCPLibrarySyncInterval: bifrost.Ptr(int64(modelcatalog.DefaultSyncInterval.Seconds())),
 			LiveModelsSyncInterval: bifrost.Ptr(int64(modelcatalog.DefaultLiveModelsSyncInterval.Seconds())),
 		}
 	}
@@ -1136,12 +766,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	}
 	if frameworkConfig.ModelParametersURL == nil {
 		frameworkConfig.ModelParametersURL = bifrost.Ptr(modelcatalog.DefaultModelParametersURL)
-	}
-	if frameworkConfig.MCPLibraryURL == nil {
-		frameworkConfig.MCPLibraryURL = bifrost.Ptr(modelcatalog.DefaultMCPLibraryURL)
-	}
-	if frameworkConfig.MCPLibrarySyncInterval == nil {
-		frameworkConfig.MCPLibrarySyncInterval = bifrost.Ptr(int64(modelcatalog.DefaultSyncInterval.Seconds()))
 	}
 	if frameworkConfig.LiveModelsSyncInterval == nil {
 		frameworkConfig.LiveModelsSyncInterval = bifrost.Ptr(int64(modelcatalog.DefaultLiveModelsSyncInterval.Seconds()))
@@ -1164,43 +788,10 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		frameworkConfig.ModelParametersURL = payload.FrameworkConfig.ModelParametersURL
 		shouldReloadFrameworkConfig = true
 	}
-	if payload.FrameworkConfig.MCPLibraryURL != nil {
-		effectiveMCPLibraryURL := *payload.FrameworkConfig.MCPLibraryURL
-		if effectiveMCPLibraryURL == "" {
-			effectiveMCPLibraryURL = modelcatalog.DefaultMCPLibraryURL
-		}
-		if frameworkConfig.MCPLibraryURL == nil || effectiveMCPLibraryURL != *frameworkConfig.MCPLibraryURL {
-			frameworkConfig.MCPLibraryURL = &effectiveMCPLibraryURL
-			shouldReloadFrameworkConfig = true
-		}
-	}
-	if payload.FrameworkConfig.MCPLibrarySyncInterval != nil {
-		syncInterval := *payload.FrameworkConfig.MCPLibrarySyncInterval
-		if frameworkConfig.MCPLibrarySyncInterval == nil || syncInterval != *frameworkConfig.MCPLibrarySyncInterval {
-			frameworkConfig.MCPLibrarySyncInterval = &syncInterval
-			shouldReloadFrameworkConfig = true
-		}
-	}
 	if payload.FrameworkConfig.LiveModelsSyncInterval != nil {
 		syncInterval := *payload.FrameworkConfig.LiveModelsSyncInterval
 		if frameworkConfig.LiveModelsSyncInterval == nil || syncInterval != *frameworkConfig.LiveModelsSyncInterval {
 			frameworkConfig.LiveModelsSyncInterval = &syncInterval
-			shouldReloadFrameworkConfig = true
-		}
-	}
-	// openapi_url is copied only when sent; empty clears it back to the build's
-	// default spec. Validated up front; the reload below rebuilds /v1/mcp.
-	if payload.FrameworkConfig.OpenAPIURL != nil {
-		var next *string
-		if trimmed := strings.TrimSpace(*payload.FrameworkConfig.OpenAPIURL); trimmed != "" {
-			next = &trimmed
-		}
-		stored := ""
-		if frameworkConfig.OpenAPIURL != nil {
-			stored = strings.TrimSpace(*frameworkConfig.OpenAPIURL)
-		}
-		if (next == nil && stored != "") || (next != nil && *next != stored) {
-			frameworkConfig.OpenAPIURL = next
 			shouldReloadFrameworkConfig = true
 		}
 	}
@@ -1217,10 +808,7 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 				PricingURL:             frameworkConfig.PricingURL,
 				PricingSyncInterval:    &syncSeconds,
 				ModelParametersURL:     frameworkConfig.ModelParametersURL,
-				MCPLibraryURL:          frameworkConfig.MCPLibraryURL,
-				MCPLibrarySyncInterval: frameworkConfig.MCPLibrarySyncInterval,
 				LiveModelsSyncInterval: frameworkConfig.LiveModelsSyncInterval,
-				OpenAPIURL:             frameworkConfig.OpenAPIURL,
 			},
 		}
 		// Persist first so a failed store write leaves the runtime config
@@ -1785,43 +1373,6 @@ func checkURLAccessibility(rawURL string) error {
 	return nil
 }
 
-// validateGlobalToolSyncIntervalMinutes checks a client-config
-// mcp_tool_sync_interval: 0 means the built-in default, negatives are
-// rejected, and the ceiling is the minutes->Duration overflow edge shared
-// with the per-client tool_sync_interval (maxToolSyncIntervalMinutes), since
-// the stored minutes are multiplied by time.Minute on every reload.
-func validateGlobalToolSyncIntervalMinutes(minutes int) error {
-	if minutes < 0 {
-		return fmt.Errorf("mcp_tool_sync_interval must be 0 (use the default) or a positive number of minutes")
-	}
-	if int64(minutes) > maxToolSyncIntervalMinutes {
-		return fmt.Errorf("mcp_tool_sync_interval must be at most %d minutes", maxToolSyncIntervalMinutes)
-	}
-	return nil
-}
-
-// maxMCPOpenAPISpecMB bounds mcp_openapi_max_spec_mb; see configstore.MaxMCPOpenAPISpecMB.
-const maxMCPOpenAPISpecMB = configstore.MaxMCPOpenAPISpecMB
-
-// validateMCPInstructionCaps rejects bounds that cannot hold: a negative value, or a per-client
-// cap larger than the total it must fit inside. 0 means "use the built-in default" for either.
-// maxInstructionCapBytes bounds both caps: far above any real server, far below prompt bloat.
-const maxInstructionCapBytes = 1 << 20
-
-func validateMCPInstructionCaps(perClient, total int) error {
-	if perClient < 0 || total < 0 {
-		return fmt.Errorf("mcp_max_instructions_per_client and mcp_max_instructions_total must not be negative")
-	}
-	if perClient > maxInstructionCapBytes || total > maxInstructionCapBytes {
-		return fmt.Errorf("mcp_max_instructions_per_client and mcp_max_instructions_total must not exceed %d bytes", maxInstructionCapBytes)
-	}
-	// Both set only: a 0 means "default", which the aggregator clamps rather than rejects.
-	if perClient > 0 && total > 0 && perClient > total {
-		return fmt.Errorf("mcp_max_instructions_per_client (%d) must not exceed mcp_max_instructions_total (%d)", perClient, total)
-	}
-	return nil
-}
-
 // hashAdminPassword applies the password policy to a newly submitted admin password and
 // returns its hash, keeping env/vault reference metadata so the stored value still records
 // where the password came from. On failure it sends the response and returns false.
@@ -1900,135 +1451,4 @@ func effectiveGlobalProxyType(t network.GlobalProxyType) network.GlobalProxyType
 		return network.GlobalProxyTypeHTTP
 	}
 	return t
-}
-
-// setMCPProtocolCap validates v and stores it in dst; "" leaves dst as it is.
-func setMCPProtocolCap(field, v string, dst *string) error {
-	if v == "" {
-		return nil
-	}
-	if err := schemas.ValidateMCPMaxProtocolVersion(field, v); err != nil {
-		return err
-	}
-	*dst = v
-	return nil
-}
-
-// clientGatewayEnabled reports whether the save switches the client gateway on. Switching it
-// off needs no admin session, as pausing telemetry does not.
-func clientGatewayEnabled(before, after *configstoreTables.OAuth2ServerConfig) bool {
-	b, a := before.ClaudeCodeGateway(), after.ClaudeCodeGateway()
-	return a != nil && a.Enabled && (b == nil || !b.Enabled)
-}
-
-// clientGatewayManagedSettingsChanged reports whether the managed settings pushed to every
-// signed-in client change.
-func clientGatewayManagedSettingsChanged(before, after *configstoreTables.OAuth2ServerConfig) bool {
-	var b, a map[string]any
-	if g := before.ClaudeCodeGateway(); g != nil {
-		b = g.ManagedSettings
-	}
-	if g := after.ClaudeCodeGateway(); g != nil {
-		a = g.ManagedSettings
-	}
-	bj, _ := json.Marshal(b)
-	aj, _ := json.Marshal(a)
-	return !bytes.Equal(bj, aj)
-}
-
-// clientGatewayTelemetryDropAttributesChanged reports whether the attributes dropped before
-// forwarding change; removing one would start forwarding it.
-func clientGatewayTelemetryDropAttributesChanged(before, after *configstoreTables.OAuth2ServerConfig) bool {
-	return !slices.Equal(clientGatewayTelemetryDropAttributes(before), clientGatewayTelemetryDropAttributes(after))
-}
-
-func clientGatewayTelemetryDropAttributes(c *configstoreTables.OAuth2ServerConfig) []string {
-	g := c.ClaudeCodeGateway()
-	if g == nil || g.Telemetry == nil {
-		return nil
-	}
-	return g.Telemetry.DropAttributes
-}
-
-// clientGatewayTelemetryDestinationsChanged reports whether the Claude Code telemetry
-// destinations differ: any endpoint or header whose value, reference or type changed.
-func clientGatewayTelemetryDestinationsChanged(before, after *configstoreTables.OAuth2ServerConfig) bool {
-	b, a := clientGatewayTelemetryDestinations(before), clientGatewayTelemetryDestinations(after)
-	if len(b) != len(a) {
-		return true
-	}
-	for i := range b {
-		if !b[i].Endpoint.Equals(a[i].Endpoint) || len(b[i].Headers) != len(a[i].Headers) {
-			return true
-		}
-		for name, v := range b[i].Headers {
-			if w, ok := a[i].Headers[name]; !ok || !v.Equals(w) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// restoreRedactedTelemetryHeaders puts the stored value back for each telemetry header sent
-// back exactly as GET /api/config redacted it. Headers are matched by their collector's
-// endpoint and name, not position, so removing a collector cannot shift a secret onto another.
-func restoreRedactedTelemetryHeaders(next, stored *configstoreTables.OAuth2ServerConfig) {
-	storedDests := clientGatewayTelemetryDestinations(stored)
-	if len(storedDests) == 0 {
-		return
-	}
-	redactedDests := clientGatewayTelemetryDestinations(stored.Redacted())
-	nextDests := clientGatewayTelemetryDestinations(next)
-	matches := func(d configstoreTables.ClientGatewayTelemetryDestination, i int) bool {
-		return d.Endpoint.Equals(storedDests[i].Endpoint) || d.Endpoint.Equals(redactedDests[i].Endpoint)
-	}
-	for _, d := range nextDests {
-		// Only an endpoint listed once on both sides identifies its collector; otherwise the
-		// placeholder stays and the save is refused rather than guessing which secret is meant.
-		match, storedCount, nextCount := -1, 0, 0
-		for i := range storedDests {
-			if matches(d, i) {
-				match = i
-				storedCount++
-			}
-		}
-		for _, other := range nextDests {
-			if other.Endpoint.Equals(d.Endpoint) {
-				nextCount++
-			}
-		}
-		if storedCount != 1 || nextCount != 1 {
-			continue
-		}
-		for name, v := range d.Headers {
-			if v.IsMaskedPlaceholder() && v.Equals(redactedDests[match].Headers[name]) {
-				d.Headers[name] = storedDests[match].Headers[name]
-			}
-		}
-	}
-}
-
-// unrestoredRedactedTelemetryHeader reports a telemetry header still holding a redaction
-// placeholder after restoreRedactedTelemetryHeaders, with its collector's endpoint.
-func unrestoredRedactedTelemetryHeader(c *configstoreTables.OAuth2ServerConfig) (endpoint, name string, ok bool) {
-	for _, d := range clientGatewayTelemetryDestinations(c) {
-		for n, v := range d.Headers {
-			if v.IsMaskedPlaceholder() {
-				if d.Endpoint.IsFromSecret() {
-					return d.Endpoint.GetRawRef(), n, true
-				}
-				return d.Endpoint.GetValue(), n, true
-			}
-		}
-	}
-	return "", "", false
-}
-
-func clientGatewayTelemetryDestinations(c *configstoreTables.OAuth2ServerConfig) []configstoreTables.ClientGatewayTelemetryDestination {
-	cc := c.ClaudeCodeGateway()
-	if cc == nil || cc.Telemetry == nil {
-		return nil
-	}
-	return cc.Telemetry.Destinations
 }
