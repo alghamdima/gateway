@@ -788,27 +788,6 @@ func TestUsageMarshalOmitsOnlyTheFlaggedCounters(t *testing.T) {
 	}
 }
 
-// TestChatDialectStreamIsUnchanged covers the other Anthropic frame source,
-// ToAnthropicChatStreamResponse, which this correction does not touch: it builds
-// its usage from Bifrost's own cumulative chat usage, which is complete.
-func TestChatDialectStreamIsUnchanged(t *testing.T) {
-	sse := ToAnthropicChatStreamResponse(&schemas.BifrostChatResponse{
-		ID:    "msg_1",
-		Model: "claude-opus-5-5",
-		Usage: &schemas.BifrostLLMUsage{PromptTokens: 100, CompletionTokens: 25, TotalTokens: 125},
-	})
-	data := sseData(t, sse)
-	for key, want := range map[string]int64{"input_tokens": 100, "output_tokens": 25} {
-		got := gjson.Get(data, "usage."+key)
-		if !got.Exists() || got.Int() != want {
-			t.Fatalf("chat-dialect usage.%s is %s, want %d (%s)", key, got.Raw, want, data)
-		}
-	}
-	if !strings.Contains(data, `"cache_creation_input_tokens":0`) {
-		t.Fatalf("chat-dialect frame lost a stock counter: %s", data)
-	}
-}
-
 // TestNonAnthropicIntegrationIsUnaffected pins the dialect gate: the neutral
 // message_delta branch only renders for an Anthropic integration, so a witness
 // cannot reach any other outbound dialect.

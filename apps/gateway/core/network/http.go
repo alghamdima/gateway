@@ -104,35 +104,12 @@ type HTTPClientFactory struct {
 	fasthttpClients map[fasthttpClientKey]*fasthttp.Client
 	httpClients     map[httpClientKey]*http.Client
 
-	// Fasthttp read/write buffer sizes. Zero unless a caller opts in via
-	// WithFasthttpBufferSizes; when set, applied to the SCIM client only
-	// (see createFasthttpClient).
-	readBufferSize  int
-	writeBufferSize int
-
 	logger schemas.Logger
-}
-
-// FactoryOption customizes an HTTPClientFactory at construction time.
-type FactoryOption func(*HTTPClientFactory)
-
-// WithFasthttpBufferSizes overrides the fasthttp read/write buffer sizes used for
-// created clients. Non-positive values leave the corresponding field at zero, which
-// selects fasthttp's default buffer size.
-func WithFasthttpBufferSizes(read, write int) FactoryOption {
-	return func(f *HTTPClientFactory) {
-		if read > 0 {
-			f.readBufferSize = read
-		}
-		if write > 0 {
-			f.writeBufferSize = write
-		}
-	}
 }
 
 // NewHTTPClientFactory creates a new HTTP client factory with the given proxy configuration.
 // Pass nil for proxyConfig if proxy is not yet configured.
-func NewHTTPClientFactory(proxyConfig *GlobalProxyConfig, logger schemas.Logger, opts ...FactoryOption) *HTTPClientFactory {
+func NewHTTPClientFactory(proxyConfig *GlobalProxyConfig, logger schemas.Logger) *HTTPClientFactory {
 	f := &HTTPClientFactory{
 		proxyConfig:     proxyConfig,
 		proxyRoots:      proxyRootPool(proxyConfig, logger),
@@ -141,9 +118,6 @@ func NewHTTPClientFactory(proxyConfig *GlobalProxyConfig, logger schemas.Logger,
 		fasthttpClients: make(map[fasthttpClientKey]*fasthttp.Client, 3),
 		httpClients:     make(map[httpClientKey]*http.Client, 3),
 		logger:          logger,
-	}
-	for _, opt := range opts {
-		opt(f)
 	}
 	return f
 }
@@ -164,28 +138,6 @@ func (f *HTTPClientFactory) UpdateProxyConfig(config *GlobalProxyConfig) {
 
 	// In-flight requests keep their connections; only idle ones go, so a request
 	// that starts after the update can never reuse a connection to the old proxy.
-	for _, client := range oldFasthttp {
-		client.CloseIdleConnections()
-	}
-	for _, client := range oldHTTP {
-		client.CloseIdleConnections()
-	}
-}
-
-// ApplyOptions applies opts to a factory that already exists, for a caller that shares a
-// factory it did not build (enterprise adds its SCIM buffer sizes to the one the config
-// loader built). Inner clients are rebuilt with the new settings on their next request;
-// live clients handed out earlier pick them up.
-func (f *HTTPClientFactory) ApplyOptions(opts ...FactoryOption) {
-	f.mu.Lock()
-	for _, opt := range opts {
-		opt(f)
-	}
-	oldFasthttp := f.fasthttpClients
-	oldHTTP := f.httpClients
-	f.fasthttpClients = make(map[fasthttpClientKey]*fasthttp.Client, 3)
-	f.httpClients = make(map[httpClientKey]*http.Client, 3)
-	f.mu.Unlock()
 	for _, client := range oldFasthttp {
 		client.CloseIdleConnections()
 	}
@@ -300,11 +252,6 @@ type fasthttpClientKey struct {
 	rawPath bool
 }
 
-// currentFasthttpClient returns the inner fasthttp client for the current proxy config.
-func (f *HTTPClientFactory) currentFasthttpClient(purpose ClientPurpose) *fasthttp.Client {
-	return f.currentFasthttpClientFor(fasthttpClientKey{purpose: purpose})
-}
-
 // currentFasthttpClientFor returns the inner fasthttp client for key, building it on first use.
 func (f *HTTPClientFactory) currentFasthttpClientFor(key fasthttpClientKey) *fasthttp.Client {
 	f.mu.RLock()
@@ -363,7 +310,7 @@ func (f *HTTPClientFactory) HTTPClientWithTLS(purpose ClientPurpose, tlsConfig *
 }
 
 // DialPolicy decides which targets a client may reach, for callers that fetch
-// user-controlled URLs (skills, plugin downloads). Build one with SSRFPolicy
+// user-controlled URLs (skills, plugin downloads). Build one with SSRFPolicyWithDialTimeout
 // or NewDialPolicy, once per caller: the factory keeps one transport per policy pointer.
 type DialPolicy struct {
 	dial          func(ctx context.Context, netw, addr string) (net.Conn, error)
@@ -397,16 +344,11 @@ func (p *DialPolicy) DialContext(ctx context.Context, netw, addr string, proxyUR
 	return policyProxyDial(p, proxyURL, &GlobalProxyConfig{}, nil)(ctx, netw, addr)
 }
 
-// SSRFPolicy is the standard policy for user-controlled URLs: public targets only,
-// plus the hosts in allow (nil permits none). Direct connections go through
-// SSRFSafeDialContextWithAllowlist, which checks every resolved address at dial time;
-// dial time is bounded by the request context.
-func SSRFPolicy(allow *Allowlist) *DialPolicy {
-	return SSRFPolicyWithDialTimeout(0, allow)
-}
-
-// SSRFPolicyWithDialTimeout is SSRFPolicy with each direct dial also bounded by
-// dialTimeout (0 leaves it to the request context).
+// SSRFPolicyWithDialTimeout is the standard policy for user-controlled URLs: public
+// targets only, plus the hosts in allow (nil permits none). Direct connections go
+// through SSRFSafeDialContextWithAllowlist, which checks every resolved address at
+// dial time; each direct dial is bounded by dialTimeout (0 leaves it to the request
+// context).
 func SSRFPolicyWithDialTimeout(dialTimeout time.Duration, allow *Allowlist) *DialPolicy {
 	return NewDialPolicy(SSRFSafeDialContextWithAllowlist(dialTimeout, allow), publicTargetCheck(net.DefaultResolver, allow))
 }
@@ -487,41 +429,10 @@ func defaultTransportProxy(req *http.Request) (*url.URL, error) {
 var defaultFactory atomic.Pointer[HTTPClientFactory]
 
 // SetDefaultHTTPClientFactory registers the process's HTTP client factory for
-// DefaultTransport, DefaultProxyFunc and DefaultGRPCDialer. The server calls it once
+// DefaultProxyFunc and DefaultGRPCDialer. The server calls it once
 // it has built the factory; nil unregisters.
 func SetDefaultHTTPClientFactory(factory *HTTPClientFactory) {
 	defaultFactory.Store(factory)
-}
-
-// DefaultTransport is the RoundTripper for outbound calls that have no factory of their
-// own to hand (OAuth discovery, catalog sync): the registered factory's transport while
-// the global proxy is on for purpose, and http.DefaultTransport itself otherwise (no
-// factory registered, or the global proxy off), so the environment proxy and anything
-// else installed there keep working.
-func DefaultTransport(purpose ClientPurpose) http.RoundTripper {
-	return defaultTransport{purpose: purpose}
-}
-
-// defaultTransport resolves the registered factory per request, so a client built
-// before the server registers its factory still follows the global proxy.
-type defaultTransport struct {
-	purpose ClientPurpose
-}
-
-func (t defaultTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if factory := defaultFactory.Load(); factory != nil && factory.proxyEnabledFor(t.purpose) {
-		return factory.CompatTransport(t.purpose).RoundTrip(req)
-	}
-	// With the global proxy off, this is http.DefaultTransport itself, not an
-	// imitation: whatever the process installed there keeps applying.
-	return http.DefaultTransport.RoundTrip(req)
-}
-
-// proxyEnabledFor reports whether the global proxy is on and configured for purpose.
-func (f *HTTPClientFactory) proxyEnabledFor(purpose ClientPurpose) bool {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-	return f.proxyURLForPurpose(purpose) != nil
 }
 
 // DefaultProxyFunc is a net/http Proxy func for transports built elsewhere (OpenTelemetry
@@ -692,18 +603,6 @@ func (f *HTTPClientFactory) newFasthttpBaseClient(purpose ClientPurpose) *fastht
 		RetryIfErr:          StaleConnectionRetryIfErr,
 	}
 
-	// Larger header buffers only for SCIM/OAuth, and only when a caller opted in via
-	// WithFasthttpBufferSizes: IdP token endpoints can return response headers
-	// exceeding fasthttp's 4KB default ("small read buffer"). Every other purpose,
-	// and any factory whose caller didn't set a size, keeps fasthttp's default.
-	if purpose == ClientPurposeSCIM {
-		if f.readBufferSize > 0 {
-			client.ReadBufferSize = f.readBufferSize
-		}
-		if f.writeBufferSize > 0 {
-			client.WriteBufferSize = f.writeBufferSize
-		}
-	}
 	return client
 }
 

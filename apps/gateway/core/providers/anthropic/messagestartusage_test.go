@@ -1,7 +1,6 @@
 package anthropic
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -73,8 +72,8 @@ func TestResponsesMessageStartAlwaysCarriesUsage(t *testing.T) {
 		requireValidMessageStart(t, marshalEvent(t, events[0]))
 	})
 
-	// Providers routed through providerUtils.SendCreatedEventResponsesChunk emit a
-	// created event with no Response payload at all; the frame must still be valid.
+	// A created event can arrive with no Response payload at all; the frame must
+	// still be valid.
 	t.Run("no response payload", func(t *testing.T) {
 		events := ToAnthropicResponsesStreamResponse(ctx, &schemas.BifrostResponsesStreamResponse{
 			Type: schemas.ResponsesStreamResponseTypeCreated,
@@ -87,36 +86,4 @@ func TestResponsesMessageStartAlwaysCarriesUsage(t *testing.T) {
 		}
 		requireValidMessageStart(t, marshalEvent(t, events[0]))
 	})
-}
-
-// TestChatMessageStartAlwaysCarriesUsage covers ToAnthropicChatStreamResponse, the
-// path taken when a /v1/messages request is served over the Chat Completions dialect.
-func TestChatMessageStartAlwaysCarriesUsage(t *testing.T) {
-	sse := ToAnthropicChatStreamResponse(&schemas.BifrostChatResponse{
-		ID:    "msg_1785995503",
-		Model: "au.anthropic.claude-opus-4-8",
-		Choices: []schemas.BifrostResponseChoice{
-			{
-				Index: 0,
-				ChatNonStreamResponseChoice: &schemas.ChatNonStreamResponseChoice{
-					Message: &schemas.ChatMessage{
-						Role: schemas.ChatMessageRoleAssistant,
-					},
-				},
-			},
-		},
-	})
-
-	data := gjson.Parse(sseData(t, sse))
-	requireValidMessageStart(t, data.Raw)
-}
-
-// sseData extracts the JSON payload from an "event: X\ndata: {...}\n\n" frame.
-func sseData(t *testing.T, sse string) string {
-	t.Helper()
-	idx := strings.Index(sse, "data: ")
-	if idx < 0 {
-		t.Fatalf("no data line in SSE frame: %q", sse)
-	}
-	return strings.TrimSpace(sse[idx+len("data: "):])
 }

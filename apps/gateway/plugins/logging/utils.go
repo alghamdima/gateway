@@ -4,11 +4,9 @@ package logging
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
@@ -477,39 +475,6 @@ func (p *LoggerPlugin) GetPluginLogManager() *PluginLogManager {
 	return &PluginLogManager{
 		plugin: p,
 	}
-}
-
-// retryOnNotFound retries a function up to 3 times with 1-second delays if it returns logstore.ErrNotFound
-func retryOnNotFound(ctx context.Context, operation func() error) error {
-	const maxRetries = 3
-	const retryDelay = time.Second
-
-	var lastErr error
-	for attempt := range maxRetries {
-		err := operation()
-		if err == nil {
-			return nil
-		}
-
-		// Check if the error is logstore.ErrNotFound
-		if !errors.Is(err, logstore.ErrNotFound) {
-			return err
-		}
-
-		lastErr = err
-
-		// Don't wait after the last attempt
-		if attempt < maxRetries-1 {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(retryDelay):
-				// Continue to next retry
-			}
-		}
-	}
-
-	return lastErr
 }
 
 // textRequestParamsAndTools returns the logged params and tools of a text completion, chat or

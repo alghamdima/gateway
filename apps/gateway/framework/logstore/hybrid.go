@@ -197,15 +197,6 @@ func (h *HybridLogStore) uploadShard(logID string) chan *uploadWork {
 	return h.uploadQueues[int(hash.Sum32()%uint32(len(h.uploadQueues)))]
 }
 
-// queuedUploads reports how many uploads are waiting across all shards.
-func (h *HybridLogStore) queuedUploads() int {
-	n := 0
-	for _, q := range h.uploadQueues {
-		n += len(q)
-	}
-	return n
-}
-
 // processUpload uploads a single payload to object storage.
 // This is fire-and-forget by design: on Put failure the upload is dropped and
 // counted in droppedUploads. The DB row retains has_object=false, so FindByID

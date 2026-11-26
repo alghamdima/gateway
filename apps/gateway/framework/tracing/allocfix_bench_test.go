@@ -110,7 +110,7 @@ func BenchmarkFixC7_StartSpanID(b *testing.B) {
 	}
 }
 
-// Fix C2: the Populate*Attributes output map already exists (it's reused for
+// Fix C2: the LLM attribute map already exists (it's reused for
 // root-span propagation), so the win is writing it into the span under ONE lock
 // instead of a range + SetAttribute loop (one lock per entry). Span resolved once.
 var benchC2Attrs = map[string]any{

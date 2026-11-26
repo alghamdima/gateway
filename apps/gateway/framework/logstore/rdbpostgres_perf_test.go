@@ -39,7 +39,7 @@ func setupPerfTestDB(t *testing.T) (*RDBLogStore, *gorm.DB) {
 	err := triggerMigrations(ctx, db, testLogger{})
 	require.NoError(t, err, "migrations should succeed")
 
-	err = ensureMatViews(ctx, db)
+	err = ensureMatViews(ctx, db, matViewSessionLimits{})
 	require.NoError(t, err, "matview creation should succeed")
 
 	store := &RDBLogStore{db: db}
@@ -104,7 +104,7 @@ func TestEnsureMatViewsRebuildsBadSameNameIndex(t *testing.T) {
 	require.NoError(t, db.Exec("CREATE INDEX mv_logs_hourly_uniq ON mv_logs_hourly(hour)").Error)
 	require.False(t, matviewIndexReady(t, db, "mv_logs_hourly", "mv_logs_hourly_uniq"), "same-name non-unique index should not be considered ready")
 
-	require.NoError(t, ensureMatViews(ctx, db))
+	require.NoError(t, ensureMatViews(ctx, db, matViewSessionLimits{}))
 
 	assert.True(t, matviewIndexReady(t, db, "mv_logs_hourly", "mv_logs_hourly_uniq"), "ensureMatViews should rebuild the required unique index")
 	for _, v := range filterMatViews {
@@ -167,7 +167,7 @@ func refreshTestMatViews(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	resetTestMatViewRefreshGate()
 	ctx := context.Background()
-	err := refreshMatViews(ctx, db, 0)
+	err := refreshMatViews(ctx, db, 0, matViewSessionLimits{})
 	require.NoError(t, err, "Failed to refresh materialized views")
 }
 

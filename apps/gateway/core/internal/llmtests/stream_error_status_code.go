@@ -12,7 +12,7 @@ import (
 
 // RunStreamErrorStatusCodeTest validates that pre-stream errors from providers carry
 // the correct HTTP status code in BifrostError.StatusCode. This is critical because
-// the HTTP transport layer (sendStreamError) relies on this field to propagate the
+// the HTTP transport layer relies on this field to propagate the
 // provider's actual status code to clients, rather than always returning 200 OK.
 //
 // The test sends a streaming request with a deliberately invalid model name.

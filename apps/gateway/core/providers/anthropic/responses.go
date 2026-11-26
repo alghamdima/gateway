@@ -3589,8 +3589,8 @@ func toAnthropicResponsesStreamEvents(ctx *schemas.BifrostContext, bifrostResp *
 			//
 			// Use actual usage if available (forwarded from upstream message_start).
 			// When unknown — Bedrock Converse reports usage only on its terminal event,
-			// and every provider routed through providerUtils.SendCreatedEventResponsesChunk
-			// hands us an empty BifrostResponsesResponse — the key must still be emitted.
+			// and a created event can arrive with an empty BifrostResponsesResponse — the
+			// key must still be emitted.
 			// message_start.usage is not optional in practice: Anthropic populates it on
 			// every real stream, and @ai-sdk/anthropic's message_start schema marks
 			// usage.input_tokens required (id/model/role are nullish), so omitting it
@@ -7464,11 +7464,6 @@ func convertAnthropicContentBlocksToResponsesMessagesGrouped(contentBlocks []Ant
 	return bifrostMessages
 }
 
-// Helper function to convert Anthropic content blocks to Bifrost ResponsesMessages
-func convertAnthropicContentBlocksToResponsesMessages(ctx *schemas.BifrostContext, contentBlocks []AnthropicContentBlock, role *schemas.ResponsesMessageRoleType, isOutputMessage bool, structuredOutputToolName string) []schemas.ResponsesMessage {
-	return convertAnthropicContentBlocksToResponsesMessagesOrdered(ctx, contentBlocks, role, isOutputMessage, structuredOutputToolName, false)
-}
-
 // convertAnthropicContentBlocksToResponsesMessagesOrdered converts content blocks, and with
 // preserveThinkingOrder emits each run of consecutive thinking blocks as its own reasoning item
 // at the position it had in the turn. The default merges all thinking blocks into one item
@@ -9079,25 +9074,6 @@ func convertBifrostMCPCallToAnthropicToolUse(msg *schemas.ResponsesMessage) *Ant
 	return nil
 }
 
-// convertBifrostMCPCallOutputToAnthropicMessage converts a Bifrost MCP call output to Anthropic message
-func convertBifrostMCPCallOutputToAnthropicMessage(msg *schemas.ResponsesMessage) *AnthropicMessage {
-	toolResultBlock := AnthropicContentBlock{
-		Type: AnthropicContentBlockTypeMCPToolResult,
-		ID:   providerUtils.SanitizeAnthropicToolUseIDPtr(msg.ResponsesToolMessage.CallID),
-	}
-
-	if msg.ResponsesToolMessage.Output != nil {
-		toolResultBlock.Content = convertToolOutputToAnthropicContent(msg.ResponsesToolMessage.Output)
-	}
-
-	return &AnthropicMessage{
-		Role: AnthropicMessageRoleUser,
-		Content: AnthropicContent{
-			ContentBlocks: []AnthropicContentBlock{toolResultBlock},
-		},
-	}
-}
-
 // convertBifrostMCPApprovalToAnthropicToolUse converts a Bifrost MCP approval request to Anthropic tool use
 func convertBifrostMCPApprovalToAnthropicToolUse(msg *schemas.ResponsesMessage) *AnthropicContentBlock {
 	if msg.ResponsesToolMessage != nil && msg.ResponsesToolMessage.Name != nil {
@@ -10120,28 +10096,6 @@ func convertBifrostUnsupportedToolCallToAnthropicMessage(msg *schemas.ResponsesM
 	return nil
 }
 
-// convertBifrostComputerCallOutputToAnthropicMessage converts a Bifrost computer call output to Anthropic message
-func convertBifrostComputerCallOutputToAnthropicMessage(msg *schemas.ResponsesMessage) *AnthropicMessage {
-	if msg.ResponsesToolMessage != nil {
-		toolResultBlock := AnthropicContentBlock{
-			Type:      AnthropicContentBlockTypeToolResult,
-			ToolUseID: providerUtils.SanitizeAnthropicToolUseIDPtr(msg.ResponsesToolMessage.CallID),
-		}
-
-		if msg.ResponsesToolMessage.Output != nil {
-			toolResultBlock.Content = convertToolOutputToAnthropicContent(msg.ResponsesToolMessage.Output)
-		}
-
-		return &AnthropicMessage{
-			Role: AnthropicMessageRoleUser,
-			Content: AnthropicContent{
-				ContentBlocks: []AnthropicContentBlock{toolResultBlock},
-			},
-		}
-	}
-	return nil
-}
-
 // shellCallOutputReplayText renders shell output for replay: the streams plus each command's
 // outcome, which ShellCallOutputText leaves out.
 func shellCallOutputReplayText(output []schemas.ResponsesShellCallOutputContent) string {
@@ -10411,27 +10365,6 @@ func convertAnthropicToolChoiceToBifrost(toolChoice *AnthropicToolChoice) *schem
 	}
 
 	return bifrostToolChoice
-}
-
-// flushPendingContentBlocks is a helper that flushes accumulated content blocks into an assistant message
-func flushPendingContentBlocks(
-	pendingContentBlocks []AnthropicContentBlock,
-	currentAssistantMessage *AnthropicMessage,
-	anthropicMessages []AnthropicMessage,
-) ([]AnthropicContentBlock, *AnthropicMessage, []AnthropicMessage) {
-	if len(pendingContentBlocks) > 0 && currentAssistantMessage != nil {
-		// Copy the slice to avoid aliasing issues
-		copied := make([]AnthropicContentBlock, len(pendingContentBlocks))
-		copy(copied, pendingContentBlocks)
-		currentAssistantMessage.Content = AnthropicContent{
-			ContentBlocks: copied,
-		}
-		anthropicMessages = append(anthropicMessages, *currentAssistantMessage)
-		// Return nil values to indicate flushed state
-		return nil, nil, anthropicMessages
-	}
-	// Return unchanged values if no flush was needed
-	return pendingContentBlocks, currentAssistantMessage, anthropicMessages
 }
 
 // convertToolOutputToAnthropicContent converts tool output to Anthropic content format
@@ -11300,39 +11233,6 @@ func convertBifrostMCPToolsetConfigToAnthropic(config *schemas.ResponsesToolMCPT
 	return &AnthropicMCPToolsetConfig{Enabled: config.Enabled, DeferLoading: config.DeferLoading}
 }
 
-// convertAnthropicMCPServerToBifrostTool converts a deprecated-format Anthropic MCP server to a Bifrost ResponsesTool.
-func convertAnthropicMCPServerToBifrostTool(mcpServer *AnthropicMCPServer) *schemas.ResponsesTool {
-	if mcpServer == nil {
-		return nil
-	}
-
-	bifrostTool := &schemas.ResponsesTool{
-		Type: schemas.ResponsesToolTypeMCP,
-		ResponsesToolMCP: &schemas.ResponsesToolMCP{
-			ServerLabel: mcpServer.Name,
-		},
-	}
-
-	// Set server URL if present
-	if mcpServer.URL != "" {
-		bifrostTool.ResponsesToolMCP.ServerURL = schemas.Ptr(mcpServer.URL)
-	}
-
-	// Set authorization token if present
-	if mcpServer.AuthorizationToken != nil {
-		bifrostTool.ResponsesToolMCP.Authorization = mcpServer.AuthorizationToken
-	}
-
-	// Set allowed tools from tool configuration
-	if mcpServer.ToolConfiguration != nil && len(mcpServer.ToolConfiguration.AllowedTools) > 0 {
-		bifrostTool.ResponsesToolMCP.AllowedTools = &schemas.ResponsesToolMCPAllowedTools{
-			ToolNames: mcpServer.ToolConfiguration.AllowedTools,
-		}
-	}
-
-	return bifrostTool
-}
-
 // convertBifrostMCPToolToAnthropicNew converts a Bifrost MCP tool to the new mcp-client-2025-11-20 format.
 // Returns both a simplified server entry (for mcp_servers[]) and a toolset entry (for tools[]).
 func convertBifrostMCPToolToAnthropicNew(tool *schemas.ResponsesTool) (*AnthropicMCPServerV2, *AnthropicMCPToolsetTool) {
@@ -11385,39 +11285,6 @@ func convertBifrostMCPToolToAnthropicNew(tool *schemas.ResponsesTool) (*Anthropi
 	}
 
 	return server, toolset
-}
-
-// convertBifrostMCPToolToAnthropicServer converts a Bifrost MCP tool to the deprecated mcp-client-2025-04-04 format.
-// Kept for backward compatibility.
-func convertBifrostMCPToolToAnthropicServer(tool *schemas.ResponsesTool) *AnthropicMCPServer {
-	if tool == nil || tool.Type != schemas.ResponsesToolTypeMCP || tool.ResponsesToolMCP == nil {
-		return nil
-	}
-
-	mcpServer := &AnthropicMCPServer{
-		Type: "url",
-		Name: tool.ResponsesToolMCP.ServerLabel,
-		ToolConfiguration: &AnthropicMCPToolConfig{
-			Enabled: true,
-		},
-	}
-
-	// Set server URL if present
-	if tool.ResponsesToolMCP.ServerURL != nil {
-		mcpServer.URL = *tool.ResponsesToolMCP.ServerURL
-	}
-
-	// Set allowed tools if present
-	if tool.ResponsesToolMCP.AllowedTools != nil && len(tool.ResponsesToolMCP.AllowedTools.ToolNames) > 0 {
-		mcpServer.ToolConfiguration.AllowedTools = tool.ResponsesToolMCP.AllowedTools.ToolNames
-	}
-
-	// Set authorization token if present
-	if tool.ResponsesToolMCP.Authorization != nil {
-		mcpServer.AuthorizationToken = tool.ResponsesToolMCP.Authorization
-	}
-
-	return mcpServer
 }
 
 // convertAnthropicCitationToAnnotation converts an Anthropic citation to an OpenAI annotation

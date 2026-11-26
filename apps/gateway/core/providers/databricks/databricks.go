@@ -54,11 +54,6 @@ const (
 	// gatewayRequestTagsHeader carries JSON string-to-string labels that Databricks records
 	// against the request for usage tracking and cost attribution.
 	gatewayRequestTagsHeader = "Databricks-Ai-Gateway-Request-Tags"
-
-	// modelServingListPath lists Model Serving endpoints.
-	modelServingListPath = "/api/2.0/serving-endpoints"
-	// aiGatewayListPath lists Unity Catalog model services.
-	aiGatewayListPath = "/api/2.1/unity-catalog/model-services"
 )
 
 // DatabricksProvider implements the Provider interface for Databricks.

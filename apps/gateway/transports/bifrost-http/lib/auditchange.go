@@ -85,13 +85,3 @@ func noteConfigFileApplied(section, targetID string) {
 		TargetName: targetID,
 	})
 }
-
-// DrainStartupAuditChanges returns and clears the config.json syncs recorded
-// since the last call.
-func DrainStartupAuditChanges() []configstore.AuditChange {
-	startupAuditMu.Lock()
-	defer startupAuditMu.Unlock()
-	out := startupAuditChanges
-	startupAuditChanges = nil
-	return out
-}

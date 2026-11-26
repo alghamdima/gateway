@@ -13,6 +13,7 @@ import (
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/configstore"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/grant"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
@@ -433,13 +434,6 @@ func settleAttemptLimits(ctx *schemas.BifrostContext, store GovernanceStore, pro
 	return limits
 }
 
-// evaluateHolderLimits runs the limits a grant carries, plus the deployment's, through that same
-// check, which is what the funnel does once a request's access is resolved.
-func evaluateHolderLimits(r *BudgetResolver, ctx *schemas.BifrostContext, _ schemas.Access, provider schemas.ModelProvider, model string) *EvaluationResult {
-	return r.evaluateLimits(ctx, &EvaluationRequest{Provider: provider, Model: model},
-		resolveLimitsForTest(r, ctx, provider, model))
-}
-
 // evaluateVirtualKey runs a request made with a virtual key through the funnel's two post-resolution
 // steps. The key is named only to say what kind of request this is: the evaluation reads the access
 // already recorded on ctx by resolverCtx, exactly as production code does, and never looks the key up.
@@ -612,4 +606,65 @@ func checkGrantBudgets(gs *LocalGovernanceStore, bifrostCtx *schemas.BifrostCont
 	heldBudgets, _ := gs.HolderLimits(bifrostCtx, permit)
 	providerBudgets, _ := gs.PermitProviderLimits(bifrostCtx, permit, provider)
 	return gs.CheckBudgets(bifrostCtx, append(heldBudgets, providerBudgets...), baselines)
+}
+
+// InitFromStore is Init with a GovernanceStore the test built, in place of the
+// LocalGovernanceStore Init constructs. The governanceStore must not be nil.
+func InitFromStore(
+	ctx context.Context,
+	config *Config,
+	logger schemas.Logger,
+	governanceStore GovernanceStore,
+	configStore configstore.ConfigStore,
+	modelCatalog *modelcatalog.ModelCatalog,
+	inMemoryStore InMemoryStore,
+) (*GovernancePlugin, error) {
+	if configStore == nil {
+		logger.Warn("governance plugin requires config store to persist data, running in memory only mode")
+	}
+	if modelCatalog == nil {
+		logger.Warn("governance plugin requires model catalog to calculate cost, all cost calculations will be skipped.")
+	}
+	if governanceStore == nil {
+		return nil, fmt.Errorf("governance store is nil")
+	}
+	// Handle nil config - use safe defaults
+	var isVkMandatory *bool
+	var requiredHeaders *[]string
+	var objectOwnershipEnforcedFn func() bool
+	if config != nil {
+		isVkMandatory = config.IsVkMandatory
+		requiredHeaders = config.RequiredHeaders
+		objectOwnershipEnforcedFn = config.ObjectOwnershipEnforced
+	}
+	resolver := NewBudgetResolver(governanceStore, modelCatalog, logger, inMemoryStore)
+	tracker := NewUsageTracker(ctx, governanceStore, resolver, configStore, logger)
+	ctx, cancelFunc := context.WithCancel(ctx)
+	plugin := &GovernancePlugin{
+		ctx:             ctx,
+		cancelFunc:      cancelFunc,
+		store:           governanceStore,
+		resolver:        resolver,
+		tracker:         tracker,
+		configStore:     configStore,
+		modelCatalog:    modelCatalog,
+		logger:          logger,
+		inMemoryStore:   inMemoryStore,
+		isVkMandatory:   isVkMandatory,
+		cfgMutex:        sync.RWMutex{},
+		requiredHeaders: requiredHeaders,
+		isEnterprise:    config != nil && config.IsEnterprise,
+
+		objectOwnershipEnforcedFn: objectOwnershipEnforcedFn,
+	}
+	return plugin, nil
+}
+
+// resolveLimits is resolveLimitsWith over the grant's own access.
+func resolveLimits(ctx *schemas.BifrostContext, store GovernanceStore, provider schemas.ModelProvider, model string) (schemas.Limits, error) {
+	g := ctx.Grant()
+	if g == nil {
+		return nil, nil
+	}
+	return resolveLimitsWith(ctx, store, g.Access(), provider, model)
 }

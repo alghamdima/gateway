@@ -263,3 +263,13 @@ func TestPublishLocalSessionFallbackPreservesProposalEvidence(t *testing.T) {
 		logs[0].Message,
 	)
 }
+
+// complexitySessionKey is complexitySessionKeyFor the Complexity Router page's config.
+func complexitySessionKey(ctx *schemas.BifrostContext) string {
+	return complexitySessionKeyFor(ctx, "")
+}
+
+// complexityTurnTierKey is complexityTurnTierKeyFor the Complexity Router page's config.
+func complexityTurnTierKey(ctx *schemas.BifrostContext) string {
+	return complexityTurnTierKeyFor(ctx, "")
+}

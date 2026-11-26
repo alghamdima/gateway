@@ -256,36 +256,6 @@ func TestSuggestSurvivesUnparseableAnswer(t *testing.T) {
 	}
 }
 
-func TestRunClustersAndSuggestsHeaviestFirst(t *testing.T) {
-	rng := rand.New(rand.NewSource(18))
-	reqs := shuffled(rng, typeRequests("refund", 0, 10, rng), typeRequests("invoice", 1, 20, rng))
-	llm := &scriptedLLM{answers: map[string][]string{
-		"refund":  {`{"coherent":true,"tier":"SIMPLE","phrases":["where is my refund"]}`},
-		"invoice": {`{"coherent":true,"tier":"MEDIUM","phrases":["compare these invoices"]}`},
-	}}
-	// The live phrase has no vector; Run must embed it.
-	live := []Phrase{{Tier: "COMPLEX", Text: "design a distributed system"}}
-	got, err := Run(context.Background(), reqs, live, testEmbedder, llm, Options{Tier: &markerTier{tiers: map[string]string{"refund": "SIMPLE", "invoice": "MEDIUM"}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("got %d suggestions, want 2", len(got))
-	}
-	if got[0].Tier != "MEDIUM" || got[0].Cluster.Weight != 20 || got[1].Tier != "SIMPLE" {
-		t.Fatalf("order/tiers wrong: %s/%d, %s", got[0].Tier, got[0].Cluster.Weight, got[1].Tier)
-	}
-	wantType := map[string]string{"MEDIUM": "invoice", "SIMPLE": "refund"}
-	for _, sg := range got {
-		if !sg.Category.Actionable() || sg.Coverage != 1 {
-			t.Errorf("%s: category %s coverage %.2f", sg.Tier, sg.Category, sg.Coverage)
-		}
-		if !strings.HasPrefix(sg.Examples[0].Text, wantType[sg.Tier]) {
-			t.Errorf("%s suggestion shows examples from %q", sg.Tier, sg.Examples[0].Text)
-		}
-	}
-}
-
 func TestPhrasePromptBoundsRequestsAndLeavesTierOut(t *testing.T) {
 	long := strings.Repeat("word ", 400)
 	msgs := buildPrompt("", []Member{{Request: Request{Text: long}}}, 7)

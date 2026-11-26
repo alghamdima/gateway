@@ -26,8 +26,8 @@ func TestPrometheusLabelsMatchEnrichmentRegistry(t *testing.T) {
 		metricSafe[n] = true
 	}
 	allDims := map[string]bool{}
-	for _, n := range schemas.EnrichmentDimNames() {
-		allDims[n] = true
+	for _, d := range schemas.EnrichmentDims {
+		allDims[d.Name] = true
 	}
 
 	// Metric-safe dims the telemetry plugin does not expose as labels. Empty: the
@@ -90,8 +90,8 @@ func TestDerivedLabelsMatchMetricTier(t *testing.T) {
 // to real registry dimensions.
 func TestUserLabelsAreOptIn(t *testing.T) {
 	dims := map[string]bool{}
-	for _, n := range schemas.EnrichmentDimNames() {
-		dims[n] = true
+	for _, d := range schemas.EnrichmentDims {
+		dims[d.Name] = true
 	}
 	for _, name := range userLabelNames {
 		if containsLabel(defaultBifrostLabelNames, name) {

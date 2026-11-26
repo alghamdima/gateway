@@ -103,18 +103,6 @@ func GetFloat64Attr(attrs map[string]any, key string) float64 {
 	return v
 }
 
-// TraceSessionID returns the session ID trace attribute, or "" when absent.
-func TraceSessionID(attrs map[string]any) string {
-	v, _ := attrs[TraceAttrSessionID].(string)
-	return v
-}
-
-// TraceTraceState returns the inbound W3C tracestate, or "" when absent.
-func TraceTraceState(attrs map[string]any) string {
-	v, _ := attrs[TraceAttrTraceState].(string)
-	return v
-}
-
 // TraceDimensions returns the x-bf-dim-* dimensions, or nil when absent.
 // Accepts map[string]any too: a trace decoded from JSON arrives that way.
 func TraceDimensions(attrs map[string]any) map[string]string {
@@ -643,7 +631,7 @@ func (s *Span) GetAttribute(key string) (any, bool) {
 
 // SetAttributes merges an already-built attribute map into the span under a
 // single lock. Preferred over a caller-side range + SetAttribute loop (one lock
-// per entry) when the map already exists (e.g. the Populate*Attributes output).
+// per entry) when the map already exists (e.g. LLMSpanData.Attributes output).
 // Nil values are skipped, matching SetAttribute.
 func (s *Span) SetAttributes(attrs map[string]any) {
 	if s == nil || len(attrs) == 0 {

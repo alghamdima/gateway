@@ -289,7 +289,7 @@ func ClearPayload(l *Log) {
 	l.ErrorDetailsParsed = nil
 }
 
-// MergePayloadFromJSON takes a JSON payload (as marshaled by MarshalPayload)
+// MergePayloadFromJSON takes a JSON payload (a field-name to value object)
 // and merges the fields back into the Log struct's serialized TEXT columns,
 // then calls DeserializeFields to populate the Parsed virtual fields.
 func MergePayloadFromJSON(l *Log, data []byte) error {
@@ -457,10 +457,6 @@ func ClearPayloadFiltered(l *Log, excluded map[string]struct{}) {
 			clearPayloadField(l, f)
 		}
 	}
-}
-
-func MarshalPayload(payload map[string]string) ([]byte, error) {
-	return sonic.Marshal(payload)
 }
 
 // BuildInputContentSummary extracts the last user message text from input fields.
@@ -828,18 +824,6 @@ func objectKey(prefix, dir string, timestamp time.Time, logID, ext string) strin
 		ts.Year(), ts.Month(), ts.Day(), ts.Hour(),
 		logID, ext,
 	)
-}
-
-// ObjectKey constructs the S3 object key for a JSON log entry.
-func ObjectKey(prefix string, timestamp time.Time, logID string) string {
-	return objectKey(prefix, "logs", timestamp, logID, jsonObjectExt)
-}
-
-// PayloadFieldNames returns the list of DB column names that are payload fields.
-func PayloadFieldNames() []string {
-	cp := make([]string, len(payloadFields))
-	copy(cp, payloadFields)
-	return cp
 }
 
 // payloadFieldSet is a set for O(1) lookup of payload field names.

@@ -55,24 +55,3 @@ func TestResponseFormatSchemaBytesReachPerplexityVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	schemaorder.AssertSchemaBytes(t, string(raw), "schema")
 }
-
-// TestResponseFormatOrderSurvivesPerplexityResponses covers the Responses method.
-func TestResponseFormatOrderSurvivesPerplexityResponses(t *testing.T) {
-	var params schemas.ResponsesParameters
-	require.NoError(t, schemas.Unmarshal([]byte(schemaorder.ResponsesBody), &params))
-
-	out := ToPerplexityResponsesRequest(&schemas.BifrostResponsesRequest{
-		Provider: schemas.Perplexity,
-		Model:    "sonar",
-		Input: []schemas.ResponsesMessage{{
-			Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
-			Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("assign it")},
-		}},
-		Params: &params,
-	})
-	require.NotNil(t, out)
-
-	raw, err := providerUtils.MarshalSorted(out)
-	require.NoError(t, err)
-	schemaorder.AssertPropertyOrder(t, string(raw))
-}

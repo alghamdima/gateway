@@ -226,11 +226,8 @@ func TestAllContentAttributeKeysMatchesClassifier(t *testing.T) {
 	_ = listed
 }
 
-// TestSpanTypedPayloadNeverSerializes pins Span.LLM to json:"-": three connectors
-// marshal a whole trace, and the payload is content by construction.
-//
-// StripSpanContent already drops it by not copying, so the content-disabled path
-// is safe either way. This guards the enabled path, which stripping never sees.
+// TestSpanTypedPayloadNeverSerializes pins Span.LLM to json:"-": a connector that
+// marshals a whole trace must never carry it, as the payload is content by construction.
 func TestSpanTypedPayloadNeverSerializes(t *testing.T) {
 	const secret = "TYPED-PAYLOAD-SENTINEL"
 	span := &Span{

@@ -238,31 +238,6 @@ func TestUpgradeLogstoreAddColumnRetriesBehindLongReader(t *testing.T) {
 	})
 }
 
-// startOldSnapshot opens a REPEATABLE READ transaction that reads a table other
-// than the one being indexed, as an old replica's unrelated long query does.
-// CREATE INDEX CONCURRENTLY waits for every transaction older than it, whatever
-// table that transaction reads. It returns a func that ends the transaction.
-func startOldSnapshot(t *testing.T, db *gorm.DB) func() {
-	t.Helper()
-	sqlDB, err := db.DB()
-	require.NoError(t, err)
-	conn, err := sqlDB.Conn(context.Background())
-	require.NoError(t, err)
-	_, err = conn.ExecContext(context.Background(), "BEGIN ISOLATION LEVEL REPEATABLE READ")
-	require.NoError(t, err)
-	_, err = conn.ExecContext(context.Background(), "SELECT count(*) FROM migrations")
-	require.NoError(t, err)
-	var once sync.Once
-	end := func() {
-		once.Do(func() {
-			_, _ = conn.ExecContext(context.Background(), "ROLLBACK")
-			_ = conn.Close()
-		})
-	}
-	t.Cleanup(end)
-	return end
-}
-
 // TestDescribeTableLockHoldersNamesOldReader pins the operator hint logged on the
 // first lock timeout: it names the session holding logs by pid, lock mode and
 // statement kind, never by statement text, and a lookup with no holders stays

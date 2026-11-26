@@ -864,37 +864,6 @@ func filterPropertiesPinecone(props map[string]interface{}, selectFields []strin
 	return filtered
 }
 
-// matchesQueries checks if properties match all query conditions.
-func matchesQueries(props map[string]interface{}, queries []Query) bool {
-	if len(queries) == 0 {
-		return true
-	}
-	for _, q := range queries {
-		val, exists := props[q.Field]
-		if !matchesQuery(val, exists, q) {
-			return false
-		}
-	}
-	return true
-}
-
-// matchesQuery checks if a single value matches a query condition.
-func matchesQuery(val interface{}, exists bool, q Query) bool {
-	switch q.Operator {
-	case QueryOperatorIsNull:
-		return !exists || val == nil
-	case QueryOperatorIsNotNull:
-		return exists && val != nil
-	case QueryOperatorEqual:
-		return exists && fmt.Sprintf("%v", val) == fmt.Sprintf("%v", q.Value)
-	case QueryOperatorNotEqual:
-		return !exists || fmt.Sprintf("%v", val) != fmt.Sprintf("%v", q.Value)
-	default:
-		// For complex operators, default to true (filter at query time)
-		return true
-	}
-}
-
 // buildPineconeFilter converts queries to Pinecone metadata filter.
 func buildPineconeFilter(queries []Query) (*structpb.Struct, error) {
 	if len(queries) == 0 {

@@ -171,11 +171,6 @@ func acquireBedrockResponsesStreamState() *BedrockResponsesStreamState {
 	return state
 }
 
-// NewBedrockResponsesStreamState returns a freshly initialised stream state for use in tests.
-func NewBedrockResponsesStreamState() *BedrockResponsesStreamState {
-	return acquireBedrockResponsesStreamState()
-}
-
 // releaseBedrockResponsesStreamState returns a Bedrock responses stream state to the pool.
 func releaseBedrockResponsesStreamState(state *BedrockResponsesStreamState) {
 	if state != nil {

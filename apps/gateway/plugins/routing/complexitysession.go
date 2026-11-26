@@ -189,26 +189,17 @@ func decodeStoredComplexityTier(value any) (string, error) {
 	return tier, nil
 }
 
-// complexitySessionKey is where the request's agent keeps its effective tier: the shared
-// session state key, scoped to the virtual key and user the request is attributed to, under
-// the complexity kind. See complexityStateKey for the agent scoping.
-func complexitySessionKey(ctx *schemas.BifrostContext) string {
-	return complexitySessionKeyFor(ctx, "")
-}
-
-// complexitySessionKeyFor is complexitySessionKey for one model router, so routers never
-// raise each other's session tiers.
+// complexitySessionKeyFor is where the request's agent keeps its effective tier for one model
+// router: the shared session state key, scoped to the virtual key and user the request is
+// attributed to, under the router's complexity kind, so routers never raise each other's
+// session tiers. See complexityStateKey for the agent scoping.
 func complexitySessionKeyFor(ctx *schemas.BifrostContext, routerID string) string {
 	return complexityStateKey(ctx, complexityRouterKind(complexitySessionKind, routerID))
 }
 
-// complexityTurnTierKey scopes continuation tier state to the request's session, caller and
-// agent, so a subagent's tool loop never resumes on a tier its parent served, or the reverse.
-func complexityTurnTierKey(ctx *schemas.BifrostContext) string {
-	return complexityTurnTierKeyFor(ctx, "")
-}
-
-// complexityTurnTierKeyFor is complexityTurnTierKey for one model router.
+// complexityTurnTierKeyFor scopes one model router's continuation tier state to the request's
+// session, caller and agent, so a subagent's tool loop never resumes on a tier its parent
+// served, or the reverse.
 func complexityTurnTierKeyFor(ctx *schemas.BifrostContext, routerID string) string {
 	return complexityStateKey(ctx, complexityRouterKind(complexityTurnTierKind, routerID))
 }

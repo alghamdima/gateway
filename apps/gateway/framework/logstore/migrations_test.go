@@ -588,18 +588,6 @@ func TestPerformanceIndexesCoverCorrelationIDs(t *testing.T) {
 	assert.Equal(t, "logs", tables["idx_logs_agent_correlation_id"])
 }
 
-// sqlRecorder captures every statement gorm executes, so a test can assert on
-// statement order - here, that rollback takes its locks in writer order.
-type sqlRecorder struct {
-	logger.Interface
-	statements []string
-}
-
-func (r *sqlRecorder) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
-	sql, _ := fc()
-	r.statements = append(r.statements, sql)
-}
-
 // ========== Embedding Input Column Migration Tests ==========
 
 // runEmbeddingInputColumnCases pins that the migration only adds the column and leaves existing rows NULL.

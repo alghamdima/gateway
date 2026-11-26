@@ -3,7 +3,6 @@ package logstore
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -14,12 +13,6 @@ import (
 	"github.com/maximhq/bifrost/framework/postgresconn"
 	"gorm.io/gorm"
 )
-
-// isValidJSON checks if a string is valid JSON.
-func isValidJSON(s string) bool {
-	var js json.RawMessage
-	return json.Unmarshal([]byte(s), &js) == nil
-}
 
 // addColumnIfNotExists is a package-local alias for migrator.AddColumnIfNotExists,
 // the idempotent column-add helper shared with configstore. Declared at package
@@ -176,22 +169,17 @@ func pendingMigrationStepIDs(ctx context.Context, db *gorm.DB, steps []migration
 	return migrator.PendingIDs(ctx, db, migrator.DefaultOptions, migrationStepIDs(steps))
 }
 
-// migrationStepLockRetry tunes how runMigrationSteps retries a step that fails
+// migrationStepLockRetry tunes how runMigrationStepsWithRetry retries a step that fails
 // on a lock timeout. The zero value takes postgresconn's defaults; a variable
 // only so tests can shrink the budget and backoff.
 var migrationStepLockRetry postgresconn.LockRetryOptions
 
-// runMigrationSteps runs migration steps in their declared order. It reads the
-// pending IDs once and skips steps whose IDs are all recorded, so a deploy with
+// runMigrationStepsWithRetry runs migration steps in their declared order. It reads
+// the pending IDs once and skips steps whose IDs are all recorded, so a deploy with
 // one new migration does not pay a round trip per already-applied step. If the
 // preflight read fails, every step runs and each one checks its own row. A step
-// that fails on a lock timeout is retried within postgresconn's retry budget.
-func runMigrationSteps(ctx context.Context, db *gorm.DB, logger schemas.Logger, steps []migrationStep) error {
-	return runMigrationStepsWithRetry(ctx, db, logger, steps, migrationStepLockRetry)
-}
-
-// runMigrationStepsWithRetry is runMigrationSteps with explicit lock-timeout
-// retry options; a zero budget takes postgresconn's default.
+// that fails on a lock timeout is retried within the retry budget; a zero budget
+// takes postgresconn's default.
 func runMigrationStepsWithRetry(ctx context.Context, db *gorm.DB, logger schemas.Logger, steps []migrationStep, retry postgresconn.LockRetryOptions) error {
 	pending, err := pendingMigrationStepIDs(ctx, db, steps)
 	var pendingSet map[string]struct{}
@@ -3385,51 +3373,6 @@ func migrationRecreateMatViewsWithCostBreakdown(ctx context.Context, db *gorm.DB
 	return nil
 }
 
-// migrationSplitFilterDataMatView drops the legacy mv_logs_filterdata view so
-// ensureMatViews recreates it as per-dimension matviews (mv_filter_models,
-// mv_filter_selected_keys, ...). The old view DISTINCTed across 16 columns and
-// could grow nearly as large as the source `logs` table on multi-tenant
-// deployments, making REFRESH ... CONCURRENTLY memory-intensive. Splitting per
-// dimension keeps each view bounded by a single column's cardinality.
-//
-// NOT CALLED YET. Multi-replica deployments do rolling restarts, so dropping
-// mv_logs_filterdata in this release would make every filterdata request on
-// not-yet-upgraded replicas return "relation does not exist" until they
-// restart. The per-dimension views ship in this release and the legacy view
-// is intentionally left in place. A follow-up release — after this one has
-// fully rolled out everywhere — will wire this migration into RunMigrations
-// (or add "mv_logs_filterdata" to legacyMatViewNames in matviews.go) to
-// actually perform the drop.
-func migrationSplitFilterDataMatView(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "logs_split_filter_data_matview"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	// Materialized views are PostgreSQL-only; skip on other dialects.
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			if db.Dialector.Name() != "postgres" {
-				return nil
-			}
-			tx = tx.WithContext(ctx)
-			if err := tx.Exec("DROP MATERIALIZED VIEW IF EXISTS mv_logs_filterdata CASCADE").Error; err != nil {
-				return fmt.Errorf("failed to drop legacy mv_logs_filterdata: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			// No rollback — ensureMatViews recreates the per-dim views on next startup.
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while splitting filter-data matview: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddOCROutputColumn adds the ocr_output column to the Log table
 func migrationAddOCROutputColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_ocr_output_column"
@@ -4324,13 +4267,6 @@ func migrationAddServedModelColumn(ctx context.Context, db *gorm.DB, logger sche
 		return fmt.Errorf("error while adding served model column: %s", err.Error())
 	}
 	return nil
-}
-
-// smallTableForPlainIndex decides when a logstore migration builds an index
-// without CONCURRENTLY; see postgresconn.TableIsSmall. A variable only so tests
-// can force the concurrent path.
-var smallTableForPlainIndex = func(tx *gorm.DB, table string) (bool, error) {
-	return postgresconn.TableIsSmall(tx, table, postgresconn.DefaultSmallTableMaxBytes, postgresconn.DefaultSmallTableMaxRows)
 }
 
 // migrationAddEmbeddingInputColumn adds the embedding_input column to the logs table.

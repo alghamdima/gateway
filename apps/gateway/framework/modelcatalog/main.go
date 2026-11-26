@@ -48,8 +48,6 @@ type ModelCatalog struct {
 	// sheet pays the full-table capability scan once per generation, not per request.
 	maxOutputTokens *gencache.Cache[int]
 
-	syncMu sync.RWMutex
-
 	shouldSyncGate func(ctx context.Context) bool
 	afterSyncHook  func(ctx context.Context)
 

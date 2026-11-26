@@ -3489,23 +3489,6 @@ func shouldSkipInlineDataForStreamingContext(ctx *schemas.BifrostContext) bool {
 	return false
 }
 
-// extractSSEJSONData returns the JSON payload for SSE "data:" lines.
-// It skips comments, control fields (event/id/retry), empty lines, and [DONE].
-func extractSSEJSONData(line []byte) ([]byte, bool) {
-	line = bytes.TrimSpace(line)
-	if len(line) == 0 || line[0] == ':' {
-		return nil, false
-	}
-	if !bytes.HasPrefix(line, []byte("data:")) {
-		return nil, false
-	}
-	data := bytes.TrimSpace(line[len("data:"):])
-	if len(data) == 0 || bytes.Equal(data, []byte("[DONE]")) {
-		return nil, false
-	}
-	return data, true
-}
-
 // readNextSSEDataLine reads the next SSE `data:` line from a streaming response.
 // It avoids scanner growth on oversized lines by reading fragments and discarding
 // inlineData lines when skipInlineData is enabled.

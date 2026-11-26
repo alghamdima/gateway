@@ -2459,3 +2459,9 @@ func TestSelectWeightedTargetSplitFollowsTheWeights(t *testing.T) {
 		})
 	}
 }
+
+// newTestRuleStore builds an empty rule cache backed by no config store; tests add rules
+// through UpsertRule.
+func newTestRuleStore() (*LocalStore, error) {
+	return NewLocalStore(context.Background(), NewMockLogger(), nil)
+}

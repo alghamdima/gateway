@@ -106,7 +106,7 @@ func (p *reloadVirtualKeyPlugin) GetGovernanceStore() governance.GovernanceStore
 func TestReloadVirtualKeyAvoidsGovernanceSnapshot(t *testing.T) {
 	handlers.SetLogger(noopTestLogger{})
 	ctx := context.Background()
-	baseStore, err := governance.NewLocalGovernanceStore(ctx, governance.NewMockLogger(), nil, &configstore.GovernanceConfig{}, nil, nil)
+	baseStore, err := governance.NewLocalGovernanceStore(ctx, noopTestLogger{}, nil, &configstore.GovernanceConfig{}, nil, nil)
 	if err != nil {
 		t.Fatalf("create governance store: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestReloadVirtualKeysMatchesPerKeyReload(t *testing.T) {
 	logger = noopTestLogger{}
 	t.Cleanup(func() { logger = previousLogger })
 	ctx := context.Background()
-	baseStore, err := governance.NewLocalGovernanceStore(ctx, governance.NewMockLogger(), nil, &configstore.GovernanceConfig{}, nil, nil)
+	baseStore, err := governance.NewLocalGovernanceStore(ctx, noopTestLogger{}, nil, &configstore.GovernanceConfig{}, nil, nil)
 	if err != nil {
 		t.Fatalf("create governance store: %v", err)
 	}

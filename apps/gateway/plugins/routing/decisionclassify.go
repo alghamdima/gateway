@@ -44,11 +44,6 @@ func (p *RoutingPlugin) decisionExecutor() DecisionRequestExecutor {
 	return nil
 }
 
-// classifyDecisionComplexity asks the Complexity Router page's decision model.
-func (p *RoutingPlugin) classifyDecisionComplexity(ctx *schemas.BifrostContext, input complexity.ComplexityInput) complexityProposal {
-	return p.classifyRouterDecision(ctx, input, p.complexityRuntime())
-}
-
 // classifyRouterDecision requests one choice answer from the router's configured decision model for the user turn.
 func (p *RoutingPlugin) classifyRouterDecision(ctx *schemas.BifrostContext, input complexity.ComplexityInput, rt *modelRouterRuntime) complexityProposal {
 	executor := p.decisionExecutor()

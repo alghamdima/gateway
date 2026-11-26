@@ -408,3 +408,11 @@ func TestEnterpriseOnly_ActiveInEnterprise(t *testing.T) {
 		t.Error("enterprise-only flag in enterprise build should toggle normally")
 	}
 }
+
+// resetRegistryForTest clears the registry. Tests call this between cases
+// to keep registrations isolated; not exported beyond the package.
+func resetRegistryForTest() {
+	registryMu.Lock()
+	registry = map[string]FlagDef{}
+	registryMu.Unlock()
+}

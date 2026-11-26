@@ -214,11 +214,6 @@ func MarshalProviderRequest(v interface{}) ([]byte, error) {
 	return MarshalSorted(v)
 }
 
-// MarshalSortedIndent marshals v to indented JSON with map keys sorted alphabetically.
-func MarshalSortedIndent(v interface{}, prefix, indent string) ([]byte, error) {
-	return sortedAPI.MarshalIndent(v, prefix, indent)
-}
-
 // SetJSONField sets a field in JSON bytes without disturbing other fields' ordering.
 // Uses in-place byte manipulation for minimal allocations and preserves nested structure.
 func SetJSONField(data []byte, path string, value interface{}) ([]byte, error) {
@@ -272,23 +267,6 @@ func GetJSONField(data []byte, path string) gjson.Result {
 	return gjson.GetBytes(data, path)
 }
 
-// GetJSONSubtree extracts a JSON sub-tree as raw bytes by gjson path, without parsing the
-// entire document. Returns nil if the path does not exist. The returned slice is a copy
-// of the matched sub-tree bytes — safe to retain after the input is mutated or released.
-func GetJSONSubtree(data []byte, path string) []byte {
-	res := gjson.GetBytes(data, path)
-	if !res.Exists() {
-		return nil
-	}
-	raw := res.Raw
-	if raw == "" {
-		return nil
-	}
-	out := make([]byte, len(raw))
-	copy(out, raw)
-	return out
-}
-
 // MergeJSONObjects lays patch over base the way OpenAI applies a session.update: a key the patch leaves
 // out keeps its value, an object is merged key by key, and anything else, an array or a null included,
 // replaces the value, since a null can be a setting. An empty patch returns base and an empty base
@@ -322,22 +300,6 @@ func MergeJSONObjects(base, patch []byte) ([]byte, error) {
 		merged[key] = value
 	}
 	return MarshalSorted(merged)
-}
-
-// UnmarshalOrdered decodes JSON bytes into a *schemas.OrderedMap, preserving the key order
-// of the source document. Use this in preference to sonic.Unmarshal into a map[string]any
-// whenever the caller cares about field order (e.g., LLM prompt-cache keying or property
-// ordering surfaced to users).
-//
-// Note: the decoder under the hood is encoding/json (not sonic), because token-by-token
-// decoding is required to preserve key order. Outer dispatch goes through sonic, which
-// invokes OrderedMap's custom UnmarshalJSON.
-func UnmarshalOrdered(data []byte) (*schemas.OrderedMap, error) {
-	om := schemas.NewOrderedMap()
-	if err := sonic.Unmarshal(data, om); err != nil {
-		return nil, err
-	}
-	return om, nil
 }
 
 // logger is the global logger for the provider utils (thread-safe via atomic.Pointer).
@@ -602,13 +564,6 @@ func DoHTTPRequest(client *http.Client, req *http.Request) (*http.Response, erro
 		resp.Body = &upstreamTimingBody{inner: resp.Body, ctx: req.Context()}
 	}
 	return resp, err
-}
-
-// Deprecated: ConfigureRetry is now handled internally by ConfigureDialer.
-// This function is kept for backward compatibility but is no longer needed.
-func ConfigureRetry(client *fasthttp.Client) *fasthttp.Client {
-	client.RetryIfErr = network.StaleConnectionRetryIfErr
-	return client
 }
 
 // ConfigureDialer configures the client's connection behavior:
@@ -1010,10 +965,9 @@ func configureProxy(client *fasthttp.Client, proxyConfig *schemas.ProxyConfig, l
 	return client
 }
 
-// NetHTTPProxy resolves a ProxyConfig into what a net/http transport needs: the
-// Proxy func and, when the proxy carries a CA, a TLS config that trusts it. It is
-// the net/http counterpart of ConfigureProxy, so every stack a provider uses reads
-// proxy_config by the same rules.
+// NetHTTPProxyWithHopTLS resolves a ProxyConfig into what a net/http transport needs:
+// the Proxy func, targetTLS and hopTLS. It is the net/http counterpart of
+// ConfigureProxy, so every stack a provider uses reads proxy_config by the same rules.
 //
 // A nil config, type "none", or an http/socks5 config with no URL returns a nil
 // Proxy func: the caller keeps its own default. The UI saves "none" when the proxy
@@ -1021,15 +975,11 @@ func configureProxy(client *fasthttp.Client, proxyConfig *schemas.ProxyConfig, l
 //
 // net/http dispatches on the proxy URL's scheme (HTTP CONNECT for "http", SOCKS5
 // for "socks5"), so both types share one path.
-func NetHTTPProxy(proxyConfig *schemas.ProxyConfig) (func(*http.Request) (*url.URL, error), *tls.Config, error) {
-	proxy, targetTLS, _, err := NetHTTPProxyWithHopTLS(proxyConfig)
-	return proxy, targetTLS, err
-}
-
-// NetHTTPProxyWithHopTLS is NetHTTPProxy that also returns hopTLS, the TLS config for
-// the connection to an https:// proxy itself: its CA and skip_tls_verify. targetTLS
-// trusts the same CA (a TLS-inspecting proxy re-signs targets with it) and always
-// verifies, so the skip never reaches a target. hopTLS is a separate copy.
+//
+// hopTLS is the TLS config for the connection to an https:// proxy itself: its CA and
+// skip_tls_verify. targetTLS trusts the same CA (a TLS-inspecting proxy re-signs
+// targets with it) and always verifies, so the skip never reaches a target. hopTLS is
+// a separate copy.
 func NetHTTPProxyWithHopTLS(proxyConfig *schemas.ProxyConfig) (proxy func(*http.Request) (*url.URL, error), targetTLS, hopTLS *tls.Config, err error) {
 	if proxyConfig == nil {
 		return nil, nil, nil, nil
@@ -1140,7 +1090,7 @@ func EnvProxyFunc() func(*http.Request) (*url.URL, error) {
 }
 
 // ConfigureWebSocketProxy sets up a proxy for a WebSocket dialer from the provider's
-// proxy configuration, using the same rules as NetHTTPProxy.
+// proxy configuration, using the same rules as NetHTTPProxyWithHopTLS.
 // Unlike ConfigureProxy (which fails fast by swapping in an always-erroring fasthttp.DialFunc on a
 // client that's built once and reused silently), this returns an error directly: callers resolve proxy
 // configuration fresh on every dial, so a returned error surfaces immediately instead of on first use.
@@ -2265,23 +2215,6 @@ const (
 	StreamBodyReadError
 )
 
-func (k StreamBodyKind) String() string {
-	switch k {
-	case StreamBodyNonSSE:
-		return "non-sse"
-	case StreamBodyEmpty:
-		return "empty"
-	case StreamBodyIdleTimeout:
-		return "idle-timeout"
-	case StreamBodyClosed:
-		return "closed"
-	case StreamBodyReadError:
-		return "read-error"
-	default:
-		return "unknown"
-	}
-}
-
 // NonSSEStreamBody describes a 200 response that could not be consumed as SSE,
 // carrying the evidence needed to diagnose it: the provider Content-Type, a
 // bounded sample of what actually arrived, and the underlying read error.
@@ -3256,82 +3189,6 @@ func IsHTMLResponse(resp *fasthttp.Response, body []byte) bool {
 	return false
 }
 
-// Limit body size to prevent ReDoS on very large malicious responses
-const maxBodySize = 32 * 1024 // 32KB
-
-// ExtractHTMLErrorMessage extracts meaningful error information from an HTML response.
-// It attempts to find error messages from title tags, headers, and visible text.
-// UNUSED for now but could be useful in the future
-func ExtractHTMLErrorMessage(body []byte) string {
-	if len(body) > maxBodySize {
-		body = body[:maxBodySize]
-	}
-
-	bodyStr := string(body)
-	bodyLower := strings.ToLower(bodyStr)
-
-	// Try to extract title first
-	if idx := strings.Index(bodyLower, "<title>"); idx != -1 {
-		endIdx := strings.Index(bodyLower[idx:], "</title>")
-		if endIdx != -1 {
-			title := strings.TrimSpace(bodyStr[idx+7 : idx+endIdx])
-			if title != "" && title != "Error" {
-				return title
-			}
-		}
-	}
-
-	// Try to extract from h1, h2, h3 tags (common for error pages)
-	for _, tag := range []string{"h1", "h2", "h3"} {
-		pattern := fmt.Sprintf("<%s[^>]*>([^<]+)</%s>", tag, tag)
-		re := regexp.MustCompile("(?i)" + pattern)
-		if matches := re.FindStringSubmatch(bodyStr); len(matches) > 1 {
-			msg := strings.TrimSpace(matches[1])
-			if msg != "" {
-				return msg
-			}
-		}
-	}
-
-	// Try to extract from meta description
-	pattern := `<meta\s+name="description"\s+content="([^"]+)"`
-	re := regexp.MustCompile("(?i)" + pattern)
-	if matches := re.FindStringSubmatch(bodyStr); len(matches) > 1 {
-		msg := strings.TrimSpace(matches[1])
-		if msg != "" {
-			return msg
-		}
-	}
-
-	// Extract visible text: remove script and style tags, then extract text
-	// Remove script and style tags and their content
-	re = regexp.MustCompile(`(?i)<script[^>]*>.*?</script>|<style[^>]*>.*?</style>`)
-	cleaned := re.ReplaceAllString(bodyStr, "")
-
-	// Remove HTML tags
-	re = regexp.MustCompile(`<[^>]+>`)
-	cleaned = re.ReplaceAllString(cleaned, " ")
-
-	// Clean up whitespace and get first meaningful sentence
-	sentences := strings.FieldsFunc(cleaned, func(r rune) bool {
-		return r == '\n' || r == '\r'
-	})
-
-	for _, sentence := range sentences {
-		trimmed := strings.TrimSpace(sentence)
-		if len(trimmed) > 10 && len(trimmed) < 500 {
-			// Limit to first 200 chars to avoid very long messages
-			if len(trimmed) > 200 {
-				trimmed = trimmed[:200] + "..."
-			}
-			return trimmed
-		}
-	}
-
-	// If all else fails, return a generic message with status code context
-	return "HTML error response received from provider"
-}
-
 // JSONLParseResult holds parsed items and any line-level errors encountered during parsing.
 type JSONLParseResult struct {
 	Errors []schemas.BatchError
@@ -3558,42 +3415,6 @@ func ResponsesStreamRawIndex(responses []*schemas.BifrostResponsesStreamResponse
 		}
 	}
 	return fallback
-}
-
-// SendCreatedEventResponsesChunk sends a ResponsesStreamResponseTypeCreated event.
-func SendCreatedEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, startTime time.Time, responseChan chan *schemas.BifrostStreamChunk, postHookSpanFinalizer func(context.Context)) {
-	firstChunk := &schemas.BifrostResponsesStreamResponse{
-		Type:           schemas.ResponsesStreamResponseTypeCreated,
-		SequenceNumber: 0,
-		Response:       &schemas.BifrostResponsesResponse{},
-		ExtraFields: schemas.BifrostResponseExtraFields{
-			ChunkIndex: 0,
-			Latency:    time.Since(startTime).Milliseconds(),
-		},
-	}
-	// TODO add bifrost response pooling here
-	bifrostResponse := &schemas.BifrostResponse{
-		ResponsesStreamResponse: firstChunk,
-	}
-	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan, postHookSpanFinalizer)
-}
-
-// SendInProgressEventResponsesChunk sends a ResponsesStreamResponseTypeInProgress event
-func SendInProgressEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, startTime time.Time, responseChan chan *schemas.BifrostStreamChunk, postHookSpanFinalizer func(context.Context)) {
-	chunk := &schemas.BifrostResponsesStreamResponse{
-		Type:           schemas.ResponsesStreamResponseTypeInProgress,
-		SequenceNumber: 1,
-		Response:       &schemas.BifrostResponsesResponse{},
-		ExtraFields: schemas.BifrostResponseExtraFields{
-			ChunkIndex: 1,
-			Latency:    time.Since(startTime).Milliseconds(),
-		},
-	}
-	// TODO add bifrost response pooling here
-	bifrostResponse := &schemas.BifrostResponse{
-		ResponsesStreamResponse: chunk,
-	}
-	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan, postHookSpanFinalizer)
 }
 
 // BuildClientStreamChunk constructs a BifrostStreamChunk from post-hook results.
@@ -4693,15 +4514,6 @@ func WaitForStreamUsage(ctx *schemas.BifrostContext) bool {
 	return ok && waitForUsage
 }
 
-func ProviderIsResponsesAPINative(providerName schemas.ModelProvider) bool {
-	switch providerName {
-	case schemas.OpenAI, schemas.OpenRouter, schemas.Azure:
-		return true
-	default:
-		return false
-	}
-}
-
 // ReleaseStreamingResponse releases a streaming response by draining the body stream and releasing the response.
 func ReleaseStreamingResponse(ctx *schemas.BifrostContext, resp *fasthttp.Response) {
 	if resp == nil {
@@ -5195,29 +5007,6 @@ func completeDeferredSpan(ctx *schemas.BifrostContext, result *schemas.BifrostRe
 
 	// Clear the deferred span from TraceStore
 	tracer.ClearDeferredSpan(traceID)
-}
-
-// ModelMatchesDenylist reports whether any of the candidate model IDs matches
-// an entry in denylist, using both exact and base-model (SameBaseModel) matching.
-// Empty candidates are skipped. Returns false immediately if denylist is empty.
-func ModelMatchesDenylist(denylist []string, candidates ...string) bool {
-	if len(denylist) == 0 {
-		return false
-	}
-	for _, c := range candidates {
-		if c == "" {
-			continue
-		}
-		if slices.Contains(denylist, c) {
-			return true
-		}
-		for _, d := range denylist {
-			if schemas.SameBaseModel(d, c) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // jsonSchemaPatternKey is the JSON Schema keyword whose value is a regex.

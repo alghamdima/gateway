@@ -225,10 +225,6 @@ type GovernancePlugin struct {
 // Side effects:
 //   - Logs warnings when optional dependencies are missing.
 //   - May perform startup resets via the usage tracker when `configStore` is non-nil.
-//
-// Alternative entry point:
-//   - Use InitFromStore to inject a custom GovernanceStore implementation instead
-//     of constructing a LocalGovernanceStore internally.
 func Init(
 	ctx context.Context,
 	config *Config,
@@ -284,68 +280,6 @@ func Init(
 		requiredHeaders: requiredHeaders,
 		isEnterprise:    config != nil && config.IsEnterprise,
 		inMemoryStore:   inMemoryStore,
-
-		objectOwnershipEnforcedFn: objectOwnershipEnforcedFn,
-	}
-	return plugin, nil
-}
-
-// InitFromStore initializes and returns a governance plugin instance with a custom store.
-//
-// This constructor allows providing a custom GovernanceStore implementation instead of
-// creating a new LocalGovernanceStore. Use this when you need to:
-//   - Inject a custom store implementation for testing
-//   - Use a pre-configured store instance
-//   - Integrate with non-standard storage backends
-//
-// Parameters are the same as Init, except governanceConfig is replaced by governanceStore.
-// The governanceStore must not be nil, or an error is returned.
-//
-// See Init documentation for details on other parameters and behavior.
-func InitFromStore(
-	ctx context.Context,
-	config *Config,
-	logger schemas.Logger,
-	governanceStore GovernanceStore,
-	configStore configstore.ConfigStore,
-	modelCatalog *modelcatalog.ModelCatalog,
-	inMemoryStore InMemoryStore,
-) (*GovernancePlugin, error) {
-	if configStore == nil {
-		logger.Warn("governance plugin requires config store to persist data, running in memory only mode")
-	}
-	if modelCatalog == nil {
-		logger.Warn("governance plugin requires model catalog to calculate cost, all cost calculations will be skipped.")
-	}
-	if governanceStore == nil {
-		return nil, fmt.Errorf("governance store is nil")
-	}
-	// Handle nil config - use safe defaults
-	var isVkMandatory *bool
-	var requiredHeaders *[]string
-	var objectOwnershipEnforcedFn func() bool
-	if config != nil {
-		isVkMandatory = config.IsVkMandatory
-		requiredHeaders = config.RequiredHeaders
-		objectOwnershipEnforcedFn = config.ObjectOwnershipEnforced
-	}
-	resolver := NewBudgetResolver(governanceStore, modelCatalog, logger, inMemoryStore)
-	tracker := NewUsageTracker(ctx, governanceStore, resolver, configStore, logger)
-	ctx, cancelFunc := context.WithCancel(ctx)
-	plugin := &GovernancePlugin{
-		ctx:             ctx,
-		cancelFunc:      cancelFunc,
-		store:           governanceStore,
-		resolver:        resolver,
-		tracker:         tracker,
-		configStore:     configStore,
-		modelCatalog:    modelCatalog,
-		logger:          logger,
-		inMemoryStore:   inMemoryStore,
-		isVkMandatory:   isVkMandatory,
-		cfgMutex:        sync.RWMutex{},
-		requiredHeaders: requiredHeaders,
-		isEnterprise:    config != nil && config.IsEnterprise,
 
 		objectOwnershipEnforcedFn: objectOwnershipEnforcedFn,
 	}
@@ -986,7 +920,7 @@ func (p *GovernancePlugin) decide(ctx *schemas.BifrostContext, result *Evaluatio
 //
 // Once per request, not per attempt: what a request may reach is a fact about the caller, and a
 // request that fails over changes its provider, not its caller. What an attempt answers to in
-// limits is settled separately, once its provider and model are known (see resolveLimits).
+// limits is settled separately, once its provider and model are known (see resolveLimitsWith).
 //
 // Resolving is the store's answer to what permits the request carries, folded under one
 // composition mode. Because the store decides that, a deployment resolving permit holders beyond
@@ -1113,7 +1047,7 @@ func (p *GovernancePlugin) aliasTargets(ctx *schemas.BifrostContext) grant.Alias
 	}
 }
 
-// resolveLimits settles the limits an attempt answers to, now that the provider and model it will
+// resolveLimitsWith settles the limits an attempt answers to, now that the provider and model it will
 // use are known, and records them on the request's grant for everything downstream.
 //
 // Until this runs, only the limits that can tell one provider from another are consulted, by load
@@ -1133,17 +1067,9 @@ func (p *GovernancePlugin) aliasTargets(ctx *schemas.BifrostContext) grant.Alias
 // composes several possible payers settles there on who pays, and this only records the answer. An
 // error is a request whose payers cannot be settled at all; nothing is recorded for it, and the
 // funnel refuses it rather than serving it against half an answer.
-func resolveLimits(ctx *schemas.BifrostContext, store GovernanceStore, provider schemas.ModelProvider, model string) (schemas.Limits, error) {
-	g := ctx.Grant()
-	if g == nil {
-		return nil, nil
-	}
-	return resolveLimitsWith(ctx, store, g.Access(), provider, model)
-}
-
-// resolveLimitsWith is resolveLimits over a given access rather than the grant's own, for a request
-// whose model check used a different one (see literalAccessFor). The grant is still where the
-// settled limits are recorded.
+//
+// access is the grant's own, or a different one for a request whose model check used one (see
+// literalAccessFor). The grant is still where the settled limits are recorded.
 func resolveLimitsWith(ctx *schemas.BifrostContext, store GovernanceStore, access schemas.Access, provider schemas.ModelProvider, model string) (schemas.Limits, error) {
 	g := ctx.Grant()
 	if g == nil {
@@ -1962,8 +1888,8 @@ func (p *GovernancePlugin) ReportUsage(ctx context.Context, usage jobaccounting.
 // They are missing from usage.BudgetIDs by construction: those ids were collected
 // while the request was in flight, and a batch create carries no top-level model
 // (each input-file row names its own), so only the all-models wildcards matched.
-// A downstream consumer's per-model limits (e.g. an access profile's, registered via
-// RegisterExtraScopedIDsResolver) materialise as configs naming exactly one model and
+// A downstream consumer's per-model limits (e.g. an access profile's, from a registered
+// extra-scoped-IDs resolver, see collectExtraScopedIDs) materialise as configs naming exactly one model and
 // provider, which is why a model-level budget never moved for a batch. Settlement does
 // know the models, so each one is resolved and charged with its own share here.
 //

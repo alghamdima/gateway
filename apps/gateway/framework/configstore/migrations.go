@@ -227,22 +227,17 @@ func pendingMigrationStepIDs(ctx context.Context, db *gorm.DB, steps []migration
 	return migrator.PendingIDs(ctx, db, migrator.DefaultOptions, migrationStepIDs(steps))
 }
 
-// migrationStepLockRetry tunes how runMigrationSteps retries a step that fails
+// migrationStepLockRetry tunes how runMigrationStepsWithRetry retries a step that fails
 // on a lock timeout. The zero value takes postgresconn's defaults; a variable
 // only so tests can shrink the budget and backoff.
 var migrationStepLockRetry postgresconn.LockRetryOptions
 
-// runMigrationSteps runs migration steps in their declared order. It reads the
-// pending IDs once and skips steps whose IDs are all recorded, so a deploy with
+// runMigrationStepsWithRetry runs migration steps in their declared order. It reads
+// the pending IDs once and skips steps whose IDs are all recorded, so a deploy with
 // one new migration does not pay a round trip per already-applied step. If the
 // preflight read fails, every step runs and each one checks its own row. A step
-// that fails on a lock timeout is retried within postgresconn's retry budget.
-func runMigrationSteps(ctx context.Context, db *gorm.DB, logger schemas.Logger, steps []migrationStep) error {
-	return runMigrationStepsWithRetry(ctx, db, logger, steps, migrationStepLockRetry)
-}
-
-// runMigrationStepsWithRetry is runMigrationSteps with explicit lock-timeout
-// retry options; a zero budget takes postgresconn's default.
+// that fails on a lock timeout is retried within the retry budget; a zero budget
+// takes postgresconn's default.
 func runMigrationStepsWithRetry(ctx context.Context, db *gorm.DB, logger schemas.Logger, steps []migrationStep, retry postgresconn.LockRetryOptions) error {
 	pending, err := pendingMigrationStepIDs(ctx, db, steps)
 	var pendingSet map[string]struct{}

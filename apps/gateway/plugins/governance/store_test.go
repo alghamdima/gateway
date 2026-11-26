@@ -3101,3 +3101,15 @@ func TestGovernanceStore_ResetDoesNotRevertAConcurrentTeamEdit(t *testing.T) {
 	assert.Equal(t, "customer-b", *final.CustomerID, "the edit is kept")
 	assert.Zero(t, final.Budgets[0].CurrentUsage, "and the reset still applies")
 }
+
+// RegisterExtraScopedIDsResolver adds fn to the resolvers consulted by
+// CollectModelScopedGovernanceIDs. Intended to be called once at process
+// startup; safe to call concurrently.
+func RegisterExtraScopedIDsResolver(fn ExtraScopedIDsResolver) {
+	if fn == nil {
+		return
+	}
+	extraScopedIDsResolversMu.Lock()
+	extraScopedIDsResolvers = append(extraScopedIDsResolvers, fn)
+	extraScopedIDsResolversMu.Unlock()
+}

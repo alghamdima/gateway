@@ -7,11 +7,9 @@ import (
 
 // Attributes renders the typed span payload back into the flat attribute map the
 // connectors read today. It exists so connectors can migrate to the typed record
-// one at a time; TestAttributesShimMatchesLegacy pins it to the output of
-// framework/tracing's Populate* functions.
+// one at a time.
 //
-// Renders only what the Populate* functions in framework/tracing emit. The
-// governance dimensions, retry count and fallback index live on LLMSpanData for
+// Renders only the LLM-call attributes. The governance dimensions, retry count and fallback index live on LLMSpanData for
 // connectors to read, but are written onto the span by core/spanenrichment.go
 // and core/bifrost.go, so rendering them here would double-write them.
 //
@@ -510,12 +508,6 @@ func usesInputTokenDetailsNamespace(rt RequestType) bool {
 
 func setIfNotEmpty(attrs map[string]any, key, value string) {
 	if value != "" {
-		attrs[key] = value
-	}
-}
-
-func setIfNotEmptySlice(attrs map[string]any, key string, value []string) {
-	if len(value) > 0 {
 		attrs[key] = value
 	}
 }

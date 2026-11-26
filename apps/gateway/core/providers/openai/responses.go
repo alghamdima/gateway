@@ -311,15 +311,6 @@ func responsesUsesPromptCacheBreakpoints(caps schemas.ModelCaps, provider schema
 	}
 }
 
-// responsesToolOutputBlocks returns the block-form output of a function_call_output
-// item, or nil when the item is not one or its output is a bare string.
-func responsesToolOutputBlocks(msg *schemas.ResponsesMessage) []schemas.ResponsesMessageContentBlock {
-	if msg.ResponsesToolMessage == nil || msg.ResponsesToolMessage.Output == nil {
-		return nil
-	}
-	return msg.ResponsesToolMessage.Output.ResponsesFunctionToolCallOutputBlocks
-}
-
 // isMarkableResponsesInputBlock reports whether a message content block has a
 // documented home for prompt_cache_breakpoint. input_text is documented by both
 // OpenAI and OpenRouter; input_image and input_file only by OpenAI.

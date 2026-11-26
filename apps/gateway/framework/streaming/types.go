@@ -212,13 +212,6 @@ const (
 	StreamStateEnded
 )
 
-// getLastChatChunk returns the chunk with the highest ChunkIndex (contains metadata like TokenUsage, Cost)
-func (sa *StreamAccumulator) getLastChatChunk() *ChatStreamChunk {
-	sa.mu.Lock()
-	defer sa.mu.Unlock()
-	return sa.getLastChatChunkLocked()
-}
-
 // getLastChatChunkLocked returns the chunk with the highest ChunkIndex.
 // MUST be called with sa.mu already held.
 func (sa *StreamAccumulator) getLastChatChunkLocked() *ChatStreamChunk {
@@ -250,13 +243,6 @@ func (sa *StreamAccumulator) getChatFinishReasonLocked() *string {
 		}
 	}
 	return finishReason
-}
-
-// getLastResponsesChunk returns the chunk with the highest ChunkIndex (contains metadata like TokenUsage, Cost)
-func (sa *StreamAccumulator) getLastResponsesChunk() *ResponsesStreamChunk {
-	sa.mu.Lock()
-	defer sa.mu.Unlock()
-	return sa.getLastResponsesChunkLocked()
 }
 
 // getLastResponsesChunkLocked returns the chunk with the highest ChunkIndex.

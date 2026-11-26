@@ -4913,17 +4913,6 @@ func TestGetVirtualKeysPaginated_MetadataFiltersAndSearch(t *testing.T) {
 	}
 }
 
-// oauthSweepPGSchema keeps the abandoned-config race test's tables apart from
-// the shared test schema.
-const oauthSweepPGSchema = "configstore_oauth_sweep_test"
-
-// orphanSince marks a credential row orphaned since age ago, without the update
-// moving updated_at to now.
-func orphanSince(t *testing.T, store *RDBConfigStore, model any, id string, age time.Duration) {
-	t.Helper()
-	require.NoError(t, store.DB().Model(model).Where("id = ?", id).UpdateColumns(map[string]any{"status": "orphaned", "updated_at": time.Now().Add(-age)}).Error)
-}
-
 // Saving by target updates the existing row in place: same ID and created_at,
 // new patches. Delete reports a missing row as ErrNotFound.
 func TestDatasheetOverride_UpsertByTargetAndDelete(t *testing.T) {

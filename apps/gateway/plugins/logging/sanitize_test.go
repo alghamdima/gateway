@@ -1,10 +1,8 @@
 package logging
 
 import (
-	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/logstore"
@@ -81,45 +79,5 @@ func TestSanitizeErrorForLoggingNilError(t *testing.T) {
 	}
 	if entry.ErrorDetails != "" {
 		t.Error("nil error should leave ErrorDetails empty")
-	}
-}
-
-// Update-path regression: updateLogEntry must sanitize UpdateLogData.ErrorDetails
-// before SerializeFields copies it into the error_details column update.
-func TestUpdateLogEntrySanitizesErrorDetails(t *testing.T) {
-	store := newTestStore(t)
-	plugin := &LoggerPlugin{
-		store:  store,
-		logger: testLogger{},
-	}
-
-	requestID := "req-err-update"
-	initial := &InitialLogData{
-		Object:   "chat_completion",
-		Provider: "openai",
-		Model:    "gpt-4o-mini",
-	}
-	if err := plugin.insertInitialLogEntry(context.Background(), requestID, "", time.Now().UTC(), 0, nil, initial); err != nil {
-		t.Fatalf("insertInitialLogEntry() error = %v", err)
-	}
-
-	update := &UpdateLogData{
-		Status:       "error",
-		ErrorDetails: errorWithRawPayloads(),
-	}
-	if err := plugin.updateLogEntry(context.Background(), requestID, "", "", 10, "", "", "", "", 0, nil, "", update, false); err != nil {
-		t.Fatalf("updateLogEntry() error = %v", err)
-	}
-
-	logEntry, err := store.FindByID(context.Background(), requestID)
-	if err != nil {
-		t.Fatalf("FindByID() error = %v", err)
-	}
-	if strings.Contains(logEntry.ErrorDetails, "RAW_REQUEST_MARKER") ||
-		strings.Contains(logEntry.ErrorDetails, "RAW_RESPONSE_MARKER") {
-		t.Errorf("stored error_details must not contain raw payloads when content logging is disabled, got %q", logEntry.ErrorDetails)
-	}
-	if !strings.Contains(logEntry.ErrorDetails, "provider rejected request") {
-		t.Errorf("stored error_details should still contain the error message, got %q", logEntry.ErrorDetails)
 	}
 }

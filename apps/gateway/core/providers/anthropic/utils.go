@@ -4453,12 +4453,6 @@ func filterEnumValuesByType(enumValues []interface{}, schemaType string) []inter
 	return filtered
 }
 
-// NormalizeSchemaForAnthropic is the exported entry point for normalizeSchemaForAnthropic,
-// used by providers (e.g. Bedrock) that share Anthropic's schema validation rules.
-func NormalizeSchemaForAnthropic(schema map[string]interface{}) map[string]interface{} {
-	return normalizeSchemaForAnthropic(schema)
-}
-
 // sjsonEscapeKey escapes characters that have special meaning in sjson path
 // syntax. Necessary for property names that include such characters; for the
 // common JSON Schema case (alphanumeric + underscore + $ + -) this is a no-op.
@@ -4516,7 +4510,7 @@ func filterEnumValuesByTypeRaw(values []gjson.Result, schemaType string) []gjson
 }
 
 // NormalizeSchemaForAnthropicRaw is the json.RawMessage equivalent of
-// NormalizeSchemaForAnthropic. Operates on raw JSON bytes throughout via
+// normalizeSchemaForAnthropic. Operates on raw JSON bytes throughout via
 // sjson/gjson; produces functionally identical output to the map-based
 // version. Use this when the caller already has the schema as raw bytes
 // and wants to avoid a map round-trip.

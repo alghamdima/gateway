@@ -612,10 +612,3 @@ func TestProviderConfig_PassthroughSurvivesRedactionAndHash(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, without, off, "an empty allowlist is a different config from no policy")
 }
-
-func mustMarshal(t *testing.T, v any) []byte {
-	t.Helper()
-	b, err := json.Marshal(v)
-	require.NoError(t, err)
-	return b
-}

@@ -136,11 +136,6 @@ func (bg *background) reap(ctx context.Context) {
 	}
 }
 
-// flush waits until every accepted settlement has been written or given up on.
-func (bg *background) flush() {
-	bg.pending.Wait()
-}
-
 // stop ends the reaper and lets the workers write what is queued, for at most the plugin's
 // shutdown grace. Settlements that arrive afterwards are written by their callers. What is
 // still unwritten when the grace runs out is lost with the process: the reaper of another

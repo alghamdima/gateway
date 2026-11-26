@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"strconv"
 
 	"github.com/google/uuid"
 )
@@ -15,13 +14,6 @@ func getEnvWithDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
-}
-
-func getEnvWithDefaultInt(key string, defaultValue int) (int, error) {
-	if value := os.Getenv(key); value != "" {
-		return strconv.Atoi(value)
-	}
-	return defaultValue, nil
 }
 
 func generateUUID() string {

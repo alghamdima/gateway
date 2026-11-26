@@ -2721,23 +2721,6 @@ func (m *TracingMiddleware) GetTracer() *tracing.Tracer {
 	return m.tracer.Load()
 }
 
-// GetObservabilityPlugins filters and returns only observability plugins from a list of plugins.
-// Uses Go type assertion to identify plugins implementing the ObservabilityPlugin interface.
-func GetObservabilityPlugins(plugins []schemas.BasePlugin) []schemas.ObservabilityPlugin {
-	if len(plugins) == 0 {
-		return nil
-	}
-
-	obsPlugins := make([]schemas.ObservabilityPlugin, 0)
-	for _, plugin := range plugins {
-		if obsPlugin, ok := plugin.(schemas.ObservabilityPlugin); ok {
-			obsPlugins = append(obsPlugins, obsPlugin)
-		}
-	}
-
-	return obsPlugins
-}
-
 // AuthBypassedMiddleware marks every request as admitted without a credential check. The
 // server installs it in place of AuthMiddleware.APIMiddleware when there is no config store
 // (and so no auth at all), so handlers that require genuine auth for dangerous changes - which

@@ -292,7 +292,7 @@ func newPostgresLogStore(ctx context.Context, config *PostgresConfig, logger sch
 		if db.Dialector.Name() != "postgres" || refreshInterval <= 0 {
 			return
 		}
-		if err := ensureMatViewsLimited(maintenanceCtx, db, d.matViewLimits); err != nil {
+		if err := ensureMatViews(maintenanceCtx, db, d.matViewLimits); err != nil {
 			logger.Warn(fmt.Sprintf("logstore: matview creation failed: %s (dashboard queries will use raw tables)", err))
 			return
 		}
@@ -304,7 +304,7 @@ func newPostgresLogStore(ctx context.Context, config *PostgresConfig, logger sch
 		initialCtx, cancelInitial := context.WithTimeout(maintenanceCtx, refreshTimeout)
 		// Spaced like a periodic tick: during a rolling restart every new process
 		// runs this, and a view another replica refreshed moments ago is skipped.
-		err := refreshMatViewsLimited(initialCtx, db, refreshInterval, d.matViewLimits)
+		err := refreshMatViews(initialCtx, db, refreshInterval, d.matViewLimits)
 		cancelInitial()
 		if err != nil {
 			logger.Warn(fmt.Sprintf("logstore: initial matview refresh failed: %s", err))

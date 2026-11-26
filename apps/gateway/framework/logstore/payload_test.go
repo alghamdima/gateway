@@ -1,10 +1,10 @@
 package logstore
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/objectstore"
 	"github.com/stretchr/testify/assert"
@@ -79,7 +79,7 @@ func TestExtractPayload_RoundTrip(t *testing.T) {
 	assert.Empty(t, log.PluginLogs)
 
 	// Marshal and merge back.
-	data, err := MarshalPayload(payload)
+	data, err := sonic.Marshal(payload)
 	require.NoError(t, err)
 
 	// Metadata is DB-authoritative: the snapshot carries a backup copy, but
@@ -306,25 +306,6 @@ func TestHybridObjectKeysFollowFormat(t *testing.T) {
 
 	h.setObjectFormat(objectstore.FormatParquet, objectstore.CompressionSnappy)
 	assert.Equal(t, objectstore.CompressionSnappy, h.parquetCompression)
-}
-
-func marshalStrictV1TestPayload(t *testing.T, value any) *string {
-	t.Helper()
-	if value == nil {
-		return nil
-	}
-	data, err := json.Marshal(value)
-	require.NoError(t, err)
-	body := string(data)
-	return &body
-}
-
-func TestPayloadFieldNames(t *testing.T) {
-	fields := PayloadFieldNames()
-	assert.True(t, len(fields) > 0)
-	// Verify it's a copy.
-	fields[0] = "modified"
-	assert.NotEqual(t, "modified", payloadFields[0])
 }
 
 func strPtr(s string) *string {

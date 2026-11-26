@@ -65,16 +65,6 @@ func SetCacheLookupOnContext(ctx *BifrostContext, metadata *BifrostCacheMetadata
 	return true
 }
 
-// Deprecated: use CacheMetadataFromContext.
-func CacheDebugFromContext(ctx *BifrostContext) (*BifrostCacheMetadata, bool) {
-	return CacheMetadataFromContext(ctx)
-}
-
-// Deprecated: use SetCacheMetadataOnContext.
-func SetCacheDebugOnContext(ctx *BifrostContext, metadata *BifrostCacheMetadata) bool {
-	return SetCacheMetadataOnContext(ctx, metadata)
-}
-
 // cloneString returns an owned copy of value.
 func cloneString(value *string) *string {
 	if value == nil {

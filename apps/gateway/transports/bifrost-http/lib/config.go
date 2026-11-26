@@ -113,14 +113,8 @@ const (
 	SourceOfTruthConfigJSON = "config.json"
 )
 
-// getWeight safely dereferences a *float64 weight pointer, returning 1.0 as default if nil.
-// This allows distinguishing between "not set" (nil -> 1.0) and "explicitly set to 0" (0.0).
-func getWeight(w *float64) float64 {
-	if w == nil {
-		return 1.0
-	}
-	return *w
-}
+// DefaultConfigSchemaURL is the published config.schema.json a config file names as its "$schema".
+const DefaultConfigSchemaURL = "https://www.getbifrost.ai/schema"
 
 // BuiltinPluginNames is the canonical list of built-in plugin names.
 // It is the single source of truth — update here when adding or removing a built-in plugin.
@@ -2790,15 +2784,6 @@ var (
 	virtualKeyPruneGuard   VirtualKeyPruneGuard
 )
 
-// RegisterVirtualKeyPruneGuard installs the guard consulted by
-// pruneGovernanceConfigToFile before deleting virtual keys. Must be called before
-// LoadConfig.
-func RegisterVirtualKeyPruneGuard(fn VirtualKeyPruneGuard) {
-	virtualKeyPruneGuardMu.Lock()
-	virtualKeyPruneGuard = fn
-	virtualKeyPruneGuardMu.Unlock()
-}
-
 // GovernanceLimitPruneGuard reports which of the candidate budgets and rate limits must survive the
 // source_of_truth config.json prune although governance.budgets and governance.rate_limits do not
 // declare them: rows another owner holds, such as the enterprise build's access profiles, which their
@@ -2809,14 +2794,6 @@ var (
 	governanceLimitPruneGuardMu sync.RWMutex
 	governanceLimitPruneGuard   GovernanceLimitPruneGuard
 )
-
-// RegisterGovernanceLimitPruneGuard installs the guard consulted by pruneGovernanceConfigToFile
-// before deleting budgets and rate limits. Must be called before LoadConfig. Passing nil clears it.
-func RegisterGovernanceLimitPruneGuard(fn GovernanceLimitPruneGuard) {
-	governanceLimitPruneGuardMu.Lock()
-	governanceLimitPruneGuard = fn
-	governanceLimitPruneGuardMu.Unlock()
-}
 
 // ConfigStoreReadyHook runs once LoadConfig has opened the config store, before anything from
 // config.json is written to it. Enterprise registers one to install the governance plugin's legacy
@@ -2829,14 +2806,6 @@ var (
 	configStoreReadyHookMu sync.RWMutex
 	configStoreReadyHook   ConfigStoreReadyHook
 )
-
-// RegisterConfigStoreReadyHook installs the hook LoadConfig calls once its config store is open.
-// Must be called before LoadConfig. Passing nil clears it.
-func RegisterConfigStoreReadyHook(fn ConfigStoreReadyHook) {
-	configStoreReadyHookMu.Lock()
-	configStoreReadyHook = fn
-	configStoreReadyHookMu.Unlock()
-}
 
 // runConfigStoreReadyHook calls the registered hook with the store LoadConfig just opened.
 func runConfigStoreReadyHook(ctx context.Context, store configstore.ConfigStore) {
@@ -5573,18 +5542,6 @@ func unlinkUndeclaredTierBudgets(ctx context.Context, tx *gorm.DB, held, declare
 	return nil
 }
 
-// isVirtualKeyTier reports whether a model config is one of a key's all-models tiers.
-func isVirtualKeyTier(ctx context.Context, tx *gorm.DB, mcID, vkID string) (bool, error) {
-	var count int64
-	if err := tx.WithContext(ctx).Model(&configstoreTables.TableModelConfig{}).
-		Where("id = ? AND scope = ? AND scope_id = ? AND model_name = ?",
-			mcID, configstoreTables.ModelConfigScopeVirtualKey, vkID, configstoreTables.ModelConfigAllModels).
-		Count(&count).Error; err != nil {
-		return false, fmt.Errorf("failed to classify model config %s: %w", mcID, err)
-	}
-	return count > 0, nil
-}
-
 // clearFileOwnedTierRateLimit drops a tier's rate limit only when the file declares that row.
 func clearFileOwnedTierRateLimit(ctx context.Context, tx *gorm.DB, mcID string, fileRateLimitIDs map[string]bool) error {
 	var mc configstoreTables.TableModelConfig
@@ -5624,34 +5581,6 @@ func clearFileOwnedTierRateLimitOf(ctx context.Context, tx *gorm.DB, vkID string
 		return nil
 	}
 	return clearFileOwnedTierRateLimit(ctx, tx, ids[0], fileRateLimitIDs)
-}
-
-// setVirtualKeyTierRateLimit points an existing tier at a rate limit, or clears it. Never creates one.
-func setVirtualKeyTierRateLimit(ctx context.Context, tx *gorm.DB, vkID string, provider *string, rateLimitID *string) error {
-	q := tx.WithContext(ctx).Model(&configstoreTables.TableModelConfig{}).
-		Where("scope = ? AND scope_id = ? AND model_name = ?",
-			configstoreTables.ModelConfigScopeVirtualKey, vkID, configstoreTables.ModelConfigAllModels)
-	if provider == nil {
-		q = q.Where("provider IS NULL")
-	} else {
-		q = q.Where("provider = ?", *provider)
-	}
-	var ids []string
-	if err := q.Limit(1).Pluck("id", &ids).Error; err != nil {
-		return fmt.Errorf("failed to look up the tier of virtual key %s: %w", vkID, err)
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	var declared any
-	if rateLimitID != nil {
-		declared = *rateLimitID
-	}
-	if err := tx.WithContext(ctx).Model(&configstoreTables.TableModelConfig{}).
-		Where("id = ?", ids[0]).UpdateColumn("rate_limit_id", declared).Error; err != nil {
-		return fmt.Errorf("failed to set rate limit of the tier of virtual key %s: %w", vkID, err)
-	}
-	return nil
 }
 
 // clearDirectRateLimitReference drops a key's or provider config's rate_limit_id once its tier holds it.

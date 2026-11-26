@@ -227,8 +227,8 @@ func (provider *BedrockProvider) resolveSurface(ctx *schemas.BifrostContext, key
 //
 // The surface is routing (identifier form, key ARN) and stays code; it decides what
 // the wire can structurally carry, and the datasheet row can only narrow within
-// that. Reads the surface directly rather than through routesToMantle to avoid a
-// second debug log line per attempt.
+// that. Reads the surface directly rather than through provider.resolveSurface to
+// avoid a second debug log line per attempt.
 func (provider *BedrockProvider) SupportsResponsesNamespaceTools(ctx *schemas.BifrostContext, key schemas.Key, model string) bool {
 	surface := resolveBedrockSurface(ctx, key, model)
 	// Converse has no namespace container, and neither does the Anthropic Messages
@@ -241,9 +241,4 @@ func (provider *BedrockProvider) SupportsResponsesNamespaceTools(ctx *schemas.Bi
 	// still switch it off for a model that turns out not to.
 	caps := schemas.ResolveModelCaps(schemas.BedrockMantle, schemas.ResolveCanonicalModel(ctx, model))
 	return caps.SupportsNamespaceTools(true)
-}
-
-// routesToMantle resolves the surface and logs the deciding rule.
-func (provider *BedrockProvider) routesToMantle(ctx *schemas.BifrostContext, key schemas.Key, model string) bool {
-	return provider.resolveSurface(ctx, key, model).isMantle()
 }

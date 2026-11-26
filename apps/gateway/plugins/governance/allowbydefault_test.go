@@ -52,35 +52,6 @@ func (m *mockInMemoryStore) GetMCPClientBySlug(slug string) (string, string, boo
 	return id, m.GetMCPClientNames()[id], true
 }
 
-// accessFor builds the access a key carries on its own, with the given clients open to every
-// key. The rules these tests pin (an explicit config owning its client, an open client granting
-// everything, a wildcard pattern) live in the permit and the fold, so they are asked of the
-// request's access rather than of the key directly.
-func accessFor(vk *configstoreTables.TableVirtualKey, openClients map[string]string) schemas.Access {
-	return grant.NewAccess([]schemas.Permit{vkPermit(vk, openClients)}, "", nil, "", nil)
-}
-
-// newPluginWithInMemoryStore builds a minimal GovernancePlugin wired with a mock InMemoryStore.
-func newPluginWithInMemoryStore(store InMemoryStore) *GovernancePlugin {
-	return &GovernancePlugin{inMemoryStore: store}
-}
-
-// buildVKWithMCPConfigs returns a VK that has explicit MCPConfigs for the given client.
-func buildVKWithMCPConfigs(clientID, clientName string, tools []string) *configstoreTables.TableVirtualKey {
-	return &configstoreTables.TableVirtualKey{
-		ID:   "vk-1",
-		Name: "test-vk",
-	}
-}
-
-// buildVKNoMCPConfigs returns a VK with no MCPConfigs at all.
-func buildVKNoMCPConfigs() *configstoreTables.TableVirtualKey {
-	return &configstoreTables.TableVirtualKey{
-		ID:   "vk-2",
-		Name: "test-vk-empty",
-	}
-}
-
 // ============================================================================
 // per-tool checks: AllowByDefault scenarios
 // ============================================================================

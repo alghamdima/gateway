@@ -91,30 +91,8 @@ var EnrichmentDims = []EnrichmentDim{
 	{Name: "business_unit_names", SpanAttr: AttrBifrostBusinessUnitNames, Multi: true, Tier: TierRecord},
 }
 
-// MetricSafeEnrichmentDims returns the bounded dimensions, in registry order.
-func MetricSafeEnrichmentDims() []EnrichmentDim {
-	out := make([]EnrichmentDim, 0, len(EnrichmentDims))
-	for _, d := range EnrichmentDims {
-		if d.MetricSafe() {
-			out = append(out, d)
-		}
-	}
-	return out
-}
-
-// HighCardinalityMetricEnrichmentDims returns the metric-safe dimensions plus the
-// unbounded ones, in registry order.
-func HighCardinalityMetricEnrichmentDims() []EnrichmentDim {
-	out := make([]EnrichmentDim, 0, len(EnrichmentDims))
-	for _, d := range EnrichmentDims {
-		if d.MetricAllowedHighCardinality() {
-			out = append(out, d)
-		}
-	}
-	return out
-}
-
-// HighCardinalityMetricEnrichmentDimNames is HighCardinalityMetricEnrichmentDims by name.
+// HighCardinalityMetricEnrichmentDimNames returns the names of the metric-safe dimensions plus
+// the unbounded ones, in registry order.
 func HighCardinalityMetricEnrichmentDimNames() []string {
 	out := make([]string, 0, len(EnrichmentDims))
 	for _, d := range EnrichmentDims {
@@ -125,16 +103,7 @@ func HighCardinalityMetricEnrichmentDimNames() []string {
 	return out
 }
 
-// EnrichmentDimNames returns every dimension name, in registry order.
-func EnrichmentDimNames() []string {
-	out := make([]string, len(EnrichmentDims))
-	for i, d := range EnrichmentDims {
-		out[i] = d.Name
-	}
-	return out
-}
-
-// MetricSafeEnrichmentDimNames is MetricSafeEnrichmentDims by name.
+// MetricSafeEnrichmentDimNames returns the names of the bounded dimensions, in registry order.
 func MetricSafeEnrichmentDimNames() []string {
 	out := make([]string, 0, len(EnrichmentDims))
 	for _, d := range EnrichmentDims {

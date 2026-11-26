@@ -514,39 +514,6 @@ func TestResolvePrivateNetworkTargetPolicy(t *testing.T) {
 	}
 }
 
-// TestCheckPrivateNetworkLiteral locks in the DNS-free variant used on the
-// proxied path: literals are judged by the same policy, bracketed IPv6 is
-// accepted, and a hostname is passed through untouched with no lookup.
-func TestCheckPrivateNetworkLiteral(t *testing.T) {
-	for _, tc := range []struct {
-		host string
-		want string
-	}{
-		{"169.254.169.254", "blocked connection to link-local address"},
-		{"[fe80::1]", "blocked connection to link-local address"},
-		{"0.0.0.0", "blocked connection to unspecified address"},
-		{"100.100.100.200", "blocked connection to cloud metadata endpoint"},
-		{"[fd00:ec2::254]", "blocked connection to cloud metadata endpoint"},
-		{"fd00:ec2::254", "blocked connection to cloud metadata endpoint"},
-	} {
-		if err := CheckPrivateNetworkLiteral(tc.host); err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Fatalf("%s: expected %q, got %v", tc.host, tc.want, err)
-		}
-	}
-	for _, host := range []string{"127.0.0.1", "[::1]", "10.0.0.5", "100.100.100.201"} {
-		if err := CheckPrivateNetworkLiteral(host); err != nil {
-			t.Fatalf("%s: expected permitted literal, got %v", host, err)
-		}
-	}
-	// A hostname is not resolved: .invalid never resolves (RFC 6761), and a
-	// name that would resolve to a blocked address is the proxy's concern.
-	for _, host := range []string{"mcp.invalid", "metadata.google.internal", ""} {
-		if err := CheckPrivateNetworkLiteral(host); err != nil {
-			t.Fatalf("%q: expected hostname to pass through without lookup, got %v", host, err)
-		}
-	}
-}
-
 // TestPrivateNetworkDialContextBlocksMetadataEndpoints proves the direct
 // dialer refuses the non-link-local metadata endpoints before any dial.
 func TestPrivateNetworkDialContextBlocksMetadataEndpoints(t *testing.T) {
@@ -626,22 +593,10 @@ func mustFailGet(t *testing.T, client *http.Client, rawURL, want string) {
 	}
 }
 
-// TestNewSSRFSafeHTTPClientRefusesLoopbackEntry: the strict client's dial
-// gate refuses a loopback destination outright, so the handler is never
-// reached.
-func TestNewSSRFSafeHTTPClientRefusesLoopbackEntry(t *testing.T) {
-	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("loopback target must never be reached through the strict client")
-	}))
-	defer internal.Close()
-	mustFailGet(t, NewSSRFSafeHTTPClient(5*time.Second), internal.URL, "blocked connection to non-public address")
-}
-
 // TestGuardedClientRedirectToLoopbackRefusedEndToEnd drives a real redirect
 // through http.Client with the strict redirect policy: the entry server
 // answers 302 to a loopback target, and the target must never see a request.
-// The strict dialer would refuse the loopback entry itself (see the test
-// above), so the entry hop is dialed plainly here and only the redirect
+// A strict dialer would refuse the loopback entry itself, so the entry hop is dialed plainly here and only the redirect
 // policy is strict - that isolates CheckRedirect as the layer under test.
 func TestGuardedClientRedirectToLoopbackRefusedEndToEnd(t *testing.T) {
 	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -660,32 +615,10 @@ func TestGuardedClientRedirectToLoopbackRefusedEndToEnd(t *testing.T) {
 	}
 }
 
-// TestNewSSRFSafeHTTPClientRefusesRedirectTargets exercises the strict
-// client's CheckRedirect directly against loopback, link-local, NAT64-wrapped
-// link-local, and non-http targets.
-func TestNewSSRFSafeHTTPClientRefusesRedirectTargets(t *testing.T) {
-	client := NewSSRFSafeHTTPClient(5 * time.Second)
-	for _, target := range []string{
-		"http://127.0.0.1:9/internal",
-		"http://169.254.169.254/latest/meta-data/",
-		"http://[64:ff9b::a9fe:a9fe]/latest/meta-data/",
-		"file:///etc/passwd",
-	} {
-		req, err := http.NewRequest(http.MethodGet, target, nil)
-		if err != nil {
-			t.Fatalf("new request %s: %v", target, err)
-		}
-		via := []*http.Request{{URL: &url.URL{Scheme: "https", Host: "entry.example"}}}
-		if err := client.CheckRedirect(req, via); err == nil {
-			t.Fatalf("redirect to %s must be refused", target)
-		}
-	}
-}
-
 // TestGuardedRedirectHopCap proves the hop cap: the sixth redirect is refused
 // even when every hop is otherwise acceptable.
 func TestGuardedRedirectHopCap(t *testing.T) {
-	client := NewSSRFSafeHTTPClient(5 * time.Second)
+	client := NewPrivateNetworkHTTPClient(5 * time.Second)
 	req, _ := http.NewRequest(http.MethodGet, "https://public.example/next", nil)
 	via := make([]*http.Request, maxRedirectHops)
 	for i := range via {
@@ -759,38 +692,6 @@ func TestGuardedRedirectViaProxyToleratesProxyOnlyDNS(t *testing.T) {
 	}
 }
 
-// TestNewSSRFSafeHTTPClientReachesConfiguredPrivateProxy pins that the SSRF-safe client
-// can use a global API proxy that sits on a private or loopback address, the normal
-// self-hosted setup. The proxy is dialed with the private-network policy; direct
-// destinations keep the public-only dialer, and the destination is still vetted before
-// it is handed to the proxy.
-func TestNewSSRFSafeHTTPClientReachesConfiguredPrivateProxy(t *testing.T) {
-	var seen atomic.Value
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen.Store(r.URL.Host)
-		_, _ = w.Write([]byte("via-proxy"))
-	}))
-	defer proxy.Close()
-	SetDefaultHTTPClientFactory(NewHTTPClientFactory(&GlobalProxyConfig{
-		Enabled: true, Type: GlobalProxyTypeHTTP, URL: proxy.URL, EnableForAPI: true,
-	}, nil))
-	t.Cleanup(func() { SetDefaultHTTPClientFactory(nil) })
-
-	client := NewSSRFSafeHTTPClient(5 * time.Second)
-	resp, err := client.Get("http://203.0.113.10/catalog.json")
-	if err != nil {
-		t.Fatalf("a loopback API proxy must be reachable, got %v", err)
-	}
-	resp.Body.Close()
-	if got, _ := seen.Load().(string); got != "203.0.113.10" {
-		t.Fatalf("proxy saw target %q, want 203.0.113.10", got)
-	}
-
-	if _, err := client.Get("http://10.0.0.5/catalog.json"); err == nil || !strings.Contains(err.Error(), "non-public") {
-		t.Fatalf("a private destination must still be refused before the proxy, got %v", err)
-	}
-}
-
 // TestGuardedRedirectViaProxyStillAppliesPolicyWhenResolvable: a proxied hop
 // is not a policy bypass. When the local resolver does answer, a hostname that
 // maps to a blocked address is refused before the proxy is asked for it.
@@ -824,7 +725,7 @@ func TestGuardedProxySelectorAppliesPolicyToHostnames(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sel := guardedProxySelector(proxy, checkPrivateNetworkPolicy, tc.resolver)
+			sel := guardedProxySelectorWith(proxy, checkPrivateNetworkPolicy, tc.resolver, true)
 			req, _ := http.NewRequest(http.MethodGet, tc.target, nil)
 			got, err := sel(req)
 			if tc.wantErr == "" {

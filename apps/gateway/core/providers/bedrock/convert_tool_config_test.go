@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maximhq/bifrost/core/providers/anthropic"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -1746,4 +1747,25 @@ func BenchmarkConverseToolStrict(b *testing.B) {
 			}
 		})
 	}
+}
+
+// collectBedrockServerTools runs params through the same filter as the request
+// path, then collectBedrockServerToolsFromFiltered.
+func collectBedrockServerTools(model string, params *schemas.ChatParameters) (serverTools []json.RawMessage, betaHeaders []string) {
+	if params == nil || len(params.Tools) == 0 {
+		return nil, nil
+	}
+	filtered, _ := anthropic.ValidateChatToolsForProvider(params.Tools, schemas.ResolveModelCaps(schemas.Bedrock, model))
+	return collectBedrockServerToolsFromFiltered(filtered)
+}
+
+// convertToolConfig runs params through the same filter as the request path,
+// then convertToolConfigFromFiltered.
+func convertToolConfig(model string, params *schemas.ChatParameters) *BedrockToolConfig {
+	if params == nil || len(params.Tools) == 0 {
+		return nil
+	}
+	filtered, _ := anthropic.ValidateChatToolsForProvider(params.Tools, schemas.ResolveModelCaps(schemas.Bedrock, model))
+	toolConfig, _, _ := convertToolConfigFromFiltered(nil, model, schemas.ResolveModelCaps(schemas.Bedrock, model), params, filtered)
+	return toolConfig
 }

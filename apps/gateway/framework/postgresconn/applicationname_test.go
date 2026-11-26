@@ -50,3 +50,11 @@ func TestWithApplicationName(t *testing.T) {
 		t.Fatalf("non-ASCII base not sanitized: %q", got)
 	}
 }
+
+// SetApplicationName sets the application_name prefix every store pool opened
+// after this call reports to Postgres, e.g. "bifrost-ip-10-0-1-13". Each store
+// appends its role ("-config", "-logs") so pg_stat_activity can attribute a
+// session to a node and a store. Empty disables it, which is the default.
+func SetApplicationName(base string) {
+	applicationNameBase.Store(base)
+}

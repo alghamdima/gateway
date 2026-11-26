@@ -288,16 +288,3 @@ func AppendGuardrailInterventionOnContext(ctx *BifrostContext, intervention Bifr
 		metadata.Interventions = append(metadata.Interventions, intervention)
 	})
 }
-
-// Deprecated: use BifrostGuardrailMetadata.
-type BifrostGuardrailDebug = BifrostGuardrailMetadata
-
-// Deprecated: use GuardrailMetadataFromContext.
-func GuardrailDebugFromContext(ctx *BifrostContext) (*BifrostGuardrailMetadata, bool) {
-	return GuardrailMetadataFromContext(ctx)
-}
-
-// Deprecated: use SetGuardrailMetadataOnContext.
-func SetGuardrailDebugOnContext(ctx *BifrostContext, metadata *BifrostGuardrailMetadata) bool {
-	return SetGuardrailMetadataOnContext(ctx, metadata)
-}

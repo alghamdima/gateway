@@ -90,8 +90,8 @@ func TestToolResultDocumentSurvivesGroupedConversion(t *testing.T) {
 
 func TestToolResultDocumentSurvivesConversion(t *testing.T) {
 	role := schemas.ResponsesInputMessageRoleUser
-	msgs := convertAnthropicContentBlocksToResponsesMessages(
-		nil, toolResultWithDocument(base64PDFSource()), &role, false, "")
+	msgs := convertAnthropicContentBlocksToResponsesMessagesOrdered(
+		nil, toolResultWithDocument(base64PDFSource()), &role, false, "", false)
 	assertDocumentSurvived(t, msgs)
 }
 
@@ -107,7 +107,7 @@ func TestToolResultDocumentWithoutTitleStaysUntitled(t *testing.T) {
 	role := schemas.ResponsesInputMessageRoleUser
 	for name, msgs := range map[string][]schemas.ResponsesMessage{
 		"grouped":   convertAnthropicContentBlocksToResponsesMessagesGrouped(blocks, &role, false),
-		"ungrouped": convertAnthropicContentBlocksToResponsesMessages(nil, blocks, &role, false, ""),
+		"ungrouped": convertAnthropicContentBlocksToResponsesMessagesOrdered(nil, blocks, &role, false, "", false),
 	} {
 		assertDocumentSurvived(t, msgs)
 		for _, msg := range msgs {

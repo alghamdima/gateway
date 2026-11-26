@@ -1698,19 +1698,6 @@ var (
 	rankingNameResolvers   = map[logstore.RankingDimension]RankingNameResolver{}
 )
 
-// RegisterRankingNameResolver installs the name resolver for a ranking
-// dimension, replacing the built-in one. A nil fn removes the registration.
-// Intended to be called at startup; safe to call concurrently.
-func RegisterRankingNameResolver(dim logstore.RankingDimension, fn RankingNameResolver) {
-	rankingNameResolversMu.Lock()
-	defer rankingNameResolversMu.Unlock()
-	if fn == nil {
-		delete(rankingNameResolvers, dim)
-		return
-	}
-	rankingNameResolvers[dim] = fn
-}
-
 // redactedTeamNames and redactedCustomerNames are the batch name lookups
 // RDBConfigStore provides; a config store without them keeps the log names.
 type redactedTeamNames interface {

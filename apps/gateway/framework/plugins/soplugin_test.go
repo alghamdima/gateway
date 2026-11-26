@@ -31,25 +31,11 @@ func TestDynamicPluginLifecycle(t *testing.T) {
 	defer cleanupHelloWorldPlugin(t)
 
 	// Test loading the plugin
-	config := &Config{
-		Plugins: []PluginConfig{
-			{
-				Path:    pluginPath,
-				Name:    "hello-world",
-				Enabled: true,
-				Config:  map[string]interface{}{"test": "config"},
-			},
-		},
-	}
-
 	loader := &SharedObjectPluginLoader{}
-	basePlugins, err := LoadPlugins(loader, config)
-	require.NoError(t, err, "Failed to load plugins")
-	require.Len(t, basePlugins, 1, "Expected exactly one plugin to be loaded")
-
-	plugins := FilterLLMPlugins(basePlugins)
-	require.Len(t, plugins, 1, "Expected plugin to implement LLMPlugin")
-	plugin := plugins[0]
+	basePlugin, err := loader.LoadPlugin(pluginPath, map[string]interface{}{"test": "config"})
+	require.NoError(t, err, "Failed to load plugin")
+	plugin, ok := basePlugin.(schemas.LLMPlugin)
+	require.True(t, ok, "Expected plugin to implement LLMPlugin")
 
 	// Test GetName
 	t.Run("GetName", func(t *testing.T) {
@@ -221,100 +207,6 @@ func TestDynamicPluginLifecycle(t *testing.T) {
 		err := plugin.Cleanup()
 		assert.NoError(t, err, "Cleanup should not return error")
 	})
-}
-
-func TestAsHTTPTransportPluginRecognizesResponseHeadersOnlyDynamicPlugin(t *testing.T) {
-	dp := &DynamicPlugin{
-		httpTransportResponseHeadersHook: func(_ *schemas.BifrostContext, _ *schemas.HTTPRequest, _ *schemas.HTTPResponseMetadata) error {
-			return nil
-		},
-	}
-
-	require.Same(t, dp, AsHTTPTransportPlugin(dp))
-}
-
-// TestLoadPlugins_DisabledPlugin tests that disabled plugins are not loaded
-func TestLoadPlugins_DisabledPlugin(t *testing.T) {
-	pluginPath := buildHelloWorldPlugin(t)
-	defer cleanupHelloWorldPlugin(t)
-
-	config := &Config{
-		Plugins: []PluginConfig{
-			{
-				Path:    pluginPath,
-				Name:    "hello-world",
-				Enabled: false, // Plugin is disabled
-				Config:  nil,
-			},
-		},
-	}
-
-	loader := &SharedObjectPluginLoader{}
-	plugins, err := LoadPlugins(loader, config)
-	require.NoError(t, err, "LoadPlugins should not error for disabled plugins")
-	assert.Len(t, plugins, 0, "No plugins should be loaded when all are disabled")
-}
-
-// TestLoadPlugins_MultiplePlugins tests loading multiple plugins
-func TestLoadPlugins_MultiplePlugins(t *testing.T) {
-	pluginPath := buildHelloWorldPlugin(t)
-	defer cleanupHelloWorldPlugin(t)
-
-	config := &Config{
-		Plugins: []PluginConfig{
-			{
-				Path:    pluginPath,
-				Name:    "hello-world-1",
-				Enabled: true,
-				Config:  nil,
-			},
-			{
-				Path:    pluginPath,
-				Name:    "hello-world-2",
-				Enabled: true,
-				Config:  map[string]interface{}{"key": "value"},
-			},
-		},
-	}
-
-	loader := &SharedObjectPluginLoader{}
-	plugins, err := LoadPlugins(loader, config)
-	require.NoError(t, err, "LoadPlugins should succeed for multiple plugins")
-	assert.Len(t, plugins, 2, "Two plugins should be loaded")
-
-	for _, plugin := range plugins {
-		assert.Equal(t, "hello-world", plugin.GetName())
-	}
-}
-
-// TestLoadPlugins_InvalidPath tests loading a plugin with invalid path
-func TestLoadPlugins_InvalidPath(t *testing.T) {
-	config := &Config{
-		Plugins: []PluginConfig{
-			{
-				Path:    "/nonexistent/path/plugin.so",
-				Name:    "invalid-plugin",
-				Enabled: true,
-				Config:  nil,
-			},
-		},
-	}
-
-	loader := &SharedObjectPluginLoader{}
-	plugins, err := LoadPlugins(loader, config)
-	assert.Error(t, err, "LoadPlugins should return error for invalid path")
-	assert.Nil(t, plugins, "No plugins should be loaded on error")
-}
-
-// TestLoadPlugins_EmptyConfig tests loading plugins with empty config
-func TestLoadPlugins_EmptyConfig(t *testing.T) {
-	config := &Config{
-		Plugins: []PluginConfig{},
-	}
-	loader := &SharedObjectPluginLoader{}
-	plugins, err := LoadPlugins(loader, config)
-	require.NoError(t, err, "LoadPlugins should succeed with empty config")
-	assert.Len(t, plugins, 0, "No plugins should be loaded with empty config")
 }
 
 // TestDynamicPlugin_ContextPropagation tests that context is properly propagated
@@ -697,110 +589,6 @@ func TestDynamicPlugin_GetNameNotEmpty(t *testing.T) {
 // Helper function to create a pointer to a string
 func stringPtr(s string) *string {
 	return &s
-}
-
-// TestLoadPlugins tests the new generic LoadPlugins function
-func TestLoadPlugins(t *testing.T) {
-	// Build the hello-world plugin first
-	pluginPath := buildHelloWorldPlugin(t)
-	defer cleanupHelloWorldPlugin(t)
-
-	t.Run("LoadSinglePlugin", func(t *testing.T) {
-		config := &Config{
-			Plugins: []PluginConfig{
-				{
-					Path:    pluginPath,
-					Name:    "hello-world",
-					Enabled: true,
-					Config:  map[string]interface{}{"test": "config"},
-				},
-			},
-		}
-
-		loader := &SharedObjectPluginLoader{}
-		plugins, err := LoadPlugins(loader, config)
-		require.NoError(t, err, "Failed to load plugins")
-		require.Len(t, plugins, 1, "Expected exactly one plugin to be loaded")
-
-		plugin := plugins[0]
-		assert.Equal(t, "hello-world", plugin.GetName())
-	})
-
-	t.Run("LoadMultiplePlugins", func(t *testing.T) {
-		config := &Config{
-			Plugins: []PluginConfig{
-				{
-					Path:    pluginPath,
-					Name:    "hello-world-1",
-					Enabled: true,
-					Config:  map[string]interface{}{"test": "config1"},
-				},
-				{
-					Path:    pluginPath,
-					Name:    "hello-world-2",
-					Enabled: true,
-					Config:  map[string]interface{}{"test": "config2"},
-				},
-			},
-		}
-
-		loader := &SharedObjectPluginLoader{}
-		plugins, err := LoadPlugins(loader, config)
-		require.NoError(t, err, "Failed to load plugins")
-		require.Len(t, plugins, 2, "Expected two plugins to be loaded")
-	})
-
-	t.Run("SkipDisabledPlugins", func(t *testing.T) {
-		config := &Config{
-			Plugins: []PluginConfig{
-				{
-					Path:    pluginPath,
-					Name:    "hello-world-enabled",
-					Enabled: true,
-					Config:  map[string]interface{}{"test": "config"},
-				},
-				{
-					Path:    pluginPath,
-					Name:    "hello-world-disabled",
-					Enabled: false,
-					Config:  map[string]interface{}{"test": "config"},
-				},
-			},
-		}
-
-		loader := &SharedObjectPluginLoader{}
-		plugins, err := LoadPlugins(loader, config)
-		require.NoError(t, err, "Failed to load plugins")
-		require.Len(t, plugins, 1, "Expected only enabled plugin to be loaded")
-	})
-}
-
-// TestFilterPlugins tests the plugin filter functions
-func TestFilterPlugins(t *testing.T) {
-	// Build the hello-world plugin first
-	pluginPath := buildHelloWorldPlugin(t)
-	defer cleanupHelloWorldPlugin(t)
-
-	loader := &SharedObjectPluginLoader{}
-	plugin, err := loader.LoadPlugin(pluginPath, nil)
-	require.NoError(t, err, "Failed to load plugin")
-
-	plugins := []schemas.BasePlugin{plugin}
-
-	t.Run("FilterLLMPlugins", func(t *testing.T) {
-		llmPlugins := FilterLLMPlugins(plugins)
-		assert.Len(t, llmPlugins, 1, "hello-world should implement LLMPlugin")
-	})
-
-	t.Run("FilterHTTPTransportPlugins", func(t *testing.T) {
-		httpPlugins := FilterHTTPTransportPlugins(plugins)
-		assert.Len(t, httpPlugins, 1, "hello-world should implement HTTPTransportPlugin")
-	})
-
-	t.Run("FilterObservabilityPlugins", func(t *testing.T) {
-		obsPlugins := FilterObservabilityPlugins(plugins)
-		assert.Len(t, obsPlugins, 0, "hello-world does not implement ObservabilityPlugin")
-	})
 }
 
 // TestLoadPluginWithOptionalHooks tests that plugins can implement only a subset of hooks

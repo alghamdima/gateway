@@ -27,10 +27,8 @@ const (
 // with a nil provider it means all models on all providers.
 const ModelConfigAllModels = "*"
 
-// validModelConfigScopes is the runtime registry of accepted scope values.
-// OSS seeds it with global + virtual_key; downstream consumers (e.g. the
-// enterprise build registering "access_profile") extend it at startup via
-// RegisterModelConfigScope. Guarded by validModelConfigScopesMu.
+// validModelConfigScopes is the set of accepted scope values: global,
+// virtual_key and project. Guarded by validModelConfigScopesMu.
 var (
 	validModelConfigScopesMu sync.RWMutex
 	validModelConfigScopes   = map[string]bool{
@@ -39,20 +37,6 @@ var (
 		ModelConfigScopeProject:    true,
 	}
 )
-
-// RegisterModelConfigScope adds scope to the allow-list consulted by
-// IsValidModelConfigScope and TableModelConfig.BeforeSave. Intended to be
-// called once at process startup; safe to call concurrently. Whitespace-
-// only input is ignored.
-func RegisterModelConfigScope(scope string) {
-	s := strings.TrimSpace(scope)
-	if s == "" {
-		return
-	}
-	validModelConfigScopesMu.Lock()
-	validModelConfigScopes[s] = true
-	validModelConfigScopesMu.Unlock()
-}
 
 // SourceRef identifies what a row came from or is governed by, for API responses
 // where that is not the same thing as the row's own scope. It is non-persisted and
@@ -72,7 +56,6 @@ type SourceRef struct {
 	// SourceName is the human-readable label for SourceID.
 	SourceName string `gorm:"-" json:"source_name,omitempty"`
 }
-
 
 // IsValidModelConfigScope reports whether scope is a recognized model config scope.
 func IsValidModelConfigScope(scope string) bool {

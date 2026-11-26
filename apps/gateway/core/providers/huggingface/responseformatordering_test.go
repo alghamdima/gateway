@@ -55,24 +55,3 @@ func TestResponseFormatSchemaBytesReachHuggingFaceVerbatim(t *testing.T) {
 	require.NoError(t, err)
 	schemaorder.AssertSchemaBytes(t, string(raw), "schema")
 }
-
-// TestResponseFormatOrderSurvivesHuggingFaceResponses covers the Responses method.
-func TestResponseFormatOrderSurvivesHuggingFaceResponses(t *testing.T) {
-	var params schemas.ResponsesParameters
-	require.NoError(t, schemas.Unmarshal([]byte(schemaorder.ResponsesBody), &params))
-
-	out, err := ToHuggingFaceResponsesRequest(&schemas.BifrostResponsesRequest{
-		Provider: schemas.HuggingFace,
-		Model:    "meta-llama/Llama-3.3-70B-Instruct",
-		Input: []schemas.ResponsesMessage{{
-			Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
-			Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("assign it")},
-		}},
-		Params: &params,
-	})
-	require.NoError(t, err)
-
-	raw, err := providerUtils.MarshalSorted(out)
-	require.NoError(t, err)
-	schemaorder.AssertPropertyOrder(t, string(raw))
-}

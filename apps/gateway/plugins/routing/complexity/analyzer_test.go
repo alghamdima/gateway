@@ -940,3 +940,8 @@ func TestAnalyze_PunctuatedKeywordStillMatches(t *testing.T) {
 		t.Fatalf("expected punctuated keyword path to match code signals")
 	}
 }
+
+// NewComplexityAnalyzer creates an analyzer with built-in defaults.
+func NewComplexityAnalyzer() *ComplexityAnalyzer {
+	return NewComplexityAnalyzerWithConfig(nil)
+}

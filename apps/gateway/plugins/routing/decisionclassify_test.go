@@ -723,3 +723,13 @@ func BenchmarkClassifyDecisionComplexity(b *testing.B) {
 		})
 	}
 }
+
+// classifyComplexityInput classifies with the Complexity Router page's classifiers.
+func (p *RoutingPlugin) classifyComplexityInput(ctx *schemas.BifrostContext, input complexity.ComplexityInput) complexityProposal {
+	return p.classifyRouterInput(ctx, input, p.complexityRuntime())
+}
+
+// classifyDecisionComplexity asks the Complexity Router page's decision model.
+func (p *RoutingPlugin) classifyDecisionComplexity(ctx *schemas.BifrostContext, input complexity.ComplexityInput) complexityProposal {
+	return p.classifyRouterDecision(ctx, input, p.complexityRuntime())
+}

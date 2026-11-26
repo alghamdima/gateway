@@ -707,31 +707,6 @@ func TestClusterFloorCountsOnlyRepresentedRequests(t *testing.T) {
 	assert.Equal(t, 3*DefaultMaxSuggestedClusters, e.MaxModelCalls)
 }
 
-// Trimming counts phrases: a cluster whose phrases would overflow the room is
-// dropped and counted; outcomes that add no phrases are always kept.
-func TestWithinRoom(t *testing.T) {
-	sg := func(cat suggest.Category, phrases ...string) suggest.Suggestion {
-		return suggest.Suggestion{Category: cat, Phrases: phrases}
-	}
-	in := []suggest.Suggestion{
-		sg(suggest.CategoryUncovered, "a", "b"),
-		sg(suggest.CategoryCovered),
-		sg(suggest.CategoryWeak, "c", "d"),
-		sg(suggest.CategoryMixed, "e"),
-	}
-	var dropped int64
-	got := WithinRoom(append([]suggest.Suggestion(nil), in...), 3, &dropped)
-	require.Len(t, got, 3)
-	assert.Equal(t, []string{"a", "b"}, got[0].Phrases)
-	assert.Equal(t, suggest.CategoryCovered, got[1].Category, "adds no phrases, kept")
-	assert.Equal(t, []string{"e"}, got[2].Phrases, "two would overflow; the next one-phrase cluster fits")
-	assert.EqualValues(t, 1, dropped)
-
-	dropped = 0
-	assert.Len(t, WithinRoom(append([]suggest.Suggestion(nil), in...), -1, &dropped), 4, "no bound")
-	assert.Zero(t, dropped)
-}
-
 // Two clusters can be written the same phrase (one prompt template split in
 // two, say). The heavier cluster keeps it; the lighter one, left with no
 // phrase of its own, is covered by it and is not suggested twice.
@@ -831,4 +806,10 @@ func TestFitSuggestionsDropsBeforeDeduplicating(t *testing.T) {
 	require.Len(t, got, 2)
 	assert.Equal(t, suggest.CategoryCovered, got[1].Category)
 	assert.Zero(t, dropped)
+}
+
+// withoutRepeatedPhrases is FitSuggestions with no bound on the room.
+func withoutRepeatedPhrases(suggestions []suggest.Suggestion) []suggest.Suggestion {
+	var dropped int64
+	return FitSuggestions(suggestions, -1, &dropped)
 }

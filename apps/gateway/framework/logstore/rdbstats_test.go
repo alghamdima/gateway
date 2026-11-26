@@ -56,5 +56,3 @@ func TestGetStatsTokenSplit(t *testing.T) {
 	require.Equal(t, int64(70), stats.CompletionTokens, "completion = 10+20+40")
 	require.Equal(t, stats.TotalTokens, stats.PromptTokens+stats.CompletionTokens, "split sums to total")
 }
-
-func ptrTime(value time.Time) *time.Time { return &value }

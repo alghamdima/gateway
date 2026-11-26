@@ -180,26 +180,12 @@ func lookupScopeNameBatchResolver(scope string) (ScopeNameBatchResolver, bool) {
 type ManagedByResolver func(ctx context.Context, scopeID string) (configstoreTables.SourceRef, bool)
 
 // managedByResolvers is the package-level registry consulted by
-// resolveModelConfigManagedBy. Empty by default in OSS; downstream builds
-// register resolvers at startup via RegisterManagedByResolver. Guarded by
-// managedByResolversMu.
+// resolveModelConfigManagedBy. Nothing registers a resolver, so it stays empty.
+// Guarded by managedByResolversMu.
 var (
 	managedByResolversMu sync.RWMutex
 	managedByResolvers   = map[string]ManagedByResolver{}
 )
-
-// RegisterManagedByResolver wires a managed-by resolver for a model_config
-// scope value. Intended to be called once at process startup, before serving
-// requests. Overwrites any previously registered resolver for the same scope.
-// Safe to call concurrently.
-func RegisterManagedByResolver(scope string, fn ManagedByResolver) {
-	if scope == "" || fn == nil {
-		return
-	}
-	managedByResolversMu.Lock()
-	managedByResolvers[scope] = fn
-	managedByResolversMu.Unlock()
-}
 
 func lookupManagedByResolver(scope string) (ManagedByResolver, bool) {
 	managedByResolversMu.RLock()
@@ -682,23 +668,6 @@ func applyResetConfigToExistingBudget(budget *configstoreTables.TableBudget, req
 	budget.ResetConfig = req.ResetConfig
 }
 
-func resetBudgetUsageIfRequested(budget *configstoreTables.TableBudget, reset bool, calendarAligned bool) {
-	if !reset {
-		return
-	}
-	budget.CurrentUsage = 0
-	budget.LastReset = budgetLastReset(calendarAligned, budget)
-}
-
-func compareBudgetRequestDurations(left, right CreateBudgetRequest) bool {
-	leftDuration, leftErr := configstoreTables.ParseDuration(left.ResetDuration)
-	rightDuration, rightErr := configstoreTables.ParseDuration(right.ResetDuration)
-	if leftErr == nil && rightErr == nil && leftDuration != rightDuration {
-		return leftDuration < rightDuration
-	}
-	return left.ResetDuration < right.ResetDuration
-}
-
 func inheritUsageFromClosestShorterBudget(budget *configstoreTables.TableBudget, existing []configstoreTables.TableBudget, reset bool) {
 	if reset {
 		return
@@ -819,17 +788,6 @@ func BudgetsFromSingleBudgetUpdate(req *UpdateBudgetRequest, existing *configsto
 	return &result
 }
 
-// IsBudgetRemovalRequest is the exported form of isBudgetRemovalRequest.
-func IsBudgetRemovalRequest(req *UpdateBudgetRequest) bool {
-	return isBudgetRemovalRequest(req)
-}
-
-// ValidateRateLimit is the exported form of validateRateLimit: a limit set to zero or below, or a
-// window missing or unparsable on a set limit, is refused.
-func ValidateRateLimit(rateLimit *configstoreTables.TableRateLimit) error {
-	return validateRateLimit(rateLimit)
-}
-
 // applyRateLimitUpdate applies an update's rate limit onto the stored one. The request states the
 // limits the owner keeps: a maximum left out is cleared along with its window, which is how an
 // editor drops one limit and keeps the other. A maximum sent without a window keeps the window
@@ -874,12 +832,6 @@ type budgetUsageReset struct {
 // BudgetUsageReset is the exported name of the usage-reset carrier, for builds that reconcile
 // budgets on owners of their own through ReconcileOwnedBudgets.
 type BudgetUsageReset = budgetUsageReset
-
-// NewBudgetUsageReset builds a carrier that zeroes usage on every reconciled budget when requested
-// is true, and does nothing otherwise.
-func NewBudgetUsageReset(requested bool) *BudgetUsageReset {
-	return &budgetUsageReset{requested: requested}
-}
 
 // BudgetIDs lists the budgets whose persisted usage was zeroed, for the in-memory pass that follows
 // the transaction. Empty when nothing was reset.
@@ -957,7 +909,7 @@ const (
 // added here is carried for every owner rather than for the ones someone remembered.
 //
 // The request-shape checks (a negative limit, an unparsable or repeated window, an id the owner does
-// not hold) come back as bad-request errors (see IsBadRequestError), exactly as the customer and
+// not hold) come back as bad-request errors (badRequestError), exactly as the customer and
 // model-config routes have always answered them. A row the store's own validation refuses comes back
 // as returned, as it always has; a caller wanting a 400 for that validates the request first.
 //

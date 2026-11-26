@@ -95,14 +95,6 @@ const (
 	InputClassifiable
 )
 
-// BuildInput extracts text from normalized BifrostRequest values for
-// complexity_tier routing. It preserves the original boolean contract while
-// BuildInputWithDisposition exposes the finer session-aware outcome.
-func BuildInput(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (ComplexityInput, bool) {
-	input, disposition := BuildInputWithDisposition(ctx, req)
-	return input, disposition == InputClassifiable
-}
-
 // BuildInputWithDisposition extracts normalized classifier input and reports
 // whether the request should be classified, should reuse existing session state,
 // or should bypass session handling. Extraction runs after provider-specific

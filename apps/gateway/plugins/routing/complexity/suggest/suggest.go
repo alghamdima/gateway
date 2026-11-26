@@ -178,47 +178,6 @@ type Suggestion struct {
 	vectors  [][]float32
 }
 
-// Run clusters requests and suggests phrases for each cluster. Live phrases
-// without vectors are embedded first. Suggestions come back heaviest cluster
-// first, including non-actionable ones so callers can show why a cluster was
-// not suggested.
-func Run(ctx context.Context, reqs []Request, live []Phrase, emb Embedder, llm LLM, opts Options) ([]Suggestion, error) {
-	opts = opts.withDefaults()
-	live, err := embedLive(ctx, emb, live)
-	if err != nil {
-		return nil, err
-	}
-	c := NewClusterer(opts.Cluster, live, opts.MatchFloor)
-	c.Add(reqs)
-	return NewSuggester(live, emb, llm, opts).SuggestAll(ctx, c.Clusters())
-}
-
-func embedLive(ctx context.Context, emb Embedder, live []Phrase) ([]Phrase, error) {
-	var texts []string
-	var idx []int
-	for i, p := range live {
-		if len(p.Vector) == 0 {
-			texts = append(texts, normalizePhrase(p.Text))
-			idx = append(idx, i)
-		}
-	}
-	if len(texts) == 0 {
-		return live, nil
-	}
-	vecs, err := emb.Embed(ctx, texts)
-	if err != nil {
-		return nil, fmt.Errorf("embed live phrases: %w", err)
-	}
-	if len(vecs) != len(texts) {
-		return nil, fmt.Errorf("embed live phrases: asked for %d, got %d", len(texts), len(vecs))
-	}
-	out := append([]Phrase(nil), live...)
-	for j, i := range idx {
-		out[i].Vector = normalize(vecs[j])
-	}
-	return out, nil
-}
-
 // Suggester asks the LLM about clusters and verifies its phrases.
 type Suggester struct {
 	live []Phrase
@@ -231,20 +190,6 @@ type Suggester struct {
 // phrases must carry vectors.
 func NewSuggester(live []Phrase, emb Embedder, llm LLM, opts Options) *Suggester {
 	return &Suggester{live: live, emb: emb, llm: llm, opts: opts.withDefaults()}
-}
-
-// SuggestAll suggests for every cluster, keeping their order.
-func (s *Suggester) SuggestAll(ctx context.Context, clusters []*Cluster) ([]Suggestion, error) {
-	out := make([]Suggestion, len(clusters))
-	err := forEach(len(clusters), s.opts.Workers, func(i int) error {
-		sg, err := s.Suggest(ctx, clusters[i])
-		if err != nil {
-			return err
-		}
-		out[i] = sg
-		return nil
-	})
-	return out, err
 }
 
 // Suggest runs both steps on one cluster. A phrase set that covers less than

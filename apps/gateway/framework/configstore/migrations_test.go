@@ -1,12 +1,9 @@
 package configstore
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -51,16 +48,6 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err, "Failed to create test database")
 
 	return db
-}
-
-// captureLogOutput captures log output during a function execution
-func captureLogOutput(fn func()) string {
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
-	fn()
-	return buf.String()
 }
 
 // setupProviderTestDBWithoutStoreRawColumn creates an in-memory SQLite database
@@ -3211,117 +3198,6 @@ func TestMigrationClearPluginConfigHashes(t *testing.T) {
 	// Running it again must be a no-op rather than an error (gormigrate skips by ID, but the
 	// statement itself has to stay safe to replay).
 	require.NoError(t, migrationClearPluginConfigHashes(ctx, db, testMigrationLogger))
-}
-
-// oauth2PreWidenDDL returns the three OAuth2 AS tables as
-// migrationAddOAuth2IssuanceTables created them before the client-controlled
-// columns were widened to text: state varchar(512), client_name and every scope
-// column varchar(255). Those bounds are the upgrade path the widen migration
-// exists for; everything else matches the structs of that time.
-func oauth2PreWidenDDL(dialect string) []string {
-	ts := "DATETIME"
-	if dialect == "postgres" {
-		ts = "TIMESTAMPTZ"
-	}
-	return []string{
-		`CREATE TABLE oauth2_clients (
-			id VARCHAR(255) PRIMARY KEY,
-			client_id VARCHAR(255) NOT NULL UNIQUE,
-			client_name VARCHAR(255),
-			redirect_uris_json TEXT NOT NULL,
-			grant_types_json TEXT NOT NULL,
-			scope VARCHAR(255),
-			created_at ` + ts + ` NOT NULL
-		)`,
-		`CREATE TABLE oauth2_authorize_requests (
-			id VARCHAR(255) PRIMARY KEY,
-			client_id VARCHAR(255) NOT NULL,
-			redirect_uri TEXT NOT NULL,
-			state VARCHAR(512) NOT NULL,
-			scope VARCHAR(255),
-			resource TEXT NOT NULL,
-			code_challenge VARCHAR(512) NOT NULL,
-			code_challenge_method VARCHAR(10) NOT NULL,
-			status VARCHAR(20) NOT NULL,
-			bf_mode VARCHAR(20),
-			bf_sub VARCHAR(255),
-			code_hash VARCHAR(255) UNIQUE,
-			expires_at ` + ts + ` NOT NULL,
-			created_at ` + ts + ` NOT NULL,
-			updated_at ` + ts + ` NOT NULL
-		)`,
-		`CREATE TABLE oauth2_refresh_tokens (
-			id VARCHAR(255) PRIMARY KEY,
-			token_hash VARCHAR(255) NOT NULL UNIQUE,
-			family_id VARCHAR(255) NOT NULL,
-			client_id VARCHAR(255) NOT NULL,
-			bf_mode VARCHAR(20) NOT NULL,
-			bf_sub VARCHAR(255) NOT NULL,
-			scope VARCHAR(255),
-			resource TEXT NOT NULL,
-			revoked_at ` + ts + `,
-			last_used_at ` + ts + `,
-			created_at ` + ts + ` NOT NULL
-		)`,
-	}
-}
-
-// oauth2WidenedColumns lists every (table, column) the widen migration targets.
-var oauth2WidenedColumns = []struct{ table, column string }{
-	{"oauth2_authorize_requests", "state"},
-	{"oauth2_authorize_requests", "scope"},
-	{"oauth2_clients", "client_name"},
-	{"oauth2_clients", "scope"},
-	{"oauth2_refresh_tokens", "scope"},
-}
-
-// forEachOAuth2PreWidenDB returns the pre-widen tables on every available
-// backend. Postgres is the one that matters: it enforces varchar(n), SQLite does
-// not, so only Postgres can show the bounds and their removal.
-func forEachOAuth2PreWidenDB(t *testing.T) []namedDB {
-	t.Helper()
-	sqliteDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err, "Failed to create test database")
-	for _, stmt := range oauth2PreWidenDDL("sqlite") {
-		require.NoError(t, sqliteDB.Exec(stmt).Error)
-	}
-	dbs := []namedDB{{"sqlite", sqliteDB}}
-
-	pgDB, err := gorm.Open(postgres.Open(postgresDSN), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	if err != nil {
-		return dbs
-	}
-	sqlDB, err := pgDB.DB()
-	if err != nil || sqlDB.Ping() != nil {
-		return dbs
-	}
-	if pgDB.Exec("CREATE SCHEMA IF NOT EXISTS "+pgTestSchema).Error != nil {
-		return dbs
-	}
-	dropAll := func() {
-		pgDB.Exec("DROP TABLE IF EXISTS oauth2_refresh_tokens CASCADE")
-		pgDB.Exec("DROP TABLE IF EXISTS oauth2_authorize_requests CASCADE")
-		pgDB.Exec("DROP TABLE IF EXISTS oauth2_clients CASCADE")
-	}
-	dropAll()
-	pgDB.Exec(`CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)`)
-	pgDB.Exec("DELETE FROM migrations")
-	for _, stmt := range oauth2PreWidenDDL("postgres") {
-		if err := pgDB.Exec(stmt).Error; err != nil {
-			return dbs
-		}
-	}
-	t.Cleanup(func() {
-		pgDB.Exec("DELETE FROM migrations")
-		dropAll()
-	})
-	return append(dbs, namedDB{"postgres", pgDB})
-}
-
-// oauth2ClientIDColumns lists the tables whose client_id the client_id widen migration targets.
-var oauth2ClientIDColumns = []struct{ table string }{
-	{"oauth2_authorize_requests"},
-	{"oauth2_refresh_tokens"},
 }
 
 // TestMigrationAddVirtualKeyBusinessUnitColumn covers the upgrade path for business-unit key

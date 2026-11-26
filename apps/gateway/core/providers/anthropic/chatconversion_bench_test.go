@@ -24,8 +24,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
-const benchAnthropicModel = "claude-sonnet-4-5-20250929"
-
 // An OpenAI-shaped request as a caller sends it, with a replayed tool result
 // and two tool definitions.
 const benchOpenAICompatRequestJSON = `{
@@ -272,27 +270,6 @@ func BenchmarkAnthropicStreamTurnParseAndConvert(b *testing.B) {
 			if bifrostErr != nil {
 				b.Fatalf("convert stream event %d: %v", i, bifrostErr)
 			}
-		}
-	}
-}
-
-// BenchmarkToAnthropicChatResponse measures the reverse response conversion,
-// used when a non-Anthropic provider serves a caller on the Messages surface.
-func BenchmarkToAnthropicChatResponse(b *testing.B) {
-	var resp AnthropicMessageResponse
-	if err := schemas.Unmarshal([]byte(benchAnthropicResponseJSON), &resp); err != nil {
-		b.Fatalf("unmarshal Anthropic response: %v", err)
-	}
-	ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
-	bifrostResp := resp.ToBifrostChatResponse(ctx)
-	if bifrostResp == nil {
-		b.Fatal("nil Bifrost response")
-	}
-	bifrostResp.Model = benchAnthropicModel
-	b.ReportAllocs()
-	for b.Loop() {
-		if out := ToAnthropicChatResponse(bifrostResp); out == nil {
-			b.Fatal("nil Anthropic response")
 		}
 	}
 }

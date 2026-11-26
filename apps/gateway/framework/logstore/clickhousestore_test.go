@@ -1482,19 +1482,6 @@ func TestClickHouseHistograms(t *testing.T) {
 	require.NotNil(t, modelRankings)
 }
 
-// chColumnNames pulls the identifiers out of generated column definitions.
-func chColumnNames(cols []string) []string {
-	names := make([]string, 0, len(cols))
-	for _, col := range cols {
-		name, _, found := strings.Cut(strings.TrimPrefix(col, "`"), "`")
-		if !found {
-			continue
-		}
-		names = append(names, name)
-	}
-	return names
-}
-
 // fakeDistributedLocker stands in for the config-store lock every replica
 // shares: one mutex per key, whichever store instance asks.
 type fakeDistributedLocker struct {
@@ -1515,29 +1502,6 @@ func (f *fakeDistributedLocker) Acquire(ctx context.Context, key string) (contex
 	f.mu.Unlock()
 	lock.Lock()
 	return ctx, lock.Unlock, nil
-}
-
-// keyRecordingLocker is a fakeDistributedLocker that counts acquisitions per key.
-type keyRecordingLocker struct {
-	fakeDistributedLocker
-	seenMu sync.Mutex
-	seen   map[string]int
-}
-
-func (k *keyRecordingLocker) Acquire(ctx context.Context, key string) (context.Context, func(), error) {
-	k.seenMu.Lock()
-	if k.seen == nil {
-		k.seen = map[string]int{}
-	}
-	k.seen[key]++
-	k.seenMu.Unlock()
-	return k.fakeDistributedLocker.Acquire(ctx, key)
-}
-
-func (k *keyRecordingLocker) count(key string) int {
-	k.seenMu.Lock()
-	defer k.seenMu.Unlock()
-	return k.seen[key]
 }
 
 // lostLeaseLocker grants the lock but reports it lost at once, the way the

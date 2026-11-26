@@ -400,18 +400,6 @@ func isLikelyBase64(s string) bool {
 	return base64Regex.MatchString(cleanData)
 }
 
-// JsonifyInput converts an interface{} to a JSON string
-func JsonifyInput(input interface{}) string {
-	if input == nil {
-		return "{}"
-	}
-	jsonString, err := MarshalString(input)
-	if err != nil {
-		return "{}"
-	}
-	return jsonString
-}
-
 //* SAFE EXTRACTION UTILITIES *//
 
 // SafeExtractString safely extracts a string value from an interface{} with type checking
@@ -2079,11 +2067,6 @@ func IsNova2Model(model string) bool {
 	return strings.Contains(model, "nova-2") && (strings.Contains(model, "lite") || strings.Contains(model, "sonic"))
 }
 
-// IsGLMModel checks if the model is a Z.AI GLM model.
-func IsGLMModel(model string) bool {
-	return strings.Contains(model, "glm")
-}
-
 // IsDeepSeekModel checks if the model is a DeepSeek model. Deployment names are
 // case-sensitive on some providers (Azure ships "DeepSeek-V3.1"), so match case-insensitively.
 func IsDeepSeekModel(model string) bool {
@@ -2734,18 +2717,4 @@ func NormalizeModelName(model string) string {
 	}
 	model = bedrockVersionSuffixRe.ReplaceAllString(model, "")
 	return BaseModelName(model)
-}
-
-// SameBaseModel reports whether two model ids refer to the same base model,
-// ignoring any recognized version suffixes.
-//
-// This works even if both sides are versioned, or both unversioned.
-func SameBaseModel(a, b string) bool {
-	// Fast path: exact match.
-	if a == b {
-		return true
-	}
-
-	// Compare normalized base names.
-	return BaseModelName(a) == BaseModelName(b)
 }

@@ -6472,14 +6472,6 @@ func (s *RDBConfigStore) CleanupExpiredLockByKey(ctx context.Context, lockKey st
 	return result.RowsAffected > 0, nil
 }
 
-// normalizeLeaseTime is applied to claimed_until on every write and fence
-// comparison: UTC (mixed offsets break SQLite's string datetime compares) and
-// microsecond precision (Postgres truncates to microseconds, so an exact
-// equality fence must not carry nanoseconds).
-func normalizeLeaseTime(t time.Time) time.Time {
-	return t.UTC().Truncate(time.Microsecond)
-}
-
 // A caller's discovery lives only as long as the credential it was made with is
 // usable. The helpers below delete discoveries inside the transaction that
 // deletes or invalidates their credentials, so the two never disagree.

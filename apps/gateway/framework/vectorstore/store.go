@@ -126,15 +126,6 @@ type VectorStore interface {
 	Close(ctx context.Context, namespace string) error
 }
 
-// WithDisableScanFallback returns a derived context that tells vector stores not
-// to fall back to full scans when indexed search fails.
-func WithDisableScanFallback(ctx context.Context) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithValue(ctx, disableScanFallbackContextKey{}, true)
-}
-
 type includeVectorsContextKey struct{}
 
 // WithIncludeVectors asks paging reads (GetAll) to return each entry's stored
@@ -157,13 +148,6 @@ func WithIncludeVectors(ctx context.Context) context.Context {
 // is read once, unfiltered, and the caller does the dropping.
 type ServerFilteredReader interface {
 	FiltersVectorReadsOnServer() bool
-}
-
-// FiltersVectorReadsOnServer reports whether store filters a paged read with
-// vectors on the server. A store that does not say is taken not to.
-func FiltersVectorReadsOnServer(store VectorStore) bool {
-	reader, ok := store.(ServerFilteredReader)
-	return ok && reader.FiltersVectorReadsOnServer()
 }
 
 // IncludeVectorsRequested reports whether the current read asked for vectors.

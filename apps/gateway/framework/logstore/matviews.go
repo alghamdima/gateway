@@ -6,13 +6,14 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/maximhq/bifrost/framework/queryscope"
 	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/maximhq/bifrost/framework/queryscope"
 
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/postgresconn"
@@ -172,9 +173,8 @@ var mvLogsHourlyRequiredColumns = []string{
 // that stops reading from it. Adding it in the same PR that switches readers is
 // unsafe — during a rolling deploy the still-old replicas would query a view
 // that the new replicas have already dropped, returning "relation does not
-// exist". See migrationSplitFilterDataMatView for the canonical example: the
-// new per-dimension matviews ship in one release while mv_logs_filterdata stays
-// in place; a follow-up release adds it here.
+// exist". The canonical example: the new per-dimension matviews shipped in one
+// release while mv_logs_filterdata stays in place; a follow-up release adds it here.
 var legacyMatViewNames = []string{}
 
 // Per-dimension filter matviews. The previous single 16-column DISTINCT view
@@ -533,18 +533,13 @@ var matviewRequiredColumns = func() map[string][]string {
 // ensureMatViews creates materialized views and their unique indexes if they
 // don't already exist. Called once on startup.
 //
-// Postgres-only — runs on a dedicated connection so the advisory lock + the
-// CONCURRENTLY DDL all share one session and live outside any migration
-// transaction. Multi-replica deployments serialize on the advisory lock so
-// only one instance does the work. It shares the same advisory lock as
-// refreshMatViews so startup create/repair cannot overlap a periodic refresh.
-func ensureMatViews(ctx context.Context, db *gorm.DB) error {
-	return ensureMatViewsLimited(ctx, db, matViewSessionLimits{})
-}
-
-// ensureMatViewsLimited is ensureMatViews with the operator's session limits
-// applied to the dedicated connection.
-func ensureMatViewsLimited(ctx context.Context, db *gorm.DB, limits matViewSessionLimits) error {
+// Postgres-only — runs on a dedicated connection, with the operator's session
+// limits applied, so the advisory lock + the CONCURRENTLY DDL all share one
+// session and live outside any migration transaction. Multi-replica deployments
+// serialize on the advisory lock so only one instance does the work. It shares
+// the same advisory lock as refreshMatViews so startup create/repair cannot
+// overlap a periodic refresh.
+func ensureMatViews(ctx context.Context, db *gorm.DB, limits matViewSessionLimits) error {
 	if db.Dialector.Name() != "postgres" {
 		return nil
 	}
@@ -784,17 +779,6 @@ func ensureIndexes(ctx context.Context, conn *sql.Conn, defs []matviewIndexDef) 
 	return nil
 }
 
-// allMatViewNames returns the names of every materialized view this package
-// manages, in refresh order (hourly first so dashboards prioritize over
-// filter-dropdown freshness).
-func allMatViewNames() []string {
-	names := []string{"mv_logs_hourly"}
-	for _, v := range filterMatViews {
-		names = append(names, v.name)
-	}
-	return names
-}
-
 // filterRotation advances each refresh pass so a run that is consistently cut
 // short by its deadline does not always starve the same tail views. mv_logs_hourly
 // stays pinned first (dashboards depend on it); only the filter views rotate.
@@ -976,7 +960,8 @@ func (g *matViewRefreshGate) markRefreshed(activityAtStart int64, activityOK boo
 }
 
 // refreshMatViews refreshes all materialized views concurrently (non-blocking
-// for readers). Uses a PostgreSQL advisory try-lock so that in multi-replica
+// for readers), on a dedicated connection with the operator's session limits
+// applied. Uses a PostgreSQL advisory try-lock so that in multi-replica
 // deployments only one instance refreshes at a time — others skip silently and
 // try again on their next scheduled tick.
 //
@@ -989,13 +974,7 @@ func (g *matViewRefreshGate) markRefreshed(activityAtStart int64, activityOK boo
 // skipped (see matViewRefreshStateDDL). Callers pass matview_refresh_interval;
 // zero refreshes every view regardless, for repair paths that must not trust the
 // record.
-func refreshMatViews(ctx context.Context, db *gorm.DB, minGap time.Duration) error {
-	return refreshMatViewsLimited(ctx, db, minGap, matViewSessionLimits{})
-}
-
-// refreshMatViewsLimited is refreshMatViews with the operator's session limits
-// applied to the dedicated connection.
-func refreshMatViewsLimited(ctx context.Context, db *gorm.DB, minGap time.Duration, limits matViewSessionLimits) error {
+func refreshMatViews(ctx context.Context, db *gorm.DB, minGap time.Duration, limits matViewSessionLimits) error {
 	sqlDB, err := db.DB()
 	if err != nil {
 		return fmt.Errorf("failed to get sql.DB for matview refresh: %w", err)
@@ -1220,7 +1199,7 @@ func runMatViewRefreshTick(ctx context.Context, db *gorm.DB, gate *migrationLock
 	// fails silently, leaving matviews permanently stale.
 	started := time.Now()
 	tickCtx, cancel := context.WithTimeout(ctx, timeout)
-	err := refreshMatViewsLimited(tickCtx, db, interval, state.limits)
+	err := refreshMatViews(tickCtx, db, interval, state.limits)
 	timedOut := err != nil && errors.Is(tickCtx.Err(), context.DeadlineExceeded)
 	cancel()
 	elapsed := time.Since(started)

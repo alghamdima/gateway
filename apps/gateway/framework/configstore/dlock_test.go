@@ -1331,3 +1331,17 @@ func TestDistributedLockManager_AcquireWithRetryLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	nextRelease()
 }
+
+// WithRetryInterval sets the interval between lock acquisition retries.
+func WithRetryInterval(interval time.Duration) DistributedLockManagerOption {
+	return func(m *DistributedLockManager) {
+		m.retryInterval = interval
+	}
+}
+
+// WithMaxRetries sets the maximum number of retries for lock acquisition.
+func WithMaxRetries(maxRetries int) DistributedLockManagerOption {
+	return func(m *DistributedLockManager) {
+		m.maxRetries = maxRetries
+	}
+}

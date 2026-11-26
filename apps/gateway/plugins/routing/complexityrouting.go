@@ -212,11 +212,6 @@ func (p *RoutingPlugin) classifyRouterRequest(
 	return result
 }
 
-// classifyComplexityInput classifies with the Complexity Router page's classifiers.
-func (p *RoutingPlugin) classifyComplexityInput(ctx *schemas.BifrostContext, input complexity.ComplexityInput) complexityProposal {
-	return p.classifyRouterInput(ctx, input, p.complexityRuntime())
-}
-
 // classifyRouterInput selects the router's configured primary classifier and fallback chain.
 func (p *RoutingPlugin) classifyRouterInput(ctx *schemas.BifrostContext, input complexity.ComplexityInput, rt *modelRouterRuntime) complexityProposal {
 	config := rt.config.Load()
@@ -380,14 +375,6 @@ func (p *RoutingPlugin) publishLocalSessionFallback(
 func (p *RoutingPlugin) logComplexitySessionStoreError(operation string, err error) {
 	if p.logger != nil {
 		p.logger.Warn("[Routing] complexity session store %s failed: %v", operation, err)
-	}
-}
-
-// publishComplexityProposal publishes a classifier result and its routing log.
-func publishComplexityProposal(ctx *schemas.BifrostContext, proposal complexityProposal) {
-	publishComplexityDecision(ctx, proposal.Result, proposal.Mechanism, proposal.Score)
-	if proposal.LogMessage != "" {
-		ctx.AppendRoutingEngineLog(schemas.RoutingEngineRoutingRule, proposal.LogLevel, proposal.LogMessage)
 	}
 }
 

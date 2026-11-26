@@ -849,33 +849,3 @@ func FitSuggestions(suggestions []suggest.Suggestion, room int, dropped *int64) 
 	}
 	return kept
 }
-
-// WithinRoom keeps the suggestions whose phrases fit the room left in the
-// phrase bank, heaviest cluster first (the order they were asked in), and
-// counts the actionable ones that did not fit. Non-actionable outcomes add no
-// phrases and are always kept, so reconciliation still supersedes what they
-// cover. A negative room means no bound.
-func WithinRoom(suggestions []suggest.Suggestion, room int, dropped *int64) []suggest.Suggestion {
-	if room < 0 {
-		return suggestions
-	}
-	kept := suggestions[:0]
-	used := 0
-	for _, sg := range suggestions {
-		if sg.Category.Actionable() {
-			if used+len(sg.Phrases) > room {
-				*dropped++
-				continue
-			}
-			used += len(sg.Phrases)
-		}
-		kept = append(kept, sg)
-	}
-	return kept
-}
-
-// withoutRepeatedPhrases is FitSuggestions with no bound on the room.
-func withoutRepeatedPhrases(suggestions []suggest.Suggestion) []suggest.Suggestion {
-	var dropped int64
-	return FitSuggestions(suggestions, -1, &dropped)
-}

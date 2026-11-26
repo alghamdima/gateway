@@ -2852,41 +2852,6 @@ func TestToAnthropicChatRequest_AllowedToolsNoneNameableStillMeansNone(t *testin
 	assert.Len(t, filtered, 2, "both server tools are still there")
 }
 
-// TestStopSequence_ChatResponseEgress verifies that a chat response's StopString becomes
-// stop_reason "stop_sequence" with the matched string, while a plain stop maps to end_turn.
-func TestStopSequence_ChatResponseEgress(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		stopString *string
-		wantReason AnthropicStopReason
-		wantSeq    *string
-	}{
-		{"matched sequence", schemas.Ptr("###"), AnthropicStopReasonStopSequence, schemas.Ptr("###")},
-		{"plain stop", nil, AnthropicStopReasonEndTurn, nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			result := ToAnthropicChatResponse(&schemas.BifrostChatResponse{
-				Model: "claude-sonnet-4-5",
-				Choices: []schemas.BifrostResponseChoice{{
-					FinishReason: schemas.Ptr(string(schemas.BifrostFinishReasonStop)),
-					ChatNonStreamResponseChoice: &schemas.ChatNonStreamResponseChoice{
-						Message: &schemas.ChatMessage{
-							Role:    schemas.ChatMessageRoleAssistant,
-							Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("1 2 3")},
-						},
-						StopString: tt.stopString,
-					},
-				}},
-			})
-			assertStopFields(t, result.StopReason, result.StopSequence, tt.wantReason, tt.wantSeq)
-		})
-	}
-}
-
 // Anthropic takes images in a tool_result; audio a tool returned becomes a placeholder beside them.
 func TestToAnthropicChatRequest_ToolResultKeepsImagesNamesOtherMedia(t *testing.T) {
 	req := &schemas.BifrostChatRequest{
@@ -2895,10 +2860,10 @@ func TestToAnthropicChatRequest_ToolResultKeepsImagesNamesOtherMedia(t *testing.
 		Input: []schemas.ChatMessage{
 			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("plot it")}},
 			{Role: schemas.ChatMessageRoleTool, ChatToolMessage: &schemas.ChatToolMessage{ToolCallID: schemas.Ptr("toolu_1")}, Content: &schemas.ChatMessageContent{ContentBlocks: []schemas.ChatContentBlock{
-		{Type: schemas.ChatContentBlockTypeText, Text: schemas.Ptr("chart below")},
-		{Type: schemas.ChatContentBlockTypeImage, ImageURLStruct: &schemas.ChatInputImage{URL: "data:image/png;base64,iVBORw0KGgo="}},
-		{Type: schemas.ChatContentBlockTypeInputAudio, InputAudio: &schemas.ChatInputAudio{Data: "SUQz", Format: schemas.Ptr("mp3")}},
-	}}},
+				{Type: schemas.ChatContentBlockTypeText, Text: schemas.Ptr("chart below")},
+				{Type: schemas.ChatContentBlockTypeImage, ImageURLStruct: &schemas.ChatInputImage{URL: "data:image/png;base64,iVBORw0KGgo="}},
+				{Type: schemas.ChatContentBlockTypeInputAudio, InputAudio: &schemas.ChatInputAudio{Data: "SUQz", Format: schemas.Ptr("mp3")}},
+			}}},
 		},
 	}
 	ctx, cancel := schemas.NewBifrostContextWithCancel(context.Background())

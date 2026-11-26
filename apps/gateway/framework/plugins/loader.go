@@ -1,3 +1,4 @@
+// Package plugins provides a framework for dynamically loading and managing plugins
 package plugins
 
 import "github.com/maximhq/bifrost/core/schemas"

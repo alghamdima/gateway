@@ -780,7 +780,7 @@ func sendFactoryMatrixRequest(t *testing.T, factory *HTTPClientFactory, purpose 
 }
 
 // factoryMatrixSSRFPolicy is the policy the "ssrf" client kind enforces.
-var factoryMatrixSSRFPolicy = SSRFPolicy(nil)
+var factoryMatrixSSRFPolicy = SSRFPolicyWithDialTimeout(0, nil)
 
 // factoryMatrixTLS stands in for a caller's own TLS settings (HTTPClientWithTLS).
 var factoryMatrixTLS = &tls.Config{MinVersion: tls.VersionTLS12, ServerName: "custom.example"}
@@ -1120,12 +1120,11 @@ func TestPolicyTransport_ProxiedTunnelIsBoundToTheCheckedAddress(t *testing.T) {
 	})
 }
 
-// TestDefaultHTTPClientFactoryRouting pins the process defaults (DefaultTransport,
-// DefaultProxyFunc, DefaultGRPCDialer) that outbound call sites without a factory handle
-// use: they follow the registered factory's global proxy for the purpose, fall back to
-// http.DefaultTransport's own selector when the global proxy is off or no factory is
-// registered, and resolve the factory per request, so clients built before the server
-// registers it still follow it.
+// TestDefaultHTTPClientFactoryRouting pins the process defaults (DefaultProxyFunc,
+// DefaultGRPCDialer) that outbound call sites without a factory handle use: they follow
+// the registered factory's global proxy for the purpose, fall back to
+// http.DefaultTransport's own selector when no factory is registered, and resolve the
+// factory per request, so values built before the server registers it still follow it.
 func TestDefaultHTTPClientFactoryRouting(t *testing.T) {
 	set := proxytest.NewSet(t)
 	t.Cleanup(func() { SetDefaultHTTPClientFactory(nil) })
@@ -1138,24 +1137,11 @@ func TestDefaultHTTPClientFactoryRouting(t *testing.T) {
 	t.Cleanup(func() { defaultTransport.Proxy = previous })
 
 	// Built before any factory is registered.
-	client := &http.Client{Transport: DefaultTransport(ClientPurposeAPI)}
 	proxyFunc := DefaultProxyFunc(ClientPurposeAPI)
 	dialer := DefaultGRPCDialer(ClientPurposeAPI)
 	req, _ := http.NewRequest(http.MethodGet, "https://api.bifrost.test/v1", nil)
 
-	send := func() {
-		ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-		defer cancel()
-		r, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.bifrost.test/v1", nil)
-		if resp, err := client.Do(r); err == nil {
-			resp.Body.Close()
-		}
-	}
-
-	// No factory: exactly http.DefaultTransport.
-	set.Reset()
-	send()
-	proxytest.AssertRoute(t, set, proxytest.Route{Proxy: "env-https"}, "api.bifrost.test:443", nil)
+	// No factory: http.DefaultTransport's selector.
 	if got, _ := proxyFunc(req); got == nil || got.Host != envProxy.Host {
 		t.Errorf("no factory: DefaultProxyFunc = %v, want the DefaultTransport selector's %v", got, envProxy)
 	}
@@ -1165,9 +1151,6 @@ func TestDefaultHTTPClientFactoryRouting(t *testing.T) {
 		Enabled: true, Type: GlobalProxyTypeHTTP, URL: "http://127.0.0.1:" + set.Config.Port(),
 		NoProxy: "bypass.bifrost.test", EnableForAPI: true,
 	}, noopTestLogger{}))
-	set.Reset()
-	send()
-	proxytest.AssertRoute(t, set, proxytest.Route{Proxy: "config"}, "api.bifrost.test:443", nil)
 	if got, _ := proxyFunc(req); got == nil || got.Port() != set.Config.Port() {
 		t.Errorf("global proxy on: DefaultProxyFunc = %v, want the global proxy", got)
 	}
@@ -1182,14 +1165,6 @@ func TestDefaultHTTPClientFactoryRouting(t *testing.T) {
 		conn.Close()
 	}
 	proxytest.AssertRoute(t, set, proxytest.Route{Proxy: "config"}, "api.bifrost.test:443", nil)
-
-	// Factory with the global proxy off for API: back to DefaultTransport's selector.
-	SetDefaultHTTPClientFactory(NewHTTPClientFactory(&GlobalProxyConfig{
-		Enabled: true, Type: GlobalProxyTypeHTTP, URL: "http://127.0.0.1:" + set.Config.Port(), EnableForSCIM: true,
-	}, noopTestLogger{}))
-	set.Reset()
-	send()
-	proxytest.AssertRoute(t, set, proxytest.Route{Proxy: "env-https"}, "api.bifrost.test:443", nil)
 }
 
 // TestGRPCDialersConnectUnixSockets pins that the gRPC dialers connect a unix-socket
@@ -1298,25 +1273,6 @@ func TestGRPCPassthroughTarget(t *testing.T) {
 	}
 }
 
-// TestHTTPClientFactoryApplyOptions pins that options applied to a factory after it
-// handed out clients reach them: enterprise adds its SCIM header buffer sizes to the
-// factory the config loader built.
-func TestHTTPClientFactoryApplyOptions(t *testing.T) {
-	factory := NewHTTPClientFactory(nil, noopTestLogger{})
-	live := factory.GetFasthttpClient(ClientPurposeSCIM)
-	if inner := factory.currentFasthttpClient(ClientPurposeSCIM); inner.ReadBufferSize != 0 {
-		t.Fatalf("ReadBufferSize = %d before any option, want fasthttp's default (0)", inner.ReadBufferSize)
-	}
-	factory.ApplyOptions(WithFasthttpBufferSizes(64*1024, 32*1024))
-	inner := factory.currentFasthttpClient(ClientPurposeSCIM)
-	if inner.ReadBufferSize != 64*1024 || inner.WriteBufferSize != 32*1024 {
-		t.Errorf("SCIM inner client buffers = %d/%d, want 65536/32768", inner.ReadBufferSize, inner.WriteBufferSize)
-	}
-	if factory.GetFasthttpClient(ClientPurposeSCIM) != live {
-		t.Error("ApplyOptions must keep the live client object")
-	}
-}
-
 // TestLiveFasthttpClientHonorsDisablePathNormalizing pins that a copy of the live
 // client with DisablePathNormalizing set still sends an escaped path segment (%2F)
 // as written, while a client that did not ask for it keeps fasthttp's default
@@ -1373,7 +1329,7 @@ func TestRawPathInnerClientFollowsProxyUpdates(t *testing.T) {
 	if !first.DisablePathNormalizing {
 		t.Fatal("raw-path inner client must have DisablePathNormalizing set")
 	}
-	if factory.currentFasthttpClient(ClientPurposeAPI).DisablePathNormalizing {
+	if factory.currentFasthttpClientFor(fasthttpClientKey{purpose: ClientPurposeAPI}).DisablePathNormalizing {
 		t.Fatal("default inner client must keep fasthttp's path normalization")
 	}
 

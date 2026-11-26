@@ -2177,11 +2177,6 @@ func createTestSQLiteConfigStore(t *testing.T, dir string) configstore.ConfigSto
 	return store
 }
 
-// makeConfigDataWithProviders creates a ConfigData with only providers configured
-func makeConfigDataWithProviders(providers map[string]configstore.ProviderConfig) *ConfigData {
-	return makeConfigDataWithProvidersAndDir(providers, "")
-}
-
 // makeConfigDataWithProvidersAndDir creates a ConfigData with providers and a specific temp directory for the DB
 func makeConfigDataWithProvidersAndDir(providers map[string]configstore.ProviderConfig, tempDir string) *ConfigData {
 	dbPath := filepath.Join(tempDir, "config.db")
@@ -2201,11 +2196,6 @@ func makeConfigDataWithProvidersAndDir(providers map[string]configstore.Provider
 		},
 		Providers: providers,
 	}
-}
-
-// makeConfigDataWithVirtualKeys creates a ConfigData with providers and virtual keys
-func makeConfigDataWithVirtualKeys(providers map[string]configstore.ProviderConfig, vks []tables.TableVirtualKey) *ConfigData {
-	return makeConfigDataWithVirtualKeysAndDir(providers, vks, "")
 }
 
 // makeConfigDataWithVirtualKeysAndDir creates a ConfigData with providers, virtual keys, and a specific temp directory
@@ -2230,11 +2220,6 @@ func makeConfigDataWithVirtualKeysAndDir(providers map[string]configstore.Provid
 			VirtualKeys: vks,
 		},
 	}
-}
-
-// makeConfigDataFull creates a full ConfigData with all configurations
-func makeConfigDataFull(client *configstore.ClientConfig, providers map[string]configstore.ProviderConfig, governance *configstore.GovernanceConfig) *ConfigData {
-	return makeConfigDataFullWithDir(client, providers, governance, "")
 }
 
 // makeConfigDataFullWithDir creates a full ConfigData with all configurations and a specific temp directory
@@ -2279,16 +2264,6 @@ func makeProviderConfigWithNetwork(keyName, keyValue, baseURL string) configstor
 	}
 }
 
-// makeProviderConfigWithMultipleKeys creates a provider config with multiple keys
-func makeProviderConfigWithMultipleKeys(keys []schemas.Key, baseURL string) configstore.ProviderConfig {
-	return configstore.ProviderConfig{
-		Keys: keys,
-		NetworkConfig: &schemas.NetworkConfig{
-			BaseURL: baseURL,
-		},
-	}
-}
-
 // makeVirtualKey creates a virtual key for testing
 func makeVirtualKey(id, name, value string) tables.TableVirtualKey {
 	return tables.TableVirtualKey{
@@ -2297,64 +2272,6 @@ func makeVirtualKey(id, name, value string) tables.TableVirtualKey {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar(value),
 		IsActive:    schemas.Ptr(true),
-	}
-}
-
-// makeVirtualKeyWithTeam creates a virtual key with team association
-func makeVirtualKeyWithTeam(id, name, value, teamID string) tables.TableVirtualKey {
-	return tables.TableVirtualKey{
-		ID:          id,
-		Name:        name,
-		Description: "Test virtual key with team",
-		Value:       *schemas.NewSecretVar(value),
-		IsActive:    schemas.Ptr(true),
-		TeamID:      &teamID,
-	}
-}
-
-// makeVirtualKeyWithCustomer creates a virtual key with customer association
-func makeVirtualKeyWithCustomer(id, name, value, customerID string) tables.TableVirtualKey {
-	return tables.TableVirtualKey{
-		ID:          id,
-		Name:        name,
-		Description: "Test virtual key with customer",
-		Value:       *schemas.NewSecretVar(value),
-		IsActive:    schemas.Ptr(true),
-		CustomerID:  &customerID,
-	}
-}
-
-// makeVirtualKeyWithProviderConfigs creates a virtual key with provider configurations
-func makeVirtualKeyWithProviderConfigs(id, name, value string, providerConfigs []tables.TableVirtualKeyProviderConfig) tables.TableVirtualKey {
-	return tables.TableVirtualKey{
-		ID:              id,
-		Name:            name,
-		Description:     "Test virtual key with provider configs",
-		Value:           *schemas.NewSecretVar(value),
-		IsActive:        schemas.Ptr(true),
-		ProviderConfigs: providerConfigs,
-	}
-}
-
-// makeVirtualKeyProviderConfig creates a provider config for virtual keys
-func makeVirtualKeyProviderConfig(provider string, weight float64, allowedModels []string, keys []tables.TableKey) tables.TableVirtualKeyProviderConfig {
-	return tables.TableVirtualKeyProviderConfig{
-		Provider:      provider,
-		Weight:        &weight,
-		AllowedModels: allowedModels,
-		Keys:          keys,
-	}
-}
-
-// makeTableKey creates a TableKey for use in virtual key provider configs
-func makeTableKey(keyID, name, value, provider string) tables.TableKey {
-	defaultWeight := 1.0
-	return tables.TableKey{
-		KeyID:    keyID,
-		Name:     name,
-		Value:    *schemas.NewSecretVar(value),
-		Provider: provider,
-		Weight:   &defaultWeight,
 	}
 }
 
@@ -2387,16 +2304,6 @@ func verifyVirtualKeyInDB(t *testing.T, store configstore.ConfigStore, vkID stri
 		t.Fatalf("virtual key %s not found in DB", vkID)
 	}
 	return vk
-}
-
-// verifyVirtualKeyNotInDB checks that a virtual key does NOT exist in the database
-func verifyVirtualKeyNotInDB(t *testing.T, store configstore.ConfigStore, vkID string) {
-	t.Helper()
-	ctx := context.Background()
-	vk, err := store.GetVirtualKey(ctx, vkID)
-	if err == nil && vk != nil {
-		t.Fatalf("virtual key %s should not exist in DB but was found", vkID)
-	}
 }
 
 // Tests
@@ -13453,70 +13360,6 @@ func TestSQLite_SourceOfTruthConfigJSON_ModelConfigOwnedBudgetPruned(t *testing.
 	require.False(t, modelIDs["api-model"], "API model config should be pruned")
 }
 
-// TestSQLite_SourceOfTruthConfigJSON_KeepsModelConfigsOfScopesTheFileCannotDeclare: config.json
-// declares model configs only under "global" and "virtual_key", so a row under any other scope - the
-// enterprise build's per-model limits for an access profile - is not the file's to prune, and neither
-// are the budgets and rate limit that row owns. A global row the file dropped is still pruned.
-func TestSQLite_SourceOfTruthConfigJSON_KeepsModelConfigsOfScopesTheFileCannotDeclare(t *testing.T) {
-	initTestLogger()
-	tables.RegisterModelConfigScope(tables.ModelConfigScopeEntityAccessProfile)
-	tempDir := createTempDir(t)
-	tokenMax := int64(1000)
-	tokenDur := "1h"
-	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-	configData.Governance = &configstore.GovernanceConfig{
-		Budgets:      []tables.TableBudget{{ID: "file-budget", MaxLimit: 100.0, ResetDuration: "1d"}},
-		RateLimits:   []tables.TableRateLimit{{ID: "file-rl", TokenMaxLimit: &tokenMax, TokenResetDuration: &tokenDur}},
-		ModelConfigs: []tables.TableModelConfig{{ID: "file-model", ModelName: "gpt-file", Scope: "global"}},
-	}
-	createConfigFile(t, tempDir, configData)
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	// The rows the enterprise build materializes for an access profile's per-model budget.
-	require.NoError(t, config1.ConfigStore.CreateRateLimit(ctx, &tables.TableRateLimit{ID: "profile-rl", TokenMaxLimit: &tokenMax, TokenResetDuration: &tokenDur}))
-	require.NoError(t, config1.ConfigStore.CreateModelConfig(ctx, &tables.TableModelConfig{
-		ID: "profile-model", ModelName: "gpt-4o", Scope: tables.ModelConfigScopeEntityAccessProfile,
-		ScopeID: stringPtr("7"), RateLimitID: stringPtr("profile-rl"),
-	}))
-	require.NoError(t, config1.ConfigStore.CreateBudget(ctx, &tables.TableBudget{
-		ID: "profile-budget", MaxLimit: 10.0, ResetDuration: "1d", ModelConfigID: stringPtr("profile-model"),
-	}))
-	require.NoError(t, config1.ConfigStore.CreateModelConfig(ctx, &tables.TableModelConfig{ID: "api-model", ModelName: "gpt-api", Scope: "global"}))
-	config1.Close(ctx)
-
-	configData.SourceOfTruth = SourceOfTruthConfigJSON
-	createConfigFile(t, tempDir, configData)
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-
-	gov, err := config2.ConfigStore.GetGovernanceConfig(ctx)
-	require.NoError(t, err)
-	ids := map[string]bool{}
-	for _, mc := range gov.ModelConfigs {
-		ids["model:"+mc.ID] = true
-	}
-	for _, b := range gov.Budgets {
-		ids["budget:"+b.ID] = true
-	}
-	for _, rl := range gov.RateLimits {
-		ids["rate_limit:"+rl.ID] = true
-	}
-	assert.True(t, ids["model:profile-model"], "a profile's per-model limit is not the file's to prune")
-	assert.True(t, ids["budget:profile-budget"], "nor the budget it owns")
-	assert.True(t, ids["rate_limit:profile-rl"], "nor its rate limit")
-	assert.False(t, ids["model:api-model"], "a global row the file does not declare is still pruned")
-	assert.True(t, ids["model:file-model"])
-
-	inMemory := map[string]bool{}
-	for _, mc := range config2.GovernanceConfig.ModelConfigs {
-		inMemory[mc.ID] = true
-	}
-	assert.True(t, inMemory["profile-model"], "what survives in the store survives in memory")
-}
-
 // TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardKeepsWhatItProtects: the budgets and rate limits
 // the registered guard claims - rows the enterprise build owns, such as an access profile's - survive
 // the prune, while every other row the file dropped goes. The guard is asked only about the rows the
@@ -16026,11 +15869,6 @@ func TestGenerateVirtualKeyHash_ProviderConfigRateLimit(t *testing.T) {
 			}
 		})
 	}
-}
-
-// intPtr is a helper to create a pointer to an int
-func intPtr(i int) *int {
-	return &i
 }
 
 // int64Ptr is a helper to create a pointer to an int64
@@ -21948,4 +21786,48 @@ func TestIgnoreBudgetBusinessUnitIDs(t *testing.T) {
 
 	ignoreBudgetBusinessUnitIDs(nil, func(string, ...any) { t.Fatal("no warning for a nil config") })
 	ignoreBudgetBusinessUnitIDs(&ConfigData{}, func(string, ...any) { t.Fatal("no warning without governance") })
+}
+
+// DrainStartupAuditChanges returns and clears the config.json syncs recorded
+// since the last call.
+func DrainStartupAuditChanges() []configstore.AuditChange {
+	startupAuditMu.Lock()
+	defer startupAuditMu.Unlock()
+	out := startupAuditChanges
+	startupAuditChanges = nil
+	return out
+}
+
+// getWeight safely dereferences a *float64 weight pointer, returning 1.0 as default if nil.
+// This allows distinguishing between "not set" (nil -> 1.0) and "explicitly set to 0" (0.0).
+func getWeight(w *float64) float64 {
+	if w == nil {
+		return 1.0
+	}
+	return *w
+}
+
+// RegisterVirtualKeyPruneGuard installs the guard consulted by
+// pruneGovernanceConfigToFile before deleting virtual keys. Must be called before
+// LoadConfig.
+func RegisterVirtualKeyPruneGuard(fn VirtualKeyPruneGuard) {
+	virtualKeyPruneGuardMu.Lock()
+	virtualKeyPruneGuard = fn
+	virtualKeyPruneGuardMu.Unlock()
+}
+
+// RegisterGovernanceLimitPruneGuard installs the guard consulted by pruneGovernanceConfigToFile
+// before deleting budgets and rate limits. Must be called before LoadConfig. Passing nil clears it.
+func RegisterGovernanceLimitPruneGuard(fn GovernanceLimitPruneGuard) {
+	governanceLimitPruneGuardMu.Lock()
+	governanceLimitPruneGuard = fn
+	governanceLimitPruneGuardMu.Unlock()
+}
+
+// RegisterConfigStoreReadyHook installs the hook LoadConfig calls once its config store is open.
+// Must be called before LoadConfig. Passing nil clears it.
+func RegisterConfigStoreReadyHook(fn ConfigStoreReadyHook) {
+	configStoreReadyHookMu.Lock()
+	configStoreReadyHook = fn
+	configStoreReadyHookMu.Unlock()
 }

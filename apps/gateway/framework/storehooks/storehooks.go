@@ -31,17 +31,6 @@ var (
 	hooks []PoolOpenedFn
 )
 
-// RegisterPoolOpened adds fn to the hooks run for every new runtime pool. Call
-// it before the stores are created; pools opened earlier are not replayed.
-func RegisterPoolOpened(fn PoolOpenedFn) {
-	if fn == nil {
-		return
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	hooks = append(hooks, fn)
-}
-
 // PoolOpened runs every registered hook for a pool that was just opened and is
 // not yet in use. Stores call it for each runtime pool, including one that
 // replaces a refreshed pool.

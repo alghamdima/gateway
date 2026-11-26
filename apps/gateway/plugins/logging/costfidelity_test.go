@@ -1804,3 +1804,13 @@ func TestTypedPassthroughRowRepricesAsItsType(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, legacy, "an untyped passthrough row has nothing to reprice from")
 }
+
+// calculateCostForLog reprices a stored log row and returns the total. Thin
+// wrapper over calculateCostBreakdownForLog for callers that only need the scalar.
+func (p *LoggerPlugin) calculateCostForLog(logEntry *logstore.Log) (float64, error) {
+	bd, err := p.calculateCostBreakdownForLog(logEntry)
+	if bd == nil {
+		return 0, err
+	}
+	return bd.TotalCost, err
+}

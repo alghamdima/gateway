@@ -6,53 +6,6 @@ import (
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 )
 
-func TestHeaderMatchesPattern(t *testing.T) {
-	tests := []struct {
-		pattern    string
-		headerName string
-		want       bool
-	}{
-		// Exact match
-		{"anthropic-beta", "anthropic-beta", true},
-		{"anthropic-beta", "anthropic-alpha", false},
-
-		// Case insensitive exact match
-		{"Anthropic-Beta", "anthropic-beta", true},
-		{"anthropic-beta", "Anthropic-Beta", true},
-
-		// Star matches all
-		{"*", "anything", true},
-		{"*", "", true},
-
-		// Prefix wildcard
-		{"anthropic-*", "anthropic-beta", true},
-		{"anthropic-*", "anthropic-version", true},
-		{"anthropic-*", "anthropic-", true},
-		{"anthropic-*", "openai-version", false},
-		{"anthropic-*", "anthropic", false},
-
-		// Case insensitive prefix wildcard
-		{"Anthropic-*", "anthropic-beta", true},
-		{"anthropic-*", "Anthropic-Beta", true},
-
-		// No match
-		{"foo", "bar", false},
-		{"", "foo", false},
-
-		// Pattern without wildcard doesn't prefix match
-		{"anthropic-", "anthropic-beta", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.pattern+"_"+tt.headerName, func(t *testing.T) {
-			got := HeaderMatchesPattern(tt.pattern, tt.headerName)
-			if got != tt.want {
-				t.Errorf("HeaderMatchesPattern(%q, %q) = %v, want %v", tt.pattern, tt.headerName, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestNewHeaderMatcher_Nil(t *testing.T) {
 	m := NewHeaderMatcher(nil)
 	if m != nil {

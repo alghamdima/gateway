@@ -19,8 +19,7 @@ type SpanBuildOptions struct {
 // BuildLLMSpanData assembles the typed payload for an LLM-call span.
 //
 // Chat is the only family filled today; the others fall through with identity
-// and usage populated, and land their params as the remaining Populate*
-// functions are migrated.
+// and usage populated, and land their params as each family is migrated.
 func BuildLLMSpanData(
 	req *schemas.BifrostRequest,
 	resp *schemas.BifrostResponse,

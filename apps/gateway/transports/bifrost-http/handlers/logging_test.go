@@ -1622,3 +1622,16 @@ func TestGetLogTrace(t *testing.T) {
 	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
 	require.NotContains(t, string(ctx.Response.Body()), "chain_length")
 }
+
+// RegisterRankingNameResolver installs the name resolver for a ranking
+// dimension, replacing the built-in one. A nil fn removes the registration.
+// Intended to be called at startup; safe to call concurrently.
+func RegisterRankingNameResolver(dim logstore.RankingDimension, fn RankingNameResolver) {
+	rankingNameResolversMu.Lock()
+	defer rankingNameResolversMu.Unlock()
+	if fn == nil {
+		delete(rankingNameResolvers, dim)
+		return
+	}
+	rankingNameResolvers[dim] = fn
+}

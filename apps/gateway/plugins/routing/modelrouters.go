@@ -52,8 +52,8 @@ func (rt *modelRouterRuntime) logEngine() string {
 	return schemas.RoutingEngineModelRouter
 }
 
-// publishProposal publishes a classifier result and its routing log, as
-// publishComplexityProposal does, tagged with the runtime's engine.
+// publishProposal publishes a classifier result and its routing log, tagged with
+// the runtime's engine.
 func (rt *modelRouterRuntime) publishProposal(ctx *schemas.BifrostContext, proposal complexityProposal) {
 	publishComplexityDecision(ctx, proposal.Result, proposal.Mechanism, proposal.Score)
 	if proposal.LogMessage != "" {

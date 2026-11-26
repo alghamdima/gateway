@@ -270,7 +270,7 @@ func newFetchClient(proxyConfig *schemas.ProxyConfig) *http.Client {
 // fetchClientKey is the set of resolved values that change which client a fetch needs.
 // It is a comparable struct used directly as the cache key: the values already live in
 // memory on the provider's ProxyConfig, so keying by them exposes nothing new, and no
-// hashing is needed. Everything that NetHTTPProxy treats as "no proxy" maps to the
+// hashing is needed. Everything that NetHTTPProxyWithHopTLS treats as "no proxy" maps to the
 // zero key.
 type fetchClientKey struct {
 	proxyType schemas.ProxyType

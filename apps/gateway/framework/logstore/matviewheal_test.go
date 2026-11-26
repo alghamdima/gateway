@@ -184,3 +184,9 @@ func TestFilterMatViewShapeErrorFallsBack(t *testing.T) {
 	assert.Contains(t, models, "gpt-4")
 	assert.False(t, store.matViewsReady.Load())
 }
+
+// resetMatViewHeal clears the single-flight and cooldown state. Test helper.
+func (s *RDBLogStore) resetMatViewHeal() {
+	s.matViewHealInFlight.Store(false)
+	s.matViewHealLastAttempt.Store(0)
+}

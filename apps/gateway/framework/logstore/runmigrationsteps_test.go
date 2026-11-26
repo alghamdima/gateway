@@ -116,3 +116,8 @@ func TestRunMigrationSteps_PreflightErrorRunsEveryStep(t *testing.T) {
 
 	assert.Equal(t, map[string]int{"a": 1, "b": 1}, calls)
 }
+
+// runMigrationSteps is runMigrationStepsWithRetry with the package's retry options.
+func runMigrationSteps(ctx context.Context, db *gorm.DB, logger schemas.Logger, steps []migrationStep) error {
+	return runMigrationStepsWithRetry(ctx, db, logger, steps, migrationStepLockRetry)
+}

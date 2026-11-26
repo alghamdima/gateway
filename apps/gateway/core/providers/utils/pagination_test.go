@@ -233,21 +233,6 @@ func TestBuildNextCursor_EmptyKeyList(t *testing.T) {
 	}
 }
 
-// --- HasMoreKeys ---
-
-func TestHasMoreKeys(t *testing.T) {
-	helper, _ := NewSerialListHelper(makeKeys(3), nil, nil, false)
-	if !helper.HasMoreKeys() {
-		t.Fatal("expected HasMoreKeys=true when on key 0 of 3")
-	}
-
-	encoded := schemas.EncodeSerialCursor(schemas.NewSerialCursor(2, ""))
-	helper2, _ := NewSerialListHelper(makeKeys(3), &encoded, nil, false)
-	if helper2.HasMoreKeys() {
-		t.Fatal("expected HasMoreKeys=false when on last key")
-	}
-}
-
 // TestBuildNextCursorWithinKey pins that a listing under one object never moves to another key.
 func TestBuildNextCursorWithinKey(t *testing.T) {
 	if cursor, more := BuildNextCursorWithinKey(2, false, "x"); cursor != "" || more {

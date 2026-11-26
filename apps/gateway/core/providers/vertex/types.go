@@ -1,10 +1,7 @@
 package vertex
 
 import (
-	"time"
-
 	"github.com/maximhq/bifrost/core/providers/gemini"
-	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 )
 
 // Vertex AI Embedding API types
@@ -73,21 +70,6 @@ type VertexAudioConfig struct {
 	VolumeGainDB     float64  `json:"volumeGainDb,omitempty"`
 	SampleRateHertz  int      `json:"sampleRateHertz,omitempty"`
 	EffectsProfileID []string `json:"effectsProfileId,omitempty"`
-}
-
-type VertexRequestBody struct {
-	RequestBody map[string]interface{} `json:"-"`
-	ExtraParams map[string]interface{} `json:"-"`
-}
-
-func (r *VertexRequestBody) GetExtraParams() map[string]interface{} {
-	return r.ExtraParams
-}
-
-// MarshalJSON implements custom JSON marshalling for VertexRequestBody.
-// It marshals the RequestBody field directly without wrapping.
-func (r *VertexRequestBody) MarshalJSON() ([]byte, error) {
-	return providerUtils.MarshalSorted(r.RequestBody)
 }
 
 // VertexRawRequestBody holds pre-serialized JSON bytes to preserve key ordering
@@ -223,34 +205,6 @@ type VertexEmbeddingResponse struct {
 // ================================ Model Types ================================
 
 const MaxPageSize = 100
-
-type VertexModel struct {
-	Name              string                `json:"name"`
-	VersionId         string                `json:"versionId"`
-	VersionAliases    []string              `json:"versionAliases"`
-	VersionCreateTime time.Time             `json:"versionCreateTime"`
-	DisplayName       string                `json:"displayName"`
-	Description       string                `json:"description"`
-	DeployedModels    []VertexDeployedModel `json:"deployedModels"`
-	Labels            VertexModelLabels     `json:"labels"`
-}
-
-type VertexListModelsResponse struct {
-	Models        []VertexModel `json:"models"`
-	NextPageToken string        `json:"nextPageToken"`
-}
-
-type VertexDeployedModel struct {
-	CheckpointID string `json:"checkpointId"`
-	DeploymentID string `json:"deploymentId"`
-	Endpoint     string `json:"endpoint"`
-}
-
-type VertexModelLabels struct {
-	GoogleVertexLLMTuningBaseModelId string `json:"google-vertex-llm-tuning-base-model-id"`
-	GoogleVertexLLMTuningJobId       string `json:"google-vertex-llm-tuning-job-id"`
-	TuneType                         string `json:"tune-type"`
-}
 
 // ================================ Publisher Model Types ================================
 // These types are for the publishers.models.list endpoint (Model Garden)

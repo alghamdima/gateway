@@ -423,23 +423,6 @@ func ResolvePrivateNetworkTarget(ctx context.Context, host string) ([]net.IP, er
 	return ips, nil
 }
 
-// CheckPrivateNetworkLiteral applies the PrivateNetworkDialContext destination
-// policy to host without any DNS lookup: an IP literal (with or without IPv6
-// brackets) is checked, and a hostname is accepted as-is. It exists for the
-// case where the connection is handed to an intermediary, such as an HTTP
-// proxy, that resolves names on its own side: resolving locally there would
-// make the request depend on DNS the host may not have (a proxy-only
-// deployment), and would still not bind what the proxy connects to. So the
-// caller enforces what it can verify without DNS, and name resolution for the
-// proxied path is left to the proxy, which is operator configuration.
-func CheckPrivateNetworkLiteral(host string) error {
-	ip := net.ParseIP(strings.Trim(host, "[]"))
-	if ip == nil {
-		return nil
-	}
-	return checkPrivateNetworkPolicy(ip, host)
-}
-
 // PrivateNetworkDialContext returns a DialContext that, unlike
 // SSRFSafeDialContext, permits loopback, RFC1918/unique-local, and CGNAT
 // destinations. It still blocks link-local addresses (including the
@@ -494,40 +477,14 @@ const maxRedirectHops = 5
 // context; this is only the early check.
 const guardedRedirectDNSTimeout = 5 * time.Second
 
-// NewSSRFSafeHTTPClient returns an *http.Client for fetching URLs that an
-// untrusted party can influence (a configured catalog URL, a discovery
-// document, a redirect Location). It is the strict policy: every connection is
-// dialed through SSRFSafeDialContext, so loopback, private, CGNAT, link-local,
-// unique-local, and IPv6-transition-wrapped internal targets are refused at
-// dial time (which also defeats DNS rebinding), and every redirect hop is
-// vetted by the same rule before it is followed. Only http and https are
-// dialable: the transport has no handler for file or any other scheme, and a
-// redirect to one is refused in CheckRedirect. Redirects stop after
-// maxRedirectHops. The process HTTP(S)_PROXY environment is honored the way
-// http.DefaultTransport honors it; on a proxied request the dialer sees the
-// proxy, so the destination policy runs in the proxy selector instead, against
-// the local resolver's answer, and a name only the proxy can resolve is left to
-// the proxy - see guardedProxySelector and vetGuardedDestination.
-//
-// Callers that must reach a self-hosted target on the operator's own network
-// use NewPrivateNetworkHTTPClient instead; this client never does.
-func NewSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
-	return newGuardedHTTPClient(timeout, SSRFSafeDialContext(timeout), func(ip net.IP, host string) error {
-		if !IsPublicIP(ip) {
-			return fmt.Errorf("blocked redirect to non-public address %s (host %s)", ip, host)
-		}
-		return nil
-	})
-}
-
-// NewPrivateNetworkHTTPClient is the PrivateNetworkDialContext counterpart of
-// NewSSRFSafeHTTPClient, for fetchers whose documented primary use includes
+// NewPrivateNetworkHTTPClient returns an *http.Client dialed through
+// PrivateNetworkDialContext, for fetchers whose documented primary use includes
 // targets on the operator's own network (a datasheet mirror). Loopback, RFC 1918, unique-local,
 // and CGNAT destinations are dialable; unspecified, link-local (169.254/16,
 // fe80::/10, and the 6to4/NAT64/Teredo forms of 169.254/16) and the
 // non-link-local cloud metadata endpoints are refused at dial time, on every
-// redirect hop, and on an IP-literal destination handed to a proxy. Same hop
-// cap and scheme rules as NewSSRFSafeHTTPClient. Like PrivateNetworkDialContext
+// redirect hop, and on an IP-literal destination handed to a proxy. Only http
+// and https are dialable, and redirects stop after maxRedirectHops. Like PrivateNetworkDialContext
 // itself, this is defense in depth against the categorically illegitimate
 // ranges, not an authorization check: callers remain responsible for gating
 // who may configure the URL.
@@ -535,11 +492,11 @@ func NewPrivateNetworkHTTPClient(timeout time.Duration) *http.Client {
 	return newGuardedHTTPClient(timeout, PrivateNetworkDialContext(timeout), checkPrivateNetworkPolicy)
 }
 
-// newGuardedHTTPClient assembles the client shared by NewSSRFSafeHTTPClient
-// and NewPrivateNetworkHTTPClient: dial is the per-connection gate, checkIP is
-// the same policy expressed as a per-address predicate, applied to redirect
-// targets (every resolved address must pass) and, through
-// guardedProxySelector, to IP-literal destinations on the proxied path. The
+// newGuardedHTTPClient assembles the client behind NewPrivateNetworkHTTPClient:
+// dial is the per-connection gate, checkIP is the same policy expressed as a
+// per-address predicate, applied to redirect targets (every resolved address
+// must pass) and, through guardedProxySelectorWith, to destinations on the
+// proxied path. The
 // proxy is the global proxy when it is enabled for API traffic, else the
 // environment's (DefaultProxyFunc).
 func newGuardedHTTPClient(timeout time.Duration, dial func(ctx context.Context, netw, addr string) (net.Conn, error), checkIP func(ip net.IP, host string) error) *http.Client {
@@ -552,7 +509,7 @@ func newGuardedHTTPClient(timeout time.Duration, dial func(ctx context.Context, 
 // A request the proxy selector sends through a proxy goes over a separate transport
 // whose dialer only ever reaches the proxy, under the private-network policy: an
 // operator's proxy on a private or loopback address is the normal self-hosted setup,
-// and the destination itself is vetted by guardedProxySelector before the proxy sees it.
+// and the destination itself is vetted by guardedProxySelectorWith before the proxy sees it.
 func newGuardedHTTPClientWith(timeout time.Duration, dial func(ctx context.Context, netw, addr string) (net.Conn, error), checkIP func(ip net.IP, host string) error, proxy func(*http.Request) (*url.URL, error), resolver ipLookuper) *http.Client {
 	return newGuardedHTTPClientWithPolicy(timeout, dial, checkIP, proxy, resolver, true)
 }
@@ -614,22 +571,17 @@ func newGuardedHTTPClientWithPolicy(timeout time.Duration, dial func(ctx context
 	}
 }
 
-// guardedProxySelector wraps an http.Transport Proxy selector so the
+// guardedProxySelectorWith wraps an http.Transport Proxy selector so the
 // destination policy still applies to a request that is routed through a
 // proxy, where the dialer only ever sees the proxy address. It runs
 // vetGuardedDestination in proxied mode: an IP-literal destination is checked
 // without DNS, a hostname is checked against what the local resolver returns,
 // and a hostname the local resolver cannot answer is handed to the proxy,
-// which resolves it on its own side (a proxy-only egress deployment). The
-// proxy itself is operator configuration (process environment) and is the
-// policy boundary for anything resolved only there; the dialer still refuses a
-// proxy that sits on a blocked address. A nil selector stays nil.
-func guardedProxySelector(next func(*http.Request) (*url.URL, error), checkIP func(ip net.IP, host string) error, resolver ipLookuper) func(*http.Request) (*url.URL, error) {
-	return guardedProxySelectorWith(next, checkIP, resolver, true)
-}
-
-// guardedProxySelectorWith is guardedProxySelector with the unresolved-destination rule chosen:
-// deferUnresolved false refuses a hostname the local resolver cannot answer.
+// which resolves it on its own side (a proxy-only egress deployment), unless
+// deferUnresolved is false, which refuses it. The proxy itself is operator
+// configuration and is the policy boundary for anything resolved only there;
+// the dialer still refuses a proxy that sits on a blocked address. A nil
+// selector stays nil.
 func guardedProxySelectorWith(next func(*http.Request) (*url.URL, error), checkIP func(ip net.IP, host string) error, resolver ipLookuper, deferUnresolved bool) func(*http.Request) (*url.URL, error) {
 	if next == nil {
 		return nil

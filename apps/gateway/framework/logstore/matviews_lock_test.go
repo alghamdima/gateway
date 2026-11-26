@@ -88,7 +88,7 @@ func TestRefreshMatViewsAdvisoryLockLifecycle(t *testing.T) {
 	t.Run("normal refresh releases lock", func(t *testing.T) {
 		resetTestMatViewRefreshGate()
 
-		require.NoError(t, refreshMatViews(context.Background(), db, 0))
+		require.NoError(t, refreshMatViews(context.Background(), db, 0, matViewSessionLimits{}))
 
 		conn := acquireTestAdvisoryLock(t, db, matviewRefreshAdvisoryLockKey)
 		releaseTestAdvisoryLock(t, conn, matviewRefreshAdvisoryLockKey)
@@ -103,7 +103,7 @@ func TestRefreshMatViewsAdvisoryLockLifecycle(t *testing.T) {
 		defer cancel()
 
 		start := time.Now()
-		require.NoError(t, refreshMatViews(ctx, db, 0))
+		require.NoError(t, refreshMatViews(ctx, db, 0, matViewSessionLimits{}))
 		assert.Less(t, time.Since(start), time.Second)
 	})
 
@@ -118,7 +118,7 @@ func TestRefreshMatViewsAdvisoryLockLifecycle(t *testing.T) {
 			resetTestMatViewRefreshGate()
 
 			ctx, cancel := context.WithTimeout(context.Background(), budget)
-			err := refreshMatViews(ctx, db, 0)
+			err := refreshMatViews(ctx, db, 0, matViewSessionLimits{})
 			cancel()
 			if err != nil {
 				timedOut = true
@@ -139,7 +139,7 @@ func TestRefreshMatViewsAdvisoryLockLifecycle(t *testing.T) {
 		holderDB, holder := acquireTestAdvisoryLockOnIsolatedPool(t, matviewRefreshAdvisoryLockKey)
 		closeTestAdvisoryLockSession(t, holderDB, holder)
 
-		require.NoError(t, refreshMatViews(context.Background(), db, 0))
+		require.NoError(t, refreshMatViews(context.Background(), db, 0, matViewSessionLimits{}))
 
 		conn := acquireTestAdvisoryLock(t, db, matviewRefreshAdvisoryLockKey)
 		releaseTestAdvisoryLock(t, conn, matviewRefreshAdvisoryLockKey)
@@ -154,11 +154,11 @@ func TestEnsureMatViewsSharesRefreshAdvisoryLock(t *testing.T) {
 	require.False(t, testMatViewExists(t, db, "mv_filter_users"))
 
 	holder := acquireTestAdvisoryLock(t, db, matviewRefreshAdvisoryLockKey)
-	require.NoError(t, ensureMatViews(ctx, db))
+	require.NoError(t, ensureMatViews(ctx, db, matViewSessionLimits{}))
 	require.False(t, testMatViewExists(t, db, "mv_filter_users"), "ensureMatViews should skip while refresh lock is held elsewhere")
 
 	releaseTestAdvisoryLock(t, holder, matviewRefreshAdvisoryLockKey)
-	require.NoError(t, ensureMatViews(ctx, db))
+	require.NoError(t, ensureMatViews(ctx, db, matViewSessionLimits{}))
 	require.True(t, testMatViewExists(t, db, "mv_filter_users"))
 }
 
@@ -479,7 +479,7 @@ func TestCloseCancelsRunningMatViewRefresh(t *testing.T) {
 	require.True(t, store.goMaintenance(func() {
 		ctx, cancel := context.WithTimeout(store.maintenanceContext(), time.Hour)
 		defer cancel()
-		passErr <- refreshMatViewsLimited(ctx, storeDB, 0, store.matViewLimits)
+		passErr <- refreshMatViews(ctx, storeDB, 0, store.matViewLimits)
 	}))
 	require.Eventually(t, func() bool { return refreshBackendCount(t, observer) == 1 },
 		10*time.Second, 50*time.Millisecond, "the refresh must be running before Close")
@@ -527,4 +527,14 @@ func TestResolveMatViewTempFileLimit(t *testing.T) {
 	require.Equal(t, "", resolveMatViewTempFileLimit("20 gigs", testLogger{}))
 	// Out of the server's range: dropped at startup, not failed on every pass.
 	require.Equal(t, "", resolveMatViewTempFileLimit("2TB", testLogger{}))
+}
+
+// allMatViewNames returns the names of every materialized view this package
+// manages, hourly first.
+func allMatViewNames() []string {
+	names := []string{"mv_logs_hourly"}
+	for _, v := range filterMatViews {
+		names = append(names, v.name)
+	}
+	return names
 }

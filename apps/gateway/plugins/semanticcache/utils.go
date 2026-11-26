@@ -227,19 +227,6 @@ func decodeBase64Embedding(s string) ([]float32, error) {
 	return vals, nil
 }
 
-// uint8ToFloat32Embedding promotes a uint8/ubinary embedding to float32 for
-// cosine-similarity search in the semantic cache.
-func uint8ToFloat32Embedding(values []uint8) []float32 {
-	if len(values) == 0 {
-		return nil
-	}
-	embedding := make([]float32, len(values))
-	for i, value := range values {
-		embedding[i] = float32(value)
-	}
-	return embedding
-}
-
 // flattenToFloat32Embedding concatenates a 2D embedding (one inner slice per
 // input chunk) into a single flat []float32. Used when the provider returns
 // per-chunk embeddings that we want to store as a single vector.

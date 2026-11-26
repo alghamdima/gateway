@@ -358,3 +358,8 @@ func TestConcurrent_FiftyRequestsOnABalanceForTenAdmitExactlyTen(t *testing.T) {
 		t.Fatalf("after the 10 settled: %+v", s)
 	}
 }
+
+// flush waits until every accepted settlement has been written or given up on.
+func (bg *background) flush() {
+	bg.pending.Wait()
+}

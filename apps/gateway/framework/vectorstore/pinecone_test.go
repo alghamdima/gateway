@@ -16,7 +16,7 @@ import (
 const (
 	PineconeTestTimeout          = 30 * time.Second
 	PineconeTestNamespace        = "bifrost-test-namespace"
-	PineconeTestDimension        = 1536 // Matches text-embedding-3-small dimension
+	PineconeTestDimension        = 1536             // Matches text-embedding-3-small dimension
 	PineconeTestDefaultAPIKey    = "pclocal"        // Pinecone Local doesn't validate API keys
 	PineconeTestDefaultIndexHost = "localhost:5081" // Pinecone Local default port
 )
@@ -260,77 +260,6 @@ func TestBuildPineconeCondition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := buildPineconeCondition(tt.query)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestMatchesQueries(t *testing.T) {
-	tests := []struct {
-		name     string
-		props    map[string]interface{}
-		queries  []Query
-		expected bool
-	}{
-		{
-			name:     "empty queries matches all",
-			props:    map[string]interface{}{"type": "document"},
-			queries:  []Query{},
-			expected: true,
-		},
-		{
-			name:     "equal match",
-			props:    map[string]interface{}{"type": "document"},
-			queries:  []Query{{Field: "type", Operator: QueryOperatorEqual, Value: "document"}},
-			expected: true,
-		},
-		{
-			name:     "equal no match",
-			props:    map[string]interface{}{"type": "document"},
-			queries:  []Query{{Field: "type", Operator: QueryOperatorEqual, Value: "image"}},
-			expected: false,
-		},
-		{
-			name:     "not equal match",
-			props:    map[string]interface{}{"type": "document"},
-			queries:  []Query{{Field: "type", Operator: QueryOperatorNotEqual, Value: "image"}},
-			expected: true,
-		},
-		{
-			name:     "is null match",
-			props:    map[string]interface{}{"type": "document"},
-			queries:  []Query{{Field: "author", Operator: QueryOperatorIsNull, Value: nil}},
-			expected: true,
-		},
-		{
-			name:     "is not null match",
-			props:    map[string]interface{}{"type": "document", "author": "alice"},
-			queries:  []Query{{Field: "author", Operator: QueryOperatorIsNotNull, Value: nil}},
-			expected: true,
-		},
-		{
-			name:  "multiple queries all match",
-			props: map[string]interface{}{"type": "document", "public": true},
-			queries: []Query{
-				{Field: "type", Operator: QueryOperatorEqual, Value: "document"},
-				{Field: "public", Operator: QueryOperatorEqual, Value: true},
-			},
-			expected: true,
-		},
-		{
-			name:  "multiple queries one fails",
-			props: map[string]interface{}{"type": "document", "public": false},
-			queries: []Query{
-				{Field: "type", Operator: QueryOperatorEqual, Value: "document"},
-				{Field: "public", Operator: QueryOperatorEqual, Value: true},
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := matchesQueries(tt.props, tt.queries)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

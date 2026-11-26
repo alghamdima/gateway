@@ -1286,3 +1286,10 @@ func TestBuildChatMessageFromChunks_CustomToolCall(t *testing.T) {
 		t.Fatalf("custom call carries a function object: %s", body)
 	}
 }
+
+// getLastChatChunk returns the chunk with the highest ChunkIndex (contains metadata like TokenUsage, Cost)
+func (sa *StreamAccumulator) getLastChatChunk() *ChatStreamChunk {
+	sa.mu.Lock()
+	defer sa.mu.Unlock()
+	return sa.getLastChatChunkLocked()
+}

@@ -1,9 +1,7 @@
 package bifrost
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -726,20 +724,6 @@ func GetResponseRoutingInfo(result *schemas.BifrostResponse, err *schemas.Bifros
 	return schemas.RoutingInfo{}
 }
 
-// MarshalUnsafe marshals the given value to a JSON string without escaping HTML characters.
-// Returns empty string if marshaling fails.
-func MarshalUnsafe(v any) string {
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetEscapeHTML(false)
-	err := encoder.Encode(v)
-	if err != nil {
-		return ""
-	}
-	// Encode adds a trailing newline, trim it
-	return strings.TrimSpace(buf.String())
-}
-
 // // [Deprecated] use err.GetErrorString() instead. Will be removed in a future release.
 func GetErrorMessage(err *schemas.BifrostError) string {
 	return err.GetErrorString()
@@ -773,18 +757,6 @@ func GetBoolFromContext(ctx context.Context, key any) bool {
 		}
 	}
 	return false
-}
-
-// RedactSensitiveString redacts sensitive information in a string
-func RedactSensitiveString(s string) string {
-	if s == "" {
-		return ""
-	}
-	// Show first 4 and last 4 characters for identification, rest is [REDACTED]
-	if len(s) <= 8 {
-		return "[REDACTED]"
-	}
-	return s[:4] + "[REDACTED]" + s[len(s)-4:]
 }
 
 // externalURLDNSLookupTimeout bounds the DNS resolution in ValidateExternalURL. The

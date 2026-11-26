@@ -57,7 +57,7 @@ func TestConvertToolResultWithoutContentField(t *testing.T) {
 
 			// Default path (native Anthropic, Vertex, Azure ingress).
 			ctx := schemas.NewBifrostContext(nil, schemas.NoDeadline)
-			plain := convertAnthropicContentBlocksToResponsesMessages(ctx, blocks, &role, false, "")
+			plain := convertAnthropicContentBlocksToResponsesMessagesOrdered(ctx, blocks, &role, false, "", false)
 			assertSingleFunctionCallOutput(t, "default", plain, *tc.block.ToolUseID)
 		})
 	}

@@ -642,8 +642,8 @@ func convertChatParameters(ctx *schemas.BifrostContext, bifrostReq *schemas.Bifr
 		responseFormatTool, _ = convertResponseFormatToTool(ctx, bifrostReq.Model, bifrostReq.Params)
 	}
 
-	// Filter provider-unsupported server tools once; both convertToolConfig and
-	// collectBedrockServerTools consume the same filtered set, and
+	// Filter provider-unsupported server tools once; both convertToolConfigFromFiltered and
+	// collectBedrockServerToolsFromFiltered consume the same filtered set, and
 	// buildBedrockServerToolChoice resolves pinned names against it.
 	filteredTools, providerDropped := anthropic.ValidateChatToolsForProvider(bifrostReq.Params.Tools, caps)
 
@@ -1559,25 +1559,6 @@ func mergeOrderedMapInto(dst, src *schemas.OrderedMap) {
 		dst.Set(key, srcVal)
 		return true
 	})
-}
-
-func newAnthropicOutputFormatOrderedMap(schemaObj any) *schemas.OrderedMap {
-	// Normalize multi-type arrays (["string","null"], ["string","integer"]) into anyOf branches
-	// so Bedrock's schema validator accepts them. Map inputs use the in-memory normalizer;
-	// json.RawMessage / []byte inputs use the sjson-based normalizer to avoid map round-trips.
-	// OrderedMap schemas are passed through unchanged.
-	switch v := schemaObj.(type) {
-	case map[string]interface{}:
-		schemaObj = anthropic.NormalizeSchemaForAnthropic(v)
-	case json.RawMessage:
-		schemaObj = anthropic.NormalizeSchemaForAnthropicRaw(v)
-	case []byte:
-		schemaObj = anthropic.NormalizeSchemaForAnthropicRaw(json.RawMessage(v))
-	}
-	return schemas.NewOrderedMapFromPairs(
-		schemas.KV("type", "json_schema"),
-		schemas.KV("schema", schemaObj),
-	)
 }
 
 // appendAnthropicBetaToFields merges a single beta header value into
@@ -3550,7 +3531,7 @@ func converseReasoningEffortLevels(ctx *schemas.BifrostContext, caps schemas.Mod
 //
 // Takes the canonical model id rather than ModelCaps because the message
 // converters that need it hold exactly that and no BifrostContext; they resolve
-// caps inline the same way convertToolConfig does.
+// caps inline the same way convertToolConfigFromFiltered does.
 func converseReasoningShape(model string) schemas.BedrockReasoningShape {
 	fallback := schemas.BedrockReasoningShapeText
 	if schemas.IsGrokModel(model) || schemas.IsOpenAIModel(model) {
@@ -3644,39 +3625,14 @@ func convertInferenceConfig(params *schemas.ChatParameters, caps schemas.ModelCa
 	return &config
 }
 
-// collectBedrockServerTools partitions kept tools into the function/custom
-// set (which convertToolConfig materializes into Converse's toolConfig.tools)
-// and the kept-server-tool set (which cannot be expressed via Converse's
-// typed toolSpec slot and must be tunneled via additionalModelRequestFields).
-//
-// Returns:
-//   - serverTools:  each ChatTool serialized to its Anthropic-native JSON shape
-//     (e.g. `{"type":"computer_20251124","name":"computer","display_width_px":1280}`)
-//     ready to drop into additionalModelRequestFields.tools. Per the comment on
-//     ChatTool in core/schemas/chatcompletions.go:340-351, the default marshaler
-//     produces this shape directly — no custom codec needed.
-//   - betaHeaders:  anthropic-beta header values derived from the server tool
-//     Types, filtered through FilterBetaHeadersForProvider(schemas.Bedrock) so
-//     only Bedrock-approved headers survive. Only high-confidence mappings are
-//     derived here (computer_* and memory_*); callers relying on other betas
-//     (e.g. text_editor-specific headers) should continue supplying them via
-//     extra-headers / ctx — they flow through bedrock.go's existing
-//     anthropic-beta HTTP header path.
-//
-// Unsupported server tools (e.g. web_search on Bedrock) are dropped upstream
-// by ValidateChatToolsForProvider, so they never reach this helper.
-func collectBedrockServerTools(model string, params *schemas.ChatParameters) (serverTools []json.RawMessage, betaHeaders []string) {
-	if params == nil || len(params.Tools) == 0 {
-		return nil, nil
-	}
-	filtered, _ := anthropic.ValidateChatToolsForProvider(params.Tools, schemas.ResolveModelCaps(schemas.Bedrock, model))
-	return collectBedrockServerToolsFromFiltered(filtered)
-}
-
-// collectBedrockServerToolsFromFiltered is the inner variant that accepts a
-// pre-filtered tool set (already run through ValidateChatToolsForProvider).
-// convertChatParameters filters once and passes the result to both this helper
-// and convertToolConfigFromFiltered to avoid re-filtering twice per request.
+// collectBedrockServerToolsFromFiltered takes a tool set already run through
+// ValidateChatToolsForProvider and returns the kept server tools, which cannot be
+// expressed via Converse's typed toolSpec slot and are tunneled via
+// additionalModelRequestFields.tools, each in its Anthropic-native JSON shape,
+// plus the anthropic-beta header values derived from their types (filtered
+// through FilterBetaHeadersForProvider(schemas.Bedrock)). convertChatParameters
+// filters once and passes the result to both this helper and
+// convertToolConfigFromFiltered.
 func collectBedrockServerToolsFromFiltered(filtered []schemas.ChatTool) (serverTools []json.RawMessage, betaHeaders []string) {
 	if len(filtered) == 0 {
 		return nil, nil
@@ -3720,14 +3676,14 @@ func collectBedrockServerToolsFromFiltered(filtered []schemas.ChatTool) (serverT
 // Converse's typed toolConfig.toolChoice path cannot express the caller's
 // intent:
 //
-//   - Named pin of a kept server tool: convertToolConfig builds toolConfig.tools
+//   - Named pin of a kept server tool: convertToolConfigFromFiltered builds toolConfig.tools
 //     from function/custom tools only, and its reconciliation (around line
 //     1274) drops any named pin that doesn't match an entry in that slice.
 //     Server-tool names never appear there, so a legitimate pin like
 //     tool_choice={type:"function", function:{name:"computer"}} gets silently
 //     nuked. We tunnel {"type":"tool","name":"computer"} instead so the
 //     forced-tool contract reaches Anthropic via Bedrock's merge.
-//   - any/required with only server tools: convertToolConfig returns nil
+//   - any/required with only server tools: convertToolConfigFromFiltered returns nil
 //     entirely (empty-slice guard since bedrockTools is empty), so the typed
 //     "any" contract is lost. We tunnel {"type":"any"} to preserve it.
 //
@@ -3905,34 +3861,15 @@ func (g *bedrockStrictGate) forward(strict *bool) *bool {
 	return strict
 }
 
-// convertToolConfig converts Bifrost tools to Bedrock tool config.
-//
-// Responsibilities (split from collectBedrockServerTools):
-//   - Filters server tools the target provider doesn't support via
-//     ValidateChatToolsForProvider (e.g. web_search on Bedrock per cited
-//     docs — AWS user guide beta-header list, Anthropic overview feature
-//     table). Silently stripped.
-//   - Materializes function/custom tools into Converse's typed toolConfig.tools.
-//     Kept server tools (bash_*, computer_*, memory_*, text_editor_*,
-//     tool_search_tool_*) are NOT emitted here — they are handled separately
-//     by collectBedrockServerTools → additionalModelRequestFields.tools, since
-//     Converse's toolSpec slot has no shape for them.
-//   - Returns nil instead of an empty-slice ToolConfig, since Bedrock's
-//     Converse API rejects `"toolConfig": {"tools": []}` with a 400.
-func convertToolConfig(model string, params *schemas.ChatParameters) *BedrockToolConfig {
-	if params == nil || len(params.Tools) == 0 {
-		return nil
-	}
-	// Strip unsupported server tools before the conversion loop.
-	filtered, _ := anthropic.ValidateChatToolsForProvider(params.Tools, schemas.ResolveModelCaps(schemas.Bedrock, model))
-	toolConfig, _, _ := convertToolConfigFromFiltered(nil, model, schemas.ResolveModelCaps(schemas.Bedrock, model), params, filtered)
-	return toolConfig
-}
-
-// convertToolConfigFromFiltered is the inner variant that accepts a
-// pre-filtered tool set. convertChatParameters uses this to avoid filtering
-// twice (once here, once in collectBedrockServerTools). The public
-// convertToolConfig entry point is a thin wrapper preserved for tests.
+// convertToolConfigFromFiltered converts Bifrost tools to a Bedrock tool config
+// from a tool set already run through ValidateChatToolsForProvider, so
+// convertChatParameters filters once for this and
+// collectBedrockServerToolsFromFiltered. It materializes function/custom tools
+// into Converse's typed toolConfig.tools; kept server tools (bash_*, computer_*,
+// memory_*, text_editor_*, tool_search_tool_*) are left to
+// collectBedrockServerToolsFromFiltered, since Converse's toolSpec slot has no
+// shape for them. It returns nil instead of an empty-slice ToolConfig, since
+// Converse rejects `"toolConfig": {"tools": []}` with a 400.
 //
 // ctx is the BifrostContext (not context.Context) so the family gates inside
 // this function can consult the resolved alias and honor explicit

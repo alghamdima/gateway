@@ -225,19 +225,6 @@ func TestReleaseSnapshotRetainsNothing(t *testing.T) {
 	}
 }
 
-func TestTraceSessionIDAccessor(t *testing.T) {
-	if got := TraceSessionID(nil); got != "" {
-		t.Errorf("TraceSessionID(nil) = %q, want empty", got)
-	}
-	if got := TraceSessionID(map[string]any{TraceAttrSessionID: "sess-1"}); got != "sess-1" {
-		t.Errorf("TraceSessionID = %q, want sess-1", got)
-	}
-	// Wrong type must not panic.
-	if got := TraceSessionID(map[string]any{TraceAttrSessionID: 42}); got != "" {
-		t.Errorf("TraceSessionID(int) = %q, want empty", got)
-	}
-}
-
 func TestTraceDimensionsAccessor(t *testing.T) {
 	if got := TraceDimensions(nil); got != nil {
 		t.Errorf("TraceDimensions(nil) = %v, want nil", got)
@@ -287,18 +274,4 @@ func TestTraceMergeDimensions(t *testing.T) {
 	}
 	var none *Trace
 	none.MergeDimensions(map[string]string{"team": "vk"})
-}
-
-func TestTraceTraceStateAccessor(t *testing.T) {
-	if got := TraceTraceState(nil); got != "" {
-		t.Errorf("TraceTraceState(nil) = %q, want empty", got)
-	}
-	const ts = "dd=s:2;t.llmobs_ml_app:checkout-agent"
-	if got := TraceTraceState(map[string]any{TraceAttrTraceState: ts}); got != ts {
-		t.Errorf("TraceTraceState() = %q, want %q", got, ts)
-	}
-	// A trace decoded from JSON could carry another type; it must not panic or guess.
-	if got := TraceTraceState(map[string]any{TraceAttrTraceState: 42}); got != "" {
-		t.Errorf("TraceTraceState() with a non-string = %q, want empty", got)
-	}
 }

@@ -44,7 +44,6 @@ type sonicSession struct {
 	// client → model
 	config           sonicSessionConfig
 	started          bool
-	liveInput        bool
 	audioContentName string
 	history          []sonicHistoryMessage
 

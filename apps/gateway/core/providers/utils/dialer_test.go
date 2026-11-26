@@ -361,25 +361,6 @@ func TestConfigureDialer_WithRetryOnStaleConnection(t *testing.T) {
 	t.Logf("Second POST succeeded after TTL mismatch via ConfigureDialer")
 }
 
-// TestConfigureRetry_Deprecated verifies the deprecated ConfigureRetry still works.
-func TestConfigureRetry_Deprecated(t *testing.T) {
-	client := &fasthttp.Client{}
-	result := ConfigureRetry(client)
-
-	if result != client {
-		t.Error("ConfigureRetry should return the same client pointer")
-	}
-	if client.RetryIfErr == nil {
-		t.Fatal("ConfigureRetry should set RetryIfErr")
-	}
-
-	// Verify it uses the same StaleConnectionRetryIfErr
-	reset, retry := client.RetryIfErr(nil, 1, fmt.Errorf("cannot find whitespace"))
-	if !reset || !retry {
-		t.Error("ConfigureRetry should install StaleConnectionRetryIfErr")
-	}
-}
-
 // TestConfigureDialer_SSRFProtection verifies that the default (no-proxy) dial
 // path rejects connections to private, loopback, and link-local addresses before
 // any TCP socket is opened.

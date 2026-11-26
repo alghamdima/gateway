@@ -85,20 +85,6 @@ func WithDefaultTTL(ttl time.Duration) DistributedLockManagerOption {
 	}
 }
 
-// WithRetryInterval sets the interval between lock acquisition retries.
-func WithRetryInterval(interval time.Duration) DistributedLockManagerOption {
-	return func(m *DistributedLockManager) {
-		m.retryInterval = interval
-	}
-}
-
-// WithMaxRetries sets the maximum number of retries for lock acquisition.
-func WithMaxRetries(maxRetries int) DistributedLockManagerOption {
-	return func(m *DistributedLockManager) {
-		m.maxRetries = maxRetries
-	}
-}
-
 // NewDistributedLockManager creates a new lock manager with the given store and options.
 func NewDistributedLockManager(store LockStore, logger schemas.Logger, opts ...DistributedLockManagerOption) *DistributedLockManager {
 	m := &DistributedLockManager{

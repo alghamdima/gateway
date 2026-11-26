@@ -876,3 +876,11 @@ func TestLoggedInputTextMatchesWhatClassificationEmbedded(t *testing.T) {
 	assert.Equal(t, "Compare them to Lamport clocks", LoggedInputText(nil, responses, "", 1))
 	assert.Empty(t, LoggedInputText(nil, nil, "", 1), "a log with no history has no text")
 }
+
+// BuildInput extracts text from normalized BifrostRequest values for
+// complexity_tier routing. It preserves the original boolean contract while
+// BuildInputWithDisposition exposes the finer session-aware outcome.
+func BuildInput(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (ComplexityInput, bool) {
+	input, disposition := BuildInputWithDisposition(ctx, req)
+	return input, disposition == InputClassifiable
+}

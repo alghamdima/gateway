@@ -155,16 +155,6 @@ func TestGuardrailJudgeCallUsageFieldsSerialize(t *testing.T) {
 	assert.InDelta(t, 0.0003, decoded.EstimatedCost, 1e-12)
 }
 
-func TestLegacyGuardrailDebugAPIsRemainCompatible(t *testing.T) {
-	ctx := NewBifrostContext(nil, NoDeadline)
-	metadata := &BifrostGuardrailDebug{JudgeCalls: []BifrostGuardrailJudgeCall{{TotalTokens: 1}}}
-	require.True(t, SetGuardrailDebugOnContext(ctx, metadata))
-
-	stored, ok := GuardrailDebugFromContext(ctx)
-	require.True(t, ok)
-	assert.Len(t, stored.JudgeCalls, 1)
-}
-
 // TestGuardrailMetadataKeepsDetectionOnlyMetadata verifies detections persist without any judge calls.
 func TestGuardrailMetadataKeepsDetectionOnlyMetadata(t *testing.T) {
 	ctx := NewBifrostContext(nil, NoDeadline)

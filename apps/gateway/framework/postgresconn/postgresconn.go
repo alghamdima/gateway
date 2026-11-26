@@ -202,24 +202,16 @@ func Validate(config *Config, requireStaticPassword bool) error {
 	return nil
 }
 
-// applicationNameBase is the process-wide application_name prefix set by
-// SetApplicationName; empty leaves DSNs without one.
+// applicationNameBase is the process-wide application_name prefix; empty, as it
+// is unless a test sets it, leaves DSNs without one.
 var applicationNameBase atomic.Value
 
 // maxApplicationNameLen is Postgres's NAMEDATALEN-1 limit; longer names are
 // truncated server-side, so they are cut here to keep the role suffix.
 const maxApplicationNameLen = 63
 
-// SetApplicationName sets the application_name prefix every store pool opened
-// after this call reports to Postgres, e.g. "bifrost-ip-10-0-1-13". Each store
-// appends its role ("-config", "-logs") so pg_stat_activity can attribute a
-// session to a node and a store. Empty disables it, which is the default.
-func SetApplicationName(base string) {
-	applicationNameBase.Store(base)
-}
-
 // WithApplicationName appends application_name=<base>-<role> to a libpq DSN
-// when SetApplicationName has set a base. The base is trimmed so the role
+// when a base is set. The base is trimmed so the role
 // suffix survives the 63-byte limit. Postgres hex-escapes anything outside
 // printable ASCII, which would lengthen the name past that limit and cut the
 // role off server-side, so such characters become '_' before the byte cut;
@@ -305,8 +297,7 @@ func Open(dsn string, config *Config, logger gormlogger.Interface) (*gorm.DB, er
 	return openGormFromSQLDB(sqlDB, logger)
 }
 
-// poolConnector opens a pool's connections. The driver it reports carries it,
-// so ConnectUnpooled can reach it from the pool.
+// poolConnector opens a pool's connections. The driver it reports carries it.
 type poolConnector struct{ driver.Connector }
 
 func (c poolConnector) Driver() driver.Driver {
@@ -316,28 +307,6 @@ func (c poolConnector) Driver() driver.Driver {
 type poolDriver struct {
 	driver.Driver
 	connector driver.Connector
-}
-
-// ConnectUnpooled opens a connection that sqlDB does not manage, the same way
-// sqlDB opens its own: the password command runs again and the session
-// settings apply. The caller closes it. ok is false when sqlDB was not opened
-// that way; its connections then need nothing beyond the settings an existing
-// one was opened with.
-func ConnectUnpooled(ctx context.Context, sqlDB *sql.DB) (conn *pgx.Conn, ok bool, err error) {
-	d, ok := sqlDB.Driver().(poolDriver)
-	if !ok {
-		return nil, false, nil
-	}
-	dc, err := d.connector.Connect(ctx)
-	if err != nil {
-		return nil, true, err
-	}
-	sc, isPgx := dc.(*stdlib.Conn)
-	if !isPgx {
-		_ = dc.Close()
-		return nil, true, fmt.Errorf("postgres driver connection %T", dc)
-	}
-	return sc.Conn(), true, nil
 }
 
 // runtimeSessionSettingsSQL returns the statement that applies the runtime

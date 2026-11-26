@@ -650,22 +650,6 @@ func TestMarshalSorted_Deterministic(t *testing.T) {
 			t.Fatalf("MarshalSorted() produced different output on iteration %d:\nfirst: %s\ngot:   %s", i, first, got)
 		}
 	}
-
-	// Also verify MarshalSortedIndent
-	firstIndent, err := MarshalSortedIndent(m, "", "  ")
-	if err != nil {
-		t.Fatalf("MarshalSortedIndent() error: %v", err)
-	}
-
-	for i := 0; i < 50; i++ {
-		got, err := MarshalSortedIndent(m, "", "  ")
-		if err != nil {
-			t.Fatalf("MarshalSortedIndent() iteration %d error: %v", i, err)
-		}
-		if string(got) != string(firstIndent) {
-			t.Fatalf("MarshalSortedIndent() produced different output on iteration %d:\nfirst: %s\ngot:   %s", i, firstIndent, got)
-		}
-	}
 }
 
 // TestCheckAndDecodeBody_ContentEncodings verifies that unary provider responses

@@ -8939,12 +8939,6 @@ func (u *videoUpstream) handler(w http.ResponseWriter, r *http.Request) {
 	notFound()
 }
 
-func (u *videoUpstream) calls() []string {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	return append([]string(nil), u.seen...)
-}
-
 func newVideoClient(t *testing.T, owners map[string][]string) (*Bifrost, *videoUpstream) {
 	t.Helper()
 	upstream := &videoUpstream{owners: owners}

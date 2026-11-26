@@ -5,7 +5,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -65,42 +64,6 @@ func endTransportPluginSpan(t schemas.Tracer, h schemas.SpanHandle, err error) {
 		t.EndSpan(h, schemas.SpanStatusError, err.Error())
 	} else {
 		t.EndSpan(h, schemas.SpanStatusOk, "")
-	}
-}
-
-// TimedMiddleware wraps an inference auth/routing middleware so its own work — the
-// time it spends before handing off — is recorded as a middleware.<name> overhead
-// span instead of hiding in the "core" bucket. The span ends the instant the wrapped
-// middleware invokes next (so the whole downstream request is excluded), or when it
-// short-circuits without calling next. Named middleware.<name> so the breakdown groups
-// these into a single "Middleware" category with a per-middleware drill-down. Applied
-// at the middleware-composition site; the wrapped middleware's body is untouched.
-func TimedMiddleware(name string, mw schemas.BifrostHTTPMiddleware) schemas.BifrostHTTPMiddleware {
-	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-		return func(ctx *fasthttp.RequestCtx) {
-			t, ok := ctx.UserValue(schemas.BifrostContextKeyTracer).(schemas.Tracer)
-			if !ok || t == nil {
-				// No trace on this request: run the middleware untimed.
-				mw(next)(ctx)
-				return
-			}
-			_, h := t.StartSpanID(ctx, "middleware."+name, schemas.SpanKindInternal)
-			ended := false
-			endOnce := func() {
-				if !ended {
-					ended = true
-					t.EndSpan(h, schemas.SpanStatusOk, "")
-				}
-			}
-			// End the span the moment the middleware hands off, so downstream time is
-			// excluded; endOnce below covers the short-circuit (no-next) path.
-			timedNext := func(c *fasthttp.RequestCtx) {
-				endOnce()
-				next(c)
-			}
-			mw(timedNext)(ctx)
-			endOnce()
-		}
 	}
 }
 
@@ -210,14 +173,6 @@ type badRequestError struct{ err error }
 
 func (e *badRequestError) Error() string { return e.err.Error() }
 func (e *badRequestError) Unwrap() error { return e.err }
-
-// IsBadRequestError reports whether err is a validation failure the caller should answer with 400,
-// as opposed to a store failure. Exported so builds that reuse this package's reconcilers can map
-// their errors the same way its own handlers do.
-func IsBadRequestError(err error) bool {
-	var bad *badRequestError
-	return errors.As(err, &bad)
-}
 
 // SendJSON sends a JSON response with 200 OK status.
 func SendJSON(ctx *fasthttp.RequestCtx, data interface{}) {
@@ -350,22 +305,6 @@ func streamLargeResponseIfActive(ctx *fasthttp.RequestCtx, bifrostCtx *schemas.B
 	return true
 }
 
-// SendSSEError sends an error in Server-Sent Events format
-func SendSSEError(ctx *fasthttp.RequestCtx, bifrostErr *schemas.BifrostError) {
-	errorJSON, err := json.Marshal(map[string]interface{}{
-		"error": bifrostErr,
-	})
-	if err != nil {
-		logger.Error("failed to marshal error for SSE: %v", err)
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		return
-	}
-
-	if _, err := fmt.Fprintf(ctx, "data: %s\n\n", errorJSON); err != nil {
-		logger.Warn(fmt.Sprintf("Failed to write SSE error: %v", err))
-	}
-}
-
 // IsOriginAllowed checks if the given origin is allowed based on localhost rules and configured allowed origins.
 // Localhost origins are always allowed. Additional origins can be configured in allowedOrigins.
 // Supports wildcard patterns like *.example.com to match any subdomain.
@@ -441,27 +380,6 @@ func matchesWildcardPattern(origin string, pattern string) bool {
 
 	actual, _ := wildcardRegexpCache.LoadOrStore(pattern, re)
 	return actual.(*regexp.Regexp).MatchString(origin)
-}
-
-// ParseModel parses a model string in the format "provider/model" or "provider/nested/model"
-// Returns the provider and full model name after the first slash
-func ParseModel(model string) (string, string, error) {
-	model = strings.TrimSpace(model)
-	if model == "" {
-		return "", "", fmt.Errorf("model cannot be empty")
-	}
-
-	parts := strings.SplitN(model, "/", 2)
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("model must be in the format 'provider/model'")
-	}
-
-	provider := strings.TrimSpace(parts[0])
-	name := strings.TrimSpace(parts[1])
-	if provider == "" || name == "" {
-		return "", "", fmt.Errorf("model must be in the format 'provider/model' with non-empty provider and model")
-	}
-	return provider, name, nil
 }
 
 // ClampPaginationParams applies default/max bounds to limit and offset so that

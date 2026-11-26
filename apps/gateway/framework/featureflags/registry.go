@@ -82,14 +82,6 @@ func Register(def FlagDef) error {
 	return nil
 }
 
-// MustRegister is the panicking variant intended for package init() use
-// where a registration error is a programming bug, not a runtime condition.
-func MustRegister(def FlagDef) {
-	if err := Register(def); err != nil {
-		panic(err)
-	}
-}
-
 // LookupDef returns the registered definition for a flag, or false if the
 // flag is not registered. Unregistered flags can still exist in DB/file as
 // stale data; the store handles them as registered=false in List().
@@ -111,12 +103,4 @@ func RegisteredDefs() []FlagDef {
 	registryMu.RUnlock()
 	sort.Slice(defs, func(i, j int) bool { return defs[i].ID < defs[j].ID })
 	return defs
-}
-
-// resetRegistryForTest clears the registry. Tests call this between cases
-// to keep registrations isolated; not exported beyond the package.
-func resetRegistryForTest() {
-	registryMu.Lock()
-	registry = map[string]FlagDef{}
-	registryMu.Unlock()
 }

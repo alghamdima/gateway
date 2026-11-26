@@ -6,8 +6,8 @@
 //
 // Everything here is a pure transformation of the bytes it is handed: no network, no logging,
 // no shared state. Classify and InferRequestType only read the route and suit the request path.
-// Parse and RedactStreamBody read whole bodies: the logging plugin parses from its batch writer,
-// and request-path callers use them on a complete body (a response, or a held stream's final chunk).
+// Parse reads whole bodies: the logging plugin parses from its batch writer, and request-path
+// callers use it on a complete body (a response, or a held stream's final chunk).
 package passthroughparse
 
 import (
@@ -88,8 +88,8 @@ func Classify(provider schemas.ModelProvider, model, method, path string) Route 
 	return Route{Wire: format.provider(), RequestType: requestType}
 }
 
-// StreamFormat names the declared format of the route's stream events, as RedactStreamBody and
-// schemas.RedactRawResponseText read it, or "" when Parse cannot assemble the route's stream.
+// StreamFormat names the declared format of the route's stream events, as
+// schemas.RedactRawResponseText reads it, or "" when Parse cannot assemble the route's stream.
 func (route Route) StreamFormat() schemas.RawResponseFormat {
 	switch route {
 	case Route{Wire: schemas.OpenAI, RequestType: schemas.ChatCompletionRequest}:

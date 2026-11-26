@@ -588,10 +588,7 @@ func categorizeGoroutine(g *GoroutineGroup) {
 		"CompleteAndFlushTrace",
 		"ProcessAndSend",
 		"handleProvider",
-		"Inject",                // Observability plugin inject
-		"insertInitialLogEntry", // Logging
-		"updateLogEntry",        // Logging
-		"retryOnNotFound",
+		"Inject", // Observability plugin inject
 		"BroadcastLogUpdate",
 	}
 

@@ -76,14 +76,6 @@ var (
 			"description": "The city name",
 		}),
 	)
-	// testPropsFromJSON is the same as testProps but with nested values as *OrderedMap
-	// (as produced by json.Unmarshal -> OrderedMap.UnmarshalJSON)
-	testPropsFromJSON = *schemas.NewOrderedMapFromPairs(
-		schemas.KV("location", schemas.NewOrderedMapFromPairs(
-			schemas.KV("type", "string"),
-			schemas.KV("description", "The city name"),
-		)),
-	)
 )
 
 // assertBedrockRequestEqual compares two BedrockConverseRequest objects

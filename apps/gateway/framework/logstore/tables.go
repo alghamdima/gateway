@@ -622,20 +622,6 @@ func (l *Log) IsUsageDegraded() bool {
 	return l != nil && l.usageRebuiltFromColumns
 }
 
-// NewLogEntryFromMap creates a new Log from a map[string]interface{}
-func NewLogEntryFromMap(entry map[string]interface{}) *Log {
-	var log Log
-	data, err := sonic.Marshal(entry)
-	if err != nil {
-		return nil
-	}
-	err = sonic.Unmarshal(data, &log)
-	if err != nil {
-		return nil
-	}
-	return &log
-}
-
 // TableName sets the table name for GORM
 func (Log) TableName() string {
 	return "logs"

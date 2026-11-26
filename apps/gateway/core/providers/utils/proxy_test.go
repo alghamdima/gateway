@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -1067,4 +1068,10 @@ func TestBareProxyURLTakesTypeScheme(t *testing.T) {
 			}
 		}
 	}
+}
+
+// NetHTTPProxy is NetHTTPProxyWithHopTLS without the proxy hop's own TLS config.
+func NetHTTPProxy(proxyConfig *schemas.ProxyConfig) (func(*http.Request) (*url.URL, error), *tls.Config, error) {
+	proxy, targetTLS, _, err := NetHTTPProxyWithHopTLS(proxyConfig)
+	return proxy, targetTLS, err
 }

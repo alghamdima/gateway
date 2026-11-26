@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"context"
 	"sync"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -85,24 +84,4 @@ func NewMockGovernanceStore() *MockGovernanceStore {
 
 func (m *MockGovernanceStore) GetBudgetAndRateLimitStatus(ctx *schemas.BifrostContext, provider schemas.ModelProvider, model string, budgetBaselines map[string]float64, tokenBaselines map[string]int64, requestBaselines map[string]int64) *governance.BudgetAndRateLimitStatus {
 	return m.Status
-}
-
-// newTestRuleStore builds an empty rule cache backed by no config store; tests add rules
-// through UpsertRule.
-func newTestRuleStore() (*LocalStore, error) {
-	return NewLocalStore(context.Background(), NewMockLogger(), nil)
-}
-
-// newTestEngine builds a rule store and an engine over it, returning both so tests can add
-// rules and then evaluate them.
-func newTestEngine(chainMaxDepth int) (*LocalStore, *Engine, error) {
-	rules, err := newTestRuleStore()
-	if err != nil {
-		return nil, nil, err
-	}
-	engine, err := NewEngine(rules, NewMockGovernanceStore(), NewMockLogger(), &chainMaxDepth)
-	if err != nil {
-		return nil, nil, err
-	}
-	return rules, engine, nil
 }

@@ -1,7 +1,5 @@
 package schemas
 
-import "context"
-
 // Entity identifies the target row family that a VisibilityFilter is being
 // resolved for. The provider closure stashed on the request context returns
 // only the dimensions relevant to the requested entity, leaving every other
@@ -78,23 +76,6 @@ type VisibilityFilter struct {
 	CustomerIDs     *[]string
 }
 
-// IsUnrestricted reports whether the filter has no dimensions set, in which
-// case query builders may skip applying any WHERE clause. A nil receiver is
-// also unrestricted, so a nil filter on context is equivalent to no filter.
-func (f *VisibilityFilter) IsUnrestricted() bool {
-	if f == nil {
-		return true
-	}
-	return f.UserIDs == nil &&
-		f.TeamIDs == nil &&
-		f.OwnTeamIDs == nil &&
-		f.VirtualKeyIDs == nil &&
-		f.RoutingScopes == nil &&
-		f.RoleIDs == nil &&
-		f.BusinessUnitIDs == nil &&
-		f.CustomerIDs == nil
-}
-
 // VisibilityFilterProvider returns the visibility filter to apply for a
 // given Entity. Returning nil signals full visibility (no filter applied).
 //
@@ -105,32 +86,3 @@ func (f *VisibilityFilter) IsUnrestricted() bool {
 // field is nil. This lets OSS query helpers stay agnostic of how the
 // filter is computed and keeps per-request allocations minimal.
 type VisibilityFilterProvider func(Entity) *VisibilityFilter
-
-// VisibilityFilterProviderFromContext returns the provider closure
-// stashed on the context, or nil when none is present (background jobs,
-// internal queries, requests that bypassed the upstream middleware,
-// OSS-only deployments without DAC). A nil provider is equivalent to
-// full visibility — query builders apply no WHERE clause.
-func VisibilityFilterProviderFromContext(ctx context.Context) VisibilityFilterProvider {
-	if ctx == nil {
-		return nil
-	}
-	if v := ctx.Value(BifrostContextKeyVisibilityFilterProvider); v != nil {
-		if p, ok := v.(VisibilityFilterProvider); ok {
-			return p
-		}
-	}
-	return nil
-}
-
-// FilterForEntity is a convenience that fetches the provider from ctx
-// and resolves the filter for entity in one call. Returns nil when no
-// provider is present (full visibility) or when the provider returns nil
-// for the requested entity (e.g. all-data scope).
-func FilterForEntity(ctx context.Context, entity Entity) *VisibilityFilter {
-	p := VisibilityFilterProviderFromContext(ctx)
-	if p == nil {
-		return nil
-	}
-	return p(entity)
-}

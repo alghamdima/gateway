@@ -2254,3 +2254,12 @@ func TestRedisStore_VectorReadGoesPastTheSearchLimit(t *testing.T) {
 	}
 	require.Len(t, seen, entries)
 }
+
+// WithDisableScanFallback returns a derived context that tells vector stores not
+// to fall back to full scans when indexed search fails.
+func WithDisableScanFallback(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, disableScanFallbackContextKey{}, true)
+}

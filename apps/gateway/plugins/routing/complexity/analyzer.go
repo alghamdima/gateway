@@ -16,11 +16,6 @@ type ComplexityAnalyzer struct {
 	matcher        *compiledKeywordMatcher
 }
 
-// NewComplexityAnalyzer creates an analyzer with built-in defaults.
-func NewComplexityAnalyzer() *ComplexityAnalyzer {
-	return NewComplexityAnalyzerWithConfig(nil)
-}
-
 // NewComplexityAnalyzerWithConfig creates an analyzer with runtime config.
 func NewComplexityAnalyzerWithConfig(config *AnalyzerConfig) *ComplexityAnalyzer {
 	resolved, err := ValidateAndNormalize(config)

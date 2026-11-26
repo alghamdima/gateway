@@ -413,41 +413,6 @@ func ensureProviderJobTable(t *testing.T, db *gorm.DB) error {
 	return db.Migrator().CreateTable(&tables.TableProviderJob{})
 }
 
-// credRow is the comparable projection of one credential or flow row.
-type credRow struct {
-	Tbl    string
-	ID     string
-	Status string
-}
-
-// snapshotCredentialState returns every OAuth and header credential/flow row as
-// (table, id, status), sorted, so two reconcile strategies can be compared.
-func snapshotCredentialState(t *testing.T, db *gorm.DB) []credRow {
-	t.Helper()
-	var out []credRow
-	for _, table := range []string{"mcp_oauth_tokens", "mcp_oauth_flows", "mcp_per_user_header_credentials", "mcp_per_user_header_flows"} {
-		var rows []credRow
-		require.NoError(t, db.Table(table).Select("? AS tbl, id, status", table).Scan(&rows).Error)
-		out = append(out, rows...)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Tbl != out[j].Tbl {
-			return out[i].Tbl < out[j].Tbl
-		}
-		return out[i].ID < out[j].ID
-	})
-	return out
-}
-
-// resetReconcileTables empties the tables seedReconcileFixture writes.
-func resetReconcileTables(t *testing.T, db *gorm.DB) {
-	t.Helper()
-	for _, table := range []string{"mcp_oauth_tokens", "mcp_oauth_flows", "mcp_per_user_header_credentials", "mcp_per_user_header_flows",
-		"governance_virtual_key_mcp_configs", "governance_virtual_keys", "config_mcp_clients"} {
-		require.NoError(t, db.Exec("DELETE FROM "+table).Error)
-	}
-}
-
 // TestHighFixGetRedactedVirtualKeysAppliesQueryScope pins that a QueryScope on ctx
 // restricts GetRedactedVirtualKeys on both the id-list and the list-all paths, as
 // it does for GetVirtualKey, so callers that resolve VK names through it cannot see

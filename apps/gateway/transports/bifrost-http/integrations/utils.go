@@ -150,46 +150,6 @@ func extractExactPath(ctx *fasthttp.RequestCtx) string {
 	return string(out)
 }
 
-// sendStreamError sends an error response for a streaming request that failed before streaming started.
-// It propagates the provider's HTTP status code and returns a JSON error body (not SSE format),
-// since no streaming has begun and clients should receive a standard error response.
-func (g *GenericRouter) sendStreamError(ctx *fasthttp.RequestCtx, bifrostCtx *schemas.BifrostContext, config RouteConfig, bifrostErr *schemas.BifrostError) {
-	bifrostErr = lib.SanitizeBifrostErrorForClient(bifrostErr)
-	if bifrostErr == nil {
-		bifrostErr = newBifrostErrorWithCode(nil, lib.ClientSafeInternalErrorMessage, fasthttp.StatusInternalServerError)
-	}
-
-	// Forward provider response headers from context so streaming error responses include them
-	if bifrostCtx != nil {
-		if headers, ok := bifrostCtx.Value(schemas.BifrostContextKeyProviderResponseHeaders).(map[string]string); ok {
-			lib.ForwardProviderResponseHeaders(ctx, headers)
-		}
-	}
-	// Routed identity after provider headers so a chained upstream's x-bifrost-* can't overwrite it.
-	lib.ApplyBifrostErrorResponseHeaders(ctx, bifrostCtx, bifrostErr.ExtraFields)
-
-	// Same ladder as the unary path, so streaming can't change the status.
-	ctx.SetStatusCode(bifrostErr.EffectiveHTTPStatus())
-	ctx.SetContentType("application/json")
-
-	// Always use the route-level ErrorConverter (not StreamConfig.ErrorConverter) because
-	// sendStreamError returns JSON, not SSE. StreamConfig.ErrorConverter is designed for
-	// in-stream SSE errors (e.g., Anthropic's returns a raw SSE string that would be
-	// double-escaped by JSON marshaling).
-	errorResponse := config.ErrorConverter(bifrostCtx, bifrostErr)
-
-	errorJSON, err := sonic.Marshal(errorResponse)
-	if err != nil {
-		g.logger.Error("failed to marshal error response", "err", err, "path", extractExactPath(ctx))
-		ctx.SetStatusCode(fasthttp.StatusInternalServerError)
-		ctx.SetContentType("text/plain; charset=utf-8")
-		ctx.SetBodyString(fmt.Sprintf("failed to encode error response: %v", err))
-		return
-	}
-
-	ctx.SetBody(lib.StripExtraFieldsIfInHeaders(ctx, errorJSON))
-}
-
 // sendError sends an error response with the appropriate status code and JSON body.
 // It handles different error types (string, error interface, or arbitrary objects).
 func (g *GenericRouter) sendError(ctx *fasthttp.RequestCtx, bifrostCtx *schemas.BifrostContext, errorConverter ErrorConverter, bifrostErr *schemas.BifrostError) {

@@ -297,7 +297,7 @@ type GovernanceStore interface {
 	// CollectModelScopedGovernanceIDs returns the budget and rate-limit IDs owned by
 	// model configs matching (provider, model) across the global and virtual-key scopes,
 	// plus whatever scopes a registered resolver derives from the IDs (see
-	// RegisterExtraScopedIDsResolver). It takes the virtual key's ID rather than its
+	// collectExtraScopedIDs). It takes the virtual key's ID rather than its
 	// value, so a caller settling long after the request — batch accounting, which has
 	// only a stored row — can still reach the same configs.
 	CollectModelScopedGovernanceIDs(ctx context.Context, virtualKeyID string, userID string, provider schemas.ModelProvider, model string) (budgetIDs []string, rateLimitIDs []string)
@@ -2108,19 +2108,6 @@ func (gs *LocalGovernanceStore) storeModelConfig(mc *configstoreTables.TableMode
 	gs.modelConfigs.Store(key, mc)
 }
 
-// extractModelAndProvider extracts the model name and optional provider from a request.
-func extractModelAndProvider(request *EvaluationRequest) (string, *string) {
-	if request == nil {
-		return "", nil
-	}
-	var provider *string
-	if request.Provider != "" {
-		p := string(request.Provider)
-		provider = &p
-	}
-	return request.Model, provider
-}
-
 type limitsContextKey struct{}
 
 // literalLimitsContextKey marks a context whose model runs at the provider exactly as written, so
@@ -2338,26 +2325,6 @@ func (gs *LocalGovernanceStore) collectModelConfigsFor(ctx context.Context, scop
 		add(loadKey(targetBase, nil))
 	}
 	return out
-}
-
-// modelConfigEntityKey builds a stable, unique entity description for a model config
-func modelConfigEntityKey(mc *configstoreTables.TableModelConfig) string {
-	name := mc.ModelName
-	if name == modelConfigWildcard {
-		name = "AllModels"
-	}
-	key := "Model:" + name
-	if mc.Provider != nil {
-		key += ":Provider:" + *mc.Provider
-	}
-	if mc.Scope != "" && mc.Scope != configstoreTables.ModelConfigScopeGlobal {
-		scopeID := ""
-		if mc.ScopeID != nil {
-			scopeID = *mc.ScopeID
-		}
-		key += ":" + mc.Scope + ":" + scopeID
-	}
-	return key
 }
 
 // GetTeamName returns a team's display name from the in-memory store, or "" if
@@ -3576,7 +3543,7 @@ func limitIDsOf(lists ...[]schemas.Limit) []string {
 
 // CollectModelScopedGovernanceIDs returns only the model-config-owned IDs for a
 // (provider, model) pair, across the global and virtual-key scopes plus whatever
-// scopes a registered resolver derives from the IDs (see RegisterExtraScopedIDsResolver).
+// scopes a registered resolver derives from the IDs (see collectExtraScopedIDs).
 //
 // It exists for delayed settlement. A request's limits are settled while it is in
 // flight, and a batch create carries no top-level model (each input-file row names
@@ -3627,7 +3594,7 @@ func (gs *LocalGovernanceStore) CollectModelScopedGovernanceIDs(ctx context.Cont
 	}
 	// Downstream-registered scopes (e.g. enterprise's per-access-profile per-model
 	// budgets, keyed by a user-access-profile association ID rather than the raw
-	// user/VK ID) — see RegisterExtraScopedIDsResolver.
+	// user/VK ID) — see collectExtraScopedIDs.
 	for _, pair := range collectExtraScopedIDs(ctx, virtualKeyID, userID) {
 		for _, mc := range gs.collectModelConfigsFor(ctx, pair.Scope, pair.ScopeID, model, providerStr, targets) {
 			addModelConfigIDs(mc)
@@ -3662,18 +3629,6 @@ var (
 	extraScopedIDsResolversMu sync.RWMutex
 	extraScopedIDsResolvers   []ExtraScopedIDsResolver
 )
-
-// RegisterExtraScopedIDsResolver adds fn to the resolvers consulted by
-// CollectModelScopedGovernanceIDs. Intended to be called once at process
-// startup; safe to call concurrently.
-func RegisterExtraScopedIDsResolver(fn ExtraScopedIDsResolver) {
-	if fn == nil {
-		return
-	}
-	extraScopedIDsResolversMu.Lock()
-	extraScopedIDsResolvers = append(extraScopedIDsResolvers, fn)
-	extraScopedIDsResolversMu.Unlock()
-}
 
 func collectExtraScopedIDs(ctx context.Context, virtualKeyID, userID string) []ScopedID {
 	extraScopedIDsResolversMu.RLock()

@@ -1589,19 +1589,6 @@ func TestHybrid_JSONFormat_DeleteRemovesParquetObject(t *testing.T) {
 	assert.Equal(t, 0, objStore.Len())
 }
 
-// putHookObjectStore runs a hook before each Put, to delete a row while its upload is in flight.
-type putHookObjectStore struct {
-	*objectstore.InMemoryObjectStore
-	beforePut func()
-}
-
-func (s *putHookObjectStore) Put(ctx context.Context, key string, data []byte, tags map[string]string) error {
-	if s.beforePut != nil {
-		s.beforePut()
-	}
-	return s.InMemoryObjectStore.Put(ctx, key, data, tags)
-}
-
 // retentionIntervalStore reports a fixed retention interval; any other LogStore call panics.
 type retentionIntervalStore struct {
 	LogStore
@@ -1616,4 +1603,18 @@ func TestHybridLogStoreForwardsRetentionInterval(t *testing.T) {
 	want := 37 * time.Minute // matches neither the hourly nor the daily default
 	hybrid := &HybridLogStore{inner: &retentionIntervalStore{interval: want}}
 	assert.Equal(t, want, hybrid.RetentionInterval())
+}
+
+// queuedUploads reports how many uploads are waiting across all shards.
+func (h *HybridLogStore) queuedUploads() int {
+	n := 0
+	for _, q := range h.uploadQueues {
+		n += len(q)
+	}
+	return n
+}
+
+// ObjectKey constructs the S3 object key for a JSON log entry.
+func ObjectKey(prefix string, timestamp time.Time, logID string) string {
+	return objectKey(prefix, "logs", timestamp, logID, jsonObjectExt)
 }

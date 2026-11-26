@@ -107,9 +107,9 @@ type MatchFn func(a, b string) bool
 // DefaultMatchFns returns the standard matching functions used by most providers.
 // Currently only performs case-insensitive exact matching.
 //
-// SameBaseModel (strips version suffixes, e.g. "claude-3-5-sonnet-20241022" ≈ "claude-3-5-sonnet")
-// is intentionally excluded — users should use aliases for explicit version-to-base-name mapping.
-// It can be appended here if fuzzy base-model matching is ever needed globally.
+// Base-model matching (stripping version suffixes, e.g. "claude-3-5-sonnet-20241022" ≈
+// "claude-3-5-sonnet", see schemas.BaseModelName) is intentionally excluded — users should use
+// aliases for explicit version-to-base-name mapping.
 func DefaultMatchFns() []MatchFn {
 	return []MatchFn{
 		func(a, b string) bool { return strings.EqualFold(a, b) },

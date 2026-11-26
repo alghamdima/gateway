@@ -7,54 +7,6 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// normalizeTraceID normalizes a trace ID to W3C-compliant format.
-// Strips hyphens and ensures 32 lowercase hex characters.
-// Returns empty string if input cannot be normalized to a valid trace ID.
-func normalizeTraceID(traceID string) string {
-	// Remove hyphens (handles UUID format)
-	normalized := strings.ReplaceAll(traceID, "-", "")
-	normalized = strings.ToLower(normalized)
-
-	// Validate length - must be exactly 32 hex chars
-	if len(normalized) != 32 {
-		return ""
-	}
-
-	// Validate hex characters
-	if !isHex(normalized) {
-		return ""
-	}
-
-	return normalized
-}
-
-// normalizeSpanID normalizes a span ID to W3C-compliant format.
-// Strips hyphens and ensures 16 lowercase hex characters.
-// If input is longer (e.g., UUID format), takes first 16 hex chars.
-// Returns empty string if input cannot be normalized to a valid span ID.
-func normalizeSpanID(spanID string) string {
-	// Remove hyphens (handles UUID format)
-	normalized := strings.ReplaceAll(spanID, "-", "")
-	normalized = strings.ToLower(normalized)
-
-	// If longer than 16 chars, truncate (e.g., full UUID -> first 16 hex chars)
-	if len(normalized) > 16 {
-		normalized = normalized[:16]
-	}
-
-	// Validate length - must be exactly 16 hex chars
-	if len(normalized) != 16 {
-		return ""
-	}
-
-	// Validate hex characters
-	if !isHex(normalized) {
-		return ""
-	}
-
-	return normalized
-}
-
 // W3C Trace Context header names
 const (
 	TraceParentHeader = "traceparent"
@@ -107,24 +59,6 @@ func ExtractTraceState(header *fasthttp.RequestHeader) string {
 	return string(header.Peek(TraceStateHeader))
 }
 
-// ExtractTraceContext extracts full W3C trace context from headers
-func ExtractTraceContext(header *fasthttp.RequestHeader) *W3CTraceContext {
-	traceparent := string(header.Peek(TraceParentHeader))
-	if traceparent == "" {
-		return nil
-	}
-
-	ctx := ParseTraceparent(traceparent)
-	if ctx == nil {
-		return nil
-	}
-
-	// Also extract tracestate if present
-	ctx.TraceState = string(header.Peek(TraceStateHeader))
-
-	return ctx
-}
-
 // ParseTraceparent parses a W3C traceparent header value
 // Format: version-traceid-parentid-traceflags
 // Example: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
@@ -163,45 +97,6 @@ func ParseTraceparent(traceparent string) *W3CTraceContext {
 		TraceID:    traceID,
 		ParentID:   parentID,
 		TraceFlags: traceFlags,
-	}
-}
-
-// FormatTraceparent formats a W3C traceparent header value.
-// It normalizes trace ID and span ID to W3C-compliant format:
-// - trace ID: 32 lowercase hex characters
-// - span ID: 16 lowercase hex characters
-// Returns empty string if IDs cannot be normalized to valid format.
-func FormatTraceparent(traceID, spanID, traceFlags string) string {
-	normalizedTraceID := normalizeTraceID(traceID)
-	normalizedSpanID := normalizeSpanID(spanID)
-
-	if normalizedTraceID == "" || normalizedSpanID == "" {
-		return ""
-	}
-
-	// Normalize and validate traceFlags
-	traceFlags = strings.ToLower(traceFlags)
-	if len(traceFlags) != 2 || !isHex(traceFlags) {
-		traceFlags = "00" // Default: not sampled
-	}
-
-	return "00-" + normalizedTraceID + "-" + normalizedSpanID + "-" + traceFlags
-}
-
-// InjectTraceContext injects W3C trace context headers into outgoing request
-func InjectTraceContext(header *fasthttp.RequestHeader, traceID, spanID, traceFlags, traceState string) {
-	if traceID == "" || spanID == "" {
-		return
-	}
-
-	traceparent := FormatTraceparent(traceID, spanID, traceFlags)
-	if traceparent == "" {
-		return // IDs could not be normalized to valid W3C format
-	}
-	header.Set(TraceParentHeader, traceparent)
-
-	if traceState != "" {
-		header.Set(TraceStateHeader, traceState)
 	}
 }
 

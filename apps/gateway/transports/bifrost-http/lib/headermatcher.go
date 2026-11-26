@@ -6,21 +6,6 @@ import (
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 )
 
-// HeaderMatchesPattern returns true if headerName matches the pattern.
-// Patterns support trailing wildcard: "anthropic-*" matches "anthropic-beta".
-// A bare "*" matches everything. All comparisons are case-insensitive.
-func HeaderMatchesPattern(pattern, headerName string) bool {
-	pattern = strings.ToLower(strings.TrimSpace(pattern))
-	headerName = strings.ToLower(strings.TrimSpace(headerName))
-	if pattern == "*" {
-		return true
-	}
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(headerName, pattern[:len(pattern)-1])
-	}
-	return pattern == headerName
-}
-
 // HeaderMatcher holds precomputed header filter data for O(1) exact-match lookups
 // and fast prefix matching. Compiled once on config change, safe for concurrent reads.
 type HeaderMatcher struct {

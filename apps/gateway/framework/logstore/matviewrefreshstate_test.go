@@ -51,7 +51,7 @@ func setupMatViewRecord(t *testing.T) (replicaA, replicaB *gorm.DB) {
 	// ensureMatViews skips silently while another session holds the refresh lock
 	// (other test packages share this database), so retry until the views exist.
 	require.Eventually(t, func() bool {
-		if ensureMatViews(context.Background(), replicaA) != nil {
+		if ensureMatViews(context.Background(), replicaA, matViewSessionLimits{}) != nil {
 			return false
 		}
 		var exists bool
@@ -152,7 +152,7 @@ func refreshAsReplica(t *testing.T, db *gorm.DB, minGap time.Duration) {
 			return false
 		}
 		resetTestMatViewRefreshGate()
-		if refreshMatViews(ctx, db, minGap) != nil {
+		if refreshMatViews(ctx, db, minGap, matViewSessionLimits{}) != nil {
 			return false
 		}
 		after, _, err := matViewRecordStarts(db, minGap)
@@ -244,7 +244,7 @@ func TestMatViewRefreshRecordFailedRefreshStaysDue(t *testing.T) {
 	for deadline := time.Now().Add(time.Minute); ; {
 		resetTestMatViewRefreshGate()
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		err = refreshMatViews(ctx, replicaB, time.Minute)
+		err = refreshMatViews(ctx, replicaB, time.Minute, matViewSessionLimits{})
 		cancel()
 		if err != nil || time.Now().After(deadline) {
 			break
@@ -279,7 +279,7 @@ func TestMatViewRepairForgetsRefreshRecord(t *testing.T) {
 	require.NoError(t, replicaA.Exec("DROP MATERIALIZED VIEW mv_logs_hourly CASCADE").Error)
 	require.NoError(t, replicaA.Exec("CREATE MATERIALIZED VIEW mv_logs_hourly AS SELECT 1 AS hour").Error)
 	require.Eventually(t, func() bool {
-		if ensureMatViews(context.Background(), replicaA) != nil {
+		if ensureMatViews(context.Background(), replicaA, matViewSessionLimits{}) != nil {
 			return false
 		}
 		_, still := readMatViewRecord(t, replicaA)["mv_logs_hourly"]
@@ -294,7 +294,7 @@ func TestMatViewRefreshWithoutRecordTableFallsBack(t *testing.T) {
 	replicaA, _ := setupMatViewRecord(t)
 	require.NoError(t, replicaA.Exec("DROP TABLE matview_refresh_state").Error)
 	resetTestMatViewRefreshGate()
-	require.NoError(t, refreshMatViews(context.Background(), replicaA, time.Minute))
+	require.NoError(t, refreshMatViews(context.Background(), replicaA, time.Minute, matViewSessionLimits{}))
 }
 
 // TestMatViewRefreshStateMigrationIsPostgresOnly pins that the migration creates

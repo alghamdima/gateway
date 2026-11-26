@@ -1800,7 +1800,7 @@ var billingPayloadColumns = map[string][]string{
 }
 
 // billingScalarColumns is every non-payload column cost recomputation reads, and
-// nothing else. Traced from calculateCostForLog, calculateBatchAggregateCost,
+// nothing else. Traced from calculateCostBreakdownForLog, calculateBatchAggregateCost,
 // pricingScopesForLog, servedTierFromLog, isKnownZeroCostLog, and the recalc
 // job's cursor bookkeeping.
 //

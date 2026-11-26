@@ -28,20 +28,6 @@ func TestCacheMetadataContextReturnsOwnedSnapshot(t *testing.T) {
 	assert.Equal(t, 12, *second.InputTokens)
 }
 
-func TestLegacyCacheDebugAPIsRemainCompatible(t *testing.T) {
-	ctx := NewBifrostContext(nil, NoDeadline)
-	provider, model, inputTokens := "openai", "text-embedding-3-small", 12
-	require.True(t, SetCacheDebugOnContext(ctx, &BifrostCacheDebug{
-		ProviderUsed: &provider,
-		ModelUsed:    &model,
-		InputTokens:  &inputTokens,
-	}))
-
-	metadata, ok := CacheDebugFromContext(ctx)
-	require.True(t, ok)
-	assert.Equal(t, inputTokens, *metadata.InputTokens)
-}
-
 func TestMetadataContextKeysPreserveLegacyValues(t *testing.T) {
 	assert.Equal(t, BifrostContextKey("bifrost-cache-debug"), BifrostContextKeyCacheMetadata)
 	assert.Equal(t, BifrostContextKey("bifrost-guardrail-debug"), BifrostContextKeyGuardrailMetadata)

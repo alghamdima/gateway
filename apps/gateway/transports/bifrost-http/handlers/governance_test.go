@@ -200,15 +200,6 @@ func (m *providerGovernanceAdoptionManager) ReloadVirtualKeys(ctx context.Contex
 	return nil
 }
 
-type recordingAgentAuthorizationRefresher struct {
-	calls []string
-}
-
-func (r *recordingAgentAuthorizationRefresher) RefreshAuthorization(_ context.Context, virtualKeyID string) error {
-	r.calls = append(r.calls, virtualKeyID)
-	return nil
-}
-
 // A virtual key holds one config per provider, so create and update refuse provider_configs that name
 // a provider twice, before anything is written.
 func TestVirtualKeyProviderConfigsHoldOneConfigPerProvider(t *testing.T) {
@@ -5949,4 +5940,35 @@ func TestUpdateTeamNewBudgetStartsAtZero(t *testing.T) {
 			}
 		})
 	}
+}
+
+func resetBudgetUsageIfRequested(budget *configstoreTables.TableBudget, reset bool, calendarAligned bool) {
+	if !reset {
+		return
+	}
+	budget.CurrentUsage = 0
+	budget.LastReset = budgetLastReset(calendarAligned, budget)
+}
+
+func compareBudgetRequestDurations(left, right CreateBudgetRequest) bool {
+	leftDuration, leftErr := configstoreTables.ParseDuration(left.ResetDuration)
+	rightDuration, rightErr := configstoreTables.ParseDuration(right.ResetDuration)
+	if leftErr == nil && rightErr == nil && leftDuration != rightDuration {
+		return leftDuration < rightDuration
+	}
+	return left.ResetDuration < right.ResetDuration
+}
+
+// NewBudgetUsageReset builds a carrier that zeroes usage on every reconciled budget when requested
+// is true, and does nothing otherwise.
+func NewBudgetUsageReset(requested bool) *BudgetUsageReset {
+	return &budgetUsageReset{requested: requested}
+}
+
+// IsBadRequestError reports whether err is a validation failure the caller should answer with 400,
+// as opposed to a store failure. Exported so builds that reuse this package's reconcilers can map
+// their errors the same way its own handlers do.
+func IsBadRequestError(err error) bool {
+	var bad *badRequestError
+	return errors.As(err, &bad)
 }

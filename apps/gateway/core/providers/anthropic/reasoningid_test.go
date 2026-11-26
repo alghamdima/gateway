@@ -41,7 +41,7 @@ func TestConvertAnthropicContentBlocks_RedactedThinkingRecoversEmbeddedID(t *tes
 	roleVal := schemas.ResponsesMessageRoleType(AnthropicMessageRoleAssistant)
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
 
-	out := convertAnthropicContentBlocksToResponsesMessages(ctx, blocks, &roleVal, false, "")
+	out := convertAnthropicContentBlocksToResponsesMessagesOrdered(ctx, blocks, &roleVal, false, "", false)
 	msg := findReasoningMessage(t, out)
 
 	if msg.ID == nil || *msg.ID != originalID {
@@ -92,7 +92,7 @@ func TestConvertAnthropicContentBlocks_ThinkingRecoversEmbeddedID(t *testing.T) 
 	roleVal := schemas.ResponsesMessageRoleType(AnthropicMessageRoleAssistant)
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
 
-	out := convertAnthropicContentBlocksToResponsesMessages(ctx, blocks, &roleVal, false, "")
+	out := convertAnthropicContentBlocksToResponsesMessagesOrdered(ctx, blocks, &roleVal, false, "", false)
 	msg := findReasoningMessage(t, out)
 
 	if msg.ID == nil || *msg.ID != originalID {
@@ -113,7 +113,7 @@ func TestConvertAnthropicContentBlocks_GenuineSignatureFallsBackToRandomID(t *te
 	roleVal := schemas.ResponsesMessageRoleType(AnthropicMessageRoleAssistant)
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
 
-	out := convertAnthropicContentBlocksToResponsesMessages(ctx, blocks, &roleVal, false, "")
+	out := convertAnthropicContentBlocksToResponsesMessagesOrdered(ctx, blocks, &roleVal, false, "", false)
 	msg := findReasoningMessage(t, out)
 
 	if msg.ID == nil || !hasPrefix(*msg.ID, "rs_") {
@@ -278,7 +278,7 @@ func TestConvertAnthropicContentBlocks_ThinkingAndRedactedThinkingMergeIntoOneMe
 	roleVal := schemas.ResponsesMessageRoleType(AnthropicMessageRoleAssistant)
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
 
-	out := convertAnthropicContentBlocksToResponsesMessages(ctx, blocks, &roleVal, false, "")
+	out := convertAnthropicContentBlocksToResponsesMessagesOrdered(ctx, blocks, &roleVal, false, "", false)
 
 	if n := countReasoningMessages(out); n != 1 {
 		t.Fatalf("expected exactly 1 reasoning message, got %d", n)
