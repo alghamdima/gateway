@@ -7,12 +7,6 @@
 
 - **Model Routers** - Named model routers classify each request into SIMPLE, MEDIUM or COMPLEX with a semantic, decision-model or LLM classifier, and send each tier to its own weighted provider/model/key targets with fallbacks. A router takes the requests its routing matches (global, team, customer, virtual key or user scope, an optional CEL condition and a priority) after the routing rules run. Routers are managed from the new Routers section in the dashboard, under `/api/routing/model-routers`, or in config.json, and request logs record which router routed each request. The existing Complexity Router config keeps filling `complexity_tier` for routing rules unchanged, and the router page warns about routing rules that still read `complexity_tier`
 - **Complexity Router Phrase Suggestions** - A model router can sample its traffic, cluster it on a schedule within a spend budget and suggest phrases for each tier. The suggestions view shows their impact on past traffic, adds accepted phrases to the router, backfills its window from existing logs, and can classify a test statement against the router's tiers. Runs can also be started on demand through the API. The dashboard view is behind a feature flag
-- **Bifrost MCP Server** - `POST /v1/mcp` serves Bifrost's own HTTP API as MCP tools, so MCP clients such as Claude Code can manage a gateway and call its inference routes. Every tool call runs through the same auth and permission checks as a direct `/api` request. Configured with `client.bifrost_url`, `client.bifrost_mcp_allow_writes` (reads only by default) and `framework.pricing.openapi_url`, or `BIFROST_MCP_SPEC` for air-gapped installs
-- **Warp Management Actions** - Warp answers questions about the gateway's configuration and can create resources through the Bifrost MCP. Every write ends the turn with a confirmation card that shows the tool, its arguments and whether it is destructive, and runs only after the user confirms. Writes are off unless enabled in Warp settings. New endpoints shared with Warp: `GET /api/session/me`, user limit lookups, `GET /api/logs/search` (semantic search) and `GET /api/logs/{id}/trace`
-- **Claude Code Gateway Sign-In** - Claude Code can sign in to Bifrost with `/login` (Cloud gateway) at `<issuer_url>/gateway/claude-code`: device-code sign-in through the OAuth consent page (virtual key, user or anonymous), silent token refresh, Messages inference resolved to the approved virtual key, managed settings, and optional forwarding of Claude Code's OTLP telemetry to your collectors, stamped with the signed-in virtual key, team, customer or user. The consent page requires the code shown in the terminal and can deny a sign-in, users with no access are refused, and enabling a gateway or changing its managed settings needs an admin session. Configured under `oauth2_server_config.gateways.claude_code` or on the new Settings → Gateways page, independent of the MCP auth mode
-  <Warning>
-  The gateway reserves the `/gateway` route prefix. A `server.base_path` whose first segment is `gateway` is refused at startup, so move such a deployment to another prefix before upgrading.
-  </Warning>
 - **Realtime Speech and Live Sessions** - `/v1/realtime` serves Gemini Live on the Gemini API and Vertex AI, ElevenLabs Scribe and Soniox real-time transcription (`intent=transcription`). GenAI SDK clients in Vertex mode can open Live sessions on `/genai`. A new WebSocket at `/v1/audio/speech/stream` streams text in and audio back while the text is still arriving, billed once per session and logged with the full spoken text
 - **ElevenLabs Drop-In Routes** - ElevenLabs SDKs and raw clients can point at `{gateway}/elevenlabs` and send a Bifrost virtual key in `xi-api-key`: text-to-speech (with and without timestamps), the model list filtered to the key's models, and the native Scribe and text-to-dialogue WebSockets, with governance, logging and cost tracking. `/elevenlabs_passthrough` forwards any other ElevenLabs route
 - **Vertex Text-to-Speech** - Vertex serves `/v1/audio/speech` through Cloud Text-to-Speech (Chirp 3 HD and other Google voices) and through Gemini TTS models, including streaming for Gemini TTS
@@ -31,9 +25,6 @@
 - **Bedrock Native Structured Output** - Bedrock Converse sends `json_schema` response formats through native `outputConfig` for models that support it, and falls back to the synthetic tool for other models, for schemas Claude cannot accept, and once more if Bedrock rejects the native schema. The `supports_native_structured_output` datasheet field overrides the default per model
 - **Custom Tools on Every Provider** - Custom (freeform) tools such as Codex's `apply_patch` are sent as function tools to every model without native custom tool support, and the model's calls come back to the client as custom tool calls on both Chat Completions and Responses, streaming included. Models marked `supports_custom_tools` keep the native form
 - **Codex WebSocket Through ChatGPT Sign-In** - `/chatgpt_passthrough/backend-api/codex/responses` accepts the WebSocket Codex opens with `supports_websockets = true` and relays it to ChatGPT with the caller's ChatGPT token. Each turn is checked against the virtual key and logged and billed like a turn sent over HTTP. A request without a ChatGPT token gets a 426, which moves Codex to HTTP right away. The Codex model picker lists only the models the caller's virtual key allows
-- **MCP Gateway Settings** - `slug_code_mode` turns Code Mode on or off for one client's `/mcp/<slug>` endpoint only. `mcp_client_metadata_url` lets Bifrost present a self-hosted Client ID Metadata Document when upstream authorization servers cannot reach it. `mcp_server_max_protocol_version` caps the MCP protocol version Bifrost's own `/mcp` serves, applied without a restart
-- **Configurable OpenAPI MCP Spec Size** - The OpenAPI MCP spec size limit rises from 5 MiB to 32 MiB by default and is set with `mcp_openapi_max_spec_mb` (up to 256)
-- **MCP Logs Dashboard** - MCP logs show a metric strip with sparklines and previous-period trends, a latency histogram and cancelled counts, readable error cards with formatted upstream JSON, and user, team and customer filters
 - **Stop Reason Column** - The logs table has an optional stop reason column (thanks [@Constantine3](https://github.com/Constantine3)!)
 - **Trace Dimensions on Child Spans** - An OTEL profile with `apply_trace_dimensions_to_child_spans` set merges the request's `x-bf-dim-*` dimensions onto every exported span (LLM call, plugin, retry, fallback, MCP tool), not only the root HTTP span. Span attributes win on conflict, and `path`, `method` and keys in reserved attribute namespaces (`gen_ai.`, `http.`, `bifrost.`, ...) are skipped (thanks [@devin-williams](https://github.com/devin-williams)!)
 - **Provider Queue Wait Metric** - New `bifrost_provider_queue_wait_seconds` histogram records how long an attempt waits for a provider worker
@@ -42,7 +33,6 @@
 - **Anthropic Thinking Block Binding** - `thinking.block_binding` is forwarded to the Claude API with its beta header
 - **Fable 5.2 Fast Mode on Vertex** - `"speed": "fast"` is sent to Vertex for `claude-fable-5-2`
 - **Databricks Scoped OAuth Secrets** - Databricks service principals whose OAuth secret is limited to specific scopes work without configuration: Bifrost retries the token request with the scopes its routes need, and a scope 403 is reported as the provider's own message
-- **Virtual MCPs on Virtual Keys** - The virtual key details sheet lists the Virtual MCPs assigned to the key
 - **FIPS-Approved Key Derivation** - In FIPS 140-3 mode, the encryption data key is derived with PBKDF2-HMAC-SHA-256 and passwords are hashed with PBKDF2-HMAC-SHA-256. Standard builds keep writing the earlier formats, and both formats stay readable, so a rolling deploy is safe
 
 ## 🐞 Fixed
@@ -89,13 +79,9 @@
 - **Virtual Key Budgets** - Updating the budget of a config.json virtual key no longer fails with `invalid reset duration format` (thanks [@High-PO](https://github.com/High-PO)!). Moving a quarterly budget to another window, or updating a team's or customer's rate-limit maximum alone, no longer fails with a 500, and a budget window added with Reset Usage starts at zero
 - **Team and Customer Saves** - Saving a customer or team no longer rewrites its teams, virtual keys or customer, and a team's virtual keys are charged to its new customer right after the change
 - **Duplicate Provider Configs** - A virtual key naming the same provider twice is refused with a 400
-- **MCP OAuth Consent** - The consent page no longer gets stuck when an expired SSO session is refreshed mid-flow, and abandoned client registrations are kept long enough for clients to retry
 - **OAuth Grant Expiry** - The OAuth Grants page uses the configured access token TTL
-- **OpenAPI MCP Tool Arguments** - OpenAPI-derived MCP tools give every argument a name clients accept, so they are no longer dropped
-- **A2A Agents** - Valid A2A v1 agent cards register, native HTTP+JSON errors are preserved, and Agent Logs show Task artifacts and history
 - **Log Retention on Postgres** - Retention deletes shrink their batch when they hit the statement timeout instead of failing on the same rows every pass, and retention tables get tighter autovacuum settings so they stop growing between vacuums
 - **ClickHouse Hybrid Storage** - Object uploads update `has_object` in batches, which stops memory growth and dropped uploads
-- **Log Filters** - Relay Logs filter values are read from the last 30 days, and MCP log team and customer filters match calls recorded under several of them
 - **Encoded Request Paths** - Transport plugins see the raw encoded path, so an encoded traversal cannot disguise the route
 - **Plugin Downloads** - URL-based plugins download only from hosts listed in `BIFROST_PLUGIN_URL_ALLOWLIST`, checked on every redirect
   <Warning>
@@ -105,7 +91,7 @@
 
 ## 🔧 Maintenance
 
-- **Dependency Upgrades** - brotli 1.2.8, A2A SDK 2.8.0 and Dependabot updates
+- **Dependency Upgrades** - brotli 1.2.8 and Dependabot updates
 
 ## 🗄️ Database Migrations
 
@@ -120,18 +106,12 @@ This release adds columns to the `logs` table (`logs_add_model_routing_columns`)
 - **add_model_routers_table** - Creates `model_routers`. Non-reversible: dropping it would delete every model router.
 - **add_model_router_targets_and_routing** - Creates `model_router_targets` and adds routing columns to `model_routers`. Non-reversible: dropping it would delete every router's targets.
 - **add_model_router_suggestions_tier_columns** - Adds suggestion tier columns to `model_routers`. Reversible: rolls back by dropping the columns.
-- **add_mcp_client_server_type_on_slug_column** - Adds the nullable `slug_code_mode` setting to `config_mcp_clients`. Reversible: rolls back by dropping the column.
-- **add_mcp_client_metadata_url_columns** - Adds `config_client.mcp_client_metadata_url` and `oauth_configs.client_metadata_document`. Non-reversible: dropping them would discard the hosted document URL and which OAuth configs use Bifrost's document.
-- **add_client_config_mcp_openapi_max_spec_mb_column** - Adds `mcp_openapi_max_spec_mb` to `config_client`. Reversible: rolls back by dropping the column.
-- **add_client_config_bifrost_url_and_bifrost_mcp_columns** - Adds the Bifrost URL and Bifrost MCP settings to `config_client`. Reversible: rolls back by dropping the columns.
 - **add_framework_config_openapi_url_column** - Adds the OpenAPI URL to the framework config. Reversible: rolls back by dropping the column.
-- **add_warp_management_writes_column** - Adds `management_writes` to the Warp config. Reversible: without the column Warp offers reads only.
 - **add_client_config_entity_access_profile_mode_column** - Adds `entity_access_profile_mode` (default `union`) to `config_client`. Reversible: rolls back by dropping the column.
 - **add_budget_business_unit_id_column** - Adds a nullable `business_unit_id` owner column to `governance_budgets`. Reversible: rolls back by dropping the column.
 - **add_budget_business_unit_id_index** - Builds the `business_unit_id` index concurrently on PostgreSQL. Reversible: rolls back by dropping the index.
 - **add_oauth2_authorize_requests_device_code_columns** - Adds the nullable `device_code_hash` and `user_code_hash` columns to `oauth2_authorize_requests`, with a bounded lock wait on PostgreSQL. Reversible: only short-lived sign-in state is dropped.
 - **add_oauth2_authorize_requests_device_code_indexes** - Builds their unique indexes concurrently on PostgreSQL, so writes are never blocked. Reversible: rolls back by dropping the indexes.
-- **add_client_config_mcp_server_max_protocol_version_column** - Adds `mcp_server_max_protocol_version` to `config_client`. Reversible: without the column `/mcp` serves every version, as before.
 - **agent_logs_add_caller_correlation_id_column** - Adds `caller_correlation_id` to `agent_logs`. Non-reversible once any row records a value: the rollback refuses while one does.
 - **logs_add_model_routing_suggestion_tables** - Creates the log-store tables for phrase suggestions. Reversible: rolls back by dropping the tables.
 - **logs_add_model_routing_columns** - Adds model router columns to `logs`. Non-reversible once any log records a router: the router a request was routed by cannot be recaptured, so the rollback refuses while one does.
@@ -150,7 +130,6 @@ All new migrations add tables, nullable columns or indexes and never rewrite exi
 - [#5792](https://github.com/maximhq/bifrost/issues/5792) - [Bug]: Anthropic passthrough rejects bare (unprefixed) Claude Code model names with "could not auto resolve a provider"
 - [#6406](https://github.com/maximhq/bifrost/issues/6406) - Vertex: prompt cache mostly misses because `messages` is serialized before `system`/`tools`
 - [#6815](https://github.com/maximhq/bifrost/issues/6815) - [Feature]: forward x-opencode-session on opencode requests
-- [#7963](https://github.com/maximhq/bifrost/issues/7963) - [Feature]: Claude Code gateway sign-in (/login → Cloud gateway) for Bifrost
 - [#8073](https://github.com/maximhq/bifrost/issues/8073) - Custom model-parameters rows stop applying after the background model-parameters URL sync
 - [#8094](https://github.com/maximhq/bifrost/issues/8094) - [Bug]: Provider config hash is non-deterministic when maps have 2+ entries; API-added keys dropped on restart
 - [#8467](https://github.com/maximhq/bifrost/issues/8467) - [Bug]: ElevenLabs Scribe is blocked by wildcard virtual-key permissions despite appearing in Models

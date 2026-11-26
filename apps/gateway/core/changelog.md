@@ -20,7 +20,6 @@
 - feat: databricks - OAuth M2M secrets limited to specific scopes work through a scope fallback, and scope errors show the provider's message
 - feat: opencode - stable `x-opencode-session` header per virtual key, resolved from client headers (thanks [@sstreichan](https://github.com/sstreichan)!)
 - feat: files - Files API uploads stream from a `FileSource` instead of a byte slice on OpenAI and Azure
-- feat: websocket stream hooks return the pre-hook request, so raw relays can forward plugin edits
 - feat: `bifrost_provider_queue_wait_seconds` timing on the attempt window
 - fix: anthropic - mid-conversation system reminders keep one form across turns, decided from the emitted messages, with placement controlled by the `supports_native_mid_conversation_system` datasheet field; the `<system-reminder>` envelope drops its trailing newline and the cache breakpoint stays on the marked block
 - fix: vertex - Claude request bodies always end with `tools`, `system`, `messages` so prompt cache reads hit

@@ -32,9 +32,10 @@ Only part of the upstream repository was copied: `core`, `framework`, `plugins`,
 | `transports/bifrost-http/server/plugins.go`, `transports/bifrost-http/lib/ctx.go`, `transports/bifrost-http/lib/config.go`, `transports/go.mod`, `transports/go.sum` | The Maxim plugin is taken out of the build: its registration, its `x-bf-maxim-*` header handling and its Go dependencies. |
 | `transports/bifrost-http/server/plugins.go` | One import and one `case`, so the gateway loads `plugins/credits` by name from its config. If the plugin's config cannot be decoded the case returns a plugin that refuses every request, because the gateway logs a plugin that fails to load and then serves without it. |
 | `transports/bifrost-http/main.go`, `transports/bifrost-http/server/server.go`, `transports/bifrost-http/lib/basepath.go`, `transports/bifrost-http/lib/basepath_test.go` | No embedded UI and no UI routes (see Removed). `NewBifrostHTTPServer` takes the version only; `CheckBasePathCollision` checks registered routes only. |
-| `Makefile` | `build` no longer builds a UI; the UI and recipe targets are gone. |
+| `Makefile` | Replaced by a short one with `build` only (`LOCAL=1` builds from the sources here). Upstream's file had about 3,250 lines of test, release, UI, recipe, MCP and relay targets; the tests run through `scripts/`. |
 | `scripts/test-baseline.sh` | No longer builds the MCP test servers first. |
 | `AGENTS.md`, `transports/README.md` | The MCP sections and links are removed. |
+| `core/changelog.md`, `framework/changelog.md`, `transports/changelog.md` | Entries about the features outside the product are removed. |
 | `transports/Dockerfile.local` | No Node stage and no UI copied into the Go stage. |
 
 ## Added
