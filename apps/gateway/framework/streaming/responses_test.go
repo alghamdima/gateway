@@ -347,7 +347,7 @@ func TestForceCleanupStreamAccumulatorReapsRegardlessOfRefcount(t *testing.T) {
 	acc := testResponsesAccumulator(t)
 
 	const requestID = "force-reap-test"
-	// Simulate two independent plugins each taking a hold (logging + maxim).
+	// Simulate two independent plugins each taking a hold.
 	acc.CreateStreamAccumulator(requestID, time.Now())
 	acc.CreateStreamAccumulator(requestID, time.Now())
 

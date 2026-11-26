@@ -36,7 +36,7 @@ func NewGCSObjectStore(ctx context.Context, cfg *Config, logger schemas.Logger) 
 
 	var opts []option.ClientOption
 
-	// Prefer credentials_json (used by Helm/schema) over deprecated credentials field.
+	// Prefer credentials_json (used by the config schema) over deprecated credentials field.
 	// Check both non-nil and non-empty to avoid an empty credentials_json shadowing
 	// a valid deprecated credentials value.
 	var creds string

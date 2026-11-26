@@ -8,9 +8,8 @@ import (
 
 // Trace fixture and assertions shared by every observability connector.
 //
-// Not a _test.go file: connectors live in other modules (and the enterprise
-// repo) and cannot import another package's test code. Per-connector fixtures
-// are what let three of them drift to a five-key content list.
+// Not a _test.go file: connectors live in other modules (plugins/otel) and
+// cannot import another package's test code.
 
 // ExportFixtureSecret marks every content-bearing field in the fixture. It must
 // not appear in a connector's output when content logging is disabled.
@@ -269,10 +268,9 @@ func AssertSpanFilterApplied(payload []byte, wantDropped, wantKept []string) []s
 	return problems
 }
 
-// CostLookup reads one cost value out of a connector's decoded output. Connectors
-// name these fields differently — BigQuery columns, Splunk event fields, Datadog
-// LLM-Obs metrics, raw span attributes — so each supplies its own lookup and the
-// reconciliation rules below stay in one place.
+// CostLookup reads one cost value out of a connector's decoded output. A connector
+// may name these fields differently from the raw span attributes, so each
+// supplies its own lookup and the reconciliation rules below stay in one place.
 //
 // found is false when the connector does not carry that value at all, which the
 // assertion reports rather than treating as zero.
@@ -322,8 +320,8 @@ var costSides = map[CostCategory][]CostCategory{
 // breakdown faithfully.
 //
 // Reconciliation is the point. Key presence alone would pass a connector that
-// wired a category to the wrong attribute, which is the mistake this class of
-// code keeps making (see BigQuery's pickDetail passing one key twice).
+// wired a category to the wrong attribute, such as one key passed for two
+// categories.
 func AssertCostBreakdown(lookup CostLookup) []string {
 	const eps = 1e-9
 	var problems []string
@@ -393,7 +391,7 @@ func AssertCostBreakdown(lookup CostLookup) []string {
 }
 
 // CostAttributeLookup is a CostLookup over raw span attributes, for connectors
-// that publish them verbatim (OTEL, Kafka, Pub/Sub).
+// that publish them verbatim (OTEL).
 func CostAttributeLookup(attrs map[string]any) CostLookup {
 	keys := map[CostCategory]string{
 		CostTotal: AttrUsageCost, CostInput: AttrBifrostCostInput,

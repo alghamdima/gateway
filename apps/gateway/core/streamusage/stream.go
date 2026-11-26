@@ -18,7 +18,7 @@ import (
 // bills the same numbers. It runs once, before the post-hooks see the failure.
 //
 // The output is the tracer accumulator's snapshot of chunks already received,
-// which the logging or Maxim plugin maintains; without one there is nothing to
+// which the logging plugin maintains; without one there is nothing to
 // count and the provider-reported usage (if any) is left as is. The snapshot
 // holds the first choice only, so n>1 streams are undercounted.
 func Estimate(ctx *schemas.BifrostContext, request *schemas.BifrostRequest, model string, failure *schemas.BifrostError) {

@@ -12,7 +12,7 @@ import (
 // It is the single live emitter of the context-sourced dimensions in
 // schemas.EnrichmentDims, so TestContextSpanAttributesCoverRegistry pins this
 // set to that registry: a dimension cannot be added to the registry (and read by
-// the curated connectors) without being emitted here, and a renamed key surfaces
+// the telemetry plugin) without being emitted here, and a renamed key surfaces
 // as a mismatch.
 func applyContextSpanAttributes(span *schemas.Span, ctx context.Context) {
 	schemas.SpanEnrichmentFromContext(ctx).ApplyToSpan(span)

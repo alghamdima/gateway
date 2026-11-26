@@ -89,8 +89,6 @@ bifrost/
 │   ├── semanticcache/             # Semantic response caching via vector store
 │   ├── otel/                      # OpenTelemetry tracing
 │   ├── mocker/                    # Mock responses for testing
-│   ├── jsonparser/                # JSON extraction utilities
-│   ├── maxim/                     # Maxim observability
 │   └── compat/                    # LiteLLM SDK compatibility (HTTP transport)
 │
 ├── ui/                            # React + vite web interface
@@ -124,7 +122,7 @@ go.work
 ├── core/go.mod              # github.com/maximhq/bifrost/core
 ├── framework/go.mod         # github.com/maximhq/bifrost/framework
 ├── transports/go.mod        # github.com/maximhq/bifrost/transports/v2
-└── plugins/*/go.mod         # 9 plugin modules (governance, telemetry, logging, etc.)
+└── plugins/*/go.mod         # 10 plugin modules (governance, telemetry, logging, etc.)
 ```
 
 **Rules:**
@@ -532,7 +530,7 @@ Bifrost can be mounted under a URL prefix (`server.base_path`, e.g. `/bifrost` f
 | Go, scheme decisions (HSTS, cookie `Secure`, trace attributes) | `lib.RequestIsHTTPS(ctx)` | reading `X-Forwarded-Proto` yourself |
 | UI, copyable or displayed URL | `getExampleBaseUrl()` / `getEndpointUrl()` (`ui/lib/utils/port.ts`) | `window.location.origin + "/..."` |
 | UI, path label, `window.open`, `router.history.push` | `withBasePath()` (`ui/lib/utils/basePath.ts`), or `router.navigate({ href })` which applies the router basepath | a literal `/workspace/...` outside the router |
-| Docs, Helm `NOTES.txt`, Terraform, Makefile | state the prefix form next to every self URL a client or browser reaches through the proxy (`https://host/<prefix>/login`); probes and health checks that hit the service directly, bypassing the ingress, may stay on `/health` because requests are accepted without the prefix | a root-only example for a proxied URL |
+| Docs, Terraform, Makefile | state the prefix form next to every self URL a client or browser reaches through the proxy (`https://host/<prefix>/login`); probes and health checks that hit the service directly, bypassing the ingress, may stay on `/health` because requests are accepted without the prefix | a root-only example for a proxied URL |
 
 Rules that follow from the implementation:
 

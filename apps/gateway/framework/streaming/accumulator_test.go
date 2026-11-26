@@ -837,7 +837,7 @@ func TestProcessStreamingResponsePreservesTerminalResponsesUsageWhenChunkIndexIs
 
 // On a monotonic stream the terminal chunk arrives with a unique highest index, so
 // the first delivery is stored as-is — the reservation must still be seeded then,
-// or a second plugin delivering the same terminal chunk (logging + maxim both call
+// or a second plugin delivering the same terminal chunk (two plugins both calling
 // ProcessStreamingChunk with the final result) mints a fresh index and the chunk is
 // double-appended into the persisted raw log.
 func TestProcessStreamingResponseDedupesDuplicateTerminalChunkWithUniqueIndex(t *testing.T) {

@@ -822,7 +822,7 @@ func (p *OtelPlugin) PreLLMHook(_ *schemas.BifrostContext, req *schemas.BifrostR
 // completed trace in recordMetricsFromTrace, but semantic-cache hits short-circuit the
 // request in a PreHook before any llm.call span exists, so the cache signal never reaches
 // a span. We therefore read cache metadata through the compatibility response field here, mirroring how the
-// Prometheus telemetry plugin and the Datadog plugin emit this metric.
+// Prometheus telemetry plugin emits this metric.
 //
 // This is the ONLY place RecordCacheHit is called — do not also emit it from
 // recordMetricsFromTrace, or cache hits will double-count.

@@ -6,7 +6,6 @@ use (
 	./plugins/compat
 	./plugins/credits
 	./plugins/governance
-	./plugins/jsonparser
 	./plugins/logging
 	./plugins/mocker
 	./plugins/modelcatalogresolver

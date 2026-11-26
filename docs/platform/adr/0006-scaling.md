@@ -5,7 +5,7 @@ Date: 2026-11-21
 
 ## Context
 
-Bifrost's cluster mode is enterprise-only. The OSS schema has `cluster_config` (`transports/config.schema.json`), but no OSS transport code reads it.
+Bifrost's cluster mode is enterprise-only. The OSS schema had `cluster_config` (`transports/config.schema.json`), but no OSS transport code read it; the key was removed from the schema on 2026-11-26.
 
 In the OSS build every instance loads governance state (virtual keys, customers, budgets, rate limits) from the config store into memory and serves from memory. Writes through one instance's API update that instance's memory and the database only. The OSS server code says so directly: "A clustered deployment overrides this to also notify peers so their in-memory copies stay current" (`transports/bifrost-http/server/server.go`, around line 1553).
 

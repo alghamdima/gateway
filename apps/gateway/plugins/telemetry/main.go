@@ -328,9 +328,8 @@ var userLabelNames = func() []string {
 	return out
 }()
 
-// defaultBifrostLabelNames is derived from schemas.EnrichmentDims, not hand-listed
-// — the registry used to be advisory and each connector kept its own copy, which
-// is how Splunk fell 2 dimensions behind. Bounded dimensions only; the unbounded
+// defaultBifrostLabelNames is derived from schemas.EnrichmentDims, not hand-listed,
+// so a hand-kept copy cannot fall behind the registry. Bounded dimensions only; the unbounded
 // ones are opt-in via user_labels_enabled.
 var defaultBifrostLabelNames = schemas.MetricSafeEnrichmentDimNames()
 

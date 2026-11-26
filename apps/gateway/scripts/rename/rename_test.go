@@ -23,7 +23,7 @@ func TestRewrite(t *testing.T) {
 		{"mcp-go fork", `github.com/maximhq/mcp-go v0.4.0`, `github.com/maximhq/mcp-go v0.4.0`},
 		{"fasthttp fork", `replace github.com/valyala/fasthttp => github.com/maximhq/fasthttp v1.0.0`, `replace github.com/valyala/fasthttp => github.com/maximhq/fasthttp v1.0.0`},
 		{"maxim sdk", `github.com/maximhq/maxim-go v0.1.0`, `github.com/maximhq/maxim-go v0.1.0`},
-		{"organisation alone", `owner:\"maximhq\",name:\"bifrost\" https://maximhq.github.io/bifrost/helm-charts projects=maximhq/1`, `owner:\"acme-ai\",name:\"acme\" https://acme-ai.github.io/acme/helm-charts projects=acme-ai/1`},
+		{"organisation alone", `owner:\"maximhq\",name:\"bifrost\" https://maximhq.github.io/bifrost/docs projects=maximhq/1`, `owner:\"acme-ai\",name:\"acme\" https://acme-ai.github.io/acme/docs projects=acme-ai/1`},
 		{"organisation profile", `[Maxim](https://github.com/maximhq)`, `[Maxim](https://github.com/acme-ai)`},
 		{"dependency without host", `fixed in maximhq/fasthttp#1 and maximhq/mcp-go`, `fixed in maximhq/fasthttp#1 and maximhq/mcp-go`},
 		// vendor hosts

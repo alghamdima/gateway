@@ -144,8 +144,7 @@ type SpanEnrichment struct {
 // Message summaries
 //
 // Moved here from framework/tracing so the span payload can be typed in
-// core/schemas. framework/tracing keeps aliases, so existing importers (the
-// Datadog connector among them) compile unchanged.
+// core/schemas.
 //
 // This is the one genuinely new normalization in this file: it unifies
 // ChatMessage and ResponsesMessage into a single shape connectors can render

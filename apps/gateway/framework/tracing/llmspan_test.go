@@ -996,7 +996,7 @@ func TestResponsesSummariesTagItemsWithoutInput(t *testing.T) {
 }
 
 // End-to-end: a custom tool call must survive spanbuild and attribute marshaling,
-// which is what a downstream sink (BigQuery, Datadog) actually reads.
+// which is what a downstream sink (the otel plugin) actually reads.
 func TestSpanAttributesCarryCustomToolCallInput(t *testing.T) {
 	const input = `{"cmd":"whoami","max_output_tokens":1000}`
 	resp := &schemas.BifrostResponse{ResponsesResponse: &schemas.BifrostResponsesResponse{
@@ -1103,8 +1103,8 @@ func TestRawPayloadsCapturedOnFailedRequest(t *testing.T) {
 }
 
 // A chat request carried every other parameter onto the span but never its tools, so
-// gen_ai.request.tools was absent on chat while Responses emitted it — the connector e2e
-// failed this on kafka, pubsub and otel at once.
+// gen_ai.request.tools was absent on chat while Responses emitted it — the otel connector
+// e2e failed on it.
 func TestChatRequestExportsTools(t *testing.T) {
 	desc := "Look up the weather"
 	req := &schemas.BifrostRequest{

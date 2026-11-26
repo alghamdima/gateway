@@ -205,7 +205,7 @@ func (a *Accumulator) processTranscriptionStreamingResponse(ctx *schemas.Bifrost
 		}, nil
 	}
 	// Non-final chunk: skip expensive rebuild since no consumer uses intermediate data.
-	// Both logging and maxim plugins return early when !isFinalChunk.
+	// The logging plugin returns early when !isFinalChunk.
 	return &ProcessedStreamResponse{
 		RequestID:      requestID,
 		StreamType:     StreamTypeTranscription,

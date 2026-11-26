@@ -10,7 +10,7 @@ require (
 	github.com/fasthttp/websocket v1.5.12
 	github.com/go-git/go-billy/v5 v5.9.0
 	github.com/go-git/go-git/v5 v5.19.2
-	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.20.3
@@ -36,12 +36,12 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/valyala/fasthttp v1.74.0
-	go.opentelemetry.io/proto/otlp v1.11.0
+	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/text v0.43.0
 	google.golang.org/grpc v1.83.2 // indirect
-	google.golang.org/protobuf v1.36.12
+	google.golang.org/protobuf v1.36.12 // indirect
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 )

@@ -3,7 +3,7 @@
 //
 // This package handles the conversion of FastHTTP request contexts to Bifrost contexts,
 // ensuring that important metadata and tracking information is preserved across the system.
-// It supports propagation of both Prometheus metrics and Maxim tracing data through HTTP headers.
+// It propagates dimensions, governance, key and tracing metadata carried in HTTP headers.
 package lib
 
 import (
@@ -229,18 +229,13 @@ func ExtraFieldsInHeaders(ctx *fasthttp.RequestCtx) bool {
 // 1. Dimension Headers (x-bf-dim-*):
 //   - All headers prefixed with 'x-bf-dim-' are collected into a map[string]string stored under
 //     schemas.BifrostContextKeyDimensions and are forwarded to all observability integrations
-//     (internal logs, OTEL spans, Prometheus custom labels, Datadog, etc.).
+//     (internal logs, OTEL spans, Prometheus custom labels).
 //   - The prefix is stripped and the remainder becomes the dimension key.
 //   - Example: 'x-bf-dim-environment' with value 'production' stores {"environment": "production"}.
 //
 // 1a. Prometheus Headers (x-bf-prom-*) [REMOVED — use x-bf-dim-* instead]:
 //   - No longer consumed by anything. Still swallowed here so they neither leak
 //     into unified dimensions nor get forwarded to the provider.
-//
-// 2. Maxim Tracing Headers (x-bf-maxim-*):
-//   - Specifically handles 'x-bf-maxim-traceID' and 'x-bf-maxim-generationID'
-//   - These headers enable trace correlation across service boundaries
-//   - Values are stored using Maxim's context keys for consistency
 //
 // 4. Governance Headers:
 //   - x-bf-vk: Virtual key for governance (required for governance to work)
@@ -290,8 +285,8 @@ func ExtraFieldsInHeaders(ctx *fasthttp.RequestCtx) bool {
 //	fastCtx := &fasthttp.RequestCtx{...}
 //	bifrostCtx, cancel := ConvertToBifrostContext(fastCtx, handlerStore)
 //	defer cancel() // Ensure cleanup
-//	// bifrostCtx now contains propagated header values including Prometheus metrics,
-//	// Maxim tracing data, governance keys, API keys, cache settings,
+//	// bifrostCtx now contains propagated header values including dimensions,
+//	// governance keys, API keys, cache settings,
 //	// session stickiness, and extra headers
 
 // ClientForwardedIP returns the leftmost X-Forwarded-For entry, else X-Real-IP, else "".
@@ -449,7 +444,7 @@ func ConvertToBifrostContext(ctx *fasthttp.RequestCtx, store HandlerStore) (*sch
 		}
 		if labelName, ok := strings.CutPrefix(keyStr, "x-bf-prom-"); ok && labelName != "" {
 			// x-bf-prom-* is a removed legacy prefix. Swallow it so it neither flows
-			// into unified dimensions (logs/OTEL/Maxim/etc) nor is forwarded upstream.
+			// into unified dimensions (logs/OTEL) nor is forwarded upstream.
 			return true
 		}
 		// Handle virtual key header (x-bf-vk, authorization, x-api-key, x-goog-api-key, api-key, xi-api-key headers)

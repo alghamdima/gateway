@@ -10,10 +10,10 @@ import (
 
 // contextDimSources lists every enrichment dimension that applyContextSpanAttributes
 // is responsible for emitting, paired with the context key it reads from and a
-// distinct sentinel value. This is the emit-side counterpart to the connectors'
-// read-side parity tests: it pins the live span emission to schemas.EnrichmentDims
-// so a dimension cannot be added to the registry (and read by BigQuery/Datadog/
-// Splunk) without also being emitted here.
+// distinct sentinel value. This is the emit-side counterpart to the telemetry
+// plugin's read-side parity test: it pins the live span emission to
+// schemas.EnrichmentDims so a dimension cannot be added to the registry without
+// also being emitted here.
 var contextDimSources = []struct {
 	spanAttr string
 	ctxKey   schemas.BifrostContextKey
@@ -118,8 +118,8 @@ func TestContextSpanAttributesEmit(t *testing.T) {
 // TestEnrichmentRegistryDimsAllEmitted is the drift guard: every dimension in the
 // canonical registry must be accounted for as emitted somewhere — either by
 // applyContextSpanAttributes (contextDimSources) or in dimsEmittedElsewhere.
-// Adding a dimension to schemas.EnrichmentDims (and thus to the connector
-// projections) without wiring its emission fails here. It also catches a stale
+// Adding a dimension to schemas.EnrichmentDims (and thus to the telemetry
+// labels) without wiring its emission fails here. It also catches a stale
 // classification: a context source or "elsewhere" entry for a key no longer in
 // the registry.
 func TestEnrichmentRegistryDimsAllEmitted(t *testing.T) {

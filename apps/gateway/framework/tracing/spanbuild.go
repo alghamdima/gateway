@@ -132,8 +132,6 @@ func buildRequestSide(d *schemas.LLMSpanData, req *schemas.BifrostRequest, opts 
 }
 
 // toMessageSummaries adapts the Responses-shaped summaries onto the unified type.
-// Collapsing ResponsesMessageSummary into MessageSummary needs a matching change
-// in the enterprise Datadog converter, so the adapter stays until then.
 func toMessageSummaries(in []ResponsesMessageSummary) []schemas.MessageSummary {
 	if len(in) == 0 {
 		return nil

@@ -804,7 +804,7 @@ func TestIntegration_FullDistributedTraceFlow(t *testing.T) {
 	tracer := NewTracer(store, nil, nil)
 	defer tracer.Stop()
 
-	// Simulating headers from user's actual Datadog request:
+	// Simulating headers from a real upstream service's request:
 	// traceparent: 00-69538b980000000079943934f90c1d40-aad09d1659b4c7e3-01
 	inheritedTraceID := "69538b980000000079943934f90c1d40"
 	externalParentSpanID := "aad09d1659b4c7e3"
@@ -837,9 +837,9 @@ func TestIntegration_FullDistributedTraceFlow(t *testing.T) {
 	// Step 7: Complete trace
 	trace := tracer.EndTrace(traceID)
 
-	// Verify the trace structure for Datadog
+	// Verify the trace inherits the upstream identity
 	if trace.TraceID != inheritedTraceID {
-		t.Errorf("Trace ID should match inherited ID from Datadog: got %q, want %q", trace.TraceID, inheritedTraceID)
+		t.Errorf("Trace ID should match the inherited upstream ID: got %q, want %q", trace.TraceID, inheritedTraceID)
 	}
 
 	// Find spans by name
@@ -859,12 +859,12 @@ func TestIntegration_FullDistributedTraceFlow(t *testing.T) {
 		t.Fatal("Not all spans found in trace")
 	}
 
-	// Verify span hierarchy for Datadog linking:
+	// Verify span hierarchy for upstream linking:
 	// External Parent (aad09d1659b4c7e3) -> HTTP Span -> LLM Span -> Plugin Span
 
-	// HTTP span should link to Datadog's parent span
+	// HTTP span should link to the upstream parent span
 	if httpSpan.ParentID != externalParentSpanID {
-		t.Errorf("HTTP span should link to Datadog parent: got ParentID %q, want %q",
+		t.Errorf("HTTP span should link to the upstream parent: got ParentID %q, want %q",
 			httpSpan.ParentID, externalParentSpanID)
 	}
 
@@ -889,9 +889,9 @@ func TestIntegration_FullDistributedTraceFlow(t *testing.T) {
 		t.Errorf("trace.TraceID = %q, want inherited %q", trace.TraceID, inheritedTraceID)
 	}
 
-	t.Logf("Trace structure (for Datadog):")
+	t.Logf("Trace structure:")
 	t.Logf("  Trace ID: %s", trace.TraceID)
-	t.Logf("  External Parent Span: %s (from Datadog)", externalParentSpanID)
+	t.Logf("  External Parent Span: %s (from upstream)", externalParentSpanID)
 	t.Logf("    -> HTTP Span: %s (ParentID: %s)", httpSpan.SpanID, httpSpan.ParentID)
 	t.Logf("      -> LLM Span: %s (ParentID: %s)", llmSpan.SpanID, llmSpan.ParentID)
 	t.Logf("        -> Plugin Span: %s (ParentID: %s)", pluginSpan.SpanID, pluginSpan.ParentID)

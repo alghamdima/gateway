@@ -18,8 +18,8 @@ const (
 
 // PluginSpanFilter configures which plugin spans an observability connector exports.
 // Mode "include" exports only the listed plugins; mode "exclude" exports everything
-// except them. It is shared by every observability connector (OTEL, Datadog, BigQuery)
-// so the span-name contract and reparenting behavior stay consistent across exporters.
+// except them. It lives here so the span-name contract and reparenting behavior are
+// defined once for every exporter (the otel plugin today).
 type PluginSpanFilter struct {
 	Mode    PluginSpanFilterMode `json:"mode"`
 	Plugins []string             `json:"plugins"`

@@ -242,17 +242,17 @@ type SkillsRegistryFile struct {
 	DataURL string `json:"dataurl,omitempty"` // for source_type "dataurl"
 }
 
-// FeatureFlagsFileConfig is the config.json / Helm shape for feature flag
+// FeatureFlagsFileConfig is the config.json shape for feature flag
 // boot overrides. Values declared here win over DB overrides and are
-// rendered as "locked" in the UI so operators must edit config.json (or
-// re-deploy Helm) to change them.
+// rendered as "locked" in the UI so operators must edit config.json to
+// change them.
 type FeatureFlagsFileConfig struct {
 	Flags map[string]FeatureFlagFileValue `json:"flags"`
 }
 
 // FeatureFlagFileValue accepts either a JSON literal bool or a string. The
 // string form supports the same "env.NAME" indirection used elsewhere in
-// config.json (encryption_key, provider creds), so Helm can flip flags via
+// config.json (encryption_key, provider creds), so a deployment can flip flags via
 // container env vars without re-templating the JSON. Recognized truthy
 // string values are "true", "1", "yes", "on" (case-insensitive); anything
 // else parses as false.
@@ -262,8 +262,8 @@ type FeatureFlagFileValue struct {
 
 // UnmarshalJSON accepts {"enabled": true} (literal bool), {"enabled": "true"}
 // (string literal), or {"enabled": "env.BIFROST_FOO"} (env-var indirection).
-// The string form is critical for Helm because chart values are stringly
-// typed when sourced from env vars.
+// The string form is needed because values sourced from env vars are
+// strings.
 func (v *FeatureFlagFileValue) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Enabled json.RawMessage `json:"enabled"`
@@ -5234,7 +5234,7 @@ func initEncryption(configData *ConfigData) error {
 }
 
 // initVault is a no-op stub at the OSS level.
-// Vault initialization is performed by the enterprise layer via config_store.vault_store.
+// No vault backend is configured from config.json in this build.
 func initVault(_ *ConfigData) {}
 
 // resolveSetupToken resolves the bootstrap setup token required to create the very

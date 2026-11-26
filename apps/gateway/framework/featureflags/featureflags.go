@@ -7,8 +7,8 @@
 //	config.json file  >  configstore DB  >  code default
 //
 // File-locked flags reject Set() with ErrLocked and silently ignore
-// ApplyRemote, preserving the GitOps invariant that operators' config.json /
-// Helm values cannot be overridden at runtime by either UI toggles or peer
+// ApplyRemote, preserving the GitOps invariant that operators' config.json
+// values cannot be overridden at runtime by either UI toggles or peer
 // gossip. The DB row is still kept around inert so it re-emerges if the file
 // override is later removed.
 package featureflags
@@ -38,8 +38,8 @@ var (
 	// ErrFlagNotFound means the id is neither registered in code nor
 	// present in the store's override map.
 	ErrFlagNotFound = errors.New("feature flag not found")
-	// ErrFlagLocked means the flag's value is pinned by config.json or
-	// Helm. The operator must edit the file (or redeploy) to change it.
+	// ErrFlagLocked means the flag's value is pinned by config.json.
+	// The operator must edit the file (or redeploy) to change it.
 	ErrFlagLocked = errors.New("feature flag is locked by config.json")
 	// ErrFlagUnregistered means the flag exists in the override store but
 	// no code registered it, so toggling has no effect. The caller should

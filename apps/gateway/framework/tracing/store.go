@@ -196,7 +196,7 @@ func (s *TraceStore) ClearDeferredSpan(traceID string) {
 
 // AppendStreamingChunk tracks TTFT and chunk count for the deferred span.
 // Chunks are no longer stored — the new streaming.Accumulator handles full content
-// accumulation for plugins (logging, maxim). This eliminates storing 1M+ BifrostResponse
+// accumulation for plugins (logging). This eliminates storing 1M+ BifrostResponse
 // objects in the old accumulator at high concurrency.
 func (s *TraceStore) AppendStreamingChunk(traceID string, chunk *schemas.BifrostResponse) {
 	s.appendStreamingChunk(traceID, chunk)

@@ -2551,8 +2551,8 @@ func (m *TracingMiddleware) Middleware() schemas.BifrostHTTPMiddleware {
 			ctx.Response.Header.Set(lib.HeaderRequestID, requestID)
 			ctx.Response.Header.Set(lib.HeaderBifrostTraceID, headerTraceID)
 			// Store dimensions and session ID at the trace level (not as span
-			// attributes) so connectors like BigQuery can export them without
-			// changing the OTEL/Datadog span payloads.
+			// attributes) so connectors can export them without changing the
+			// OTEL span payloads.
 			dimensions := collectDimensionHeaders(ctx)
 			if len(dimensions) > 0 {
 				// Hand the trace its own copy — connectors read the attribute
@@ -2574,7 +2574,8 @@ func (m *TracingMiddleware) Middleware() schemas.BifrostHTTPMiddleware {
 			ctx.SetUserValue(schemas.BifrostContextKeyExportTraceID, headerTraceID)
 			// Extract parent span ID from W3C traceparent header (if present)
 			// This is the 16-char span ID from the upstream service that should be
-			// set as the ParentID of our root span for proper trace linking in Datadog/etc.
+			// set as the ParentID of our root span for proper trace linking in the
+			// caller's tracing backend.
 			parentSpanID := tracing.ExtractTraceParentSpanID(&ctx.Request.Header)
 			if parentSpanID != "" {
 				ctx.SetUserValue(schemas.BifrostContextKeyParentSpanID, parentSpanID)

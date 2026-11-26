@@ -247,7 +247,7 @@ func benchChatRequest() (*schemas.BifrostRequest, *schemas.BifrostResponse) {
 }
 
 // benchMetricsOnlyPlugin declines plugin spans, standing in for a connector that
-// reads only LLM spans (Splunk derives metrics that way).
+// reads only LLM spans.
 type benchMetricsOnlyPlugin struct{ name string }
 
 func (p *benchMetricsOnlyPlugin) GetName() string                                  { return p.name }

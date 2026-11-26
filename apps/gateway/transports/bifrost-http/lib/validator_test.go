@@ -1173,50 +1173,6 @@ func TestValidateConfigSchema_OtelPlugin_MissingProtocol(t *testing.T) {
 }
 
 // =============================================================================
-// Maxim Plugin Config Required Fields Tests
-// =============================================================================
-
-func TestValidateConfigSchema_MaximPlugin_Valid(t *testing.T) {
-	// Valid Maxim plugin with required field: api_key
-	validConfig := `{
-		"plugins": [
-			{
-				"enabled": true,
-				"name": "maxim",
-				"config": {
-					"api_key": "maxim-api-key-12345"
-				}
-			}
-		]
-	}`
-
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected valid Maxim plugin config to pass validation, got error: %v", err)
-	}
-}
-
-func TestValidateConfigSchema_MaximPlugin_MissingApiKey(t *testing.T) {
-	// Missing required field: api_key
-	invalidConfig := `{
-		"plugins": [
-			{
-				"enabled": true,
-				"name": "maxim",
-				"config": {
-					"log_repo_id": "my-log-repo"
-				}
-			}
-		]
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'api_key' in Maxim plugin to fail validation")
-	}
-}
-
-// =============================================================================
 // Azure Key Config Required Fields Tests
 // Note: Azure provider uses a special key schema that extends base_key
 // The azure_key_config is only valid within the azure provider's keys array
@@ -1479,18 +1435,6 @@ func TestValidateConfigSchema_BedrockKeyConfig_MissingRegion(t *testing.T) {
 		t.Error("expected config missing 'region' in Bedrock key config to fail validation")
 	}
 }
-
-// =============================================================================
-// Guardrails Config Tests
-// Note: Guardrails is an enterprise feature. The guardrails_config schema
-// validation is tested but the detailed rules/providers validation is only
-// available in the enterprise version. The public schema validates that the
-// guardrails_config exists but doesn't expose detailed structure.
-// =============================================================================
-
-// Guardrails tests are skipped for the public schema as guardrails_config
-// is an enterprise feature with a different schema structure.
-// Enterprise-specific tests should be added to the enterprise test suite.
 
 func TestValidateConfigSchema_VirtualKeyDeleteAfterExpireRequiresExpiresAt(t *testing.T) {
 	schema := loadLocalSchema(t)
@@ -1912,7 +1856,6 @@ func TestSchemaObjectStorageAzure(t *testing.T) {
 		config string
 	}{
 		{name: "logs", config: `{"logs_store":{"enabled":true,"type":"sqlite","config":{"path":"/tmp/logs.db"},"object_storage":%s}}`},
-		{name: "audit", config: `{"audit_logs":{"object_storage":%s}}`},
 	} {
 		t.Run(target.name, func(t *testing.T) {
 			for _, tt := range tests {
@@ -1934,24 +1877,18 @@ func TestSchemaObjectStorageAzureFormats(t *testing.T) {
 	compiled := compileSchema(t)
 	for _, tt := range []struct {
 		name      string
-		target    string
 		fields    string
 		wantError bool
 	}{
-		{name: "Parquet snappy", target: "logs_store", fields: `"format":"parquet","compression":"snappy"`},
-		{name: "Parquet zstd", target: "logs_store", fields: `"format":"parquet","compression":"zstd"`},
-		{name: "JSON gzip", target: "logs_store", fields: `"format":"json","compression":"gzip"`},
-		{name: "JSON rejects snappy", target: "logs_store", fields: `"format":"json","compression":"snappy"`, wantError: true},
-		{name: "default JSON rejects zstd", target: "logs_store", fields: `"compression":"zstd"`, wantError: true},
-		{name: "audit keeps JSONL format contract", target: "audit_logs", fields: `"format":"parquet"`, wantError: true},
-		{name: "audit keeps gzip switch contract", target: "audit_logs", fields: `"compression":"zstd"`, wantError: true},
+		{name: "Parquet snappy", fields: `"format":"parquet","compression":"snappy"`},
+		{name: "Parquet zstd", fields: `"format":"parquet","compression":"zstd"`},
+		{name: "JSON gzip", fields: `"format":"json","compression":"gzip"`},
+		{name: "JSON rejects snappy", fields: `"format":"json","compression":"snappy"`, wantError: true},
+		{name: "default JSON rejects zstd", fields: `"compression":"zstd"`, wantError: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			storage := `{"type":"azure","bucket":"logs","connection_string":"UseDevelopmentStorage=true",` + tt.fields + `}`
-			config := `{"audit_logs":{"object_storage":` + storage + `}}`
-			if tt.target == "logs_store" {
-				config = `{"logs_store":{"enabled":true,"type":"sqlite","config":{"path":"/tmp/logs.db"},"object_storage":` + storage + `}}`
-			}
+			config := `{"logs_store":{"enabled":true,"type":"sqlite","config":{"path":"/tmp/logs.db"},"object_storage":` + storage + `}}`
 			err := validateConfig(t, compiled, config)
 			if tt.wantError && err == nil {
 				t.Fatal("expected schema validation to fail")
@@ -2325,297 +2262,6 @@ func TestSchemaComplexityAnalyzerConfigRefusesSuggestions(t *testing.T) {
 		if err := validateConfig(t, compiled, fmt.Sprintf(`{"model_routers":[%s]}`, modelRouterSchemaConfig(analyzer))); err != nil {
 			t.Fatalf("a model router must take suggestions %s: %v", block, err)
 		}
-	}
-}
-
-// TestSchemaGuardrailRuleTarget verifies the target field without breaking legacy LLM rules.
-func TestSchemaGuardrailRuleTarget(t *testing.T) {
-	compiled := compileSchema(t)
-
-	tests := []struct {
-		name      string
-		target    string
-		wantError bool
-	}{
-		{name: "omitted target remains valid", target: ""},
-		{name: "unknown target is rejected", target: `,"target":"agent"`, wantError: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := fmt.Sprintf(`{
-				"guardrails_config": {
-					"guardrail_rules": [{
-						"id": 1,
-						"name": "MCP rule",
-						"enabled": true,
-						"cel_expression": "true",
-						"apply_to": "input"%s
-					}]
-				}
-			}`, tt.target)
-
-			err := validateConfig(t, compiled, config)
-			if tt.wantError && err == nil {
-				t.Fatal("config should be invalid")
-			}
-			if !tt.wantError && err != nil {
-				t.Fatalf("config should be valid, got: %v", err)
-			}
-		})
-	}
-}
-
-// TestSchemaGuardrailRuleConversationWindow verifies config accepts the explicit
-// history switch and rejects non-boolean values before Enterprise reconciliation.
-func TestSchemaGuardrailRuleConversationWindow(t *testing.T) {
-	compiled := compileSchema(t)
-
-	tests := []struct {
-		name      string
-		window    string
-		wantError bool
-	}{
-		{name: "current input only is valid", window: `,"send_all_conversation_turns":false,"max_turns_to_send":0`},
-		{name: "all history is valid", window: `,"send_all_conversation_turns":true`},
-		{name: "non boolean switch is rejected", window: `,"send_all_conversation_turns":"false"`, wantError: true},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			config := fmt.Sprintf(`{
-				"guardrails_config": {
-					"guardrail_rules": [{
-						"id": 1,
-						"name": "Conversation rule",
-						"enabled": true,
-						"cel_expression": "true",
-						"apply_to": "input"%s
-					}]
-				}
-			}`, test.window)
-
-			err := validateConfig(t, compiled, config)
-			if test.wantError && err == nil {
-				t.Fatal("config should be invalid")
-			}
-			if !test.wantError && err != nil {
-				t.Fatalf("config should be valid, got: %v", err)
-			}
-		})
-	}
-}
-
-func TestSchemaSCIMConfigValidation(t *testing.T) {
-	compiled := compileSchema(t)
-
-	tests := []struct {
-		name      string
-		config    string
-		wantError bool
-	}{
-		{
-			name:   "disabled okta with empty config is valid",
-			config: `{"scim_config":{"enabled":false,"provider":"okta","config":{}}}`,
-		},
-		{
-			name:   "disabled entra with empty config is valid",
-			config: `{"scim_config":{"enabled":false,"provider":"entra","config":{}}}`,
-		},
-		{
-			name:   "disabled keycloak with empty config is valid",
-			config: `{"scim_config":{"enabled":false,"provider":"keycloak","config":{}}}`,
-		},
-		{
-			name:      "enabled okta with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"okta","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name:      "enabled entra with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"entra","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name:      "enabled keycloak with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"keycloak","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name: "enabled keycloak with required config is valid",
-			config: `{
-				"scim_config": {
-					"enabled": true,
-					"provider": "keycloak",
-					"config": {
-						"serverUrl": "https://keycloak.company.com",
-						"realm": "bifrost-prod",
-						"clientId": "bifrost",
-						"clientSecret": "env.KEYCLOAK_CLIENT_SECRET"
-					}
-				}
-			}`,
-		},
-		{
-			name:      "enabled generic with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"generic","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name:      "enabled zitadel with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"zitadel","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name:   "enabled zitadel with required config is valid",
-			config: `{"scim_config":{"enabled":true,"provider":"zitadel","config":{"domain":"acme.zitadel.cloud","clientId":"bifrost"}}}`,
-		},
-		{
-			name:      "enabled google with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"google","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name:   "enabled google with required config is valid",
-			config: `{"scim_config":{"enabled":true,"provider":"google","config":{"domain":"company.com","clientId":"bifrost"}}}`,
-		},
-		{
-			name:      "enabled google with credentialMode env but no serviceAccountEnvVar is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"google","config":{"domain":"company.com","clientId":"bifrost","credentialMode":"env"}}}`,
-			wantError: true,
-		},
-		{
-			name:      "enabled sailpoint with empty config is invalid",
-			config:    `{"scim_config":{"enabled":true,"provider":"sailpoint","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name:   "enabled sailpoint with required config is valid",
-			config: `{"scim_config":{"enabled":true,"provider":"sailpoint","config":{"product":"isc","tenant":"acme"}}}`,
-		},
-		{
-			name:      "unknown provider is rejected",
-			config:    `{"scim_config":{"enabled":true,"provider":"pingfederate","config":{}}}`,
-			wantError: true,
-		},
-		{
-			name: "enabled generic with required config is valid",
-			config: `{
-				"scim_config": {
-					"enabled": true,
-					"provider": "generic",
-					"config": {
-						"issuerUrl": "https://idp.company.com",
-						"clientId": "bifrost"
-					}
-				}
-			}`,
-		},
-		{
-			name: "enabled generic with claim SCIM attributes is valid",
-			config: `{
-				"scim_config": {
-					"enabled": true,
-					"provider": "generic",
-					"config": {
-						"issuerUrl": "https://idp.company.com",
-						"clientId": "bifrost",
-						"claimScimAttributes": {
-							"department": {"attributeType": "user", "attributeValue": "department"}
-						}
-					}
-				}
-			}`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateConfig(t, compiled, tt.config)
-			if tt.wantError && err == nil {
-				t.Fatal("expected validation error")
-			}
-			if !tt.wantError && err != nil {
-				t.Fatalf("expected config to validate, got: %v", err)
-			}
-		})
-	}
-}
-
-// workloadIssuer returns the provider config suffix holding one trusted issuer at
-// https://idp.example for audience a, with fields added to it.
-func workloadIssuer(fields string) string {
-	return `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"IdP","issuerUrl":"https://idp.example","audiences":["a"],` + fields + `}]}`
-}
-
-// TestSchemaSCIMSharedProvisioningFields pins the fields every identity provider inherits from
-// the enterprise mapping.ProvisioningConfig: workload identity (workloadIdentity) and
-// accessProfileResolutionStrategy. Each
-// provider's config refuses unknown keys, so a provider missing one of them rejects a config
-// the loader accepts.
-func TestSchemaSCIMSharedProvisioningFields(t *testing.T) {
-	compiled := compileSchema(t)
-
-	providers := map[string]string{
-		"okta":      `"issuerUrl":"https://acme.okta.com/oauth2/default","clientId":"bifrost","clientSecret":"env.OKTA_CLIENT_SECRET"`,
-		"entra":     `"tenantId":"00000000-0000-0000-0000-000000000000","clientId":"bifrost"`,
-		"keycloak":  `"serverUrl":"https://keycloak.company.com","realm":"bifrost-prod","clientId":"bifrost","clientSecret":"env.KEYCLOAK_CLIENT_SECRET"`,
-		"zitadel":   `"domain":"acme.zitadel.cloud","clientId":"bifrost"`,
-		"google":    `"domain":"company.com","clientId":"bifrost"`,
-		"sailpoint": `"product":"isc","tenant":"acme"`,
-		"generic":   `"issuerUrl":"https://idp.company.com","clientId":"bifrost"`,
-	}
-	scimConfig := func(provider, extra string) string {
-		return `{"scim_config":{"enabled":true,"provider":"` + provider + `","config":{` + providers[provider] + extra + `}}}`
-	}
-
-	for provider := range providers {
-		t.Run(provider+" accepts the shared provisioning fields", func(t *testing.T) {
-			extra := `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"AWS prod","kind":"aws","issuerUrl":"https://abc.tokens.sts.global.api.aws","audiences":["https://bifrost.example"]}]},` +
-				`"accessProfileResolutionStrategy":"order"`
-			if err := validateConfig(t, compiled, scimConfig(provider, extra)); err != nil {
-				t.Fatalf("expected config to validate, got: %v", err)
-			}
-		})
-	}
-
-	tests := []struct {
-		name      string
-		extra     string
-		wantError bool
-	}{
-		{name: "okta syncAllUsers false is valid", extra: `,"syncAllUsers":false`},
-		{name: "generic trusted issuer with its claims", extra: workloadIssuer(`"kind":"generic","identityClaim":"client_id","machineCheck":{"kind":"sub_equals_claim","claim":"client_id"},"maxLifetimeSeconds":3600,"disabled":true`)},
-		{name: "generic trusted issuer taking only mapped IDs", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"any"}`)},
-		{name: "generic trusted issuer with a prefix rule", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_prefix","claim":"preferred_username","value":"service-account-"}`)},
-		{name: "trusted issuer on localhost over http", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"Local","kind":"aws","issuerUrl":"http://localhost:8381/realms/acme","audiences":["a"]}]}`},
-		{name: "trusted issuer over plain http", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"X","kind":"aws","issuerUrl":"http://idp.example","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer URL with a query", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"X","kind":"aws","issuerUrl":"https://idp.example/?","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer URL with a fragment", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"X","kind":"aws","issuerUrl":"https://idp.example#","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer URL with user info", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"X","kind":"aws","issuerUrl":"https://u:p@idp.example","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer without an audience", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"X","kind":"aws","issuerUrl":"https://idp.example","audiences":[]}]}`, wantError: true},
-		{name: "trusted issuer of an unknown kind", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"X","kind":"okta","issuerUrl":"https://idp.example","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer without a name", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"kind":"aws","issuerUrl":"https://idp.example","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer with a blank name", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"  ","kind":"aws","issuerUrl":"https://idp.example","audiences":["a"]}]}`, wantError: true},
-		{name: "trusted issuer with an id", extra: `,"workloadIdentity":{"additionalTrustedIssuers":[{"id":"x","name":"X","kind":"aws","issuerUrl":"https://idp.example","audiences":["a"]}]}`, wantError: true},
-		{name: "generic trusted issuer without an identity claim", extra: workloadIssuer(`"kind":"generic","machineCheck":{"kind":"any"}`), wantError: true},
-		{name: "generic trusted issuer without a machine check", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp"`), wantError: true},
-		{name: "machine check prefix that is empty", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_prefix","claim":"preferred_username","value":""}`), wantError: true},
-		{name: "machine check prefix without a value", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_prefix","claim":"preferred_username"}`), wantError: true},
-		{name: "machine check equals without a claim", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_equals","value":"client-credentials"}`), wantError: true},
-		{name: "machine check sub_equals_claim without a claim", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"sub_equals_claim"}`), wantError: true},
-		{name: "accessProfileResolutionStrategy rejects unknown values", extra: `,"accessProfileResolutionStrategy":"first"`, wantError: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateConfig(t, compiled, scimConfig("okta", tt.extra))
-			if tt.wantError && err == nil {
-				t.Fatal("expected validation error")
-			}
-			if !tt.wantError && err != nil {
-				t.Fatalf("expected config to validate, got: %v", err)
-			}
-		})
 	}
 }
 
@@ -3807,42 +3453,6 @@ func TestValidateConfigSchema_Passthrough(t *testing.T) {
 		if err := ValidateConfigSchema([]byte(config(block)), schema); err == nil {
 			t.Errorf("%s: expected passthrough to fail validation", name)
 		}
-	}
-}
-
-// TestSchemaAuditLogsSigningKeys pins the audit signing-key rules the gateway
-// enforces at startup: a literal key needs 32 characters (an env. reference
-// is resolved later), and several keys need active_key_id, where hmac_key
-// counts as the key "default".
-func TestSchemaAuditLogsSigningKeys(t *testing.T) {
-	compiled := compileSchema(t)
-	key := `"` + strings.Repeat("k", 32) + `"`
-
-	tests := []struct {
-		name      string
-		auditLogs string
-		wantError bool
-	}{
-		{name: "one named key", auditLogs: `{"hmac_keys":[{"id":"a","key":` + key + `}]}`},
-		{name: "env reference key", auditLogs: `{"hmac_key":"env.AUDIT_KEY"}`},
-		{name: "short literal hmac_key", auditLogs: `{"hmac_key":"short"}`, wantError: true},
-		{name: "short literal named key", auditLogs: `{"hmac_keys":[{"id":"a","key":"short"}]}`, wantError: true},
-		{name: "two named keys without active_key_id", auditLogs: `{"hmac_keys":[{"id":"a","key":` + key + `},{"id":"b","key":` + key + `}]}`, wantError: true},
-		{name: "two named keys with active_key_id", auditLogs: `{"hmac_keys":[{"id":"a","key":` + key + `},{"id":"b","key":` + key + `}],"active_key_id":"b"}`},
-		{name: "hmac_key plus a named key without active_key_id", auditLogs: `{"hmac_key":` + key + `,"hmac_keys":[{"id":"a","key":` + key + `}]}`, wantError: true},
-		{name: "hmac_key plus a named key with active_key_id", auditLogs: `{"hmac_key":` + key + `,"hmac_keys":[{"id":"a","key":` + key + `}],"active_key_id":"a"}`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateConfig(t, compiled, `{"audit_logs":`+tt.auditLogs+`}`)
-			if tt.wantError && err == nil {
-				t.Fatal("expected schema validation to fail")
-			}
-			if !tt.wantError && err != nil {
-				t.Fatalf("expected schema validation to pass, got: %v", err)
-			}
-		})
 	}
 }
 

@@ -363,8 +363,7 @@ func TestConvertSpanEventsStripContent(t *testing.T) {
 	}
 }
 
-// TestConvertTraceContentFidelity is the OTEL analog of the Kafka/PubSub harness
-// assertPayloadComplete: it builds a realistic root + llm.call trace carrying the same
+// TestConvertTraceContentFidelity builds a realistic root + llm.call trace carrying the same
 // gen_ai.* attributes the framework's llmspan producer emits (provider/model, JSON-string
 // input/output messages, []string finish reasons, int token counts) and asserts the *actual
 // values* survive conversion onto the correct (llm.call) exported span — not just that the keys

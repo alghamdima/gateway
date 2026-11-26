@@ -168,7 +168,7 @@ func GetUpstreamLatency(ctx context.Context) (time.Duration, bool) {
 }
 
 // StampUpstreamLatency writes the accumulated total onto the request's root span
-// so trace-based connectors (OTEL, Datadog) can derive overhead at export time.
+// so trace-based connectors (OTEL) can derive overhead at export time.
 //
 // It stamps the ROOT span, not the llm.call span: the root is the only one whose
 // duration covers the whole request, and the accumulator spans every attempt.

@@ -6,7 +6,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/stretchr/testify/assert"
@@ -354,7 +353,7 @@ func TestAssertCostBreakdownCatchesMistakes(t *testing.T) {
 	})
 
 	t.Run("cross-wired category", func(t *testing.T) {
-		// The BigQuery pickDetail mistake: two categories fed from one key.
+		// Two categories fed from one key.
 		attrs := CostAttributes(ExportFixtureCost())
 		attrs[AttrBifrostCostInputAudio] = attrs[AttrBifrostCostInputText]
 		if len(AssertCostBreakdown(CostAttributeLookup(attrs))) == 0 {
@@ -482,30 +481,6 @@ func TestSpanAttributeAccessors(t *testing.T) {
 	_ = GetInt64Attr(nil, "i")
 	if _, ok := GetFloat64AttrOK(nil, "f"); ok {
 		t.Error("nil map reported a value")
-	}
-}
-
-// Datadog's copy of this had no nil guard and would panic; Splunk's did. Both
-// now share this one, so the contract is pinned here.
-func TestFinalAttemptSpan(t *testing.T) {
-	at := func(sec int, kind SpanKind) *Span {
-		return &Span{Kind: kind, EndTime: time.Unix(int64(1700000000+sec), 0)}
-	}
-	early, late := at(1, SpanKindLLMCall), at(9, SpanKindRetry)
-
-	tr := &Trace{Spans: []*Span{early, nil, at(5, SpanKindHTTPRequest), late}}
-	if got := FinalAttemptSpan(tr); got != late {
-		t.Errorf("FinalAttemptSpan picked %v, want the latest LLM/retry span", got)
-	}
-	// Non-LLM spans are never the final attempt.
-	if got := FinalAttemptSpan(&Trace{Spans: []*Span{at(9, SpanKindHTTPRequest)}}); got != nil {
-		t.Errorf("FinalAttemptSpan returned a non-LLM span: %v", got)
-	}
-	if got := FinalAttemptSpan(&Trace{Spans: []*Span{nil}}); got != nil {
-		t.Errorf("nil-only trace returned %v", got)
-	}
-	if got := FinalAttemptSpan(nil); got != nil {
-		t.Errorf("nil trace returned %v", got)
 	}
 }
 

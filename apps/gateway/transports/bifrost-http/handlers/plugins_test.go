@@ -383,33 +383,33 @@ func TestRestoreRedacted_OTELProfilesHeaders(t *testing.T) {
 	}
 }
 
-// TestRestoreRedacted_KafkaSecretVarObjects covers the Kafka connector shape: secrets are
+// TestRestoreRedacted_NestedSecretVarObjects covers nested credentials: secrets are
 // stored in the DB as plain strings, but the redacted GET returns plain-text SecretVars as
 // value-only objects ({"value": "supe…cret"} — ref/type are omitempty). Saving that back
 // must restore the stored string, not persist the mask.
-func TestRestoreRedacted_KafkaSecretVarObjects(t *testing.T) {
-	realPassword := "REAL-KAFKA-SASL-PASSWORD-123"
+func TestRestoreRedacted_NestedSecretVarObjects(t *testing.T) {
+	realPassword := "REAL-SERVICE-PASSWORD-123"
 	realCACert := "-----BEGIN CERTIFICATE-----\nREAL\n-----END CERTIFICATE-----"
 	maskedPassword := schemas.NewSecretVar(realPassword).Redacted().GetValue()
 	maskedCACert := schemas.NewSecretVar(realCACert).Redacted().GetValue()
 
 	// What MarshalForStorage stored in the DB.
 	existing := map[string]any{
-		"brokers": []any{"localhost:9092"},
-		"ca_cert": realCACert,
-		"sasl": map[string]any{
+		"endpoints": []any{"localhost:4317"},
+		"ca_cert":   realCACert,
+		"auth": map[string]any{
 			"mechanism": "PLAIN",
-			"username":  "kafka-user",
+			"username":  "svc-user",
 			"password":  realPassword,
 		},
 	}
 	// What the UI sends back after a redacted GET, untouched.
 	incoming := map[string]any{
-		"brokers": []any{"localhost:9092"},
-		"ca_cert": map[string]any{"value": maskedCACert},
-		"sasl": map[string]any{
+		"endpoints": []any{"localhost:4317"},
+		"ca_cert":   map[string]any{"value": maskedCACert},
+		"auth": map[string]any{
 			"mechanism": "PLAIN",
-			"username":  map[string]any{"value": "kafka-user"},
+			"username":  map[string]any{"value": "svc-user"},
 			"password":  map[string]any{"value": maskedPassword},
 		},
 	}
@@ -418,38 +418,38 @@ func TestRestoreRedacted_KafkaSecretVarObjects(t *testing.T) {
 	if got["ca_cert"] != realCACert {
 		t.Errorf("ca_cert not restored: got %v, want %q", got["ca_cert"], realCACert)
 	}
-	sasl := got["sasl"].(map[string]any)
-	if sasl["password"] != realPassword {
-		t.Errorf("sasl.password not restored: got %v, want %q", sasl["password"], realPassword)
+	auth := got["auth"].(map[string]any)
+	if auth["password"] != realPassword {
+		t.Errorf("auth.password not restored: got %v, want %q", auth["password"], realPassword)
 	}
 	// A non-redacted value-only object (username shown in clear) must pass through.
-	if u, ok := sasl["username"].(map[string]any); !ok || u["value"] != "kafka-user" {
-		t.Errorf("sasl.username should pass through unchanged, got %v", sasl["username"])
+	if u, ok := auth["username"].(map[string]any); !ok || u["value"] != "svc-user" {
+		t.Errorf("auth.username should pass through unchanged, got %v", auth["username"])
 	}
 
 	// A genuinely rotated password ({"value": ..., "ref": ""} as SecretVarInput emits)
 	// must pass through, not be clobbered by the stored value.
 	rotated := map[string]any{
-		"sasl": map[string]any{
+		"auth": map[string]any{
 			"password": map[string]any{"value": "A-BRAND-NEW-PASSWORD-5678", "ref": ""},
 		},
 	}
 	got2 := restoreRedactedFromExisting(rotated, existing)
-	p, ok := got2["sasl"].(map[string]any)["password"].(map[string]any)
+	p, ok := got2["auth"].(map[string]any)["password"].(map[string]any)
 	if !ok || p["value"] != "A-BRAND-NEW-PASSWORD-5678" {
-		t.Errorf("new password should pass through, got %v", got2["sasl"].(map[string]any)["password"])
+		t.Errorf("new password should pass through, got %v", got2["auth"].(map[string]any)["password"])
 	}
 
 	// Switching to an env reference must pass through (intentional update).
 	envRef := map[string]any{
-		"sasl": map[string]any{
+		"auth": map[string]any{
 			"password": map[string]any{"value": "", "ref": "env.KAFKA_PASSWORD", "type": "env"},
 		},
 	}
 	got3 := restoreRedactedFromExisting(envRef, existing)
-	p3, ok := got3["sasl"].(map[string]any)["password"].(map[string]any)
+	p3, ok := got3["auth"].(map[string]any)["password"].(map[string]any)
 	if !ok || p3["ref"] != "env.KAFKA_PASSWORD" {
-		t.Errorf("env ref password should pass through, got %v", got3["sasl"].(map[string]any)["password"])
+		t.Errorf("env ref password should pass through, got %v", got3["auth"].(map[string]any)["password"])
 	}
 }
 
@@ -612,11 +612,11 @@ func TestGetLoadedPlugins(t *testing.T) {
 }
 
 // A plugin that loaded despite its row saying disabled must surface as enabled=false
-// with the runtime status, not be masked as "disabled". Masking it is what hid the
-// enterprise loader ignoring the row: the API reported disabled while every pod ran it.
+// with the runtime status, not be masked as "disabled". Masking it would hide a
+// loader ignoring the row: the API would report disabled while every pod ran it.
 func TestBuildPluginResponseSurfacesRowRuntimeDivergence(t *testing.T) {
 	h := &PluginsHandler{}
-	row := &configstoreTables.TablePlugin{Name: "datadog", Enabled: false}
+	row := &configstoreTables.TablePlugin{Name: "otel", Enabled: false}
 
 	t.Run("disabled row with no runtime entry reads as disabled", func(t *testing.T) {
 		got := h.buildPluginResponseWithStatuses(row, map[string]schemas.PluginStatus{})
@@ -630,7 +630,7 @@ func TestBuildPluginResponseSurfacesRowRuntimeDivergence(t *testing.T) {
 
 	t.Run("disabled row that is actually loaded reads as active", func(t *testing.T) {
 		got := h.buildPluginResponseWithStatuses(row, map[string]schemas.PluginStatus{
-			"datadog": {Name: "datadog", Status: schemas.PluginStatusActive},
+			"otel": {Name: "otel", Status: schemas.PluginStatusActive},
 		})
 		if got.Enabled {
 			t.Errorf("Enabled = true, want false (the row still says disabled)")

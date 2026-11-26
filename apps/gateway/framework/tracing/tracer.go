@@ -275,8 +275,8 @@ func (t *Tracer) SetTraceRequestHeaders(traceID string, headers map[string]strin
 	}
 	patterns := t.CollectRequestHeaderPatterns()
 	// Redact credential-bearing headers once, here at the single capture point, so
-	// every connector reading trace.RequestHeaders (Datadog, OTEL, BigQuery, Kafka,
-	// Pub/Sub) exports redacted values even under a broad pattern like "*".
+	// every connector reading trace.RequestHeaders (OTEL) exports redacted values
+	// even under a broad pattern like "*".
 	matched := schemas.RedactSensitiveHeaders(schemas.FilterHeaders(headers, patterns))
 	if len(matched) == 0 {
 		return
@@ -285,7 +285,7 @@ func (t *Tracer) SetTraceRequestHeaders(traceID string, headers map[string]strin
 }
 
 // SetTraceAttribute sets a trace-level attribute. Trace attributes are never
-// exported as OTEL/Datadog span attributes; observability connectors read them
+// exported as OTEL span attributes; observability connectors read them
 // directly off the completed trace.
 func (t *Tracer) SetTraceAttribute(traceID string, key string, value any) {
 	t.store.SetTraceAttribute(traceID, key, value)
@@ -1384,7 +1384,7 @@ func (t *Tracer) exportAndRelease(completedTrace *schemas.Trace, slots []*obsPlu
 		exportTrace.StampOverheadDuration()
 
 		// Connectors receive a copy with the internal overhead-breakdown spans stripped
-		// so they don't inflate span volume in OTEL/Datadog/etc.; only plugins that opt
+		// so they don't inflate span volume in OTEL; only plugins that opt
 		// in via OverheadSpanConsumer (the logging plugin, which needs them to compute
 		// the breakdown) get the full trace. Computed once; returns exportTrace unchanged
 		// when there are no breakdown spans to strip.

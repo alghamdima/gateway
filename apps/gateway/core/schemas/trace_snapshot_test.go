@@ -7,7 +7,7 @@ import (
 )
 
 // TestSnapshotForExport_ConcurrentWriter reproduces the crash observed by the
-// Datadog/OTEL exporters: an exporter iterating a span's live Attributes map
+// trace exporters: an exporter iterating a span's live Attributes map
 // while a late writer (streaming finalization, redaction) mutates it via the
 // span lock triggers a fatal "concurrent map iteration and map write".
 //

@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseTraceparent_ValidHeader(t *testing.T) {
-	// Example from W3C spec and the user's actual Datadog headers
+	// Examples from the W3C spec and a real upstream service's headers
 	tests := []struct {
 		name        string
 		traceparent string
@@ -16,7 +16,7 @@ func TestParseTraceparent_ValidHeader(t *testing.T) {
 		wantFlags   string
 	}{
 		{
-			name:        "valid traceparent from Datadog",
+			name:        "valid traceparent from an upstream service",
 			traceparent: "00-69538b980000000079943934f90c1d40-aad09d1659b4c7e3-01",
 			wantTraceID: "69538b980000000079943934f90c1d40",
 			wantParent:  "aad09d1659b4c7e3",
@@ -324,7 +324,7 @@ func TestExtractTraceContext_WithTraceState(t *testing.T) {
 		t.Errorf("ParentID = %q, want %q", ctx.ParentID, "aad09d1659b4c7e3")
 	}
 	if ctx.TraceState != "dd=p:aad09d1659b4c7e3;s:1;t.dm:-1;t.tid:69538b9800000000" {
-		t.Errorf("TraceState = %q, want Datadog tracestate", ctx.TraceState)
+		t.Errorf("TraceState = %q, want the inbound tracestate", ctx.TraceState)
 	}
 }
 

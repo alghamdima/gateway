@@ -153,8 +153,7 @@ func PopulateErrorAttributes(err *schemas.BifrostError) map[string]any {
 	// Usage the provider billed us for even though the request failed or was
 	// cancelled (see BifrostError.ExtraFields.BilledUsage). Governance and the
 	// logging plugin already charge for this; without emitting it here every
-	// span-based consumer — the otel plugin and the BigQuery / Datadog / Kafka /
-	// Pub-Sub connectors — records zero tokens for the same request.
+	// span-based consumer (the otel plugin) records zero tokens for the same request.
 	if u := err.ExtraFields.BilledUsage; u != nil {
 		// Everything below is gated on > 0: attachBilledUsageFromContext
 		// (core/providers/utils) attaches a BilledUsage when *any* of tokens,
@@ -1427,23 +1426,13 @@ func PopulateFileContentResponseAttributes(resp *schemas.BifrostFileContentRespo
 // Helper functions for extracting messages
 // ===============================================
 
-// Aliases kept so existing importers (the Datadog connector reads
-// tracing.MessageSummary) compile unchanged after the types moved to
-// core/schemas.
-type (
-	MessageSummary         = schemas.MessageSummary
-	ToolCallSummary        = schemas.ToolCallSummary
-	ReasoningDetailSummary = schemas.ReasoningDetailSummary
-	AudioSummary           = schemas.AudioSummary
-)
-
-// ResponsesMessageSummary extends MessageSummary with reasoning
+// ResponsesMessageSummary extends schemas.MessageSummary with reasoning
 type ResponsesMessageSummary struct {
 	Role        string                      `json:"role"`
 	Content     string                      `json:"content"`
 	Attachments []schemas.AttachmentSummary `json:"attachments,omitempty"`
 	Reasoning   string                      `json:"reasoning,omitempty"`
-	ToolCalls   []ToolCallSummary           `json:"tool_calls,omitempty"`
+	ToolCalls   []schemas.ToolCallSummary   `json:"tool_calls,omitempty"`
 	ToolCallID  string                      `json:"tool_call_id,omitempty"`
 }
 
@@ -1485,7 +1474,7 @@ func extractResponsesOutputMessages(resp *schemas.BifrostResponsesResponse) []Re
 			if msg.ResponsesToolMessage == nil || msg.ResponsesToolMessage.Name == nil {
 				continue
 			}
-			tc := ToolCallSummary{
+			tc := schemas.ToolCallSummary{
 				Type: "function",
 				Name: *msg.ResponsesToolMessage.Name,
 			}
@@ -1497,14 +1486,14 @@ func extractResponsesOutputMessages(resp *schemas.BifrostResponsesResponse) []Re
 			}
 			result = append(result, ResponsesMessageSummary{
 				Role:      "assistant",
-				ToolCalls: []ToolCallSummary{tc},
+				ToolCalls: []schemas.ToolCallSummary{tc},
 			})
 
 		case schemas.ResponsesMessageTypeMCPCall:
 			if msg.ResponsesToolMessage == nil || msg.ResponsesToolMessage.Name == nil {
 				continue
 			}
-			tc := ToolCallSummary{
+			tc := schemas.ToolCallSummary{
 				Type: "mcp",
 				Name: *msg.ResponsesToolMessage.Name,
 			}
@@ -1516,7 +1505,7 @@ func extractResponsesOutputMessages(resp *schemas.BifrostResponsesResponse) []Re
 			}
 			result = append(result, ResponsesMessageSummary{
 				Role:      "assistant",
-				ToolCalls: []ToolCallSummary{tc},
+				ToolCalls: []schemas.ToolCallSummary{tc},
 			})
 
 		case schemas.ResponsesMessageTypeWebSearchCall:
@@ -1538,7 +1527,7 @@ func extractResponsesOutputMessages(resp *schemas.BifrostResponsesResponse) []Re
 			schemas.ResponsesMessageTypeCodeInterpreterCall:
 			result = append(result, ResponsesMessageSummary{
 				Role:      "assistant",
-				ToolCalls: []ToolCallSummary{responsesItemToolCall(&msg, msgType)},
+				ToolCalls: []schemas.ToolCallSummary{responsesItemToolCall(&msg, msgType)},
 			})
 
 		case schemas.ResponsesMessageTypeFileSearchCall,
@@ -1596,7 +1585,7 @@ func extractResponsesInputMessages(messages []schemas.ResponsesMessage) []Respon
 			if msg.ResponsesToolMessage == nil || msg.ResponsesToolMessage.Name == nil {
 				continue
 			}
-			tc := ToolCallSummary{
+			tc := schemas.ToolCallSummary{
 				Type: "function",
 				Name: *msg.ResponsesToolMessage.Name,
 			}
@@ -1608,7 +1597,7 @@ func extractResponsesInputMessages(messages []schemas.ResponsesMessage) []Respon
 			}
 			result = append(result, ResponsesMessageSummary{
 				Role:      "assistant",
-				ToolCalls: []ToolCallSummary{tc},
+				ToolCalls: []schemas.ToolCallSummary{tc},
 			})
 
 		case schemas.ResponsesMessageTypeFunctionCallOutput:
@@ -1630,7 +1619,7 @@ func extractResponsesInputMessages(messages []schemas.ResponsesMessage) []Respon
 			}
 			if msg.ResponsesToolMessage.Name != nil {
 				// Outbound MCP tool call (assistant side)
-				tc := ToolCallSummary{
+				tc := schemas.ToolCallSummary{
 					Type: "mcp",
 					Name: *msg.ResponsesToolMessage.Name,
 				}
@@ -1642,7 +1631,7 @@ func extractResponsesInputMessages(messages []schemas.ResponsesMessage) []Respon
 				}
 				result = append(result, ResponsesMessageSummary{
 					Role:      "assistant",
-					ToolCalls: []ToolCallSummary{tc},
+					ToolCalls: []schemas.ToolCallSummary{tc},
 				})
 			} else if msg.ResponsesToolMessage.CallID != nil {
 				// Inbound MCP tool result (user side)
@@ -1690,7 +1679,7 @@ func extractResponsesInputMessages(messages []schemas.ResponsesMessage) []Respon
 			schemas.ResponsesMessageTypeCodeInterpreterCall:
 			result = append(result, ResponsesMessageSummary{
 				Role:      "assistant",
-				ToolCalls: []ToolCallSummary{responsesItemToolCall(&msg, msgType)},
+				ToolCalls: []schemas.ToolCallSummary{responsesItemToolCall(&msg, msgType)},
 			})
 
 		case schemas.ResponsesMessageTypeFileSearchCall,
@@ -1726,8 +1715,8 @@ func extractResponsesInputMessages(messages []schemas.ResponsesMessage) []Respon
 
 // responsesItemToolCall summarizes a tool call whose model-generated payload does
 // not live on `arguments`: `input`, `action` and `code` respectively.
-func responsesItemToolCall(msg *schemas.ResponsesMessage, msgType schemas.ResponsesMessageType) ToolCallSummary {
-	tc := ToolCallSummary{Type: responsesItemToolType(msgType)}
+func responsesItemToolCall(msg *schemas.ResponsesMessage, msgType schemas.ResponsesMessageType) schemas.ToolCallSummary {
+	tc := schemas.ToolCallSummary{Type: responsesItemToolType(msgType)}
 	if msg.ID != nil {
 		tc.ID = *msg.ID
 	}

@@ -959,7 +959,7 @@ func restoreRedactedValue(incoming, existing any) any {
 // isSecretVarObject returns true if m has the shape of a serialised SecretVar: a string
 // "value" plus, optionally, only SecretVar keys. Plain-text SecretVars marshal as
 // {"value": "..."} alone (ref/type are omitempty), so value-only objects must match too —
-// e.g. the Kafka SASL credentials round-tripped by the UI after a redacted GET.
+// e.g. nested credentials round-tripped by a client after a redacted GET.
 func isSecretVarObject(m map[string]any) bool {
 	if _, ok := m["value"].(string); !ok {
 		return false

@@ -78,13 +78,13 @@ Status of each feature here:
 
 ## Request extras
 
-| OpenRouter                                                              | Status                                        | Gateway                                                | Notes                                                   |
-| ----------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------- |
-| Presets (saved system prompt, model and parameters, referenced by name) | Not planned yet                               | `prompts` plugin is similar                            | Small once wanted                                       |
-| Response healing for broken JSON (opt-in plugin)                        | Not planned yet                               | `jsonparser` plugin fixes partial JSON in streams only |                                                         |
-| Web search as a server tool (the `:online` plugin is deprecated)        | Not planned                                   | No                                                     | Needs a search provider contract and its own price      |
-| PDF and file inputs                                                     | Passed through where the provider supports it | Yes                                                    | No conversion of our own                                |
-| Bring your own provider key (BYOK), free to $25k/month then 5%          | Not planned yet                               | Possible with per-customer provider keys               | A pricing decision and an isolation design; later phase |
+| OpenRouter                                                              | Status                                        | Gateway                                  | Notes                                                   |
+| ----------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| Presets (saved system prompt, model and parameters, referenced by name) | Not planned yet                               | `prompts` plugin is similar              | Small once wanted                                       |
+| Response healing for broken JSON (opt-in plugin)                        | Not planned yet                               | No                                       |                                                         |
+| Web search as a server tool (the `:online` plugin is deprecated)        | Not planned                                   | No                                       | Needs a search provider contract and its own price      |
+| PDF and file inputs                                                     | Passed through where the provider supports it | Yes                                      | No conversion of our own                                |
+| Bring your own provider key (BYOK), free to $25k/month then 5%          | Not planned yet                               | Possible with per-customer provider keys | A pricing decision and an isolation design; later phase |
 
 ## Catalog and site
 

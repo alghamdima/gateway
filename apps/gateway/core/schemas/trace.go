@@ -26,8 +26,8 @@ type Trace struct {
 }
 
 // Trace-level attribute keys. Unlike span attributes, trace attributes are not
-// exported as OTEL/Datadog span attributes by default — observability connectors
-// (BigQuery, Datadog) read them directly off the completed trace. The one exception
+// exported as OTEL span attributes by default — observability plugins read them
+// directly off the completed trace. The one exception
 // is an OTEL profile with apply_trace_dimensions_to_child_spans, which merges
 // TraceAttrDimensions onto every exported span.
 const (
@@ -37,8 +37,8 @@ const (
 	// TraceAttrDimensions holds the map[string]string of request dimensions
 	// parsed from x-bf-dim-* headers, keyed by bare dimension name.
 	TraceAttrDimensions = "bifrost.dimensions"
-	// TraceAttrTraceState holds the inbound W3C tracestate. Vendor data such as Datadog's
-	// propagating tags lives there, not in traceparent.
+	// TraceAttrTraceState holds the inbound W3C tracestate. Vendor-specific propagation
+	// data lives there, not in traceparent.
 	TraceAttrTraceState = "tracestate"
 )
 
@@ -179,28 +179,6 @@ func (t *Trace) GetSpan(spanID string) *Span {
 	return nil
 }
 
-// FinalAttemptSpan returns the last-ending LLM or retry span, which is the
-// attempt a trace's metrics are labelled from. Datadog and Splunk each had a
-// copy and they drifted — only one guarded against a nil span.
-func FinalAttemptSpan(trace *Trace) *Span {
-	if trace == nil {
-		return nil
-	}
-	var final *Span
-	for _, span := range trace.Spans {
-		if span == nil {
-			continue
-		}
-		if span.Kind != SpanKindLLMCall && span.Kind != SpanKindRetry {
-			continue
-		}
-		if final == nil || span.EndTime.After(final.EndTime) {
-			final = span
-		}
-	}
-	return final
-}
-
 // GetRequestID retrieves the request ID from the trace
 func (t *Trace) GetRequestID() string {
 	t.mu.Lock()
@@ -286,7 +264,7 @@ func (t *Trace) GetAttribute(key string) (any, bool) {
 }
 
 // SnapshotForExport returns a copy of the trace that is safe for concurrent
-// read-only use by observability exporters (Datadog, OTEL, ...) while the
+// read-only use by observability exporters (OTEL, logging) while the
 // original trace's spans may still be mutated.
 //
 // Trace- and span-level attribute maps are cloned under their respective locks,
@@ -952,8 +930,7 @@ const (
 )
 
 // LLM Attribute Keys (gen_ai.* namespace)
-// These follow the OpenTelemetry semantic conventions for GenAI
-// and are compatible with both OTEL and Datadog backends.
+// These follow the OpenTelemetry semantic conventions for GenAI.
 const (
 	// Provider and Model Attributes
 	AttrProviderName  = "gen_ai.provider.name"
@@ -1292,7 +1269,7 @@ const (
 
 	// legacy: bare unprefixed key retained for back-compat with existing dashboards.
 	// "request.type" is superseded by AttrOperationName, but still drives the live
-	// "method" metric label and request_type column via EnrichmentDims.
+	// "method" metric label via EnrichmentDims.
 	AttrLegacyRequestType = "request.type"
 
 	// File Operation Attributes

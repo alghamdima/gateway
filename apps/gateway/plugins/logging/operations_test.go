@@ -621,7 +621,7 @@ func (c *captureObsPlugin) Inject(_ context.Context, trace *schemas.Trace) error
 // TestEmitAggregateLogEmitsSettlementSpan verifies the settlement→observability
 // bridge: a settled aggregate cost row is mirrored onto a span carrying the cost,
 // tokens, request type, and enrichment dimensions, so the trace-fed connectors
-// (Datadog/BigQuery/Splunk/OTEL/Kafka/Pub-Sub) can record batch/video cost that the
+// (OTEL) can record batch/video cost that the
 // async settlement path would otherwise keep out of the tracing pipeline entirely.
 func TestEmitAggregateLogEmitsSettlementSpan(t *testing.T) {
 	logger := testLogger{}

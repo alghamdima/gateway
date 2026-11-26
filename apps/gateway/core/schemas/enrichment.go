@@ -1,17 +1,14 @@
 package schemas
 
-// EnrichmentDim describes one identity/context dimension connectors attach to a
+// EnrichmentDim describes one identity/context dimension attached to a
 // request's telemetry — which team, customer, virtual key it belongs to.
 //
-// The curated emitters derive their lists from this registry and a per-connector
-// conformance test pins each one to it: Prometheus labels (plugins/telemetry),
-// Datadog and Splunk metric tags, BigQuery columns. The generic emitters (otel,
-// kafka, pubsub) project the whole attribute map and need no derivation.
+// The Prometheus labels (plugins/telemetry) are derived from this registry and a
+// conformance test pins them to it. The otel plugin projects the whole attribute
+// map and needs no derivation.
 type EnrichmentDim struct {
-	// Name is used verbatim as the Prometheus label and Datadog tag key.
+	// Name is used verbatim as the Prometheus label.
 	Name string
-	// Column overrides the BigQuery column name; empty means it equals Name.
-	Column string
 	// SpanAttr is the span-attribute key connectors read the dimension from.
 	SpanAttr string
 	Tier     DimensionTier
@@ -32,9 +29,8 @@ const (
 	// TierMetric is bounded and safe as a metric label everywhere.
 	TierMetric
 	// TierHighCardinalityMetric is unbounded, so it multiplies series rather than
-	// adding a dimension. Datadog and Splunk emit it (a costly tag can be dropped
-	// server-side); Prometheus cannot drop a label after the fact, so it keeps
-	// these behind user_labels_enabled.
+	// adding a dimension. Prometheus cannot drop a label after the fact, so it
+	// keeps these behind user_labels_enabled.
 	TierHighCardinalityMetric
 )
 
@@ -48,12 +44,12 @@ func (d EnrichmentDim) MetricAllowedHighCardinality() bool {
 }
 
 // EnrichmentDims is the ordered registry. Order is stable so derived lists are
-// deterministic; adding an entry here reaches every curated connector.
+// deterministic; adding an entry here reaches every list derived from it.
 var EnrichmentDims = []EnrichmentDim{
 	// --- Metric tier: bounded, safe as labels on any backend. ---
 	{Name: "provider", SpanAttr: AttrBifrostProviderName, Tier: TierMetric},
 	{Name: "model", SpanAttr: AttrRequestModel, Tier: TierMetric},
-	{Name: "method", Column: "request_type", SpanAttr: AttrLegacyRequestType, Tier: TierMetric},
+	{Name: "method", SpanAttr: AttrLegacyRequestType, Tier: TierMetric},
 	// Derived post-response in framework/tracing, then read like any other dimension.
 	{Name: "alias", SpanAttr: AttrBifrostAlias, Tier: TierMetric},
 	{Name: "app", SpanAttr: AttrBifrostApp, Tier: TierMetric},
@@ -93,23 +89,6 @@ var EnrichmentDims = []EnrichmentDim{
 	{Name: "customer_names", SpanAttr: AttrBifrostCustomerNames, Multi: true, Tier: TierRecord},
 	{Name: "business_unit_ids", SpanAttr: AttrBifrostBusinessUnitIDs, Multi: true, Tier: TierRecord},
 	{Name: "business_unit_names", SpanAttr: AttrBifrostBusinessUnitNames, Multi: true, Tier: TierRecord},
-}
-
-// ColumnName returns Column when set, otherwise Name.
-func (d EnrichmentDim) ColumnName() string {
-	if d.Column != "" {
-		return d.Column
-	}
-	return d.Name
-}
-
-// EnrichmentDimColumnNames returns every dimension's column name, in registry order.
-func EnrichmentDimColumnNames() []string {
-	out := make([]string, len(EnrichmentDims))
-	for i, d := range EnrichmentDims {
-		out[i] = d.ColumnName()
-	}
-	return out
 }
 
 // MetricSafeEnrichmentDims returns the bounded dimensions, in registry order.

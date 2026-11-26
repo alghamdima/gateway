@@ -483,7 +483,7 @@ type ConfigMarshallerPlugin interface {
 }
 
 // ObservabilityPlugin is an interface for plugins that receive completed traces
-// for forwarding to observability backends (e.g., OTEL collectors, Datadog, etc.)
+// for forwarding to observability backends (e.g., OTEL collectors).
 //
 // ObservabilityPlugins are called asynchronously after the HTTP response has been
 // written to the wire, ensuring they don't add latency to the client response.
@@ -491,8 +491,6 @@ type ConfigMarshallerPlugin interface {
 // Plugins implementing this interface will:
 // 1. Continue to work as regular plugins via PreLLMHook/PostLLMHook
 // 2. Additionally receive completed traces via the Inject method
-//
-// Example backends: OpenTelemetry collectors, Datadog, Jaeger, Maxim, etc.
 //
 // Note: Go type assertion (plugin.(ObservabilityPlugin)) is used to identify
 // plugins implementing this interface - no marker method is needed.
@@ -539,7 +537,7 @@ type ObservabilityLimits struct {
 // to opt into receiving the internal overhead-breakdown spans (see
 // IsOverheadBreakdownSpan). By default those spans are stripped from the trace before
 // it reaches a connector, so they feed the log-detail overhead breakdown without
-// inflating span volume in OTEL/Datadog/etc. The logging plugin implements this and
+// inflating span volume in OTEL. The logging plugin implements this and
 // returns true because it computes the breakdown from those spans; connectors that do
 // not implement it receive the stripped trace. Type-asserted by the tracer, so no
 // change is required of existing plugins.
