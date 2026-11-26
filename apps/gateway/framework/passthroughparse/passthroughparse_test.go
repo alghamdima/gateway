@@ -73,12 +73,6 @@ func TestParse(t *testing.T) {
 			check:    checkOpenAIResponses,
 		},
 		{
-			name:     "chatgpt codex responses",
-			in:       Input{Provider: schemas.OpenAI, Model: "gpt-5", Method: "POST", Path: "/backend-api/codex/responses", StatusCode: 200, RequestBody: []byte(openAIResponsesRequest), ResponseBody: []byte(openAIResponsesResponse)},
-			wantType: schemas.ResponsesRequest,
-			check:    checkOpenAIResponses,
-		},
-		{
 			name:     "openai legacy completions",
 			in:       Input{Provider: schemas.OpenAI, Model: "gpt-3.5-turbo-instruct", Method: "POST", Path: "/v1/completions", StatusCode: 200, RequestBody: []byte(openAITextRequest), ResponseBody: []byte(openAITextResponse)},
 			wantType: schemas.TextCompletionRequest,
@@ -540,7 +534,6 @@ func TestParseMethods(t *testing.T) {
 	routes := []Input{
 		{Provider: schemas.OpenAI, Model: "gpt-4o", Path: "/v1/chat/completions", RequestBody: []byte(openAIChatRequest), ResponseBody: []byte(openAIChatResponse)},
 		{Provider: schemas.OpenAI, Model: "gpt-5", Path: "/v1/responses", RequestBody: []byte(openAIResponsesRequest), ResponseBody: []byte(openAIResponsesResponse)},
-		{Provider: schemas.OpenAI, Model: "gpt-5", Path: "/backend-api/codex/responses", RequestBody: []byte(openAIResponsesRequest), ResponseBody: []byte(openAIResponsesResponse)},
 		{Provider: schemas.OpenAI, Model: "gpt-3.5-turbo-instruct", Path: "/v1/completions", RequestBody: []byte(openAITextRequest), ResponseBody: []byte(openAITextResponse)},
 		{Provider: schemas.Azure, Model: "gpt-4o", Path: "/openai/deployments/gpt-4o/chat/completions", RequestBody: []byte(openAIChatRequest), ResponseBody: []byte(openAIChatResponse)},
 		{Provider: schemas.Azure, Model: "claude-sonnet-4-5", Path: "/anthropic/v1/messages", RequestBody: []byte(anthropicMessagesRequest), ResponseBody: []byte(anthropicMessagesResponse)},
@@ -669,14 +662,6 @@ func TestParseStream(t *testing.T) {
 				require.Equal(t, "hi", text)
 				require.Equal(t, "completed", *resp.ResponsesResponse.Status)
 				require.NotNil(t, resp.ResponsesResponse.Usage)
-			},
-		},
-		{
-			name: "chatgpt codex responses stream",
-			in:   Input{Provider: schemas.OpenAI, Model: "gpt-5", Method: "POST", Path: "/backend-api/codex/responses", StatusCode: 200, Stream: true, RequestBody: []byte(openAIResponsesRequest), ResponseBody: []byte(openAIResponsesStream)},
-			check: func(t *testing.T, resp *schemas.BifrostResponse) {
-				text, _ := responsesTextAndCalls(resp.ResponsesResponse.Output)
-				require.Equal(t, "hi", text)
 			},
 		},
 		{
@@ -849,7 +834,6 @@ func TestInferRequestType(t *testing.T) {
 	}{
 		{"openai chat", schemas.OpenAI, "gpt-4o", "POST", "/v1/chat/completions", false, schemas.ChatCompletionRequest},
 		{"openai chat stream", schemas.OpenAI, "gpt-4o", "POST", "/v1/chat/completions", true, schemas.ChatCompletionStreamRequest},
-		{"codex responses stream", schemas.OpenAI, "gpt-5", "POST", "/backend-api/codex/responses", true, schemas.ResponsesStreamRequest},
 		{"openai embeddings stream has no stream variant", schemas.OpenAI, "text-embedding-3-small", "POST", "/v1/embeddings", true, schemas.EmbeddingRequest},
 		{"anthropic messages", schemas.Anthropic, "claude-sonnet-4-5", "POST", "/v1/messages", false, schemas.ResponsesRequest},
 		{"azure foundry anthropic", schemas.Azure, "claude-sonnet-4-5", "POST", "/anthropic/v1/messages", false, schemas.ResponsesRequest},
@@ -917,8 +901,8 @@ func TestInferRequestTypeMethods(t *testing.T) {
 }
 
 // TestClassify pins the API shape and request kind of each route family, including providers whose route speaks
-// another provider's API (Claude on Azure and Vertex speaks Anthropic, Mistral on Vertex speaks OpenAI, Codex on the
-// ChatGPT backend speaks Responses). Routes without a typed equivalent, and non-POST calls, return the zero Route.
+// another provider's API (Claude on Azure and Vertex speaks Anthropic, Mistral on Vertex speaks OpenAI). Routes without
+// a typed equivalent, and non-POST calls, return the zero Route.
 func TestClassify(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -929,7 +913,6 @@ func TestClassify(t *testing.T) {
 	}{
 		{"openai chat", schemas.OpenAI, "POST", "/v1/chat/completions", Route{schemas.OpenAI, schemas.ChatCompletionRequest}},
 		{"openai responses", schemas.OpenAI, "POST", "/v1/responses", Route{schemas.OpenAI, schemas.ResponsesRequest}},
-		{"codex responses", schemas.OpenAI, "POST", "/backend-api/codex/responses", Route{schemas.OpenAI, schemas.ResponsesRequest}},
 		{"openai text completions", schemas.OpenAI, "POST", "/v1/completions", Route{schemas.OpenAI, schemas.TextCompletionRequest}},
 		{"anthropic messages", schemas.Anthropic, "POST", "/v1/messages", Route{schemas.Anthropic, schemas.ResponsesRequest}},
 		{"anthropic count tokens", schemas.Anthropic, "POST", "/v1/messages/count_tokens", Route{schemas.Anthropic, schemas.CountTokensRequest}},

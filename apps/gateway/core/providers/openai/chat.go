@@ -200,15 +200,6 @@ func ToOpenAIChatRequest(ctx *schemas.BifrostContext, bifrostReq *schemas.Bifros
 		openaiReq.filterOpenAISpecificParameters(caps)
 		openaiReq.applyBasetenCompatibility()
 		return openaiReq
-	case schemas.OpencodeGo, schemas.OpencodeZen:
-		openaiReq.filterOpenAISpecificParameters(caps)
-		// OpenCode's chat-completions endpoints still use the legacy max_tokens
-		// field and ignore max_completion_tokens.
-		if openaiReq.MaxCompletionTokens != nil {
-			openaiReq.MaxTokens = openaiReq.MaxCompletionTokens
-			openaiReq.MaxCompletionTokens = nil
-		}
-		return openaiReq
 	case schemas.Databricks:
 		openaiReq.filterOpenAISpecificParameters(caps)
 		// Llama, gpt-oss and Qwen endpoints reject max_completion_tokens with a 400

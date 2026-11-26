@@ -1234,7 +1234,7 @@ func TestRunStreamPreHooks_ReturnsPreHookRequest(t *testing.T) {
 			RequestType: schemas.PassthroughStreamRequest,
 			PassthroughRequest: &schemas.BifrostPassthroughRequest{
 				Method:   "POST",
-				Path:     "/backend-api/codex/responses",
+				Path:     "/v1/responses",
 				Body:     original,
 				Provider: schemas.OpenAI,
 				Model:    "gpt-5",
@@ -4133,8 +4133,6 @@ func TestShouldContinueWithFallbacksStopsOnNilError(t *testing.T) {
 // Claude Code OAuth key-selection skip applies only when the attempt resolved to Anthropic. A
 // governance routing rule can rewrite provider/model after the transport set the flag, and every
 // non-Anthropic provider authenticates with its own configured key — so it must still get one.
-// OpenAI passthrough is the exception: a ChatGPT token forwarded to the Codex backend is the
-// credential, and a stored API key in its place is refused upstream (api_key_not_supported).
 func TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvider(t *testing.T) {
 	account := NewMockAccount()
 	account.SetKeysForProvider(schemas.Anthropic, []schemas.Key{
@@ -4157,8 +4155,7 @@ func TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvid
 	}{
 		{"anthropic keeps the skip", schemas.ResponsesRequest, schemas.Anthropic, "claude-opus-4-5", ""},
 		{"fireworks selects its own key", schemas.ResponsesRequest, schemas.Fireworks, "accounts/fireworks/models/kimi-k2p7-code", "fireworks-key"},
-		{"openai passthrough keeps the skip", schemas.PassthroughRequest, schemas.OpenAI, "", ""},
-		{"openai passthrough stream keeps the skip", schemas.PassthroughStreamRequest, schemas.OpenAI, "gpt-5.5", ""},
+		{"openai passthrough selects its own key", schemas.PassthroughStreamRequest, schemas.OpenAI, "gpt-5.5", "openai-key"},
 		{"openai inference selects its own key", schemas.ResponsesRequest, schemas.OpenAI, "gpt-5.5", "openai-key"},
 	}
 

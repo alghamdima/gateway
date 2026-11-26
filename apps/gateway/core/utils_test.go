@@ -410,14 +410,6 @@ func TestClearCtxForFallback(t *testing.T) {
 	}
 }
 
-// TestCanProviderKeyValueBeEmptyGithubCopilot pins that a GitHub Copilot key needs a value:
-// every way to authenticate, including Sign in with GitHub, ends with a token in it.
-func TestCanProviderKeyValueBeEmptyGithubCopilot(t *testing.T) {
-	if CanProviderKeyValueBeEmpty(schemas.GithubCopilot) {
-		t.Fatal("GitHub Copilot keys always carry a token; the allowlist must not include the provider")
-	}
-}
-
 // TestStampRequestedRoute pins what core records as the caller's route before any
 // PreRequestHook runs: plugins read it to report the model a routing rule rewrote.
 func TestStampRequestedRoute(t *testing.T) {
@@ -457,13 +449,6 @@ func TestStampRequestedRoute(t *testing.T) {
 		assert.Empty(t, provider)
 		assert.Equal(t, "claude-sonnet-4-6", model)
 	})
-}
-
-// TestValidateKeyGithubCopilot pins that a GitHub Copilot key without a token is refused at
-// setup rather than at the first inference call.
-func TestValidateKeyGithubCopilot(t *testing.T) {
-	assert.NoError(t, validateKey(schemas.GithubCopilot, &schemas.Key{Value: *schemas.NewSecretVar("github_pat_abc")}))
-	assert.False(t, keyValueMayBeEmpty(schemas.GithubCopilot, &schemas.Key{}), "a key with no token is not a credential")
 }
 
 func TestValidateKeyOAuthKeyConfig(t *testing.T) {

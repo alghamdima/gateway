@@ -101,8 +101,7 @@ func ToOpenAIEmbeddingRequest(bifrostReq *schemas.BifrostEmbeddingRequest, provi
 			return nil, providerUtils.InvalidRequestErrorf("this provider does not support mixing text and token embedding inputs in the same request")
 		}
 		switch {
-		// github copilot only accepts string[]
-		case len(texts) == 1 && providerName != schemas.GithubCopilot:
+		case len(texts) == 1:
 			input = &OpenAIEmbeddingInput{Text: &texts[0]}
 		case len(texts) > 0:
 			input = &OpenAIEmbeddingInput{Texts: texts}

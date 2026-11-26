@@ -9869,9 +9869,8 @@ func migrationAddOAuthKeyConfigColumns(ctx context.Context, db *gorm.DB, logger 
 	return nil
 }
 
-// rollbackOAuthKeyConfigColumns refuses rather than dropping, for the same reason as the
-// GitHub Copilot columns: oauth_private_key holds signing keys an identity provider may have
-// issued once. The columns are additive, so an older binary ignores them.
+// rollbackOAuthKeyConfigColumns refuses rather than dropping: oauth_private_key holds signing
+// keys an identity provider may have issued once. The columns are additive, so an older binary ignores them.
 func rollbackOAuthKeyConfigColumns(*gorm.DB) error {
 	return fmt.Errorf("add_oauth_key_config_columns is non-rollbackable: dropping the oauth_* columns would permanently delete stored OAuth client secrets and private keys; the columns are additive and older binaries safely ignore them")
 }

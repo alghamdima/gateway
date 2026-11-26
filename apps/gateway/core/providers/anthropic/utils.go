@@ -2578,7 +2578,7 @@ func appendAnthropicToolBetaHeaders(headers []string, tool *AnthropicTool, caps 
 	// current docs — it's no longer part of the AdvancedToolUse bundle.
 	// allowed_callers is still bundle-only.
 	if tool.DeferLoading != nil && *tool.DeferLoading {
-		if !hasProvider || (caps.SupportsToolSearch(features.ToolSearch) && !features.ToolSearchHeaderless) {
+		if !hasProvider || caps.SupportsToolSearch(features.ToolSearch) {
 			headers = appendUniqueHeader(headers, AnthropicToolSearchBetaHeader)
 		}
 	}
@@ -3468,7 +3468,7 @@ var betaHeaderPrefixToFeature = map[string]func(ProviderFeatureSupport) bool{
 	"context-management-":                        func(f ProviderFeatureSupport) bool { return f.ContextEditing },
 	"files-api-":                                 func(f ProviderFeatureSupport) bool { return f.FilesAPI },
 	AnthropicAdvancedToolUseBetaHeaderPrefix:     func(f ProviderFeatureSupport) bool { return f.AdvancedToolUse },
-	AnthropicToolSearchBetaHeaderPrefix:          func(f ProviderFeatureSupport) bool { return f.ToolSearch && !f.ToolSearchHeaderless },
+	AnthropicToolSearchBetaHeaderPrefix:          func(f ProviderFeatureSupport) bool { return f.ToolSearch },
 	AnthropicToolExamplesBetaHeaderPrefix:        func(f ProviderFeatureSupport) bool { return f.InputExamples },
 	AnthropicInterleavedThinkingBetaHeaderPrefix: func(f ProviderFeatureSupport) bool { return f.InterleavedThinking },
 	AnthropicSkillsBetaHeaderPrefix:              func(f ProviderFeatureSupport) bool { return f.Skills },

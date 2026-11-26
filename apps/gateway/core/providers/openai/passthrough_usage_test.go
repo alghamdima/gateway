@@ -338,7 +338,6 @@ func TestClassifyPassthroughPath(t *testing.T) {
 		{"POST", "/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21", schemas.ChatCompletionRequest},
 		{"POST", "/v1/completions", schemas.TextCompletionRequest},
 		{"POST", "/v1/responses", schemas.ResponsesRequest},
-		{"POST", "/backend-api/codex/responses", schemas.ResponsesRequest},
 		{"POST", "/v1/embeddings", schemas.EmbeddingRequest},
 		{"POST", "/v1/audio/speech", schemas.SpeechRequest},
 		{"POST", "/v1/audio/transcriptions", schemas.TranscriptionRequest},

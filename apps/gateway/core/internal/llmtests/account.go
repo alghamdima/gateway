@@ -213,7 +213,6 @@ func (account *ComprehensiveTestAccount) GetConfiguredProviders() ([]schemas.Mod
 		schemas.Kimchi,
 		schemas.Databricks,
 		schemas.Cloudflare,
-		schemas.GithubCopilot,
 		schemas.Typesafe,
 		ProviderOpenAICustom,
 	}, nil
@@ -611,14 +610,6 @@ func (account *ComprehensiveTestAccount) GetKeysForProvider(ctx context.Context,
 					AccountID: *schemas.NewSecretVar("env.CLOUDFLARE_ACCOUNT_ID"),
 				},
 				UseForBatchAPI: bifrost.Ptr(true),
-			},
-		}, nil
-	case schemas.GithubCopilot:
-		return []schemas.Key{
-			{
-				Value:  *schemas.NewSecretVar("env.GITHUB_COPILOT_API_KEY"),
-				Models: []string{"*"},
-				Weight: 1.0,
 			},
 		}, nil
 	case schemas.Gemini:
@@ -1090,22 +1081,6 @@ func (account *ComprehensiveTestAccount) GetConfigForProvider(providerKey schema
 	case schemas.Cloudflare:
 		return &schemas.ProviderConfig{
 			NetworkConfig: schemas.NetworkConfig{
-				DefaultRequestTimeoutInSeconds: 120,
-				MaxRetries:                     10,
-				RetryBackoffInitial:            5 * time.Second,
-				RetryBackoffMax:                3 * time.Minute,
-			},
-			ConcurrencyAndBufferSize: schemas.ConcurrencyAndBufferSize{
-				Concurrency: Concurrency,
-				BufferSize:  10,
-			},
-		}, nil
-	case schemas.GithubCopilot:
-		return &schemas.ProviderConfig{
-			NetworkConfig: schemas.NetworkConfig{
-				// Only needed when GITHUB_COPILOT_API_KEY is a raw Copilot API token; a PAT or
-				// GitHub token has its host looked up.
-				BaseURL:                        os.Getenv("GITHUB_COPILOT_API_URL"),
 				DefaultRequestTimeoutInSeconds: 120,
 				MaxRetries:                     10,
 				RetryBackoffInitial:            5 * time.Second,

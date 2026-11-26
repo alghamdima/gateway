@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -163,56 +162,6 @@ func TestParsePassthroughBody_JSONModelIsStrict(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantModel, model)
 			assert.Equal(t, tc.wantStream, stream)
-		})
-	}
-}
-
-func TestChatGPTPassthroughRouterRegistersCodexResponsesPost(t *testing.T) {
-	r := router.New()
-	passthroughRouter := NewChatGPTPassthroughRouter(nil, &mockHandlerStore{}, nil, &testLogger{})
-	passthroughRouter.RegisterRoutes(r, func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-		return func(ctx *fasthttp.RequestCtx) {
-			ctx.SetStatusCode(fasthttp.StatusNoContent)
-		}
-	})
-
-	var ctx fasthttp.RequestCtx
-	ctx.Request.Header.SetMethod(fasthttp.MethodPost)
-	ctx.Request.SetRequestURI("/chatgpt_passthrough/backend-api/codex/responses")
-
-	r.Handler(&ctx)
-
-	require.Equal(t, fasthttp.StatusNoContent, ctx.Response.StatusCode())
-}
-
-func TestChatGPTPassthroughRouterRegistersOnlyCodexRoutes(t *testing.T) {
-	r := router.New()
-	passthroughRouter := NewChatGPTPassthroughRouter(nil, &mockHandlerStore{}, nil, &testLogger{})
-	passthroughRouter.RegisterRoutes(r, func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-		return func(ctx *fasthttp.RequestCtx) {
-			ctx.SetStatusCode(fasthttp.StatusNoContent)
-		}
-	})
-
-	cases := []struct {
-		method string
-		uri    string
-		want   int
-	}{
-		{fasthttp.MethodGet, "/chatgpt_passthrough/backend-api/codex/models?client_version=0.160.0", fasthttp.StatusNoContent},
-		{fasthttp.MethodPost, "/chatgpt_passthrough/backend-api/codex/responses", fasthttp.StatusNoContent},
-		{fasthttp.MethodPost, "/chatgpt_passthrough/backend-api/codex/models", fasthttp.StatusMethodNotAllowed},
-		{fasthttp.MethodGet, "/chatgpt_passthrough/backend-api/codex/responses", fasthttp.StatusMethodNotAllowed}, // the upgrade is the Codex WebSocket relay's route, not this router's
-		{fasthttp.MethodGet, "/chatgpt_passthrough/backend-api/conversations", fasthttp.StatusNotFound},
-		{fasthttp.MethodGet, "/chatgpt_passthrough/backend-api/codex/models/gpt-5.5", fasthttp.StatusNotFound},
-	}
-	for _, tc := range cases {
-		t.Run(tc.method+" "+tc.uri, func(t *testing.T) {
-			var ctx fasthttp.RequestCtx
-			ctx.Request.Header.SetMethod(tc.method)
-			ctx.Request.SetRequestURI(tc.uri)
-			r.Handler(&ctx)
-			require.Equal(t, tc.want, ctx.Response.StatusCode())
 		})
 	}
 }
@@ -1081,7 +1030,7 @@ func TestExtractPassthroughModel(t *testing.T) {
 }
 
 // Caller-auth forwarding for passthrough routes: OAuth/JWT bearer tokens are the
-// upstream credential (Claude Code, ChatGPT/Codex) and must survive to the provider,
+// upstream credential (Claude Code) and must survive to the provider,
 // while plain API keys keep the strip-and-inject behavior.
 func TestApplyPassthroughCallerAuth_AnthropicOAuthForwarded(t *testing.T) {
 	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
@@ -1096,36 +1045,19 @@ func TestApplyPassthroughCallerAuth_AnthropicOAuthForwarded(t *testing.T) {
 	}
 }
 
-func TestApplyPassthroughCallerAuth_OpenAIJWTForwarded(t *testing.T) {
-	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
-	defer cancel()
-	safeHeaders := map[string]string{}
-	jwt := "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln"
-	applyPassthroughCallerAuth(bifrostCtx, safeHeaders, schemas.OpenAI, jwt, "https://chatgpt.com")
-	if got := safeHeaders["authorization"]; got != jwt {
-		t.Fatalf("expected JWT forwarded in safe headers, got %q", got)
-	}
-	if skip, _ := bifrostCtx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); !skip {
-		t.Fatal("expected SkipKeySelection to be set for JWT passthrough")
-	}
-}
-
 func TestApplyPassthroughCallerAuth_APIKeysStayStripped(t *testing.T) {
 	for name, tc := range map[string]struct {
 		provider    schemas.ModelProvider
 		auth        string
 		upstreamURL string
 	}{
-		"openai plain api key":             {schemas.OpenAI, "Bearer sk-plain-api-key", ""},
-		"anthropic api key bearer":         {schemas.Anthropic, "Bearer sk-ant-api03-key", ""},
-		"provider override bedrock":        {schemas.Bedrock, "Bearer sk-ant-oat01-caller-token", ""},
-		"openai two-segment token":         {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.c2ln", ""},
-		"http upstream override":           {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "http://mock.local"},
-		"openai jwt on openai api":         {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", ""},
-		"openai jwt on other https":        {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "https://api.example.com"},
-		"identity provider jwt on chatgpt": {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2lkcC5leGFtcGxlLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "https://chatgpt.com"},
-		"jwt without issuer on chatgpt":    {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJjb2RleCJ9.c2ln", "https://chatgpt.com"},
-		"undecodable jwt on chatgpt":       {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.!!!.c2ln", "https://chatgpt.com"},
+		"openai plain api key":      {schemas.OpenAI, "Bearer sk-plain-api-key", ""},
+		"anthropic api key bearer":  {schemas.Anthropic, "Bearer sk-ant-api03-key", ""},
+		"provider override bedrock": {schemas.Bedrock, "Bearer sk-ant-oat01-caller-token", ""},
+		"openai two-segment token":  {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.c2ln", ""},
+		"http upstream override":    {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "http://mock.local"},
+		"openai jwt on openai api":  {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", ""},
+		"openai jwt on other https": {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "https://api.example.com"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
@@ -1725,39 +1657,6 @@ func TestRegisterPassthroughTextRewriters(t *testing.T) {
 	}
 }
 
-// TestNewChatGPTCodexTurn pins what one Codex websocket turn is built as: the frame forwarded
-// byte for byte, the model read from it, key selection skipped for the caller's ChatGPT token, and
-// the Responses text rewriter registered so a redacting plugin can rewrite the turn. A frame that
-// is not valid JSON is refused, as the HTTP route refuses the same body.
-func TestNewChatGPTCodexTurn(t *testing.T) {
-	frame := []byte(`{"type":"response.create","model":"gpt-5-codex","input":[{"role":"user","content":[{"type":"input_text","text":"mail alice@example.com"}]}]}`)
-	headers := map[string]string{"chatgpt-account-id": "acct"}
-
-	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-	req, err := NewChatGPTCodexTurn(ctx, frame, headers)
-	require.NoError(t, err)
-	require.Equal(t, string(frame), string(req.Body))
-	require.Equal(t, "gpt-5-codex", req.Model)
-	require.Equal(t, fasthttp.MethodPost, req.Method)
-	require.Equal(t, chatGPTCodexResponsesPath, req.Path)
-	require.Equal(t, chatGPTUpstreamURL, req.UpstreamURL)
-	require.Equal(t, schemas.OpenAI, req.Provider)
-	require.Equal(t, headers, req.SafeHeaders)
-
-	skip, _ := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool)
-	require.True(t, skip, "the caller's ChatGPT token is the upstream credential, so key selection must be skipped")
-
-	rewriter, _ := ctx.Value(schemas.BifrostContextKeyRawRequestBodyTextRewriter).(schemas.RawRequestBodyTextRewriter)
-	require.NotNil(t, rewriter, "a Codex turn must carry the Responses text rewriter")
-	rewritten, err := rewriter(bytes.Clone(frame), map[string]string{"alice@example.com": "[EMAIL]"})
-	require.NoError(t, err)
-	require.Contains(t, string(rewritten), "mail [EMAIL]")
-	require.Equal(t, string(frame), string(req.Body), "rewriting must not touch the forwarded frame")
-
-	_, err = NewChatGPTCodexTurn(schemas.NewBifrostContext(context.Background(), schemas.NoDeadline), []byte(`{"type":"response.create"`), headers)
-	require.Error(t, err)
-}
-
 // passthroughRewriteCustom is a custom provider based on Anthropic that may forward every passthrough route.
 const passthroughRewriteCustom schemas.ModelProvider = "passthrough-claude-proxy"
 
@@ -2331,26 +2230,26 @@ func TestResponseForConverterDropsRawAfterInjectedTools(t *testing.T) {
 	}
 }
 
-// codexPassthroughAccount initializes only the provider needed by the synthetic relay test.
-type codexPassthroughAccount struct{}
+// openAIPassthroughAccount initializes only the provider needed by the synthetic relay test.
+type openAIPassthroughAccount struct{}
 
 // GetConfiguredProviders keeps the test independent of installed provider configuration.
-func (codexPassthroughAccount) GetConfiguredProviders() ([]schemas.ModelProvider, error) {
+func (openAIPassthroughAccount) GetConfiguredProviders() ([]schemas.ModelProvider, error) {
 	return []schemas.ModelProvider{schemas.OpenAI}, nil
 }
 
-// GetKeysForProvider supplies a synthetic key that must never replace the caller's subscription token.
-func (codexPassthroughAccount) GetKeysForProvider(context.Context, schemas.ModelProvider) ([]schemas.Key, error) {
+// GetKeysForProvider supplies a synthetic key; the short circuit keeps it from reaching an upstream.
+func (openAIPassthroughAccount) GetKeysForProvider(context.Context, schemas.ModelProvider) ([]schemas.Key, error) {
 	return []schemas.Key{{ID: "synthetic-key", Value: *schemas.NewSecretVar("synthetic-key"), Models: schemas.WhiteList{"*"}, Weight: 1}}, nil
 }
 
 // GetConfigForProvider uses defaults; the short circuit guarantees no live upstream is contacted.
-func (codexPassthroughAccount) GetConfigForProvider(schemas.ModelProvider) (*schemas.ProviderConfig, error) {
+func (openAIPassthroughAccount) GetConfigForProvider(schemas.ModelProvider) (*schemas.ProviderConfig, error) {
 	return &schemas.ProviderConfig{}, nil
 }
 
-// codexPassthroughReceipt witnesses the real router-to-core request before an explicit synthetic policy denial.
-type codexPassthroughReceipt struct {
+// passthroughReceipt witnesses the real router-to-core request before an explicit synthetic policy denial.
+type passthroughReceipt struct {
 	request          *schemas.BifrostRequest
 	skipKeySelection bool
 	skipModelCheck   bool
@@ -2358,18 +2257,18 @@ type codexPassthroughReceipt struct {
 }
 
 // GetName identifies the isolated test plugin.
-func (*codexPassthroughReceipt) GetName() string { return "synthetic-codex-receipt" }
+func (*passthroughReceipt) GetName() string { return "synthetic-passthrough-receipt" }
 
 // Cleanup has no resources to release.
-func (*codexPassthroughReceipt) Cleanup() error { return nil }
+func (*passthroughReceipt) Cleanup() error { return nil }
 
 // PreRequestHook leaves native passthrough state unchanged.
-func (*codexPassthroughReceipt) PreRequestHook(*schemas.BifrostContext, *schemas.BifrostRequest) error {
+func (*passthroughReceipt) PreRequestHook(*schemas.BifrostContext, *schemas.BifrostRequest) error {
 	return nil
 }
 
 // PreLLMHook captures native dispatch and rejects before any live upstream or operator key can be used.
-func (p *codexPassthroughReceipt) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
+func (p *passthroughReceipt) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
 	snapshot := *req
 	p.request = &snapshot
 	p.skipKeySelection, _ = ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool)
@@ -2380,79 +2279,8 @@ func (p *codexPassthroughReceipt) PreLLMHook(ctx *schemas.BifrostContext, req *s
 }
 
 // PostLLMHook preserves the synthetic receipt unchanged.
-func (*codexPassthroughReceipt) PostLLMHook(_ *schemas.BifrostContext, resp *schemas.BifrostResponse, err *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
+func (*passthroughReceipt) PostLLMHook(_ *schemas.BifrostContext, resp *schemas.BifrostResponse, err *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
 	return resp, err, nil
-}
-
-// TestChatGPTPassthroughStreamsWithoutBodyFlag reproduces a server buffering a Codex WebSocket bridge's native response when stream is omitted.
-// The reported logs contain no raw body: these requests and the policy denial are synthetic, not captured production payloads.
-func TestChatGPTPassthroughStreamsWithoutBodyFlag(t *testing.T) {
-	for _, flag := range []string{"", `,"stream":true`, `,"stream":false`} {
-		t.Run(flag, func(t *testing.T) {
-			plugin := &codexPassthroughReceipt{}
-			client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: codexPassthroughAccount{}, LLMPlugins: []schemas.LLMPlugin{plugin}, Logger: bifrost.NewNoOpLogger()})
-			require.NoError(t, err)
-			defer client.Shutdown()
-			r := router.New()
-			NewChatGPTPassthroughRouter(client, &mockHandlerStore{}, nil, &testLogger{}).RegisterRoutes(r)
-			body := `{"model":"gpt-5.5","input":[],"future":9007199254740993` + flag + `}`
-			var ctx fasthttp.RequestCtx
-			ctx.Request.Header.SetMethod("POST")
-			ctx.Request.SetRequestURI("/chatgpt_passthrough/backend-api/codex/responses")
-			ctx.Request.Header.SetContentType("application/json")
-			ctx.Request.Header.Set("Authorization", "Bearer eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.signature")
-			ctx.Request.SetBodyString(body)
-			r.Handler(&ctx)
-			require.Equal(t, 403, ctx.Response.StatusCode())
-			require.Contains(t, string(ctx.Response.Body()), "synthetic policy denial")
-			require.NotNil(t, plugin.request)
-			require.Equal(t, schemas.PassthroughStreamRequest, plugin.request.RequestType, "native Codex responses must not use the buffered API path")
-			require.True(t, plugin.skipKeySelection)
-			require.False(t, plugin.skipModelCheck, "a responses turn runs a model, so the model allowlist still applies")
-			require.Nil(t, plugin.modelListFilter, "a responses turn is not a model list")
-			require.Equal(t, "https://chatgpt.com", plugin.request.PassthroughRequest.UpstreamURL)
-			require.Equal(t, "/backend-api/codex/responses", plugin.request.PassthroughRequest.Path)
-			require.Equal(t, body, string(plugin.request.PassthroughRequest.Body))
-			require.Equal(t, "Bearer eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.signature", plugin.request.PassthroughRequest.SafeHeaders["authorization"])
-		})
-	}
-}
-
-// TestChatGPTPassthroughForwardsCodexModelList covers Codex fetching its model list through the gateway
-// with ChatGPT sign-in: the caller's ChatGPT token goes upstream, the gateway credential does not.
-func TestChatGPTPassthroughForwardsCodexModelList(t *testing.T) {
-	plugin := &codexPassthroughReceipt{}
-	client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: codexPassthroughAccount{}, LLMPlugins: []schemas.LLMPlugin{plugin}, Logger: bifrost.NewNoOpLogger()})
-	require.NoError(t, err)
-	defer client.Shutdown()
-	r := router.New()
-	NewChatGPTPassthroughRouter(client, &mockHandlerStore{}, nil, &testLogger{}).RegisterRoutes(r)
-	jwt := "Bearer eyJhbGciOiJub25lIn0.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.signature"
-	var ctx fasthttp.RequestCtx
-	ctx.Request.Header.SetMethod(fasthttp.MethodGet)
-	ctx.Request.SetRequestURI("/chatgpt_passthrough/backend-api/codex/models?client_version=0.160.0")
-	ctx.Request.Header.Set("Authorization", jwt)
-	ctx.Request.Header.Set("ChatGPT-Account-ID", "synthetic-workspace")
-	ctx.Request.Header.Set("x-bf-vk", "sk-bf-synthetic")
-	ctx.Request.Header.Set("Cookie", "session=synthetic; auth-openid=synthetic-gateway-token")
-	ctx.Request.Header.Set("If-None-Match", `"cached-etag"`)
-	r.Handler(&ctx)
-	require.Equal(t, 403, ctx.Response.StatusCode())
-	require.NotNil(t, plugin.request)
-	require.Equal(t, schemas.PassthroughRequest, plugin.request.RequestType)
-	require.True(t, plugin.skipKeySelection)
-	require.True(t, plugin.skipModelCheck, "a model list runs no model, so a restricted model allowlist must not refuse it")
-	require.NotNil(t, plugin.modelListFilter, "governance trims the list with the filter the route registers")
-	req := plugin.request.PassthroughRequest
-	require.Equal(t, fasthttp.MethodGet, req.Method)
-	require.Equal(t, "https://chatgpt.com", req.UpstreamURL)
-	require.Equal(t, "/backend-api/codex/models", req.Path)
-	require.Equal(t, "client_version=0.160.0", req.RawQuery)
-	require.Equal(t, jwt, req.SafeHeaders["authorization"])
-	require.Equal(t, "synthetic-workspace", req.SafeHeaders["chatgpt-account-id"])
-	require.NotContains(t, req.SafeHeaders, "x-bf-vk")
-	require.NotContains(t, req.SafeHeaders, "cookie")
-	require.NotContains(t, req.SafeHeaders, "if-none-match", "a 304 would keep a list filtered under an older access")
 }
 
 // geminiPassthroughAccount initializes only Gemini for the synthetic Interactions passthrough tests.
@@ -2507,7 +2335,7 @@ func TestGenAIPassthroughInteractionsAgentIsTheModel(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			plugin := &codexPassthroughReceipt{}
+			plugin := &passthroughReceipt{}
 			client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: geminiPassthroughAccount{}, LLMPlugins: []schemas.LLMPlugin{plugin}, Logger: bifrost.NewNoOpLogger()})
 			require.NoError(t, err)
 			defer client.Shutdown()
@@ -2567,34 +2395,6 @@ func BenchmarkGenAIPassthroughBodyModelKey(b *testing.B) {
 	})
 }
 
-// BenchmarkChatGPTPassthroughStreamDecision measures the route predicate without touching provider execution.
-func BenchmarkChatGPTPassthroughStreamDecision(b *testing.B) {
-	cfg := NewChatGPTPassthroughRouter(nil, nil, nil, &testLogger{}).passthroughCfg
-	b.ReportAllocs()
-	for b.Loop() {
-		_ = cfg.streams("POST", "/backend-api/codex/responses", false)
-	}
-}
-
-// BenchmarkChatGPTPassthroughModelFreeDecision measures the model-list predicate every ChatGPT passthrough request runs.
-func BenchmarkChatGPTPassthroughModelFreeDecision(b *testing.B) {
-	cfg := NewChatGPTPassthroughRouter(nil, nil, nil, &testLogger{}).passthroughCfg
-	b.ReportAllocs()
-	for b.Loop() {
-		_ = cfg.ModelFreePath("POST", "/backend-api/codex/responses")
-	}
-}
-
-// BenchmarkIsChatGPTBearer measures the issuer check each ChatGPT passthrough request runs, on a token padded to a real ChatGPT token's size.
-func BenchmarkIsChatGPTBearer(b *testing.B) {
-	claims := `{"iss":"https://auth.openai.com","sub":"synthetic","pad":"` + strings.Repeat("x", 1500) + `"}`
-	authHeader := "Bearer eyJhbGciOiJSUzI1NiJ9." + base64.RawURLEncoding.EncodeToString([]byte(claims)) + "." + strings.Repeat("s", 342)
-	b.ReportAllocs()
-	for b.Loop() {
-		_ = isChatGPTBearer(authHeader)
-	}
-}
-
 // TestPassthroughStreamTeardownPanicIsRecovered pins that the passthrough relay goroutine
 // survives a panic in its deferred teardown (the trace completer runs observability
 // plugins after the handler returned, outside RecoveryMiddleware): the relayed body still
@@ -2614,7 +2414,7 @@ func TestPassthroughStreamTeardownPanicIsRecovered(t *testing.T) {
 		_, _ = fmt.Fprintf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n%x\r\n%s\r\n0\r\n\r\n", len(event), event)
 	}()
 
-	client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: codexPassthroughAccount{}, Logger: bifrost.NewNoOpLogger()})
+	client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: openAIPassthroughAccount{}, Logger: bifrost.NewNoOpLogger()})
 	require.NoError(t, err)
 	defer client.Shutdown()
 	g := NewGenericRouter(client, &mockHandlerStore{}, nil, nil, nil, bifrost.NewNoOpLogger())
@@ -2628,7 +2428,7 @@ func TestPassthroughStreamTeardownPanicIsRecovered(t *testing.T) {
 	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
 	g.handlePassthroughStream(&ctx, bifrostCtx, cancel, schemas.OpenAI, &schemas.BifrostPassthroughRequest{
 		Method:      "POST",
-		Path:        "/backend-api/codex/responses",
+		Path:        "/v1/responses",
 		UpstreamURL: "http://" + ln.Addr().String(),
 		Body:        []byte(`{"model":"gpt-5.5","input":[],"stream":true}`),
 		SafeHeaders: map[string]string{"content-type": "application/json"},
@@ -2653,77 +2453,6 @@ func TestPassthroughStreamTeardownPanicIsRecovered(t *testing.T) {
 	}
 }
 
-// TestChatGPTPassthroughStreamEndsWithResponseFailedOnUpstreamError covers an upstream that answers
-// 200 text/event-stream and then fails mid-body. The relay used to stop on the error chunk without
-// writing anything, so Codex saw the stream close with no terminal event, retried the same request
-// blind and reported "stream closed before response.completed" instead of the upstream's error.
-func TestChatGPTPassthroughStreamEndsWithResponseFailedOnUpstreamError(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer ln.Close()
-	go func() {
-		conn, err := ln.Accept()
-		if err != nil {
-			return
-		}
-		defer conn.Close()
-		_, _ = http.ReadRequest(bufio.NewReader(conn))
-		event := "event: response.created\ndata: {\"type\":\"response.created\",\"sequence_number\":0,\"response\":{\"id\":\"resp_1\",\"status\":\"in_progress\"}}\n\n"
-		// Chunked body with no terminating chunk: the connection drops mid-stream.
-		_, _ = fmt.Fprintf(conn, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n%x\r\n%s\r\n", len(event), event)
-	}()
-
-	client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: codexPassthroughAccount{}, Logger: bifrost.NewNoOpLogger()})
-	require.NoError(t, err)
-	defer client.Shutdown()
-	g := NewGenericRouter(client, &mockHandlerStore{}, nil, nil, nil, bifrost.NewNoOpLogger())
-
-	var ctx fasthttp.RequestCtx
-	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
-	g.handlePassthroughStream(&ctx, bifrostCtx, cancel, schemas.OpenAI, &schemas.BifrostPassthroughRequest{
-		Method:      "POST",
-		Path:        "/backend-api/codex/responses",
-		UpstreamURL: "http://" + ln.Addr().String(),
-		Body:        []byte(`{"model":"gpt-5.5","input":[],"stream":true}`),
-		SafeHeaders: map[string]string{"content-type": "application/json"},
-	})
-	require.Equal(t, 200, ctx.Response.StatusCode())
-
-	bodyStream := ctx.Response.BodyStream()
-	require.NotNil(t, bodyStream)
-	done := make(chan []byte, 1)
-	go func() {
-		b, _ := io.ReadAll(bodyStream)
-		done <- b
-	}()
-	var body string
-	select {
-	case b := <-done:
-		body = string(b)
-	case <-time.After(10 * time.Second):
-		t.Fatal("timed out reading the relayed stream")
-	}
-
-	require.Contains(t, body, `"type":"response.created"`, "events before the failure are relayed unchanged")
-	require.Contains(t, body, "event: response.failed\n", "a stream that fails mid-body must end with a terminal event: %q", body)
-	failed := body[strings.LastIndex(body, "data: ")+len("data: "):]
-	var event struct {
-		Type     string `json:"type"`
-		Response struct {
-			Status string `json:"status"`
-			Error  struct {
-				Code    string `json:"code"`
-				Message string `json:"message"`
-			} `json:"error"`
-		} `json:"response"`
-	}
-	require.NoError(t, sonic.UnmarshalString(strings.TrimSpace(failed), &event), "terminal frame must be JSON: %q", failed)
-	assert.Equal(t, "response.failed", event.Type)
-	assert.Equal(t, "failed", event.Response.Status)
-	assert.NotEmpty(t, event.Response.Error.Code)
-	assert.NotEmpty(t, event.Response.Error.Message)
-}
-
 // TestPassthroughFailedFrameOnlyForResponsesSSE pins the gate: only an SSE stream on an OpenAI-shaped
 // Responses path speaks response.failed, so every other passthrough keeps ending without a frame.
 func TestPassthroughFailedFrameOnlyForResponsesSSE(t *testing.T) {
@@ -2734,7 +2463,6 @@ func TestPassthroughFailedFrameOnlyForResponsesSSE(t *testing.T) {
 		contentType string
 		want        bool
 	}{
-		{"codex responses", schemas.OpenAI, "/backend-api/codex/responses", "text/event-stream", true},
 		{"openai responses", schemas.OpenAI, "/v1/responses", "text/event-stream; charset=utf-8", true},
 		{"azure responses", schemas.Azure, "/openai/v1/responses", "text/event-stream", true},
 		{"openai chat", schemas.OpenAI, "/v1/chat/completions", "text/event-stream", false},
@@ -2790,7 +2518,7 @@ func TestPassthroughResponsesFailedFrameHidesGatewayReadErrors(t *testing.T) {
 	})
 }
 
-// relayResponsesPassthrough runs handlePassthroughStream for a Codex Responses request against a raw
+// relayResponsesPassthrough runs handlePassthroughStream for a Responses request against a raw
 // TCP upstream scripted by upstream, and returns every byte the client received.
 func relayResponsesPassthrough(t *testing.T, upstream func(conn net.Conn)) string {
 	t.Helper()
@@ -2808,7 +2536,7 @@ func relayResponsesPassthrough(t *testing.T, upstream func(conn net.Conn)) strin
 		upstream(conn)
 	}()
 
-	client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: codexPassthroughAccount{}, Logger: bifrost.NewNoOpLogger()})
+	client, err := bifrost.Init(context.Background(), schemas.BifrostConfig{Account: openAIPassthroughAccount{}, Logger: bifrost.NewNoOpLogger()})
 	require.NoError(t, err)
 	defer client.Shutdown()
 	g := NewGenericRouter(client, &mockHandlerStore{}, nil, nil, nil, bifrost.NewNoOpLogger())
@@ -2817,7 +2545,7 @@ func relayResponsesPassthrough(t *testing.T, upstream func(conn net.Conn)) strin
 	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
 	g.handlePassthroughStream(&ctx, bifrostCtx, cancel, schemas.OpenAI, &schemas.BifrostPassthroughRequest{
 		Method:      "POST",
-		Path:        "/backend-api/codex/responses",
+		Path:        "/v1/responses",
 		UpstreamURL: "http://" + ln.Addr().String(),
 		Body:        []byte(`{"model":"gpt-5.5","input":[],"stream":true}`),
 		SafeHeaders: map[string]string{"content-type": "application/json"},

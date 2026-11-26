@@ -132,8 +132,6 @@ type TableKey struct {
 
 	EncryptionStatus string `gorm:"type:varchar(20);default:'plain_text'" json:"-"`
 
-	// GitHub Copilot config fields (embedded)
-
 	// oauth_key_config: the credential fields get their own encrypted columns; the
 	// non-secret settings (grant, scopes, claims, auth style) travel as one JSON column.
 	OAuthTokenURL     *schemas.SecretVar `gorm:"column:oauth_token_url;type:text" json:"oauth_token_url,omitempty"`
@@ -1032,7 +1030,6 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		if err := decryptSecretVarPtr(&k.DatabricksClientSecret); err != nil {
 			return fmt.Errorf("failed to decrypt databricks client secret: %w", err)
 		}
-		// GitHub Copilot
 		// oauth_key_config
 		if err := decryptSecretVarPtr(&k.OAuthTokenURL); err != nil {
 			return fmt.Errorf("failed to decrypt oauth token url: %w", err)

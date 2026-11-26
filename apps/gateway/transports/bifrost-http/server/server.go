@@ -2207,7 +2207,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	// Going ahead with API handlers
 	healthHandler.RegisterRoutes(s.Router, middlewares...)
 	providerHandler.RegisterRoutes(s.Router, middlewares...)
-	handlers.NewGithubCopilotSignInHandler().RegisterRoutes(s.Router, middlewares...)
 	configHandler.RegisterRoutes(s.Router, middlewares...)
 	if pluginsHandler != nil {
 		pluginsHandler.RegisterRoutes(s.Router, middlewares...)

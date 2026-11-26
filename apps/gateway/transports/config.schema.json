@@ -452,12 +452,6 @@
         "gemini": {
           "$ref": "#/$defs/provider"
         },
-        "opencode-go": {
-          "$ref": "#/$defs/provider"
-        },
-        "opencode-zen": {
-          "$ref": "#/$defs/provider"
-        },
         "openrouter": {
           "$ref": "#/$defs/provider"
         },
@@ -532,9 +526,6 @@
         },
         "sarvam": {
           "$ref": "#/$defs/provider"
-        },
-        "github-copilot": {
-          "$ref": "#/$defs/provider_with_github_copilot_config"
         }
       },
       "additionalProperties": true
@@ -6036,24 +6027,6 @@
         }
       ]
     },
-    "github_copilot_key": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/base_key"
-        },
-        {
-          "properties": {
-            "value": {
-              "minLength": 1,
-              "description": "A fine-grained personal access token (github_pat_), a GitHub OAuth token from Sign in with GitHub (ghu_ or gho_), or a Copilot API token with network_config.base_url (can use env. prefix)"
-            }
-          },
-          "required": [
-            "value"
-          ]
-        }
-      ]
-    },
     "ollama_key": {
       "allOf": [
         {
@@ -6765,54 +6738,6 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/azure_key"
-          },
-          "minItems": 1,
-          "description": "API keys for this provider"
-        },
-        "network_config": {
-          "$ref": "#/$defs/network_config"
-        },
-        "concurrency_and_buffer_size": {
-          "$ref": "#/$defs/concurrency_and_buffer_size"
-        },
-        "proxy_config": {
-          "$ref": "#/$defs/proxy_config"
-        },
-        "send_back_raw_request": {
-          "type": "boolean",
-          "description": "Include raw request in BifrostResponse (default: false)"
-        },
-        "send_back_raw_response": {
-          "type": "boolean",
-          "description": "Include raw response in BifrostResponse (default: false)"
-        },
-        "store_raw_request_response": {
-          "type": "boolean",
-          "description": "Capture raw request/response for internal logging only; strip from API responses returned to clients (default: false)"
-        },
-        "ignore_provider_cost": {
-          "type": "boolean",
-          "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "passthrough": {
-          "$ref": "#/$defs/passthrough_policy"
-        },
-        "custom_provider_config": {
-          "$ref": "#/$defs/custom_provider_config"
-        }
-      },
-      "required": [
-        "keys"
-      ],
-      "additionalProperties": false
-    },
-    "provider_with_github_copilot_config": {
-      "type": "object",
-      "properties": {
-        "keys": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/github_copilot_key"
           },
           "minItems": 1,
           "description": "API keys for this provider"
@@ -8191,8 +8116,6 @@
             "mistral",
             "ollama",
             "groq",
-            "opencode-go",
-            "opencode-zen",
             "sgl",
             "parasail",
             "perplexity",
@@ -8200,7 +8123,6 @@
             "databricks",
             "deepseek",
             "gemini",
-            "github-copilot",
             "openrouter",
             "elevenlabs",
             "huggingface",

@@ -3185,17 +3185,6 @@ func TestSchemaGovernanceProjectsValidation(t *testing.T) {
 	}
 }
 
-// copilotKeyConfig builds a github-copilot provider config with the given key body.
-func copilotKeyConfig(keyBody string) string {
-	return fmt.Sprintf(`{
-		"providers": {
-			"github-copilot": {
-				"keys": [{%s}]
-			}
-		}
-	}`, keyBody)
-}
-
 // TestSchemaOAuthKeyConfig pins that oauth_key_config is accepted on any key (the base key
 // definition carries it) and that the schema enforces the per-grant required fields, so a
 // half-configured block is refused by the schema rather than at boot.
@@ -3344,24 +3333,6 @@ func TestSchemaAnthropicKeyConfig(t *testing.T) {
 	}
 }
 
-// TestSchemaGithubCopilotCredentialRequired pins that the schema demands a token, as
-// core/utils.go does: every way to authenticate, including Sign in with GitHub, ends with one.
-func TestSchemaGithubCopilotCredentialRequired(t *testing.T) {
-	compiled := compileSchema(t)
-
-	if err := validateConfig(t, compiled, copilotKeyConfig(`"name": "k", "value": "github_pat_abc", "models": ["*"], "weight": 1.0`)); err != nil {
-		t.Fatalf("a token alone should be valid: %v", err)
-	}
-	for name, key := range map[string]string{
-		"no token":       `"name": "k", "models": ["*"], "weight": 1.0`,
-		"an empty token": `"name": "k", "value": "", "models": ["*"], "weight": 1.0`,
-	} {
-		if err := validateConfig(t, compiled, copilotKeyConfig(key)); err == nil {
-			t.Errorf("%s should be invalid", name)
-		}
-	}
-}
-
 // TestValidateConfigSchema_VirtualKeyMetadata checks that config.schema.json enforces the same
 // metadata rules as the configstore validator, including the reserved keys.
 func TestValidateConfigSchema_VirtualKeyMetadata(t *testing.T) {
@@ -3408,7 +3379,7 @@ func TestValidateConfigSchema_Passthrough(t *testing.T) {
 		"vllm":       `, "vllm_key_config": {"url": "http://localhost:8000", "model_name": "m"}`,
 		"databricks": `, "databricks_key_config": {"workspace_url": "https://dbc-1234abcd-5678.cloud.databricks.com"}`,
 	}
-	for _, provider := range []string{"openai", "anthropic", "bedrock", "bedrock_mantle", "azure", "vertex", "ollama", "sgl", "vllm", "replicate", "databricks", "deepseek", "fireworks", "github_copilot"} {
+	for _, provider := range []string{"openai", "anthropic", "bedrock", "bedrock_mantle", "azure", "vertex", "ollama", "sgl", "vllm", "replicate", "databricks", "deepseek", "fireworks"} {
 		key := fmt.Sprintf(`{"name": "k", "value": "v", "weight": 1.0%s}`, keyConfigs[provider])
 		base := fmt.Sprintf(`{"providers": {%q: {"keys": [%s]}}}`, provider, key)
 		if err := ValidateConfigSchema([]byte(base), schema); err != nil {

@@ -53,8 +53,6 @@ const (
 	Vertex        ModelProvider = "vertex"
 	Mistral       ModelProvider = "mistral"
 	Ollama        ModelProvider = "ollama"
-	OpencodeGo    ModelProvider = "opencode-go"
-	OpencodeZen   ModelProvider = "opencode-zen"
 	Groq          ModelProvider = "groq"
 	SGL           ModelProvider = "sgl"
 	Parasail      ModelProvider = "parasail"
@@ -74,7 +72,6 @@ const (
 	Fireworks     ModelProvider = "fireworks"
 	Sarvam        ModelProvider = "sarvam"
 	Wafer         ModelProvider = "wafer"
-	GithubCopilot ModelProvider = "github-copilot"
 	Databricks    ModelProvider = "databricks"
 	Cloudflare    ModelProvider = "cloudflare"
 	Typesafe      ModelProvider = "typesafe"
@@ -112,8 +109,6 @@ var StandardProviders = []ModelProvider{
 	Groq,
 	Mistral,
 	Ollama,
-	OpencodeGo,
-	OpencodeZen,
 	OpenAI,
 	Parasail,
 	Perplexity,
@@ -131,7 +126,6 @@ var StandardProviders = []ModelProvider{
 	Fireworks,
 	Sarvam,
 	Wafer,
-	GithubCopilot,
 	Databricks,
 	Cloudflare,
 	Typesafe,
@@ -408,7 +402,6 @@ const (
 	BifrostContextKeySSEReaderFactory                    BifrostContextKey = "bifrost-sse-reader-factory"                 // *providerUtils.SSEReaderFactory (set by enterprise — replaces default bufio.Scanner SSE readers with streaming readers)
 	BifrostContextKeySessionID                           BifrostContextKey = "bifrost-session-id"                         // string session ID for the request (session stickiness)
 	BifrostContextKeySessionTTL                          BifrostContextKey = "bifrost-session-ttl"                        // time.Duration session TTL for the request (session stickiness)
-	BifrostContextKeyOpencodeSession                     BifrostContextKey = "bifrost-opencode-session"                   // string (resolved x-opencode-session value, namespaced per virtual key ID; set once per request by the egress transport for the OpenCode provider family - DO NOT SET MANUALLY)
 	BifrostContextKeySessionAffinity                     BifrostContextKey = "bifrost-session-affinity"                   // bool: whether the request lets its session decide where it goes (default true)
 	BifrostContextKeyStreamTurnPending                   BifrostContextKey = "bifrost-stream-turn-pending"                // bool (set by bifrost - DO NOT SET THIS MANUALLY) - true while a provider-injected tool loop will start another upstream stream after the current one ends; the request's LLM span stays open until the client stream's last chunk
 	BifrostContextKeyInjectedToolsExecuted               BifrostContextKey = "bifrost-injected-tools-executed"            // bool (set by bifrost - DO NOT SET THIS MANUALLY) - the current attempt ran a provider-injected tool: it is not retried, and its response is assembled across turns

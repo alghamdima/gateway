@@ -84,13 +84,9 @@ func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
 }
 
 // isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag
-// is set where the caller's OAuth token is the upstream credential: Claude Code on Anthropic, and
-// ChatGPT/Codex tokens on OpenAI passthrough, which pins its provider so no fallback inherits it.
-func isKeySkippingAllowed(baseProvider schemas.ModelProvider, requestType schemas.RequestType) bool {
-	if baseProvider == schemas.Anthropic {
-		return true
-	}
-	return baseProvider == schemas.OpenAI && (requestType == schemas.PassthroughRequest || requestType == schemas.PassthroughStreamRequest)
+// is set where the caller's OAuth token is the upstream credential: Claude Code on Anthropic.
+func isKeySkippingAllowed(baseProvider schemas.ModelProvider) bool {
+	return baseProvider == schemas.Anthropic
 }
 
 // calculateBackoff implements exponential backoff with jitter for retry attempts.

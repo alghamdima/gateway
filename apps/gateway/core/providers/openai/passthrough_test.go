@@ -12,16 +12,16 @@ func TestBuildPassthroughURLWithUpstreamOverride(t *testing.T) {
 	provider := NewOpenAIProvider(&schemas.ProviderConfig{}, passthroughTestLogger{})
 
 	req := &schemas.BifrostPassthroughRequest{
-		Path:        "/backend-api/codex/responses",
+		Path:        "/api/responses",
 		RawQuery:    "conversation=abc",
-		UpstreamURL: "https://chatgpt.com",
+		UpstreamURL: "https://upstream.example",
 	}
 
 	got, err := provider.buildPassthroughURL(req)
 	if err != nil {
 		t.Fatalf("buildPassthroughURL unexpected error: %v", err)
 	}
-	want := "https://chatgpt.com/backend-api/codex/responses?conversation=abc"
+	want := "https://upstream.example/api/responses?conversation=abc"
 	if got != want {
 		t.Fatalf("buildPassthroughURL = %q, want %q", got, want)
 	}
@@ -34,7 +34,7 @@ func TestBuildPassthroughURLWithUpstreamOverride(t *testing.T) {
 func TestBuildPassthroughURLRejectsForeignAuthority(t *testing.T) {
 	provider := NewOpenAIProvider(&schemas.ProviderConfig{}, passthroughTestLogger{})
 
-	req := &schemas.BifrostPassthroughRequest{Path: "//evil.example/x", UpstreamURL: "https://chatgpt.com"}
+	req := &schemas.BifrostPassthroughRequest{Path: "//evil.example/x", UpstreamURL: "https://upstream.example"}
 	if got, err := provider.buildPassthroughURL(req); err == nil {
 		t.Fatalf("buildPassthroughURL(%q) = %q, want error", req.Path, got)
 	}

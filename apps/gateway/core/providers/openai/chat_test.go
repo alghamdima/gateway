@@ -2013,8 +2013,6 @@ func TestToOpenAIChatRequest_LegacyMaxTokensProvidersUseMaxTokensOnWire(t *testi
 		name     string
 		provider schemas.ModelProvider
 	}{
-		{name: "Go", provider: schemas.OpencodeGo},
-		{name: "Zen", provider: schemas.OpencodeZen},
 		{name: "Ollama", provider: schemas.Ollama},
 		{name: "DeepSeek", provider: schemas.DeepSeek},
 	}

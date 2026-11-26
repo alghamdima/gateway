@@ -32,7 +32,6 @@ import (
 	"github.com/maximhq/bifrost/core/providers/elevenlabs"
 	"github.com/maximhq/bifrost/core/providers/fireworks"
 	"github.com/maximhq/bifrost/core/providers/gemini"
-	"github.com/maximhq/bifrost/core/providers/githubcopilot"
 	"github.com/maximhq/bifrost/core/providers/groq"
 	"github.com/maximhq/bifrost/core/providers/huggingface"
 	"github.com/maximhq/bifrost/core/providers/kimchi"
@@ -42,7 +41,6 @@ import (
 	"github.com/maximhq/bifrost/core/providers/nebius"
 	"github.com/maximhq/bifrost/core/providers/ollama"
 	"github.com/maximhq/bifrost/core/providers/openai"
-	"github.com/maximhq/bifrost/core/providers/opencode"
 	"github.com/maximhq/bifrost/core/providers/openrouter"
 	"github.com/maximhq/bifrost/core/providers/parasail"
 	"github.com/maximhq/bifrost/core/providers/perplexity"
@@ -4214,12 +4212,6 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return ollama.NewOllamaProvider(config, bifrost.logger)
 	case schemas.Groq:
 		return groq.NewGroqProvider(config, bifrost.logger)
-	case schemas.OpencodeGo:
-		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
-	case schemas.OpencodeZen:
-		return opencode.NewOpencodeZenProvider(config, bifrost.logger)
-	case schemas.GithubCopilot:
-		return githubcopilot.NewGithubCopilotProvider(config, bifrost.logger)
 	case schemas.SGL:
 		return sgl.NewSGLProvider(config, bifrost.logger)
 	case schemas.Parasail:
@@ -9744,7 +9736,7 @@ func (bifrost *Bifrost) selectKeyFromProviderForModelWithPool(ctx *schemas.Bifro
 	}
 
 	// SkipKeySelection: the caller's OAuth token is the credential — return empty pool, no rotation.
-	if skipKeySelection, ok := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); ok && skipKeySelection && isKeySkippingAllowed(baseProviderType, requestType) {
+	if skipKeySelection, ok := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); ok && skipKeySelection && isKeySkippingAllowed(baseProviderType) {
 		return []schemas.Key{}, false, nil
 	}
 

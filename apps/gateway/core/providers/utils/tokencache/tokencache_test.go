@@ -592,7 +592,7 @@ func TestInvalidateAndExpire(t *testing.T) {
 	})
 
 	t.Run("a mint built on an entry invalidated mid-flight is redone from scratch", func(t *testing.T) {
-		// A minter that reuses parts of prev (as Copilot reuses its installation token) must not
+		// A minter that reuses parts of prev (an intermediate token, for example) must not
 		// publish a result derived from an entry the caller has since invalidated.
 		clk := newClock()
 		cache := newCache(clk)

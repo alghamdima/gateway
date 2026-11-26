@@ -3754,7 +3754,7 @@ func parseMultipartPassthroughBody(body []byte, boundary string) (model string, 
 
 // applyPassthroughCallerAuth forwards the caller's Authorization header upstream when
 // it is an OAuth/JWT bearer token that is itself the provider credential (Claude Code
-// sk-ant-oat tokens on Anthropic, ChatGPT/Codex JWTs on OpenAI). Key selection is
+// sk-ant-oat tokens on Anthropic). Key selection is
 // skipped so a stored provider key never overrides the token: providers only inject
 // their key when key.Value is non-empty, so the forwarded header survives as-is.
 // Every other provider keeps strip-and-inject; Bedrock signs with SigV4 and a stray
@@ -3773,9 +3773,6 @@ func applyPassthroughCallerAuth(bifrostCtx *schemas.BifrostContext, safeHeaders 
 	switch provider {
 	case schemas.Anthropic:
 		forward = isAnthropicOAuthBearer(authHeader)
-	case schemas.OpenAI:
-		// Only the ChatGPT backend takes a caller token, and only one ChatGPT issued; everything else keeps the stored key.
-		forward = upstreamURL == chatGPTUpstreamURL && isChatGPTBearer(authHeader)
 	}
 	if !forward {
 		return

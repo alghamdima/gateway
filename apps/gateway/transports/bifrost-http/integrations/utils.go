@@ -2,7 +2,6 @@ package integrations
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -471,33 +470,6 @@ func isAnthropicAPIKeyAuth(ctx *fasthttp.RequestCtx) bool {
 // Anthropic OAuth access token (e.g. Claude Code's "Bearer sk-ant-oat01-...").
 func isAnthropicOAuthBearer(authHeader string) bool {
 	return strings.HasPrefix(strings.ToLower(authHeader), "bearer sk-ant-oat")
-}
-
-// chatGPTTokenIssuer is the issuer of the access tokens ChatGPT sign-in gives Codex.
-const chatGPTTokenIssuer = "https://auth.openai.com"
-
-// isChatGPTBearer reports whether the Authorization header value carries a ChatGPT sign-in
-// token: a JWT (three dot-separated segments, the first a base64url JSON header starting with
-// "eyJ") whose issuer is auth.openai.com. The issuer is read without verification, since
-// chatgpt.com verifies the token; the check only keeps other JWTs, such as a user's
-// identity-provider token, from being sent there. API keys and virtual keys do not match.
-func isChatGPTBearer(authHeader string) bool {
-	const prefix = "bearer "
-	if len(authHeader) <= len(prefix) || !strings.EqualFold(authHeader[:len(prefix)], prefix) {
-		return false
-	}
-	parts := strings.Split(strings.TrimSpace(authHeader[len(prefix):]), ".")
-	if len(parts) != 3 || !strings.HasPrefix(parts[0], "eyJ") || parts[1] == "" || parts[2] == "" {
-		return false
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
-	if err != nil {
-		return false
-	}
-	var claims struct {
-		Issuer string `json:"iss"`
-	}
-	return sonic.Unmarshal(payload, &claims) == nil && claims.Issuer == chatGPTTokenIssuer
 }
 
 // resolveLargePayloadMetadata returns metadata from the sync context key,

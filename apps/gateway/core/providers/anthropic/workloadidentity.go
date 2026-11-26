@@ -63,8 +63,8 @@ const (
 // a persistent rejection from turning every request into a token request. A var so tests can lower it.
 var rejectedTokenMinAge = 30 * time.Second
 
-// workloadIdentityTokens caches minted access tokens by credential, at package level like Copilot's
-// copilotTokens: adding, editing or removing any key rebuilds the provider, and a per-provider cache
+// workloadIdentityTokens caches minted access tokens by credential, at package level: adding,
+// editing or removing any key rebuilds the provider, and a per-provider cache
 // would lose every token, making the next request re-present a single-use identity token Anthropic
 // has already accepted. The cache key names the endpoint and the whole credential, so providers can
 // share it. A refresh that fails while the current token still has serving time left keeps that

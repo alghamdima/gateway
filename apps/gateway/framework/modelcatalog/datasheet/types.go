@@ -504,8 +504,6 @@ func normalizeProvider(p string) string {
 		return string(schemas.Runway)
 	case strings.Contains(p, "fireworks_ai"):
 		return string(schemas.Fireworks)
-	case strings.Contains(p, "github_copilot"):
-		return string(schemas.GithubCopilot)
 	default:
 		return p
 	}

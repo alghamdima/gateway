@@ -53,8 +53,8 @@ type Entry[T any] struct {
 }
 
 // Minter mints a fresh entry. prev is the slot's current entry, possibly stale, or nil; the
-// minter decides which parts of it are still worth reusing (a GitHub installation token that
-// outlives the Copilot token minted from it, for example). ctx carries the exchange deadline
+// minter decides which parts of it are still worth reusing (a long-lived intermediate token that
+// outlives the access token minted from it, for example). ctx carries the exchange deadline
 // and is detached from the caller's cancellation.
 type Minter[T any] func(ctx context.Context, prev *Entry[T]) (*Entry[T], *schemas.BifrostError)
 
@@ -175,8 +175,8 @@ func (c *Cache[T]) Get(ctx context.Context, cacheKey string, mint Minter[T]) (*E
 	prev := e
 	e, bErr := mint(exchangeCtx, prev)
 	if bErr == nil && e != nil && prev != nil && s.gen.Load() != gen {
-		// The result may reuse parts of the invalidated entry (Copilot reuses its installation
-		// token), so mint again from scratch. One redo: a from-scratch mint carries nothing stale.
+		// The result may reuse parts of the invalidated entry (an intermediate token, for
+		// example), so mint again from scratch. One redo: a from-scratch mint carries nothing stale.
 		prev = nil
 		e, bErr = mint(exchangeCtx, nil)
 	}

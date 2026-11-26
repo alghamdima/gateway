@@ -34,7 +34,7 @@ func TestPassthroughRouteAllowed(t *testing.T) {
 		{"rule keeps its method limit", chatPlusFiles, &schemas.BifrostPassthroughRequest{Method: http.MethodDelete, Path: "/v1/files/f1"}, false},
 		{"genai rule includes the version segment", genAIVersioned, &schemas.BifrostPassthroughRequest{Method: http.MethodPost, APIVersion: "v1beta", Path: "/models/m:generateContent"}, true},
 		{"genai rule refuses another version", genAIVersioned, &schemas.BifrostPassthroughRequest{Method: http.MethodPost, APIVersion: "v1", Path: "/models/m:generateContent"}, false},
-		{"host-backed routes are not governed", &schemas.PassthroughPolicy{}, &schemas.BifrostPassthroughRequest{Method: http.MethodPost, Path: "/backend-api/codex/responses", UpstreamURL: "https://chatgpt.com"}, true},
+		{"host-backed routes are not governed", &schemas.PassthroughPolicy{}, &schemas.BifrostPassthroughRequest{Method: http.MethodPost, Path: "/api/responses", UpstreamURL: "https://upstream.example"}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := passthroughRouteAllowed(tc.policy, tc.req); got != tc.want {
