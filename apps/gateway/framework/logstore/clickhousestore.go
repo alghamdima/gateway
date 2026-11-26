@@ -413,7 +413,7 @@ func (s *ClickHouseLogStore) BatchCreateMCPToolLogsIfNotExists(ctx context.Conte
 const chLogTimestampWindow = time.Second
 
 // chIDLookupTables are the tables whose rows are read back by id under FINAL.
-var chIDLookupTables = []string{"logs", "relay_logs", "mcp_tool_logs"}
+var chIDLookupTables = []string{"logs", "mcp_tool_logs"}
 
 // chMutableSkipIndexes lists, as an ignore_data_skipping_indices value, every
 // skip index on chIDLookupTables except those on id. Names that do not exist on
@@ -543,8 +543,8 @@ func (s *ClickHouseLogStore) withChildAggregates(ctx context.Context, log Log) *
 
 // --- Updates (read-modify-write + re-insert) ---
 
-// chFindForUpdate loads the row an RMW update patches. logs, mcp_tool_logs
-// and relay_logs all sort by (timestamp, id), so a bare id read
+// chFindForUpdate loads the row an RMW update patches. logs and mcp_tool_logs
+// both sort by (timestamp, id), so a bare id read
 // prunes only through the id bloom filter, and only where FINAL honours skip
 // indexes; otherwise it reads every granule of the table. A timestamp hint on
 // ctx (LogTimestampContextKey) bounds the read to the partition and granules
@@ -639,8 +639,6 @@ func (s *ClickHouseLogStore) MarkHasObject(ctx context.Context, table string, ma
 		return chMarkHasObject(ctx, s, table, marks, func(r *Log) (string, *bool) { return r.ID, &r.HasObject })
 	case "mcp_tool_logs":
 		return chMarkHasObject(ctx, s, table, marks, func(r *MCPToolLog) (string, *bool) { return r.ID, &r.HasObject })
-	case "relay_logs":
-		return chMarkHasObject(ctx, s, table, marks, func(r *RelayLog) (string, *bool) { return r.ID, &r.HasObject })
 	default:
 		return HasObjectMarkResult{}, fmt.Errorf("clickhouse: MarkHasObject: unsupported table %q", table)
 	}
@@ -829,24 +827,6 @@ func (s *ClickHouseLogStore) BatchUpdate(ctx context.Context, entries []*Log) er
 		}
 		return s.chReinsert(ctx, &rows)
 	})
-}
-
-// UpdateRelayLog applies an update to a Relay Logs row via read-modify-write.
-func (s *ClickHouseLogStore) UpdateRelayLog(ctx context.Context, id string, updates map[string]any) error {
-	_, _, updates = takeRelayRetainedUpdates(updates)
-	st, err := chParseSchema(s.db, &RelayLog{})
-	if err != nil {
-		return err
-	}
-	defer s.lockRMW("relay_logs", id)()
-	var existing RelayLog
-	if err := s.chFindForUpdate(ctx, &existing, id); err != nil {
-		return err
-	}
-	if err := chApplyUpdateMap(ctx, st, reflect.ValueOf(&existing).Elem(), updates); err != nil {
-		return err
-	}
-	return s.chReinsert(ctx, &existing)
 }
 
 // UpdateMCPToolLog applies an update to an MCP tool log row via read-modify-write.
@@ -1084,14 +1064,6 @@ func (s *ClickHouseLogStore) FlushMCPToolLogs(ctx context.Context, since time.Ti
 	return nil
 }
 
-// FlushRelayLogs removes stale processing relay log rows. See Flush.
-func (s *ClickHouseLogStore) FlushRelayLogs(ctx context.Context, since time.Time) error {
-	if err := s.chFlushProcessing(ctx, "relay_logs", since); err != nil {
-		return fmt.Errorf("failed to cleanup old processing relay logs: %w", err)
-	}
-	return nil
-}
-
 // DeleteExpiredAsyncJobs deletes async jobs whose expiry has passed with one
 // lightweight delete; the count is selected first because mutations never
 // report rows affected.
@@ -1125,76 +1097,6 @@ func (s *ClickHouseLogStore) UpdateAsyncJob(ctx context.Context, id string, upda
 		return err
 	}
 	return s.chReinsert(ctx, &existing)
-}
-
-// BatchCreateRelayLogsIfNotExists inserts Relay Logs rows whose IDs are absent and
-// returns the inserted IDs; ClickHouse has no ON CONFLICT, so absent IDs are found first.
-func (s *ClickHouseLogStore) BatchCreateRelayLogsIfNotExists(ctx context.Context, entries []*RelayLog) ([]string, error) {
-	if len(entries) == 0 {
-		return nil, nil
-	}
-	seen := make(map[string]struct{}, len(entries))
-	inserted := make([]string, 0, len(entries))
-	err := forEachRMWChunk(entries, func(chunk []*RelayLog) error {
-		fresh := make([]*RelayLog, 0, len(chunk))
-		ids := make([]string, 0, len(chunk))
-		for _, entry := range chunk {
-			if entry == nil {
-				continue
-			}
-			if _, ok := seen[entry.ID]; ok {
-				continue
-			}
-			seen[entry.ID] = struct{}{}
-			fresh = append(fresh, entry)
-			ids = append(ids, entry.ID)
-		}
-		if len(fresh) == 0 {
-			return nil
-		}
-		defer s.lockRMWBatch("relay_logs", ids)()
-		missing, err := chFilterMissing(ctx, s.db, "relay_logs", fresh, func(l *RelayLog) string { return l.ID }, func(l *RelayLog) time.Time { return l.Timestamp })
-		if err != nil {
-			return err
-		}
-		if len(missing) == 0 {
-			return nil
-		}
-		if err := s.db.WithContext(ctx).Create(&missing).Error; err != nil {
-			return err
-		}
-		for _, entry := range missing {
-			inserted = append(inserted, entry.ID)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return inserted, nil
-}
-
-// DeleteRelayLogsBatch removes Relay Logs rows older than cutoff, as DeleteLogsBatch does for the
-// request logs, so the retention cleaner prunes relay rows on ClickHouse too.
-func (s *ClickHouseLogStore) DeleteRelayLogsBatch(ctx context.Context, cutoff time.Time, _ int) (int64, error) {
-	return s.chRetentionDelete(ctx, "relay_logs", "timestamp", cutoff)
-}
-
-// DeleteRelayLogs deletes the identified rows with a lightweight delete.
-func (s *ClickHouseLogStore) DeleteRelayLogs(ctx context.Context, ids []string) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	// Raw SQL would skip the caller's scope, so the rows they may see are selected first,
-	// and only those are deleted.
-	var entryIDs []string
-	if err := s.ScopedDB(ctx).Model(&RelayLog{}).Where("id IN ? OR parent_log_id IN ?", ids, ids).Pluck("id", &entryIDs).Error; err != nil {
-		return err
-	}
-	if len(entryIDs) == 0 {
-		return nil
-	}
-	return s.chLightweightDelete(ctx, "relay_logs", "id IN ?", entryIDs)
 }
 
 // --- Complexity phrase suggestions ---

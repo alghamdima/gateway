@@ -365,13 +365,10 @@ func TestLogsCleanerStopsAfterOversizedBatch(t *testing.T) {
 func TestClickHouseRetentionDeleteRunsOncePerCutoff(t *testing.T) {
 	s := &ClickHouseLogStore{}
 	cutoff := time.Now().UTC().AddDate(0, 0, -30)
-	for _, table := range []string{"logs", "relay_logs"} {
-		s.retentionCutoffs.Store(table, cutoff)
-	}
+	s.retentionCutoffs.Store("logs", cutoff)
 	ctx := context.Background()
 	for name, deleteBatch := range map[string]func(context.Context, time.Time, int) (int64, error){
-		"logs":       s.DeleteLogsBatch,
-		"relay_logs": s.DeleteRelayLogsBatch,
+		"logs": s.DeleteLogsBatch,
 	} {
 		var deleted int64
 		var err error
@@ -639,7 +636,7 @@ func BenchmarkChIDLookupContext(b *testing.B) {
 func TestClickHouseReconcileSkipIndexesMaterializesNewIndex(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	ctx := context.Background()
-	for _, idx := range []string{"idx_logs_id", "idx_logs_parent_request_id", "idx_relay_logs_id", "idx_mcp_logs_id"} {
+	for _, idx := range []string{"idx_logs_id", "idx_logs_parent_request_id", "idx_mcp_logs_id"} {
 		var n int64
 		require.NoError(t, store.db.Raw("SELECT count() FROM system.data_skipping_indices WHERE database = currentDatabase() AND name = ?", idx).Scan(&n).Error)
 		assert.Equal(t, int64(1), n, "migration must create skip index %s", idx)
@@ -1905,8 +1902,7 @@ func TestClickHouseHybridBatchesHasObjectFlips(t *testing.T) {
 	require.NoError(t, hybrid.Close(ctx))
 }
 
-// TestClickHouseHybridFlushMarksMissingRows: a relay flip whose row is gone
-// deletes the uploaded object at once; any other flip whose row is missing is
+// TestClickHouseHybridFlushMarksMissingRows: a flip whose row is missing is
 // retried, and when the retries run out its object is deleted too, since the
 // row was inserted before the upload was queued.
 func TestClickHouseHybridFlushMarksMissingRows(t *testing.T) {
@@ -1916,22 +1912,17 @@ func TestClickHouseHybridFlushMarksMissingRows(t *testing.T) {
 	t.Cleanup(func() { _ = hybrid.Close(context.Background()) })
 	ctx := context.Background()
 	ts := time.Now().UTC().Truncate(time.Millisecond)
-	relayKey := hybrid.relayLogKey(ts, "gone-relay")
 	logKey := hybrid.logKey(ts, "gone-log")
-	require.NoError(t, objects.Put(ctx, relayKey, []byte("{}"), nil))
 	require.NoError(t, objects.Put(ctx, logKey, []byte("{}"), nil))
 
 	retry := hybrid.flushMarks([]hasObjectMark{
-		{kind: uploadKindRelay, logID: "gone-relay", timestamp: ts, key: relayKey},
 		{kind: uploadKindLog, logID: "gone-log", timestamp: ts, key: logKey},
 	}, false)
-	_, err := objects.Get(ctx, relayKey)
-	assert.ErrorIs(t, err, objectstore.ErrNotFound, "the deleted relay row's object must be removed")
 	require.Len(t, retry, 1)
 	assert.Equal(t, "gone-log", retry[0].logID)
 	assert.Equal(t, 1, retry[0].attempts)
 	assert.True(t, retry[0].retryAt.After(time.Now()))
-	_, err = objects.Get(ctx, logKey)
+	_, err := objects.Get(ctx, logKey)
 	require.NoError(t, err, "the object stays while the row may still appear")
 
 	assert.Empty(t, hybrid.flushMarks(retry, true))

@@ -145,7 +145,7 @@ func assertStrings(t *testing.T, field string, got, want []string) {
 	}
 }
 
-// TestApplyGovernanceContextRecordsUserEmail pins that MCP and relay rows keep the email beside the user id it was read with.
+// TestApplyGovernanceContextRecordsUserEmail pins that MCP rows keep the email beside the user id it was read with.
 func TestApplyGovernanceContextRecordsUserEmail(t *testing.T) {
 	values := map[schemas.BifrostContextKey]any{
 		schemas.BifrostContextKeyUserID:    "user-1",
@@ -155,11 +155,6 @@ func TestApplyGovernanceContextRecordsUserEmail(t *testing.T) {
 	mcp.ApplyGovernanceContext(governanceCtx(t, values))
 	if mcp.UserEmail == nil || *mcp.UserEmail != "ada@example.com" {
 		t.Fatalf("mcp user_email = %v, want ada@example.com", mcp.UserEmail)
-	}
-	relay := &RelayLog{}
-	relay.ApplyGovernanceContext(governanceCtx(t, values))
-	if relay.UserEmail == nil || *relay.UserEmail != "ada@example.com" {
-		t.Fatalf("relay user_email = %v, want ada@example.com", relay.UserEmail)
 	}
 
 	staleID, staleEmail := "user-old", "old@example.com"

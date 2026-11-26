@@ -65,7 +65,6 @@ func setupRDBTestStore(t *testing.T) *RDBConfigStore {
 		&tables.TableOAuth2RefreshToken{},
 	)
 	require.NoError(t, err, "Failed to migrate test database")
-	require.NoError(t, migrationAddRelaysTables(context.Background(), db, testMigrationLogger), "Failed to migrate relay tables")
 
 	// Virtual MCP tables (separate call: the in-batch AutoMigrate above does not create
 	// enterprise_mcp_tool_groups reliably). MCP client create now cross-checks slugs against them.
@@ -5284,8 +5283,6 @@ func trySetupPostgresVKMetadataStore(t *testing.T) *RDBConfigStore {
 		&tables.TableVirtualKeyProviderConfig{},
 		&tables.TableVirtualKeyProviderConfigKey{},
 		&tables.TableVirtualKeyMCPConfig{},
-		&tables.TableRelay{},
-		&tables.TableVirtualKeyRelayGrant{},
 	)
 	if s == nil {
 		return nil

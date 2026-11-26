@@ -60,9 +60,8 @@ func TestGetStatsTokenSplit(t *testing.T) {
 
 func ptrTime(value time.Time) *time.Time { return &value }
 
-// TestGetDistinctMCPKeyPairsFollowsRelayOptions checks the MCP filter dropdowns list options the way
-// the Relay Logs ones do.
-func TestGetDistinctMCPKeyPairsFollowsRelayOptions(t *testing.T) {
+// TestGetDistinctMCPKeyPairsListsOptions checks how the MCP filter dropdowns list options.
+func TestGetDistinctMCPKeyPairsListsOptions(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&MCPToolLog{}))
@@ -104,7 +103,7 @@ func assertMCPKeyPairs(t *testing.T, store *RDBLogStore, create func(context.Con
 		require.NoError(t, err)
 		return pairs
 	}
-	// Where a nameless id sorts follows the database's NULL ordering, as on the Relay Logs options.
+	// Where a nameless id sorts follows the database's NULL ordering.
 	require.ElementsMatch(t, []KeyPairResult{{ID: namelessUserID, Name: ""}, {ID: userID, Name: userName}}, options(ctx, "user_id", "user_name", 100, ""))
 	require.Equal(t, []KeyPairResult{{ID: "team-a", Name: "Alpha Renamed"}, {ID: "team-b", Name: "Beta"}, {ID: soloTeamID, Name: soloTeamName}}, options(ctx, "team_id", "team_name", 100, ""))
 	require.Equal(t, []KeyPairResult{{ID: "customer-a", Name: "Acme"}, {ID: "customer-b", Name: "Bravo"}}, options(ctx, "customer_id", "customer_name", 100, ""))
@@ -137,7 +136,7 @@ func TestPostgresMCPKeyPairsAndAttributionFilters(t *testing.T) {
 }
 
 // TestGetDistinctMCPKeyPairsAppliesDimensionCeiling verifies the MCP filter dropdowns list only the
-// organisations the caller may be shown, like the LLM and Relay dropdowns.
+// organisations the caller may be shown, like the LLM dropdowns.
 func TestGetDistinctMCPKeyPairsAppliesDimensionCeiling(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
@@ -183,7 +182,7 @@ func TestGetDistinctMCPKeyPairsAppliesDimensionCeiling(t *testing.T) {
 }
 
 // TestMCPStatsAndHistogramsCountFinishedCalls checks the MCP stats and histograms count calls as the
-// LLM and Relay logs do.
+// LLM logs do.
 func TestMCPStatsAndHistogramsCountFinishedCalls(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
@@ -208,7 +207,7 @@ func TestPostgresMCPStatsAndHistograms(t *testing.T) {
 	assertMCPFinishedCallAggregates(t, store, store.BatchCreateMCPToolLogsIfNotExists)
 }
 
-// assertMCPFinishedCallAggregates pins how MCP stats and histograms count calls, as the LLM and Relay
+// assertMCPFinishedCallAggregates pins how MCP stats and histograms count calls, as the LLM
 // logs do: a cancelled call is a finished call, counted in the success rate, the average latency, the
 // cost and the volume histogram, while a call still running counts only toward the total. The latency
 // histogram reads the same finished calls, and has no overhead to report for MCP tool calls. create is

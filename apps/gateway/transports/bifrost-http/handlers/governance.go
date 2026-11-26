@@ -404,13 +404,6 @@ type CreateVirtualKeyRequest struct {
 	// Metadata is free-form key/value attribution (cost center, owner, ...). See
 	// configstoreTables.ValidateVirtualKeyMetadata for the rules.
 	Metadata map[string]string `json:"metadata,omitempty"`
-	// RelayGrants names the relays the key may call, one by one. Empty means no relay (deny-by-default).
-	RelayGrants []relayGrantBody `json:"relay_grants,omitempty"`
-}
-
-// relayGrantBody is one relay a virtual key may call.
-type relayGrantBody struct {
-	RelayName string `json:"relay_name" validate:"required"`
 }
 
 // vkModelBudgetRequest is one per-model budget/rate-limit group under a provider config
@@ -468,8 +461,7 @@ type UpdateVirtualKeyRequest struct {
 	DisableContentLogging schemas.OptionalJSON[bool] `json:"disable_content_logging,omitempty"`
 	// Metadata replaces the key's metadata as a whole: omitted (or null) leaves it unchanged,
 	// {} clears it, and any other object becomes the new metadata.
-	Metadata    *map[string]string `json:"metadata,omitempty"`
-	RelayGrants []relayGrantBody   `json:"relay_grants,omitempty"` // Omitted leaves grants unchanged; [] clears them
+	Metadata *map[string]string `json:"metadata,omitempty"`
 }
 
 var errVirtualKeyDualAssociation = errors.New("VirtualKey cannot be attached to more than one of Team, Customer or Business Unit")
@@ -2180,27 +2172,6 @@ func virtualKeyMatchesMetadataFilters(vk *configstoreTables.TableVirtualKey, fil
 	return true
 }
 
-// relayGrantNames turns the request's grants into names, refusing a name given twice.
-func relayGrantNames(grants []relayGrantBody) ([]string, error) {
-	seen := make(map[string]bool, len(grants))
-	names := make([]string, 0, len(grants))
-	for _, g := range grants {
-		if seen[g.RelayName] {
-			return nil, &badRequestError{err: fmt.Errorf("duplicate relay_name: %s", g.RelayName)}
-		}
-		seen[g.RelayName] = true
-		names = append(names, g.RelayName)
-	}
-	return names, nil
-}
-
-func classifyRelayGrantError(err error) error {
-	if errors.Is(err, configstore.ErrInvalidRelayGrant) {
-		return &badRequestError{err: err}
-	}
-	return err
-}
-
 // validateVirtualKeyProviders refuses provider configs that name one provider more than once. A
 // virtual key holds one config per provider: its per-provider budgets and rate limits are keyed by
 // the provider, and access answers for a provider from that one config's models and keys. Names are
@@ -2445,15 +2416,6 @@ func (h *GovernanceHandler) createVirtualKey(ctx *fasthttp.RequestCtx) {
 				}, tx); err != nil {
 					return err
 				}
-			}
-		}
-		if req.RelayGrants != nil {
-			names, err := relayGrantNames(req.RelayGrants)
-			if err != nil {
-				return err
-			}
-			if err := h.configStore.ReplaceVirtualKeyRelayGrants(ctx, vk.ID, names, tx); err != nil {
-				return classifyRelayGrantError(err)
 			}
 		}
 		return nil
@@ -3098,16 +3060,6 @@ func (h *GovernanceHandler) updateVirtualKey(ctx *fasthttp.RequestCtx) {
 						return err
 					}
 				}
-			}
-		}
-
-		if req.RelayGrants != nil {
-			names, err := relayGrantNames(req.RelayGrants)
-			if err != nil {
-				return err
-			}
-			if err := h.configStore.ReplaceVirtualKeyRelayGrants(ctx, vk.ID, names, tx); err != nil {
-				return classifyRelayGrantError(err)
 			}
 		}
 

@@ -294,18 +294,6 @@ func (a *Access) IsMCPToolAllowed(toolPattern string) bool {
 	return a.compose(base, allowsTool(a.scoping, toolPattern))
 }
 
-// IsRelayAllowed implements schemas.Access.
-func (a *Access) IsRelayAllowed(endpointName string) bool {
-	if a == nil || endpointName == "" {
-		return false
-	}
-	base := a.callerAllows(func(p schemas.Permit) bool { return allowsRelay(p, endpointName) })
-	if a.scoping == nil {
-		return base
-	}
-	return a.compose(base, allowsRelay(a.scoping, endpointName))
-}
-
 // PermitsForModel implements schemas.Access.
 func (a *Access) PermitsForModel(provider string, model string) []schemas.Permit {
 	if a == nil || !a.IsModelAllowed(provider, model) {
@@ -781,14 +769,6 @@ func (a *Access) DeniedPermitsForModel(provider string, model string) []schemas.
 		return nil
 	}
 	return a.deniedBy(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }, true)
-}
-
-// DeniedPermitsForRelay implements schemas.Access.
-func (a *Access) DeniedPermitsForRelay(endpointName string) []schemas.Permit {
-	if a == nil {
-		return nil
-	}
-	return a.deniedBy(func(p schemas.Permit) bool { return allowsRelay(p, endpointName) }, true)
 }
 
 // DeniedPermitsForMCPTool implements schemas.Access.

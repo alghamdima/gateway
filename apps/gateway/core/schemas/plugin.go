@@ -34,8 +34,6 @@ const (
 	PluginTypeLLM  PluginType = "llm"
 	PluginTypeMCP  PluginType = "mcp"
 	PluginTypeHTTP PluginType = "http"
-
-	PluginTypeRelay PluginType = "relay"
 )
 
 // HTTPRequest is a serializable representation of an HTTP request.
@@ -439,20 +437,6 @@ type MCPPlugin interface {
 
 	PreMCPHook(ctx *BifrostContext, req *BifrostMCPRequest) (*BifrostMCPRequest, *MCPPluginShortCircuit, error)
 	PostMCPHook(ctx *BifrostContext, resp *BifrostMCPResponse, bifrostErr *BifrostError) (*BifrostMCPResponse, *BifrostError, error)
-}
-
-// RelayPlugin is the internal hook surface for Relays traffic
-// (/passthrough/{endpoint}/{path}); it is not a plugin users configure. It mirrors MCPPlugin:
-// PreRelayHook runs in registration order and may mutate the envelope or short-circuit
-// it (governance denies an ungranted endpoint or an exhausted budget here, before any upstream
-// effect), PostRelayHook runs in reverse order for the plugins whose pre-hook ran, and
-// a returned Go error is non-blocking. For a streamed call the post-hook runs once the stream has
-// ended, with the final usage.
-type RelayPlugin interface {
-	BasePlugin
-
-	PreRelayHook(ctx *BifrostContext, req *BifrostRelayRequest) (*BifrostRelayRequest, *RelayPluginShortCircuit, error)
-	PostRelayHook(ctx *BifrostContext, resp *BifrostRelayResponse, bifrostErr *BifrostError) (*BifrostRelayResponse, *BifrostError, error)
 }
 
 // MCPConnectionPlugin is an optional, typed extension interface for handling MCP

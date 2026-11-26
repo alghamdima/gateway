@@ -55,12 +55,6 @@ type MCPToolLogRetentionManager interface {
 	DeleteMCPToolLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (deletedCount int64, err error)
 }
 
-// RelayLogRetentionManager is implemented by stores that can expire
-// relay_logs rows. Optional for the same reason MCPToolLogRetentionManager is.
-type RelayLogRetentionManager interface {
-	DeleteRelayLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (deletedCount int64, err error)
-}
-
 // RetentionScheduler is how the cleaner reads a store's retention interval; every LogStore implements it.
 type RetentionScheduler interface {
 	RetentionInterval() time.Duration
@@ -217,9 +211,6 @@ func (c *LogsCleaner) cleanupOldLogs(ctx context.Context) {
 	var rest []expiringTable
 	if hasMCP {
 		rest = append(rest, expiringTable{"MCP tool logs", mcp.DeleteMCPToolLogsBatch})
-	}
-	if endpoints, ok := c.manager.(RelayLogRetentionManager); ok {
-		rest = append(rest, expiringTable{"relay logs", endpoints.DeleteRelayLogsBatch})
 	}
 	for index, table := range rest {
 		if ctx.Err() != nil {

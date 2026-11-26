@@ -30,7 +30,6 @@ type BifrostConfig struct {
 	Account                  Account
 	LLMPlugins               []LLMPlugin
 	MCPPlugins               []MCPPlugin
-	RelayPlugins             []RelayPlugin
 	OAuth2Provider           OAuth2Provider
 	MCPHeadersProvider       MCPHeadersProvider // Backend for MCPAuthTypePerUserHeaders credential storage; nil disables per-user-headers auth (resolver errors at use)
 	Logger                   Logger
@@ -224,7 +223,6 @@ const (
 	CountTokensRequest             RequestType = "count_tokens"
 	CompactionRequest              RequestType = "compaction"
 	MCPToolExecutionRequest        RequestType = "mcp_tool_execution"
-	RelayRequest                   RequestType = "relay" // a call to a Relay; no provider, no model
 	PassthroughRequest             RequestType = "passthrough"
 	PassthroughStreamRequest       RequestType = "passthrough_stream"
 	UnknownRequest                 RequestType = "unknown"
@@ -386,8 +384,6 @@ const (
 	BifrostContextKeyDropRawRequestFromClient            BifrostContextKey = "bifrost-drop-raw-request-from-client"             // bool (set by bifrost - DO NOT SET THIS MANUALLY) — true when raw request should be stripped from the client-facing response
 	BifrostContextKeyDropRawResponseFromClient           BifrostContextKey = "bifrost-drop-raw-response-from-client"            // bool (set by bifrost - DO NOT SET THIS MANUALLY) — true when raw response should be stripped from the client-facing response
 	BifrostContextKeyShouldStoreRawInLogs                BifrostContextKey = "bifrost-should-store-raw-in-logs"                 // bool (set by bifrost - DO NOT SET THIS MANUALLY) — true when raw request/response should be persisted in log records
-	BifrostContextKeyRelayContentCapture                 BifrostContextKey = "bifrost-relay-content-capture"                    // bool (set by the logging plugin's PreRelayHook - DO NOT SET THIS MANUALLY) — true when core/relay should keep the streamed reply's bytes for the log row: the plugin's content policy as it stood at the pre-hook, or provisionally while governance has yet to decide, exactly as LLM input capture is gated
-	BifrostContextKeyRelayActivity                       BifrostContextKey = "bifrost-relay-activity"                           // *atomic.Int64 (set by the logging plugin's PreRelayHook - DO NOT SET THIS MANUALLY) — unix nanos of the last forwarded stream chunk, stored by core/relay so the plugin's stale sweep keeps a live stream's pending row, as LastActivity does for LLM streams
 	BifrostContextKeyRetryDBFetch                        BifrostContextKey = "bifrost-retry-db-fetch"                           // bool (set by bifrost - DO NOT SET THIS MANUALLY)
 	BifrostContextKeyIsCustomProvider                    BifrostContextKey = "bifrost-is-custom-provider"                       // bool (set by bifrost - DO NOT SET THIS MANUALLY)
 	BifrostContextKeyBaseProviderType                    BifrostContextKey = "bifrost-base-provider-type"                       // ModelProvider (set by bifrost - DO NOT SET THIS MANUALLY) — built-in provider backing this attempt (custom providers resolve to their BaseProviderType)

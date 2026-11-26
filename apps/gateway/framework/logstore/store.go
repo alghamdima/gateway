@@ -238,22 +238,6 @@ type LogStore interface {
 	// GetDistinctMCPKeyPairs returns one MCP tool log dimension's id/name pairs for the filter sidebar.
 	GetDistinctMCPKeyPairs(ctx context.Context, idCol, nameCol string, limit int, query string) ([]KeyPairResult, error)
 
-	// Relay log methods (Relay Logs).
-	BatchCreateRelayLogsIfNotExists(ctx context.Context, entries []*RelayLog) ([]string, error)
-	FindRelayLog(ctx context.Context, id string) (*RelayLog, error)
-	FindRelayLogsForDeletion(ctx context.Context, ids []string) ([]*RelayLog, error)
-	UpdateRelayLog(ctx context.Context, id string, updates map[string]any) error
-	SearchRelayLogs(ctx context.Context, filters RelayLogFilters, pagination PaginationOptions) (*RelayLogSearchResult, error)
-	GetRelayLogStats(ctx context.Context, filters RelayLogFilters) (*RelayLogStats, error)
-	GetRelayHistogram(ctx context.Context, filters RelayLogFilters, bucketSizeSeconds int64) (*RelayHistogramResult, error)
-	GetRelayLatencyHistogram(ctx context.Context, filters RelayLogFilters, bucketSizeSeconds int64) (*LatencyHistogramResult, error)
-	GetRelayTopEndpoints(ctx context.Context, filters RelayLogFilters, limit int) (*RelayTopResults, error)
-	GetRelayFilterData(ctx context.Context, dimensions []string, limit int, search string) (*RelayFilterData, error)
-	HasRelayLogs(ctx context.Context) (bool, error)
-	DeleteRelayLogs(ctx context.Context, ids []string) error
-	DeleteRelayLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (int64, error)
-	FlushRelayLogs(ctx context.Context, since time.Time) error
-
 	// Async Job methods
 	CreateAsyncJob(ctx context.Context, job *AsyncJob) error
 	FindAsyncJobByID(ctx context.Context, id string) (*AsyncJob, error)

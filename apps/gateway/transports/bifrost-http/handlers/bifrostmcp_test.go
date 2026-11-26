@@ -1638,3 +1638,7 @@ func TestBifrostMCPToolsNeverStream(t *testing.T) {
 		t.Errorf("the rest of the whole body was lost: %s", sent)
 	}
 }
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

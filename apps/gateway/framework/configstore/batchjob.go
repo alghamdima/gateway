@@ -71,11 +71,10 @@ func (s *RDBConfigStore) UpsertProviderJob(ctx context.Context, job *tables.Tabl
 	if job.PollAttempts > 0 {
 		updates["poll_attempts"] = job.PollAttempts
 	}
-	// Relay and interaction statuses are the upstream's own word, so "failed" or "cancelled"
+	// Interaction statuses are the upstream's own word, so "failed" or "cancelled"
 	// there is no batch state: a failed run can still owe for the work it did, so the sweeper
 	// settles it and retries a failed settlement at next_check_at.
-	if job.Kind != tables.ProviderJobKindRelay &&
-		job.Kind != tables.ProviderJobKindInteraction &&
+	if job.Kind != tables.ProviderJobKindInteraction &&
 		tables.IsTerminalBatchProviderStatus(job.ProviderStatus) &&
 		job.ProviderStatus != string(schemas.BatchStatusCompleted) &&
 		job.ProviderStatus != string(schemas.BatchStatusEnded) {

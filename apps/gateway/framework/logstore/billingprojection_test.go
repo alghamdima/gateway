@@ -267,7 +267,7 @@ func containsColumn(clause, column string) bool {
 	return false
 }
 
-// TestClientIPRoundTripsThroughListQueries pins that client_ip reaches the list views of LLM, MCP and relay logs.
+// TestClientIPRoundTripsThroughListQueries pins that client_ip reaches the list views of LLM and MCP logs.
 func TestClientIPRoundTripsThroughListQueries(t *testing.T) {
 	ctx := context.Background()
 	store := newProjectionTestStore(t)
@@ -301,14 +301,4 @@ func TestClientIPRoundTripsThroughListQueries(t *testing.T) {
 	assert.Equal(t, ip, *mcp.Logs[0].ClientIP)
 	require.NotNil(t, mcp.Logs[0].UserEmail)
 	assert.Equal(t, email, *mcp.Logs[0].UserEmail)
-
-	_, err = store.BatchCreateRelayLogsIfNotExists(ctx, []*RelayLog{{ID: "relay-ip", RequestID: "relay-ip", Timestamp: now, RelayName: "docs", Status: RelayLogStatusSuccess, ClientIP: &ip, UserEmail: &email}})
-	require.NoError(t, err)
-	relay, err := store.SearchRelayLogs(ctx, RelayLogFilters{}, PaginationOptions{Limit: 10})
-	require.NoError(t, err)
-	require.Len(t, relay.Logs, 1)
-	require.NotNil(t, relay.Logs[0].ClientIP)
-	assert.Equal(t, ip, *relay.Logs[0].ClientIP)
-	require.NotNil(t, relay.Logs[0].UserEmail)
-	assert.Equal(t, email, *relay.Logs[0].UserEmail)
 }

@@ -33,8 +33,6 @@ const (
 	// there was nothing to evaluate it against. It is a wiring fault rather than a policy
 	// decision: evaluation is reached only after access has been resolved for the request.
 	DecisionAccessUnresolved Decision = "access_unresolved"
-	// DecisionRelayBlocked refuses a relay the caller holds no grant for.
-	DecisionRelayBlocked Decision = "relay_blocked"
 )
 
 // EvaluationRequest contains the context for evaluating a request
@@ -112,7 +110,7 @@ func (r *BudgetResolver) evaluateAccess(ctx *schemas.BifrostContext, evaluationR
 	// model gate has nothing left to check against, so it is skipped with it. A provider the
 	// caller does configure keeps its model allowlist.
 	providerUnconfigured := skipProviderCheck && !access.IsProviderAllowed(string(provider))
-	if !skipProviderCheck && evaluationRequest.RequestType != schemas.MCPToolExecutionRequest && requestType != schemas.RelayRequest && requestType != schemas.ListModelsRequest && !access.IsProviderAllowed(string(provider)) {
+	if !skipProviderCheck && evaluationRequest.RequestType != schemas.MCPToolExecutionRequest && requestType != schemas.ListModelsRequest && !access.IsProviderAllowed(string(provider)) {
 		return &EvaluationResult{
 			Decision: DecisionProviderBlocked,
 			Reason:   denialReason(fmt.Sprintf("Provider '%s' is not allowed", provider), access.DeniedPermitsForModel(string(provider), "")),

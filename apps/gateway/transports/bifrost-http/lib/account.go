@@ -139,17 +139,6 @@ type inheritedProxy struct {
 	proxy *schemas.ProxyConfig
 }
 
-// InheritedGlobalProxy is the proxy a relay with no proxy_config of its own inherits
-// from the global proxy, nil when the global proxy is off or not enabled for inference,
-// and an error when it is on but its URL cannot be read.
-func InheritedGlobalProxy(global *configstoreTables.GlobalProxyConfig) (*schemas.ProxyConfig, error) {
-	inherited, ok, err := inheritGlobalProxy(nil, global)
-	if err != nil || !ok {
-		return nil, err
-	}
-	return inherited.proxy, nil
-}
-
 // inheritGlobalProxy returns the global proxy for a provider that has none of its
 // own, when the global proxy is enabled for inference. A provider's own proxy always
 // wins. ok is false when nothing should be inherited.

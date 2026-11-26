@@ -1752,33 +1752,6 @@ func assertPermitsAre(t *testing.T, got []schemas.Permit, want ...schemas.Permit
 	}
 }
 
-func TestIsRelayAllowed(t *testing.T) {
-	named := NewPermit(PermitVirtualKey, "vk-1", "named", true, false, nil, nil, WithRelayPermits([]string{"tavily"}))
-	// Relays have no allow-all on any holder: a wide permit names every relay.
-	all := NewPermit(PermitAccessProfile, "ap-2", "all", true, false, nil, nil, WithRelayPermits([]string{"tavily", "textract"}))
-	none := NewPermit(PermitVirtualKey, "vk-3", "none", true, false, nil, nil)
-
-	access := NewAccess(held(named), "", nil, "", nil)
-	if !access.IsRelayAllowed("tavily") || access.IsRelayAllowed("textract") {
-		t.Fatalf("a named grant allows exactly that endpoint")
-	}
-	if denied := access.DeniedPermitsForRelay("textract"); len(denied) != 1 || denied[0] != named {
-		t.Fatalf("the refusal names the permit that denied it, got %v", denied)
-	}
-	if !NewAccess(held(all), "", nil, "", nil).IsRelayAllowed("textract") {
-		t.Fatalf("a permit naming the endpoint grants it")
-	}
-	if NewAccess(held(none), "", nil, "", nil).IsRelayAllowed("tavily") {
-		t.Fatalf("no grant denies by default")
-	}
-	if NewAccess(held(all), "", none, Intersect, nil).IsRelayAllowed("tavily") {
-		t.Fatalf("an intersecting scope without the endpoint denies it")
-	}
-	if !NewAccess(held(none), "", named, Union, nil).IsRelayAllowed("tavily") {
-		t.Fatalf("a union scope with the endpoint allows it")
-	}
-}
-
 // A blacklist wins over a key alias: naming a blocked model through an alias does not get it past
 // the permit, whether the alias is admitted by a pattern or by its own name.
 func TestAccess_AliasTargetHeldToBlacklist(t *testing.T) {
@@ -2256,20 +2229,6 @@ func TestAccessLevels_MCPTools(t *testing.T) {
 	})
 }
 
-// Relays are capped.
-func TestAccessLevels_Relays(t *testing.T) {
-	caller := NewPermit(PermitAccessProfile, "ap1", "Member", true, false, nil, nil,
-		WithRelayPermits([]string{"relay-a", "relay-b"}))
-	team := atLevel(NewPermit(PermitTeamAccessProfile, "t1", "Team", true, false, nil, nil,
-		WithRelayPermits([]string{"relay-b"})), 1)
-
-	access := NewAccess(held(caller, team), Intersect, nil, "", nil)
-
-	assert.False(t, access.IsRelayAllowed("relay-a"))
-	assert.True(t, access.IsRelayAllowed("relay-b"))
-	assertPermitsAre(t, access.DeniedPermitsForRelay("relay-a"), team)
-}
-
 func TestAccessLevels_ComposeWithAScope(t *testing.T) {
 	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
 	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a"), 1)
@@ -2328,14 +2287,14 @@ type matrixPermit struct {
 // build turns a matrix permit into a real one. A refusing permit holds the provider but grants
 // something else.
 func (m matrixPermit) build(kind PermitType, level int, id string) *Permit {
-	model, relay, tool := "other-model", "other-relay", "other_tool"
+	model, tool := "other-model", "other_tool"
 	if m.allows {
-		model, relay, tool = "gpt-4o", "relay-a", "read_file"
+		model, tool = "gpt-4o", "read_file"
 	}
 	return NewPermit(kind, id, id, true, false,
 		[]schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{model}, KeyIDs: m.keys}},
 		[]schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: []string{tool}}},
-		WithRelayPermits([]string{relay}), WithLevel(level))
+		WithLevel(level))
 }
 
 // matrixLevelKinds is the permit kind at each matrix level.
@@ -2573,7 +2532,6 @@ func TestAccessLevelsMatrix(t *testing.T) {
 
 			// Every capped dimension answers to the same rule.
 			assert.Equal(t, want, access.IsModelAllowed("openai", "gpt-4o"), "model")
-			assert.Equal(t, want, access.IsRelayAllowed("relay-a"), "relay")
 			assert.Equal(t, want, access.IsMCPToolAllowed("github-read_file"), "tool")
 			assert.Equal(t, want, slices.Contains(access.MCPToolIncludeList(), "github-read_file"), "tool include list")
 

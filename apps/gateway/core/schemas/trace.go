@@ -595,12 +595,6 @@ func redactSpanAttributes(span *Span, inputReplacements map[string]string, outpu
 	if span.LLM != nil {
 		span.LLM.redact(inputReplacements, outputReplacements)
 	}
-	if span.A2A != nil {
-		cp := *span.A2A
-		cp.RawRequest = ApplyLiteralReplacements(cp.RawRequest, inputReplacements)
-		cp.RawResponse = ApplyLiteralReplacements(cp.RawResponse, outputReplacements)
-		span.A2A = &cp
-	}
 }
 
 // Span represents a single operation within a trace
@@ -616,7 +610,6 @@ type Span struct {
 	StatusMsg  string          // Optional status message (for errors)
 	Attributes map[string]any  // Additional attributes for the span
 	LLM        *LLMSpanData    `json:"-"`
-	A2A        *A2ASpanData    `json:"-"`
 	Enrichment *SpanEnrichment // Governance/identity dimensions read off the request context
 	Events     []SpanEvent     // Events that occurred during the span
 	mu         sync.Mutex      // Mutex for thread-safe attribute operations
@@ -710,7 +703,6 @@ func (s *Span) snapshotForExport() *Span {
 	cp.Status = s.Status
 	cp.StatusMsg = s.StatusMsg
 	cp.LLM = s.LLM
-	cp.A2A = s.A2A
 	cp.Enrichment = s.Enrichment
 	clear(cp.Attributes)
 	for k, v := range s.Attributes {
@@ -898,7 +890,6 @@ func (s *Span) Reset() {
 	s.Status = SpanStatusUnset
 	s.StatusMsg = ""
 	s.LLM = nil
-	s.A2A = nil
 	s.Enrichment = nil
 	// Reuse the attribute map across pool cycles: tracing/store.go clears and
 	// refills it, so nil-ing here forced a fresh map alloc per pooled span every
@@ -951,8 +942,6 @@ const (
 	SpanKindTranscription SpanKind = "transcription"
 	// SpanKindInternal represents internal operations (key selection, etc.)
 	SpanKindInternal SpanKind = "internal"
-	// SpanKindRelay represents one relay call to a non-LLM upstream API.
-	SpanKindRelay SpanKind = "relay.call"
 )
 
 // SpanStatus represents the status of a span's operation
@@ -1212,23 +1201,6 @@ const (
 	// A tool call that reported failure in its result; the span status stays ok.
 	AttrBifrostMCPToolIsError = "bifrost.mcp.tool.is_error"
 
-	// Relay span attributes. A relay call is plain HTTP, so the method and status code use
-	// the OTel HTTP semconv names; the rest is Bifrost-namespaced.
-	AttrHTTPRequestMethod              = "http.request.method"
-	AttrBifrostRelayName               = "bifrost.relay.name"
-	AttrBifrostRelayRoutePath          = "bifrost.relay.route.path" // the matched route glob, "" for none
-	AttrBifrostRelayBillable           = "bifrost.relay.billable"
-	AttrBifrostRelayCounted            = "bifrost.relay.counted" // the call was priced and charged
-	AttrBifrostRelayStreamed           = "bifrost.relay.streamed"
-	AttrBifrostRelayCost               = "bifrost.relay.cost" // USD charged for the call
-	AttrBifrostRelayBytesOut           = "bifrost.relay.bytes_out"
-	AttrBifrostRelayUpstreamDurationMs = "bifrost.relay.upstream.duration_ms" // time blocked on the upstream socket
-	AttrBifrostRelayDurationMs         = "bifrost.relay.duration_ms"          // the whole call, pre-hooks to the end of the reply
-
-	// RelayMethodLabelOther is the method label for a request method outside the set a relay
-	// route can name, so a relay that skips the route check cannot grow a metric's series.
-	RelayMethodLabelOther = "_OTHER"
-
 	// =====================================================================
 	// Bifrost-namespaced attributes (bifrost.*)
 	//
@@ -1414,31 +1386,11 @@ func IsSensitiveHeader(name string) bool {
 		strings.HasSuffix(normalized, "_token")
 }
 
-// relayMethodLabels are the request methods a relay route can name (plus OPTIONS, which a
-// browser preflight sends); every other method is reported as RelayMethodLabelOther.
-var relayMethodLabels = map[string]struct{}{"GET": {}, "POST": {}, "PUT": {}, "PATCH": {}, "DELETE": {}, "HEAD": {}, "OPTIONS": {}}
-
-// RelayMethodLabel bounds a relay call's HTTP method to a fixed label set for metrics, as the
-// OTel HTTP semconv does for http.request.method.
-func RelayMethodLabel(method string) string {
-	if _, ok := relayMethodLabels[strings.ToUpper(strings.TrimSpace(method))]; ok {
-		return strings.ToUpper(strings.TrimSpace(method))
+// RawPayloads returns the operation's raw bodies without exposing them through
+// ordinary trace serialization. Callers must enforce export and content policy.
+func (s *Span) RawPayloads() (request, response string) {
+	if s == nil || s.LLM == nil {
+		return "", ""
 	}
-	return RelayMethodLabelOther
-}
-
-// RelaySpanDurationSeconds is a relay call's duration for the relay metrics: the whole call the
-// span records (AttrBifrostRelayDurationMs, which covers a call the pre-hooks refused), else the
-// span's own extent.
-func RelaySpanDurationSeconds(span *Span) float64 {
-	if span == nil {
-		return 0
-	}
-	if ms, ok := GetFloat64AttrOK(span.Attributes, AttrBifrostRelayDurationMs); ok && ms > 0 {
-		return ms / 1000
-	}
-	if !span.StartTime.IsZero() && !span.EndTime.IsZero() {
-		return span.EndTime.Sub(span.StartTime).Seconds()
-	}
-	return 0
+	return s.LLM.RawRequest, s.LLM.RawResponse
 }

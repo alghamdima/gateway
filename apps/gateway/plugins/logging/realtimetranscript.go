@@ -12,8 +12,7 @@ import (
 	"github.com/maximhq/bifrost/framework/logstore"
 )
 
-// grantAttributionTarget points at the attribution fields of one row type, so LLM rows and relay
-// rows take the same grant attribution through one implementation.
+// grantAttributionTarget points at the attribution fields of a row.
 type grantAttributionTarget struct {
 	virtualKeyID, virtualKeyName, teamID, teamName, customerID, customerName           **string
 	businessUnitID, businessUnitName, projectID, projectName, userID, userName         **string
@@ -26,25 +25,6 @@ type grantAttributionTarget struct {
 // applyGrantAttribution supplies identity fields absent on a fresh realtime turn context.
 // Access is cached on the session's grant, so scope stamping need not run again.
 func applyGrantAttribution(ctx *schemas.BifrostContext, entry *logstore.Log) {
-	applyGrantAttributionTo(ctx, grantAttributionTarget{
-		virtualKeyID: &entry.VirtualKeyID, virtualKeyName: &entry.VirtualKeyName,
-		teamID: &entry.TeamID, teamName: &entry.TeamName,
-		customerID: &entry.CustomerID, customerName: &entry.CustomerName,
-		businessUnitID: &entry.BusinessUnitID, businessUnitName: &entry.BusinessUnitName,
-		projectID: &entry.ProjectID, projectName: &entry.ProjectName,
-		userID: &entry.UserID, userName: &entry.UserName, userEmail: &entry.UserEmail,
-		teamIDs: &entry.TeamIDsParsed, teamNames: &entry.TeamNamesParsed,
-		customerIDs: &entry.CustomerIDsParsed, customerNames: &entry.CustomerNamesParsed,
-		businessUnitIDs: &entry.BusinessUnitIDsParsed, businessUnitNames: &entry.BusinessUnitNamesParsed,
-		storedTeamIDs: entry.TeamIDs, storedTeamNames: entry.TeamNames,
-		storedCustomerIDs: entry.CustomerIDs, storedCustomerNames: entry.CustomerNames,
-		storedBusinessUnitIDs: entry.BusinessUnitIDs, storedBusinessUnitNames: entry.BusinessUnitNames,
-	})
-}
-
-// applyRelayGrantAttribution gives a relay row the grant attribution an LLM row gets, so every
-// team, customer and business unit the call is attributed to is recorded, not only the first.
-func applyRelayGrantAttribution(ctx *schemas.BifrostContext, entry *logstore.RelayLog) {
 	applyGrantAttributionTo(ctx, grantAttributionTarget{
 		virtualKeyID: &entry.VirtualKeyID, virtualKeyName: &entry.VirtualKeyName,
 		teamID: &entry.TeamID, teamName: &entry.TeamName,

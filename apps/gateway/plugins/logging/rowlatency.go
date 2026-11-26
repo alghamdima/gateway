@@ -166,7 +166,6 @@ func clipSpanEnd(s *schemas.Span, end time.Time) *schemas.Span {
 		StatusMsg:  s.StatusMsg,
 		Attributes: s.Attributes,
 		LLM:        s.LLM,
-		A2A:        s.A2A,
 		Enrichment: s.Enrichment,
 		Events:     s.Events,
 	}

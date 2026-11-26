@@ -5282,7 +5282,6 @@ func (s *RDBLogStore) deleteExpiredBatchByKey(ctx context.Context, table, key, c
 var retentionAdvisoryLockKeys = map[string]int64{
 	"logs":          1000040,
 	"mcp_tool_logs": 1000041,
-	"relay_logs":    1000042,
 }
 
 // retentionAdvisoryLockKeyOther covers any retention table missing from retentionAdvisoryLockKeys.
@@ -5707,7 +5706,7 @@ func (s *RDBLogStore) GetMCPToolLogStats(ctx context.Context, filters MCPToolLog
 			TotalCost      sql.NullFloat64 `gorm:"column:total_cost"`
 		}
 
-		// A cancelled call is a finished call, as on the LLM and Relay logs stats: it counts against
+		// A cancelled call is a finished call, as on the LLM logs stats: it counts against
 		// the success rate and toward the average latency and the cost.
 		statsQuery := s.ScopedDB(ctx).Model(&MCPToolLog{})
 		statsQuery = s.applyMCPFilters(statsQuery, filters)
@@ -5859,8 +5858,8 @@ func (s *RDBLogStore) GetAvailableMCPVirtualKeys(ctx context.Context, limit int,
 	return logs, nil
 }
 
-// GetDistinctMCPKeyPairs lists one MCP tool log dimension's id/name pairs for the filter sidebar,
-// built like the Relay Logs options (GetRelayFilterData): teams, customers and business units fan out
+// GetDistinctMCPKeyPairs lists one MCP tool log dimension's id/name pairs for the filter sidebar:
+// teams, customers and business units fan out
 // over their JSON-array columns, each id is listed once under one of its names, an id with no name is
 // still listed, and the dimension ceiling bounds the list. Rows older than the filter-data window,
 // which every other MCP filter dimension reads, are left out.
@@ -5886,7 +5885,7 @@ func (s *RDBLogStore) GetDistinctMCPKeyPairs(ctx context.Context, idCol, nameCol
 	q = applyDimensionCeiling(ctx, q, src, idCol)
 	if query != "" {
 		// Backslash is the default LIKE escape on Postgres, MySQL and ClickHouse, and ClickHouse rejects an
-		// ESCAPE clause; only SQLite needs it declared, as in applyRelayLogFilters' search.
+		// ESCAPE clause; only SQLite needs it declared.
 		switch s.db.Dialector.Name() {
 		case "postgres":
 			q = q.Where(queryName+" ILIKE ?", "%"+escapeLike(query)+"%")
@@ -5991,14 +5990,14 @@ func (s *RDBLogStore) GetMCPHistogram(ctx context.Context, filters MCPToolLogSea
 }
 
 // GetMCPLatencyHistogram returns per-bucket average and p90/p95/p99 latency of finished MCP tool calls,
-// the shape GetLatencyHistogram and GetRelayLatencyHistogram return. MCP tool calls record no Bifrost
+// the shape GetLatencyHistogram returns. MCP tool calls record no Bifrost
 // overhead, so the overhead percentiles are always zero.
 func (s *RDBLogStore) GetMCPLatencyHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*LatencyHistogramResult, error) {
 	if bucketSizeSeconds <= 0 {
 		bucketSizeSeconds = 3600
 	}
 	dialect := s.db.Dialector.Name()
-	// The dialect queries shared with the LLM and Relay histograms read overhead_latency, which
+	// The dialect queries shared with the LLM histogram read overhead_latency, which
 	// mcp_tool_logs does not have, so they read a derived table that supplies it as a typed NULL.
 	nullOverhead := "NULL"
 	switch dialect {
@@ -6348,4 +6347,9 @@ func escapeLikeLiteral(v string) string {
 	v = strings.ReplaceAll(v, "%", `\%`)
 	v = strings.ReplaceAll(v, "_", `\_`)
 	return v
+}
+
+// escapeLike escapes the LIKE wildcards in a search term.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }

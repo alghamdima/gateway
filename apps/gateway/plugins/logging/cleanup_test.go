@@ -264,12 +264,6 @@ func (s *flushCountingStore) FlushMCPToolLogs(context.Context, time.Time) error 
 	s.mu.Unlock()
 	return nil
 }
-func (s *flushCountingStore) FlushRelayLogs(context.Context, time.Time) error {
-	s.mu.Lock()
-	s.flushes++
-	s.mu.Unlock()
-	return nil
-}
 
 // TestCleanupTickSkipsFlushWhileMigrating pins that the periodic
 // processing-row deletes stay off the logs table while another node migrates,
@@ -286,7 +280,7 @@ func TestCleanupTickSkipsFlushWhileMigrating(t *testing.T) {
 
 	store.setMigrating(false)
 	plugin.cleanupOldProcessingLogs()
-	if got := store.count(); got != 3 {
-		t.Fatalf("expected the LLM, MCP and relay flushes once the lock cleared, got %d", got)
+	if got := store.count(); got != 2 {
+		t.Fatalf("expected the LLM and MCP flushes once the lock cleared, got %d", got)
 	}
 }

@@ -23,7 +23,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/network"
-	"github.com/maximhq/bifrost/core/relay"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
@@ -338,12 +337,6 @@ type BifrostHTTPServer struct {
 	refreshInFlight   map[schemas.ModelProvider]*providerRefreshState
 
 	wsPool *bfws.Pool
-	// relays serves /relay/{name}/{path}; built by InitializeRelays together with RelaysHandler,
-	// the management handler a clustered server replays relay changes through.
-	relays                *relay.Manager
-	RelaysHandler         *handlers.RelaysHandler
-	endpointSweeperCancel context.CancelFunc
-	endpointSweeperMu     sync.Mutex // serializes sweeper restarts from concurrent plugin reloads
 }
 
 var logger schemas.Logger
@@ -1645,7 +1638,6 @@ func (s *BifrostHTTPServer) ReloadClientConfigFromConfigStore(ctx context.Contex
 			DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
 			LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
 			MCPPlugins:         s.Config.GetLoadedMCPPlugins(),
-			RelayPlugins:       s.Config.GetLoadedRelayPlugins(),
 			MCPConfig:          mcpConfig,
 			Logger:             logger,
 
@@ -2395,7 +2387,6 @@ func (s *BifrostHTTPServer) ReloadProxyConfig(ctx context.Context, config *table
 	if err := s.Config.SetGlobalProxyConfig(config); err != nil {
 		return err
 	}
-	s.rebuildRelays(ctx)
 	if config == nil {
 		logger.Info("proxy configuration removed")
 		return nil
@@ -2803,9 +2794,6 @@ func (s *BifrostHTTPServer) RegisterInferenceRoutes(ctx context.Context, middlew
 	asyncHandler.RegisterRoutes(s.Router, middlewares...)
 	mcpInferenceHandler.RegisterRoutes(s.Router, middlewares...)
 	s.MCPServerHandler.RegisterRoutes(s.Router, middlewares...)
-	if s.relays != nil {
-		handlers.NewRelayGatewayHandler(s.relays, s.Config, logger).RegisterRoutes(s.Router, middlewares...)
-	}
 	// One client gateway handler serves every client gateway (Claude Code, ...),
 	// so the sign-in limiters, poll tracker and verified-token cache are shared,
 	// and every bearer check uses the governance virtual-key cache. The sign-in,
@@ -2980,9 +2968,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 		sessionHandler.SetSetupLock(s.AuthMiddleware)
 	}
 	featureFlagsHandler := handlers.NewFeatureFlagsHandler(s.Config.FeatureFlags, s.Config.ConfigStore)
-	if s.RelaysHandler != nil {
-		s.RelaysHandler.RegisterRoutes(s.Router, middlewares...)
-	}
 	// Going ahead with API handlers
 	oauth2DiscoveryHandler := handlers.NewOAuth2DiscoveryHandler(s.Config)
 	oauth2IssuanceHandler := handlers.NewOAuth2IssuanceHandler(s.Config, s.TempTokens, s.OAuth2IdentityResolver)
@@ -3040,9 +3025,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	}
 	if loggingHandler != nil {
 		loggingHandler.RegisterRoutes(s.Router, middlewares...)
-		if s.RelaysHandler != nil {
-			s.RelaysHandler.RegisterLogRoutes(s.Router, middlewares...)
-		}
 	}
 	if s.WebSocketHandler != nil {
 		s.WebSocketHandler.RegisterRoutes(s.Router, middlewares...)
@@ -3466,7 +3448,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
 		LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
 		MCPPlugins:         s.Config.GetLoadedMCPPlugins(),
-		RelayPlugins:       s.Config.GetLoadedRelayPlugins(),
 		MCPConfig:          mcpConfig,
 		OAuth2Provider:     s.Config.OAuthProvider,
 		MCPHeadersProvider: s.Config.MCPHeadersProvider,
@@ -3608,9 +3589,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	if routingPlugin, err := s.getRoutingPlugin(); err == nil {
 		s.wireRoutingSuggestions(routingPlugin)
 	}
-
-	// Initialize relays once before either management or protocol routes are registered.
-	s.InitializeRelays(s.Ctx, nil, nil)
 
 	// Register routes
 	// /v1/mcp takes the /api chain. Copied now: apiMiddlewares and

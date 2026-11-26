@@ -404,16 +404,6 @@ type ConfigStore interface {
 	CreateVirtualKey(ctx context.Context, virtualKey *tables.TableVirtualKey, tx ...*gorm.DB) error
 	UpdateVirtualKey(ctx context.Context, virtualKey *tables.TableVirtualKey, tx ...*gorm.DB) error
 	DeleteVirtualKey(ctx context.Context, id string, tx ...*gorm.DB) error
-	ReplaceVirtualKeyRelayGrants(ctx context.Context, virtualKeyID string, endpointNames []string, tx ...*gorm.DB) error
-
-	// Relay CRUD.
-	ListRelays(ctx context.Context) ([]*schemas.RelayConfig, error)
-	GetRelay(ctx context.Context, name string) (*schemas.RelayConfig, error)
-	CreateRelay(ctx context.Context, cfg *schemas.RelayConfig, configHash string) error
-	UpdateRelay(ctx context.Context, cfg *schemas.RelayConfig, configHash string) error
-	DeleteRelay(ctx context.Context, name string) error
-	GetRelayConfigHashes(ctx context.Context) (map[string]string, error)
-	GetRelayGrantedVirtualKeyIDs(ctx context.Context, name string) ([]string, error)
 
 	// Virtual key provider config CRUD
 	GetVirtualKeyProviderConfigs(ctx context.Context, virtualKeyID string) ([]tables.TableVirtualKeyProviderConfig, error)

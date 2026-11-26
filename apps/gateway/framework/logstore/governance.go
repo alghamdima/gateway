@@ -8,7 +8,7 @@ import (
 )
 
 // governanceSnapshotTarget describes the persisted request-time attribution shared
-// by MCP and relay logs.
+// by MCP logs.
 type governanceSnapshotTarget struct {
 	virtualKeyID, virtualKeyName       **string
 	userID, userName                   **string
@@ -119,26 +119,4 @@ func applyGovernanceContext(ctx *schemas.BifrostContext, target governanceSnapsh
 			*set.target = slices.Clone(ids)
 		}
 	}
-}
-
-// ApplyGovernanceContext records the request's governance attribution on a Relay Logs row: the
-// virtual key, user, team, customer, business unit and project, and the budgets and rate limits the
-// call was charged against. The multi-valued team, customer and business unit sets are not stored on
-// this table; the primary of each is.
-func (l *RelayLog) ApplyGovernanceContext(ctx *schemas.BifrostContext) {
-	if l == nil {
-		return
-	}
-	applyGovernanceContext(ctx, governanceSnapshotTarget{
-		virtualKeyID: &l.VirtualKeyID, virtualKeyName: &l.VirtualKeyName,
-		userID: &l.UserID, userName: &l.UserName, userEmail: &l.UserEmail,
-		teamID: &l.TeamID, teamName: &l.TeamName,
-		customerID: &l.CustomerID, customerName: &l.CustomerName,
-		businessUnitID: &l.BusinessUnitID, businessUnitName: &l.BusinessUnitName,
-		projectID: &l.ProjectID, projectName: &l.ProjectName,
-		teamIDs: &l.TeamIDsParsed, teamNames: &l.TeamNamesParsed,
-		customerIDs: &l.CustomerIDsParsed, customerNames: &l.CustomerNamesParsed,
-		businessUnitIDs: &l.BusinessUnitIDsParsed, businessUnitNames: &l.BusinessUnitNamesParsed,
-		budgetIDs: &l.BudgetIDsParsed, rateLimitIDs: &l.RateLimitIDsParsed,
-	})
 }

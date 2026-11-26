@@ -211,7 +211,6 @@ type ConfigData struct {
 	Providers          map[string]configstore.ProviderConfig `json:"providers"`
 	FrameworkConfig    *framework.FrameworkConfig            `json:"framework,omitempty"`
 	MCP                *schemas.MCPConfig                    `json:"mcp,omitempty"`
-	Relays             []*schemas.RelayConfig                `json:"relays,omitempty"`
 	DatasheetOverrides []DatasheetOverrideFileConfig         `json:"datasheet_overrides,omitempty"`
 	ModelRouters       []configstore.ModelRouter             `json:"model_routers,omitempty"`
 	Governance         *configstore.GovernanceConfig         `json:"governance,omitempty"`
@@ -357,8 +356,6 @@ func (cd *ConfigData) sectionPresent(name string) bool {
 		return cd.Providers != nil
 	case "mcp":
 		return cd.MCP != nil
-	case "relays":
-		return cd.Relays != nil
 	case "datasheet_overrides":
 		return cd.DatasheetOverrides != nil
 	case "model_routers":
@@ -446,7 +443,6 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 		SetupToken         *schemas.SecretVar                    `json:"setup_token,omitempty"`
 		Providers          map[string]configstore.ProviderConfig `json:"providers"`
 		MCP                *schemas.MCPConfig                    `json:"mcp,omitempty"`
-		Relays             []*schemas.RelayConfig                `json:"relays,omitempty"`
 		DatasheetOverrides []DatasheetOverrideFileConfig         `json:"datasheet_overrides,omitempty"`
 		ModelRouters       []configstore.ModelRouter             `json:"model_routers,omitempty"`
 		Governance         *configstore.GovernanceConfig         `json:"governance,omitempty"`
@@ -477,7 +473,6 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 	cd.SetupToken = temp.SetupToken
 	cd.Providers = temp.Providers
 	cd.MCP = temp.MCP
-	cd.Relays = temp.Relays
 	cd.DatasheetOverrides = temp.DatasheetOverrides
 	cd.ModelRouters = temp.ModelRouters
 	cd.Governance = temp.Governance
@@ -628,7 +623,6 @@ type Config struct {
 	BasePlugins          atomic.Pointer[[]schemas.BasePlugin]                      // Master list of all plugins
 	LLMPlugins           atomic.Pointer[[]schemas.LLMPlugin]                       // Derived cache (auto-rebuilt)
 	MCPPlugins           atomic.Pointer[[]schemas.MCPPlugin]                       // Derived cache (auto-rebuilt)
-	RelayPlugins         atomic.Pointer[[]schemas.RelayPlugin]                     // Derived cache (auto-rebuilt)
 	HTTPTransportPlugins atomic.Pointer[[]schemas.HTTPTransportPlugin]             // Derived cache (auto-rebuilt)
 	ConfigMarshallers    atomic.Pointer[map[string]schemas.ConfigMarshallerPlugin] // Derived cache (auto-rebuilt)
 	PluginLoader         plugins.PluginLoader
@@ -1108,8 +1102,6 @@ func LoadConfig(ctx context.Context, configDirPath string) (*Config, error) {
 	for _, problem := range unresolvedInjectedTools(config.Providers, config.GetMCPClientNames()) {
 		logger.Warn("%s; requests to this provider are sent without it until the client exists", problem)
 	}
-	// 7a. Relays (before governance, whose virtual keys may grant them)
-	loadRelaysConfig(ctx, config, &configData)
 	// 8. Governance config
 	loadGovernanceConfig(ctx, config, &configData)
 	// 8a. Model routers
@@ -5542,25 +5534,6 @@ func updateGovernanceConfigInStore(
 			}
 		}
 
-		// The relays the file could grant, loaded once on first use: declared grants are checked
-		// against them, so a typo in one key's relay_grants is skipped with a warning rather than
-		// failing the sync.
-		var storedRelayNames map[string]bool
-		relayNamesForGrants := func() (map[string]bool, error) {
-			if storedRelayNames != nil {
-				return storedRelayNames, nil
-			}
-			relays, err := config.ConfigStore.ListRelays(ctx)
-			if err != nil {
-				return nil, err
-			}
-			storedRelayNames = make(map[string]bool, len(relays))
-			for _, r := range relays {
-				storedRelayNames[r.Name] = true
-			}
-			return storedRelayNames, nil
-		}
-
 		// Create virtual keys with explicit association handling
 		for i := range virtualKeysToAdd {
 			virtualKey := &virtualKeysToAdd[i]
@@ -5580,29 +5553,13 @@ func updateGovernanceConfigInStore(
 			// Written to the key's tier below; left here the save would cascade them as the key's own.
 			inlineBudgets := virtualKey.Budgets
 			rateLimitID := virtualKey.RateLimitID
-			// Grants are written after the key, through the same checks an update uses: left here the
-			// save would cascade them, and one name with no stored relay fails the whole sync.
-			relayGrants := virtualKey.RelayGrants
 			virtualKey.ProviderConfigs = nil
 			virtualKey.MCPConfigs = nil
 			virtualKey.Budgets = nil
 			virtualKey.RateLimitID = nil
-			virtualKey.RelayGrants = nil
 			// Here we wll filter provider / keys that are not available
 			if err := config.ConfigStore.CreateVirtualKey(ctx, virtualKey, tx); err != nil {
 				return fmt.Errorf("failed to create virtual key %s: %w", virtualKey.ID, err)
-			}
-			virtualKey.RelayGrants = relayGrants
-			if len(relayGrants) > 0 && !governed.skipKeyLimits(virtualKey.ID) {
-				stored, err := relayNamesForGrants()
-				if err != nil {
-					return fmt.Errorf("failed to list relays for virtual key relay grants: %w", err)
-				}
-				if names := grantableRelayNames(relayGrantNames(relayGrants), stored, virtualKey.ID, virtualKey.Name); len(names) > 0 {
-					if err := config.ConfigStore.ReplaceVirtualKeyRelayGrants(ctx, virtualKey.ID, names, tx); err != nil {
-						return fmt.Errorf("failed to create relay grants for virtual key %s: %w", virtualKey.ID, err)
-					}
-				}
 			}
 			pendingVKLimits = append(pendingVKLimits, virtualKeyTierState{
 				vkID: virtualKey.ID, budgets: inlineBudgets,
@@ -5660,22 +5617,6 @@ func updateGovernanceConfigInStore(
 			}
 			if err := config.ConfigStore.UpdateVirtualKey(ctx, &virtualKey, tx); err != nil {
 				return fmt.Errorf("failed to update virtual key %s: %w", virtualKey.ID, err)
-			}
-			// UpdateVirtualKey writes scalar columns only. A key synced from the file takes the file's
-			// declaration as a whole, as its provider and MCP configs do: the grants it lists replace the
-			// stored ones, and a key that lists none is left with none.
-			if !governed.skipKeyLimits(virtualKey.ID) {
-				names := []string{}
-				if len(virtualKey.RelayGrants) > 0 {
-					stored, err := relayNamesForGrants()
-					if err != nil {
-						return fmt.Errorf("failed to list relays for virtual key relay grants: %w", err)
-					}
-					names = grantableRelayNames(relayGrantNames(virtualKey.RelayGrants), stored, virtualKey.ID, virtualKey.Name)
-				}
-				if err := config.ConfigStore.ReplaceVirtualKeyRelayGrants(ctx, virtualKey.ID, names, tx); err != nil {
-					return fmt.Errorf("failed to update relay grants for virtual key %s: %w", virtualKey.ID, err)
-				}
 			}
 		}
 
@@ -8584,15 +8525,6 @@ func (c *Config) GetLoadedMCPPlugins() []schemas.MCPPlugin {
 	return nil
 }
 
-// GetLoadedRelayPlugins returns the current snapshot of loaded plugins that see
-// relay calls, with the same lock-free, read-only contract as GetLoadedMCPPlugins.
-func (c *Config) GetLoadedRelayPlugins() []schemas.RelayPlugin {
-	if plugins := c.RelayPlugins.Load(); plugins != nil {
-		return slices.Clone(*plugins)
-	}
-	return nil
-}
-
 // GetLoadedHTTPTransportPlugins returns all loaded plugins that implement HTTPTransportPlugin interface.
 // This method returns a cached list that is updated on plugin add/reload/remove operations.
 // It is lock-free and safe for concurrent access from hot paths.
@@ -8614,11 +8546,9 @@ func (c *Config) rebuildInterfaceCaches() {
 		// Clear all caches atomically, except ConfigMarshallers which are preserved.
 		emptyLLM := []schemas.LLMPlugin{}
 		emptyMCP := []schemas.MCPPlugin{}
-		emptyEndpoints := []schemas.RelayPlugin{}
 		emptyHTTP := []schemas.HTTPTransportPlugin{}
 		c.LLMPlugins.Store(&emptyLLM)
 		c.MCPPlugins.Store(&emptyMCP)
-		c.RelayPlugins.Store(&emptyEndpoints)
 		c.HTTPTransportPlugins.Store(&emptyHTTP)
 		return
 	}
@@ -8626,7 +8556,6 @@ func (c *Config) rebuildInterfaceCaches() {
 	// Single pass through all plugins - check all interfaces in one iteration
 	var llm []schemas.LLMPlugin
 	var mcp []schemas.MCPPlugin
-	var endpointPlugins []schemas.RelayPlugin
 	var httpTransport []schemas.HTTPTransportPlugin
 
 	for _, p := range *basePlugins {
@@ -8635,9 +8564,6 @@ func (c *Config) rebuildInterfaceCaches() {
 		}
 		if mcpPlugin, ok := p.(schemas.MCPPlugin); ok {
 			mcp = append(mcp, mcpPlugin)
-		}
-		if endpointPlugin, ok := p.(schemas.RelayPlugin); ok {
-			endpointPlugins = append(endpointPlugins, endpointPlugin)
 		}
 		if httpPlugin, ok := p.(schemas.HTTPTransportPlugin); ok {
 			httpTransport = append(httpTransport, httpPlugin)
@@ -8650,7 +8576,6 @@ func (c *Config) rebuildInterfaceCaches() {
 
 	c.LLMPlugins.Store(&llm)
 	c.MCPPlugins.Store(&mcp)
-	c.RelayPlugins.Store(&endpointPlugins)
 	c.HTTPTransportPlugins.Store(&httpTransport)
 }
 
@@ -11230,33 +11155,3 @@ func (c *Config) GetSkillsExternalClientURL() string {
 	return strings.TrimRight(value, "/")
 }
 
-// grantableRelayNames returns the relay names a key's relay_grants in config.json can grant: each
-// name once, and only names with a stored relay. A repeated name is dropped silently; a name no
-// relay carries (a typo, or a declaration loadRelaysConfig skipped as invalid) is dropped with a
-// warning, as other unresolvable references on a key are, so one bad grant never fails the whole
-// governance sync. The store rejects both, and the sync treats a store error as fatal.
-func grantableRelayNames(names []string, stored map[string]bool, vkID, vkName string) []string {
-	out := make([]string, 0, len(names))
-	seen := make(map[string]bool, len(names))
-	for _, name := range names {
-		if seen[name] {
-			continue
-		}
-		seen[name] = true
-		if !stored[name] {
-			logger.Warn("virtual key %s (%s): relay_grants names relay %q, which is not configured; skipping that grant", vkID, vkName, name)
-			continue
-		}
-		out = append(out, name)
-	}
-	return out
-}
-
-// relayGrantNames returns the relay names a key's relay_grants declare, in file order.
-func relayGrantNames(grants []configstoreTables.TableVirtualKeyRelayGrant) []string {
-	names := make([]string, 0, len(grants))
-	for _, g := range grants {
-		names = append(names, g.RelayName)
-	}
-	return names
-}

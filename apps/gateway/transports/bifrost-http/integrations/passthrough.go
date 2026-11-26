@@ -61,8 +61,8 @@ func stripPassthroughPrefix(path string, prefixes []string) (string, string, boo
 	return "", "", false
 }
 
-// validatePassthroughPath rejects a path a provider could misread; the rules are shared with the
-// relay data plane in lib.ValidatePassthroughPath.
+// validatePassthroughPath rejects a path a provider could misread; the rules are in
+// lib.ValidatePassthroughPath.
 func validatePassthroughPath(p string) error {
 	return lib.ValidatePassthroughPath(p)
 }

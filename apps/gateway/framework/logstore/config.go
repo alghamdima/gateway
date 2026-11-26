@@ -21,7 +21,7 @@ type Config struct {
 	ObjectStorageExcludeFields []string `json:"object_storage_exclude_fields,omitempty"`
 	// ObjectStorageExcludeRequestTypes lists request types (log object_type values) whose logs stay fully in the database and are never offloaded.
 	ObjectStorageExcludeRequestTypes []string `json:"object_storage_exclude_request_types,omitempty"`
-	CaptureClientIP                  bool     `json:"capture_client_ip,omitempty"` // records client_ip on LLM, MCP and relay logs; off by default
+	CaptureClientIP                  bool     `json:"capture_client_ip,omitempty"` // records client_ip on LLM and MCP logs; off by default
 }
 
 const (
