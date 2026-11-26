@@ -3,7 +3,6 @@ package lib
 import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/grant"
-	"github.com/valyala/fasthttp"
 )
 
 // contextGrant returns the grant a request context carries, installing one when it carries none.
@@ -39,21 +38,7 @@ func RecordCredential(bifrostCtx *schemas.BifrostContext, credential schemas.Cre
 	if g == nil {
 		return
 	}
-	g.SetIdentity(identityWith(g.Identity(), credential, nil))
-}
-
-// RecordUser records the user the request is attributed to on the request context's grant, keeping
-// whatever else its identity already holds, for the same layers RecordCredential is for. Recording
-// nobody changes nothing.
-func RecordUser(bifrostCtx *schemas.BifrostContext, user *schemas.UserRef) {
-	if user == nil || user.ID == "" {
-		return
-	}
-	g := contextGrant(bifrostCtx)
-	if g == nil {
-		return
-	}
-	g.SetIdentity(identityWith(g.Identity(), schemas.Credential{}, user))
+	g.SetIdentity(identityWith(g.Identity(), credential))
 }
 
 // SettleIdentity records who the request is from what the middlewares left on the context, all at
@@ -105,40 +90,12 @@ func userFromContext(bifrostCtx *schemas.BifrostContext) *schemas.UserRef {
 	return &schemas.UserRef{ID: userID, Name: name, Email: email}
 }
 
-// identityWith is the identity current holds with credential and user replaced where given: an
-// identity is replaced whole, never edited, so a layer that learns one thing rebuilds it around
-// what the layers before it learned.
-func identityWith(current schemas.Identity, credential schemas.Credential, user *schemas.UserRef) schemas.Identity {
+// identityWith is the identity current holds with credential replaced: an identity is replaced
+// whole, never edited, so a layer that learns one thing rebuilds it around what the layers before
+// it learned.
+func identityWith(current schemas.Identity, credential schemas.Credential) schemas.Identity {
 	if current == nil {
-		return grant.NewIdentity(credential, user, nil, nil, nil, nil, nil)
+		return grant.NewIdentity(credential, nil, nil, nil, nil, nil, nil)
 	}
-	if credential.Kind == "" {
-		credential = current.Credential()
-	}
-	if user == nil {
-		user = current.User()
-	}
-	return grant.NewIdentity(credential, user, current.VirtualKey(), current.Teams(), current.Customers(), current.BusinessUnits(), current.Project())
-}
-
-// preAuthenticatedKey marks a request whose credential an earlier middleware verified and removed.
-// Typed and unexported, so only MarkPreAuthenticated can set it.
-const preAuthenticatedKey schemas.BifrostContextKey = "bifrost-pre-authenticated"
-
-// Methods a request can be pre-authenticated by.
-const (
-	PreAuthClientGateway    = "client_gateway"    // a client gateway bearer (Claude Code /login)
-	PreAuthWorkloadIdentity = "workload_identity" // an enterprise workload identity token
-)
-
-// MarkPreAuthenticated records that a middleware verified the request's credential and removed it,
-// so later auth middlewares do not challenge it again. Call it only after verification.
-func MarkPreAuthenticated(ctx *fasthttp.RequestCtx, method string) {
-	ctx.SetUserValue(preAuthenticatedKey, method)
-}
-
-// PreAuthenticated returns the method an earlier middleware authenticated ctx with, if any.
-func PreAuthenticated(ctx *fasthttp.RequestCtx) (string, bool) {
-	method, ok := ctx.UserValue(preAuthenticatedKey).(string)
-	return method, ok && method != ""
+	return grant.NewIdentity(credential, current.User(), current.VirtualKey(), current.Teams(), current.Customers(), current.BusinessUnits(), current.Project())
 }

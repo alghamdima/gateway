@@ -500,7 +500,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_model_routers_table"}, run: migrationAddModelRoutersTable},
 	{IDs: []string{"add_model_router_targets_and_routing"}, run: migrationAddModelRouterTargetsAndRouting},
 	{IDs: []string{"add_model_router_suggestions_tier_columns"}, run: migrationAddModelRouterSuggestionTierColumns},
-	{IDs: []string{"add_framework_config_openapi_url_column"}, run: migrationAddFrameworkConfigOpenAPIURLColumn},
 	{IDs: []string{"add_client_config_entity_access_profile_mode_column"}, run: migrationAddClientConfigEntityAccessProfileModeColumn},
 }
 
@@ -2763,7 +2762,7 @@ func migrationAddVirtualKeyConfigHashColumn(ctx context.Context, db *gorm.DB, lo
 }
 
 // migrationAddAdditionalConfigHashColumns adds config_hash columns to client config, budget, rate limit,
-// customer, team, MCP client, and plugin tables for reconciliation support
+// customer, team, and plugin tables for reconciliation support
 func migrationAddAdditionalConfigHashColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_additional_config_hash_columns"
 	logger.Info("[configstore] starting migration %s", migrationName)
@@ -4495,7 +4494,7 @@ func migrationAddRateLimitToTeamsAndCustomers(ctx context.Context, db *gorm.DB, 
 }
 
 // migrationBackfillEmptyVirtualKeyConfigs backfills existing virtual keys that have
-// empty ProviderConfigs or MCPConfigs with all available providers/MCP clients.
+// empty ProviderConfigs with all available providers.
 // This preserves the previous "empty means all" behavior for existing VKs after
 // the semantic change to "empty means none" (deny-by-default).
 func migrationBackfillEmptyVirtualKeyConfigs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -11857,33 +11856,6 @@ func migrationAddComplexitySuggestionSchedulesTable(ctx context.Context, db *gor
 		},
 		Rollback: func(tx *gorm.DB) error {
 			return tx.WithContext(ctx).Migrator().DropTable(&tables.TableComplexitySuggestionSchedule{})
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddFrameworkConfigOpenAPIURLColumn adds openapi_url to framework_configs.
-// NULL reads as unset (the build's default spec), so existing rows need no backfill
-// and a rolled-back binary ignores the column.
-func migrationAddFrameworkConfigOpenAPIURLColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_framework_config_openapi_url_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &tables.TableFrameworkConfig{}, "OpenAPIURL")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableFrameworkConfig{}, "OpenAPIURL")
 		},
 	}})
 	if err := m.Migrate(); err != nil {

@@ -28,7 +28,7 @@ type vaultStoreSelfManaged interface {
 // The store callback runs at Before("gorm:before_create") / Before("gorm:before_update"),
 // so the vault ref replaces the plaintext before BeforeSave serializes/encrypts it.
 // This is correct for models whose SecretVar fields are set by the caller
-// (TableMCPClient.Headers, TableOauthConfig.ClientSecret). Models that populate their
+// (TableKey.Value, for instance). Models that populate their
 // SecretVar columns inside BeforeSave implement vaultStoreSelfManaged and do their own
 // store at the correct midpoint; the global callback skips them.
 func RegisterVaultCallbacks(db *gorm.DB) {

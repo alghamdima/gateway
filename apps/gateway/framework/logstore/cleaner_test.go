@@ -140,16 +140,6 @@ func (m *logsOnlyRetention) DeleteLogsBatch(ctx context.Context, cutoff time.Tim
 	return m.logs.deleteBatch(ctx, cutoff, batchSize)
 }
 
-// fullRetention is a manager with every table the cleaner knows about.
-type fullRetention struct {
-	logsOnlyRetention
-	mcp retentionTable
-}
-
-func (m *fullRetention) DeleteMCPToolLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (int64, error) {
-	return m.mcp.deleteBatch(ctx, cutoff, batchSize)
-}
-
 // scriptedRetention returns one scripted result per call, then empty batches.
 type scriptedRetention struct {
 	results  []scriptedBatch
@@ -183,18 +173,12 @@ func TestDrainExpiredContinuesPastShortBatch(t *testing.T) {
 }
 
 // Another replica holding the table's lock ends this replica's drain of that
-// table quietly, and the pass still moves on to the other tables.
+// table quietly.
 func TestDrainExpiredYieldsToLockHolder(t *testing.T) {
 	m := &scriptedRetention{results: []scriptedBatch{{deleted: batchSize}, {err: ErrRetentionBusy}, {deleted: batchSize}}}
 	cleaner := NewLogsCleaner(m, CleanerConfig{RetentionDays: 3}, testLogger{})
 	require.True(t, cleaner.drainExpired(context.Background(), "logs", time.Now(), m.DeleteLogsBatch), "yielding is not a failure")
 	assert.Equal(t, 2, m.calls, "no batch may follow the yield")
-
-	manager := &fullRetention{}
-	manager.logs.err = ErrRetentionBusy
-	manager.mcp.expired = 4
-	NewLogsCleaner(manager, CleanerConfig{RetentionDays: 3}, testLogger{}).cleanupOldLogs(context.Background())
-	assert.Zero(t, manager.mcp.expired, "a busy logs table must not hold up the tables after it")
 }
 
 // Retention keys share Postgres' advisory key space with every other lock, so a shared key makes
@@ -243,7 +227,6 @@ func setupRetentionPostgres(t *testing.T, expired, fresh int) (*RDBLogStore, *go
 	}
 	ctx := context.Background()
 	dropAllManagedMatViews(db)
-	require.NoError(t, db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS logs CASCADE").Error)
 	require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)
@@ -387,7 +370,7 @@ func TestDrainExpiredShrinksBatchOnStatementTimeout(t *testing.T) {
 	d = &timeoutAbove{limit: 1000, backlog: 700}
 	require.True(t, cleaner.drainExpired(context.Background(), "logs", time.Now(), d.deleteBatch))
 	assert.Equal(t, 625, d.sizes[0], "the next pass starts at the size that fit")
-	assert.Equal(t, batchSize, cleaner.batchSizeFor("mcp tool logs"), "each table learns its own size")
+	assert.Equal(t, batchSize, cleaner.batchSizeFor("async jobs"), "each table learns its own size")
 }
 
 func TestDrainExpiredGrowsBatchBackAfterSuccesses(t *testing.T) {

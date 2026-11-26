@@ -147,7 +147,6 @@ func chatCustomToolAsFunction(tool schemas.ChatTool) schemas.ChatTool {
 	}
 	tool.Custom = nil
 	tool.Name = ""
-	tool.InvalidateSerialized()
 	return tool
 }
 

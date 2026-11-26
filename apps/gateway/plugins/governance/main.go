@@ -738,7 +738,7 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 
 	// This request now has the provider and model it will use, so the limits it answers to can be
 	// settled and recorded on its grant. Doing it here rather than in a hook covers every path: the
-	// streaming, realtime-turn and MCP pipelines run no request hook, and this is the funnel they
+	// streaming and realtime-turn pipelines run no request hook, and this is the funnel they
 	// all pass through. Everything downstream, the checks below and the co-payers named for the
 	// log, then reads one settled set instead of assembling its own.
 	//
@@ -823,8 +823,8 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 	// what they asked for. Like the first, it does not say which of "no such project" and "not
 	// yours" it was, because a caller who may not use a project has no business learning it exists.
 	//
-	// This is the funnel every pipeline passes through, including the streaming, realtime-turn and
-	// MCP ones that run no request hook, so refusing here is what makes the answer the same on all
+	// This is the funnel every pipeline passes through, including the streaming and realtime-turn
+	// ones that run no request hook, so refusing here is what makes the answer the same on all
 	// of them.
 	if refusal := unusablePermit(access); refusal != nil {
 		return p.decide(ctx, refusal)
@@ -994,7 +994,7 @@ func (p *GovernancePlugin) decide(ctx *schemas.BifrostContext, result *Evaluatio
 //
 // Two places call it. The request hook, because that is where a request's grant decisions start on
 // the ordinary path. And evaluation, because it is the one funnel every evaluating caller passes
-// through, including the streaming, realtime-turn and MCP pipelines, which never run the request
+// through, including the streaming and realtime-turn pipelines, which never run the request
 // hook, and callers that evaluate governance with no hook in front of them at all.
 //
 // Every request context carries a grant, installed by the transport that built it. One that does
@@ -1159,8 +1159,7 @@ func resolveLimitsWith(ctx *schemas.BifrostContext, store GovernanceStore, acces
 }
 
 // PreRequestHook is the per-request governance phase: it resolves the request's access, completes
-// its identity on the grant for downstream plugins, and narrows the MCP tool list to what the
-// access allows.
+// and completes its identity on the grant for downstream plugins.
 //
 // It deliberately runs before the routing plugin so a routing rule evaluates against a fully
 // stamped context. The provider allowlist and load balancing that used to live here now run

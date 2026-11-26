@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -569,157 +569,6 @@ func TestUpdateConfig_SkipAccessProfileUserVirtualKeyLifecyclePresence(t *testin
 	}
 }
 
-// mcp_openapi_max_spec_mb is copied only when sent, so a partial save keeps the stored limit, 0
-// resets it to the default, and a value outside 0..maxMCPOpenAPISpecMB is refused before anything
-// changes.
-func TestUpdateConfig_MCPOpenAPIMaxSpecMB(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	cfg.ClientConfig.MCPOpenAPIMaxSpecMB = 64
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	stored := func() int {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted.MCPOpenAPIMaxSpecMB
-	}
-
-	omitted := putConfigCtx(`{"client_config":{"log_retention_days":8}}`)
-	h.updateConfig(omitted)
-	require.Equal(t, fasthttp.StatusOK, omitted.Response.StatusCode(), string(omitted.Response.Body()))
-	assert.Equal(t, 64, cfg.ClientConfig.MCPOpenAPIMaxSpecMB, "an omitted field keeps the live value")
-	assert.Equal(t, 64, stored(), "an omitted field keeps the stored value")
-	assert.Equal(t, 64<<20, cfg.MCPOpenAPIMaxSpecBytes())
-
-	raised := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_openapi_max_spec_mb":128}}`)
-	h.updateConfig(raised)
-	require.Equal(t, fasthttp.StatusOK, raised.Response.StatusCode(), string(raised.Response.Body()))
-	assert.Equal(t, 128, cfg.ClientConfig.MCPOpenAPIMaxSpecMB)
-	assert.Equal(t, 128, stored())
-
-	for _, body := range []string{
-		`{"client_config":{"log_retention_days":8,"mcp_openapi_max_spec_mb":-1}}`,
-		fmt.Sprintf(`{"client_config":{"log_retention_days":8,"mcp_openapi_max_spec_mb":%d}}`, maxMCPOpenAPISpecMB+1),
-		// null would decode as 0 and silently reset the limit; an explicit 0 is the reset.
-		`{"client_config":{"log_retention_days":8,"mcp_openapi_max_spec_mb":null}}`,
-	} {
-		refused := putConfigCtx(body)
-		h.updateConfig(refused)
-		assert.Equal(t, fasthttp.StatusBadRequest, refused.Response.StatusCode(), "%s: %s", body, refused.Response.Body())
-		assert.Equal(t, 128, cfg.ClientConfig.MCPOpenAPIMaxSpecMB, "%s left the live value unchanged", body)
-		assert.Equal(t, 128, stored(), "%s left the stored value unchanged", body)
-	}
-
-	reset := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_openapi_max_spec_mb":0}}`)
-	h.updateConfig(reset)
-	require.Equal(t, fasthttp.StatusOK, reset.Response.StatusCode(), string(reset.Response.Body()))
-	assert.Zero(t, stored())
-	assert.Zero(t, cfg.MCPOpenAPIMaxSpecBytes(), "0 leaves the limit to openapimcp's default")
-}
-
-// bifrost_url and bifrost_mcp_allow_writes are copied only when sent, so a partial save keeps them; an invalid value is refused before anything
-// changes; and allow_writes false is stored as false, not reset to the default.
-func TestUpdateConfig_BifrostURLAndBifrostMCPSettings(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	stored := func() *configstore.ClientConfig {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted
-	}
-
-	set := putConfigCtx(`{"client_config":{"log_retention_days":8,"bifrost_url":"https://gw.example.com","bifrost_mcp_allow_writes":false}}`)
-	h.updateConfig(set)
-	require.Equal(t, fasthttp.StatusOK, set.Response.StatusCode(), string(set.Response.Body()))
-	assert.Equal(t, "https://gw.example.com", cfg.GetBifrostURL())
-	assert.False(t, cfg.GetBifrostMCPAllowWrites())
-	persisted := stored()
-	assert.Equal(t, "https://gw.example.com", persisted.BifrostURL.GetValue())
-	require.NotNil(t, persisted.BifrostMCPAllowWrites)
-	assert.False(t, *persisted.BifrostMCPAllowWrites)
-
-	omitted := putConfigCtx(`{"client_config":{"log_retention_days":9}}`)
-	h.updateConfig(omitted)
-	require.Equal(t, fasthttp.StatusOK, omitted.Response.StatusCode(), string(omitted.Response.Body()))
-	persisted = stored()
-	assert.Equal(t, "https://gw.example.com", persisted.BifrostURL.GetValue(), "an omitted field keeps the stored value")
-	require.NotNil(t, persisted.BifrostMCPAllowWrites)
-	assert.False(t, *persisted.BifrostMCPAllowWrites)
-
-	for _, body := range []string{
-		`{"client_config":{"log_retention_days":8,"bifrost_url":"gw.example.com"}}`,
-		`{"client_config":{"log_retention_days":8,"bifrost_url":"https://user:pass@gw.example.com"}}`,
-	} {
-		refused := putConfigCtx(body)
-		h.updateConfig(refused)
-		assert.Equal(t, fasthttp.StatusBadRequest, refused.Response.StatusCode(), "%s: %s", body, refused.Response.Body())
-		assert.Equal(t, "https://gw.example.com", stored().BifrostURL.GetValue(), "%s left the stored value unchanged", body)
-	}
-
-	reset := putConfigCtx(`{"client_config":{"log_retention_days":8,"bifrost_url":"","bifrost_mcp_allow_writes":null}}`)
-	h.updateConfig(reset)
-	require.Equal(t, fasthttp.StatusOK, reset.Response.StatusCode(), string(reset.Response.Body()))
-	assert.Empty(t, cfg.GetBifrostURL())
-	assert.True(t, cfg.GetBifrostMCPAllowWrites(), "null resets the writes switch to its default, on")
-}
-
-// framework_config.openapi_url is copied only when sent, so a partial save keeps it;
-// a value outside the app directory is refused before anything changes; and empty
-// clears it, so the Bifrost MCP reads the build's default spec again.
-func TestUpdateConfig_FrameworkOpenAPIURL(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	stored := func() *string {
-		t.Helper()
-		fc, err := store.GetFrameworkConfig(bgCtx())
-		require.NoError(t, err)
-		if fc == nil {
-			return nil
-		}
-		return fc.OpenAPIURL
-	}
-	const fallback = "https://example.com/default/openapi.json"
-	assert.Equal(t, fallback, cfg.GetOpenAPIURL(fallback), "unset reads the build's default")
-
-	set := putConfigCtx(`{"client_config":{"log_retention_days":8},"framework_config":{"openapi_url":" specs/openapi.json "}}`)
-	h.updateConfig(set)
-	require.Equal(t, fasthttp.StatusOK, set.Response.StatusCode(), string(set.Response.Body()))
-	require.NotNil(t, stored())
-	assert.Equal(t, "specs/openapi.json", *stored())
-	assert.Equal(t, "specs/openapi.json", cfg.GetOpenAPIURL(fallback))
-
-	omitted := putConfigCtx(`{"client_config":{"log_retention_days":8},"framework_config":{"pricing_sync_interval":7200}}`)
-	h.updateConfig(omitted)
-	require.Equal(t, fasthttp.StatusOK, omitted.Response.StatusCode(), string(omitted.Response.Body()))
-	require.NotNil(t, stored())
-	assert.Equal(t, "specs/openapi.json", *stored(), "an omitted field keeps the stored value")
-	assert.Equal(t, "specs/openapi.json", cfg.GetOpenAPIURL(fallback))
-
-	for _, value := range []string{"/etc/passwd", "../openapi.json", "ftp://example.com/openapi.json"} {
-		refused := putConfigCtx(`{"client_config":{"log_retention_days":8},"framework_config":{"openapi_url":"` + value + `"}}`)
-		h.updateConfig(refused)
-		assert.Equal(t, fasthttp.StatusBadRequest, refused.Response.StatusCode(), "%s: %s", value, refused.Response.Body())
-		assert.Contains(t, string(refused.Response.Body()), "openapi_url")
-		require.NotNil(t, stored())
-		assert.Equal(t, "specs/openapi.json", *stored(), "%s left the stored value unchanged", value)
-	}
-
-	reset := putConfigCtx(`{"client_config":{"log_retention_days":8},"framework_config":{"openapi_url":""}}`)
-	h.updateConfig(reset)
-	require.Equal(t, fasthttp.StatusOK, reset.Response.StatusCode(), string(reset.Response.Body()))
-	assert.Nil(t, stored(), "empty clears the stored value")
-	assert.Equal(t, fallback, cfg.GetOpenAPIURL(fallback), "cleared, the build's default is read again")
-}
-
 // extra_fields_placement is copied only when sent, so a partial save keeps the stored value,
 // and anything other than body/headers is refused before any live mutation.
 func TestUpdateConfig_ExtraFieldsPlacement(t *testing.T) {
@@ -766,185 +615,6 @@ func TestUpdateConfig_ExtraFieldsPlacement(t *testing.T) {
 	require.Equal(t, fasthttp.StatusOK, body.Response.StatusCode(), string(body.Response.Body()))
 	assert.False(t, cfg.ShouldSendExtraFieldsInHeaders())
 	assert.Equal(t, configtables.ExtraFieldsPlacementBody, stored())
-}
-
-// TestUpdateConfig_ClientGatewayTelemetryPlainHeaders pins plain telemetry header values, which
-// the config API redacts: a value sent back redacted keeps the stored one (also with auth
-// bypassed, where a change would be refused), a new value replaces it, and headers are matched
-// by their collector's endpoint, so removing a collector cannot move a secret onto another.
-func TestUpdateConfig_ClientGatewayTelemetryPlainHeaders(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	dest := func(endpoint, header string) string {
-		return `{"endpoint":"` + endpoint + `","headers":{"authorization":"` + header + `"}}`
-	}
-	body := func(dests ...string) string {
-		return `{"client_config":{"log_retention_days":8,"oauth2_server_config":{"issuer_url":"https://bifrost.example.com","gateways":{"claude_code":{"enabled":true,"managed_settings":null,"telemetry":{"enabled":true,"destinations":[` +
-			strings.Join(dests, ",") + `]}}}}}}`
-	}
-	put := func(name, b string, bypassed bool) {
-		t.Helper()
-		ctx := putConfigCtx(b)
-		if bypassed {
-			ctx.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-		}
-		h.updateConfig(ctx)
-		require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), name+": "+string(ctx.Response.Body()))
-	}
-	headers := func() map[string]string {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		live, saved := map[string]string{}, map[string]string{}
-		for _, d := range cfg.ClientConfig.OAuth2ServerConfig.ClaudeCodeGateway().Telemetry.Destinations {
-			live[d.Endpoint.GetValue()] = d.Headers["authorization"].GetValue()
-		}
-		for _, d := range persisted.OAuth2ServerConfig.ClaudeCodeGateway().Telemetry.Destinations {
-			saved[d.Endpoint.GetValue()] = d.Headers["authorization"].GetValue()
-		}
-		require.Equal(t, live, saved, "the live config and the stored row must agree")
-		return live
-	}
-
-	put("set", body(dest("https://a.example.com", "Bearer token-a"), dest("https://b.example.com", "Bearer token-b")), false)
-	assert.Equal(t, map[string]string{"https://a.example.com": "Bearer token-a", "https://b.example.com": "Bearer token-b"}, headers())
-
-	put("resent redacted", body(dest("https://a.example.com", "<REDACTED>"), dest("https://b.example.com", "<REDACTED>")), false)
-	assert.Equal(t, map[string]string{"https://a.example.com": "Bearer token-a", "https://b.example.com": "Bearer token-b"}, headers())
-
-	put("resent redacted with auth bypassed", body(dest("https://a.example.com", "<REDACTED>"), dest("https://b.example.com", "<REDACTED>")), true)
-
-	put("first collector removed", body(dest("https://b.example.com", "<REDACTED>")), false)
-	assert.Equal(t, map[string]string{"https://b.example.com": "Bearer token-b"}, headers())
-
-	put("replaced", body(dest("https://b.example.com", "Bearer token-new")), false)
-	assert.Equal(t, map[string]string{"https://b.example.com": "Bearer token-new"}, headers())
-
-	// A redacted value that matches nothing must be typed again, never saved as the credential.
-	refused := func(name, b string) {
-		t.Helper()
-		ctx := putConfigCtx(b)
-		h.updateConfig(ctx)
-		require.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode(), name+": "+string(ctx.Response.Body()))
-		assert.Contains(t, string(ctx.Response.Body()), "re-enter the value", name)
-	}
-	refused("endpoint changed", body(dest("https://c.example.com", "<REDACTED>")))
-	refused("header renamed", body(`{"endpoint":"https://b.example.com","headers":{"x-token":"<REDACTED>"}}`))
-	assert.Equal(t, map[string]string{"https://b.example.com": "Bearer token-new"}, headers())
-
-	// Two collectors on one endpoint cannot be told apart on a later save, so they are refused
-	// even while forwarding is paused.
-	paused := strings.Replace(body(dest("https://d.example.com", "Bearer token-1"), dest("https://d.example.com", "Bearer token-2")), `"telemetry":{"enabled":true`, `"telemetry":{"enabled":false`, 1)
-	dup := putConfigCtx(paused)
-	h.updateConfig(dup)
-	require.Equal(t, fasthttp.StatusBadRequest, dup.Response.StatusCode(), string(dup.Response.Body()))
-	assert.Contains(t, string(dup.Response.Body()), "repeats destinations[0]")
-	assert.Equal(t, map[string]string{"https://b.example.com": "Bearer token-new"}, headers())
-}
-
-// TestUpdateConfig_ClientGatewayTelemetryDestinations pins that a caller admitted with
-// auth bypassed may resend the Claude Code telemetry destinations but not change them,
-// since a destination decides where its env or vault header values are sent.
-func TestUpdateConfig_ClientGatewayTelemetryDestinations(t *testing.T) {
-	SetLogger(&mockLogger{})
-	t.Setenv("BIFROST_TEST_OTEL_TOKEN", "otel-token")
-	t.Setenv("BIFROST_TEST_SERVER_SECRET", "server-secret")
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	body := func(endpoint, header string, enabled bool) string {
-		return `{"client_config":{"log_retention_days":8,"oauth2_server_config":{"issuer_url":"https://bifrost.example.com","gateways":{"claude_code":{"enabled":true,"managed_settings":null,"telemetry":{"enabled":` +
-			strconv.FormatBool(enabled) + `,"destinations":[{"endpoint":"` + endpoint + `","headers":{"authorization":"` + header + `"}}]}}}}}}`
-	}
-	endpoint := func() string {
-		t.Helper()
-		return cfg.ClientConfig.OAuth2ServerConfig.ClaudeCodeGateway().Telemetry.Destinations[0].Endpoint.GetValue()
-	}
-
-	set := putConfigCtx(body("https://otel.example.com", "env.BIFROST_TEST_OTEL_TOKEN", true))
-	h.updateConfig(set)
-	require.Equal(t, fasthttp.StatusOK, set.Response.StatusCode(), string(set.Response.Body()))
-
-	for name, b := range map[string]string{
-		"resent unchanged": body("https://otel.example.com", "env.BIFROST_TEST_OTEL_TOKEN", true),
-		"paused":           body("https://otel.example.com", "env.BIFROST_TEST_OTEL_TOKEN", false),
-	} {
-		ok := putConfigCtx(b)
-		ok.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-		h.updateConfig(ok)
-		require.Equal(t, fasthttp.StatusOK, ok.Response.StatusCode(), name+": "+string(ok.Response.Body()))
-	}
-
-	for name, b := range map[string]string{
-		"new endpoint": body("https://attacker.example.com", "env.BIFROST_TEST_OTEL_TOKEN", true),
-		"new header":   body("https://otel.example.com", "env.BIFROST_TEST_SERVER_SECRET", true),
-	} {
-		changed := putConfigCtx(b)
-		changed.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-		h.updateConfig(changed)
-		require.Equal(t, fasthttp.StatusForbidden, changed.Response.StatusCode(), name+": "+string(changed.Response.Body()))
-		assert.Contains(t, string(changed.Response.Body()), "telemetry destinations requires an authenticated admin session")
-		assert.Equal(t, "https://otel.example.com", endpoint(), name)
-	}
-
-	// A plain header holding the text of a reference, stored while telemetry is paused, must
-	// not let a bypassed caller swap in the real reference: the source type is compared too.
-	plain := `{"client_config":{"log_retention_days":8,"oauth2_server_config":{"issuer_url":"https://bifrost.example.com","gateways":{"claude_code":{"enabled":true,"managed_settings":null,"telemetry":{"enabled":false,"destinations":[{"endpoint":"https://otel.example.com","headers":{"authorization":{"value":"env.BIFROST_TEST_SERVER_SECRET","ref":"","type":"plain"}}}]}}}}}}`
-	stored := putConfigCtx(plain)
-	h.updateConfig(stored)
-	require.Equal(t, fasthttp.StatusOK, stored.Response.StatusCode(), string(stored.Response.Body()))
-	swapped := putConfigCtx(body("https://otel.example.com", "env.BIFROST_TEST_SERVER_SECRET", true))
-	swapped.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-	h.updateConfig(swapped)
-	require.Equal(t, fasthttp.StatusForbidden, swapped.Response.StatusCode(), string(swapped.Response.Body()))
-
-	admin := putConfigCtx(body("https://otel2.example.com", "env.BIFROST_TEST_OTEL_TOKEN", true))
-	h.updateConfig(admin)
-	require.Equal(t, fasthttp.StatusOK, admin.Response.StatusCode(), string(admin.Response.Body()))
-	assert.Equal(t, "https://otel2.example.com", endpoint())
-}
-
-// TestUpdateConfig_ClientGatewayNeedsAdminWhileBypassed pins that a caller without an admin
-// session cannot switch the client gateway on, change its managed settings or its dropped
-// telemetry attributes, while switching it off stays allowed.
-func TestUpdateConfig_ClientGatewayNeedsAdminWhileBypassed(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	body := func(enabled bool, managed, drop string) string {
-		return `{"client_config":{"log_retention_days":8,"oauth2_server_config":{"issuer_url":"https://bifrost.example.com","gateways":{"claude_code":{"enabled":` +
-			strconv.FormatBool(enabled) + `,"managed_settings":` + managed + `,"telemetry":{"enabled":false,"drop_attributes":` + drop + `}}}}}}`
-	}
-	put := func(name, b string, bypassed bool, want int) {
-		t.Helper()
-		c := putConfigCtx(b)
-		if bypassed {
-			c.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-		}
-		h.updateConfig(c)
-		require.Equal(t, want, c.Response.StatusCode(), name+": "+string(c.Response.Body()))
-	}
-	gateway := func() *configtables.ClaudeCodeGatewayConfig {
-		return cfg.ClientConfig.OAuth2ServerConfig.ClaudeCodeGateway()
-	}
-	stored := body(true, `{"model":"opus"}`, `["prompt"]`)
-	put("admin stores the gateway", stored, false, fasthttp.StatusOK)
-
-	put("resent unchanged", stored, true, fasthttp.StatusOK)
-	put("managed settings changed", body(true, `{"model":"opus","env":{"ANTHROPIC_BASE_URL":"https://attacker.example.com"}}`, `["prompt"]`), true, fasthttp.StatusForbidden)
-	put("dropped attribute removed", body(true, `{"model":"opus"}`, `[]`), true, fasthttp.StatusForbidden)
-	assert.Equal(t, map[string]any{"model": "opus"}, gateway().ManagedSettings)
-	assert.Equal(t, []string{"prompt"}, gateway().Telemetry.DropAttributes)
-
-	put("switched off", body(false, `{"model":"opus"}`, `["prompt"]`), true, fasthttp.StatusOK)
-	put("switched back on", stored, true, fasthttp.StatusForbidden)
-	assert.False(t, gateway().Enabled)
 }
 
 // entity_access_profile_mode is copied only when sent, so a partial save keeps the stored mode,
@@ -994,122 +664,10 @@ func TestUpdateConfig_EntityAccessProfileMode(t *testing.T) {
 	assert.Equal(t, configtables.EntityAccessProfileModeUnion, stored())
 }
 
-// TestUpdateConfig_MCPOAuthPrivateAllowlist pins how PUT /api/config handles
-// mcp_oauth_private_allowlist: an authenticated admin sets it and it is
-// persisted; an omitted field keeps it; a caller admitted with auth bypassed
-// may resend the current value (the dashboard saves the whole client config)
-// but not change it; entries the policy can never honor are refused.
-func TestUpdateConfig_MCPOAuthPrivateAllowlist(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	persistedAllowlist := func() []string {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted.MCPOAuthPrivateAllowlist
-	}
-
-	set := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":["localhost","127.0.0.1","10.0.0.0/8"]}}`)
-	h.updateConfig(set)
-	require.Equal(t, fasthttp.StatusOK, set.Response.StatusCode(), string(set.Response.Body()))
-	want := []string{"localhost", "127.0.0.1", "10.0.0.0/8"}
-	assert.Equal(t, want, cfg.ClientConfig.MCPOAuthPrivateAllowlist)
-	assert.Equal(t, want, persistedAllowlist())
-
-	omitted := putConfigCtx(`{"client_config":{"log_retention_days":8}}`)
-	omitted.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-	h.updateConfig(omitted)
-	require.Equal(t, fasthttp.StatusOK, omitted.Response.StatusCode(), string(omitted.Response.Body()))
-	assert.Equal(t, want, persistedAllowlist(), "an omitted allowlist must be kept")
-
-	resent := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":["localhost","127.0.0.1","10.0.0.0/8"]}}`)
-	resent.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-	h.updateConfig(resent)
-	require.Equal(t, fasthttp.StatusOK, resent.Response.StatusCode(), string(resent.Response.Body()))
-
-	for _, body := range []string{
-		`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":["localhost","192.168.0.0/16"]}}`,
-		`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":[]}}`,
-	} {
-		changed := putConfigCtx(body)
-		changed.SetUserValue(schemas.BifrostContextKeyAuthBypassed, true)
-		h.updateConfig(changed)
-		require.Equal(t, fasthttp.StatusForbidden, changed.Response.StatusCode(), string(changed.Response.Body()))
-		assert.Contains(t, string(changed.Response.Body()), "mcp_oauth_private_allowlist requires an authenticated admin session")
-		assert.Equal(t, want, persistedAllowlist(), "an auth-bypassed caller must not change the allowlist")
-	}
-
-	for _, entry := range []string{"169.254.169.254", "0.0.0.0/0", "metadata.google.internal", "http://localhost:3000"} {
-		invalid := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":["` + entry + `"]}}`)
-		h.updateConfig(invalid)
-		require.Equal(t, fasthttp.StatusBadRequest, invalid.Response.StatusCode(), entry+": "+string(invalid.Response.Body()))
-		assert.Equal(t, want, persistedAllowlist())
-	}
-
-	cleared := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":[]}}`)
-	h.updateConfig(cleared)
-	require.Equal(t, fasthttp.StatusOK, cleared.Response.StatusCode(), string(cleared.Response.Body()))
-	assert.Empty(t, persistedAllowlist())
-}
-
-// failingReloadConfigManager fails the post-save reload, as a config store read
-// error would.
-type failingReloadConfigManager struct{ stubConfigManager }
-
-func (failingReloadConfigManager) ReloadClientConfigFromConfigStore(context.Context) error {
-	return errors.New("config store read failed")
-}
-
-// TestUpdateConfig_MCPOAuthPrivateAllowlistRemovalSurvivesFailedReload pins
-// that a saved allowlist removal takes effect even when the reload after the
-// save fails: the OAuth chain must stop reaching the removed host rather than
-// keep the old list until a later reload succeeds.
-func TestUpdateConfig_MCPOAuthPrivateAllowlistRemovalSurvivesFailedReload(t *testing.T) {
-	SetLogger(&mockLogger{})
-	oauth2.SetDiscoveryDialContextForTests(nil)
-	t.Cleanup(func() {
-		oauth2.SetDiscoveryDialContextForTests((&net.Dialer{}).DialContext)
-		require.NoError(t, lib.ApplyMCPOAuthPrivateAllowlist(nil))
-	})
-
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	cfg.ClientConfig.MCPOAuthPrivateAllowlist = []string{"127.0.0.1"}
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	require.NoError(t, lib.ApplyMCPOAuthPrivateAllowlist(cfg.ClientConfig.MCPOAuthPrivateAllowlist))
-
-	h := &ConfigHandler{store: cfg, configManager: failingReloadConfigManager{}}
-	removal := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_oauth_private_allowlist":[]}}`)
-	h.updateConfig(removal)
-	require.Equal(t, fasthttp.StatusInternalServerError, removal.Response.StatusCode(), string(removal.Response.Body()))
-	persisted, err := store.GetClientConfig(bgCtx())
-	require.NoError(t, err)
-	require.Empty(t, persisted.MCPOAuthPrivateAllowlist, "the removal is saved before the reload runs")
-
-	server := newLoopbackOAuthMCPServer(t)
-	provider := oauth2.NewOAuth2Provider(store, bifrost.NewDefaultLogger(schemas.LogLevelError))
-	mcpCfg := &lib.Config{ConfigStore: store, ClientConfig: &configstore.ClientConfig{}, OAuthProvider: provider}
-	mh := &MCPHandler{store: mcpCfg, mcpManager: failingMCPManager{}, oauthHandler: NewOAuthHandler(provider, nil, mcpCfg, nil)}
-	var req fasthttp.Request
-	req.Header.SetMethod(fasthttp.MethodPost)
-	req.Header.SetContentType("application/json")
-	req.Header.SetHost("bifrost.example.com")
-	req.SetBodyString(`{"name":"local_oauth","connection_type":"http","connection_string":"` + server.URL + `/mcp","auth_type":"oauth","oauth_config":{}}`)
-	add := initCtx(&req)
-	mh.addMCPClient(add)
-
-	body := string(add.Response.Body())
-	require.Equal(t, fasthttp.StatusBadRequest, add.Response.StatusCode(), "a host removed from the saved allowlist must not stay reachable: %s", body)
-	assert.Contains(t, body, "blocked connection to non-public address")
-}
-
 // TestUpdateConfig_EmptyDatasheetURLsResetToDefaults pins the regression where
 // PUT /api/config rejected an empty pricing_url with "URL cannot be empty".
 // The custom pricing page sends "" when the user clears the field; an empty
-// pricing_url, model_parameters_url or mcp_library_url means "use the built-in URL".
+// pricing_url or model_parameters_url means "use the built-in URL".
 func TestUpdateConfig_EmptyDatasheetURLsResetToDefaults(t *testing.T) {
 	// The datasheet server below is loopback-bound; the accessibility check refuses loopback
 	// by default, so route its dial through a plain dialer for this test only.
@@ -1125,58 +683,28 @@ func TestUpdateConfig_EmptyDatasheetURLsResetToDefaults(t *testing.T) {
 	// are refused over the API (TestUpdateConfig_RejectsFileURLsOverAPI).
 	customURL := newDatasheetServer(t).URL
 
-	save := func(t *testing.T, pricingURL, modelParamsURL, mcpLibraryURL string) {
+	save := func(t *testing.T, pricingURL, modelParamsURL string) {
 		t.Helper()
-		ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"framework_config":{"pricing_url":"` + pricingURL + `","model_parameters_url":"` + modelParamsURL + `","mcp_library_url":"` + mcpLibraryURL + `"}}`)
+		ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"framework_config":{"pricing_url":"` + pricingURL + `","model_parameters_url":"` + modelParamsURL + `"}}`)
 		h.updateConfig(ctx)
 		require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
 	}
 
-	save(t, customURL, customURL, customURL)
+	save(t, customURL, customURL)
 	persisted, err := store.GetFrameworkConfig(bgCtx())
 	require.NoError(t, err)
 	require.NotNil(t, persisted)
 	assert.Equal(t, customURL, *persisted.PricingURL)
 	assert.Equal(t, customURL, *persisted.ModelParametersURL)
-	assert.Equal(t, customURL, *persisted.MCPLibraryURL)
 
-	save(t, "", "", "")
+	save(t, "", "")
 	persisted, err = store.GetFrameworkConfig(bgCtx())
 	require.NoError(t, err)
 	require.NotNil(t, persisted)
 	assert.Equal(t, modelcatalog.DefaultPricingURL, *persisted.PricingURL, "empty pricing_url must reset to the default")
 	assert.Equal(t, modelcatalog.DefaultModelParametersURL, *persisted.ModelParametersURL, "empty model_parameters_url must reset to the default")
-	assert.Equal(t, modelcatalog.DefaultMCPLibraryURL, *persisted.MCPLibraryURL, "empty mcp_library_url must reset to the default")
 	assert.Equal(t, modelcatalog.DefaultPricingURL, *cfg.FrameworkConfig.Pricing.PricingURL)
 	assert.Equal(t, modelcatalog.DefaultModelParametersURL, *cfg.FrameworkConfig.Pricing.ModelParametersURL)
-	assert.Equal(t, modelcatalog.DefaultMCPLibraryURL, *cfg.FrameworkConfig.Pricing.MCPLibraryURL)
-}
-
-// TestUpdateConfig_MCPLibrarySyncInterval pins /api/config to the config.json
-// contract for mcp_library_sync_interval: 0 (sync disabled) or at least 3600
-// seconds. Anything else is refused rather than stored.
-func TestUpdateConfig_MCPLibrarySyncInterval(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	put := func(seconds int64) *fasthttp.RequestCtx {
-		ctx := putConfigCtx(fmt.Sprintf(`{"client_config":{"log_retention_days":7},"framework_config":{"mcp_library_sync_interval":%d}}`, seconds))
-		h.updateConfig(ctx)
-		return ctx
-	}
-	for _, seconds := range []int64{0, modelcatalog.MinimumPricingSyncIntervalSec, 86400} {
-		ctx := put(seconds)
-		require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), "%d seconds: %s", seconds, ctx.Response.Body())
-		persisted, err := store.GetFrameworkConfig(bgCtx())
-		require.NoError(t, err)
-		require.NotNil(t, persisted.MCPLibrarySyncInterval)
-		assert.Equal(t, seconds, *persisted.MCPLibrarySyncInterval)
-	}
-	for _, seconds := range []int64{-1, 1, modelcatalog.MinimumPricingSyncIntervalSec - 1} {
-		ctx := put(seconds)
-		assert.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode(), "%d seconds: %s", seconds, ctx.Response.Body())
-	}
 }
 
 // failingFrameworkConfigStore makes the framework config write fail while every
@@ -1284,23 +812,6 @@ func TestUpdateProxyConfig_InterceptionGuardWhenAuthBypassed(t *testing.T) {
 			}
 		})
 	}
-}
-
-// A per-server cap larger than the total it must fit inside can never be satisfied, so it is
-// rejected rather than stored and silently clamped later.
-func TestValidateMCPInstructionCaps(t *testing.T) {
-	assert.NoError(t, validateMCPInstructionCaps(0, 0), "0/0 means use the built-in defaults")
-	assert.NoError(t, validateMCPInstructionCaps(4096, 16384))
-	assert.NoError(t, validateMCPInstructionCaps(0, 2048), "a total alone is fine")
-	assert.NoError(t, validateMCPInstructionCaps(2048, 0), "a per-client cap alone is fine")
-
-	assert.Error(t, validateMCPInstructionCaps(-1, 0))
-	assert.Error(t, validateMCPInstructionCaps(0, -1))
-	assert.Error(t, validateMCPInstructionCaps(1<<21, 0), "a cap in the megabytes is a typo")
-	assert.Error(t, validateMCPInstructionCaps(0, 1<<21))
-	err := validateMCPInstructionCaps(20000, 16384)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "must not exceed")
 }
 
 // newDatasheetServer serves an empty JSON datasheet on loopback.
@@ -1426,31 +937,7 @@ func TestCheckURLAccessibility_DoesNotReflectTransportErrors(t *testing.T) {
 	assert.Equal(t, "url is not reachable", err.Error())
 }
 
-// TestUpdateConfig_RejectsOAuthModeWithoutIssuerURL pins the HTTP side of the issuer_url
-// rule the OpenAPI description states: enabling issuance over PUT /api/config without a
-// pinned issuer is refused with 400 and names the field. The startup side (a config.json
-// doing the same fails validation at boot) is pinned by
-// TestLoadConfig_OAuthDiscoveryWithoutIssuerURLFailsBoot in lib.
-func TestUpdateConfig_RejectsOAuthModeWithoutIssuerURL(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	// The shared fixture pins an issuer so the issuance tests clear this rule; this test is
-	// about the rule itself, so start from a headers-mode config with no issuer stored.
-	cfg.ClientConfig.OAuth2ServerConfig = nil
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-
-	for _, mode := range []string{"both", "oauth"} {
-		t.Run(mode, func(t *testing.T) {
-			ctx := putConfigCtx(`{"client_config":{"log_retention_days":7,"mcp_server_auth_mode":"` + mode + `"}}`)
-			h.updateConfig(ctx)
-			require.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-			assert.Contains(t, string(ctx.Response.Body()), "issuer_url")
-		})
-	}
-}
-
-// TestUpdateConfig_RejectsFileURLsOverAPI pins the API-side rule for all three
+// TestUpdateConfig_RejectsFileURLsOverAPI pins the API-side rule for both
 // catalog URLs: PUT /api/config answers 400 and persists nothing.
 func TestUpdateConfig_RejectsFileURLsOverAPI(t *testing.T) {
 	SetLogger(&mockLogger{})
@@ -1458,7 +945,7 @@ func TestUpdateConfig_RejectsFileURLsOverAPI(t *testing.T) {
 	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
-	for _, field := range []string{"pricing_url", "model_parameters_url", "mcp_library_url"} {
+	for _, field := range []string{"pricing_url", "model_parameters_url"} {
 		t.Run(field, func(t *testing.T) {
 			ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"framework_config":{"` + field + `":"file:///etc/hostname"}}`)
 			h.updateConfig(ctx)
@@ -1469,7 +956,7 @@ func TestUpdateConfig_RejectsFileURLsOverAPI(t *testing.T) {
 	persisted, err := store.GetFrameworkConfig(bgCtx())
 	require.NoError(t, err)
 	if persisted != nil {
-		for _, got := range []*string{persisted.PricingURL, persisted.ModelParametersURL, persisted.MCPLibraryURL} {
+		for _, got := range []*string{persisted.PricingURL, persisted.ModelParametersURL} {
 			if got != nil {
 				assert.NotContains(t, *got, "file://")
 			}
@@ -1492,7 +979,7 @@ func TestUpdateConfig_UnchangedFileURLsPassOverAPI(t *testing.T) {
 	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
-	for _, field := range []string{"pricing_url", "model_parameters_url", "mcp_library_url"} {
+	for _, field := range []string{"pricing_url", "model_parameters_url"} {
 		t.Run(field, func(t *testing.T) {
 			ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"framework_config":{"` + field + `":"` + stored + `"}}`)
 			h.updateConfig(ctx)
@@ -1687,80 +1174,6 @@ func TestUpdateConfig_FirstAdminStillRequiresSetupToken(t *testing.T) {
 	}
 }
 
-// recordingToolManagerConfig records the code mode limits handed to the MCP hot reload.
-type recordingToolManagerConfig struct {
-	stubConfigManager
-	calls  int
-	limits *schemas.MCPCodeModeLimits
-}
-
-func (r *recordingToolManagerConfig) UpdateMCPToolManagerConfig(_ context.Context, _ int, _ int, _ string, _ bool, _ int, _ int, limits *schemas.MCPCodeModeLimits) error {
-	r.calls++
-	r.limits = limits
-	return nil
-}
-
-func TestUpdateConfig_MCPCodeModeLimits(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	cfg.MCPConfig = &schemas.MCPConfig{}
-	recorder := &recordingToolManagerConfig{}
-	h := &ConfigHandler{store: cfg, configManager: recorder}
-
-	save := func(t *testing.T, limitsJSON string) *fasthttp.RequestCtx {
-		t.Helper()
-		body := `{"client_config":{"log_retention_days":7}}`
-		if limitsJSON != "" {
-			body = `{"client_config":{"log_retention_days":7,"mcp_code_mode_limits":` + limitsJSON + `}}`
-		}
-		ctx := putConfigCtx(body)
-		h.updateConfig(ctx)
-		return ctx
-	}
-	persisted := func(t *testing.T) *schemas.MCPCodeModeLimits {
-		t.Helper()
-		stored, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return stored.MCPCodeModeLimits
-	}
-	limits := &schemas.MCPCodeModeLimits{MaxSteps: 5_000_000, MaxToolCalls: 500}
-
-	ctx := save(t, `{"max_steps":5000000,"max_tool_calls":500}`)
-	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	assert.Equal(t, limits, persisted(t), "limits must persist")
-	assert.Equal(t, limits, cfg.ClientConfig.MCPCodeModeLimits, "limits must apply in memory")
-	assert.Equal(t, limits, cfg.MCPConfig.ToolManagerConfig.CodeModeLimits, "the in-memory MCP config must carry the limits")
-	assert.Equal(t, limits, recorder.limits, "limits must be hot-reloaded")
-
-	calls := recorder.calls
-	ctx = save(t, "")
-	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	assert.Equal(t, limits, persisted(t), "an update that omits the limits must keep them")
-	assert.Equal(t, calls, recorder.calls, "an update that omits the limits must not reload")
-
-	for _, invalid := range []string{`{"max_steps":-1}`, `{"max_nesting_depth":5000}`, `{"max_value_bytes":10}`} {
-		ctx = save(t, invalid)
-		require.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode(), "%s: %s", invalid, ctx.Response.Body())
-		assert.Equal(t, limits, persisted(t), "rejected limits %s must not persist", invalid)
-	}
-
-	// A save rejected after the MCP section must not have reloaded or published the limits.
-	calls = recorder.calls
-	ctx = putConfigCtx(`{"client_config":{"log_retention_days":0,"mcp_code_mode_limits":{"max_tool_calls":7}}}`)
-	h.updateConfig(ctx)
-	require.Equal(t, fasthttp.StatusBadRequest, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	assert.Equal(t, calls, recorder.calls, "a rejected save must not hot-reload the limits")
-	assert.Equal(t, limits, recorder.limits, "a rejected save must leave the runtime limits alone")
-	assert.Equal(t, limits, cfg.MCPConfig.ToolManagerConfig.CodeModeLimits, "a rejected save must leave the in-memory MCP config alone")
-	assert.Equal(t, limits, persisted(t), "a rejected save must not persist")
-
-	ctx = save(t, `{}`)
-	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	assert.Equal(t, &schemas.MCPCodeModeLimits{}, persisted(t), "empty limits must reset to the defaults")
-	assert.Equal(t, &schemas.MCPCodeModeLimits{}, recorder.limits, "the reset must be hot-reloaded")
-}
-
 // recordingCompatConfigManager records compat plugin reloads and removals.
 type recordingCompatConfigManager struct {
 	stubConfigManager
@@ -1927,50 +1340,6 @@ func TestUpdateConfig_SkillsExternalClientURLPresence(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, persisted.SkillsExternalClientURL)
 	assert.Empty(t, persisted.SkillsExternalClientURL.GetValue())
-}
-
-// TestUpdateConfig_MCPClientMetadataURL pins persistence, partial-update semantics, and validation of the
-// hosted Client ID Metadata Document URL.
-func TestUpdateConfig_MCPClientMetadataURL(t *testing.T) {
-	SetLogger(&mockLogger{})
-	const hosted = "https://public.example.com/bifrost/client.json"
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-
-	set := putConfigCtx(fmt.Sprintf(`{"client_config":{"log_retention_days":8,"mcp_client_metadata_url":%q}}`, hosted))
-	h.updateConfig(set)
-	require.Equal(t, fasthttp.StatusOK, set.Response.StatusCode(), string(set.Response.Body()))
-	assert.Equal(t, hosted, cfg.GetMCPClientMetadataURL())
-	persisted, err := store.GetClientConfig(bgCtx())
-	require.NoError(t, err)
-	require.NotNil(t, persisted.MCPClientMetadataURL)
-	assert.Equal(t, hosted, persisted.MCPClientMetadataURL.GetValue())
-
-	omitted := putConfigCtx(`{"client_config":{"log_retention_days":8}}`)
-	h.updateConfig(omitted)
-	require.Equal(t, fasthttp.StatusOK, omitted.Response.StatusCode(), string(omitted.Response.Body()))
-	assert.Equal(t, hosted, cfg.GetMCPClientMetadataURL(), "an omitted field keeps the stored URL")
-
-	// The accepted shapes are tabled in lib's TestMCPClientMetadataURLPolicy; here, a refusal is a 400 that
-	// names the setting, does not echo the value, and leaves the stored URL.
-	rejected := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_client_metadata_url":"https://public.example.com/client.json?v=1"}}`)
-	h.updateConfig(rejected)
-	require.Equal(t, fasthttp.StatusBadRequest, rejected.Response.StatusCode())
-	require.Contains(t, string(rejected.Response.Body()), "mcp_client_metadata_url")
-	require.NotContains(t, string(rejected.Response.Body()), "client.json?v=1")
-	assert.Equal(t, hosted, cfg.GetMCPClientMetadataURL(), "a rejected value leaves the stored URL")
-
-	// Checked before the skills URL, which the provider harness relies on to stay red without writing.
-	both := putConfigCtx(`{"client_config":{"mcp_client_metadata_url":"https://public.example.invalid/client.json?v=1","skills_external_client_url":"https://skills.example.invalid?token=refused"}}`)
-	h.updateConfig(both)
-	require.Equal(t, fasthttp.StatusBadRequest, both.Response.StatusCode())
-	require.Contains(t, string(both.Response.Body()), "mcp_client_metadata_url")
-
-	cleared := putConfigCtx(`{"client_config":{"log_retention_days":8,"mcp_client_metadata_url":null}}`)
-	h.updateConfig(cleared)
-	require.Equal(t, fasthttp.StatusOK, cleared.Response.StatusCode(), string(cleared.Response.Body()))
-	assert.Empty(t, cfg.GetMCPClientMetadataURL())
 }
 
 // TestUpdateConfigRejectsPrivateSkillsURLComponents prevents public catalogs from exposing URL credentials.
@@ -2162,4 +1531,34 @@ func TestUpdateProxyConfig_ErrorsDoNotEchoURLPassword(t *testing.T) {
 			assert.NotContains(t, string(put.Response.Body()), "s3cret", "the 400 must not quote the stored password")
 		})
 	}
+}
+
+// TestUpdateConfig_ConcurrentSavesAreSerialized pins that overlapping config saves each
+// succeed: updateConfig serializes them from snapshot through publication.
+func TestUpdateConfig_ConcurrentSavesAreSerialized(t *testing.T) {
+	SetLogger(&mockLogger{})
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
+	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var failures []string
+	for _, days := range []string{"7", "9"} {
+		wg.Add(1)
+		go func(days string) {
+			defer wg.Done()
+			for i := 0; i < 10; i++ {
+				ctx := putConfigCtx(`{"client_config":{"log_retention_days":` + days + `}}`)
+				h.updateConfig(ctx)
+				if ctx.Response.StatusCode() != fasthttp.StatusOK {
+					mu.Lock()
+					failures = append(failures, string(ctx.Response.Body()))
+					mu.Unlock()
+				}
+			}
+		}(days)
+	}
+	wg.Wait()
+	require.Empty(t, failures, "overlapping saves must each succeed")
 }

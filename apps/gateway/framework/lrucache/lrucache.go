@@ -18,10 +18,6 @@
 //   - An optional secondary index maps a caller-chosen string (typically a
 //     row's primary key) to the cache key holding it, so write paths that
 //     only know the row identity can evict without recomputing the key.
-//   - An optional validator runs on every hit; an entry it rejects is
-//     removed and reported as a miss, so callers fall through to their full
-//     load path (used, for example, to treat expired credentials as misses
-//     while keeping all expiry policy in the caller).
 //
 // The cache owns its own locking and never holds a lock across a loader
 // call, so loaders are free to perform database reads or network I/O. It
@@ -64,11 +60,6 @@ type entry[V any] struct {
 	key      string
 	indexKey string
 	value    V
-	// version increments on every in-place value update (setIfGeneration's
-	// existing-entry branch). An update reuses the same *list.Element, so
-	// element identity alone can't distinguish "still the value I read" from
-	// "replaced since I read it" — version closes that gap. See Get's use.
-	version uint64
 }
 
 // Cache is a bounded LRU cache with single-flight fills. Construct with New;
@@ -83,88 +74,41 @@ type Cache[V any] struct {
 	// generation increments on every explicit eviction or flush; see the
 	// package doc for the fill-race guarantee it provides.
 	generation uint64
-	// validator, when non-nil, is consulted on every hit; entries it
-	// rejects are removed and reported as misses.
-	validator func(V) bool
 
 	inflightMu sync.Mutex
 	inflight   map[string]*inflightCall[V]
 }
 
-// Option configures a Cache at construction time.
-type Option[V any] func(*Cache[V])
-
-// WithValidator installs a hit-time validity check: entries for which valid
-// returns false are removed and reported as misses.
-func WithValidator[V any](valid func(V) bool) Option[V] {
-	return func(c *Cache[V]) {
-		c.validator = valid
-	}
-}
-
 // New constructs a Cache bounded to capacity entries. A non-positive
 // capacity panics: the bound is part of the type's contract, and silently
 // defaulting it would hide a caller bug.
-func New[V any](capacity int, opts ...Option[V]) *Cache[V] {
+func New[V any](capacity int) *Cache[V] {
 	if capacity <= 0 {
 		panic("lrucache: capacity must be positive")
 	}
-	c := &Cache[V]{
+	return &Cache[V]{
 		capacity: capacity,
 		items:    make(map[string]*list.Element),
 		order:    list.New(),
 		byIndex:  make(map[string]string),
 		inflight: make(map[string]*inflightCall[V]),
 	}
-	for _, opt := range opts {
-		opt(c)
-	}
-	return c
 }
 
-// Get returns the cached value for key. An entry rejected by the validator
-// is removed and reported as a miss.
+// Get returns the cached value for key.
 func (c *Cache[V]) Get(key string) (V, bool) {
 	var zero V
 	if c == nil {
 		return zero, false
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	elem, ok := c.items[key]
 	if !ok {
-		c.mu.Unlock()
 		return zero, false
 	}
-	ent := elem.Value.(*entry[V])
-	value := ent.value
-	version := ent.version
-	validator := c.validator
-	c.mu.Unlock()
-
-	// validator runs without c.mu held: it's caller code and may re-enter
-	// the cache (e.g. call Len()), which would deadlock on this
-	// non-reentrant mutex if still held here. Re-check the entry is still
-	// the same one — by *list.Element identity AND version — before acting
-	// on it. Identity alone isn't enough: setIfGeneration's existing-entry
-	// branch updates ent.value in place on the same element, so a
-	// concurrent Fill installing a fresh value between the unlock above and
-	// this re-lock would otherwise look unchanged, and this validator's
-	// verdict on the stale value we already read could wrongly evict it.
-	if validator != nil && !validator(value) {
-		c.mu.Lock()
-		if cur, ok := c.items[key]; ok && cur == elem && cur.Value.(*entry[V]).version == version {
-			c.removeLocked(cur)
-		}
-		c.mu.Unlock()
-		return zero, false
-	}
-
-	c.mu.Lock()
-	if cur, ok := c.items[key]; ok && cur == elem {
-		c.order.MoveToFront(cur)
-	}
-	c.mu.Unlock()
-	return value, true
+	c.order.MoveToFront(elem)
+	return elem.Value.(*entry[V]).value, true
 }
 
 // Fill runs load for key with single-flight deduplication: concurrent
@@ -255,7 +199,6 @@ func (c *Cache[V]) setIfGeneration(key, indexKey string, value V, gen uint64) {
 		}
 		ent.value = value
 		ent.indexKey = indexKey
-		ent.version++
 		if indexKey != "" {
 			c.evictIndexOwnerLocked(indexKey, key)
 			c.byIndex[indexKey] = key
@@ -365,8 +308,9 @@ func (c *Cache[V]) EvictWhere(pred func(key string) bool) {
 	}
 	c.mu.Unlock()
 
-	// pred runs without c.mu held, for the same re-entrancy reason as
-	// Get's validator call above.
+	// pred runs without c.mu held: it's caller code and may re-enter the
+	// cache (e.g. call Len()), which would deadlock on this non-reentrant
+	// mutex if still held here.
 	var toRemove []string
 	for _, key := range keys {
 		if pred(key) {
@@ -408,15 +352,15 @@ func (c *Cache[V]) Len() int {
 
 // EncodeKey builds a collision-free composite cache key from parts, for
 // callers whose key is a tuple of caller-controlled strings (e.g.
-// (auth mode, identity, mcp client ID) — identity is frequently a
+// (auth mode, identity) — identity is frequently a
 // caller-asserted string with no charset restriction). A naive
 // separator-joined key lets one part's content forge a boundary — e.g.
 // join("\x00", "a\x00b", "c") and join("\x00", "a", "b\x00c") would build
 // the identical string, aliasing two distinct tuples onto one cache entry
 // and skewing any eviction predicate that parses the key back apart.
 // Length-prefixing each part makes that forgery impossible regardless of
-// what bytes a part contains. Pair with DecodeKey to parse it back. The key
-// is built in one allocation of its exact size.
+// what bytes a part contains. The key is built in one allocation of its exact
+// size.
 func EncodeKey(parts ...string) string {
 	size := 0
 	for _, p := range parts {
@@ -442,37 +386,4 @@ func decimalLen(n int) int {
 		digits++
 	}
 	return digits
-}
-
-// DecodeKey is EncodeKey's inverse: it parses exactly n length-prefixed
-// parts out of key, in the order EncodeKey wrote them. ok is false for a
-// key that isn't in the length-prefixed form EncodeKey builds for n parts
-// (impossible for keys a well-behaved caller produces with EncodeKey).
-func DecodeKey(key string, n int) (parts []string, ok bool) {
-	if n < 0 {
-		return nil, false
-	}
-	rest := key
-	parts = make([]string, 0, n)
-	for range n {
-		i := strings.IndexByte(rest, ':')
-		if i < 0 {
-			return nil, false
-		}
-		lengthText := rest[:i]
-		length, err := strconv.Atoi(lengthText)
-		if err != nil || length < 0 || strconv.Itoa(length) != lengthText {
-			return nil, false
-		}
-		rest = rest[i+1:]
-		if length > len(rest) {
-			return nil, false
-		}
-		parts = append(parts, rest[:length])
-		rest = rest[length:]
-	}
-	if rest != "" {
-		return nil, false
-	}
-	return parts, true
 }

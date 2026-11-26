@@ -2117,7 +2117,7 @@ func ensureMultiTeamBusinessUnitGINIndexes(ctx context.Context, conn *sql.Conn) 
 }
 
 // migrationAddDashboardEnhancements adds cached_read_tokens column to logs table.
-// The expensive backfill, covering index rebuild, and MCP index creation are deferred
+// The expensive backfill and covering index rebuild are deferred
 // to ensureDashboardEnhancements (called post-startup in a background goroutine) so
 // they do not block pod startup on large tables.
 func migrationAddDashboardEnhancements(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {

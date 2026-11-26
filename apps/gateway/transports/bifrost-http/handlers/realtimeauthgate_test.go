@@ -171,7 +171,6 @@ func (usableTestPermit) Name() string                              { return "tes
 func (usableTestPermit) IsActive() bool                            { return true }
 func (usableTestPermit) IsExpired() bool                           { return false }
 func (usableTestPermit) ProviderPermits() []schemas.ProviderPermit { return nil }
-func (usableTestPermit) MCPPermits() []schemas.MCPPermit           { return nil }
 func (usableTestPermit) AgentPermits() []string                    { return nil }
 func (usableTestPermit) AllowsAllProviders() bool                  { return true }
 func (usableTestPermit) RelayPermits() []string                    { return nil }

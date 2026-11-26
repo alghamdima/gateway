@@ -38,11 +38,6 @@ func MarshalSorted(v interface{}) ([]byte, error) {
 	return sonic.ConfigStd.Marshal(v)
 }
 
-// MarshalSortedIndent encodes v to indented JSON with map keys sorted alphabetically.
-func MarshalSortedIndent(v interface{}, prefix, indent string) ([]byte, error) {
-	return sonic.ConfigStd.MarshalIndent(v, prefix, indent)
-}
-
 // ConvertViaJSON converts src to type T via JSON round-trip using sorted marshaling.
 // Use as fallback when direct type assertion fails (e.g., map[string]interface{} from JSON).
 func ConvertViaJSON[T any](src interface{}) (T, error) {

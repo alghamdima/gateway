@@ -86,7 +86,7 @@ func TestScalePostgresLogstoreMigrations(t *testing.T) {
 	stopMonitor()
 	monitorWG.Wait()
 
-	t.Logf("scale rows per table: %d", rows)
+	t.Logf("scale rows: %d", rows)
 	t.Logf("migration elapsed: %s", migrationElapsed)
 	t.Logf("index/background maintenance elapsed: %s", indexElapsed)
 	t.Logf("matview maintenance elapsed: %s", matviewElapsed)
@@ -119,7 +119,6 @@ func resetScaleMigrationDB(t *testing.T, ctx context.Context, db *gorm.DB) {
 	statements := []string{
 		"DROP MATERIALIZED VIEW IF EXISTS mv_logs_hourly CASCADE",
 		"DROP MATERIALIZED VIEW IF EXISTS mv_logs_filterdata CASCADE",
-		"DROP TABLE IF EXISTS mcp_tool_logs CASCADE",
 		"DROP TABLE IF EXISTS async_jobs CASCADE",
 		"DROP TABLE IF EXISTS logs CASCADE",
 		"CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)",
@@ -190,32 +189,11 @@ CREATE UNLOGGED TABLE logs (
 )`
 	require.NoError(t, db.WithContext(ctx).Exec(logsSQL).Error)
 
-	mcpSQL := `
-CREATE UNLOGGED TABLE mcp_tool_logs (
-	id VARCHAR(255) NOT NULL,
-	request_id VARCHAR(255),
-	llm_request_id VARCHAR(255),
-	timestamp TIMESTAMP NOT NULL,
-	tool_name VARCHAR(255) NOT NULL,
-	server_label VARCHAR(255),
-	virtual_key_id VARCHAR(255),
-	virtual_key_name VARCHAR(255),
-	arguments TEXT,
-	result TEXT,
-	error_details TEXT,
-	latency DOUBLE PRECISION,
-	cost DOUBLE PRECISION,
-	status VARCHAR(50) NOT NULL,
-	metadata TEXT,
-	has_object BOOLEAN DEFAULT FALSE,
-	created_at TIMESTAMP NOT NULL
-)`
-	require.NoError(t, db.WithContext(ctx).Exec(mcpSQL).Error)
 }
 
 func populateScaleMigrationTables(t *testing.T, ctx context.Context, db *gorm.DB, rows int) {
 	t.Helper()
-	t.Logf("populating %d logs and %d mcp_tool_logs rows", rows, rows)
+	t.Logf("populating %d logs rows", rows)
 	require.NoError(t, db.WithContext(ctx).Exec("SET synchronous_commit = off").Error)
 
 	insertLogsSQL := `
@@ -264,29 +242,6 @@ SELECT
 FROM generate_series(1, ?) AS gs`
 	require.NoError(t, db.WithContext(ctx).Exec(insertLogsSQL, rows).Error)
 
-	insertMCPSQL := `
-INSERT INTO mcp_tool_logs (
-	id, request_id, llm_request_id, timestamp, tool_name, server_label,
-	virtual_key_id, virtual_key_name, arguments, result, latency, cost, status, metadata, created_at
-)
-SELECT
-	'mcp-' || gs,
-	CASE WHEN gs % 2 = 0 THEN '' ELSE NULL END,
-	'log-' || gs,
-	NOW() - ((gs % 129600) * INTERVAL '1 minute'),
-	'tool-' || (gs % 250),
-	'server-' || (gs % 50),
-	'vk-' || (gs % 10000),
-	'vk-name-' || (gs % 10000),
-	'{"x":1}',
-	'{"ok":true}',
-	(gs % 5000)::DOUBLE PRECISION / 10.0,
-	(gs % 500)::DOUBLE PRECISION / 100000.0,
-	CASE WHEN gs % 19 = 0 THEN 'error' ELSE 'success' END,
-	'{"tenant":"scale"}',
-	NOW() - ((gs % 129600) * INTERVAL '1 minute')
-FROM generate_series(1, ?) AS gs`
-	require.NoError(t, db.WithContext(ctx).Exec(insertMCPSQL, rows).Error)
 }
 
 func createOldShapeScaleMatViews(t *testing.T, ctx context.Context, db *gorm.DB) {

@@ -333,14 +333,10 @@ func stripBasePath(ctx *fasthttp.RequestCtx, prefix []byte) bool {
 // prefixLocation puts prefix in front of the path of the response's Location
 // header when it points at this origin (a root-relative path, or an absolute
 // URL whose host is the request's Host) and is not already under prefix.
-// Protocol-relative and other-origin URLs are left alone, as is a Location the
-// handler marked with markLocationExternal.
+// Protocol-relative and other-origin URLs are left alone.
 func prefixLocation(ctx *fasthttp.RequestCtx, prefix []byte) {
 	loc := ctx.Response.Header.Peek(fasthttp.HeaderLocation)
 	if len(loc) == 0 {
-		return
-	}
-	if external, _ := ctx.UserValue(locationExternalKey).(bool); external {
 		return
 	}
 	var pathStart int
@@ -2775,16 +2771,4 @@ func AuthBypassedMiddleware(allowedOrigins, whitelistedRoutes []string) schemas.
 			next(ctx)
 		}
 	}
-}
-
-// locationExternalKey is the request user value a handler sets when its Location
-// header is a third party's URL that may share this host, such as an OAuth client's
-// redirect_uri, so prefixLocation leaves it alone.
-const locationExternalKey = "bf-location-external"
-
-// markLocationExternal records that the response's Location leaves Bifrost: the
-// base-path middleware will not pull it under server.base_path even when it is
-// root-relative or on this host.
-func markLocationExternal(ctx *fasthttp.RequestCtx) {
-	ctx.SetUserValue(locationExternalKey, true)
 }

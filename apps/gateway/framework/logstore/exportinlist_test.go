@@ -105,7 +105,6 @@ func TestRankingsExport_PreviousPeriodInListOverParamLimitPostgres(t *testing.T)
 	// Clean slate with no matviews, so every ranking takes the raw-table path
 	// that carries the previous-period id filter.
 	dropAllManagedMatViews(db)
-	require.NoError(t, db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS logs CASCADE").Error)
 	require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)

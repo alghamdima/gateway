@@ -70,21 +70,19 @@ Still not covered:
 
 Method: the gateway ran in a mount namespace whose `/etc/resolv.conf` pointed at a logging DNS stub that answers every name with an unroutable address, with no proxy variables set. Every hostname the process tried to resolve was recorded. This shows which hosts are contacted, not the full URLs; URLs are from the gateway's own log lines and the source.
 
-| Host                                                   | When                                   | Seen at runtime                        | Source                                       | Recommended disposition                                 |
-| ------------------------------------------------------ | -------------------------------------- | -------------------------------------- | -------------------------------------------- | ------------------------------------------------------- |
-| `getbifrost.ai/datasheet`                              | boot, then every 24 h                  | yes; fatal on first boot if it fails   | `framework/modelcatalog/datasheet`           | our host or a file shipped in the image (`pricing_url`) |
-| `getbifrost.ai/datasheet/model-parameters`             | boot                                   | yes (same host)                        | same                                         | our host or a file (`model_parameters_url`)             |
-| `getbifrost.ai/mcp-library`                            | boot, retried in the background        | yes; warning only                      | `framework/modelcatalog/mcp_library_sync.go` | off, or our host (`mcp_library_url`)                    |
-| each configured provider, for example `api.openai.com` | boot (model listing) and every request | yes, with a fake OpenAI key configured | provider config                              | expected; this is the product                           |
-| `getbifrost.ai/openapi-oss.json`                       | when `/v1/mcp` builds its tools        | no                                     | `openapi_url` default                        | our host or a file                                      |
-| `www.getbifrost.ai/announcements/rss.xml`              | not seen before login                  | no                                     | Go source                                    | off                                                     |
-| `www.getbifrost.ai/schema`                             | never fetched; only named in a warning | no                                     | config validator                             | rename only                                             |
+| Host                                                   | When                                   | Seen at runtime                        | Source                             | Recommended disposition                                 |
+| ------------------------------------------------------ | -------------------------------------- | -------------------------------------- | ---------------------------------- | ------------------------------------------------------- |
+| `getbifrost.ai/datasheet`                              | boot, then every 24 h                  | yes; fatal on first boot if it fails   | `framework/modelcatalog/datasheet` | our host or a file shipped in the image (`pricing_url`) |
+| `getbifrost.ai/datasheet/model-parameters`             | boot                                   | yes (same host)                        | same                               | our host or a file (`model_parameters_url`)             |
+| each configured provider, for example `api.openai.com` | boot (model listing) and every request | yes, with a fake OpenAI key configured | provider config                    | expected; this is the product                           |
+| `www.getbifrost.ai/announcements/rss.xml`              | not seen before login                  | no                                     | Go source                          | off                                                     |
+| `www.getbifrost.ai/schema`                             | never fetched; only named in a warning | no                                     | config validator                   | rename only                                             |
 
 Limits of this inventory: 45 s of a default boot, then a configured boot plus 75 s idle and the UI login page in a browser (which made no external request). Not exercised: the UI after login, a successful inference request, any plugin that is off by default (OTel, semantic cache, Maxim), and `framework/warp`. Those need an admin account and provider keys.
 
 ## Unit tests
 
-Run with `apps/gateway/scripts/test-baseline.sh` on the tree with patch `0003` applied. It builds the MCP test servers (`make setup-mcp-tests`), then executes `go test -json -count=1 -timeout 20m ./...` in each of the 14 `go.work` modules with no credentials and no network. The run took 11 minutes.
+Run with `apps/gateway/scripts/test-baseline.sh` on the tree with patch `0003` applied. It executes `go test -json -count=1 -timeout 20m ./...` in each of the 14 `go.work` modules with no credentials and no network. The run took 11 minutes.
 
 Every top-level test and its result is in [`gateway-baseline/results.tsv`](gateway-baseline/results.tsv) (module, package, test, result; 15,547 test rows and 122 package rows). Subtests are not listed separately: a parent fails if any subtest fails.
 

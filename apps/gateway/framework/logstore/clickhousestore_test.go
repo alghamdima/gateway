@@ -76,7 +76,7 @@ func chTestTargetIsDedicated(cfg *ClickHouseConfig, overridden bool) bool {
 func requireDedicatedClickHouseTestDB(t testing.TB, cfg *ClickHouseConfig) {
 	t.Helper()
 	if !chTestTargetIsDedicated(cfg, chTestOverridden()) {
-		t.Fatalf("refusing to run destructive ClickHouse tests against database %q: BIFROST_TEST_CLICKHOUSE_* overrides must point at a database whose name contains \"test\" (the suite truncates logs, mcp_tool_logs, agent_logs and async_jobs and rewrites their TTL)", cfg.Database.GetValue())
+		t.Fatalf("refusing to run destructive ClickHouse tests against database %q: BIFROST_TEST_CLICKHOUSE_* overrides must point at a database whose name contains \"test\" (the suite truncates logs and async_jobs and rewrites their TTL)", cfg.Database.GetValue())
 	}
 }
 
@@ -636,7 +636,7 @@ func BenchmarkChIDLookupContext(b *testing.B) {
 func TestClickHouseReconcileSkipIndexesMaterializesNewIndex(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	ctx := context.Background()
-	for _, idx := range []string{"idx_logs_id", "idx_logs_parent_request_id", "idx_mcp_logs_id"} {
+	for _, idx := range []string{"idx_logs_id", "idx_logs_parent_request_id"} {
 		var n int64
 		require.NoError(t, store.db.Raw("SELECT count() FROM system.data_skipping_indices WHERE database = currentDatabase() AND name = ?", idx).Scan(&n).Error)
 		assert.Equal(t, int64(1), n, "migration must create skip index %s", idx)
@@ -1123,7 +1123,7 @@ func TestClickHouseDeleteLogsBatchIsSingleLightweightMutation(t *testing.T) {
 }
 
 // TestClickHouseFlushIsLightweightAndSkipsWhenEmpty covers the minute sweep
-// from plugins/logging: LLM and MCP cleanup must use lightweight
+// from plugins/logging: log cleanup must use lightweight
 // deletes and must not issue any mutation when nothing is left to flush.
 func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	store := trySetupClickHouseStore(t)
@@ -1137,7 +1137,6 @@ func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	require.NoError(t, store.CreateIfNotExists(ctx, done))
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
-	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
 	since := time.Now().UTC().Add(-30 * time.Minute)
 	require.NoError(t, store.Flush(ctx, since))
 
@@ -1145,22 +1144,16 @@ func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotFound, "stale processing row must be flushed")
 	_, err = store.FindByID(ctx, "ch-flush-done")
 	assert.NoError(t, err, "completed rows must survive the flush")
-	assert.ErrorIs(t, err, ErrNotFound, "stale processing MCP row must be flushed")
 
 	logsCmds := chNewMutationCommands(t, store.db, "logs", logsBefore)
 	require.Len(t, logsCmds, 1, "logs: one flush must issue exactly one mutation, got %v", logsCmds)
 	assertLightweightMutations(t, "logs", logsCmds)
-	mcpCmds := chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore)
-	require.Len(t, mcpCmds, 1, "mcp_tool_logs: one flush must issue exactly one mutation, got %v", mcpCmds)
-	assertLightweightMutations(t, "mcp_tool_logs", mcpCmds)
 
 	// Nothing left to flush: the once-a-minute sweep must not touch the
-	// tables at all (the issue counted ~1,440 mutations per table per day).
+	// logs table at all (the issue counted ~1,440 mutations per table per day).
 	logsBefore = chMutationIDs(t, store.db, "logs")
-	mcpBefore = chMutationIDs(t, store.db, "mcp_tool_logs")
 	require.NoError(t, store.Flush(ctx, since))
 	assert.Empty(t, chNewMutationCommands(t, store.db, "logs", logsBefore), "empty flush must not issue a mutation")
-	assert.Empty(t, chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore), "empty flush must not issue a mutation")
 }
 
 // TestClickHouseFlushSkipsSupersededProcessingRow: a log created as processing
@@ -1175,16 +1168,13 @@ func TestClickHouseFlushSkipsSupersededProcessingRow(t *testing.T) {
 	require.NoError(t, store.Update(ctx, "ch-flush-superseded", map[string]interface{}{"status": "success"}))
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
-	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
 	since := time.Now().UTC().Add(-30 * time.Minute)
 	require.NoError(t, store.Flush(ctx, since))
 	assert.Empty(t, chNewMutationCommands(t, store.db, "logs", logsBefore), "superseded processing version must not trigger a flush mutation")
-	assert.Empty(t, chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore), "superseded processing version must not trigger a flush mutation")
 
 	found, err := store.FindByID(ctx, "ch-flush-superseded")
 	require.NoError(t, err)
 	assert.Equal(t, "success", found.Status)
-	require.NoError(t, err)
 }
 
 // TestClickHouseFinalAfterLightweightDelete proves the _row_exists mask left
@@ -1221,7 +1211,6 @@ func TestClickHouseFinalAfterLightweightDelete(t *testing.T) {
 	startMerges()
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
-	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
 	require.NoError(t, store.DeleteLog(ctx, "ch-final-1"))
 	require.NoError(t, store.DeleteLogs(ctx, []string{"ch-final-2", "ch-final-3"}))
 
@@ -1235,9 +1224,6 @@ func TestClickHouseFinalAfterLightweightDelete(t *testing.T) {
 	logsCmds := chNewMutationCommands(t, store.db, "logs", logsBefore)
 	require.Len(t, logsCmds, 2, "DeleteLog + DeleteLogs must issue one mutation each, got %v", logsCmds)
 	assertLightweightMutations(t, "logs", logsCmds)
-	mcpCmds := chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore)
-	require.Len(t, mcpCmds, 1, "DeleteMCPToolLogs must issue one mutation, got %v", mcpCmds)
-	assertLightweightMutations(t, "mcp_tool_logs", mcpCmds)
 }
 
 func chEngineFull(t *testing.T, db *gorm.DB, table string) string {

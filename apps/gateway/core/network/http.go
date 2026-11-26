@@ -493,13 +493,6 @@ func SetDefaultHTTPClientFactory(factory *HTTPClientFactory) {
 	defaultFactory.Store(factory)
 }
 
-// DefaultHTTPClientFactory returns the process's registered HTTP client factory, or nil
-// when none is registered, for code that needs one of its clients but was handed no
-// factory (e.g. identity providers constructed with only an *http.Client).
-func DefaultHTTPClientFactory() *HTTPClientFactory {
-	return defaultFactory.Load()
-}
-
 // DefaultTransport is the RoundTripper for outbound calls that have no factory of their
 // own to hand (OAuth discovery, catalog sync): the registered factory's transport while
 // the global proxy is on for purpose, and http.DefaultTransport itself otherwise (no
@@ -531,8 +524,8 @@ func (f *HTTPClientFactory) proxyEnabledFor(purpose ClientPurpose) bool {
 	return f.proxyURLForPurpose(purpose) != nil
 }
 
-// DefaultProxyFunc is a net/http Proxy func for transports built elsewhere (MCP clients,
-// OpenTelemetry exporters): the registered factory's global proxy for purpose, else
+// DefaultProxyFunc is a net/http Proxy func for transports built elsewhere (OpenTelemetry
+// exporters): the registered factory's global proxy for purpose, else
 // http.DefaultTransport's selector (the environment). It resolves the factory on every
 // request.
 func DefaultProxyFunc(purpose ClientPurpose) func(*http.Request) (*url.URL, error) {

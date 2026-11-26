@@ -74,7 +74,7 @@ var (
 )
 
 // noteConfigFileApplied records that LoadConfig synced a config.json section
-// over the stored copy. section is e.g. "client", "provider", "mcp_client".
+// over the stored copy. section is e.g. "client_config", "provider".
 func noteConfigFileApplied(section, targetID string) {
 	startupAuditMu.Lock()
 	defer startupAuditMu.Unlock()

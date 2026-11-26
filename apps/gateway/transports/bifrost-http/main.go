@@ -4,7 +4,6 @@
 // The HTTP service provides the following main endpoints:
 //   - /v1/completions: For text completion requests
 //   - /v1/chat/completions: For chat completion requests
-//   - /v1/mcp/tool/execute: For MCP tool execution requests
 //   - /providers/*: For provider configuration management
 //
 // Configuration is handled through a JSON config file, high-performance ConfigStore, and environment variables:

@@ -216,7 +216,7 @@ func TestAccess_AllowAllProviders(t *testing.T) {
 			{Provider: "openai", AllowedModels: []string{"*"}, BlacklistedModels: []string{"gpt-4o"}, KeyIDs: []string{"key-a"}},
 			// Restrictive, non-wildcard allowlist: allow-all must not open models it omits.
 			{Provider: "anthropic", AllowedModels: []string{"claude-3-5-sonnet"}},
-		}, nil, WithAllowAllProviders(true))
+		}, WithAllowAllProviders(true))
 	access := NewAccess(held(base), "", nil, "", nil)
 
 	// A provider with no permit is allowed for any model, with no key restriction.
@@ -258,7 +258,7 @@ func TestAccess_AllowsEveryModel(t *testing.T) {
 		ProviderPermits: []schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{"*"}, BlacklistedModels: []string{"gpt-4o"}}},
 	})
 	allowAll := NewPermit(PermitVirtualKey, "vk4", "Allow All", true, false,
-		[]schemas.ProviderPermit{{Provider: "anthropic", AllowedModels: []string{"claude-sonnet-4"}}}, nil, WithAllowAllProviders(true))
+		[]schemas.ProviderPermit{{Provider: "anthropic", AllowedModels: []string{"claude-sonnet-4"}}}, WithAllowAllProviders(true))
 
 	assert.True(t, NewAccess(held(wildcard), "", nil, "", nil).AllowsEveryModel("openai"))
 	assert.False(t, NewAccess(held(wildcard), "", nil, "", nil).AllowsEveryModel("anthropic"), "an unlisted provider is not granted at all")
@@ -1562,7 +1562,7 @@ func TestAccess_AliasTargetHeldToBlacklist(t *testing.T) {
 // reports every key.
 func TestAccess_KeyScopedMatcherAndAliasTargetsSeeThePermitsKeys(t *testing.T) {
 	keyed := func(pps ...schemas.ProviderPermit) *Permit {
-		return NewPermit(PermitVirtualKey, "vk1", "VK", true, false, pps, nil)
+		return NewPermit(PermitVirtualKey, "vk1", "VK", true, false, pps)
 	}
 	var seen [][]string
 	matcher := func(_, model string, allowed, keyIDs []string) bool {
@@ -1647,8 +1647,8 @@ func TestAccess_KeyScopedMatcherAndAliasTargetsSeeThePermitsKeys(t *testing.T) {
 
 func TestAccess_RestrictsKeys(t *testing.T) {
 	all := permitWithModels(PermitVirtualKey, "vk1", "VK", "bedrock", "*")
-	some := NewPermit(PermitVirtualKey, "vk2", "VK2", true, false, []schemas.ProviderPermit{{Provider: "bedrock", AllowedModels: []string{"*"}, KeyIDs: []string{"k1"}}}, nil)
-	none := NewPermit(PermitVirtualKey, "vk3", "VK3", true, false, []schemas.ProviderPermit{{Provider: "bedrock", AllowedModels: []string{"*"}, KeyIDs: []string{}}}, nil)
+	some := NewPermit(PermitVirtualKey, "vk2", "VK2", true, false, []schemas.ProviderPermit{{Provider: "bedrock", AllowedModels: []string{"*"}, KeyIDs: []string{"k1"}}})
+	none := NewPermit(PermitVirtualKey, "vk3", "VK3", true, false, []schemas.ProviderPermit{{Provider: "bedrock", AllowedModels: []string{"*"}, KeyIDs: []string{}}})
 	var nilAccess *Access
 	assert.False(t, nilAccess.RestrictsKeys("bedrock"))
 	assert.False(t, NewAccess(held(all), "", nil, "", nil).RestrictsKeys("bedrock"))
@@ -1853,7 +1853,7 @@ func TestAccessLevels_ProvidersAndBlacklists(t *testing.T) {
 	})
 
 	t.Run("a level that allows all providers caps nothing", func(t *testing.T) {
-		team := atLevel(NewPermit(PermitTeamAccessProfile, "t1", "Team", true, false, nil, nil, WithAllowAllProviders(true)), 1)
+		team := atLevel(NewPermit(PermitTeamAccessProfile, "t1", "Team", true, false, nil, WithAllowAllProviders(true)), 1)
 		access := NewAccess(held(caller, team), Intersect, nil, "", nil)
 		assert.True(t, access.IsModelAllowed("openai", "gpt-4o"))
 		assert.ElementsMatch(t, []string{"openai", "anthropic"}, access.GrantedProvidersForModel(""))
@@ -1875,7 +1875,7 @@ func TestAccessLevels_KeysAreNarrowed(t *testing.T) {
 			{Provider: "anthropic", AllowedModels: []string{"*"}, KeyIDs: []string{"key-team"}},
 		},
 	}), 1)
-	customer := atLevel(NewPermit(PermitCustomerAccessProfile, "c1", "Customer", true, false, nil, nil, WithAllowAllProviders(true)), 2)
+	customer := atLevel(NewPermit(PermitCustomerAccessProfile, "c1", "Customer", true, false, nil, WithAllowAllProviders(true)), 2)
 
 	access := NewAccess(held(caller, team, customer), Intersect, nil, "", nil)
 
@@ -2309,10 +2309,10 @@ func TestAccess_UnionCandidateHeldToBaseBlacklistOfAliasTarget(t *testing.T) {
 	}
 	base := NewPermit(PermitVirtualKey, "vk1", "VK", true, false, []schemas.ProviderPermit{{
 		Provider: "bedrock", AllowedModels: []string{"regex:^claude-.*"}, BlacklistedModels: []string{"claude-opus-4-6"}, KeyIDs: []string{"base-key"},
-	}}, nil)
+	}})
 	scoping := NewPermit("other", "o1", "Other", true, false, []schemas.ProviderPermit{{
 		Provider: "bedrock", AllowedModels: []string{"*"}, KeyIDs: []string{"scope-key"},
-	}}, nil)
+	}})
 	access := NewAccess(held(base), "", scoping, Union, allowAll).WithAliasTargets(bestToOpus)
 	for _, model := range []string{"best-model", "claude-opus-4-6"} {
 		assert.True(t, access.IsModelAllowed("bedrock", model), model)

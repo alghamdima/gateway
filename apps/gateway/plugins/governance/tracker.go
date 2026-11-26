@@ -281,9 +281,8 @@ func (t *UsageTracker) resetExpiredCounters(ctx context.Context) {
 // callers that carry no request id.
 //
 // All four components are load-bearing: the nonce alone is not enough because
-// MCP agent mode and codemode mint a fresh RequestID per nested inference call
-// while sharing one HTTP request (one nonce), and those nested calls must each
-// bill; RequestID+attempt alone is not enough because RequestID may be
+// nested inference calls can each carry a fresh RequestID while sharing one
+// HTTP request (one nonce), and those nested calls must each bill; RequestID+attempt alone is not enough because RequestID may be
 // caller-supplied (x-request-id) and two unrelated requests sharing a chosen
 // ID must not collide; and the attempt number restarts at 0 for every provider
 // in the fallback chain, so the fallback index tells a fallback's attempts from

@@ -93,11 +93,10 @@ func TestGithubCopilotSignInUsesGlobalProxy(t *testing.T) {
 	}))
 	t.Cleanup(proxy.Close)
 
-	previous := network.DefaultHTTPClientFactory()
 	network.SetDefaultHTTPClientFactory(network.NewHTTPClientFactory(&network.GlobalProxyConfig{
 		Enabled: true, Type: network.GlobalProxyTypeHTTP, URL: proxy.URL, EnableForAPI: true,
 	}, nil))
-	t.Cleanup(func() { network.SetDefaultHTTPClientFactory(previous) })
+	t.Cleanup(func() { network.SetDefaultHTTPClientFactory(nil) }) // tests run with none registered
 
 	h := NewGithubCopilotSignInHandler()
 	h.endpoints.deviceCodeURL = "http://github.invalid/login/device/code"

@@ -267,7 +267,7 @@ func containsColumn(clause, column string) bool {
 	return false
 }
 
-// TestClientIPRoundTripsThroughListQueries pins that client_ip reaches the list views of LLM and MCP logs.
+// TestClientIPRoundTripsThroughListQueries pins that client_ip reaches the logs list view.
 func TestClientIPRoundTripsThroughListQueries(t *testing.T) {
 	ctx := context.Background()
 	store := newProjectionTestStore(t)

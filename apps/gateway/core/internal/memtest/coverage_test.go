@@ -138,10 +138,6 @@ var reviewedSites = map[string]siteReview{
 		status: bounded,
 		reason: "loops over the 3-element literal {name, strict, schema}",
 	},
-	"handlers.toolMeta": {
-		status: bounded,
-		reason: "loops over the fixed 3-element uiResourcePaths package var and edits a copy of one tool's _meta, never a request body",
-	},
 	"integrations.createAnthropicMessagesRouteConfig": {
 		status: bounded,
 		reason: "the sjson call sits in a ResponsesResponseConverter closure defined inside a " +

@@ -74,7 +74,7 @@ func permitWithProviders(permitType PermitType, id, name string, providers ...st
 			KeyIDs:        []string{"*"},
 		})
 	}
-	return NewPermit(permitType, id, name, true, false, providerPermits, nil)
+	return NewPermit(permitType, id, name, true, false, providerPermits)
 }
 
 // permitWithModels builds a permit permitting exactly the listed models on provider.
@@ -83,7 +83,7 @@ func permitWithModels(permitType PermitType, id, name, provider string, models .
 		Provider:      provider,
 		AllowedModels: models,
 		KeyIDs:        []string{"*"},
-	}}, nil)
+	}})
 }
 
 // permitWithBlacklist builds a permit allowing the listed models of one provider and blocking others.
@@ -93,7 +93,7 @@ func permitWithBlacklist(permitType PermitType, id, name, provider string, allow
 		AllowedModels:     allowed,
 		BlacklistedModels: blocked,
 		KeyIDs:            []string{"*"},
-	}}, nil)
+	}})
 }
 
 func limitIDs(limits []schemas.Limit) []string {

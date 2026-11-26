@@ -505,8 +505,8 @@ func (s *ClickHouseLogStore) withChildAggregates(ctx context.Context, log Log) *
 
 // --- Updates (read-modify-write + re-insert) ---
 
-// chFindForUpdate loads the row an RMW update patches. logs and mcp_tool_logs
-// both sort by (timestamp, id), so a bare id read
+// chFindForUpdate loads the row an RMW update patches. logs sorts by
+// (timestamp, id), so a bare id read
 // prunes only through the id bloom filter, and only where FINAL honours skip
 // indexes; otherwise it reads every granule of the table. A timestamp hint on
 // ctx (LogTimestampContextKey) bounds the read to the partition and granules

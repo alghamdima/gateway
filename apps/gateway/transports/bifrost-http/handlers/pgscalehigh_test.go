@@ -11,8 +11,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
-	"github.com/maximhq/bifrost/plugins/governance"
-	"github.com/maximhq/bifrost/transports/v2/bifrost-http/lib"
 	"github.com/stretchr/testify/require"
 	"github.com/valyala/fasthttp"
 	"gorm.io/gorm"
@@ -317,109 +315,4 @@ func TestRegisterScopeNameResolverOverridesBatchResolver(t *testing.T) {
 	h.enrichModelConfigScopeNames(context.Background(), configs)
 	require.Equal(t, "override-"+ids[0], configs[0].ScopeName)
 	require.Equal(t, 0, store.getRedactedCalls)
-}
-
-// mcpRefreshConfigStore serves one MCP client row and its VK assignments, and
-// counts the reads the MCP client update path makes.
-type mcpRefreshConfigStore struct {
-	configstore.ConfigStore
-
-	client          *configstoreTables.TableMCPClient
-	assignments     []configstoreTables.TableVirtualKeyMCPConfig
-	getClientCalls  int
-	assignmentCalls int
-}
-
-// GetMCPClientByID returns the configured client row.
-func (s *mcpRefreshConfigStore) GetMCPClientByID(_ context.Context, id string) (*configstoreTables.TableMCPClient, error) {
-	s.getClientCalls++
-	if s.client == nil || s.client.ClientID != id {
-		return nil, configstore.ErrNotFound
-	}
-	c := *s.client
-	return &c, nil
-}
-
-// GetVirtualKeyMCPConfigsByMCPClientID returns the configured assignments.
-func (s *mcpRefreshConfigStore) GetVirtualKeyMCPConfigsByMCPClientID(_ context.Context, _ uint) ([]configstoreTables.TableVirtualKeyMCPConfig, error) {
-	s.assignmentCalls++
-	return s.assignments, nil
-}
-
-// reloadCountingGovernanceManager counts per-key reloads.
-type reloadCountingGovernanceManager struct {
-	GovernanceManager
-	reloaded []string
-	// reloadedBatches records every ReloadVirtualKeys id list; batchErr, when
-	// set, makes the batched reload fail.
-	reloadedBatches [][]string
-	batchErr        error
-}
-
-// ReloadVirtualKeys records the batch and returns batchErr.
-func (m *reloadCountingGovernanceManager) ReloadVirtualKeys(_ context.Context, ids []string) error {
-	if m.batchErr != nil {
-		return m.batchErr
-	}
-	m.reloadedBatches = append(m.reloadedBatches, append([]string(nil), ids...))
-	return nil
-}
-
-// ReloadVirtualKey records the reloaded key.
-func (m *reloadCountingGovernanceManager) ReloadVirtualKey(_ context.Context, id string) (*configstoreTables.TableVirtualKey, error) {
-	m.reloaded = append(m.reloaded, id)
-	return nil, nil
-}
-
-// newMCPRefreshFixture builds a governance store holding n keys assigned to MCP
-// client 7 and one key assigned only to client 8.
-func newMCPRefreshFixture(t *testing.T, n int) (*governance.LocalGovernanceStore, []configstoreTables.TableVirtualKeyMCPConfig) {
-	t.Helper()
-	oldClient := configstoreTables.TableMCPClient{ID: 7, ClientID: "c7", Name: "old_name"}
-	other := configstoreTables.TableMCPClient{ID: 8, ClientID: "c8", Name: "other"}
-	active := true
-	var vks []configstoreTables.TableVirtualKey
-	var assignments []configstoreTables.TableVirtualKeyMCPConfig
-	for i := 0; i < n; i++ {
-		id := fmt.Sprintf("vk-mcp-%03d", i)
-		cfg := configstoreTables.TableVirtualKeyMCPConfig{ID: uint(i + 1), VirtualKeyID: id, MCPClientID: 7, MCPClient: oldClient, ToolsToExecute: schemas.WhiteList{"*"}}
-		assignments = append(assignments, cfg)
-		vks = append(vks, configstoreTables.TableVirtualKey{ID: id, Name: id, Value: *schemas.NewSecretVar("sk-bf-" + id), IsActive: &active, MCPConfigs: []configstoreTables.TableVirtualKeyMCPConfig{cfg}})
-	}
-	vks = append(vks, configstoreTables.TableVirtualKey{ID: "vk-other", Name: "vk-other", Value: *schemas.NewSecretVar("sk-bf-other"), IsActive: &active,
-		MCPConfigs: []configstoreTables.TableVirtualKeyMCPConfig{{ID: 999, VirtualKeyID: "vk-other", MCPClientID: 8, MCPClient: other}}})
-	store, err := governance.NewLocalGovernanceStore(context.Background(), &mockLogger{}, nil, &configstore.GovernanceConfig{VirtualKeys: vks}, nil, nil)
-	require.NoError(t, err)
-	return store, assignments
-}
-
-// TestUpdateMCPClientReloadsAssignedVirtualKeysInOneCall pins that an MCP client
-// update reloads every assigned key through one batched ReloadVirtualKeys call,
-// which does per key what ReloadVirtualKey does (key re-read, model configs,
-// token and credential eviction) and which a clustered deployment propagates,
-// with no per-key reloads.
-func TestUpdateMCPClientReloadsAssignedVirtualKeysInOneCall(t *testing.T) {
-	SetLogger(&mockLogger{})
-	_, assignments := newMCPRefreshFixture(t, 3)
-	cs := &mcpRefreshConfigStore{client: &configstoreTables.TableMCPClient{ID: 7, ClientID: "c7", Name: "new_name"}, assignments: assignments}
-	gm := &reloadCountingGovernanceManager{}
-	h := &MCPHandler{store: &lib.Config{ConfigStore: cs}, governanceManager: gm}
-
-	h.refreshMCPClientOnAssignedVirtualKeys(context.Background(), "c7", 7)
-
-	require.Equal(t, [][]string{{"vk-mcp-000", "vk-mcp-001", "vk-mcp-002"}}, gm.reloadedBatches, "one batched reload of every assigned key")
-	require.Empty(t, gm.reloaded, "no per-key reloads when the batched reload succeeds")
-}
-
-// TestUpdateMCPClientBatchedReloadFallsBackPerKey pins that when the batched
-// reload fails, every assigned key is still reloaded, one ReloadVirtualKey each.
-func TestUpdateMCPClientBatchedReloadFallsBackPerKey(t *testing.T) {
-	SetLogger(&mockLogger{})
-	_, assignments := newMCPRefreshFixture(t, 3)
-	cs := &mcpRefreshConfigStore{client: &configstoreTables.TableMCPClient{ID: 7, ClientID: "c7"}, assignments: assignments}
-	gm := &reloadCountingGovernanceManager{batchErr: fmt.Errorf("config store does not support batched virtual key reads")}
-	h := &MCPHandler{store: &lib.Config{ConfigStore: cs}, governanceManager: gm}
-
-	h.refreshMCPClientOnAssignedVirtualKeys(context.Background(), "c7", 7)
-	require.Equal(t, []string{"vk-mcp-000", "vk-mcp-001", "vk-mcp-002"}, gm.reloaded)
 }

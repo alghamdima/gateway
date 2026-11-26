@@ -47,7 +47,7 @@ const (
 	ErrorTypeBifrostInternal ErrorType = "bifrost_internal"
 
 	// Nobody declared and no rule matched. Alarm on it. "_OTHER" is the OTel
-	// catch-all, matching the error_type label the MCP metrics emit.
+	// catch-all.
 	ErrorTypeOther ErrorType = "_OTHER"
 )
 

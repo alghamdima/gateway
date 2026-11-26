@@ -91,7 +91,7 @@ func TestNewPermit(t *testing.T) {
 	})
 
 	t.Run("no lists is no lists", func(t *testing.T) {
-		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, false, nil, nil)
+		permit := NewPermit(PermitVirtualKey, "vk1", "Caller Key", true, false, nil)
 		assert.Empty(t, permit.ProviderPermits())
 	})
 }

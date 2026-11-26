@@ -1,8 +1,6 @@
 package bifrost
 
 import (
-	"context"
-	"errors"
 	"testing"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -10,114 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type fakeInjectedToolSource struct {
-	tools    map[string]schemas.ChatTool
-	maxDepth int
-}
-
-func (f fakeInjectedToolSource) GetInjectedTool(_ context.Context, clientName, toolName string) (schemas.ChatTool, error) {
-	tool, ok := f.tools[clientName+"-"+toolName]
-	if !ok {
-		return schemas.ChatTool{}, errors.New("not found")
-	}
-	return schemas.DeepCopyChatTool(tool), nil // the MCP manager's contract: the caller owns the copy
-}
-
-func (f fakeInjectedToolSource) GetMaxAgentDepth() int { return f.maxDepth }
-
-func tavilySearchTool() schemas.ChatTool {
-	return schemas.ChatTool{
-		Type: schemas.ChatToolTypeFunction,
-		Function: &schemas.ChatToolFunction{
-			Name:        "tavily-search",
-			Description: schemas.Ptr("Search the web"),
-			Parameters:  &schemas.ToolFunctionParameters{Type: "object"},
-		},
-	}
-}
-
-func chatToolCall(id, name string) schemas.ChatAssistantMessageToolCall {
-	return schemas.ChatAssistantMessageToolCall{
-		ID:       schemas.Ptr(id),
-		Type:     schemas.Ptr("function"),
-		Function: schemas.ChatAssistantMessageToolCallFunction{Name: schemas.Ptr(name), Arguments: `{"query":"q"}`},
-	}
-}
-
-func chatTurnResponse(text string, finish string, promptTokens int, calls ...schemas.ChatAssistantMessageToolCall) *schemas.BifrostChatResponse {
-	msg := &schemas.ChatMessage{Role: schemas.ChatMessageRoleAssistant}
-	if text != "" {
-		msg.Content = &schemas.ChatMessageContent{ContentStr: schemas.Ptr(text)}
-	}
-	if len(calls) > 0 {
-		msg.ChatAssistantMessage = &schemas.ChatAssistantMessage{ToolCalls: calls}
-	}
-	return &schemas.BifrostChatResponse{
-		ID: "resp",
-		Choices: []schemas.BifrostResponseChoice{{
-			FinishReason:                schemas.Ptr(finish),
-			ChatNonStreamResponseChoice: &schemas.ChatNonStreamResponseChoice{Message: msg},
-		}},
-		Usage: &schemas.BifrostLLMUsage{PromptTokens: promptTokens, CompletionTokens: 1, TotalTokens: promptTokens + 1},
-	}
-}
-
-// scriptedChatTurns answers each dispatch with the next scripted response and records
-// every request the loop sent.
-type scriptedChatTurns struct {
-	responses []*schemas.BifrostChatResponse
-	sent      []*schemas.BifrostChatRequest
-}
-
-func (s *scriptedChatTurns) dispatch(req *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
-	s.sent = append(s.sent, req)
-	resp := s.responses[0]
-	s.responses = s.responses[1:]
-	return resp, nil
-}
-
-func searchResult(call schemas.ChatAssistantMessageToolCall) *schemas.ChatMessage {
-	return &schemas.ChatMessage{
-		Role:            schemas.ChatMessageRoleTool,
-		Content:         &schemas.ChatMessageContent{ContentStr: schemas.Ptr("results for " + *call.ID)},
-		ChatToolMessage: &schemas.ChatToolMessage{ToolCallID: call.ID},
-	}
-}
-
-func responsesFunctionCall(callID, name string) schemas.ResponsesMessage {
-	return schemas.ResponsesMessage{
-		ID:   schemas.Ptr("fc_" + callID),
-		Type: schemas.Ptr(schemas.ResponsesMessageTypeFunctionCall),
-		ResponsesToolMessage: &schemas.ResponsesToolMessage{
-			CallID: schemas.Ptr(callID), Name: schemas.Ptr(name), Arguments: schemas.Ptr(`{"query":"q"}`),
-		},
-	}
-}
-
-func responsesText(text string) schemas.ResponsesMessage {
-	return schemas.ResponsesMessage{
-		Type:    schemas.Ptr(schemas.ResponsesMessageTypeMessage),
-		Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleAssistant),
-		Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr(text)},
-	}
-}
-
 // An allowed_tools choice in required mode is relaxed by mode only: its set is the
 // client's constraint on which tools may run, and must survive into later turns.
-func TestRelaxForcedChoice_AllowedToolsKeepsItsSet(t *testing.T) {
-	chatSet := []schemas.ChatToolChoiceAllowedToolsTool{{Type: "function", Function: schemas.ChatToolChoiceFunction{Name: "get_weather"}}}
-	chatIn := &schemas.ChatParameters{ToolChoice: &schemas.ChatToolChoice{ChatToolChoiceStruct: &schemas.ChatToolChoiceStruct{
-		Type:         schemas.ChatToolChoiceTypeAllowedTools,
-		AllowedTools: &schemas.ChatToolChoiceAllowedTools{Mode: "required", Tools: chatSet},
-	}}}
-	chat := relaxForcedChatChoice(chatIn)
-	require.NotNil(t, chat.ToolChoice.ChatToolChoiceStruct, "the allowed set must not collapse to a bare auto")
-	allowed := chat.ToolChoice.ChatToolChoiceStruct.AllowedTools
-	require.NotNil(t, allowed)
-	assert.Equal(t, "auto", allowed.Mode)
-	assert.Equal(t, chatSet, allowed.Tools)
-	assert.Equal(t, "required", chatIn.ToolChoice.ChatToolChoiceStruct.AllowedTools.Mode, "the turn's own params are not written")
-
+func TestRelaxForcedResponsesChoice_AllowedToolsKeepsItsSet(t *testing.T) {
 	respSet := []schemas.ResponsesToolChoiceAllowedToolDef{{Type: "function", Name: schemas.Ptr("get_weather")}}
 	respIn := &schemas.ResponsesParameters{ToolChoice: &schemas.ResponsesToolChoice{ResponsesToolChoiceStruct: &schemas.ResponsesToolChoiceStruct{
 		Type:  schemas.ResponsesToolChoiceTypeAllowedTools,

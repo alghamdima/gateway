@@ -26,7 +26,7 @@ type ModelInfoProvider interface {
 	// CalculateRequestCostBreakdown returns the per-category cost breakdown of
 	// a completed response: input (text, audio, image, cache read, cache
 	// write, per-request surcharge), output (text, audio, image, reasoning,
-	// citation, search queries) and additional (guardrail, MCP, semantic cache,
+	// citation, search queries) and additional (guardrail, semantic cache,
 	// routing), resolving governance pricing overrides from ctx. TotalCost
 	// equals CalculateRequestCost for the same response. Returns nil when
 	// there is nothing billable.

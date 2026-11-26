@@ -126,7 +126,6 @@ func TestGuardrailOutcomeFilterPostgres(t *testing.T) {
 	// The bifrost_safe_jsonb helper SearchLogs relies on is created by the
 	// migrations, so run them on a clean schema exactly as the parity tests do.
 	dropAllManagedMatViews(db)
-	require.NoError(t, db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS logs CASCADE").Error)
 	require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)

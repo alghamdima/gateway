@@ -357,72 +357,6 @@ func TestUpdateProvider_RejectsBaseURLComponents(t *testing.T) {
 	}
 }
 
-// An injected_tools list the typed payload cannot hold must be rejected, not decoded
-// into an empty or zeroed config: the old object shape, a null entry or a typo'd field
-// would otherwise return 200 with no tool configured. Repeated names are rejected too.
-// Both write paths are covered.
-func TestProviderWrites_RejectMalformedInjectedTools(t *testing.T) {
-	SetLogger(&mockLogger{})
-	lib.SetLogger(&mockLogger{})
-	blocks := map[string]struct{ body, reason string }{
-		"old object shape":          {`{"web_search": {"mcp_client_name": "tavily", "tool_name": "search"}}`, "injected_tools must be an array"},
-		"null entry":                {`[null]`, "injected_tools[0] must be an object"},
-		"unknown field":             {`[{"name": "web_search", "mcp_client_name": "tavily", "tool_name": "search", "max_results": 5}]`, `unknown field \"max_results\"`},
-		"duplicate list, last null": {`[{"name": "web_search", "mcp_client_name": "tavily", "tool_name": "search"}], "injected_tools": [null]`, "injected_tools[0] must be an object"},
-		"duplicate names":           {`[{"name": "web_search", "mcp_client_name": "tavily", "tool_name": "search"}, {"name": "web_search", "mcp_client_name": "tavily", "tool_name": "crawl"}]`, "used more than once"},
-		"invalid name":              {`[{"name": "web search", "mcp_client_name": "tavily", "tool_name": "search"}]`, "must be 1-64"},
-	}
-	for name, tc := range blocks {
-		t.Run("add/"+name, func(t *testing.T) {
-			h := &ProviderHandler{
-				inMemoryStore: &lib.Config{Providers: map[schemas.ModelProvider]configstore.ProviderConfig{}},
-				modelsManager: &mockModelsManager{},
-			}
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Request.SetBody([]byte(`{"provider": "mock-openai", "custom_provider_config": {"base_provider_type": "openai", "is_key_less": true}, "injected_tools": ` + tc.body + `}`))
-			h.addProvider(ctx)
-			if ctx.Response.StatusCode() != fasthttp.StatusBadRequest || !strings.Contains(string(ctx.Response.Body()), tc.reason) {
-				t.Fatalf("expected injected_tools rejection, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
-			}
-			if len(h.inMemoryStore.Providers) != 0 {
-				t.Fatal("invalid provider was persisted")
-			}
-		})
-		t.Run("update/"+name, func(t *testing.T) {
-			customConfig := &schemas.CustomProviderConfig{BaseProviderType: schemas.OpenAI, IsKeyLess: true}
-			modelsManager := &mockModelsManager{}
-			h := &ProviderHandler{
-				inMemoryStore: &lib.Config{
-					ClientConfig: &configstore.ClientConfig{},
-					Providers: map[schemas.ModelProvider]configstore.ProviderConfig{
-						"mock-openai": {
-							ConcurrencyAndBufferSize: &schemas.ConcurrencyAndBufferSize{Concurrency: 1, BufferSize: 4},
-							CustomProviderConfig:     customConfig,
-						},
-					},
-				},
-				modelsManager: modelsManager,
-			}
-			attachBifrostClient(t, h.inMemoryStore)
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Request.Header.SetMethod(fasthttp.MethodPut)
-			ctx.Request.SetRequestURI("/api/providers/mock-openai")
-			ctx.Request.SetBody([]byte(`{"concurrency_and_buffer_size": {"concurrency": 2, "buffer_size": 4}, "custom_provider_config": {"base_provider_type": "openai", "is_key_less": true}, "injected_tools": ` + tc.body + `}`))
-			ctx.SetUserValue("provider", "mock-openai")
-			h.updateProvider(ctx)
-			if ctx.Response.StatusCode() != fasthttp.StatusBadRequest || !strings.Contains(string(ctx.Response.Body()), tc.reason) {
-				t.Fatalf("expected injected_tools rejection, got %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
-			}
-			if got := h.inMemoryStore.Providers["mock-openai"].ConcurrencyAndBufferSize.Concurrency; got != 1 {
-				t.Fatalf("rejected update changed the stored provider: concurrency=%d", got)
-			}
-			if len(modelsManager.reloadCalls) != 0 {
-				t.Fatalf("rejected update reloaded the provider: %v", modelsManager.reloadCalls)
-			}
-		})
-	}
-}
-
 // A passthrough block the typed payload would silently reshape must be rejected: a
 // misspelled or missing allowed_routes decodes to an empty list, which forwards no routes
 // at all, and a rule the matcher cannot honour would block routes without saying why.
@@ -3865,8 +3799,7 @@ func datasheetHandlerForTest(t *testing.T) *ProviderHandler {
 	}
 	t.Cleanup(func() { _ = cs.Close(ctx) })
 	pricingURL, paramsURL := "file://"+pricingPath, "file://"+paramsPath
-	disabled := int64(0)
-	mc, err := modelcatalog.Init(ctx, &modelcatalog.Config{PricingURL: &pricingURL, ModelParametersURL: &paramsURL, MCPLibrarySyncInterval: &disabled}, cs, bifrost.NewNoOpLogger())
+	mc, err := modelcatalog.Init(ctx, &modelcatalog.Config{PricingURL: &pricingURL, ModelParametersURL: &paramsURL}, cs, bifrost.NewNoOpLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

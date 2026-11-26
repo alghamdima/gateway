@@ -2,7 +2,6 @@ package schemas
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -43,19 +42,11 @@ func (bc *BifrostContext) ResetUpstreamLatency() {
 // upstreamAccumulator is the per-request upstream total plus a mark of where the
 // current attempt (one log row) began, so each row can report its own share.
 type upstreamAccumulator struct {
-	total             atomic.Int64                      // nanoseconds blocked on upstream, whole request
-	attemptStartNanos atomic.Int64                      // unix nanos when the current attempt began; 0 = unmarked
-	attemptUpstream   atomic.Int64                      // total at the moment the current attempt began
-	attempts          atomic.Int64                      // attempts marked so far in this request
-	queueWait         atomic.Int64                      // nanoseconds the current attempt's message sat in the provider queue; cleared when an attempt is marked
-	wait              atomic.Pointer[upstreamWaitState] // set on the first BeginUpstreamWait
-}
-
-// upstreamWaitState tracks overlapping waits; only requests that make MCP tool calls allocate it.
-type upstreamWaitState struct {
-	mu       sync.Mutex
-	inFlight int       // open waits
-	since    time.Time // when inFlight last rose from zero
+	total             atomic.Int64 // nanoseconds blocked on upstream, whole request
+	attemptStartNanos atomic.Int64 // unix nanos when the current attempt began; 0 = unmarked
+	attemptUpstream   atomic.Int64 // total at the moment the current attempt began
+	attempts          atomic.Int64 // attempts marked so far in this request
+	queueWait         atomic.Int64 // nanoseconds the current attempt's message sat in the provider queue; cleared when an attempt is marked
 }
 
 func upstreamAccumulatorFrom(ctx context.Context) *upstreamAccumulator {
@@ -146,53 +137,6 @@ func AddUpstreamLatency(ctx context.Context, d time.Duration) {
 	}
 	if acc, ok := ctx.Value(BifrostContextKeyUpstreamLatency).(*upstreamAccumulator); ok && acc != nil {
 		acc.total.Add(int64(d))
-	}
-}
-
-// UpstreamWait is one open wait from BeginUpstreamWait; End closes it.
-type UpstreamWait struct {
-	acc *upstreamAccumulator
-	ws  *upstreamWaitState
-}
-
-// BeginUpstreamWait opens a wait that may overlap others on the same request, such as
-// parallel MCP tool calls. Overlapping waits add their union to the upstream total, not
-// their sum, so concurrent calls never report more upstream time than wall time.
-func BeginUpstreamWait(ctx context.Context) UpstreamWait {
-	acc := upstreamAccumulatorFrom(ctx)
-	if acc == nil {
-		return UpstreamWait{}
-	}
-	ws := acc.wait.Load()
-	if ws == nil {
-		ws = &upstreamWaitState{}
-		if !acc.wait.CompareAndSwap(nil, ws) {
-			ws = acc.wait.Load()
-		}
-	}
-	ws.mu.Lock()
-	if ws.inFlight == 0 {
-		ws.since = time.Now()
-	}
-	ws.inFlight++
-	ws.mu.Unlock()
-	return UpstreamWait{acc: acc, ws: ws}
-}
-
-// End closes the wait. The span since the first open wait is added once the last one closes.
-func (w UpstreamWait) End() {
-	ws := w.ws
-	if ws == nil {
-		return
-	}
-	ws.mu.Lock()
-	defer ws.mu.Unlock()
-	if ws.inFlight == 0 {
-		return
-	}
-	ws.inFlight--
-	if ws.inFlight == 0 {
-		w.acc.total.Add(int64(time.Since(ws.since)))
 	}
 }
 

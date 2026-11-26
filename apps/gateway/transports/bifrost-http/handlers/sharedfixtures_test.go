@@ -43,13 +43,6 @@ func bgCtx() *fasthttp.RequestCtx {
 	return initCtx(&req)
 }
 
-func getCtx(uri string) *fasthttp.RequestCtx {
-	var req fasthttp.Request
-	req.Header.SetMethod("GET")
-	req.SetRequestURI(uri)
-	return initCtx(&req)
-}
-
 func putConfigCtx(body string) *fasthttp.RequestCtx {
 	var req fasthttp.Request
 	req.Header.SetMethod("PUT")

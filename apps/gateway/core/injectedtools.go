@@ -248,29 +248,11 @@ func injectedResponsesCall(item schemas.ResponsesMessage, set *injectedToolSet) 
 	}, true
 }
 
-// relaxForcedChatChoice returns params for the turn after an injected call ran. A forced
-// choice (the remapped web search, "required") would force another tool call after
-// every result until maxDepth, leaving the model no turn to answer in, so it becomes
-// "auto". An allowed_tools choice keeps its set and only switches to mode auto. Params
-// are copied; the caller's are never written.
-func relaxForcedChatChoice(params *schemas.ChatParameters) *schemas.ChatParameters {
-	if params == nil || !params.ToolChoice.IsForced() {
-		return params
-	}
-	cp := *params
-	// An allowed_tools set is the client's limit on which tools may run; only its mode relaxes.
-	if s := params.ToolChoice.ChatToolChoiceStruct; s != nil && s.Type == schemas.ChatToolChoiceTypeAllowedTools && s.AllowedTools != nil {
-		cp.ToolChoice = &schemas.ChatToolChoice{ChatToolChoiceStruct: &schemas.ChatToolChoiceStruct{
-			Type:         schemas.ChatToolChoiceTypeAllowedTools,
-			AllowedTools: &schemas.ChatToolChoiceAllowedTools{Mode: string(schemas.ChatToolChoiceTypeAuto), Tools: s.AllowedTools.Tools},
-		}}
-		return &cp
-	}
-	cp.ToolChoice = &schemas.ChatToolChoice{ChatToolChoiceStr: new(string(schemas.ChatToolChoiceTypeAuto))}
-	return &cp
-}
-
-// relaxForcedResponsesChoice is the Responses API parallel of relaxForcedChatChoice.
+// relaxForcedResponsesChoice returns params for the turn after an injected call ran. A
+// forced choice (the remapped web search, "required") would force another tool call
+// after every result until maxDepth, leaving the model no turn to answer in, so it
+// becomes "auto". An allowed_tools choice keeps its set and only switches to mode auto.
+// Params are copied; the caller's are never written.
 func relaxForcedResponsesChoice(params *schemas.ResponsesParameters) *schemas.ResponsesParameters {
 	if params == nil || !params.ToolChoice.IsForced() {
 		return params

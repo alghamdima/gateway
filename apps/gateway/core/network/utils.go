@@ -5,15 +5,6 @@ import (
 	"net/netip"
 )
 
-// IsLocalhost reports whether hostname is localhost or a loopback literal.
-func IsLocalhost(hostname string) bool {
-	return hostname == "localhost" ||
-		hostname == "127.0.0.1" ||
-		hostname == "::1" ||
-		hostname == "0.0.0.0" ||
-		hostname == "::"
-}
-
 var privateSubnets []*net.IPNet
 var linkLocalSubnet *net.IPNet
 

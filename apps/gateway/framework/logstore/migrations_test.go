@@ -1081,8 +1081,8 @@ func TestRefuseRollbackWhileRecorded_LocksTablesOnPostgres(t *testing.T) {
 
 	var locked int64
 	require.NoError(t, tx.Raw(`SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
-		WHERE l.pid = pg_backend_pid() AND l.mode = 'AccessExclusiveLock' AND c.relname IN ('logs', 'mcp_tool_logs')`).Scan(&locked).Error)
-	assert.EqualValues(t, 3, locked, "every table is locked against writers before its values are checked")
+		WHERE l.pid = pg_backend_pid() AND l.mode = 'AccessExclusiveLock' AND c.relname IN ('logs')`).Scan(&locked).Error)
+	assert.EqualValues(t, 1, locked, "every table is locked against writers before its values are checked")
 
 	// lock_timeout only bounds waiting for the locks; the scan that runs while they are held needs its own bound.
 	var timeout string
@@ -1097,6 +1097,8 @@ func TestClientIPColumnMigration_NonRollbackable(t *testing.T) {
 	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "client-ip.db")}, testLogger{})
 	require.NoError(t, err)
 	db := store.db
+	require.NoError(t, db.Create(&Log{ID: "log-1", Object: "chat_completion", Provider: "openai", Model: "gpt-4o", Status: "success", Timestamp: time.Now().UTC(), CreatedAt: time.Now().UTC()}).Error)
+	require.NoError(t, db.Model(&Log{}).Where("id = ?", "log-1").Update("client_ip", "203.0.113.7").Error)
 
 	err = clientIPColumnMigration(ctx, testLogger{}).Rollback(db)
 	require.Error(t, err, "rollback must refuse while client_ip holds a value")
@@ -1105,6 +1107,7 @@ func TestClientIPColumnMigration_NonRollbackable(t *testing.T) {
 		assert.True(t, db.Migrator().HasColumn(model, "client_ip"), "%T.client_ip survives a refused rollback", model)
 	}
 	var stored string
+	require.NoError(t, db.Model(&Log{}).Where("id = ?", "log-1").Pluck("client_ip", &stored).Error)
 	assert.Equal(t, "203.0.113.7", stored)
 }
 
@@ -1139,6 +1142,8 @@ func TestUserEmailColumnMigration_NonRollbackable(t *testing.T) {
 	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "user-email.db")}, testLogger{})
 	require.NoError(t, err)
 	db := store.db
+	require.NoError(t, db.Create(&Log{ID: "log-1", Object: "chat_completion", Provider: "openai", Model: "gpt-4o", Status: "success", Timestamp: time.Now().UTC(), CreatedAt: time.Now().UTC()}).Error)
+	require.NoError(t, db.Model(&Log{}).Where("id = ?", "log-1").Update("user_email", "ada@example.com").Error)
 
 	err = userEmailColumnMigration(ctx, testLogger{}).Rollback(db)
 	require.Error(t, err, "rollback must refuse while user_email holds a value")
@@ -1147,6 +1152,7 @@ func TestUserEmailColumnMigration_NonRollbackable(t *testing.T) {
 		assert.True(t, db.Migrator().HasColumn(model, "user_email"), "%T.user_email survives a refused rollback", model)
 	}
 	var stored string
+	require.NoError(t, db.Model(&Log{}).Where("id = ?", "log-1").Pluck("user_email", &stored).Error)
 	assert.Equal(t, "ada@example.com", stored)
 }
 
@@ -1188,7 +1194,7 @@ func pgRelOptions(t *testing.T, db *gorm.DB, table string) []string {
 // retention tables get per-table autovacuum settings that run vacuum after a
 // small, bounded share of dead rows.
 func TestMigrationTuneRetentionAutovacuum_Postgres(t *testing.T) {
-	// setupRetentionPostgres recreates only logs and mcp_tool_logs, so the other
+	// setupRetentionPostgres recreates only logs, so the other
 	// retention tables keep settings from an earlier run on a reused database.
 	// Clear them first, or a broken migration still passes on those tables.
 	if pre := trySetupPostgresDB(t); pre != nil {

@@ -5,7 +5,6 @@ go 1.27.4
 require (
 	github.com/bytedance/sonic v1.15.3-0.20260730064818-2a36d6da63e2
 	github.com/google/uuid v1.6.0
-	github.com/mark3labs/mcp-go v1.5.0
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/maximhq/bifrost/core v1.16.0
 	github.com/maximhq/bifrost/framework v1.13.0
@@ -176,4 +175,3 @@ require (
 	gorm.io/gorm v1.31.1 // indirect
 )
 
-replace github.com/mark3labs/mcp-go => github.com/maximhq/mcp-go v0.0.0-20261102181017-b7da3bc145a1

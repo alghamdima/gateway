@@ -2604,8 +2604,8 @@ func (s *RDBConfigStore) GetRedactedVirtualKeys(ctx context.Context, ids []strin
 	var virtualKeys []tables.TableVirtualKey
 
 	if len(ids) > 0 {
-		// One bound parameter for the whole list: ids can hold every VK assigned
-		// to an MCP client, which exceeds the bind-parameter limit at scale.
+		// One bound parameter for the whole list: ids can hold enough VKs to
+		// exceed the bind-parameter limit at scale.
 		db := s.ScopedDB(ctx)
 		err := db.Select("id, name, description, is_active").Where(queryscope.InStrings(db, "governance_virtual_keys.id", ids)).Find(&virtualKeys).Error
 		if err != nil {
@@ -3272,7 +3272,7 @@ func (s *RDBConfigStore) GetVirtualKeyByValue(ctx context.Context, value string)
 }
 
 // GetVirtualKeyQuotaByValue retrieves budget, rate limit, and provider-level limit data for a virtual key.
-// This is a lean query that avoids loading Team, Customer, MCPConfigs, and provider Keys.
+// This is a lean query that avoids loading Team, Customer, and provider Keys.
 func (s *RDBConfigStore) GetVirtualKeyQuotaByValue(ctx context.Context, value string) (*tables.TableVirtualKey, error) {
 	baseQuery := s.DB().WithContext(ctx).
 		Preload("Budgets").

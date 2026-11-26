@@ -5642,4 +5642,3 @@ func escapeLikeLiteral(v string) string {
 	v = strings.ReplaceAll(v, "_", `\_`)
 	return v
 }
-

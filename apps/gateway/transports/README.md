@@ -87,7 +87,6 @@ Bifrost Gateway provides enterprise-grade AI infrastructure with these core capa
 
 ### Advanced Features
 
-- **[Model Context Protocol (MCP)](https://docs.getbifrost.ai/features/mcp)** - Enable AI models to use external tools (filesystem, web search, databases)
 - **[Semantic Caching](https://docs.getbifrost.ai/features/semantic-caching)** - Intelligent response caching based on semantic similarity
 - **[Load Balancing](https://docs.getbifrost.ai/features/fallbacks)** - Distribute requests across multiple API keys and providers
 - **[Governance & Budget Management](https://docs.getbifrost.ai/features/governance)** - Usage tracking, rate limiting, and cost control
@@ -154,7 +153,6 @@ genai.configure(
 
 ### Advanced Topics
 
-- [MCP Tool Calling](https://docs.getbifrost.ai/features/mcp) - External tool integration
 - [Semantic Caching](https://docs.getbifrost.ai/features/semantic-caching) - Intelligent response caching
 - [Fallbacks & Load Balancing](https://docs.getbifrost.ai/features/fallbacks) - Reliability and scaling
 - [Budget Management](https://docs.getbifrost.ai/features/governance) - Cost control and governance

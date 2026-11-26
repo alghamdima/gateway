@@ -86,18 +86,6 @@
     },
     "client": {
       "type": "object",
-      "allOf": [
-        {
-          "if": {
-            "properties": { "mcp_server_auth_mode": { "enum": ["oauth", "both"] } },
-            "required": ["mcp_server_auth_mode"]
-          },
-          "then": {
-            "required": ["oauth2_server_config"],
-            "properties": { "oauth2_server_config": { "required": ["issuer_url"] } }
-          }
-        }
-      ],
       "description": "Client configuration settings",
       "properties": {
         "drop_excess_requests": {
@@ -197,7 +185,7 @@
             "headers"
           ],
           "default": "body",
-          "description": "Where inference responses carry Bifrost's extra_fields metadata. 'body' (default) keeps the extra_fields object in the JSON body. 'headers' removes extra_fields from the body (and from every streaming chunk) and sends its scalar fields as x-bifrost-* response headers. In 'headers' mode the large and nested fields are dropped and not sent anywhere: raw_request, raw_response, routing_metadata, guardrail_debug, parse_errors, and on errors key_statuses, billed_usage and mcp_auth_required. Streaming responses only carry the fields known before the first chunk (routing identity, fallback index, cache lookup); per-chunk latency, chunk_index and final totals are dropped."
+          "description": "Where inference responses carry Bifrost's extra_fields metadata. 'body' (default) keeps the extra_fields object in the JSON body. 'headers' removes extra_fields from the body (and from every streaming chunk) and sends its scalar fields as x-bifrost-* response headers. In 'headers' mode the large and nested fields are dropped and not sent anywhere: raw_request, raw_response, routing_metadata, guardrail_debug, parse_errors, and on errors key_statuses and billed_usage. Streaming responses only carry the fields known before the first chunk (routing identity, fallback index, cache lookup); per-chunk latency, chunk_index and final totals are dropped."
         },
         "enforce_scim_auth": {
           "type": "boolean",
@@ -297,7 +285,7 @@
         },
         "hide_deleted_virtual_keys_in_filters": {
           "type": "boolean",
-          "description": "When true, deleted virtual keys are omitted from logs and MCP logs filter data.",
+          "description": "When true, deleted virtual keys are omitted from logs filter data.",
           "default": false
         },
         "hidden_request_types": {
@@ -357,7 +345,7 @@
             "intersect"
           ],
           "default": "union",
-          "description": "Enterprise only. How the access profiles of the teams, business units and customers a caller belongs to combine with the caller's own access. Takes the same values as a project's access_rule. 'union' (default) lets each of them add to what the caller may reach. 'intersect' makes each level that holds an active profile cap it instead: the caller keeps only what their own profiles (or virtual key) allow AND what at least one of their team or business unit profiles allows AND what at least one of their customer profiles allows. A level holding no active profile is skipped. The cap covers providers, models, provider keys, MCP tools; agents are not capped, since team, business unit and customer profiles cannot grant them. Budgets and rate limits are charged as in 'union' mode. The x-bf-customer-id / x-bf-customer-name scope headers are ignored in 'intersect' mode."
+          "description": "Enterprise only. How the access profiles of the teams, business units and customers a caller belongs to combine with the caller's own access. Takes the same values as a project's access_rule. 'union' (default) lets each of them add to what the caller may reach. 'intersect' makes each level that holds an active profile cap it instead: the caller keeps only what their own profiles (or virtual key) allow AND what at least one of their team or business unit profiles allows AND what at least one of their customer profiles allows. A level holding no active profile is skipped. The cap covers providers, models, provider keys; agents are not capped, since team, business unit and customer profiles cannot grant them. Budgets and rate limits are charged as in 'union' mode. The x-bf-customer-id / x-bf-customer-name scope headers are ignored in 'intersect' mode."
         },
         "vk_rotation_cooldown": {
           "type": [
@@ -369,133 +357,11 @@
           "description": "Cooldown after virtual key rotation: grace period during which the previous key value still authenticates. Accepts a Go duration string (e.g. \"5m\", \"1h\"); integer values are nanoseconds (Go duration JSON encoding), so prefer strings. 0 or an empty string disables the grace period (the old value stops working immediately). Maximum 30 days (2592000000000000 ns); string durations are bounds-checked at runtime.",
           "default": 0
         },
-        "mcp_agent_depth": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "DEPRECATED: Maximum depth for MCP agent mode tool execution. Use mcp.tool_manager_config.max_agent_depth.",
-          "default": 10
-        },
-        "mcp_tool_execution_timeout": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "DEPRECATED: Timeout for individual MCP tool execution in seconds. Use mcp.tool_manager_config.tool_execution_timeout.",
-          "default": 30
-        },
-        "mcp_code_mode_binding_level": {
-          "type": "string",
-          "enum": [
-            "server",
-            "tool"
-          ],
-          "description": "DEPRECATED: Code mode binding level for MCP tools. Use mcp.tool_manager_config.code_mode_binding_level."
-        },
-        "mcp_tool_sync_interval": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "DEPRECATED: Global tool sync interval in minutes (0 = default of 10 minutes). Use mcp.tool_sync_interval.",
-          "default": 10
-        },
-        "mcp_disable_auto_tool_inject": {
-          "type": "boolean",
-          "description": "DEPRECATED: When true, MCP tools are not automatically injected into requests. Use mcp.tool_manager_config.disable_auto_tool_inject.",
-          "default": false
-        },
-        "mcp_openapi_max_spec_mb": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 256,
-          "default": 0,
-          "description": "Size limit, in MiB, on the spec of an openapi MCP client (inline, spec_file or fetched from spec_url). 0 uses the built-in default of 32 MiB. Parsing holds several times the spec's size in memory while it runs."
-        },
-        "mcp_code_mode_limits": {
-          "$ref": "#/$defs/mcp_code_mode_limits",
-          "description": "Per-execution code mode limits, as stored and served by the config API. In config.json prefer mcp.tool_manager_config.code_mode_limits, which takes precedence when both are set."
-        },
-        "mcp_oauth_private_allowlist": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Hostnames, IP addresses, or CIDR ranges (no schemes or ports) that the MCP OAuth chain (discovery, dynamic client registration, token requests) may reach even when they resolve to a loopback or private address. Applies only to MCP clients registered by an authenticated admin or declared in config.json; clients registered while dashboard auth was off stay public-only. Link-local and cloud metadata addresses are always refused and cannot be listed. As stored and served by the config API; changing it over the API requires an authenticated admin session. In config.json prefer mcp.tool_manager_config.oauth_private_allowlist, which takes precedence when both are set."
-        },
-        "mcp_enable_temp_token_auth": {
-          "type": "boolean",
-          "description": "When true, Bifrost mints and accepts scoped temp tokens for MCP per-user OAuth and per-user-headers auth pages so anonymous browser visitors can complete the flow without a dashboard session. User-mode flows are never minted regardless of this setting \u2014 they always require SSO login.",
-          "default": false
-        },
         "routing_chain_max_depth": {
           "type": "integer",
           "minimum": 1,
           "description": "Maximum depth for routing rule chain evaluation",
           "default": 10
-        },
-        "mcp_external_client_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "value": {
-                  "type": "string"
-                },
-                "ref": {
-                  "type": "string"
-                },
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "plain_text",
-                    "env",
-                    "vault"
-                  ]
-                },
-                "env_var": {
-                  "type": "string"
-                },
-                "from_env": {
-                  "type": "boolean"
-                }
-              },
-              "additionalProperties": false
-            }
-          ],
-          "description": "Public base URL Bifrost uses as the redirect_uri when acting as an OAuth client to upstream MCP servers (Notion, Jira, etc.). Set when Bifrost's callback endpoint is reached via a different URL than its server-side metadata. Supports env var syntax: \"env.MY_VAR\"."
-        },
-        "mcp_client_metadata_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "value": {
-                  "type": "string"
-                },
-                "ref": {
-                  "type": "string"
-                },
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "plain_text",
-                    "env",
-                    "vault"
-                  ]
-                },
-                "env_var": {
-                  "type": "string"
-                },
-                "from_env": {
-                  "type": "boolean"
-                }
-              },
-              "additionalProperties": false
-            }
-          ],
-          "description": "Full HTTPS URL where you host Bifrost's Client ID Metadata Document, for upstream MCP servers that cannot reach Bifrost. Bifrost presents it as its client_id. Publish the document served at /api/oauth/client-metadata.json there unchanged: its client_id must equal this URL with the scheme and host lowercased and a default :443 port removed, the form Bifrost presents, and its redirect_uris keep Bifrost's callback under mcp_external_client_url. Unset, the document is served under mcp_external_client_url. Must have a path, and no query or fragment. Supports env var syntax: \"env.MY_VAR\"."
         },
         "skills_external_client_url": {
           "anyOf": [
@@ -530,259 +396,9 @@
             }
           ],
           "description": "Public base URL for Skills Repository marketplaces. Required to enable Claude Code and Codex marketplace serving; skill management and downloads remain available when unset. Supports env var and vault references."
-        },
-        "bifrost_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "value": {
-                  "type": "string"
-                },
-                "ref": {
-                  "type": "string"
-                },
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "plain_text",
-                    "env",
-                    "vault"
-                  ]
-                },
-                "env_var": {
-                  "type": "string"
-                },
-                "from_env": {
-                  "type": "boolean"
-                }
-              },
-              "additionalProperties": false
-            }
-          ],
-          "description": "The gateway's public base URL (scheme, host and any base path), as clients reach it through your proxy. Required for /v1/mcp: its tool calls take their host and scheme from it, never from the Host the client sent, so the URLs their routes build point here. Unset, the Bifrost MCP does not load and /v1/mcp answers 503. Supports env var syntax (\"env.MY_VAR\") and vault refs. Must include server.base_path when Bifrost is mounted under one."
-        },
-        "bifrost_mcp_allow_writes": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether /v1/mcp serves the non-GET /api operations (gateway configuration changes) as tools. Inference, batch and file routes outside /api are served either way. Every call is still authorized by the caller's own credential, and destructive tools carry destructiveHint."
-        },
-        "mcp_server_auth_mode": {
-          "type": "string",
-          "enum": [
-            "headers",
-            "both",
-            "oauth"
-          ],
-          "description": "How /mcp authenticates inbound MCP clients. 'headers' (default): VK/api-key/session headers only, discovery disabled. 'both': accepts header credentials and Bifrost-issued JWTs, discovery enabled. 'oauth': Bifrost JWTs only \u2014 WARNING: disables VK/header MCP access."
-        },
-        "oauth2_server_config": {
-          "type": "object",
-          "properties": {
-            "allowed_redirect_uris": {
-              "type": "array",
-              "items": { "anyOf": [{ "type": "string", "const": "*" }, { "type": "string", "format": "uri", "not": { "pattern": "\\*" } }] },
-              "default": [],
-              "description": "Exact remote OAuth client callback URIs approved by the administrator. Local loopback and cursor://anysphere.cursor-mcp callbacks are permitted without entries. Remote callbacks are denied by default; a bare \"*\" entry allows any https callback; private-use scheme callbacks still need an exact entry, and partial wildcards are rejected. Changing this list through the API requires dashboard authentication."
-            },
-            "issuer_url": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "value": {
-                      "type": "string"
-                    },
-                    "env_var": {
-                      "type": "string"
-                    },
-                    "from_env": {
-                      "type": "boolean"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              ],
-              "description": "Stable public URL advertised as the OAuth2 AS issuer in discovery documents and JWT iss claim. A trailing slash is ignored. Required whenever mcp_server_auth_mode is 'both' or 'oauth', or any client gateway is enabled (config load and PUT /api/config reject an unset value then); the issuer is never derived from the request Host header while OAuth is enabled. Supports env var syntax: \"env.MY_VAR\"."
-            },
-            "auth_code_ttl": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 900,
-              "default": 300,
-              "description": "Lifetime of the single-use authorization code in seconds (default: 300, max: 900 = 15 minutes)."
-            },
-            "access_token_ttl": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 600,
-              "description": "Lifetime of the issued JWT Bearer token in seconds (default: 600)."
-            },
-            "disable_vk_identity": {
-              "type": "boolean",
-              "default": false,
-              "description": "When true, the OAuth consent flow no longer offers or accepts virtual-key identity and existing virtual-key grants lose access immediately (rejected at request time and unable to refresh). Honored only when an identity provider is configured. Only valid when mcp_server_auth_mode is 'oauth'."
-            },
-            "gateways": {
-              "type": "object",
-              "properties": {
-                "claude_code": {
-                  "type": "object",
-                  "properties": {
-                    "enabled": {
-                      "type": "boolean",
-                      "default": false,
-                      "description": "Serve the Claude Code gateway protocol under /gateway/claude-code so developers sign in with Claude Code's /login (Cloud gateway) at <issuer_url>/gateway/claude-code. Sign-in uses the OAuth consent page (virtual key, signed-in user, or anonymous session). Independent of mcp_server_auth_mode; requires issuer_url."
-                    },
-                    "managed_settings": {
-                      "type": ["object", "null"],
-                      "description": "Claude Code managed-settings.json served at /gateway/claude-code/managed/settings to every signed-in client. null or omitted means no policy (the endpoint answers 404); {} is an empty policy."
-                    },
-                    "telemetry": {
-                      "type": "object",
-                      "description": "Keep the OTLP telemetry Claude Code sends while signed in to this gateway (metrics, logs and traces) instead of discarding it. Each export is stamped with the Bifrost identity the client signed in as (bifrost.virtual_key.id/name, bifrost.team.id, bifrost.customer.id, or enduser.id) and forwarded asynchronously to every destination as OTLP/HTTP protobuf. Client-sent bifrost.* and enduser.id attributes are removed first.",
-                      "properties": {
-                        "enabled": {
-                          "type": "boolean",
-                          "default": false,
-                          "description": "Forward telemetry. Off: exports are acknowledged and discarded."
-                        },
-                        "destinations": {
-                          "type": "array",
-                          "description": "OTLP/HTTP collectors. Required (at least one) when enabled.",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "endpoint": {
-                                "type": "string",
-                                "description": "Collector base URL (http or https); each signal is posted to {endpoint}/v1/{metrics|logs|traces}. Supports env var syntax: \"env.MY_VAR\"."
-                              },
-                              "headers": {
-                                "type": "object",
-                                "additionalProperties": {
-                                  "type": "string",
-                                  "pattern": "\\S",
-                                  "description": "A plain value or an env. or vault. reference; it must not be empty. Use a reference to keep the credential out of config.json."
-                                },
-                                "description": "Headers sent with every export, for example authorization. Values can be plain or env./vault. references, like provider keys."
-                              }
-                            },
-                            "required": [
-                              "endpoint"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "drop_attributes": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "description": "Attribute keys removed at every level (resource, scope, record, data point, span, event) before forwarding, for example \"prompt\"."
-                        }
-                      },
-                      "if": {
-                        "properties": { "enabled": { "const": true } },
-                        "required": ["enabled"]
-                      },
-                      "then": {
-                        "required": ["destinations"],
-                        "properties": { "destinations": { "minItems": 1 } }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "additionalProperties": false,
-                  "description": "Claude Code gateway at <issuer_url>/gateway/claude-code: Claude Code's /login (Cloud gateway) sign-in, Anthropic Messages inference, managed settings and telemetry."
-                }
-              },
-              "additionalProperties": false,
-              "description": "Client gateways, one block per coding client, each served under <issuer_url>/gateway/<client>. A client signs in with its own /login flow through the OAuth consent page instead of a hand-configured virtual key. Independent of mcp_server_auth_mode; every enabled gateway requires issuer_url."
-            }
-          },
-          "additionalProperties": false,
-          "description": "OAuth2 authorization server settings for /mcp (when mcp_server_auth_mode is 'both' or 'oauth') and for client gateways (oauth2_server_config.gateways)."
         }
       },
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "mcp_server_auth_mode": {
-                "enum": [
-                  "both",
-                  "oauth"
-                ]
-              }
-            },
-            "required": [
-              "mcp_server_auth_mode"
-            ]
-          },
-          "then": {
-            "required": [
-              "oauth2_server_config"
-            ],
-            "properties": {
-              "oauth2_server_config": {
-                "required": [
-                  "issuer_url"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "oauth2_server_config": {
-                "properties": {
-                  "gateways": {
-                    "properties": {
-                      "claude_code": {
-                        "properties": {
-                          "enabled": {
-                            "const": true
-                          }
-                        },
-                        "required": [
-                          "enabled"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "claude_code"
-                    ]
-                  }
-                },
-                "required": [
-                  "gateways"
-                ]
-              }
-            },
-            "required": [
-              "oauth2_server_config"
-            ]
-          },
-          "then": {
-            "properties": {
-              "oauth2_server_config": {
-                "required": [
-                  "issuer_url"
-                ]
-              }
-            }
-          }
-        }
-      ]
+      "additionalProperties": false
     },
     "framework": {
       "type": "object",
@@ -1428,7 +1044,7 @@
               },
               "entity_dac": {
                 "type": "object",
-                "description": "Per-entity Data Access Control overrides, keyed by resource name. Each entry narrows or widens the role's global dac for that one entity; entities not listed follow dac. Resources accepting an override as of this release: Logs, MCPLogs, AuditLogs, VirtualKeys, Users, Teams, Customers, BusinessUnits, RBAC, APIKeys, AccessProfiles, RoutingRules, GuardrailsConfig, MCPGateway, VirtualMCPs, Projects. ",
+                "description": "Per-entity Data Access Control overrides, keyed by resource name. Each entry narrows or widens the role's global dac for that one entity; entities not listed follow dac. Resources accepting an override as of this release: Logs, AuditLogs, VirtualKeys, Users, Teams, Customers, BusinessUnits, RBAC, APIKeys, AccessProfiles, RoutingRules, GuardrailsConfig, Projects. ",
                 "additionalProperties": {
                   "type": "string",
                   "enum": [
@@ -1459,7 +1075,7 @@
                   "properties": {
                     "resource": {
                       "type": "string",
-                      "description": "Permission resource (e.g. Logs, VirtualKeys, Users, ModelProvider, Metrics, Guardrails, AccessProfiles, MCPToolGroups, Roles, BusinessUnits, AuditLogs, Billing)"
+                      "description": "Permission resource (e.g. Logs, VirtualKeys, Users, ModelProvider, Metrics, Guardrails, AccessProfiles, Roles, BusinessUnits, AuditLogs, Billing)"
                     },
                     "operation": {
                       "type": "string",
@@ -1613,13 +1229,6 @@
                 "description": "Provider configurations for this virtual key (empty means no providers allowed, deny-by-default)",
                 "items": {
                   "$ref": "#/$defs/virtual_key_provider_config"
-                }
-              },
-              "mcp_configs": {
-                "type": "array",
-                "description": "MCP configurations for this virtual key (empty array means no MCP tools allowed, deny-by-default)",
-                "items": {
-                  "$ref": "#/$defs/virtual_key_mcp_config"
                 }
               }
             },
@@ -2316,60 +1925,6 @@
       "items": {
         "$ref": "#/$defs/model_router"
       }
-    },
-    "mcp": {
-      "type": "object",
-      "description": "Model Context Protocol configuration",
-      "properties": {
-        "client_configs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/mcp_client_config"
-          },
-          "description": "MCP client configurations"
-        },
-        "tool_manager_config": {
-          "$ref": "#/$defs/mcp_tool_manager_config"
-        },
-        "max_protocol_version": {
-          "$ref": "#/$defs/mcp_max_protocol_version",
-          "description": "Newest MCP protocol version Bifrost offers to upstream MCP servers. 'auto' uses the newest version Bifrost supports. MCP servers can override it with their own max_protocol_version. Omitted keeps the stored value: deployments upgraded with existing MCP servers start at '2025-06-18', the version they used before."
-        },
-        "server_max_protocol_version": {
-          "$ref": "#/$defs/mcp_max_protocol_version",
-          "description": "Newest MCP protocol version Bifrost's own MCP endpoint (/mcp) serves to clients. 'auto' serves every version Bifrost supports. Below '2025-11-25', sign-in with Client ID Metadata Documents is turned off and clients register dynamically instead. Omitted keeps the stored value."
-        },
-        "tool_sync_interval": {
-          "description": "Global default interval for syncing tools from MCP servers (Go duration string in whole minutes, e.g. '10m', '1h', '1h30m'; '0s' uses the runtime default of 10 minutes). Legacy integer nanoseconds are also accepted and must be a whole number of minutes.",
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^(?:0|0s|0m|0h|(?:\\d+h)?\\d+m|\\d+h)$"
-            },
-            {
-              "type": "integer",
-              "minimum": 0,
-              "multipleOf": 60000000000
-            }
-          ]
-        },
-        "virtual_mcps": {
-          "type": "array",
-          "description": "Virtual MCPs: named bundles of tools from one or more MCP clients, served at /mcp/<endpoint_slug> and attachable to virtual keys. Canonical key; supersedes the deprecated tool_groups alias.",
-          "items": {
-            "$ref": "#/$defs/virtual_mcp_config"
-          }
-        },
-        "tool_groups": {
-          "type": "array",
-          "description": "DEPRECATED: use virtual_mcps instead. Enterprise MCP tool groups with optional governance associations. Kept for backward compatibility.",
-          "deprecated": true,
-          "items": {
-            "$ref": "#/$defs/mcp_tool_group_config"
-          }
-        }
-      },
-      "additionalProperties": false
     },
     "vector_store": {
       "type": "object",
@@ -3531,7 +3086,7 @@
         },
         "object_storage": {
           "type": "object",
-          "description": "Optional object storage for offloading LLM and MCP log payloads. When configured, full payloads are stored in S3/GCS/Azure Blob while the DB keeps lightweight index data. MCP log rows keep dashboard/table fields plus a 200-character input preview.",
+          "description": "Optional object storage for offloading LLM log payloads. When configured, full payloads are stored in S3/GCS/Azure Blob while the DB keeps lightweight index data.",
           "properties": {
             "type": {
               "type": "string",
@@ -4044,7 +3599,7 @@
         },
         "object_storage_exclude_fields": {
           "type": "array",
-          "description": "LLM log payload field DB column names that should NOT be offloaded to object storage and must remain in the database (e.g. output_message, input_history, raw_request, raw_response). Unknown names are ignored. error_details always remains in the database (except on content-hidden logs), since the error type, error code and status code breakdowns query it; any raw provider bodies inside it are offloaded unless error_details is listed here. MCP logs always offload the full log and keep dashboard/table fields plus a 200-character input preview in the database.",
+          "description": "LLM log payload field DB column names that should NOT be offloaded to object storage and must remain in the database (e.g. output_message, input_history, raw_request, raw_response). Unknown names are ignored. error_details always remains in the database (except on content-hidden logs), since the error type, error code and status code breakdowns query it; any raw provider bodies inside it are offloaded unless error_details is listed here.",
           "items": {
             "type": "string"
           }
@@ -4057,7 +3612,7 @@
         "capture_client_ip": {
           "type": "boolean",
           "default": false,
-          "description": "Record the caller's IP as client_ip on LLM and MCP logs, in the order enterprise audit logs use: leftmost X-Forwarded-For, else X-Real-IP, else the TCP peer. The headers are caller-supplied and not verified; to trust the value, run behind a proxy that overwrites them and block direct access to Bifrost. Off by default. When off, new logs leave client_ip empty in the logs database and in object storage; turning it off does not clear values already recorded. Takes effect on restart."
+          "description": "Record the caller's IP as client_ip on LLM logs, in the order enterprise audit logs use: leftmost X-Forwarded-For, else X-Real-IP, else the TCP peer. The headers are caller-supplied and not verified; to trust the value, run behind a proxy that overwrites them and block direct access to Bifrost. Off by default. When off, new logs leave client_ip empty in the logs database and in object storage; turning it off does not clear values already recorded. Takes effect on restart."
         }
       },
       "additionalProperties": false
@@ -4759,7 +4314,7 @@
                     },
                     "llmobs_gateway_mode": {
                       "type": "boolean",
-                      "description": "Follow Datadog's proxy-service pattern for LLM Observability: open a workflow span per request at the gateway entrypoint so all gateway traffic is queryable as top-level spans, and export MCP tool and task spans. Changes the shape of exported LLM Observability data, so existing dashboards and breakdowns may need updating (default: false)",
+                      "description": "Follow Datadog's proxy-service pattern for LLM Observability: open a workflow span per request at the gateway entrypoint so all gateway traffic is queryable as top-level spans. Changes the shape of exported LLM Observability data, so existing dashboards and breakdowns may need updating (default: false)",
                       "default": false
                     },
                     "group_traces_by_session": {
@@ -5559,11 +5114,6 @@
       ],
       "additionalProperties": false
     },
-    "mcp_max_protocol_version": {
-      "type": "string",
-      "enum": ["auto", "2026-07-28", "2025-11-25", "2025-06-18"],
-      "description": "An MCP protocol version cap: 'auto' (newest supported) or a revision."
-    },
     "global_proxy_config": {
       "type": "object",
       "description": "Global outbound proxy (the dashboard's proxy settings page) and which components use it. Under source_of_truth \"split\" it is applied when new or changed and dashboard edits are kept otherwise; under \"config.json\" it is applied on every startup. Omit to manage the proxy from the dashboard. Not the same as a provider's own proxy_config.",
@@ -6226,36 +5776,6 @@
       "required": [
         "provider"
       ],
-      "additionalProperties": false
-    },
-    "virtual_key_mcp_config": {
-      "type": "object",
-      "description": "MCP configuration for a virtual key",
-      "properties": {
-        "id": {
-          "type": "integer",
-          "description": "MCP config ID"
-        },
-        "virtual_key_id": {
-          "type": "string",
-          "description": "Associated virtual key ID"
-        },
-        "mcp_client_id": {
-          "type": "integer",
-          "description": "Associated MCP client ID (database format)"
-        },
-        "mcp_client_name": {
-          "type": "string",
-          "description": "MCP client name (config file format \u2014 resolved to mcp_client_id at startup)"
-        },
-        "tools_to_execute": {
-          "type": "array",
-          "description": "Include-only list of tools this Virtual Key is permitted to execute from this MCP client. ['*'] means all tools allowed, [] means no tools allowed (deny-by-default).",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
       "additionalProperties": false
     },
     "complexity_tier_boundaries": {
@@ -7277,26 +6797,6 @@
           "optional": true,
           "format": "uri"
         },
-        "mcp_library_url": {
-          "type": "string",
-          "description": "URL to a custom MCP server catalog. Leave empty to use the default Bifrost catalog. In config.json this also accepts a file:// URL to load the catalog from local disk in air-gapped deployments; the API accepts http(s) URLs only.",
-          "optional": true,
-          "format": "uri"
-        },
-        "mcp_library_sync_interval": {
-          "type": "integer",
-          "description": "MCP library sync interval in seconds. Set to 0 to disable background catalog syncing entirely (air-gapped deployments with no local catalog file); an explicit force-sync still works. Default is 24 hours; minimum when enabled is 3600 seconds (1 hour).",
-          "default": 86400,
-          "optional": true,
-          "anyOf": [
-            {
-              "const": 0
-            },
-            {
-              "minimum": 3600
-            }
-          ]
-        },
         "live_models_sync_interval": {
           "type": "integer",
           "description": "How often each provider's list-models response is re-fetched in the background, in seconds. Without this, a model an upstream starts serving after the gateway booted stays invisible until a restart or a key edit. Set to 0 to disable background refresh. Default is 1 hour; minimum when enabled is 60 seconds.",
@@ -7310,12 +6810,6 @@
               "minimum": 60
             }
           ]
-        },
-        "openapi_url": {
-          "type": "string",
-          "maxLength": 2048,
-          "description": "OpenAPI spec /v1/mcp builds its tools from: an http(s) URL, or a path relative to the app directory (for air-gapped installs). Supports env var syntax (\"env.MY_VAR\"). Leave empty to read the default spec, https://getbifrost.ai/openapi-oss.json.",
-          "optional": true
         }
       },
       "additionalProperties": false
@@ -7549,39 +7043,6 @@
           }
         }
       },
-      "additionalProperties": false
-    },
-    "injected_tools": {
-      "type": "array",
-      "description": "MCP tools Bifrost injects into every chat and responses request served by this provider and executes server side when the model calls them. The client never sees the injected tool call, only the final answer. Names must be unique within a provider.",
-      "items": {
-        "$ref": "#/$defs/injected_tool"
-      }
-    },
-    "injected_tool": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-          "description": "Tool name the model sees. It replaces any client tool with the same name; the name web_search also replaces native web search tools and web_search_options."
-        },
-        "mcp_client_name": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Name of the configured MCP client that provides the tool"
-        },
-        "tool_name": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Tool name as the MCP server exposes it, without the client prefix"
-        }
-      },
-      "required": [
-        "name",
-        "mcp_client_name",
-        "tool_name"
-      ],
       "additionalProperties": false
     },
     "passthrough_policy": {
@@ -8747,9 +8208,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -8797,9 +8255,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -8849,9 +8304,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -8899,9 +8351,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -8951,9 +8400,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -9001,9 +8447,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -9053,9 +8496,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -9103,9 +8543,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -9155,9 +8592,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -9205,9 +8639,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -9257,9 +8688,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -9304,9 +8732,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -9353,9 +8778,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -9400,9 +8822,6 @@
         "ignore_provider_cost": {
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
-        },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
         },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
@@ -9452,9 +8871,6 @@
           "type": "boolean",
           "description": "Ignore the provider-reported usage.cost and calculate cost from Bifrost's model pricing and pricing overrides (default: false)"
         },
-        "injected_tools": {
-          "$ref": "#/$defs/injected_tools"
-        },
         "passthrough": {
           "$ref": "#/$defs/passthrough_policy"
         },
@@ -9464,1055 +8880,6 @@
       },
       "required": [
         "keys"
-      ],
-      "additionalProperties": false
-    },
-    "mcp_client_config": {
-      "type": "object",
-      "properties": {
-        "client_id": {
-          "type": "string",
-          "description": "MCP client identifier"
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the MCP client"
-        },
-        "endpoint_slug": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-          "description": "URL-safe, immutable slug that serves this client at /mcp/<slug>. Derived from the name when omitted; must be unique across MCP clients and Virtual MCPs."
-        },
-        "is_code_mode_client": {
-          "type": "boolean",
-          "description": "Whether this client is a code mode client"
-        },
-        "server_type_on_slug": {
-          "type": "string",
-          "enum": [
-            "inherit",
-            "enabled",
-            "disabled"
-          ],
-          "default": "inherit",
-          "description": "Code mode for this client on its own /mcp/<slug> endpoint. 'inherit' follows is_code_mode_client; 'enabled' or 'disabled' overrides it there only. /mcp, Virtual MCPs and LLM requests always follow is_code_mode_client."
-        },
-        "connection_type": {
-          "type": "string",
-          "enum": [
-            "stdio",
-            "http",
-            "sse",
-            "inprocess",
-            "openapi"
-          ],
-          "description": "Connection type for MCP client. 'openapi' synthesizes an in-process MCP server from an OpenAPI/Swagger document (see openapi_config); its tools proxy HTTP calls to the described API."
-        },
-        "openapi_config": {
-          "type": "object",
-          "description": "Configuration for connection_type 'openapi'. At least one of spec (inline JSON/YAML text), spec_file (path relative to the config directory, read at load) or spec_url (fetched at every connect) supplies the document, in that order of precedence; the others then record where it came from. Supported documents: Swagger 2.0, OpenAPI 3.0, 3.1 and 3.2.",
-          "properties": {
-            "spec": {
-              "type": "string",
-              "description": "Inline OpenAPI/Swagger document (JSON or YAML text)."
-            },
-            "spec_file": {
-              "type": "string",
-              "description": "Path to the document, relative to the config.json directory (or absolute). Read once at load; the content is what gets persisted."
-            },
-            "spec_url": {
-              "type": "string",
-              "format": "uri",
-              "pattern": "^https?://[^@/?#\\s]+(?:[/?#].*)?$",
-              "description": "http(s) URL of the document. Fetched at connect time when spec and spec_file are not given; next to spec it records the source and resolves relative servers."
-            },
-            "base_url": {
-              "type": "string",
-              "format": "uri",
-              "pattern": "^https?://[^@/?#\\s]+(?:[/?#].*)?$",
-              "description": "Upstream API base URL. Defaults to the document's first server entry; required when the document declares none or only relative ones."
-            },
-            "security_credentials": {
-              "type": "object",
-              "description": "Credentials keyed by the document's securitySchemes name. apiKey and http-bearer schemes take value; http-basic takes username and password. Values support env.VAR and vault.path references.",
-              "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "value": {
-                    "type": "string"
-                  },
-                  "username": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            },
-            "include_deprecated": {
-              "type": "boolean",
-              "default": false,
-              "description": "Expose operations the document marks deprecated."
-            },
-            "max_response_bytes": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Cap on the upstream response body returned to the model (0 = default 64 KiB)."
-            }
-          },
-          "anyOf": [
-            {
-              "required": [
-                "spec"
-              ]
-            },
-            {
-              "required": [
-                "spec_file"
-              ]
-            },
-            {
-              "required": [
-                "spec_url"
-              ]
-            }
-          ],
-          "additionalProperties": false
-        },
-        "connection_string": {
-          "type": "string",
-          "description": "HTTP or SSE URL (alternative to http_config sub-object, required for HTTP or SSE connections)"
-        },
-        "auth_type": {
-          "type": "string",
-          "enum": [
-            "none",
-            "headers",
-            "oauth",
-            "per_user_oauth",
-            "per_user_headers",
-            "token_exchange"
-          ],
-          "description": "Authentication type for MCP connection"
-        },
-        "token_exchange": {
-          "type": "object",
-          "description": "Delegated token-exchange configuration for auth_type 'token_exchange': each caller's identity-provider token is exchanged at runtime for a short-lived token scoped to this server's audience. The exchange endpoint and grant shape come from the deployment's identity-provider integration; the application performing the exchange is configured here. Requires user-identity authentication to be available. The MCP client lands in `pending_verification` state at boot; an admin verifies it once from the UI (as themselves).",
-          "properties": {
-            "audience": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Resource identifier the exchanged token is scoped to at the identity provider (e.g. 'api://jira-mcp')"
-            },
-            "use_idp_credentials": {
-              "type": "boolean",
-              "description": "When true, performs the exchange as the SSO login application itself instead of client_id/client_secret below, which are then ignored. Always implied by the id_jag profile, since the identity provider accepts the user's sign-in token only from the app it was issued to. Some providers require this: Microsoft Entra ID's on-behalf-of grant only accepts an assertion audienced to the exchanging application, and Bifrost's SSO login flow always requests a token self-audienced to the SSO application, so a separate exchange application can never receive a usable one."
-            },
-            "client_id": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Identity-provider application authorized to perform exchanges for this audience \u2014 typically a dedicated registration carrying the token-exchange (or on-behalf-of) grant, separate from the SSO login application. Required unless use_idp_credentials is true. Can use env. or vault. prefix."
-            },
-            "client_secret": {
-              "type": "string",
-              "description": "Secret for the exchange application; omit for public clients. Ignored when use_idp_credentials is true. Can use env. or vault. prefix."
-            },
-            "authorization_server_url": {
-              "type": "string",
-              "description": "Overrides where the exchange request is sent, for identity providers that bind an audience to a specific authorization server distinct from the one used for SSO login (e.g. Okta's per-resource Custom Authorization Servers). Leave empty to use the deployment's SSO login issuer, which is correct for providers with one tenant-wide token endpoint (Entra, Auth0). Takes an issuer URL, from which the token endpoint is derived, or a full token endpoint URL ending in /token, which is used as is."
-            },
-            "scopes": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Optional scopes to request on the exchanged token. Include 'offline_access' (where the identity provider supports it) so exchanges issue refresh tokens, keeping the retained admin discovery credential self-renewing."
-            },
-            "profile": {
-              "type": "string",
-              "enum": ["", "id_jag"],
-              "description": "Empty (default): the identity provider issues the upstream token directly. 'id_jag' (Bifrost Enterprise): Cross App Access (Okta XAA) \u2014 the identity provider issues an ID-JAG for `audience` (the upstream authorization server's issuer) from the user's SSO session, and the upstream authorization server exchanges it for its own token with the jwt-bearer grant. Users must have signed in to Bifrost through the identity provider."
-            },
-            "resource": {
-              "type": "string",
-              "description": "id_jag only: resource indicator sent to the identity provider. Set it only when the identity provider's connection defines one; Okta rejects a resource it does not expect. Omitted when empty."
-            },
-            "resource_token_endpoint": {
-              "type": "string",
-              "description": "id_jag only: the upstream authorization server's token endpoint. Defaults to the endpoint discovered from the audience's own authorization server metadata (never from what the MCP server advertises), whose issuer must equal the audience and which must list the jwt-bearer grant."
-            },
-            "resource_client_id": {
-              "type": "string",
-              "description": "id_jag only, required: Bifrost's client ID registered at the upstream authorization server. Can use env. or vault. prefix."
-            },
-            "resource_client_secret": {
-              "type": "string",
-              "description": "id_jag only: secret for resource_client_id; omit for a public client or when resource_private_key is set. Can use env. or vault. prefix."
-            },
-            "resource_private_key": {
-              "type": "string",
-              "description": "id_jag only: PEM RSA or EC private key. When set, Bifrost authenticates to the upstream authorization server with private_key_jwt (a client assertion signed with this key, audience the token endpoint) instead of a client secret. Cannot be combined with resource_client_secret. Can use env. or vault. prefix."
-            },
-            "resource_key_id": {
-              "type": "string",
-              "description": "id_jag only: kid header of the client assertion, when the upstream server selects keys by ID. Requires resource_private_key."
-            },
-            "resource_signing_algorithm": {
-              "type": "string",
-              "enum": ["", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512"],
-              "description": "id_jag only: client assertion signing algorithm; empty (default) means RS256. Use an ES algorithm with an EC key. Requires resource_private_key."
-            },
-            "resource_assertion_audience": {
-              "type": "string",
-              "description": "id_jag only: aud claim of the client assertion. Defaults to the upstream token endpoint, which Okta and Entra require; set the authorization server's issuer for servers that expect it instead. Requires resource_private_key."
-            },
-            "resource_client_auth_method": {
-              "type": "string",
-              "enum": ["", "client_secret_basic", "client_secret_post"],
-              "description": "id_jag only: how resource_client_secret is sent. Empty (default) uses HTTP Basic unless the discovered metadata admits only client_secret_post. Set it when resource_token_endpoint is configured, since there is then no discovery. Requires resource_client_secret."
-            }
-          },
-          "required": [
-            "audience"
-          ],
-          "allOf": [
-            {
-              "$comment": "Bifrost authenticates to the upstream authorization server with a client secret or a private key, not both.",
-              "not": {
-                "required": ["resource_client_secret", "resource_private_key"]
-              }
-            },
-            {
-              "$comment": "The id_jag profile redeems the ID-JAG as a client of the upstream authorization server.",
-              "if": {
-                "properties": { "profile": { "const": "id_jag" } },
-                "required": ["profile"]
-              },
-              "then": { "required": ["resource_client_id"] }
-            },
-            {
-              "$comment": "client_id is required unless use_idp_credentials is true or the profile is id_jag, in which cases the exchange uses the SSO login application's own credentials instead.",
-              "if": {
-                "not": {
-                  "anyOf": [
-                    {
-                      "properties": {
-                        "use_idp_credentials": {
-                          "const": true
-                        }
-                      },
-                      "required": [
-                        "use_idp_credentials"
-                      ]
-                    },
-                    {
-                      "properties": {
-                        "profile": {
-                          "const": "id_jag"
-                        }
-                      },
-                      "required": [
-                        "profile"
-                      ]
-                    }
-                  ]
-                }
-              },
-              "then": {
-                "required": [
-                  "client_id"
-                ]
-              }
-            }
-          ],
-          "additionalProperties": false
-        },
-        "oauth_config": {
-          "type": "object",
-          "description": "Inline OAuth provider configuration for auth_type 'oauth' or 'per_user_oauth'. All inner fields are optional \u2014 missing URLs are resolved via RFC 8414 discovery and a missing client_id triggers RFC 7591 dynamic client registration at admin-click time. The client lands in `pending_verification` state at boot; an admin runs the verification flow once from the MCP Gateway UI.",
-          "properties": {
-            "client_id": {
-              "type": "string",
-              "description": "OAuth client ID (optional \u2014 Dynamic Client Registration is used when omitted; can use env. or vault. prefix)"
-            },
-            "client_secret": {
-              "type": "string",
-              "description": "OAuth client secret (optional \u2014 omit for PKCE public clients or DCR; can use env. or vault. prefix)"
-            },
-            "authorize_url": {
-              "type": "string",
-              "description": "Provider authorize endpoint (optional \u2014 discovered from the MCP server URL when omitted)"
-            },
-            "token_url": {
-              "type": "string",
-              "description": "Provider token endpoint (optional \u2014 discovered when omitted)"
-            },
-            "registration_url": {
-              "type": "string",
-              "description": "Dynamic Client Registration endpoint (optional \u2014 discovered when omitted)"
-            },
-            "scopes": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "OAuth scopes to request"
-            },
-            "resource": {
-              "type": "string",
-              "description": "OAuth resource indicator, RFC 8707 (optional: discovered from the MCP server's protected resource metadata when omitted)"
-            },
-            "use_client_metadata_document": {
-              "type": "boolean",
-              "default": false,
-              "description": "Register with Bifrost's Client ID Metadata Document even if the authorization server does not advertise support (for example when discovery fails and the endpoints are entered by hand). Requires Bifrost on a public HTTPS address; cannot be combined with client_id. When off, the document is still used automatically wherever the server advertises support."
-            }
-          },
-          "additionalProperties": false
-        },
-        "per_user_header_keys": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "minItems": 1,
-          "description": "Required header names each end-user must supply when auth_type is 'per_user_headers'. Schema only \u2014 values are submitted per-user at runtime. The MCP client lands in `pending_verification` state at boot; an admin submits sample values once from the UI to verify the connection and discover tools."
-        },
-        "headers": {
-          "type": "object",
-          "description": "Headers to send with the request (for headers auth type)",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "stdio_config": {
-          "type": "object",
-          "properties": {
-            "command": {
-              "type": "string",
-              "description": "Command to execute"
-            },
-            "args": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Command arguments"
-            },
-            "envs": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Environment variables"
-            }
-          },
-          "required": [
-            "command"
-          ],
-          "additionalProperties": false
-        },
-        "tools_to_execute": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Include-only list of tools to execute. ['*'] means all, [] means none."
-        },
-        "tools_to_auto_execute": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Auto-execute list of tools. ['*'] means all, [] means none."
-        },
-        "prompts_to_expose": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Prompts (by the server's own name) served through Bifrost's MCP gateway. ['*'] for all, [] for none. Omitted, a new server serves all and an existing one keeps its stored list."
-        },
-        "resources_to_expose": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Resource URIs and URI templates served through Bifrost's MCP gateway. ['*'] for all, [] for none. Omitted, a new server serves all and an existing one keeps its stored list."
-        },
-        "max_protocol_version": {
-          "$ref": "#/$defs/mcp_max_protocol_version",
-          "description": "Per-client cap on the MCP protocol version Bifrost offers this server. Omit to use the global mcp.max_protocol_version; 'auto' uses the newest version Bifrost supports."
-        },
-        "tool_sync_interval": {
-          "description": "Per-client override for tool sync interval as a Go duration string in whole seconds (e.g. '10m', '90s'; '0s' or omitted = use global). Legacy integer nanoseconds are also accepted and must be a whole number of seconds.",
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^(?:0|\\d+h(?:\\d+m)?(?:\\d+s)?|\\d+m(?:\\d+s)?|\\d+s)$"
-            },
-            {
-              "type": "integer",
-              "minimum": 0,
-              "multipleOf": 1000000000
-            }
-          ]
-        },
-        "tool_execution_timeout": {
-          "description": "Per-client override for tool execution timeout. Accepts a Go duration string (e.g. '30s', '2m') or a bare integer treated as seconds. When set, overrides the global tool_manager_config.tool_execution_timeout for this MCP server only. Omit or set to 0 to use the global default.",
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^(?:\\d+(?:\\.\\d+)?(?:ns|us|\u00b5s|ms|s|m|h))+$"
-            },
-            {
-              "type": "integer",
-              "minimum": 0
-            }
-          ]
-        },
-        "max_instructions_length": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 0,
-          "description": "Per-client override for the forwarded instruction byte cap. When set, overrides the global mcp.tool_manager_config.max_instructions_per_client for this MCP server only; the aggregate is still bounded by max_instructions_total. Omit or set to 0 to use the global default."
-        },
-        "allowed_extra_headers": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Allowlist of request-level headers that callers may forward to this MCP server at execution time. Use ['*'] to allow all headers."
-        },
-        "is_ping_available": {
-          "type": "boolean",
-          "description": "Whether the MCP server supports ping for health checks (default: true)",
-          "default": true
-        },
-        "needs_session_stickiness": {
-          "type": "boolean",
-          "description": "Only meaningful for connection_type 'http': whether this client maintains one persistent connection reused across every caller (true) or connects fresh per call (false, the default for newly created clients). SSE and STDIO always behave as sticky regardless of this field.",
-          "default": false
-        },
-        "require_public_target": {
-          "type": "boolean",
-          "description": "Server-managed. Set to true when the client was registered over the management API with no admin credential check; every connection to the MCP server (initial, reconnect, per-call) must then resolve to a public address. Once stored as true it is never cleared by the API or by config.json reconciliation; declaring it true here is honored.",
-          "default": false
-        },
-        "per_user_discovery": {
-          "type": "boolean",
-          "description": "Only valid for per-user auth types (per_user_oauth, per_user_headers, token_exchange), and not for openapi clients: when true, each caller's discovery (its tools, prompts, resources and the server's instructions) is made with its own credential and kept per (auth mode, identity, client), and the client stores no admin credential and does no admin discovery. When false, every caller is served the discovery made with the admin credential. Turning it on deletes the stored admin credential and discovery; turning it off deletes every caller's discovery, and the client goes back to pending verification until an admin verifies it again.",
-          "default": false
-        },
-        "tool_pricing": {
-          "type": "object",
-          "description": "Tool pricing map (tool name to cost per execution)",
-          "additionalProperties": {
-            "type": "number",
-            "minimum": 0
-          }
-        },
-        "allow_by_default": {
-          "type": "boolean",
-          "description": "When true, this MCP server is available to every caller that has not been assigned it explicitly, with all tools allowed. An explicit assignment for a caller takes precedence over this setting for that caller.",
-          "default": false
-        },
-        "allow_on_all_virtual_keys": {
-          "type": "boolean",
-          "deprecated": true,
-          "description": "Deprecated: use allow_by_default. Read only when allow_by_default is absent.",
-          "default": false
-        },
-        "disabled": {
-          "type": "boolean",
-          "description": "When true, this MCP client is disabled (connection and workers are stopped while preserving configuration).",
-          "default": false
-        },
-        "tls_config": {
-          "type": "object",
-          "description": "TLS configuration for HTTP and SSE connections. Not applicable to stdio or inprocess connection types.",
-          "properties": {
-            "insecure_skip_verify": {
-              "type": "boolean",
-              "description": "Disable TLS certificate verification. Takes priority over ca_cert_pem when both are set. Use only in development or trusted isolated environments. Not recommended for production."
-            },
-            "ca_cert_pem": {
-              "type": "string",
-              "description": "PEM-encoded CA certificate to trust for MCP server connections. Use when the MCP server uses a self-signed or private CA certificate. Supports env.VAR_NAME syntax to read the certificate from an environment variable."
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "name",
-        "connection_type"
-      ],
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "$comment": "The per-user auth types open a new streamable HTTP connection for each call, which an SSE stream or a STDIO subprocess cannot serve, so SSE and STDIO take the shared auth types only. Bifrost skips such a client at boot with an error naming it.",
-          "if": {
-            "properties": {
-              "connection_type": {
-                "enum": [
-                  "sse",
-                  "stdio"
-                ]
-              }
-            },
-            "required": [
-              "connection_type"
-            ]
-          },
-          "then": {
-            "properties": {
-              "auth_type": {
-                "enum": [
-                  "none",
-                  "headers",
-                  "oauth"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "$comment": "per_user_headers requires the admin to declare which header names users must submit. OAuth-based types have no required input \u2014 the connection_string drives RFC 8414 discovery + RFC 7591 dynamic client registration when oauth_config is omitted or its inner fields are blank.",
-          "if": {
-            "properties": {
-              "auth_type": {
-                "const": "per_user_headers"
-              }
-            },
-            "required": [
-              "auth_type"
-            ]
-          },
-          "then": {
-            "required": [
-              "per_user_header_keys"
-            ]
-          }
-        },
-        {
-          "$comment": "oauth_config only applies to OAuth-based auth types; forbid it elsewhere (including entries that omit auth_type, which defaults to headers) so a misplaced block fails validation instead of being silently ignored.",
-          "if": {
-            "not": {
-              "properties": {
-                "auth_type": {
-                  "enum": [
-                    "oauth",
-                    "per_user_oauth"
-                  ]
-                }
-              },
-              "required": [
-                "auth_type"
-              ]
-            }
-          },
-          "then": {
-            "not": {
-              "required": [
-                "oauth_config"
-              ]
-            }
-          }
-        },
-        {
-          "$comment": "per_user_header_keys only applies to auth_type 'per_user_headers'; forbid it elsewhere so a misplaced declaration fails validation instead of being silently ignored.",
-          "if": {
-            "not": {
-              "properties": {
-                "auth_type": {
-                  "const": "per_user_headers"
-                }
-              },
-              "required": [
-                "auth_type"
-              ]
-            }
-          },
-          "then": {
-            "not": {
-              "required": [
-                "per_user_header_keys"
-              ]
-            }
-          }
-        },
-        {
-          "$comment": "token_exchange requires its scoping block (audience), and the block only applies to that auth type; forbid it elsewhere so a misplaced declaration fails validation instead of being silently ignored.",
-          "if": {
-            "properties": {
-              "auth_type": {
-                "const": "token_exchange"
-              }
-            },
-            "required": [
-              "auth_type"
-            ]
-          },
-          "then": {
-            "required": [
-              "token_exchange"
-            ]
-          },
-          "else": {
-            "not": {
-              "required": [
-                "token_exchange"
-              ]
-            }
-          }
-        },
-        {
-          "$comment": "openapi_config only applies to connection_type 'openapi'; forbid it elsewhere so a misplaced block fails validation instead of being silently ignored.",
-          "if": {
-            "not": {
-              "properties": {
-                "connection_type": {
-                  "const": "openapi"
-                }
-              },
-              "required": [
-                "connection_type"
-              ]
-            }
-          },
-          "then": {
-            "not": {
-              "required": [
-                "openapi_config"
-              ]
-            }
-          }
-        },
-        {
-          "$comment": "A synthesized OpenAPI server has no remote MCP handshake to authenticate: only none, headers and per_user_headers apply. OAuth-flavored and token-exchange auth types are refused.",
-          "if": {
-            "properties": {
-              "connection_type": {
-                "const": "openapi"
-              }
-            },
-            "required": [
-              "connection_type"
-            ]
-          },
-          "then": {
-            "properties": {
-              "auth_type": {
-                "enum": [
-                  "none",
-                  "headers",
-                  "per_user_headers"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "$comment": "per_user_discovery discovers each caller's tools with their own credential, so it only applies to the per-user auth types, and not to an openapi client, whose tools come from its document.",
-          "if": {
-            "properties": {
-              "per_user_discovery": {
-                "const": true
-              }
-            },
-            "required": [
-              "per_user_discovery"
-            ]
-          },
-          "then": {
-            "required": [
-              "auth_type"
-            ],
-            "properties": {
-              "auth_type": {
-                "enum": [
-                  "per_user_oauth",
-                  "per_user_headers",
-                  "token_exchange"
-                ]
-              },
-              "connection_type": {
-                "not": {
-                  "const": "openapi"
-                }
-              }
-            }
-          }
-        }
-      ],
-      "oneOf": [
-        {
-          "properties": {
-            "connection_type": {
-              "const": "stdio"
-            }
-          },
-          "required": [
-            "stdio_config"
-          ]
-        },
-        {
-          "properties": {
-            "connection_type": {
-              "const": "openapi"
-            }
-          },
-          "required": [
-            "openapi_config"
-          ]
-        },
-        {
-          "properties": {
-            "connection_type": {
-              "const": "websocket"
-            }
-          },
-          "required": [
-            "websocket_config"
-          ]
-        },
-        {
-          "properties": {
-            "connection_type": {
-              "const": "http"
-            }
-          },
-          "anyOf": [
-            {
-              "required": [
-                "http_config"
-              ]
-            },
-            {
-              "required": [
-                "connection_string"
-              ]
-            }
-          ]
-        },
-        {
-          "properties": {
-            "connection_type": {
-              "const": "sse"
-            }
-          },
-          "required": [
-            "connection_string"
-          ]
-        }
-      ]
-    },
-    "mcp_tool_manager_config": {
-      "type": "object",
-      "properties": {
-        "tool_execution_timeout": {
-          "type": [
-            "integer",
-            "string"
-          ],
-          "description": "Tool execution timeout. Accepts a duration string (e.g. \"30s\", \"2m\") or an integer number of seconds (e.g. 30 means 30 seconds).",
-          "minimum": 1,
-          "default": 30
-        },
-        "max_agent_depth": {
-          "type": "integer",
-          "description": "Max agent depth",
-          "minimum": 1,
-          "default": 10
-        },
-        "code_mode_binding_level": {
-          "type": "string",
-          "enum": [
-            "server",
-            "tool"
-          ],
-          "description": "How tools are exposed in VFS for code execution"
-        },
-        "disable_auto_tool_inject": {
-          "type": "boolean",
-          "description": "When true, MCP tools are not automatically injected into requests. Tools are only included when explicitly specified via request context filters or headers, such as x-bf-mcp-include-tools or x-bf-mcp-include-clients.",
-          "default": false
-        },
-        "max_instructions_per_client": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Byte bound on a single MCP server's forwarded instructions. Longer text is truncated on a rune boundary with a notice. 0 uses the built-in default of 4096.",
-          "default": 0
-        },
-        "max_instructions_total": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Byte bound on the whole forwarded aggregate across every visible MCP server. Rides on every MCP-bearing request that carries tools, so raising it raises per-request tokens. 0 uses the built-in default of 16384.",
-          "default": 0
-        },
-        "code_mode_limits": {
-          "$ref": "#/$defs/mcp_code_mode_limits"
-        },
-        "oauth_private_allowlist": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Hostnames, IP addresses, or CIDR ranges (no schemes or ports) that the MCP OAuth chain (discovery, dynamic client registration, token requests) may reach even when they resolve to a loopback or private address. Applies only to MCP clients registered by an authenticated admin or declared in config.json; clients registered while dashboard auth was off stay public-only. Link-local and cloud metadata addresses are always refused and cannot be listed. Example: [\"localhost\", \"127.0.0.1\", \"10.20.0.0/16\"]."
-        }
-      }
-    },
-    "mcp_code_mode_limits": {
-      "type": "object",
-      "description": "Limits applied to each code mode (executeToolCode) execution. Every field is optional; omit it or set 0 to use the built-in default. There is no limit on how many executions run concurrently.",
-      "additionalProperties": false,
-      "properties": {
-        "max_source_bytes": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum size of the submitted code in bytes. 0 uses the default of 65536 (64 KiB).",
-          "default": 0
-        },
-        "max_steps": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum interpreter computation steps per execution, including work inside builtins. 0 uses the default of 1000000.",
-          "default": 0
-        },
-        "max_memory_bytes": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Estimated allocation budget per execution in bytes, enforced by the interpreter and value converters before allocating. 0 uses the default of 67108864 (64 MiB).",
-          "default": 0
-        },
-        "max_log_bytes": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum print and tool log output per execution in bytes, including newlines. 0 uses the default of 65536 (64 KiB).",
-          "default": 0
-        },
-        "max_tool_calls": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum nested MCP tool calls per execution. 0 uses the default of 64.",
-          "default": 0
-        },
-        "max_value_bytes": {
-          "type": "integer",
-          "anyOf": [
-            {
-              "const": 0
-            },
-            {
-              "minimum": 1024
-            }
-          ],
-          "description": "Size budget in bytes for each tool payload and converted result, counted conservatively for JSON escaping. Must be 0 (default of 1048576, 1 MiB) or at least 1024.",
-          "default": 0
-        },
-        "max_nesting_depth": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000,
-          "description": "Maximum nesting depth of values crossing the tool boundary. 0 uses the default of 64; at most 1000.",
-          "default": 0
-        }
-      }
-    },
-    "virtual_mcp_config": {
-      "type": "object",
-      "description": "A Virtual MCP: a named bundle of tools from one or more MCP clients, served at /mcp/<endpoint_slug> and attachable to virtual keys.",
-      "properties": {
-        "id": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "DB ID of this Virtual MCP. When set, the reconciler updates the existing Virtual MCP with this ID rather than matching by name."
-        },
-        "name": {
-          "type": "string",
-          "description": "Virtual MCP display name (unique)"
-        },
-        "endpoint_slug": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-          "description": "URL-safe path the Virtual MCP is served at (/mcp/<endpoint_slug>). Honored on create only (immutable after); derived from the name when omitted. Unique across Virtual MCPs and MCP clients."
-        },
-        "description": {
-          "type": "string",
-          "description": "Virtual MCP description"
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether the Virtual MCP is enabled. A disabled Virtual MCP is not served.",
-          "default": true
-        },
-        "tools": {
-          "type": "array",
-          "minItems": 1,
-          "description": "Per-client tool specs the Virtual MCP exposes",
-          "items": {
-            "type": "object",
-            "properties": {
-              "mcp_client_id": {
-                "type": "string",
-                "description": "MCP client ID"
-              },
-              "mcp_client_name": {
-                "type": "string",
-                "description": "MCP client name (resolved to client_id at startup)"
-              },
-              "tool_names": {
-                "type": "array",
-                "description": "Tool names to expose. [\"*\"] means all tools (including future ones); [] means none; a named list means only those tools.",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "oneOf": [
-              {
-                "required": [
-                  "mcp_client_id"
-                ]
-              },
-              {
-                "required": [
-                  "mcp_client_name"
-                ]
-              }
-            ],
-            "additionalProperties": false
-          }
-        },
-        "virtual_key_ids": {
-          "type": "array",
-          "description": "Virtual keys this Virtual MCP is attached to.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "name",
-        "tools"
-      ],
-      "additionalProperties": false
-    },
-    "mcp_tool_group_config": {
-      "type": "object",
-      "description": "DEPRECATED: use virtual_mcp_config (mcp.virtual_mcps) instead.",
-      "deprecated": true,
-      "properties": {
-        "id": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "DB ID of this tool group. When set, the reconciler updates the existing group with this ID rather than matching by name."
-        },
-        "name": {
-          "type": "string",
-          "description": "Tool group name"
-        },
-        "description": {
-          "type": "string",
-          "description": "Tool group description"
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether tool group is enabled",
-          "default": true
-        },
-        "tools": {
-          "type": "array",
-          "minItems": 1,
-          "description": "MCP tools included in this group",
-          "items": {
-            "type": "object",
-            "properties": {
-              "mcp_client_id": {
-                "type": "string",
-                "description": "MCP client ID"
-              },
-              "mcp_client_name": {
-                "type": "string",
-                "description": "MCP client name (resolved to client_id at startup)"
-              },
-              "tool_names": {
-                "type": "array",
-                "description": "Tool names to expose. [\"*\"] means all tools (including future ones); [] means none; a named list means only those tools.",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "oneOf": [
-              {
-                "required": [
-                  "mcp_client_id"
-                ]
-              },
-              {
-                "required": [
-                  "mcp_client_name"
-                ]
-              }
-            ],
-            "additionalProperties": false
-          }
-        },
-        "virtual_key_ids": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "team_ids": {
-          "type": "array",
-          "description": "DEPRECATED: attach Virtual MCPs to virtual keys via virtual_key_ids instead.",
-          "deprecated": true,
-          "items": {
-            "type": "string"
-          }
-        },
-        "customer_ids": {
-          "type": "array",
-          "description": "DEPRECATED: attach Virtual MCPs to virtual keys via virtual_key_ids instead.",
-          "deprecated": true,
-          "items": {
-            "type": "string"
-          }
-        },
-        "user_ids": {
-          "type": "array",
-          "description": "DEPRECATED: attach Virtual MCPs to virtual keys via virtual_key_ids instead.",
-          "deprecated": true,
-          "items": {
-            "type": "string"
-          }
-        },
-        "provider_names": {
-          "type": "array",
-          "description": "DEPRECATED: attach Virtual MCPs to virtual keys via virtual_key_ids instead.",
-          "deprecated": true,
-          "items": {
-            "type": "string"
-          }
-        },
-        "api_key_ids": {
-          "type": "array",
-          "description": "DEPRECATED: attach Virtual MCPs to virtual keys via virtual_key_ids instead.",
-          "deprecated": true,
-          "items": {
-            "type": "integer"
-          }
-        }
-      },
-      "required": [
-        "name",
-        "tools"
       ],
       "additionalProperties": false
     },
@@ -11291,12 +9658,6 @@
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
         },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
-        },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
         },
@@ -11399,12 +9760,6 @@
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
         },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
-        },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
         },
@@ -11490,12 +9845,6 @@
         },
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
-        },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
         },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
@@ -11595,12 +9944,6 @@
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
         },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
-        },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
         },
@@ -11685,12 +10028,6 @@
         },
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
-        },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
         },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
@@ -11793,12 +10130,6 @@
         },
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
-        },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
         },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
@@ -11940,12 +10271,6 @@
         },
         "accessProfileResolutionStrategy": {
           "$ref": "#/$defs/scim_access_profile_resolution_strategy"
-        },
-        "tokenExchangeHosts": {
-          "$ref": "#/$defs/scim_token_exchange_hosts"
-        },
-        "crossAppAccess": {
-          "$ref": "#/$defs/scim_cross_app_access"
         },
         "workloadIdentity": {
           "$ref": "#/$defs/scim_workload_identity"
@@ -12295,8 +10620,7 @@
               "target": {
                 "type": "string",
                 "enum": [
-                  "llm",
-                  "mcp"
+                  "llm"
                 ],
                 "default": "llm",
                 "description": "Execution target for the rule. Omitted values default to LLM guardrails."
@@ -12801,44 +11125,6 @@
           "items": {
             "$ref": "#/$defs/access_profile_provider_config"
           }
-        },
-        "virtual_mcps": {
-          "type": "array",
-          "description": "Virtual MCPs this profile grants. Canonical key; supersedes the deprecated mcp_tool_groups alias, which is ignored when this key is present. An explicit empty array detaches every Virtual MCP from the profile.",
-          "items": {
-            "$ref": "#/$defs/access_profile_virtual_mcp"
-          }
-        },
-        "mcp_configs": {
-          "type": "array",
-          "description": "Per-MCP-client tool allowlists this profile grants. Canonical key; supersedes the deprecated mcp_servers and mcp_tool_overrides aliases, which are folded into this shape at load time.",
-          "items": {
-            "$ref": "#/$defs/access_profile_mcp_config"
-          }
-        },
-        "mcp_tool_groups": {
-          "type": "array",
-          "description": "DEPRECATED: use virtual_mcps instead. MCP tool group associations, folded into virtual_mcps at load time. Ignored when virtual_mcps is present.",
-          "deprecated": true,
-          "items": {
-            "$ref": "#/$defs/access_profile_mcp_tool_group"
-          }
-        },
-        "mcp_servers": {
-          "type": "array",
-          "description": "DEPRECATED: use mcp_configs instead. Blanket MCP server grants, folded into mcp_configs at load time as [\"*\"] allowlists. A client listed in mcp_configs keeps its explicit allowlist; naming one client here and in mcp_configs by different spellings (an id in one, its name in the other) is ambiguous and refused.",
-          "deprecated": true,
-          "items": {
-            "$ref": "#/$defs/access_profile_mcp_server"
-          }
-        },
-        "mcp_tool_overrides": {
-          "type": "array",
-          "description": "DEPRECATED: use mcp_configs instead. Per-tool include/exclude overrides, folded into mcp_configs allowlists at load time. The new model has no exclude concept, so an exclude only narrows the tools that can be enumerated.",
-          "deprecated": true,
-          "items": {
-            "$ref": "#/$defs/access_profile_mcp_tool_override"
-          }
         }
       },
       "required": [
@@ -13004,7 +11290,7 @@
         },
         "access_rule": {
           "type": "string",
-          "description": "How the project's own access composes with the access a caller already holds: union leaves the caller's own access untouched (a project with no provider or MCP config then only accounts for spend), intersect permits only what both allow.",
+          "description": "How the project's own access composes with the access a caller already holds: union leaves the caller's own access untouched (a project with no provider config then only accounts for spend), intersect permits only what both allow.",
           "enum": [
             "union",
             "intersect"
@@ -13068,53 +11354,11 @@
           "items": {
             "$ref": "#/$defs/project_provider_config"
           }
-        },
-        "mcp_configs": {
-          "type": "array",
-          "description": "MCP clients the project allows, one entry per client",
-          "items": {
-            "$ref": "#/$defs/project_mcp_config"
-          }
-        },
-        "virtual_mcps": {
-          "type": "array",
-          "description": "Virtual MCPs assigned to the project, one entry per assignment. A request scoped to the project can reach each one at its /mcp/<slug> endpoint.",
-          "items": {
-            "$ref": "#/$defs/project_virtual_mcp"
-          }
         }
       },
       "required": [
         "name",
         "access_rule"
-      ],
-      "additionalProperties": false
-    },
-    "project_virtual_mcp": {
-      "type": "object",
-      "description": "A Virtual MCP assigned to a project. Assignments are a set, so a repeat collapses rather than doubling.",
-      "properties": {
-        "virtual_mcp_name": {
-          "type": "string",
-          "description": "Name of the Virtual MCP (as declared under mcp.virtual_mcps) the project is assigned. Resolved to the stored Virtual MCP on startup; a name that matches no Virtual MCP is refused."
-        },
-        "virtual_mcp_id": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Virtual MCP ID, as an alternative to virtual_mcp_name. Wins when both are set. Ids are assigned by the database, so prefer the name in a file that has to be portable across environments."
-        }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "virtual_mcp_name"
-          ]
-        },
-        {
-          "required": [
-            "virtual_mcp_id"
-          ]
-        }
       ],
       "additionalProperties": false
     },
@@ -13309,135 +11553,6 @@
       },
       "required": [
         "model_name"
-      ],
-      "additionalProperties": false
-    },
-    "project_mcp_config": {
-      "type": "object",
-      "properties": {
-        "mcp_client_name": {
-          "type": "string",
-          "description": "Name of the MCP client (as declared under mcp.client_configs) the project allows. Resolved to the stored client on startup; a name that matches no client is refused."
-        },
-        "tools_to_execute": {
-          "type": "array",
-          "description": "Tools of the client the project may execute. Use [\"*\"] to allow every tool; empty array or omitted allows none, regardless of the top-level version.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "mcp_client_name"
-      ],
-      "additionalProperties": false
-    },
-    "access_profile_virtual_mcp": {
-      "type": "object",
-      "description": "A Virtual MCP granted to an access profile. Assignments are a set, so a repeat collapses rather than doubling.",
-      "properties": {
-        "virtual_mcp_name": {
-          "type": "string",
-          "description": "Name of the Virtual MCP (as declared under mcp.virtual_mcps) the profile grants. Resolved to the stored Virtual MCP on startup; a name that matches no Virtual MCP is refused."
-        },
-        "virtual_mcp_id": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Virtual MCP ID, as an alternative to virtual_mcp_name. Wins when both are set. Ids are assigned by the database, so prefer the name in a file that has to be portable across environments."
-        }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "virtual_mcp_name"
-          ]
-        },
-        {
-          "required": [
-            "virtual_mcp_id"
-          ]
-        }
-      ],
-      "additionalProperties": false
-    },
-    "access_profile_mcp_config": {
-      "type": "object",
-      "description": "The tools of one MCP client an access profile may execute.",
-      "properties": {
-        "mcp_client_id": {
-          "type": "string",
-          "description": "MCP client ID or name (names are resolved to client ids at startup)"
-        },
-        "tools_to_execute": {
-          "type": "array",
-          "description": "Tools the profile may execute. [\"*\"] means all tools (including future ones); [] means none; a named list means only those tools.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "mcp_client_id"
-      ],
-      "additionalProperties": false
-    },
-    "access_profile_mcp_tool_group": {
-      "type": "object",
-      "description": "DEPRECATED: use access_profile_virtual_mcp (virtual_mcps) instead.",
-      "deprecated": true,
-      "properties": {
-        "tool_group_id": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "MCP tool group ID (the Virtual MCP's ID; the column kept its old name across the rename)"
-        }
-      },
-      "required": [
-        "tool_group_id"
-      ],
-      "additionalProperties": false
-    },
-    "access_profile_mcp_server": {
-      "type": "object",
-      "description": "DEPRECATED: use access_profile_mcp_config (mcp_configs) instead.",
-      "deprecated": true,
-      "properties": {
-        "mcp_server_id": {
-          "type": "string",
-          "description": "MCP server identifier"
-        }
-      },
-      "required": [
-        "mcp_server_id"
-      ],
-      "additionalProperties": false
-    },
-    "access_profile_mcp_tool_override": {
-      "type": "object",
-      "description": "DEPRECATED: use access_profile_mcp_config (mcp_configs) instead.",
-      "deprecated": true,
-      "properties": {
-        "mcp_client_id": {
-          "type": "string",
-          "description": "MCP client identifier"
-        },
-        "tool_name": {
-          "type": "string",
-          "description": "Tool name"
-        },
-        "action": {
-          "type": "string",
-          "enum": [
-            "include",
-            "exclude"
-          ],
-          "description": "Override action"
-        }
-      },
-      "required": [
-        "mcp_client_id",
-        "tool_name",
-        "action"
       ],
       "additionalProperties": false
     },
@@ -14623,42 +12738,6 @@
       ],
       "default": "all",
       "description": "How many attribute-access-profile grants a user receives when several attributeAccessProfileMappings match: 'all' (default) grants every matching rule's profile; 'order' grants only the profiles of the first rule, in list order, that the user matches. Profiles granted through roles are unaffected."
-    },
-    "scim_token_exchange_hosts": {
-      "type": "array",
-      "description": "Hosts besides the issuer's own that an MCP client's token exchange may be sent to through its authorization_server_url (for example an Okta custom authorization server on another domain). The exchange carries the caller's identity-provider token, so only these hosts may be named. Each entry is a bare host name, with a port only when it needs one; entries are lowercased and deduplicated.",
-      "items": {
-        "type": "string",
-        "pattern": "^\\s*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:[1-9][0-9]{0,4})?\\s*$"
-      }
-    },
-    "scim_cross_app_access": {
-      "type": "object",
-      "description": "Cross App Access (XAA, the ID-JAG profile), inbound: AI clients this identity provider admits for a user exchange a provider-signed ID-JAG at Bifrost's /oauth2/token for a Bifrost token that acts as that user. Needs the governance plugin and client.oauth2_server_config.issuer_url. Client IDs are registered in the dashboard.",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "Turn Cross App Access on for this provider."
-        },
-        "accessTokenTtl": {
-          "type": "integer",
-          "anyOf": [
-            {
-              "const": 0
-            },
-            {
-              "minimum": 60,
-              "maximum": 86400
-            }
-          ],
-          "description": "Lifetime in seconds of the Bifrost tokens issued for an ID-JAG, 60 to 86400. 0 or omitted uses the default of 86400 (one day), since Okta caps ID-JAGs per user per resource app per month."
-        },
-        "provisionUsers": {
-          "type": "boolean",
-          "description": "Create a Bifrost user for an assertion that names someone who has none, instead of refusing the grant. Off by default: an ID-JAG carries only an ID and email, so most new users would resolve no role."
-        }
-      },
-      "additionalProperties": false
     },
     "scim_claims_sync_mode": {
       "type": "string",

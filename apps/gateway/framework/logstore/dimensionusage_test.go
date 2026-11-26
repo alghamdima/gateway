@@ -14,8 +14,8 @@ import (
 // usageParityStore is one backend the usage readers are checked against: the
 // store to read through and how to write a row into it.
 type usageParityStore struct {
-	store     *RDBLogStore
-	create    func(t *testing.T, entry *Log)
+	store  *RDBLogStore
+	create func(t *testing.T, entry *Log)
 }
 
 // usageParityStores runs fn against SQLite, Postgres and ClickHouse, skipping a

@@ -423,7 +423,7 @@ func (s *Store) calculateCostWithCache(result *schemas.BifrostResponse, cacheMet
 		}
 		// Semantic cache hit — only the embedding lookup cost. It's an internal
 		// sidecar cost (a separate embedding call), so it lands on the additional
-		// side, alongside guardrail/MCP, not folded into the request's input.
+		// side, alongside guardrail, not folded into the request's input.
 		if cacheMetadata.ProviderUsed != nil && cacheMetadata.ModelUsed != nil && cacheMetadata.InputTokens != nil {
 			c := s.computeCacheEmbeddingCost(cacheMetadata, scopes)
 			if c == 0 {
@@ -3227,7 +3227,7 @@ func offPeakMultiplier(pricing *configstoreTables.TableModelPricing, at time.Tim
 // RequestCost and SearchQueriesCost are deliberately excluded: they are flat
 // per-request and per-query fees rather than usage categories, matching how the
 // inference_geo multiplier in computeTextCost already treats the search fee.
-// AdditionalCost is excluded too — guardrail and MCP sidecar costs are priced
+// AdditionalCost is excluded too — guardrail sidecar costs are priced
 // through their own computeCostFromInput call and are discounted there on
 // their own pricing rows.
 func scaleUsageCost(cost *schemas.BifrostCost, m float64) {

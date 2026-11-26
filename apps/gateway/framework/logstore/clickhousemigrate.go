@@ -16,7 +16,7 @@ import (
 
 // clickhouseColumnType maps a GORM-parsed field to a ClickHouse column type.
 // Pointer fields become Nullable(...). This keeps the ClickHouse DDL in lockstep
-// with the shared Log/MCPToolLog/AsyncJob structs so the reused read path (which
+// with the shared Log/AsyncJob structs so the reused read path (which
 // references DB column names) never drifts from the physical schema.
 func clickhouseColumnType(f *schema.Field) string {
 	ft := f.FieldType
@@ -224,7 +224,7 @@ func clickhouseExistingColumns(ctx context.Context, db *gorm.DB, table string) (
 
 // clickhouseReconcileColumns adds any model columns missing from the live table
 // via ALTER TABLE ... ADD COLUMN IF NOT EXISTS. This is the forward-evolution
-// path: the shared Log/MCPToolLog structs gain fields over time, and CREATE
+// path: the shared Log struct gains fields over time, and CREATE
 // TABLE IF NOT EXISTS only ever runs once. We do this ourselves (rather than the
 // gorm driver's AutoMigrate) because AutoMigrate maps the structs' Postgres/
 // SQLite tags (type:varchar(255) -> FixedString(255), etc.) incorrectly for
@@ -318,7 +318,7 @@ func clickhouseReconcileSkipIndexes(ctx context.Context, db *gorm.DB, table, clu
 	return nil
 }
 
-// chLogsTTL derives the logs/mcp_tool_logs TTL clause from the configured
+// chLogsTTL derives the logs TTL clause from the configured
 // retention. Values < 1 return "" which means the TTL is not managed by
 // Bifrost: new tables get none and existing tables keep whatever they have
 // (the LogsCleaner still prunes with one lightweight delete per run).

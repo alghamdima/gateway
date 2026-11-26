@@ -25,9 +25,6 @@ func (stubConfigManager) ReloadClientConfigFromConfigStore(context.Context) erro
 func (stubConfigManager) UpdateSyncConfig(context.Context) error                          { return nil }
 func (stubConfigManager) ForceReloadPricing(context.Context) error                        { return nil }
 func (stubConfigManager) UpdateDropExcessRequests(context.Context, bool)                  {}
-func (stubConfigManager) UpdateMCPToolManagerConfig(context.Context, int, int, string, bool, int, int, *schemas.MCPCodeModeLimits) error {
-	return nil
-}
 func (stubConfigManager) ReloadPlugin(context.Context, string, *string, any, *schemas.PluginPlacement, *int) error {
 	return nil
 }
@@ -88,74 +85,6 @@ func TestUpdateConfig_PersistsVKRotationCooldown(t *testing.T) {
 	})
 }
 
-// PUT /api/config sets the global MCP max protocol version; omitting it keeps the stored cap, so a
-// caller unaware of the field never lifts the upgrade pin, and an unsupported value is rejected.
-func TestUpdateConfig_MCPMaxProtocolVersion(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	save := func(t *testing.T, body string) int {
-		t.Helper()
-		ctx := putConfigCtx(`{"client_config":{` + body + `"log_retention_days":7}}`)
-		h.updateConfig(ctx)
-		return ctx.Response.StatusCode()
-	}
-	stored := func(t *testing.T) string {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted.MCPMaxProtocolVersion
-	}
-
-	require.Equal(t, fasthttp.StatusOK, save(t, `"mcp_max_protocol_version":"2025-06-18",`))
-	assert.Equal(t, "2025-06-18", stored(t))
-
-	require.Equal(t, fasthttp.StatusOK, save(t, ``))
-	assert.Equal(t, "2025-06-18", stored(t), "omitted keeps the cap")
-
-	require.Equal(t, fasthttp.StatusBadRequest, save(t, `"mcp_max_protocol_version":"latest",`))
-	assert.Equal(t, "2025-06-18", stored(t))
-
-	require.Equal(t, fasthttp.StatusOK, save(t, `"mcp_max_protocol_version":"auto",`))
-	assert.Equal(t, "auto", stored(t))
-
-	// The /mcp cap is a separate field with the same rules.
-	storedServer := func(t *testing.T) string {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted.MCPServerMaxProtocolVersion
-	}
-	require.Equal(t, fasthttp.StatusOK, save(t, `"mcp_server_max_protocol_version":"2025-06-18",`))
-	assert.Equal(t, "2025-06-18", storedServer(t))
-	assert.Equal(t, "auto", stored(t), "the upstream cap is untouched")
-	require.Equal(t, fasthttp.StatusOK, save(t, ``))
-	assert.Equal(t, "2025-06-18", storedServer(t), "omitted keeps the cap")
-	require.Equal(t, fasthttp.StatusBadRequest, save(t, `"mcp_server_max_protocol_version":"latest",`))
-	require.Equal(t, fasthttp.StatusOK, save(t, `"mcp_server_max_protocol_version":"auto",`))
-	assert.Equal(t, "auto", storedServer(t))
-
-	// A refused cap changes nothing live: drop_excess_requests in the same request is not applied.
-	recorder := &dropExcessRecorder{}
-	h.configManager = recorder
-	require.Equal(t, fasthttp.StatusBadRequest, save(t, `"drop_excess_requests":true,"mcp_server_max_protocol_version":"latest",`))
-	assert.Empty(t, recorder.applied, "drop_excess_requests was applied before the cap was refused")
-	persisted, err := store.GetClientConfig(bgCtx())
-	require.NoError(t, err)
-	assert.False(t, persisted.DropExcessRequests)
-}
-
-// dropExcessRecorder records the drop_excess_requests values a config save applies live.
-type dropExcessRecorder struct {
-	stubConfigManager
-	applied []bool
-}
-
-func (r *dropExcessRecorder) UpdateDropExcessRequests(_ context.Context, value bool) {
-	r.applied = append(r.applied, value)
-}
-
 // tokenizerRecorder records the tokenizer families each post-save reload hands to the
 // running client. Like the server's reload, it reads the stored list.
 type tokenizerRecorder struct {
@@ -212,7 +141,7 @@ func TestUpdateConfig_UsageEstimationTokenizers(t *testing.T) {
 	assert.Len(t, recorder.applied, 2, "a rejected list is never applied")
 
 	// A valid list on a request that a later check rejects must not reach the runtime.
-	require.Equal(t, fasthttp.StatusBadRequest, save(t, `"usage_estimation_tokenizers":["deepseek"],"mcp_code_mode_binding_level":"bogus",`))
+	require.Equal(t, fasthttp.StatusBadRequest, save(t, `"usage_estimation_tokenizers":["deepseek"],"header_filter_config":{"allowlist":["x-*-bad"]},`))
 	assert.Equal(t, []string{"anthropic", "llama3"}, stored(t))
 	assert.Len(t, recorder.applied, 2, "a list on a rejected request is never applied")
 

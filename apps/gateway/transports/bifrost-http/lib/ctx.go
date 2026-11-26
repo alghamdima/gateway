@@ -291,7 +291,7 @@ func ExtraFieldsInHeaders(ctx *fasthttp.RequestCtx) bool {
 //	bifrostCtx, cancel := ConvertToBifrostContext(fastCtx, handlerStore)
 //	defer cancel() // Ensure cleanup
 //	// bifrostCtx now contains propagated header values including Prometheus metrics,
-//	// Maxim tracing data, MCP filters, governance keys, API keys, cache settings,
+//	// Maxim tracing data, governance keys, API keys, cache settings,
 //	// session stickiness, and extra headers
 
 // ClientForwardedIP returns the leftmost X-Forwarded-For entry, else X-Real-IP, else "".
@@ -309,7 +309,7 @@ func ClientForwardedIP(ctx *fasthttp.RequestCtx) string {
 func ConvertToBifrostContext(ctx *fasthttp.RequestCtx, store HandlerStore) (*schemas.BifrostContext, context.CancelFunc) {
 	// "transport-context" overhead phase: building the request-scoped BifrostContext —
 	// child-context alloc, request-id resolution, and the full request-header iteration
-	// that populates dimensions/tags/mcp-header maps. It runs inside the root http.request
+	// that populates dimensions/tags maps. It runs inside the root http.request
 	// span but on no phase span, so it would otherwise fold into the residual "core"
 	// bucket. The tracer + root span live on the fasthttp ctx (set by TracingMiddleware),
 	// so this parents to the root span. Nil-safe when no trace is active.

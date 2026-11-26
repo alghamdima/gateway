@@ -30,7 +30,6 @@ func setupPerfTestDB(t *testing.T) (*RDBLogStore, *gorm.DB) {
 	for _, view := range legacyMatViewNames {
 		db.Exec("DROP MATERIALIZED VIEW IF EXISTS " + view + " CASCADE")
 	}
-	db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS logs CASCADE")
 	db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)")
@@ -55,7 +54,6 @@ func setupPerfTestDB(t *testing.T) (*RDBLogStore, *gorm.DB) {
 		for _, view := range legacyMatViewNames {
 			db.Exec("DROP MATERIALIZED VIEW IF EXISTS " + view + " CASCADE")
 		}
-		db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS logs CASCADE")
 		db.Exec("DELETE FROM migrations")
@@ -155,30 +153,6 @@ func insertPerfLog(t *testing.T, db *gorm.DB, opts logOpts) {
 		opts.VirtualKeyID, opts.VirtualKeyName, opts.SelectedKeyID, opts.SelectedKeyName,
 		opts.RoutingRuleID, opts.RoutingRuleName, opts.StopReason, opts.Timestamp).Error
 	require.NoError(t, err, "Failed to insert test log")
-}
-
-type mcpLogOpts struct {
-	ToolName       string
-	ServerLabel    string
-	Timestamp      time.Time
-	VirtualKeyID   string
-	VirtualKeyName string
-	Arguments      string
-	Result         string
-}
-
-func insertPerfMCPLog(t *testing.T, db *gorm.DB, opts mcpLogOpts) {
-	t.Helper()
-	id := uuid.New().String()
-	err := db.Exec(`
-		INSERT INTO mcp_tool_logs (id, llm_request_id, tool_name, server_label,
-			timestamp, status, latency, cost,
-			virtual_key_id, virtual_key_name, arguments, result, created_at)
-		VALUES (?, ?, ?, ?, ?, 'success', 50, 0.001, ?, ?, ?, ?, ?)
-	`, id, uuid.New().String(), opts.ToolName, opts.ServerLabel,
-		opts.Timestamp, opts.VirtualKeyID, opts.VirtualKeyName,
-		opts.Arguments, opts.Result, opts.Timestamp).Error
-	require.NoError(t, err, "Failed to insert MCP test log")
 }
 
 // refreshTestMatViews refreshes materialized views after inserting test data.
@@ -439,7 +413,6 @@ func TestEnsurePerformanceIndexes(t *testing.T) {
 		t.Skip("Postgres not available, skipping test")
 	}
 
-	db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 	db.Exec("DROP TABLE IF EXISTS logs CASCADE")
 	db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)")
@@ -453,7 +426,6 @@ func TestEnsurePerformanceIndexes(t *testing.T) {
 		for _, idx := range performanceIndexes {
 			db.Exec("DROP INDEX IF EXISTS " + idx.name)
 		}
-		db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE")
 		db.Exec("DROP TABLE IF EXISTS logs CASCADE")
 		db.Exec("DELETE FROM migrations")

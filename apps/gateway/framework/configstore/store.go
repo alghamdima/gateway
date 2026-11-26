@@ -421,7 +421,6 @@ type ConfigStore interface {
 	// Returns the number of locks cleaned up.
 	CleanupExpiredLocks(ctx context.Context) (int64, error)
 
-
 	// Not found retry wrapper
 	RetryOnNotFound(ctx context.Context, fn func(ctx context.Context) (any, error), maxRetries int, retryDelay time.Duration) (any, error)
 

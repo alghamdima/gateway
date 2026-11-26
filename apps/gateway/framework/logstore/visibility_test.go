@@ -85,10 +85,6 @@ func TestHiddenRequestTypesReads(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), stats.TotalRequests)
 
-	// The consolidated dashboard also reads MCP tables, which lack object_type.
-	require.NoError(t, err)
-	require.NoError(t, err)
-
 	allHidden := context.WithValue(base, HiddenRequestTypesContextKey, []string{"count_tokens", "embedding", "chat_completion", "responses", "chat_completion_stream"})
 	hasLogs, err := s.HasLogs(allHidden)
 	require.NoError(t, err)

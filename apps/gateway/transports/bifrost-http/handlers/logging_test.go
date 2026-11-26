@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +16,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
-	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/queryscope"
 	"github.com/maximhq/bifrost/framework/sidekiq"
@@ -38,99 +35,6 @@ func TestShouldUseFilterDataCacheAllowsUnscopedEmptyQuery(t *testing.T) {
 	if !shouldUseFilterDataCache(context.Background(), "   ") {
 		t.Fatal("expected whitespace-only query to use filterdata cache")
 	}
-}
-
-// TestParseComplexityFilters verifies complexity-specific query filters are
-// parsed independently from generic log filters.
-// mcpScopeOptionsLogManager serves one fixed option per MCP scope dimension and none for the others.
-type mcpScopeOptionsLogManager struct {
-	loggingplugin.LogManager
-}
-
-func (mcpScopeOptionsLogManager) GetAvailableToolNames(context.Context, int, string) ([]string, error) {
-	return nil, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableServerLabels(context.Context, int, string) ([]string, error) {
-	return nil, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPApps(context.Context, int, string) ([]string, error) {
-	return nil, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPUserAgents(context.Context, int, string) ([]string, error) {
-	return nil, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPVirtualKeys(context.Context, int, string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPUsers(context.Context, int, string) ([]loggingplugin.KeyPair, error) {
-	return []loggingplugin.KeyPair{{ID: "user-1", Name: "Ada"}}, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPTeams(context.Context, int, string) ([]loggingplugin.KeyPair, error) {
-	return []loggingplugin.KeyPair{{ID: "team-1", Name: "Platform"}}, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPCustomers(context.Context, int, string) ([]loggingplugin.KeyPair, error) {
-	return []loggingplugin.KeyPair{{ID: "customer-1", Name: "Acme"}}, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPBusinessUnits(context.Context, int, string) ([]loggingplugin.KeyPair, error) {
-	return []loggingplugin.KeyPair{{ID: "bu-1", Name: "Advisory"}}, nil
-}
-func (mcpScopeOptionsLogManager) GetAvailableMCPProjects(context.Context, int, string) ([]loggingplugin.KeyPair, error) {
-	return []loggingplugin.KeyPair{{ID: "project-1", Name: "Apollo"}}, nil
-}
-
-// TestGetMCPLogsFilterDataServesScopeDimensions pins the user, team, customer, business unit and project
-// options on /api/mcp-logs/filterdata, each as {id, name} pairs like /api/logs/filterdata, and that
-// a narrowed request carries only the dimensions it named.
-func TestGetMCPLogsFilterDataServesScopeDimensions(t *testing.T) {
-	SetLogger(&mockLogger{})
-	fetch := func(t *testing.T, dimensions string) map[string][]loggingplugin.KeyPair {
-		t.Helper()
-		h := &LoggingHandler{logManager: mcpScopeOptionsLogManager{}}
-		var req fasthttp.Request
-		// A search query bypasses the filter-data cache, which a bare handler lacks.
-		req.SetRequestURI("/api/mcp-logs/filterdata?dimensions=" + dimensions + "&q=a")
-		ctx := &fasthttp.RequestCtx{}
-		ctx.Init(&req, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, nil)
-		h.getMCPLogsFilterData(ctx)
-		require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-		var body map[string][]loggingplugin.KeyPair
-		require.NoError(t, json.Unmarshal(ctx.Response.Body(), &body), string(ctx.Response.Body()))
-		return body
-	}
-
-	require.Equal(t, map[string][]loggingplugin.KeyPair{
-		"users":          {{ID: "user-1", Name: "Ada"}},
-		"teams":          {{ID: "team-1", Name: "Platform"}},
-		"customers":      {{ID: "customer-1", Name: "Acme"}},
-		"business_units": {{ID: "bu-1", Name: "Advisory"}},
-		"projects":       {{ID: "project-1", Name: "Apollo"}},
-	}, fetch(t, "users,teams,customers,business_units,projects"))
-	require.Equal(t, map[string][]loggingplugin.KeyPair{"teams": {{ID: "team-1", Name: "Platform"}}}, fetch(t, "teams"))
-}
-
-// TestGetMCPLatencyHistogramServesPercentiles pins GET /api/mcp-logs/histogram/latency: it reads the MCP
-// filters and the window's bucket size, as /api/mcp-logs/histogram does, and returns the store's buckets
-// in the /api/logs/histogram/latency shape.
-func TestGetMCPLatencyHistogramServesPercentiles(t *testing.T) {
-	SetLogger(&mockLogger{})
-	mgr := &dashboardLogManager{}
-	h := &LoggingHandler{logManager: mgr}
-	var req fasthttp.Request
-	req.SetRequestURI("/api/mcp-logs/histogram/latency?tool_names=calculator&period=24h")
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Init(&req, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, nil)
-
-	h.getMCPLatencyHistogram(ctx)
-
-	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	require.Equal(t, []string{"calculator"}, mgr.lastMCPFilters.ToolNames)
-	require.NotNil(t, mgr.lastMCPFilters.StartTime)
-	require.Equal(t, calculateBucketSize(mgr.lastMCPFilters.StartTime, mgr.lastMCPFilters.EndTime), mgr.mcpLatencyBucketSize)
-	var body logstore.LatencyHistogramResult
-	require.NoError(t, json.Unmarshal(ctx.Response.Body(), &body))
-	require.Len(t, body.Buckets, 1)
-	require.EqualValues(t, 3, body.Buckets[0].TotalRequests)
-	require.InDelta(t, 29, body.Buckets[0].P95Latency, 1e-9)
 }
 
 func TestParseComplexityFilters(t *testing.T) {
@@ -328,63 +232,6 @@ func TestShouldUseFilterDataCacheRejectsScopedContext(t *testing.T) {
 	}
 }
 
-// TestGetMCPLogByIDRedactionMapping verifies raw mappings stay hidden and only resolver-approved mappings are returned.
-func TestGetMCPLogByIDRedactionMapping(t *testing.T) {
-	SetLogger(&mockLogger{})
-	revealed := &schemas.RedactionMapsByPhase{
-		Input: map[string]string{"EMAIL-1": "revealed@example.com"},
-	}
-	tests := []struct {
-		name        string
-		resolver    *staticMCPLogRedactionResolver
-		wantMapping bool
-		wantCalls   int
-	}{
-		{name: "no resolver"},
-		{name: "authorized mapping", resolver: &staticMCPLogRedactionResolver{mapping: revealed}, wantMapping: true, wantCalls: 1},
-		{name: "resolver error", resolver: &staticMCPLogRedactionResolver{err: errors.New("decode failed")}, wantCalls: 1},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			manager := &dashboardLogManager{mcpLog: &logstore.MCPToolLog{
-				ID:               "mcp-1",
-				RedactionMapping: `plain:{"input":{"EMAIL-1":"private@example.com"}}`,
-			}}
-			handler := &LoggingHandler{logManager: manager}
-			if tt.resolver != nil {
-				handler.SetMCPLogRedactionMappingResolver(tt.resolver)
-			}
-			ctx := &fasthttp.RequestCtx{}
-			ctx.SetUserValue("id", "mcp-1")
-
-			handler.getMCPLogByID(ctx)
-
-			if ctx.Response.StatusCode() != fasthttp.StatusOK {
-				t.Fatalf("status = %d, want %d", ctx.Response.StatusCode(), fasthttp.StatusOK)
-			}
-			var response struct {
-				RedactionMapping *schemas.RedactionMapsByPhase `json:"redaction_mapping"`
-			}
-			if err := json.Unmarshal(ctx.Response.Body(), &response); err != nil {
-				t.Fatalf("decode response: %v", err)
-			}
-			if bytes.Contains(ctx.Response.Body(), []byte("private@example.com")) {
-				t.Fatalf("raw persisted mapping leaked in response: %s", ctx.Response.Body())
-			}
-			if tt.wantMapping != (response.RedactionMapping != nil) {
-				t.Fatalf("redaction mapping present = %t, want %t", response.RedactionMapping != nil, tt.wantMapping)
-			}
-			if tt.wantMapping && response.RedactionMapping.Input["EMAIL-1"] != "revealed@example.com" {
-				t.Fatalf("revealed mapping = %#v", response.RedactionMapping)
-			}
-			if tt.resolver != nil && tt.resolver.calls != tt.wantCalls {
-				t.Fatalf("resolver calls = %d, want %d", tt.resolver.calls, tt.wantCalls)
-			}
-		})
-	}
-}
-
 // timestampHintLogManager records the timestamp hint GET /api/logs/{id} hands the store.
 type timestampHintLogManager struct {
 	loggingplugin.LogManager
@@ -532,7 +379,7 @@ func TestGetDashboard(t *testing.T) {
 				if err := json.Unmarshal(body, &payload); err != nil {
 					t.Fatalf("decode dashboard response: %v", err)
 				}
-				for _, key := range []string{"meta", "overview", "provider_usage", "model_rankings", "dimension_rankings", "mcp"} {
+				for _, key := range []string{"meta", "overview", "provider_usage", "model_rankings", "dimension_rankings"} {
 					if _, ok := payload[key]; !ok {
 						t.Fatalf("expected top-level key %q in response", key)
 					}
@@ -550,9 +397,6 @@ func TestGetDashboard(t *testing.T) {
 				if got := mgr.lastLLMFilters.Providers; len(got) != 1 || got[0] != "openai" {
 					t.Fatalf("expected LLM providers filter, got %#v", got)
 				}
-				if got := mgr.lastMCPFilters.ToolNames; len(got) != 1 || got[0] != "calculator" {
-					t.Fatalf("expected MCP tool_names filter, got %#v", got)
-				}
 			},
 		},
 		{
@@ -568,23 +412,6 @@ func TestGetDashboard(t *testing.T) {
 							t.Fatalf("expected error payload, got partial dashboard: %s", string(body))
 						}
 					}
-				}
-			},
-		},
-		{
-			name:       "MCP filters are isolated from LLM filters",
-			query:      "providers=openai&models=gpt-4&tool_names=calculator,clock&server_labels=primary&virtual_key_ids=vk-llm",
-			wantStatus: fasthttp.StatusOK,
-			assert: func(t *testing.T, mgr *dashboardLogManager, body []byte) {
-				t.Helper()
-				if len(mgr.lastLLMFilters.Providers) != 1 || mgr.lastLLMFilters.Providers[0] != "openai" {
-					t.Fatalf("expected LLM providers filter, got %#v", mgr.lastLLMFilters.Providers)
-				}
-				if len(mgr.lastMCPFilters.ToolNames) != 2 {
-					t.Fatalf("expected MCP tool filters, got %#v", mgr.lastMCPFilters.ToolNames)
-				}
-				if mgr.lastLLMFilters.ContentSearch == "calculator" {
-					t.Fatal("MCP tool_names leaked into LLM filters")
 				}
 			},
 		},
@@ -1058,18 +885,10 @@ type dashboardLogManager struct {
 	// statsFunc, when set, supplies the SearchStats for each GetStats call so a
 	// test can tell the current and previous periods apart.
 	statsFunc              func(filters *logstore.SearchFilters) (*logstore.SearchStats, error)
-	mcpStatsCalls          []logstore.MCPToolLogSearchFilters // every GetMCPToolLogStats filter, in call order
-	mcpStatsFunc           func(filters *logstore.MCPToolLogSearchFilters) (*logstore.MCPToolLogStats, error)
-	mcpLatencyBucketSize   int64
 	projects               []loggingplugin.KeyPair
-	mcpLog                 *logstore.MCPToolLog
 	lastLLMFilters         logstore.SearchFilters
-	lastMCPFilters         logstore.MCPToolLogSearchFilters
 	lastRecalculateFilters logstore.SearchFilters
 	lastRecalculateContext chan context.Context
-	deleteMCPCalls         int
-	deleteMCPIDs           []string
-	deleteMCPError         error
 	// rankings, when set, supplies the rows GetDimensionRankings returns per dimension.
 	rankings map[logstore.RankingDimension][]logstore.DimensionRankingWithTrend
 	// logs, when set, are the rows GetLog serves by id; searchLogs are what
@@ -1299,211 +1118,6 @@ func (m *dashboardLogManager) RunCostRecalcJob(ctx context.Context, metaJSON str
 	return metaJSON, nil
 }
 
-// GetMCPToolLog implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetMCPToolLog(ctx context.Context, id string) (*logstore.MCPToolLog, error) {
-	if m.mcpLog == nil {
-		return nil, nil
-	}
-	entry := *m.mcpLog
-	return &entry, nil
-}
-
-// SearchMCPToolLogs implements the test double used by logging handler tests.
-func (m *dashboardLogManager) SearchMCPToolLogs(ctx context.Context, filters *logstore.MCPToolLogSearchFilters, pagination *logstore.PaginationOptions) (*logstore.MCPToolLogSearchResult, error) {
-	return nil, nil
-}
-
-// GetMCPToolLogStats implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetMCPToolLogStats(ctx context.Context, filters *logstore.MCPToolLogSearchFilters) (*logstore.MCPToolLogStats, error) {
-	m.mcpStatsCalls = append(m.mcpStatsCalls, *filters)
-	if m.mcpStatsFunc != nil {
-		return m.mcpStatsFunc(filters)
-	}
-	return &logstore.MCPToolLogStats{}, nil
-}
-
-// GetAvailableToolNames implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableToolNames(ctx context.Context, limit int, query string) ([]string, error) {
-	return nil, nil
-}
-
-// GetAvailableServerLabels implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableServerLabels(ctx context.Context, limit int, query string) ([]string, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPVirtualKeys implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPVirtualKeys(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPUsers implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPUsers(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPTeams implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPTeams(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPCustomers implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPCustomers(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPBusinessUnits implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPBusinessUnits(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPProjects implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPProjects(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetMCPHistogram implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetMCPHistogram(ctx context.Context, filters logstore.MCPToolLogSearchFilters, bucketSizeSeconds int64) (*logstore.MCPHistogramResult, error) {
-	m.lastMCPFilters = filters
-	return &logstore.MCPHistogramResult{}, nil
-}
-
-// GetMCPLatencyHistogram implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetMCPLatencyHistogram(ctx context.Context, filters logstore.MCPToolLogSearchFilters, bucketSizeSeconds int64) (*logstore.LatencyHistogramResult, error) {
-	m.lastMCPFilters = filters
-	m.mcpLatencyBucketSize = bucketSizeSeconds
-	return &logstore.LatencyHistogramResult{
-		Buckets:           []logstore.LatencyHistogramBucket{{AvgLatency: 20, P95Latency: 29, TotalRequests: 3}},
-		BucketSizeSeconds: bucketSizeSeconds,
-	}, nil
-}
-
-// GetMCPCostHistogram implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetMCPCostHistogram(ctx context.Context, filters logstore.MCPToolLogSearchFilters, bucketSizeSeconds int64) (*logstore.MCPCostHistogramResult, error) {
-	return &logstore.MCPCostHistogramResult{}, nil
-}
-
-// GetMCPTopTools implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetMCPTopTools(ctx context.Context, filters logstore.MCPToolLogSearchFilters, limit int) (*logstore.MCPTopToolsResult, error) {
-	return &logstore.MCPTopToolsResult{}, nil
-}
-
-// DeleteMCPToolLogs implements the test double used by logging handler tests.
-func (m *dashboardLogManager) DeleteMCPToolLogs(ctx context.Context, ids []string) error {
-	m.deleteMCPCalls++
-	m.deleteMCPIDs = append([]string(nil), ids...)
-	return m.deleteMCPError
-}
-
-type mcpLogAuthStore struct {
-	configstore.ConfigStore
-}
-
-func (*mcpLogAuthStore) GetSession(_ context.Context, token string) (*tables.SessionsTable, error) {
-	if token == "admin-session" {
-		return &tables.SessionsTable{ExpiresAt: time.Now().Add(time.Hour)}, nil
-	}
-	return nil, nil
-}
-
-func TestDeleteMCPLogsRequiresAuthenticatedAdmin(t *testing.T) {
-	SetLogger(&mockLogger{})
-	passwordHash, err := encrypt.Hash("password")
-	require.NoError(t, err)
-	enabled := &configstore.AuthConfig{
-		AdminUserName: schemas.NewSecretVar("admin"),
-		AdminPassword: schemas.NewSecretVar(passwordHash),
-		IsEnabled:     true,
-	}
-	disabled := &configstore.AuthConfig{IsEnabled: false}
-	basic := "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:password"))
-	validBody := `{"ids":["mcp-1","mcp-2"]}`
-
-	for _, tc := range []struct {
-		name          string
-		authConfig    *configstore.AuthConfig
-		noConfigStore bool
-		whitelist     []string
-		authorization string
-		cookie        string
-		body          string
-		storeError    error
-		wantStatus    int
-		wantCallCount int
-		wantError     string
-	}{
-		{name: "auth unconfigured", body: validBody, wantStatus: fasthttp.StatusForbidden},
-		{name: "auth unconfigured malformed body", body: `{`, wantStatus: fasthttp.StatusForbidden},
-		{name: "auth disabled", authConfig: disabled, body: validBody, wantStatus: fasthttp.StatusForbidden},
-		{name: "auth disabled with credentials", authConfig: disabled, authorization: basic, body: validBody, wantStatus: fasthttp.StatusForbidden},
-		{name: "no config store", noConfigStore: true, body: validBody, wantStatus: fasthttp.StatusForbidden},
-		{name: "exact whitelist", authConfig: enabled, whitelist: []string{"/api/mcp-logs"}, body: validBody, wantStatus: fasthttp.StatusForbidden},
-		{name: "wildcard whitelist with credentials", authConfig: enabled, whitelist: []string{"/api/*"}, authorization: basic, body: validBody, wantStatus: fasthttp.StatusForbidden},
-		{name: "no credentials", authConfig: enabled, body: validBody, wantStatus: fasthttp.StatusUnauthorized},
-		{name: "invalid credentials", authConfig: enabled, authorization: "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:wrong")), body: validBody, wantStatus: fasthttp.StatusUnauthorized},
-		{name: "invalid session", authConfig: enabled, cookie: "invalid-session", body: validBody, wantStatus: fasthttp.StatusUnauthorized},
-		{name: "basic admin", authConfig: enabled, authorization: basic, body: validBody, wantStatus: fasthttp.StatusOK, wantCallCount: 1},
-		{name: "bearer session admin", authConfig: enabled, authorization: "Bearer admin-session", body: validBody, wantStatus: fasthttp.StatusOK, wantCallCount: 1},
-		{name: "cookie session admin", authConfig: enabled, cookie: "admin-session", body: validBody, wantStatus: fasthttp.StatusOK, wantCallCount: 1},
-		{name: "authenticated malformed body", authConfig: enabled, authorization: basic, body: `{`, wantStatus: fasthttp.StatusBadRequest, wantError: "Invalid JSON"},
-		{name: "authenticated empty IDs", authConfig: enabled, authorization: basic, body: `{"ids":[]}`, wantStatus: fasthttp.StatusBadRequest, wantError: "No log IDs provided"},
-		{name: "authenticated storage failure", authConfig: enabled, authorization: basic, body: validBody, storeError: errors.New("storage unavailable"), wantStatus: fasthttp.StatusInternalServerError, wantCallCount: 1, wantError: "Failed to delete MCP tool logs"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			manager := &dashboardLogManager{deleteMCPError: tc.storeError}
-			h := &LoggingHandler{logManager: manager}
-			am := &AuthMiddleware{store: &mcpLogAuthStore{}}
-			am.UpdateAuthConfig(tc.authConfig)
-			am.UpdateWhitelistedRoutes(tc.whitelist)
-			middleware := am.APIMiddleware()
-			if tc.noConfigStore {
-				middleware = AuthBypassedMiddleware(nil, tc.whitelist)
-			}
-			r := router.New()
-			h.RegisterRoutes(r, middleware)
-			var req fasthttp.Request
-			req.Header.SetMethod(fasthttp.MethodDelete)
-			req.SetRequestURI("/api/mcp-logs")
-			req.SetBodyString(tc.body)
-			req.Header.Set("Authorization", tc.authorization)
-			if tc.cookie != "" {
-				req.Header.SetCookie("token", tc.cookie)
-			}
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Init(&req, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, nil)
-
-			r.Handler(ctx)
-
-			require.Equal(t, tc.wantStatus, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-			require.Equal(t, tc.wantCallCount, manager.deleteMCPCalls)
-			if tc.wantStatus == fasthttp.StatusForbidden {
-				require.Contains(t, string(ctx.Response.Body()), "requires an authenticated admin session")
-			}
-			if tc.wantError != "" {
-				require.Contains(t, string(ctx.Response.Body()), tc.wantError)
-			}
-			if tc.wantCallCount != 0 {
-				require.Equal(t, []string{"mcp-1", "mcp-2"}, manager.deleteMCPIDs)
-			} else {
-				require.Empty(t, manager.deleteMCPIDs)
-			}
-		})
-	}
-}
-
-// staticMCPLogRedactionResolver records calls and returns a configured reveal result.
-type staticMCPLogRedactionResolver struct {
-	mapping *schemas.RedactionMapsByPhase
-	err     error
-	calls   int
-}
-
-// ResolveMCPLogRedactionMapping returns the configured test result.
-func (r *staticMCPLogRedactionResolver) ResolveMCPLogRedactionMapping(_ *fasthttp.RequestCtx, _ *logstore.MCPToolLog) (*schemas.RedactionMapsByPhase, error) {
-	r.calls++
-	return r.mapping, r.err
-}
-
 // CreateUserAgentMapping implements the test double used by logging handler tests.
 func (m *dashboardLogManager) CreateUserAgentMapping(ctx context.Context, mapping *logstore.UserAgentMapping) (*logstore.UserAgentMapping, error) {
 	return nil, nil
@@ -1531,16 +1145,6 @@ func (m *dashboardLogManager) GetAvailableUserAgents(ctx context.Context, _ int,
 
 // GetAvailableApps implements the test double used by logging handler tests.
 func (m *dashboardLogManager) GetAvailableApps(ctx context.Context, _ int, _ string) ([]string, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPApps implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPApps(ctx context.Context, _ int, _ string) ([]string, error) {
-	return nil, nil
-}
-
-// GetAvailableMCPUserAgents implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableMCPUserAgents(ctx context.Context, _ int, _ string) ([]string, error) {
 	return nil, nil
 }
 
@@ -1625,7 +1229,7 @@ func TestFilterDataListsProjects(t *testing.T) {
 }
 
 // TestCorrelationFilterParsing keeps scalar correlation filters identical across
-// LLM list/stats/histogram and MCP list/stats/analytics endpoints.
+// LLM list/stats/histogram endpoints.
 func TestCorrelationFilterParsing(t *testing.T) {
 	var ctx fasthttp.RequestCtx
 	ctx.Request.SetRequestURI("/api/logs?session_id=session-1&agent_correlation_id=agent-1")
@@ -1638,47 +1242,6 @@ func TestCorrelationFilterParsing(t *testing.T) {
 	}
 	if got := parseHistogramFilters(&ctx); got.SessionID != "session-1" || got.AgentCorrelationID != "agent-1" {
 		t.Fatalf("lost LLM histogram correlation filters: %+v", got)
-	}
-
-	list, _, err := parseMCPFiltersAndPagination(&ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stats, err := parseMCPFilters(&ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	analytics, err := parseMCPHistogramFilters(&ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, filters := range []*logstore.MCPToolLogSearchFilters{list, stats, analytics} {
-		if filters.SessionID != "session-1" || filters.AgentCorrelationID != "agent-1" {
-			t.Fatalf("lost MCP correlation filters: %+v", filters)
-		}
-	}
-}
-
-// TestMCPAttributionFilterParsing keeps detail-link filters identical across list and analytics endpoints.
-func TestMCPAttributionFilterParsing(t *testing.T) {
-	var ctx fasthttp.RequestCtx
-	ctx.Request.SetRequestURI("/api/mcp-logs?user_ids=u1,u2&team_ids=t1&customer_ids=c1&business_unit_ids=b1&project_ids=p1&device_ids=d1")
-	list, _, err := parseMCPFiltersAndPagination(&ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stats, err := parseMCPFilters(&ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	histogram, err := parseMCPHistogramFilters(&ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, filters := range []*logstore.MCPToolLogSearchFilters{list, stats, histogram} {
-		if !reflect.DeepEqual(filters.UserIDs, []string{"u1", "u2"}) || !reflect.DeepEqual(filters.TeamIDs, []string{"t1"}) || !reflect.DeepEqual(filters.CustomerIDs, []string{"c1"}) || !reflect.DeepEqual(filters.BusinessUnitIDs, []string{"b1"}) || !reflect.DeepEqual(filters.ProjectIDs, []string{"p1"}) || !reflect.DeepEqual(filters.DeviceIDs, []string{"d1"}) {
-			t.Fatalf("lost attribution filters: %+v", filters)
-		}
 	}
 }
 

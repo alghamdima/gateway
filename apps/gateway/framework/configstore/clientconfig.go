@@ -115,7 +115,7 @@ type ClientConfig struct {
 	RequiredHeaders                         []string                              `json:"required_headers,omitempty"`                    // Headers that must be present on every request (case-insensitive)
 	LoggingHeaders                          []string                              `json:"logging_headers,omitempty"`                     // Headers to capture in log metadata
 	WhitelistedRoutes                       []string                              `json:"whitelisted_routes,omitempty"`                  // Routes that bypass auth middleware
-	HideDeletedVirtualKeysInFilters         bool                                  `json:"hide_deleted_virtual_keys_in_filters"`          // Hide deleted virtual keys from logs/MCP filter data
+	HideDeletedVirtualKeysInFilters         bool                                  `json:"hide_deleted_virtual_keys_in_filters"`          // Hide deleted virtual keys from logs filter data
 	DeleteExpiredVirtualKeys                bool                                  `json:"delete_expired_virtual_keys"`                   // Delete expired virtual keys by default; a key's delete_after_expire overrides this
 	EnforceVKObjectOwnership                bool                                  `json:"enforce_vk_object_ownership"`                   // Restrict provider objects (files, batches, containers, ...) to the virtual key that created them
 	SkipAccessProfileUserVirtualKeyCreation bool                                  `json:"skip_access_profile_user_virtual_key_creation"` // Enterprise: a user's first access profile does not create a virtual key for them
@@ -2112,4 +2112,3 @@ func ValidatePublicBaseURL(value string) error {
 	}
 	return nil
 }
-

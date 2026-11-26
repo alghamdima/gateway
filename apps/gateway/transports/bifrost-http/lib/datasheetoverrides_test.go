@@ -38,8 +38,7 @@ func datasheetOverrideTestConfig(t *testing.T, withStore bool) *Config {
 		t.Cleanup(func() { _ = cs.Close(ctx) })
 	}
 	pricingURL, paramsURL := "file://"+pricingPath, "file://"+paramsPath
-	disabled := int64(0)
-	mc, err := modelcatalog.Init(ctx, &modelcatalog.Config{PricingURL: &pricingURL, ModelParametersURL: &paramsURL, MCPLibrarySyncInterval: &disabled}, cs, bifrost.NewNoOpLogger())
+	mc, err := modelcatalog.Init(ctx, &modelcatalog.Config{PricingURL: &pricingURL, ModelParametersURL: &paramsURL}, cs, bifrost.NewNoOpLogger())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = mc.Cleanup() })
 	return &Config{ConfigStore: cs, ModelCatalog: mc}

@@ -604,14 +604,6 @@ func (m *mockRealtimeMintingGovernancePlugin) PostLLMHook(_ *schemas.BifrostCont
 	return result, bifrostErr, nil
 }
 
-func (m *mockRealtimeMintingGovernancePlugin) PreMCPHook(_ *schemas.BifrostContext, req *schemas.BifrostMCPRequest) (*schemas.BifrostMCPRequest, *schemas.MCPPluginShortCircuit, error) {
-	return req, nil, nil
-}
-
-func (m *mockRealtimeMintingGovernancePlugin) PostMCPHook(_ *schemas.BifrostContext, resp *schemas.BifrostMCPResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostMCPResponse, *schemas.BifrostError, error) {
-	return resp, bifrostErr, nil
-}
-
 func (m *mockRealtimeMintingGovernancePlugin) Cleanup() error {
 	return nil
 }

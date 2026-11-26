@@ -1891,8 +1891,7 @@ func (s *BifrostHTTPServer) PluginInitContext() context.Context {
 }
 
 // ReloadPlugin reloads a plugin with new instance and updates Bifrost core.
-// The plugin is checked for LLM and MCP interfaces independently and registered
-// to the appropriate arrays based on which interfaces it implements.
+// The plugin is registered to the appropriate arrays based on which interfaces it implements.
 func (s *BifrostHTTPServer) ReloadPlugin(ctx context.Context, name string, path *string, pluginConfig any, placement *schemas.PluginPlacement, order *int) error {
 	logger.Debug("reloading plugin %s", name)
 	// 0. A semantic_cache config gets the same validation config.json does, here rather than when
@@ -2038,7 +2037,7 @@ func (s *BifrostHTTPServer) dropCapturesOfDisabledRouting(ctx context.Context) {
 }
 
 // RemovePlugin removes a plugin from the server.
-// The plugin is removed from both LLM and MCP arrays independently if it exists in them.
+// The plugin is removed from the plugin arrays it is in.
 func (s *BifrostHTTPServer) RemovePlugin(ctx context.Context, displayName string) error {
 	// Get the actual plugin name from the display name
 	name, ok := s.Config.GetPluginNameByDisplayName(displayName)
@@ -2678,7 +2677,7 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	}
 
 	// Register routes
-	// /v1/mcp takes the /api chain. Copied now: apiMiddlewares and
+	// The /api chain is registered now: apiMiddlewares and
 	// inferenceMiddlewares grow from the same commonMiddlewares array, so an append
 	// to the inference chain below can overwrite an /api entry that fit in its
 	// spare capacity (AuthBypassedMiddleware, without a config store).

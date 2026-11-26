@@ -16,7 +16,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10
 	github.com/aws/smithy-go v1.27.1
 	github.com/bytedance/sonic v1.15.3-0.20260730064818-2a36d6da63e2
-	github.com/canonical/starlark v0.0.0-20260428155828-9a81051fac39
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/dlclark/regexp2/v2 v2.5.1
 	github.com/fasthttp/websocket v1.5.12
@@ -24,7 +23,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/klauspost/compress v1.20.3
-	github.com/mark3labs/mcp-go v1.5.0
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.18.0
@@ -56,22 +54,17 @@ require (
 	github.com/bytedance/sonic/loader v0.5.2 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dlclark/regexp2 v1.11.4 // indirect
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/molecule-man/go-brrr v1.0.1 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/savsgio/gotils v0.0.0-20250408102913-196191ec6287 // indirect
-	github.com/spf13/cast v1.10.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.47.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
@@ -82,4 +75,3 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 )
 
-replace github.com/mark3labs/mcp-go => github.com/maximhq/mcp-go v0.0.0-20261102181017-b7da3bc145a1

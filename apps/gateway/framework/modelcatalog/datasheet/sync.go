@@ -31,7 +31,7 @@ var (
 )
 
 // NewHTTPClient builds the client for every catalog feed download (pricing,
-// model parameters, MCP library). It is a var, not a direct call to
+// model parameters). It is a var, not a direct call to
 // network.NewPrivateNetworkHTTPClient, only so tests can wrap the transport:
 // the guarded client builds its own *http.Transport, so swapping
 // http.DefaultTransport no longer intercepts these fetches. Without this hook
@@ -264,8 +264,7 @@ func (s *Store) applyPricingData(pricingData map[string]Entry) {
 // sqlite config store treats a relative "path" value.
 //
 // Exported because every air-gapped source in the catalog resolves file:// URLs
-// the same way: the pricing datasheet, the model parameters datasheet, and the
-// MCP library catalog (modelcatalog.fetchMCPLibrary).
+// the same way: the pricing datasheet and the model parameters datasheet.
 func FilePathFromURL(parsed *url.URL) string {
 	if parsed.Opaque != "" {
 		return parsed.Opaque

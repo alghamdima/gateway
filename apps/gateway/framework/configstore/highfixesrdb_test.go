@@ -514,4 +514,3 @@ func TestGetRedactedTeamsAndCustomers(t *testing.T) {
 		})
 	}
 }
-

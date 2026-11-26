@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,13 +19,11 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// recordingRetentionManager is a retention stub for both tables that records
-// the batch size each call asked for and returns one scripted count per call.
+// recordingRetentionManager is a retention stub that records the batch size
+// each call asked for and returns one scripted count per call.
 type recordingRetentionManager struct {
 	logCounts  []int64
-	mcpCounts  []int64
 	logBatches []int
-	mcpBatches []int
 }
 
 // DeleteLogsBatch records the batch size and returns the next scripted count.
@@ -38,42 +35,13 @@ func (m *recordingRetentionManager) DeleteLogsBatch(_ context.Context, _ time.Ti
 	return m.logCounts[len(m.logBatches)-1], nil
 }
 
-// DeleteMCPToolLogsBatch records the batch size and returns the next scripted count.
-func (m *recordingRetentionManager) DeleteMCPToolLogsBatch(_ context.Context, _ time.Time, size int) (int64, error) {
-	m.mcpBatches = append(m.mcpBatches, size)
-	if len(m.mcpBatches) > len(m.mcpCounts) {
-		return 0, nil
-	}
-	return m.mcpCounts[len(m.mcpBatches)-1], nil
-}
+// TestHighFixesCleanerUsesLargeBatches pins H2: the cleaner deletes in batches
+// of 5000 (100 could not keep up with 5.6M expired rows per day).
+func TestHighFixesCleanerUsesLargeBatches(t *testing.T) {
+	m := &recordingRetentionManager{logCounts: []int64{5000, 5000, 12}}
+	NewLogsCleaner(m, CleanerConfig{RetentionDays: 7}, testLogger{}).cleanupOldLogs(context.Background())
 
-// backlogRetentionManager simulates a logs table that never finishes draining:
-// every logs batch is full (or fails, when logErr is set). It counts the MCP
-// batches the cleaner still gets to run.
-type backlogRetentionManager struct {
-	logErr     error
-	mcpBatches atomic.Int32
-}
-
-// DeleteLogsBatch reports a full batch after a short pause, or logErr.
-func (m *backlogRetentionManager) DeleteLogsBatch(ctx context.Context, _ time.Time, size int) (int64, error) {
-	if m.logErr != nil {
-		return 0, m.logErr
-	}
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case <-time.After(2 * time.Millisecond):
-	}
-	return int64(size), nil
-}
-
-// DeleteMCPToolLogsBatch counts the call and reports a short batch, then an empty one.
-func (m *backlogRetentionManager) DeleteMCPToolLogsBatch(_ context.Context, _ time.Time, _ int) (int64, error) {
-	if m.mcpBatches.Add(1) == 1 {
-		return 3, nil
-	}
-	return 0, nil
+	require.Equal(t, []int{5000, 5000, 5000, 5000}, m.logBatches, "logs must be deleted 5000 rows at a time until an empty batch")
 }
 
 // hfInsertLogAt inserts a minimal logs row with explicit timestamp and created_at.
@@ -111,10 +79,6 @@ func TestHighFixesDeleteLogsBatchOldestFirst(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deleted)
 	require.Equal(t, []string{"fresh", "old-10d"}, hfLogIDs(t, store.db, "logs"), "the two oldest expired rows go first")
-
-	require.NoError(t, err)
-	require.Equal(t, int64(2), deleted)
-	require.Equal(t, []string{"m-fresh", "m-old-10d"}, hfLogIDs(t, store.db, "mcp_tool_logs"))
 }
 
 // TestHighFixesCleanerRetentionEndToEnd runs the real cleaner over a SQLite
@@ -175,8 +139,8 @@ func TestLogsCleanerUpdateRetentionDays(t *testing.T) {
 
 // retentionCutoffManager records cutoffs and can update retention during a pass.
 type retentionCutoffManager struct {
-	logCutoff, mcpCutoff time.Time
-	onLogsDelete         func()
+	logCutoff    time.Time
+	onLogsDelete func()
 }
 
 // DeleteLogsBatch captures the logs cutoff and invokes the optional update callback.
@@ -185,12 +149,6 @@ func (m *retentionCutoffManager) DeleteLogsBatch(_ context.Context, cutoff time.
 	if m.onLogsDelete != nil {
 		m.onLogsDelete()
 	}
-	return 0, nil
-}
-
-// DeleteMCPToolLogsBatch captures the MCP cutoff from the same cleanup pass.
-func (m *retentionCutoffManager) DeleteMCPToolLogsBatch(_ context.Context, cutoff time.Time, _ int) (int64, error) {
-	m.mcpCutoff = cutoff
 	return 0, nil
 }
 
@@ -203,7 +161,6 @@ func TestLogsCleanerRetentionUpdateDuringPass(t *testing.T) {
 		now := time.Now().UTC()
 		cleaner.cleanupOldLogs(context.Background())
 		assert.WithinDuration(t, now.AddDate(0, 0, -days), m.logCutoff, time.Second)
-		assert.Equal(t, m.logCutoff, m.mcpCutoff, "both tables must use the same cutoff when retention changes during a pass")
 	}
 }
 
@@ -229,14 +186,13 @@ func TestLogsCleanerRetentionUpdateConcurrent(t *testing.T) {
 		cleaner.cleanupOldLogs(context.Background())
 		days := int(math.Round(time.Since(m.logCutoff).Hours() / 24))
 		assert.True(t, days == 7 || days == 30, "unexpected retention: %d", days)
-		assert.Equal(t, m.logCutoff, m.mcpCutoff)
 		runtime.Gosched()
 	}
 }
 
 // hfOwnerTimestampIndexes are the H4 composite indexes, per table.
 var hfOwnerTimestampIndexes = map[string][]string{
-	"logs":          {"idx_logs_vk_ts", "idx_logs_user_ts", "idx_logs_team_ts"},
+	"logs": {"idx_logs_vk_ts", "idx_logs_user_ts", "idx_logs_team_ts"},
 }
 
 // hfReplacedSingleIndexes are the single-column indexes the composites replace.
@@ -252,6 +208,7 @@ func TestHighFixesCreateTableBuildsOwnerTimestampIndexes(t *testing.T) {
 	dsn := "file:" + url.QueryEscape(t.Name()) + "?mode=memory&cache=shared"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
+	require.NoError(t, db.Migrator().CreateTable(&Log{}))
 	for _, name := range hfOwnerTimestampIndexes["logs"] {
 		assert.True(t, db.Migrator().HasIndex(&Log{}, name), "fresh logs table must have %s", name)
 	}
@@ -309,18 +266,7 @@ func hfBulkInsertLogs(t *testing.T, db *gorm.DB, prefix string, n int) {
 	`, n, prefix).Error)
 }
 
-// hfBulkInsertMCP inserts n mcp_tool_logs rows in one statement.
-func hfBulkInsertMCP(t *testing.T, db *gorm.DB, prefix string, n int) {
-	t.Helper()
-	require.NoError(t, db.Exec(`
-		WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM seq WHERE x < ?)
-		INSERT INTO mcp_tool_logs (id, request_id, timestamp, tool_name, status, created_at)
-		SELECT ? || x, ? || x, CURRENT_TIMESTAMP, 'search', 'success', CURRENT_TIMESTAMP FROM seq
-	`, n, prefix, prefix).Error)
-}
-
-// TestHighFixesSearchCountIsExact pins that the logs and MCP logs list counts
-// stay exact above 10,000 matching rows, as they were before the scale work:
+// TestHighFixesSearchCountIsExact pins that the logs list count stays exact above 10,000 matching rows, as they were before the scale work:
 // the pagination footer, page count and navigation all depend on the real
 // total, so the count must never stop at a cap. SkipCount still skips it.
 func TestHighFixesSearchCountIsExact(t *testing.T) {
@@ -343,12 +289,6 @@ func TestHighFixesSearchCountIsExact(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), res.Pagination.TotalCount, "SkipCount runs no count")
 	assert.Len(t, res.Logs, 10)
-
-	hfBulkInsertMCP(t, store.db, "mcp-few-", 3)
-	require.NoError(t, err)
-
-	hfBulkInsertMCP(t, store.db, "mcp-many-", many)
-	require.NoError(t, err)
 }
 
 // TestHighFixesKeysetPagination pins the (timestamp, id) keyset cursor: pages
@@ -497,4 +437,3 @@ func TestHighFixesErrorDimensionsBoundByFailedStatus(t *testing.T) {
 	// Per dimension: current rankings, attributed count, previous period.
 	assert.GreaterOrEqual(t, bounded, 9, "every error-dimension scan must carry the failed-status predicate")
 }
-

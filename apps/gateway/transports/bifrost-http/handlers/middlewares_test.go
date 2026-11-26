@@ -31,7 +31,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
-	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/tracing"
 	"github.com/maximhq/bifrost/transports/v2/bifrost-http/lib"
@@ -93,7 +92,7 @@ func TestCorsMiddleware_LocalhostOrigins(t *testing.T) {
 			if string(ctx.Response.Header.Peek("Access-Control-Allow-Methods")) != "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD" {
 				t.Errorf("Access-Control-Allow-Methods header not set correctly")
 			}
-			if string(ctx.Response.Header.Peek("Access-Control-Allow-Headers")) != "Content-Type, Authorization, X-Requested-With, X-Stainless-Timeout, X-Api-Key, X-OpenAI-Agents-SDK, X-Operation-ID, X-Bifrost-View-As, X-Bifrost-Setup-Token, MCP-Protocol-Version, Mcp-Session-Id, Mcp-Method, Mcp-Name, Last-Event-ID" {
+			if string(ctx.Response.Header.Peek("Access-Control-Allow-Headers")) != "Content-Type, Authorization, X-Requested-With, X-Stainless-Timeout, X-Api-Key, X-OpenAI-Agents-SDK, X-Operation-ID, X-Bifrost-View-As, X-Bifrost-Setup-Token" {
 				t.Errorf("Access-Control-Allow-Headers header not set correctly")
 			}
 			if string(ctx.Response.Header.Peek("Access-Control-Allow-Credentials")) != "true" {
@@ -230,32 +229,6 @@ func TestCorsMiddleware_PreflightAllowsSetupTokenHeader(t *testing.T) {
 				if !strings.Contains(allowHeaders, "x-bifrost-setup-token") {
 					t.Errorf("%s: Access-Control-Allow-Headers %q must include X-Bifrost-Setup-Token", origin, allowHeaders)
 				}
-			}
-		})
-	}
-}
-
-// Browser MCP clients send the Streamable HTTP headers on every request after initialize, and on
-// every 2026-07-28 request; a preflight that leaves any out blocks the request in the browser.
-func TestCorsMiddleware_PreflightAllowsMCPTransportHeaders(t *testing.T) {
-	SetLogger(&mockLogger{})
-	requested := []string{"content-type", "mcp-protocol-version", "mcp-session-id", "mcp-method", "mcp-name", "last-event-id", "mcp-param-region"}
-	for _, origins := range [][]string{{"*"}, {"https://inspector.example.com"}} {
-		t.Run(strings.Join(origins, ","), func(t *testing.T) {
-			config := &lib.Config{ClientConfig: &configstore.ClientConfig{AllowedOrigins: origins}}
-			for _, origin := range []string{"http://localhost:6274", "https://inspector.example.com"} {
-				ctx := &fasthttp.RequestCtx{}
-				ctx.Request.Header.SetMethod("OPTIONS")
-				ctx.Request.Header.Set("Origin", origin)
-				ctx.Request.Header.Set("Access-Control-Request-Headers", strings.Join(requested, ", "))
-				NewCorsMiddleware(config).Middleware()(func(ctx *fasthttp.RequestCtx) {})(ctx)
-				assert.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), origin)
-				allowed := strings.Split(strings.ToLower(string(ctx.Response.Header.Peek("Access-Control-Allow-Headers"))), ", ")
-				for _, header := range requested {
-					assert.Contains(t, allowed, header, "%s: Access-Control-Allow-Headers", origin)
-				}
-				exposed := strings.Split(strings.ToLower(string(ctx.Response.Header.Peek("Access-Control-Expose-Headers"))), ", ")
-				assert.Contains(t, exposed, "mcp-session-id", "%s: initialize's session id must be readable", origin)
 			}
 		})
 	}
@@ -1251,24 +1224,9 @@ func TestAuthMiddleware_EncodedTraversalDoesNotBypassAuth(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assertTraversalAuthRoute(t, am, tc.method, tc.route, tc.uri, "", tc.status)
+			assertTraversalAuthRoute(t, am, tc.method, tc.route, tc.uri, tc.status)
 		})
 	}
-}
-
-// traversalTokenStore only implements the lookup used by the real token service.
-// An embedded interface makes any unexpected store access fail loudly.
-type traversalTokenStore struct {
-	configstore.ConfigStore
-	row tables.TempToken
-}
-
-func (s *traversalTokenStore) GetTempTokenByHash(_ context.Context, hash string) (*tables.TempToken, error) {
-	if hash != s.row.TokenHash {
-		return nil, nil
-	}
-	row := s.row
-	return &row, nil
 }
 
 func newTraversalAuthMiddleware() *AuthMiddleware {
@@ -1284,7 +1242,7 @@ func newTraversalAuthMiddleware() *AuthMiddleware {
 
 // Record router selection separately from the protected handler: a 404 caused
 // by a malformed fixture must not be mistaken for successful auth enforcement.
-func assertTraversalAuthRoute(t *testing.T, am *AuthMiddleware, method, route, uri, token string, status int) {
+func assertTraversalAuthRoute(t *testing.T, am *AuthMiddleware, method, route, uri string, status int) {
 	t.Helper()
 	matched, reached := false, false
 	r := router.New()
@@ -1299,9 +1257,6 @@ func assertTraversalAuthRoute(t *testing.T, am *AuthMiddleware, method, route, u
 	ctx := &fasthttp.RequestCtx{}
 	ctx.Request.Header.SetMethod(method)
 	ctx.Request.SetRequestURI(uri)
-	if token != "" {
-		ctx.Request.Header.Set("X-Bifrost-Temp-Token", token)
-	}
 	r.Handler(ctx)
 	if !matched {
 		t.Fatalf("fixture did not match route %s %s: %q", method, route, uri)
@@ -1311,126 +1266,6 @@ func assertTraversalAuthRoute(t *testing.T, am *AuthMiddleware, method, route, u
 	}
 	if wantReached := status == fasthttp.StatusNoContent; reached != wantReached {
 		t.Fatalf("%s %s: handler reached=%v, want %v", method, uri, reached, wantReached)
-	}
-	if reached && token != "" {
-		if ctx.UserValue(schemas.BifrostContextKeyTempTokenScope) == nil || ctx.UserValue(schemas.BifrostContextKeyTempTokenResourceID) == nil {
-			t.Fatal("successful token auth must attach the validated scope and resource ID")
-		}
-	}
-}
-
-func TestAuthMiddleware_TempTokenEncodedTraversal(t *testing.T) {
-	const token = "test-scoped-token"
-	const flowID = "flow-123"
-	for _, scope := range []temptoken.Scope{mcpAuthScope, mcpHeadersAuthScope, oauth2ConsentScope} {
-		t.Run(scope.Name, func(t *testing.T) {
-			store := &traversalTokenStore{row: tables.TempToken{
-				ID: "token-123", TokenHash: encrypt.HashSHA256(token),
-				Scope: scope.Name, ResourceID: flowID, ExpiresAt: time.Now().Add(time.Hour),
-			}}
-			am := newTraversalAuthMiddleware()
-			am.tempTokensService = temptoken.NewService(store, temptoken.NewRegistry())
-			if err := RegisterTempTokenScopes(am.tempTokensService); err != nil {
-				t.Fatal(err)
-			}
-			am.UpdateTempTokenAuthEnabled(true)
-			for _, allowed := range scope.AllowedRoutes {
-				path := strings.ReplaceAll(allowed.Path, scope.ResourceIDInPath, flowID)
-				t.Run(allowed.Method+" "+allowed.Path, func(t *testing.T) {
-					t.Run("legitimate", func(t *testing.T) {
-						assertTraversalAuthRoute(t, am, allowed.Method, allowed.Path, path+"?source=test", token, 204)
-					})
-					for _, target := range []string{"/api/providers/{provider}", "/api/plugins/{name}"} {
-						for _, slash := range []string{"%2F", "%2f"} {
-							for _, dots := range []string{"..", "%2e%2e"} {
-								uri := target[:strings.Index(target, "{")] + dots + slash + strings.ReplaceAll(strings.TrimPrefix(path, "/api/"), "/", slash)
-								t.Run(uri, func(t *testing.T) {
-									assertTraversalAuthRoute(t, am, allowed.Method, target, uri, token, 401)
-								})
-							}
-						}
-					}
-					t.Run("wrong resource", func(t *testing.T) {
-						assertTraversalAuthRoute(t, am, allowed.Method, allowed.Path, strings.ReplaceAll(path, flowID, "other-flow"), token, 401)
-					})
-					t.Run("wrong method", func(t *testing.T) {
-						assertTraversalAuthRoute(t, am, "POST", allowed.Path, path, token, 401)
-					})
-					t.Run("unknown token", func(t *testing.T) {
-						assertTraversalAuthRoute(t, am, allowed.Method, allowed.Path, path, "unknown-token", 401)
-					})
-					t.Run("expired", func(t *testing.T) {
-						expiresAt := store.row.ExpiresAt
-						store.row.ExpiresAt = time.Now().Add(-time.Hour)
-						defer func() { store.row.ExpiresAt = expiresAt }()
-						assertTraversalAuthRoute(t, am, allowed.Method, allowed.Path, path, token, 401)
-					})
-					t.Run("disabled", func(t *testing.T) {
-						am.UpdateTempTokenAuthEnabled(false)
-						defer am.UpdateTempTokenAuthEnabled(true)
-						assertTraversalAuthRoute(t, am, allowed.Method, allowed.Path, path, token, 401)
-					})
-				})
-			}
-		})
-	}
-}
-
-// The two failure modes must stay distinguishable, and a caller that presented
-// no token must learn nothing about whether the feature is on.
-func TestAuthMiddleware_TempTokenUnauthorizedCodes(t *testing.T) {
-	const token = "test-scoped-token"
-	const flowID = "flow-123"
-	route := oauth2ConsentScope.AllowedRoutes[0]
-	path := strings.ReplaceAll(route.Path, oauth2ConsentScope.ResourceIDInPath, flowID)
-
-	for _, tc := range []struct {
-		name     string
-		enabled  bool
-		token    string
-		wantCode string
-	}{
-		{"feature disabled", false, token, TempTokenAuthDisabledCode},
-		{"token rejected", true, "unknown-token", TempTokenRejectedCode},
-		{"no token stays opaque", false, "", ""},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			store := &traversalTokenStore{row: tables.TempToken{
-				ID: "token-123", TokenHash: encrypt.HashSHA256(token),
-				Scope: oauth2ConsentScope.Name, ResourceID: flowID, ExpiresAt: time.Now().Add(time.Hour),
-			}}
-			am := newTraversalAuthMiddleware()
-			am.tempTokensService = temptoken.NewService(store, temptoken.NewRegistry())
-			if err := RegisterTempTokenScopes(am.tempTokensService); err != nil {
-				t.Fatal(err)
-			}
-			am.UpdateTempTokenAuthEnabled(tc.enabled)
-
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Request.Header.SetMethod(route.Method)
-			ctx.Request.SetRequestURI(path)
-			if tc.token != "" {
-				ctx.Request.Header.Set("X-Bifrost-Temp-Token", tc.token)
-			}
-			am.APIMiddleware()(func(*fasthttp.RequestCtx) {
-				t.Fatal("protected handler must not run")
-			})(ctx)
-
-			if got := ctx.Response.StatusCode(); got != fasthttp.StatusUnauthorized {
-				t.Fatalf("expected 401, got %d", got)
-			}
-			var body struct {
-				Error struct {
-					Code string `json:"code"`
-				} `json:"error"`
-			}
-			if err := json.Unmarshal(ctx.Response.Body(), &body); err != nil {
-				t.Fatalf("decode body %q: %v", ctx.Response.Body(), err)
-			}
-			if body.Error.Code != tc.wantCode {
-				t.Fatalf("expected code %q, got %q", tc.wantCode, body.Error.Code)
-			}
-		})
 	}
 }
 
@@ -1452,9 +1287,6 @@ func TestAuthMiddleware_WhitelistedRoutes(t *testing.T) {
 		// token is present) and must never 401, or a repeat logout cascades
 		// into a redirect loop in the dashboard.
 		"/api/session/logout",
-		"/api/oauth/callback",
-		// Client ID Metadata Document
-		"/api/oauth/client-metadata.json",
 		"/health",
 	}
 
@@ -2166,7 +1998,7 @@ func TestCorsMiddleware_DefaultHeaders(t *testing.T) {
 	handler(ctx)
 
 	// Check default headers are set
-	expectedHeaders := "Content-Type, Authorization, X-Requested-With, X-Stainless-Timeout, X-Api-Key, X-OpenAI-Agents-SDK, X-Operation-ID, X-Bifrost-View-As, X-Bifrost-Setup-Token, MCP-Protocol-Version, Mcp-Session-Id, Mcp-Method, Mcp-Name, Last-Event-ID"
+	expectedHeaders := "Content-Type, Authorization, X-Requested-With, X-Stainless-Timeout, X-Api-Key, X-OpenAI-Agents-SDK, X-Operation-ID, X-Bifrost-View-As, X-Bifrost-Setup-Token"
 	actualHeaders := string(ctx.Response.Header.Peek("Access-Control-Allow-Headers"))
 	if actualHeaders != expectedHeaders {
 		t.Errorf("Expected Access-Control-Allow-Headers to be %s, got %s", expectedHeaders, actualHeaders)
@@ -6223,45 +6055,8 @@ func BenchmarkLogRequestTargetRedacted(b *testing.B) {
 	}
 }
 
-// manyMCPParamHeaders is an Access-Control-Request-Headers value naming n mcp-param- headers.
-func manyMCPParamHeaders(n int) string {
-	names := make([]string, n)
-	for i := range names {
-		names[i] = fmt.Sprintf("mcp-param-p%d", i)
-	}
-	return strings.Join(names, ", ")
-}
-
-// Echoing a preflight's mcp-param- names costs one allocation however many it lists, and a
-// disallowed origin gets no CORS headers.
-func TestCorsMiddleware_MCPParamHeadersAreBounded(t *testing.T) {
-	requested := manyMCPParamHeaders(500)
-	defaults, requestedBytes := corsAllowHeaders(nil), []byte(requested)
-	if got, want := appendMCPParamHeaders(defaults, requestedBytes), defaults+", "+requested; got != want {
-		t.Fatalf("every name must be echoed, in order: got %d bytes, want %d", len(got), len(want))
-	}
-	if allocs := testing.AllocsPerRun(20, func() { _ = appendMCPParamHeaders(defaults, requestedBytes) }); allocs > 1 {
-		t.Fatalf("the list must be built once, not copied per name: %.0f allocs", allocs)
-	}
-	noParams := []byte("content-type, mcp-method")
-	if allocs := testing.AllocsPerRun(20, func() { _ = appendMCPParamHeaders(defaults, noParams) }); allocs != 0 {
-		t.Fatalf("a preflight asking for no mcp-param- names must not allocate: %.0f allocs", allocs)
-	}
-
-	SetLogger(&mockLogger{})
-	handler := NewCorsMiddleware(&lib.Config{ClientConfig: &configstore.ClientConfig{AllowedOrigins: []string{"https://app.example.com"}}}).Middleware()(func(ctx *fasthttp.RequestCtx) {})
-	var ctx fasthttp.RequestCtx
-	ctx.Request.Header.SetMethod(fasthttp.MethodOptions)
-	ctx.Request.Header.Set("Origin", "https://evil.example.com")
-	ctx.Request.Header.Set("Access-Control-Request-Headers", requested)
-	handler(&ctx)
-	if got := ctx.Response.Header.Peek("Access-Control-Allow-Headers"); len(got) != 0 {
-		t.Fatalf("a disallowed origin must get no CORS headers, got %q", got)
-	}
-}
-
 // BenchmarkCorsMiddleware measures the CORS headers on a cross-origin request, which every route
-// pays, and on an MCP client's preflight.
+// pays.
 func BenchmarkCorsMiddleware(b *testing.B) {
 	SetLogger(&mockLogger{})
 	handler := NewCorsMiddleware(&lib.Config{ClientConfig: &configstore.ClientConfig{AllowedOrigins: []string{"*"}}}).Middleware()(func(ctx *fasthttp.RequestCtx) {})
@@ -6271,8 +6066,6 @@ func BenchmarkCorsMiddleware(b *testing.B) {
 		request string
 	}{
 		{"request", fasthttp.MethodPost, ""},
-		{"preflight-mcp", fasthttp.MethodOptions, "content-type, mcp-protocol-version, mcp-method, mcp-name, mcp-param-region"},
-		{"preflight-many-params", fasthttp.MethodOptions, manyMCPParamHeaders(500)},
 	}
 	for _, tc := range cases {
 		b.Run(tc.name, func(b *testing.B) {
@@ -6424,12 +6217,7 @@ func TestBasePathMiddleware_RedirectsKeepPrefix(t *testing.T) {
 			ctx.SetStatusCode(fasthttp.StatusFound)
 		case "lookalike":
 			ctx.Redirect("/bifrostx/y", fasthttp.StatusFound)
-		case "foreign-same-host":
-			// A third-party OAuth client's redirect_uri that happens to share this host.
-			ctx.Response.Header.Set("Location", "http://gw.example.com/app/cb?code=1")
-			ctx.SetStatusCode(fasthttp.StatusFound)
-			markLocationExternal(ctx)
-		case "foreign-same-host-unmarked":
+		case "same-host":
 			ctx.Response.Header.Set("Location", "http://gw.example.com/app/cb?code=1")
 			ctx.SetStatusCode(fasthttp.StatusFound)
 		}
@@ -6455,10 +6243,8 @@ func TestBasePathMiddleware_RedirectsKeepPrefix(t *testing.T) {
 		{"GET", "/bifrost/handler/protocol-relative", fasthttp.StatusFound, "//evil.example.org/x"},
 		{"GET", "/bifrost/handler/backslash", fasthttp.StatusFound, "/\\evil.example.org/x"},
 		{"GET", "/bifrost/handler/lookalike", fasthttp.StatusFound, "http://gw.example.com/bifrost/bifrostx/y"},
-		// A redirect the handler marked as leaving Bifrost is not pulled under the prefix.
-		{"GET", "/bifrost/handler/foreign-same-host", fasthttp.StatusFound, "http://gw.example.com/app/cb?code=1"},
-		// Unmarked same-host Locations are still assumed to be ours.
-		{"GET", "/bifrost/handler/foreign-same-host-unmarked", fasthttp.StatusFound, "http://gw.example.com/bifrost/app/cb?code=1"},
+		// Same-host Locations are assumed to be ours.
+		{"GET", "/bifrost/handler/same-host", fasthttp.StatusFound, "http://gw.example.com/bifrost/app/cb?code=1"},
 	}
 	for _, tc := range cases {
 		ctx := &fasthttp.RequestCtx{}

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newProviderJobTestPlugin is newAccessTestPlugin over the MCP-stamping VK (id vk-mcp-stamp,
+// newProviderJobTestPlugin is newAccessTestPlugin over the access-test VK (id vk-access-test,
 // value accessTestVKValue, every openai model), backed by a real SQLite config store that holds the
 // provider job rows the ownership checks read.
 func newProviderJobTestPlugin(t *testing.T) (*GovernancePlugin, configstore.ConfigStore) {
@@ -71,7 +71,7 @@ func batchRequest(requestType schemas.RequestType, batchID string) *schemas.Bifr
 // key are all unrestricted, as they were.
 func TestPreLLMHookBindsBatchesToTheCreatingVirtualKey(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	seedProviderJob(t, store, "openai", "batch-own", &own)
 	seedProviderJob(t, store, "openai", "batch-other", &other)
@@ -109,7 +109,7 @@ func TestPreLLMHookBindsBatchesToTheCreatingVirtualKey(t *testing.T) {
 // dropped, its own and unbound ones stay, and the provider's pagination cursors are untouched.
 func TestPostLLMHookFiltersBatchListToTheVirtualKey(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	seedProviderJob(t, store, "openai", "batch-own", &own)
 	seedProviderJob(t, store, "openai", "batch-other", &other)
@@ -234,7 +234,7 @@ func TestPreLLMHookRefusesVirtualKeyBatchRequestsWithoutConfigStore(t *testing.T
 // carry that raw page; a page with nothing removed keeps its raw responses.
 func TestPostLLMHookDropsRawResponsesWhenBatchListIsFiltered(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	seedProviderJob(t, store, "openai", "batch-own", &own)
 	seedProviderJob(t, store, "openai", "batch-other", &other)
@@ -329,7 +329,7 @@ func providerObjectKindFor(requestType schemas.RequestType) string {
 // stay unrestricted. Container files are bound through their container.
 func TestPreLLMHookBindsProviderObjectsToTheCreatingVirtualKey(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	for _, kind := range []string{configstoreTables.ProviderObjectKindFile, configstoreTables.ProviderObjectKindVideo, configstoreTables.ProviderObjectKindContainer, configstoreTables.ProviderObjectKindCachedContent} {
 		seedProviderObject(t, store, kind, "openai", kind+"-own", own)
@@ -421,7 +421,7 @@ func TestProviderObjectOwnershipFollowsTheClientSetting(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 2, "creators are recorded while the setting is off")
 	for _, row := range rows {
-		assert.Equal(t, "vk-mcp-stamp", row.VirtualKeyID)
+		assert.Equal(t, "vk-access-test", row.VirtualKeyID)
 	}
 
 	// Turning the setting on binds the objects, including the ones recorded while it was off.
@@ -441,7 +441,7 @@ func TestProviderObjectOwnershipFollowsTheClientSetting(t *testing.T) {
 func TestPostLLMHookFiltersAListLargerThanOneStatementBinds(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-other", "vk-someone-else")
-	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-mcp-stamp")
+	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-access-test")
 	data := make([]schemas.FileObject, 0, 40002)
 	for i := 0; i < 40000; i++ {
 		data = append(data, schemas.FileObject{ID: fmt.Sprintf("file-shared-%05d", i)})
@@ -483,7 +483,7 @@ func TestPreLLMHookBindsVideosUnderEitherIDForm(t *testing.T) {
 func TestPreLLMHookBindsBatchFilesThroughTheBatchRow(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
 	other := "vk-someone-else"
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	output := "file-other-output"
 	errFile := "file-other-error"
 	require.NoError(t, store.UpsertProviderJob(context.Background(), &configstoreTables.TableProviderJob{
@@ -585,7 +585,7 @@ func TestPostLLMHookRecordsProviderObjectCreatorsAndForgetsDeleted(t *testing.T)
 			rows, err := store.GetProviderObjectsByIDs(context.Background(), []string{configstoreTables.ProviderObjectID(kind, "openai", objectIDs[kind])})
 			require.NoError(t, err)
 			require.Len(t, rows, 1, "the create was recorded")
-			assert.Equal(t, "vk-mcp-stamp", rows[0].VirtualKeyID)
+			assert.Equal(t, "vk-access-test", rows[0].VirtualKeyID)
 		})
 	}
 
@@ -633,7 +633,7 @@ func TestPostLLMHookRecordsProviderObjectCreatorsAndForgetsDeleted(t *testing.T)
 // pagination is untouched. A file list also hides the files of another key's batches.
 func TestPostLLMHookFiltersProviderObjectListsToTheVirtualKey(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	for _, kind := range []string{configstoreTables.ProviderObjectKindFile, configstoreTables.ProviderObjectKindVideo, configstoreTables.ProviderObjectKindContainer, configstoreTables.ProviderObjectKindCachedContent} {
 		seedProviderObject(t, store, kind, "openai", kind+"-own", own)
@@ -832,7 +832,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 	vk.ProviderConfigs = append(vk.ProviderConfigs, buildProviderConfig("gemini", []string{"*"}))
 	plugin := newAccessTestPlugin(t, vk, nil)
 	plugin.configStore = store
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-own", own)
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-other", other)
@@ -1108,7 +1108,7 @@ func TestPostLLMHookRecordsAndFiltersContainerFiles(t *testing.T) {
 	rows, err := store.GetProviderObjectsByIDs(context.Background(), []string{configstoreTables.ProviderObjectID(configstoreTables.ProviderObjectKindContainerFile, "openai", "cfile-new")})
 	require.NoError(t, err)
 	require.Len(t, rows, 1, "the container file create was recorded")
-	assert.Equal(t, "vk-mcp-stamp", rows[0].VirtualKeyID)
+	assert.Equal(t, "vk-access-test", rows[0].VirtualKeyID)
 
 	ctx = presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.ContainerFileListRequest, ContainerFileListRequest: &schemas.BifrostContainerFileListRequest{Provider: schemas.OpenAI, ContainerID: "container-unbound"}})
@@ -1158,7 +1158,7 @@ func TestPostLLMHookRecordsAutomaticContainers(t *testing.T) {
 	}
 
 	run(t, map[string]interface{}{"type": "auto", "file_ids": []interface{}{}}, "cntr_auto")
-	assert.Equal(t, "vk-mcp-stamp", owner("cntr_auto"), "the automatic container belongs to the key that asked for it")
+	assert.Equal(t, "vk-access-test", owner("cntr_auto"), "the automatic container belongs to the key that asked for it")
 
 	run(t, "cntr_unbound_existing", "cntr_unbound_existing")
 	assert.Empty(t, owner("cntr_unbound_existing"), "a container named by id is not claimed by using it")
@@ -1183,7 +1183,7 @@ func TestPostLLMHookRecordsAutomaticContainers(t *testing.T) {
 		Output:      []schemas.ResponsesMessage{call("cntr_auto_second"), call("cntr_named_shared")},
 		ExtraFields: schemas.BifrostResponseExtraFields{RequestType: schemas.ResponsesRequest, Provider: schemas.OpenAI}}}, nil)
 	require.NoError(t, err)
-	assert.Equal(t, "vk-mcp-stamp", owner("cntr_auto_second"), "the automatic container is recorded")
+	assert.Equal(t, "vk-access-test", owner("cntr_auto_second"), "the automatic container is recorded")
 	assert.Empty(t, owner("cntr_named_shared"), "the container the request named by id is not claimed")
 }
 
@@ -1278,7 +1278,7 @@ func TestProviderObjectOwnershipReadsTheGrant(t *testing.T) {
 // nobody recorded are not claimed for whoever retrieved it.
 func TestPostLLMHookRecordsBatchFilesFromRetrieve(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
-	seedProviderObject(t, store, configstoreTables.ProviderObjectKindBatch, "openai", "batch-own", "vk-mcp-stamp")
+	seedProviderObject(t, store, configstoreTables.ProviderObjectKindBatch, "openai", "batch-own", "vk-access-test")
 	retrieve := func(t *testing.T, batchID, output, errFile string) {
 		t.Helper()
 		ctx := presentCtx(accessTestVKValue)
@@ -1307,8 +1307,8 @@ func TestPostLLMHookRecordsBatchFilesFromRetrieve(t *testing.T) {
 	}
 
 	retrieve(t, "batch-own", "file-own-output", "file-own-error")
-	assert.Equal(t, "vk-mcp-stamp", owner(t, "file-own-output"), "the output file follows the batch's creator")
-	assert.Equal(t, "vk-mcp-stamp", owner(t, "file-own-error"), "the error file follows the batch's creator")
+	assert.Equal(t, "vk-access-test", owner(t, "file-own-output"), "the output file follows the batch's creator")
+	assert.Equal(t, "vk-access-test", owner(t, "file-own-error"), "the error file follows the batch's creator")
 
 	otherKey := buildAccessTestVK()
 	otherKey.ID = "vk-other"
@@ -1330,7 +1330,7 @@ func TestProviderObjectOwnersReadBatchRowsOnlyForUnrecordedFiles(t *testing.T) {
 	plugin, real := newProviderJobTestPlugin(t)
 	store := &recordingObjectStore{ConfigStore: real}
 	plugin.configStore = store
-	seedProviderObject(t, real, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-mcp-stamp")
+	seedProviderObject(t, real, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-access-test")
 
 	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-own")[schemas.FileRetrieveRequest])
 	require.NoError(t, err)
@@ -1351,14 +1351,14 @@ func TestProviderObjectOwnersReadBatchRowsOnlyForUnrecordedFiles(t *testing.T) {
 func TestHiddenProviderObjectsReadsAPageOverTheBindParameterLimit(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-other", "vk-someone-else")
-	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-mcp-stamp")
+	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-access-test")
 	ids := make([]string, 0, 40002)
 	for i := range 40000 {
 		ids = append(ids, fmt.Sprintf("file-unrecorded-%05d", i))
 	}
 	ids = append(ids, "file-other", "file-own")
 
-	hidden, err := plugin.hiddenProviderObjects(presentCtx(accessTestVKValue), configstoreTables.ProviderObjectKindFile, "openai", "vk-mcp-stamp", ids)
+	hidden, err := plugin.hiddenProviderObjects(presentCtx(accessTestVKValue), configstoreTables.ProviderObjectKindFile, "openai", "vk-access-test", ids)
 	require.NoError(t, err)
 	require.NotNil(t, hidden)
 	assert.True(t, hidden("file-other"), "another key's file is hidden")
@@ -1494,7 +1494,7 @@ func resourceRequest(requestType schemas.RequestType, provider schemas.ModelProv
 // logging plugin wrote before ownership rows existed.
 func TestPreLLMHookBindsResourceNamesUnderEveryForm(t *testing.T) {
 	plugin, store := newResourceNameTestPlugin(t)
-	own := "vk-mcp-stamp"
+	own := "vk-access-test"
 	other := "vk-someone-else"
 	batch := configstoreTables.ProviderObjectKindBatch
 	file := configstoreTables.ProviderObjectKindFile
@@ -1582,7 +1582,7 @@ func TestPostLLMHookRecordsFullResourceNamesOnceAndForgetsOnlyTheDeletersRows(t 
 	require.NoError(t, err)
 	require.Len(t, rows, 1, "only the full name is recorded; a bare job number is not one project's to claim")
 	assert.Equal(t, vertexBatch, rows[0].ObjectID)
-	assert.Equal(t, "vk-mcp-stamp", rows[0].VirtualKeyID)
+	assert.Equal(t, "vk-access-test", rows[0].VirtualKeyID)
 
 	// Another project's job with the same number, created by another key, survives this key's
 	// delete. The delete is admitted by the full name, which is one project's; the provider then
@@ -1612,7 +1612,7 @@ func TestPreLLMHookResolvesShortResourceNamesThroughFullNameRows(t *testing.T) {
 	cached := configstoreTables.ProviderObjectKindCachedContent
 	seedProviderObject(t, store, cached, "vertex", "projects/p-1/locations/us-central1/cachedContents/9797", other)
 	seedProviderObject(t, store, batch, "vertex", "projects/p-1/locations/us-central1/batchPredictionJobs/4242", other)
-	seedProviderObject(t, store, cached, "vertex", "projects/p-1/locations/us-central1/cachedContents/7777", "vk-mcp-stamp")
+	seedProviderObject(t, store, cached, "vertex", "projects/p-1/locations/us-central1/cachedContents/7777", "vk-access-test")
 
 	for _, tc := range []struct {
 		name string
@@ -1650,7 +1650,7 @@ func TestPreLLMHookRefusesAmbiguousShortResourceNames(t *testing.T) {
 	batch := configstoreTables.ProviderObjectKindBatch
 	const own = "projects/p-1/locations/us-central1/batchPredictionJobs/4242"
 	const theirs = "projects/p-2/locations/us-central1/batchPredictionJobs/4242"
-	seedProviderObject(t, store, batch, "vertex", own, "vk-mcp-stamp")
+	seedProviderObject(t, store, batch, "vertex", own, "vk-access-test")
 	seedProviderObject(t, store, batch, "vertex", theirs, "vk-someone-else")
 
 	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "4242"))
@@ -1690,7 +1690,7 @@ func TestPreLLMHookRefusesAmbiguousShortResourceNames(t *testing.T) {
 func TestPreLLMHookRefusesABareIDWhoseSourcesDisagree(t *testing.T) {
 	plugin, store := newResourceNameTestPlugin(t)
 	batch := configstoreTables.ProviderObjectKindBatch
-	seedProviderObject(t, store, batch, "vertex", "projects/p-1/locations/us-central1/batchPredictionJobs/4242", "vk-mcp-stamp")
+	seedProviderObject(t, store, batch, "vertex", "projects/p-1/locations/us-central1/batchPredictionJobs/4242", "vk-access-test")
 	other := "vk-someone-else"
 	seedProviderJob(t, store, "vertex", "4242", &other)
 
@@ -1711,7 +1711,7 @@ func TestPostLLMHookKeepsBindingsWhenABareDeleteIsAmbiguous(t *testing.T) {
 	const p2 = "projects/p-2/locations/us-central1/batchPredictionJobs/4242"
 	const single = "projects/p-1/locations/us-central1/batchPredictionJobs/5151"
 	for _, id := range []string{p1, p2, single} {
-		seedProviderObject(t, store, batch, "vertex", id, "vk-mcp-stamp")
+		seedProviderObject(t, store, batch, "vertex", id, "vk-access-test")
 	}
 	deleteBare := func(id string) {
 		ctx := presentCtx(accessTestVKValue)
@@ -1753,7 +1753,7 @@ func TestPostLLMHookForgetsDeletedObjectsUnderEveryAlias(t *testing.T) {
 		schemas.OpenAI: {},
 		"my-openai":    {CustomProviderConfig: &schemas.CustomProviderConfig{BaseProviderType: schemas.OpenAI}},
 	}}
-	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-aliased", "vk-mcp-stamp")
+	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-aliased", "vk-access-test")
 
 	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileDeleteRequest, FileDeleteRequest: &schemas.BifrostFileDeleteRequest{Provider: "my-openai", FileID: "file-aliased"}})
@@ -1792,8 +1792,8 @@ func TestProviderObjectOwnersScanSuffixesOnceForUnresolvedShortIDs(t *testing.T)
 	store := &suffixCountingStore{ConfigStore: real}
 	plugin.configStore = store
 	batch := configstoreTables.ProviderObjectKindBatch
-	seedProviderObject(t, real, batch, "vertex", "4242", "vk-mcp-stamp")
-	seedProviderObject(t, real, batch, "vertex", "5151", "vk-mcp-stamp")
+	seedProviderObject(t, real, batch, "vertex", "4242", "vk-access-test")
+	seedProviderObject(t, real, batch, "vertex", "5151", "vk-access-test")
 
 	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.Vertex}})

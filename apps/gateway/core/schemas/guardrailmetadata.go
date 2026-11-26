@@ -16,7 +16,7 @@ type BifrostGuardrailMetadata struct {
 }
 
 // BifrostGuardrailIntervention records one guardrail policy match that blocked
-// the request (input, output, or MCP tool call).
+// the request (input or output).
 type BifrostGuardrailIntervention struct {
 	Phase             string   `json:"phase,omitempty"`
 	RuleID            *uint    `json:"rule_id,omitempty"`

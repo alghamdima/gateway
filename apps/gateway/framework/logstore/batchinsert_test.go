@@ -68,7 +68,6 @@ func TestBatchCreateIfNotExists_WriterSizedBatchPostgres(t *testing.T) {
 	}
 	ctx := context.Background()
 	dropAllManagedMatViews(db)
-	require.NoError(t, db.Exec("DROP TABLE IF EXISTS mcp_tool_logs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS async_jobs CASCADE").Error)
 	require.NoError(t, db.Exec("DROP TABLE IF EXISTS logs CASCADE").Error)
 	require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)
@@ -76,7 +75,6 @@ func TestBatchCreateIfNotExists_WriterSizedBatchPostgres(t *testing.T) {
 	require.NoError(t, triggerMigrations(ctx, db, testLogger{}))
 	t.Cleanup(func() {
 		_ = db.Exec("TRUNCATE logs").Error
-		_ = db.Exec("TRUNCATE mcp_tool_logs").Error
 	})
 	store := &RDBLogStore{db: db, logger: testLogger{}}
 

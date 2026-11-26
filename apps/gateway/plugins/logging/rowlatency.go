@@ -23,8 +23,7 @@ type rowLatency struct {
 // Sequential rows each cover their own attempt window. The first row also covers the
 // work before it (transport parse, routing) back to the root span's start, and the last
 // row the work after it (response write) up to the root span's end and the request's
-// final upstream total. Time between rows, such as MCP tool execution between agent
-// turns, belongs to no row. Each row's breakdown is computed from the spans that start
+// final upstream total. Time between rows belongs to no row. Each row's breakdown is computed from the spans that start
 // inside its window.
 //
 // Rows that overlap in time (a concurrent list_models fan-out) keep their own windows

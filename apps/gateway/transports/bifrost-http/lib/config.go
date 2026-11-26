@@ -169,7 +169,7 @@ type ServerConfig struct {
 }
 
 // ConfigData represents the configuration data for the Bifrost HTTP transport.
-// It contains the client configuration, provider configurations, MCP configuration,
+// It contains the client configuration, provider configurations,
 // vector store configuration, config store configuration, and logs store configuration.
 type ConfigData struct {
 	// Version controls how empty arrays in allow-list fields are interpreted when loading
@@ -414,7 +414,7 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 		AuthConfig         *configstore.AuthConfig               `json:"auth_config,omitempty"`
 		SetupToken         *schemas.SecretVar                    `json:"setup_token,omitempty"`
 		Providers          map[string]configstore.ProviderConfig `json:"providers"`
-			DatasheetOverrides []DatasheetOverrideFileConfig         `json:"datasheet_overrides,omitempty"`
+		DatasheetOverrides []DatasheetOverrideFileConfig         `json:"datasheet_overrides,omitempty"`
 		ModelRouters       []configstore.ModelRouter             `json:"model_routers,omitempty"`
 		Governance         *configstore.GovernanceConfig         `json:"governance,omitempty"`
 		VectorStoreConfig  json.RawMessage                       `json:"vector_store,omitempty"`
@@ -5159,18 +5159,18 @@ func ResolveFrameworkPricingConfig(
 	}
 
 	return &configstoreTables.TableFrameworkConfig{
-		ID:                     configID,
-		PricingURL:             resolvedPricingURL,
-		PricingSyncInterval:    resolvedSyncSeconds,
-		ModelParametersURL:     resolvedModelParametersURL,
-		LiveModelsSyncInterval: resolvedLiveModelsSyncInterval,
-		ConfigHash:             persistedHash,
-	}, &modelcatalog.Config{
-		PricingURL:             resolvedPricingURL,
-		PricingSyncInterval:    resolvedSyncSeconds,
-		ModelParametersURL:     resolvedModelParametersURL,
-		LiveModelsSyncInterval: resolvedLiveModelsSyncInterval,
-	}, needsDBUpdate
+			ID:                     configID,
+			PricingURL:             resolvedPricingURL,
+			PricingSyncInterval:    resolvedSyncSeconds,
+			ModelParametersURL:     resolvedModelParametersURL,
+			LiveModelsSyncInterval: resolvedLiveModelsSyncInterval,
+			ConfigHash:             persistedHash,
+		}, &modelcatalog.Config{
+			PricingURL:             resolvedPricingURL,
+			PricingSyncInterval:    resolvedSyncSeconds,
+			ModelParametersURL:     resolvedModelParametersURL,
+			LiveModelsSyncInterval: resolvedLiveModelsSyncInterval,
+		}, needsDBUpdate
 }
 
 // initFrameworkConfig initializes framework config and pricing manager from file
@@ -5686,7 +5686,7 @@ func providerConfigLimitOwner(ctx context.Context, tx *gorm.DB, providerConfigID
 	return pc.VirtualKeyID, pc.Provider, nil
 }
 
-// reconcileVirtualKeyAssociations reconciles ProviderConfigs and MCPConfigs associations
+// reconcileVirtualKeyAssociations reconciles ProviderConfigs associations
 // for a virtual key when config.json changes (hash mismatch already detected at VK level).
 //
 // NOTE: This function is ONLY called when the virtual key's hash has changed,
@@ -7740,7 +7740,7 @@ type governedConfigEntities struct {
 //
 // Virtual keys are governed through their owner: a team, business unit or customer holding a profile
 // governs every key under it, and what config.json declares as such a key's own - budgets, rate limits,
-// provider and MCP access, model configs - is left unwritten. The profile replaces it, and adopt strips
+// provider access, model configs - is left unwritten. The profile replaces it, and adopt strips
 // it again, so writing it only leaves rows for the next boot to re-insert by an id every node of a
 // cluster races to insert. A key is asked about when it is saved, or when a rate limit, budget or
 // model config of its own is written; its owner is config.json's when it is saved, the store's
@@ -8270,4 +8270,3 @@ func (c *Config) GetSkillsExternalClientURL() string {
 	}
 	return strings.TrimRight(value, "/")
 }
-

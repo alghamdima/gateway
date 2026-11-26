@@ -237,7 +237,6 @@ func TestHighFixTagsBuildIndexes(t *testing.T) {
 
 	require.True(t, indexIsUnique(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
 	require.True(t, indexIsUnique(t, db, "sessions", "idx_session_token_hash"))
-	require.True(t, indexIsUnique(t, db, "governance_virtual_key_mcp_configs", "idx_vk_mcpclient"))
 
 	require.Equal(t, []string{"provider"}, indexColumns(t, db, "idx_vk_provider_configs_provider"))
 	require.Equal(t, []string{"table_key_id"}, indexColumns(t, db, "idx_vkpc_keys_table_key_id"))

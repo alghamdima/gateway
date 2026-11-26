@@ -27,8 +27,8 @@ type (
 
 // LocalGovernanceStore provides in-memory cache for governance data with fast, non-blocking access
 type LocalGovernanceStore struct {
-	// inMemoryStore supplies the MCP clients open to every virtual key when building the
-	// grant a key carries. Optional: without it, no client is treated as open.
+	// inMemoryStore supplies the configured providers: the ones a key that allows all providers
+	// may use, and the provider config read for key aliases. Optional: without it, neither applies.
 	inMemoryStore InMemoryStore
 	// Core data maps using sync.Map for lock-free reads
 	// virtualKeys is keyed by VK value; during the rotation grace period a VK is
@@ -38,7 +38,7 @@ type LocalGovernanceStore struct {
 	// index must survive such cleanup).
 	virtualKeys sync.Map // string -> *VirtualKey (VK value -> VirtualKey with preloaded relationships)
 	// virtualKeysByID is a secondary index over virtualKeys keyed by VK row ID,
-	// giving O(1) by-ID lookups (e.g. the /mcp JWT auth path) without an O(n)
+	// giving O(1) by-ID lookups (e.g. resolving a permit's key) without an O(n)
 	// scan or a database read. Maintained in lock-step with virtualKeys via
 	// storeVirtualKey / deleteVirtualKeyByValue — never write it directly.
 	virtualKeysByID sync.Map // string -> *VirtualKey (VK row ID -> VirtualKey)
@@ -307,8 +307,8 @@ type GovernanceStore interface {
 //
 // The modelCatalog parameter is optional (can be nil) and enables cross-provider model matching
 // for governance lookups (e.g., "openai/gpt-4o" matching config for "gpt-4o"). inMemoryStore is
-// the deployment's view of its configured MCP clients, read when building the grant a key carries
-// so the clients allowed by default are appended; without it, no client is treated as open.
+// the deployment's view of its configured providers, read when building the grant of a key that
+// allows all providers and when resolving key aliases; without it, neither applies.
 func NewLocalGovernanceStore(ctx context.Context, logger schemas.Logger, configStore configstore.ConfigStore, governanceConfig *configstore.GovernanceConfig, modelCatalog *modelcatalog.ModelCatalog, inMemoryStore InMemoryStore) (*LocalGovernanceStore, error) {
 	store := &LocalGovernanceStore{
 		inMemoryStore:                  inMemoryStore,
@@ -1255,8 +1255,8 @@ func (gs *LocalGovernanceStore) GetVirtualKey(ctx context.Context, vkValue strin
 
 // GetVirtualKeyByID retrieves a virtual key by its row ID (lock-free) with all
 // relationships preloaded, via the ID-keyed secondary index. Mirrors
-// GetVirtualKey (which is keyed by value); used by by-ID hot paths such as /mcp
-// JWT auth to avoid a per-request database read.
+// GetVirtualKey (which is keyed by value); used by by-ID hot paths such as
+// virtualKeyOf to avoid a per-request database read.
 func (gs *LocalGovernanceStore) GetVirtualKeyByID(ctx context.Context, vkID string) (*configstoreTables.TableVirtualKey, bool) {
 	value, exists := gs.virtualKeysByID.Load(vkID)
 	if !exists || value == nil {
@@ -1517,12 +1517,7 @@ func (gs *LocalGovernanceStore) CheckProviderCandidateExclusion(ctx *schemas.Bif
 }
 
 // permitForVirtualKey builds the permit a virtual key confers: one provider permit per configured
-// provider, and one MCP permit per MCP client the key may execute tools of: its own MCP configs,
-// plus the clients allowed by default.
-//
-// allowedByDefaultClients maps client id to client name, as the in-memory store reports it. A client
-// the key configures explicitly is never widened by that map: the explicit config decides, including
-// when it grants no tool at all.
+// provider, plus every configured provider when the key allows all providers.
 //
 // The result is a snapshot for one attempt. Provider permits carry a copy of the config they came
 // from, so a key reloaded mid-attempt cannot change what that attempt has already resolved. A later
@@ -4809,7 +4804,7 @@ func patchCached[T any](m *sync.Map, key, value any, patch func(*T) *T) {
 // store resolves one permit per credential, so there is nothing to pick between, and one limit
 // reached twice is still one limit once the list is settled.
 func (gs *LocalGovernanceStore) GatherLimits(ctx *schemas.BifrostContext, access schemas.Access, provider schemas.ModelProvider, model string) (budgets []schemas.Limit, rateLimits []schemas.Limit, err error) {
-	// A request naming no provider and no model (an MCP tool execution) still walks
+	// A request naming no provider and no model still walks
 	// the model-config scopes: only the all-models, all-providers tier can match then, and that
 	// tier is where a key's own budget and rate limit live since the model-config migration.
 	// Provider- and model-specific tiers cannot match an empty pair, so they never reach it.

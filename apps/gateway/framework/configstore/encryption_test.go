@@ -93,21 +93,6 @@ func TestEncryptPlaintextRows_EncryptsAllTables(t *testing.T) {
 		"session-plaintext-token", future, now, now)
 
 	insertPlaintextRow(t, db,
-		`INSERT INTO mcp_oauth_tokens (id, auth_mode, access_token, refresh_token, token_type, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'shared', ?, ?, 'Bearer', 'plain_text', ?, ?, ?)`,
-		"tok-1", "plaintext-access-token", "plaintext-refresh-token", future, now, now)
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO oauth_configs (id, client_secret, redirect_uri, status, encryption_status, created_at, updated_at)
-		 VALUES (?, ?, ?, 'pending', 'plain_text', ?, ?)`,
-		"cfg-1", "plaintext-client-secret", "https://example.com/cb", now, now)
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO config_mcp_clients (client_id, name, connection_type, connection_string, headers_json, encryption_status, created_at, updated_at)
-		 VALUES (?, ?, 'sse', ?, ?, 'plain_text', ?, ?)`,
-		"mcp-1", "test-mcp", "https://mcp.example.com", `{"Authorization":"Bearer token"}`, now, now)
-
-	insertPlaintextRow(t, db,
 		`INSERT INTO config_providers (name, proxy_config_json, encryption_status, created_at, updated_at)
 		 VALUES (?, ?, 'plain_text', ?, ?)`,
 		"openai", `{"url":"https://proxy.example.com"}`, now, now)
@@ -141,20 +126,6 @@ func TestEncryptPlaintextRows_EncryptsAllTables(t *testing.T) {
 	db.Table("sessions").Take(&sessionRow)
 	assert.Equal(t, "encrypted", sessionRow["encryption_status"])
 	assert.NotEqual(t, "session-plaintext-token", sessionRow["token"])
-
-	var tokRow map[string]any
-	db.Table("mcp_oauth_tokens").Where("id = ?", "tok-1").Take(&tokRow)
-	assert.Equal(t, "encrypted", tokRow["encryption_status"])
-	assert.NotEqual(t, "plaintext-access-token", tokRow["access_token"])
-
-	var cfgRow map[string]any
-	db.Table("oauth_configs").Where("id = ?", "cfg-1").Take(&cfgRow)
-	assert.Equal(t, "encrypted", cfgRow["encryption_status"])
-	assert.NotEqual(t, "plaintext-client-secret", cfgRow["client_secret"])
-
-	var mcpRow map[string]any
-	db.Table("config_mcp_clients").Where("client_id = ?", "mcp-1").Take(&mcpRow)
-	assert.Equal(t, "encrypted", mcpRow["encryption_status"])
 
 	var providerRow map[string]any
 	db.Table("config_providers").Where("name = ?", "openai").Take(&providerRow)

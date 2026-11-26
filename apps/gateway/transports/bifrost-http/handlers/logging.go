@@ -1878,9 +1878,8 @@ var dashboardRankingDimensions = []logstore.RankingDimension{
 //
 // It accepts the same filter query parameters as the individual histogram and
 // rankings endpoints (period OR start_time/end_time, providers, models, status,
-// virtual_key_ids, team_ids, etc., plus metadata_<key> filters) and the MCP
-// filter params (tool_names, server_labels), plus the ranking row-cap params
-// (limit, all). Filters are parsed once and the
+// virtual_key_ids, team_ids, etc., plus metadata_<key> filters), plus the ranking
+// row-cap params (limit, all). Filters are parsed once and the
 // histogram bucket size is derived once from the resolved time range, so every
 // section is computed against an identical window. All sub-queries run
 // concurrently; if any fails the whole request fails, so consumers always get a

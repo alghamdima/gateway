@@ -281,7 +281,7 @@ func (h *WebSocketHandler) removeClient(conn *websocket.Conn) {
 }
 
 // BroadcastUpdatesToClients sends a store update notification to all connected WebSocket clients
-// The tags parameter should match RTK Query tagTypes (e.g., "Providers", "VirtualKeys", "MCPClients")
+// The tags parameter should match RTK Query tagTypes (e.g., "Providers", "VirtualKeys")
 func (h *WebSocketHandler) BroadcastUpdatesToClients(tags []string) {
 	message := struct {
 		Type string   `json:"type"`

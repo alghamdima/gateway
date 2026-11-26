@@ -267,86 +267,6 @@ func TestAuditChange_VirtualKeyDeleteSnapshotIncludesBudgets(t *testing.T) {
 	}
 }
 
-// TestAuditChange_MCPClientUpdateRecordedWhenVKAssignmentFails pins that an
-// update whose client write committed is audited even when the VK assignment
-// step after it fails, and that the after snapshot keeps the fields the handler
-// does not rebuild. Invalid vk_configs are refused before the client write, so
-// the failure here is the store's.
-func TestAuditChange_MCPClientUpdateRecordedWhenVKAssignmentFails(t *testing.T) {
-	SetLogger(&mockLogger{})
-	existing := &schemas.MCPClientConfig{
-		ID:             "client-audit",
-		Name:           "audit_mcp",
-		EndpointSlug:   "audit-slug",
-		ConnectionType: schemas.MCPConnectionTypeHTTP,
-		AuthType:       schemas.MCPAuthTypeNone,
-	}
-	store := &lib.Config{
-		ClientConfig: &configstore.ClientConfig{},
-	}
-	cfgStore := &auditVKUpdateStore{}
-	store.ConfigStore = cfgStore
-	h := &MCPHandler{store: store, mcpManager: &fakeMCPManagerVerifyOnly{}}
-
-	disabled := true
-	body, err := json.Marshal(MCPClientUpdateRequest{
-		Disabled:  &disabled,
-		VKConfigs: &[]MCPVKConfigRequest{{VirtualKeyID: "vk-1", ToolsToExecute: schemas.WhiteList{"*"}}},
-	})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	ctx := &fasthttp.RequestCtx{}
-	ctx.SetUserValue("id", existing.ID)
-	ctx.Request.SetBody(body)
-	h.updateMCPClient(ctx)
-
-	if code := ctx.Response.StatusCode(); code != fasthttp.StatusInternalServerError {
-		t.Fatalf("expected 500 from the VK assignment step, got %d: %s", code, ctx.Response.Body())
-	}
-	if cfgStore.updates != 1 {
-		t.Fatalf("expected the client write to commit before the VK step, got %d writes", cfgStore.updates)
-	}
-	change := requireSingleAuditChange(t, ctx, "mcp_client.updated")
-	if !strings.Contains(string(change.After), `"endpoint_slug":"audit-slug"`) {
-		t.Fatalf("after snapshot dropped the unchanged endpoint slug: %s", change.After)
-	}
-}
-
-func (failingRemoveMCPManager) RemoveMCPClient(context.Context, string) error {
-	return errors.New("runtime removal failed")
-}
-
-// TestAuditChange_MCPClientDeleteRecordedWhenRuntimeRemovalFails pins that a
-// delete is audited once the row is gone, even when the runtime removal fails.
-func TestAuditChange_MCPClientDeleteRecordedWhenRuntimeRemovalFails(t *testing.T) {
-	SetLogger(&mockLogger{})
-	cfgStore := newRealConfigStore(t)
-	if err := cfgStore.CreateMCPClientConfig(context.Background(), &schemas.MCPClientConfig{
-		ID:               "mcp-audit-delete",
-		Name:             "audit_delete",
-		ConnectionType:   schemas.MCPConnectionTypeHTTP,
-		ConnectionString: schemas.NewSecretVar("https://example.invalid/mcp"),
-	}); err != nil {
-		t.Fatalf("create client: %v", err)
-	}
-	h := &MCPHandler{store: &lib.Config{ConfigStore: cfgStore, ClientConfig: &configstore.ClientConfig{}}, mcpManager: failingRemoveMCPManager{}}
-
-	var req fasthttp.Request
-	req.Header.SetMethod(fasthttp.MethodDelete)
-	ctx := initCtx(&req)
-	ctx.SetUserValue("id", "mcp-audit-delete")
-	h.deleteMCPClient(ctx)
-
-	if code := ctx.Response.StatusCode(); code != fasthttp.StatusInternalServerError {
-		t.Fatalf("expected 500 from the runtime removal, got %d: %s", code, ctx.Response.Body())
-	}
-	change := requireSingleAuditChange(t, ctx, "mcp_client.deleted")
-	if change.TargetID != "mcp-audit-delete" {
-		t.Fatalf("unexpected target: %+v", change)
-	}
-}
-
 // failingProxyReloadManager fails the proxy reload after the config is saved.
 type failingProxyReloadManager struct {
 	stubConfigManager
@@ -444,44 +364,6 @@ func TestAuditDeletedIDsCapsTheList(t *testing.T) {
 	}
 	if small := auditDeletedIDs([]string{"a"}); small["ids_truncated"] != nil {
 		t.Fatalf("a small delete must not be marked truncated: %+v", small)
-	}
-}
-
-// TestAuditMCPClientMasksStdioCommandLine pins that an STDIO client's
-// arguments and inline env values never reach the audit snapshot, while env
-// names and the argument count stay so a change is still visible.
-func TestAuditMCPClientMasksStdioCommandLine(t *testing.T) {
-	cfg := &schemas.MCPClientConfig{
-		ID:             "stdio-audit",
-		Name:           "stdio_audit",
-		ConnectionType: schemas.MCPConnectionTypeSTDIO,
-		StdioConfig: &schemas.MCPStdioConfig{
-			Command: "npx",
-			Args:    []string{"server", "--token=arg-secret"},
-			Envs:    []string{"API_TOKEN=env-secret", "HOME"},
-		},
-	}
-	snap := string(auditMCPClient(&lib.Config{}, cfg))
-	for _, secret := range []string{"arg-secret", "env-secret"} {
-		if strings.Contains(snap, secret) {
-			t.Fatalf("snapshot leaks %q: %s", secret, snap)
-		}
-	}
-	var decoded struct {
-		StdioConfig schemas.MCPStdioConfig `json:"stdio_config"`
-	}
-	if err := json.Unmarshal([]byte(snap), &decoded); err != nil {
-		t.Fatalf("decode snapshot: %v", err)
-	}
-	got := decoded.StdioConfig
-	if got.Command != "npx" || len(got.Args) != 2 || got.Args[1] != "<redacted>" {
-		t.Fatalf("expected the command kept and every argument masked, got %+v", got)
-	}
-	if len(got.Envs) != 2 || got.Envs[0] != "API_TOKEN=<redacted>" || got.Envs[1] != "HOME" {
-		t.Fatalf("expected env names kept and inline values masked, got %+v", got.Envs)
-	}
-	if cfg.StdioConfig.Args[1] != "--token=arg-secret" || cfg.StdioConfig.Envs[0] != "API_TOKEN=env-secret" {
-		t.Fatalf("masking mutated the live config: %+v", cfg.StdioConfig)
 	}
 }
 

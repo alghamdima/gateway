@@ -1317,19 +1317,6 @@ func TestHTTPClientFactoryApplyOptions(t *testing.T) {
 	}
 }
 
-func TestDefaultHTTPClientFactoryGetter(t *testing.T) {
-	t.Cleanup(func() { SetDefaultHTTPClientFactory(nil) })
-	SetDefaultHTTPClientFactory(nil)
-	if DefaultHTTPClientFactory() != nil {
-		t.Fatal("no factory registered: want nil")
-	}
-	factory := NewHTTPClientFactory(nil, noopTestLogger{})
-	SetDefaultHTTPClientFactory(factory)
-	if DefaultHTTPClientFactory() != factory {
-		t.Fatal("want the registered factory")
-	}
-}
-
 // TestLiveFasthttpClientHonorsDisablePathNormalizing pins that a copy of the live
 // client with DisablePathNormalizing set still sends an escaped path segment (%2F)
 // as written, while a client that did not ask for it keeps fasthttp's default

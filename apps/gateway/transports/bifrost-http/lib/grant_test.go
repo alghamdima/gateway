@@ -23,13 +23,12 @@ func TestRecordingInstallsAGrantWhenTheContextCarriesNone(t *testing.T) {
 	installed := ctx.Grant()
 	assert.Equal(t, "sk-bf-1", installed.Identity().Credential().Value)
 
-	RecordUser(ctx, &schemas.UserRef{ID: "u1"})
+	RecordCredential(ctx, grant.NewCredential(grant.CredentialAPIKey, "key-7"))
 	assert.Same(t, installed, ctx.Grant(), "and keeps using it")
-	assert.Equal(t, "u1", ctx.Grant().Identity().User().ID)
+	assert.Equal(t, "key-7", ctx.Grant().Identity().Credential().Value)
 
 	// A nil context has nothing to record on, and must not panic.
 	RecordCredential(nil, grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-1"))
-	RecordUser(nil, &schemas.UserRef{ID: "u1"})
 }
 
 func TestCredentialFromContext(t *testing.T) {
@@ -87,26 +86,16 @@ func TestUserFromContext(t *testing.T) {
 	assert.Equal(t, &schemas.UserRef{ID: "u1", Name: "Ada", Email: "ada@example.com"}, userFromContext(ctx))
 }
 
-func TestRecordCredentialAndUserKeepEachOther(t *testing.T) {
+func TestRecordCredentialKeepsTheUser(t *testing.T) {
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 
 	RecordCredential(ctx, schemas.Credential{})
-	RecordUser(ctx, nil)
-	RecordUser(ctx, &schemas.UserRef{})
 	assert.Nil(t, ctx.Grant(), "recording nothing records nothing, and installs nothing")
 
-	RecordUser(ctx, &schemas.UserRef{ID: "u1", Name: "Ada"})
-	g := ctx.Grant()
-	require.NotNil(t, g)
-	require.NotNil(t, g.Identity())
-	assert.Equal(t, &schemas.UserRef{ID: "u1", Name: "Ada"}, g.Identity().User())
-	assert.False(t, g.Identity().Presented(), "a user without a credential presented nothing yet")
+	g := grant.New()
+	ctx.SetGrant(g)
+	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: "u1", Name: "Ada"}, nil, nil, nil, nil, nil))
 
-	RecordCredential(ctx, grant.NewCredential(grant.CredentialMCPToken, "sub-1"))
-	assert.Equal(t, grant.NewCredential(grant.CredentialMCPToken, "sub-1"), g.Identity().Credential())
-	assert.Equal(t, &schemas.UserRef{ID: "u1", Name: "Ada"}, g.Identity().User(), "the user is kept")
-
-	// The last layer to authenticate is the one the request goes by.
 	RecordCredential(ctx, grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-1"))
 	assert.Equal(t, grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-1"), g.Identity().Credential())
 	assert.Equal(t, "u1", g.Identity().User().ID)
@@ -118,7 +107,7 @@ func TestRecordingKeepsWhatResolutionSettled(t *testing.T) {
 	ctx.SetGrant(g)
 	g.SetIdentity(grant.NewIdentity(
 		grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-1"),
-		nil,
+		&schemas.UserRef{ID: "u1"},
 		&schemas.EntityRef{ID: "vk1", Name: "Key"},
 		[]schemas.EntityRef{{ID: "t1"}},
 		[]schemas.EntityRef{{ID: "c1"}},
@@ -126,9 +115,9 @@ func TestRecordingKeepsWhatResolutionSettled(t *testing.T) {
 		&schemas.EntityRef{ID: "p1"},
 	))
 
-	RecordUser(ctx, &schemas.UserRef{ID: "u1"})
+	RecordCredential(ctx, grant.NewCredential(grant.CredentialAPIKey, "key-7"))
 	identity := g.Identity()
-	assert.Equal(t, "sk-bf-1", identity.Credential().Value)
+	assert.Equal(t, "key-7", identity.Credential().Value)
 	assert.Equal(t, "vk1", identity.VirtualKey().ID)
 	assert.Equal(t, []schemas.EntityRef{{ID: "t1"}}, identity.Teams())
 	assert.Equal(t, []schemas.EntityRef{{ID: "c1"}}, identity.Customers())
@@ -200,21 +189,4 @@ func TestConvertToBifrostContextSettlesTheIdentity(t *testing.T) {
 		defer cancelSecond()
 		assert.Same(t, first.Grant(), second.Grant())
 	})
-}
-
-// TestPreAuthenticated pins the marker: unset by default, set only through MarkPreAuthenticated,
-// and not forgeable through a plain string user value of the same name.
-func TestPreAuthenticated(t *testing.T) {
-	ctx := &fasthttp.RequestCtx{}
-	_, ok := PreAuthenticated(ctx)
-	assert.False(t, ok)
-
-	ctx.SetUserValue("bifrost-pre-authenticated", PreAuthClientGateway)
-	_, ok = PreAuthenticated(ctx)
-	assert.False(t, ok, "a plain string key must not count as the typed marker")
-
-	MarkPreAuthenticated(ctx, PreAuthClientGateway)
-	method, ok := PreAuthenticated(ctx)
-	assert.True(t, ok)
-	assert.Equal(t, PreAuthClientGateway, method)
 }

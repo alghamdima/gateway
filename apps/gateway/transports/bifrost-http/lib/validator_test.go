@@ -11,10 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 	"unicode"
 
-	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/vectorstore"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -297,42 +295,6 @@ func TestValidateConfigSchema_ValidClientConfig(t *testing.T) {
 	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
 	if err != nil {
 		t.Errorf("expected valid client config to pass validation, got error: %v", err)
-	}
-}
-
-// TestValidateConfigSchema_ClaudeCodeGatewayManagedSettings pins that managed_settings accepts
-// null (no policy, what Go writes for an unset value), {} (empty policy) and a policy object.
-func TestValidateConfigSchema_ClaudeCodeGatewayManagedSettings(t *testing.T) {
-	cfg := func(managed string) []byte {
-		return []byte(`{"client": {"oauth2_server_config": {"issuer_url": "https://bifrost.example.com",
-			"gateways": {"claude_code": {"enabled": true, "managed_settings": ` + managed + `}}}}}`)
-	}
-	for _, valid := range []string{`null`, `{}`, `{"permissions": {"deny": ["Bash(rm:*)"]}}`} {
-		if err := ValidateConfigSchema(cfg(valid), loadLocalSchema(t)); err != nil {
-			t.Errorf("managed_settings %s must be valid, got: %v", valid, err)
-		}
-	}
-	if err := ValidateConfigSchema(cfg(`"not an object"`), loadLocalSchema(t)); err == nil {
-		t.Error("a string managed_settings must be rejected")
-	}
-}
-
-// TestValidateConfigSchema_ClaudeCodeGatewayTelemetryDestinations pins that enabled telemetry
-// needs at least one destination, as the config validator does; disabled telemetry needs none.
-func TestValidateConfigSchema_ClaudeCodeGatewayTelemetryDestinations(t *testing.T) {
-	cfg := func(telemetry string) []byte {
-		return []byte(`{"client": {"oauth2_server_config": {"issuer_url": "https://bifrost.example.com",
-			"gateways": {"claude_code": {"enabled": true, "telemetry": ` + telemetry + `}}}}}`)
-	}
-	for _, invalid := range []string{`{"enabled": true}`, `{"enabled": true, "destinations": []}`} {
-		if err := ValidateConfigSchema(cfg(invalid), loadLocalSchema(t)); err == nil {
-			t.Errorf("telemetry %s must be rejected", invalid)
-		}
-	}
-	for _, valid := range []string{`{"enabled": false}`, `{"enabled": true, "destinations": [{"endpoint": "https://otel.example.com"}]}`} {
-		if err := ValidateConfigSchema(cfg(valid), loadLocalSchema(t)); err != nil {
-			t.Errorf("telemetry %s must be valid, got: %v", valid, err)
-		}
 	}
 }
 
@@ -773,352 +735,6 @@ func TestValidateConfigSchema_VirtualKeyProviderConfig_MissingProvider(t *testin
 	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
 	if err == nil {
 		t.Error("expected config missing 'provider' in virtual key provider config to fail validation")
-	}
-}
-
-// =============================================================================
-// Virtual Key MCP Config Required Fields Tests
-// =============================================================================
-
-func TestValidateConfigSchema_VirtualKeyMCPConfig_Valid(t *testing.T) {
-	// Valid virtual key MCP config identifying the MCP client by mcp_client_id (DB form)
-	validConfig := `{
-		"governance": {
-			"virtual_keys": [
-				{
-					"id": "vk-1",
-					"name": "Test Virtual Key",
-					"value": "vk_test_123456",
-					"mcp_configs": [
-						{
-							"mcp_client_id": 1
-						}
-					]
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected valid virtual key MCP config to pass validation, got error: %v", err)
-	}
-}
-
-func TestValidateConfigSchema_VirtualKeyMCPConfig_ValidWithClientName(t *testing.T) {
-	// Valid virtual key MCP config identifying the MCP client by mcp_client_name
-	// (config-file form — resolved to mcp_client_id at startup). Either identifier
-	// alone is sufficient; neither is required at the JSON Schema level.
-	validConfig := `{
-		"governance": {
-			"virtual_keys": [
-				{
-					"id": "vk-1",
-					"name": "Test Virtual Key",
-					"value": "vk_test_123456",
-					"mcp_configs": [
-						{
-							"mcp_client_name": "my-mcp-client",
-							"tools_to_execute": ["tool1"]
-						}
-					]
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected virtual key MCP config with mcp_client_name to pass validation, got error: %v", err)
-	}
-}
-
-// =============================================================================
-// MCP Client Config Required Fields Tests
-// =============================================================================
-
-func TestValidateConfigSchema_MCPClientConfig_Valid_Stdio(t *testing.T) {
-	// Valid MCP client config with stdio connection type
-	validConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "stdio",
-					"stdio_config": {
-						"command": "/usr/bin/my-tool"
-					}
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected valid MCP client config (stdio) to pass validation, got error: %v", err)
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_Valid_Sse(t *testing.T) {
-	// Valid MCP client config with sse connection type
-	validConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "sse",
-					"connection_string": "http://localhost:8080"
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected valid MCP client config (sse) to pass validation, got error: %v", err)
-	}
-}
-
-// TestValidateConfigSchema_MCPClientOAuthUseClientMetadataDocument: oauth_config takes the
-// use_client_metadata_document toggle, and it reaches the client's pending OAuth config.
-func TestValidateConfigSchema_MCPClientOAuthUseClientMetadataDocument(t *testing.T) {
-	client := `{
-		"name": "linear",
-		"connection_type": "http",
-		"connection_string": "https://mcp.linear.app/mcp",
-		"auth_type": "oauth",
-		"oauth_config": {
-			"authorize_url": "https://linear.app/oauth/authorize",
-			"token_url": "https://api.linear.app/oauth/token",
-			"use_client_metadata_document": true
-		}
-	}`
-	if err := ValidateConfigSchema([]byte(`{"mcp": {"client_configs": [`+client+`]}}`), loadLocalSchema(t)); err != nil {
-		t.Fatalf("expected use_client_metadata_document to pass validation: %v", err)
-	}
-	var parsed schemas.MCPClientConfig
-	if err := json.Unmarshal([]byte(client), &parsed); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if parsed.PendingOAuthConfig == nil || !parsed.PendingOAuthConfig.UseClientMetadataDocument {
-		t.Fatal("use_client_metadata_document did not reach the pending OAuth config")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_Valid_Http(t *testing.T) {
-	// Valid MCP client config with http connection type
-	validConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "http",
-					"connection_string": "http://localhost:8080"
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t))
-	if err != nil {
-		t.Errorf("expected valid MCP client config (http) to pass validation, got error: %v", err)
-	}
-}
-
-// TestValidateConfigSchema_MCPClientConfig_PerUserDiscovery: per_user_discovery
-// discovers each caller's tools with their own credential, so the schema accepts
-// it only on a per-user auth type, and not on an openapi client.
-func TestValidateConfigSchema_MCPClientConfig_PerUserDiscovery(t *testing.T) {
-	schema := loadLocalSchema(t)
-	for _, tc := range []struct {
-		name   string
-		client string
-		valid  bool
-	}{
-		{"per_user_headers", `"connection_type": "http", "connection_string": "http://localhost:3001/mcp", "auth_type": "per_user_headers", "per_user_header_keys": ["x-api-key"]`, true},
-		{"per_user_oauth", `"connection_type": "http", "connection_string": "http://localhost:3001/mcp", "auth_type": "per_user_oauth"`, true},
-		{"token_exchange", `"connection_type": "http", "connection_string": "http://localhost:3001/mcp", "auth_type": "token_exchange", "token_exchange": {"audience": "api://notes", "client_id": "exchange-app"}`, true},
-		{"headers", `"connection_type": "http", "connection_string": "http://localhost:3001/mcp", "auth_type": "headers"`, false},
-		{"oauth", `"connection_type": "http", "connection_string": "http://localhost:3001/mcp", "auth_type": "oauth"`, false},
-		{"no auth_type", `"connection_type": "http", "connection_string": "http://localhost:3001/mcp"`, false},
-		{"openapi per_user_headers", `"connection_type": "openapi", "auth_type": "per_user_headers", "per_user_header_keys": ["x-api-key"], "openapi_config": {"spec_url": "https://example.com/openapi.json"}`, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			config := `{"mcp": {"client_configs": [{"name": "notes", ` + tc.client + `, "per_user_discovery": true}]}}`
-			err := ValidateConfigSchema([]byte(config), schema)
-			if tc.valid && err != nil {
-				t.Errorf("expected per_user_discovery to be accepted, got: %v", err)
-			}
-			if !tc.valid && err == nil {
-				t.Error("expected per_user_discovery to be rejected")
-			}
-		})
-	}
-
-	off := `{"mcp": {"client_configs": [{"name": "notes", "connection_type": "http", "connection_string": "http://localhost:3001/mcp", "auth_type": "headers", "per_user_discovery": false}]}}`
-	if err := ValidateConfigSchema([]byte(off), schema); err != nil {
-		t.Errorf("expected per_user_discovery false to be accepted on any auth type, got: %v", err)
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_MissingName(t *testing.T) {
-	// Missing required field: name
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"connection_type": "stdio",
-					"stdio_config": {
-						"command": "/usr/bin/my-tool"
-					}
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'name' in MCP client config to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_MissingConnectionType(t *testing.T) {
-	// Missing required field: connection_type
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"stdio_config": {
-						"command": "/usr/bin/my-tool"
-					}
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'connection_type' in MCP client config to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_MissingStdioConfig(t *testing.T) {
-	// Missing conditional required field: stdio_config when connection_type is stdio
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "stdio"
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'stdio_config' for stdio connection type to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_MissingWebsocketConfig(t *testing.T) {
-	// Missing conditional required field: websocket_config when connection_type is websocket
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "websocket"
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'websocket_config' for websocket connection type to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_MissingHttpConfig(t *testing.T) {
-	// Missing conditional required field: http_config when connection_type is http
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "http"
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'http_config' for http connection type to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_StdioConfig_MissingCommand(t *testing.T) {
-	// Missing required field in stdio_config: command
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "stdio",
-					"stdio_config": {
-						"args": ["--help"]
-					}
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'command' in stdio_config to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_WebsocketConfig_MissingUrl(t *testing.T) {
-	// Missing required field in websocket_config: url
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "websocket",
-					"websocket_config": {}
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'url' in websocket_config to fail validation")
-	}
-}
-
-func TestValidateConfigSchema_MCPClientConfig_HttpConfig_MissingUrl(t *testing.T) {
-	// Missing required field in http_config: url
-	invalidConfig := `{
-		"mcp": {
-			"client_configs": [
-				{
-					"name": "my-mcp-client",
-					"connection_type": "http",
-					"http_config": {}
-				}
-			]
-		}
-	}`
-
-	err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t))
-	if err == nil {
-		t.Error("expected config missing 'url' in http_config to fail validation")
 	}
 }
 
@@ -2712,7 +2328,7 @@ func TestSchemaComplexityAnalyzerConfigRefusesSuggestions(t *testing.T) {
 	}
 }
 
-// TestSchemaGuardrailRuleTarget verifies explicit MCP targets without breaking legacy LLM rules.
+// TestSchemaGuardrailRuleTarget verifies the target field without breaking legacy LLM rules.
 func TestSchemaGuardrailRuleTarget(t *testing.T) {
 	compiled := compileSchema(t)
 
@@ -2721,7 +2337,6 @@ func TestSchemaGuardrailRuleTarget(t *testing.T) {
 		target    string
 		wantError bool
 	}{
-		{name: "explicit MCP target is valid", target: `,"target":"mcp"`},
 		{name: "omitted target remains valid", target: ""},
 		{name: "unknown target is rejected", target: `,"target":"agent"`, wantError: true},
 	}
@@ -2934,8 +2549,7 @@ func workloadIssuer(fields string) string {
 }
 
 // TestSchemaSCIMSharedProvisioningFields pins the fields every identity provider inherits from
-// the enterprise mapping.ProvisioningConfig: Cross App Access (crossAppAccess), workload
-// identity (workloadIdentity), the token exchange host allowlist (tokenExchangeHosts) and
+// the enterprise mapping.ProvisioningConfig: workload identity (workloadIdentity) and
 // accessProfileResolutionStrategy. Each
 // provider's config refuses unknown keys, so a provider missing one of them rejects a config
 // the loader accepts.
@@ -2957,9 +2571,7 @@ func TestSchemaSCIMSharedProvisioningFields(t *testing.T) {
 
 	for provider := range providers {
 		t.Run(provider+" accepts the shared provisioning fields", func(t *testing.T) {
-			extra := `,"crossAppAccess":{"enabled":true,"accessTokenTtl":3600,"provisionUsers":false},` +
-				`"workloadIdentity":{"additionalTrustedIssuers":[{"name":"AWS prod","kind":"aws","issuerUrl":"https://abc.tokens.sts.global.api.aws","audiences":["https://bifrost.example"]}]},` +
-				`"tokenExchangeHosts":["auth.example.com","login.example.com:8443"],` +
+			extra := `,"workloadIdentity":{"additionalTrustedIssuers":[{"name":"AWS prod","kind":"aws","issuerUrl":"https://abc.tokens.sts.global.api.aws","audiences":["https://bifrost.example"]}]},` +
 				`"accessProfileResolutionStrategy":"order"`
 			if err := validateConfig(t, compiled, scimConfig(provider, extra)); err != nil {
 				t.Fatalf("expected config to validate, got: %v", err)
@@ -2973,11 +2585,6 @@ func TestSchemaSCIMSharedProvisioningFields(t *testing.T) {
 		wantError bool
 	}{
 		{name: "okta syncAllUsers false is valid", extra: `,"syncAllUsers":false`},
-		{name: "crossAppAccess accessTokenTtl 0 means the default", extra: `,"crossAppAccess":{"enabled":true,"accessTokenTtl":0}`},
-		{name: "crossAppAccess accessTokenTtl at the 60 second floor", extra: `,"crossAppAccess":{"enabled":true,"accessTokenTtl":60}`},
-		{name: "crossAppAccess accessTokenTtl below the floor", extra: `,"crossAppAccess":{"enabled":true,"accessTokenTtl":59}`, wantError: true},
-		{name: "crossAppAccess accessTokenTtl above one day", extra: `,"crossAppAccess":{"enabled":true,"accessTokenTtl":86401}`, wantError: true},
-		{name: "crossAppAccess rejects unknown keys", extra: `,"crossAppAccess":{"enabled":true,"trustedIssuer":"https://acme.okta.com"}`, wantError: true},
 		{name: "generic trusted issuer with its claims", extra: workloadIssuer(`"kind":"generic","identityClaim":"client_id","machineCheck":{"kind":"sub_equals_claim","claim":"client_id"},"maxLifetimeSeconds":3600,"disabled":true`)},
 		{name: "generic trusted issuer taking only mapped IDs", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"any"}`)},
 		{name: "generic trusted issuer with a prefix rule", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_prefix","claim":"preferred_username","value":"service-account-"}`)},
@@ -2997,8 +2604,6 @@ func TestSchemaSCIMSharedProvisioningFields(t *testing.T) {
 		{name: "machine check prefix without a value", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_prefix","claim":"preferred_username"}`), wantError: true},
 		{name: "machine check equals without a claim", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"claim_equals","value":"client-credentials"}`), wantError: true},
 		{name: "machine check sub_equals_claim without a claim", extra: workloadIssuer(`"kind":"generic","identityClaim":"azp","machineCheck":{"kind":"sub_equals_claim"}`), wantError: true},
-		{name: "tokenExchangeHosts rejects a URL", extra: `,"tokenExchangeHosts":["https://auth.example.com"]`, wantError: true},
-		{name: "tokenExchangeHosts rejects a path", extra: `,"tokenExchangeHosts":["auth.example.com/oauth2"]`, wantError: true},
 		{name: "accessProfileResolutionStrategy rejects unknown values", extra: `,"accessProfileResolutionStrategy":"first"`, wantError: true},
 	}
 	for _, tt := range tests {
@@ -3135,16 +2740,10 @@ func loadSchema(t *testing.T) map[string]interface{} {
 	return schema
 }
 
-func TestSchemaClientMCPFields(t *testing.T) {
+func TestSchemaClientAllowedHeaders(t *testing.T) {
 	schema := loadSchema(t)
 	fields := []string{
 		"allowed_headers",
-		"mcp_agent_depth",
-		"mcp_tool_execution_timeout",
-		"mcp_code_mode_binding_level",
-		"mcp_tool_sync_interval",
-		"mcp_disable_auto_tool_inject",
-		"mcp_enable_temp_token_auth",
 	}
 	for _, field := range fields {
 		t.Run("client has "+field, func(t *testing.T) {
@@ -3155,21 +2754,15 @@ func TestSchemaClientMCPFields(t *testing.T) {
 		})
 	}
 
-	t.Run("client MCP fields validate successfully", func(t *testing.T) {
+	t.Run("client allowed_headers validates successfully", func(t *testing.T) {
 		compiled := compileSchema(t)
 		config := `{
 			"client": {
-				"allowed_headers": ["X-Custom-Header"],
-				"mcp_agent_depth": 5,
-				"mcp_tool_execution_timeout": 60,
-				"mcp_code_mode_binding_level": "server",
-				"mcp_tool_sync_interval": 10,
-				"mcp_disable_auto_tool_inject": false,
-				"mcp_enable_temp_token_auth": true
+				"allowed_headers": ["X-Custom-Header"]
 			}
 		}`
 		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("client with MCP fields should be valid, got: %v", err)
+			t.Errorf("client with allowed_headers should be valid, got: %v", err)
 		}
 	})
 }
@@ -3256,167 +2849,6 @@ func TestSchemaGovernanceProviders(t *testing.T) {
 	})
 }
 
-func TestSchemaMCPToolSyncInterval(t *testing.T) {
-	schema := loadSchema(t)
-
-	t.Run("mcp includes tool_sync_interval property", func(t *testing.T) {
-		_, found := navigateJSON(schema, "properties", "mcp", "properties", "tool_sync_interval")
-		if !found {
-			t.Error("mcp is missing 'tool_sync_interval' property — MCPConfig Go struct defines this field")
-		}
-	})
-
-	t.Run("mcp with tool_sync_interval validates successfully", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"client_configs": [],
-				"tool_sync_interval": "10m"
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("mcp with tool_sync_interval should be valid, got: %v", err)
-		}
-	})
-}
-
-// max_protocol_version is accepted globally (mcp) and per client, limited to the supported values.
-func TestSchemaMCPMaxProtocolVersion(t *testing.T) {
-	compiled := compileSchema(t)
-	config := func(global, client string) string {
-		return fmt.Sprintf(`{
-			"mcp": {
-				"max_protocol_version": %s,
-				"client_configs": [
-					{"name": "example", "connection_type": "http", "connection_string": "https://example.com/mcp", "max_protocol_version": %s}
-				]
-			}
-		}`, global, client)
-	}
-	for _, v := range []string{`"auto"`, `"2026-07-28"`, `"2025-11-25"`, `"2025-06-18"`} {
-		if err := validateConfig(t, compiled, config(v, v)); err != nil {
-			t.Errorf("max_protocol_version %s should be valid, got: %v", v, err)
-		}
-	}
-	if err := validateConfig(t, compiled, config(`"2024-11-05"`, `"auto"`)); err == nil {
-		t.Error("an unsupported global max_protocol_version must be rejected")
-	}
-	if err := validateConfig(t, compiled, config(`"auto"`, `"latest"`)); err == nil {
-		t.Error("an unsupported per-client max_protocol_version must be rejected")
-	}
-}
-
-func TestSchemaMCPClientEndpointSlug(t *testing.T) {
-	schema := loadSchema(t)
-
-	t.Run("mcp_client_config includes endpoint_slug property", func(t *testing.T) {
-		_, found := navigateJSON(schema, "$defs", "mcp_client_config", "properties", "endpoint_slug")
-		if !found {
-			t.Error("$defs/mcp_client_config is missing 'endpoint_slug' — MCPClientConfig Go struct serializes this field")
-		}
-	})
-
-	clientConfig := func(slug string) string {
-		return fmt.Sprintf(`{
-			"mcp": {
-				"client_configs": [
-					{"name": "example", "connection_type": "http", "connection_string": "https://example.com/mcp", "endpoint_slug": %s}
-				]
-			}
-		}`, slug)
-	}
-
-	t.Run("client config with valid endpoint_slug validates successfully", func(t *testing.T) {
-		compiled := compileSchema(t)
-		if err := validateConfig(t, compiled, clientConfig(`"my-server-1"`)); err != nil {
-			t.Errorf("client config with endpoint_slug should be valid, got: %v", err)
-		}
-	})
-
-	t.Run("client config with non-url-safe endpoint_slug rejected", func(t *testing.T) {
-		compiled := compileSchema(t)
-		if err := validateConfig(t, compiled, clientConfig(`"My Server"`)); err == nil {
-			t.Error("non-url-safe endpoint_slug must be rejected by the schema")
-		}
-	})
-}
-
-func TestSchemaMCPVirtualMCPs(t *testing.T) {
-	schema := loadSchema(t)
-
-	t.Run("mcp includes virtual_mcps property", func(t *testing.T) {
-		_, found := navigateJSON(schema, "properties", "mcp", "properties", "virtual_mcps")
-		if !found {
-			t.Error("mcp is missing 'virtual_mcps' property — MCPConfig Go struct defines this field")
-		}
-	})
-
-	t.Run("virtual_mcp_config def includes endpoint_slug property", func(t *testing.T) {
-		_, found := navigateJSON(schema, "$defs", "virtual_mcp_config", "properties", "endpoint_slug")
-		if !found {
-			t.Error("$defs/virtual_mcp_config is missing 'endpoint_slug' — VirtualMCPConfig Go struct serializes this field")
-		}
-	})
-
-	t.Run("virtual_mcps entry with explicit endpoint_slug validates", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"virtual_mcps": [
-					{
-						"name": "Platform Tools",
-						"endpoint_slug": "platform-tools",
-						"enabled": true,
-						"tools": [
-							{"mcp_client_name": "github", "tool_names": ["create_pull_request"]}
-						],
-						"virtual_key_ids": ["vk-1"]
-					}
-				]
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("virtual_mcps entry should be valid, got: %v", err)
-		}
-	})
-
-	t.Run("virtual_mcps entry with non-url-safe endpoint_slug rejected", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"virtual_mcps": [
-					{"name": "Bad Slug", "endpoint_slug": "Not A Slug", "tools": [{"mcp_client_id": "c1"}]}
-				]
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err == nil {
-			t.Error("non-url-safe endpoint_slug must be rejected by the schema")
-		}
-	})
-
-	t.Run("virtual_mcps entry missing required name/tools rejected", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{"mcp": {"virtual_mcps": [{"endpoint_slug": "x"}]}}`
-		if err := validateConfig(t, compiled, config); err == nil {
-			t.Error("virtual_mcps entry without name and tools must be rejected")
-		}
-	})
-
-	t.Run("deprecated tool_groups still validates for backward compatibility", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"tool_groups": [
-					{"name": "Legacy", "tools": [{"mcp_client_name": "github"}], "team_ids": ["t-1"]}
-				]
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("deprecated tool_groups should still validate, got: %v", err)
-		}
-	})
-}
-
 func TestSchemaVKRotationCooldownBounds(t *testing.T) {
 	compiled := compileSchema(t)
 
@@ -3451,139 +2883,6 @@ func TestSchemaVKRotationCooldownBounds(t *testing.T) {
 	t.Run("integer above 30 days rejected", func(t *testing.T) {
 		if err := validateConfig(t, compiled, cooldownConfig(`2592000000000001`)); err == nil {
 			t.Error("cooldown above 30 days must be rejected by the schema")
-		}
-	})
-}
-
-func TestSchemaMCPToolManagerCodeMode(t *testing.T) {
-	schema := loadSchema(t)
-
-	t.Run("mcp_tool_manager_config includes code_mode_binding_level", func(t *testing.T) {
-		_, found := navigateJSON(schema, "$defs", "mcp_tool_manager_config", "properties", "code_mode_binding_level")
-		if !found {
-			t.Error("$defs/mcp_tool_manager_config is missing 'code_mode_binding_level' — MCPToolManagerConfig Go struct defines this field")
-		}
-	})
-
-	t.Run("tool_manager_config with code_mode_binding_level validates successfully", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"client_configs": [],
-				"tool_manager_config": {
-					"tool_execution_timeout": 30,
-					"max_agent_depth": 10,
-					"code_mode_binding_level": "tool"
-				}
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("tool_manager_config with code_mode_binding_level should be valid, got: %v", err)
-		}
-		var root struct {
-			MCP schemas.MCPConfig `json:"mcp"`
-		}
-		if err := json.Unmarshal([]byte(config), &root); err != nil {
-			t.Errorf("failed to unmarshal mcp config: %v", err)
-		}
-		if root.MCP.ToolManagerConfig == nil {
-			t.Fatal("tool_manager_config missing after unmarshal")
-		}
-		if root.MCP.ToolManagerConfig.ToolExecutionTimeout.D() != 30*time.Second {
-			t.Errorf("tool_execution_timeout should be 30 seconds, got: %v", root.MCP.ToolManagerConfig.ToolExecutionTimeout.D())
-		}
-	})
-}
-
-func TestSchemaMCPClientConfigFields(t *testing.T) {
-	schema := loadSchema(t)
-
-	fields := []string{
-		"client_id",
-		"is_code_mode_client",
-		"connection_string",
-		"auth_type",
-		// config.json declares OAuth inline via `oauth_config`; the
-		// `oauth_config_id` FK is assigned server-side and is not settable here.
-		"oauth_config",
-		"headers",
-		"tools_to_execute",
-		"tools_to_auto_execute",
-		"tool_sync_interval",
-	}
-	for _, field := range fields {
-		t.Run("mcp_client_config has "+field, func(t *testing.T) {
-			_, found := navigateJSON(schema, "$defs", "mcp_client_config", "properties", field)
-			if !found {
-				t.Errorf("$defs/mcp_client_config is missing '%s' property — MCPClientConfig Go struct defines this field", field)
-			}
-		})
-	}
-
-	t.Run("mcp_client_config with new fields validates (stdio)", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"client_configs": [{
-					"client_id": "mcp-1",
-					"name": "test-mcp",
-					"is_code_mode_client": false,
-					"connection_type": "stdio",
-					"auth_type": "none",
-					"tools_to_execute": ["*"],
-					"tools_to_auto_execute": [],
-					"stdio_config": {
-						"command": "npx",
-						"args": ["-y", "@modelcontextprotocol/server-filesystem"]
-					}
-				}]
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("mcp_client_config with new fields (stdio) should be valid, got: %v", err)
-		}
-	})
-
-	t.Run("mcp_client_config with SSE connection validates", func(t *testing.T) {
-		compiled := compileSchema(t)
-		config := `{
-			"mcp": {
-				"client_configs": [{
-					"name": "sse-client",
-					"connection_type": "sse",
-					"connection_string": "http://localhost:8080/sse",
-					"auth_type": "headers",
-					"headers": {"Authorization": "Bearer token123"}
-				}]
-			}
-		}`
-		if err := validateConfig(t, compiled, config); err != nil {
-			t.Errorf("mcp_client_config with SSE connection should be valid, got: %v", err)
-		}
-	})
-}
-
-func TestSchemaMCPConnectionTypeSSE(t *testing.T) {
-	schema := loadSchema(t)
-
-	t.Run("connection_type enum includes sse", func(t *testing.T) {
-		enumVal, found := navigateJSON(schema, "$defs", "mcp_client_config", "properties", "connection_type", "enum")
-		if !found {
-			t.Fatal("could not find connection_type enum in mcp_client_config")
-		}
-		enumArr, ok := enumVal.([]interface{})
-		if !ok {
-			t.Fatal("connection_type enum is not an array")
-		}
-		hasSSE := false
-		for _, v := range enumArr {
-			if s, ok := v.(string); ok && s == "sse" {
-				hasSSE = true
-				break
-			}
-		}
-		if !hasSSE {
-			t.Error("connection_type enum does not include 'sse' — MCPConnectionType supports SSE")
 		}
 	})
 }
@@ -4206,8 +3505,7 @@ func TestSchemaGovernanceProjectsValidation(t *testing.T) {
 				"rate_limit": {"request_max_limit": 10, "request_reset_duration": "1m"},
 				"provider_configs": [{"provider_name": "openai", "allowed_models": ["gpt-4o"],
 					"budgets": [{"max_limit": 40, "reset_duration": "1d"}],
-					"model_budgets": [{"model_name": "gpt-4o", "budgets": [{"max_limit": 5, "reset_duration": "1d"}]}]}],
-				"mcp_configs": [{"mcp_client_name": "github", "tools_to_execute": ["*"]}]
+					"model_budgets": [{"model_name": "gpt-4o", "budgets": [{"max_limit": 5, "reset_duration": "1d"}]}]}]
 			}`,
 		},
 		{name: "an open project cannot split equally", project: `{"name": "p", "access_rule": "union", "membership_mode": "open", "split_policy": "equal"}`, wantError: true},
@@ -4418,181 +3716,6 @@ func TestSchemaGithubCopilotCredentialRequired(t *testing.T) {
 	}
 }
 
-// TestSchemaAccessProfileMCPGrants covers the access-profile MCP keys. The
-// schema drifted from the Go struct once already: the profile grant model was
-// renamed to virtual_mcps / mcp_configs while the schema still declared only the
-// retired spellings under additionalProperties:false, so every GitOps file that
-// used the current keys failed validation.
-func TestSchemaAccessProfileMCPGrants(t *testing.T) {
-	profileConfig := func(body string) string {
-		return fmt.Sprintf(`{"access_profiles": [{"name": "platform-default", %s}]}`, body)
-	}
-
-	t.Run("access_profile def declares virtual_mcps and mcp_configs", func(t *testing.T) {
-		schema := loadSchema(t)
-		for _, key := range []string{"virtual_mcps", "mcp_configs"} {
-			if _, found := navigateJSON(schema, "$defs", "access_profile", "properties", key); !found {
-				t.Errorf("$defs/access_profile is missing %q — TableAccessProfile serializes this field", key)
-			}
-		}
-	})
-
-	t.Run("virtual_mcps assignment validates", func(t *testing.T) {
-		compiled := compileSchema(t)
-		if err := validateConfig(t, compiled, profileConfig(`"virtual_mcps": [{"virtual_mcp_id": 1}]`)); err != nil {
-			t.Errorf("virtual_mcps assignment should be valid, got: %v", err)
-		}
-	})
-
-	t.Run("mcp_configs allowlist validates", func(t *testing.T) {
-		compiled := compileSchema(t)
-		body := `"mcp_configs": [{"mcp_client_id": "github", "tools_to_execute": ["create_pull_request"]}]`
-		if err := validateConfig(t, compiled, profileConfig(body)); err != nil {
-			t.Errorf("mcp_configs allowlist should be valid, got: %v", err)
-		}
-	})
-
-	t.Run("mcp_configs allow-all and deny-all allowlists validate", func(t *testing.T) {
-		compiled := compileSchema(t)
-		for _, tools := range []string{`["*"]`, `[]`} {
-			body := fmt.Sprintf(`"mcp_configs": [{"mcp_client_id": "github", "tools_to_execute": %s}]`, tools)
-			if err := validateConfig(t, compiled, profileConfig(body)); err != nil {
-				t.Errorf("tools_to_execute %s should be valid, got: %v", tools, err)
-			}
-		}
-	})
-
-	t.Run("virtual_mcps entry missing virtual_mcp_id rejected", func(t *testing.T) {
-		compiled := compileSchema(t)
-		if err := validateConfig(t, compiled, profileConfig(`"virtual_mcps": [{}]`)); err == nil {
-			t.Error("virtual_mcps entry without virtual_mcp_id must be rejected")
-		}
-	})
-
-	t.Run("virtual_mcps entry still rejects the retired tool_group_id key", func(t *testing.T) {
-		compiled := compileSchema(t)
-		if err := validateConfig(t, compiled, profileConfig(`"virtual_mcps": [{"tool_group_id": 1}]`)); err == nil {
-			t.Error("virtual_mcps entry must not accept the retired tool_group_id spelling")
-		}
-	})
-
-	t.Run("deprecated grant keys still validate for backward compatibility", func(t *testing.T) {
-		compiled := compileSchema(t)
-		body := `"mcp_tool_groups": [{"tool_group_id": 1}],
-			"mcp_servers": [{"mcp_server_id": "github"}],
-			"mcp_tool_overrides": [{"mcp_client_id": "github", "tool_name": "create_pull_request", "action": "include"}]`
-		if err := validateConfig(t, compiled, profileConfig(body)); err != nil {
-			t.Errorf("deprecated access-profile grant keys should still validate, got: %v", err)
-		}
-	})
-}
-
-func TestSchemaVirtualMCPByName(t *testing.T) {
-	compiled := compileSchema(t)
-
-	profile := func(body string) string {
-		return fmt.Sprintf(`{"access_profiles": [{"name": "p", "virtual_mcps": [%s]}]}`, body)
-	}
-	project := func(body string) string {
-		return fmt.Sprintf(`{"governance": {"projects": [{"name": "proj", "access_rule": "union", "virtual_mcps": [%s]}]}}`, body)
-	}
-
-	for _, tc := range []struct {
-		name  string
-		body  string
-		valid bool
-	}{
-		{"name only", `{"virtual_mcp_name": "Platform Tools"}`, true},
-		{"id only still valid", `{"virtual_mcp_id": 1}`, true},
-		{"both accepted, id wins at load", `{"virtual_mcp_name": "Platform Tools", "virtual_mcp_id": 1}`, true},
-		{"neither rejected", `{}`, false},
-		{"unknown key rejected", `{"virtual_mcp_slug": "x"}`, false},
-		{"id zero rejected", `{"virtual_mcp_id": 0}`, false},
-	} {
-		t.Run("access_profile/"+tc.name, func(t *testing.T) {
-			err := validateConfig(t, compiled, profile(tc.body))
-			if tc.valid && err != nil {
-				t.Errorf("expected valid, got: %v", err)
-			}
-			if !tc.valid && err == nil {
-				t.Error("expected rejection")
-			}
-		})
-		t.Run("project/"+tc.name, func(t *testing.T) {
-			err := validateConfig(t, compiled, project(tc.body))
-			if tc.valid && err != nil {
-				t.Errorf("expected valid, got: %v", err)
-			}
-			if !tc.valid && err == nil {
-				t.Error("expected rejection")
-			}
-		})
-	}
-}
-
-// TestValidateConfigSchema_IssuerURLRequiredForDiscovery pins the schema's own
-// statement of the load-time invariant: enabling OAuth discovery without a
-// pinned issuer_url is rejected by the schema, not only by validateClientConfig.
-func TestValidateConfigSchema_IssuerURLRequiredForDiscovery(t *testing.T) {
-	schemaPath := filepath.Join(t.TempDir(), "config.schema.json")
-	if err := os.WriteFile(schemaPath, loadLocalSchema(t), 0644); err != nil {
-		t.Fatalf("failed to write temp schema: %v", err)
-	}
-	t.Setenv(ConfigSchemaURLEnv, schemaPath)
-
-	for _, tc := range []struct {
-		name    string
-		config  string
-		wantErr bool
-	}{
-		{"oauth without issuer_url", `{"client":{"mcp_server_auth_mode":"oauth"}}`, true},
-		{"both without issuer_url", `{"client":{"mcp_server_auth_mode":"both","oauth2_server_config":{}}}`, true},
-		{"oauth with issuer_url", `{"client":{"mcp_server_auth_mode":"oauth","oauth2_server_config":{"issuer_url":"https://issuer.example.com"}}}`, false},
-		{"headers without issuer_url", `{"client":{"mcp_server_auth_mode":"headers"}}`, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateConfigSchema([]byte(tc.config))
-			if tc.wantErr && err == nil {
-				t.Fatal("expected schema validation to reject discovery without issuer_url")
-			}
-			if !tc.wantErr && err != nil {
-				t.Fatalf("expected config to pass schema validation, got: %v", err)
-			}
-		})
-	}
-}
-
-// TestSchemaCodeModeLimitsValueBytes keeps config.schema.json aligned with the server:
-// max_value_bytes is 0 (the default) or at least 1024, in both places the limits live.
-func TestSchemaCodeModeLimitsValueBytes(t *testing.T) {
-	wrap := map[string]func(string) string{
-		"client.mcp_code_mode_limits": func(limits string) string {
-			return `{"client": {"mcp_code_mode_limits": ` + limits + `}}`
-		},
-		"mcp.tool_manager_config.code_mode_limits": func(limits string) string {
-			return `{"mcp": {"tool_manager_config": {"code_mode_limits": ` + limits + `}}}`
-		},
-	}
-	for where, config := range wrap {
-		for _, tc := range []struct {
-			limits  string
-			wantErr bool
-		}{
-			{`{}`, false},
-			{`{"max_value_bytes": 0}`, false},
-			{`{"max_value_bytes": 1024}`, false},
-			{`{"max_value_bytes": 1048576}`, false},
-			{`{"max_value_bytes": 10}`, true},
-			{`{"max_value_bytes": 1023}`, true},
-		} {
-			err := ValidateConfigSchema([]byte(config(tc.limits)), loadLocalSchema(t))
-			if (err != nil) != tc.wantErr {
-				t.Errorf("%s %s: err=%v, wantErr=%v", where, tc.limits, err, tc.wantErr)
-			}
-		}
-	}
-}
-
 // TestValidateConfigSchema_VirtualKeyMetadata checks that config.schema.json enforces the same
 // metadata rules as the configstore validator, including the reserved keys.
 func TestValidateConfigSchema_VirtualKeyMetadata(t *testing.T) {
@@ -4623,84 +3746,6 @@ func TestValidateConfigSchema_VirtualKeyMetadata(t *testing.T) {
 				t.Errorf("expected metadata %s to pass validation, got error: %v", tt.metadata, err)
 			}
 		})
-	}
-}
-
-// TestValidateConfigSchema_InjectedTools pins injected_tools on every provider shape.
-// The provider_with_*_config variants set additionalProperties:false, so a field listed
-// only on the generic provider def is rejected for Bedrock, Azure, Vertex and the rest.
-func TestValidateConfigSchema_InjectedTools(t *testing.T) {
-	schema := loadLocalSchema(t)
-	const injected = `"injected_tools": [{"name": "web_search", "mcp_client_name": "tavily", "tool_name": "search"}, {"name": "read_page", "mcp_client_name": "fetcher", "tool_name": "fetch"}]`
-	// Each base config must pass on its own. A base that fails for an unrelated reason
-	// fails identically with injected_tools added, which would hide a rejection.
-	keyConfigs := map[string]string{
-		"azure":      `, "azure_key_config": {"endpoint": "https://example.openai.azure.com"}`,
-		"vertex":     `, "vertex_key_config": {"project_id": "p", "region": "us-central1"}`,
-		"ollama":     `, "ollama_key_config": {"url": "http://localhost:11434"}`,
-		"sgl":        `, "sgl_key_config": {"url": "http://localhost:30000"}`,
-		"vllm":       `, "vllm_key_config": {"url": "http://localhost:8000", "model_name": "m"}`,
-		"databricks": `, "databricks_key_config": {"workspace_url": "https://dbc-1234abcd-5678.cloud.databricks.com"}`,
-	}
-	for _, provider := range []string{"openai", "anthropic", "bedrock", "bedrock_mantle", "azure", "vertex", "ollama", "sgl", "vllm", "replicate", "databricks", "deepseek", "fireworks", "github_copilot"} {
-		key := fmt.Sprintf(`{"name": "k", "value": "v", "weight": 1.0%s}`, keyConfigs[provider])
-		base := fmt.Sprintf(`{"providers": {%q: {"keys": [%s]}}}`, provider, key)
-		if err := ValidateConfigSchema([]byte(base), schema); err != nil {
-			t.Errorf("%s: base config must pass before injected_tools is checked: %v", provider, err)
-			continue
-		}
-		with := fmt.Sprintf(`{"providers": {%q: {"keys": [%s], %s}}}`, provider, key, injected)
-		if err := ValidateConfigSchema([]byte(with), schema); err != nil {
-			t.Errorf("%s: injected_tools rejected: %v", provider, err)
-		}
-	}
-
-	// governance.providers is loaded for governance settings only (budget, rate limit), so
-	// an injected_tools block there would be silently ignored. The schema must not
-	// advertise it there.
-	var doc struct {
-		Properties struct {
-			Governance struct {
-				Properties struct {
-					Providers struct {
-						Items struct {
-							Properties map[string]json.RawMessage `json:"properties"`
-						} `json:"items"`
-					} `json:"providers"`
-				} `json:"properties"`
-			} `json:"governance"`
-		} `json:"properties"`
-	}
-	if err := json.Unmarshal(schema, &doc); err != nil {
-		t.Fatalf("parse schema: %v", err)
-	}
-	if _, ok := doc.Properties.Governance.Properties.Providers.Items.Properties["injected_tools"]; ok {
-		t.Error("governance.providers must not declare injected_tools: its loader never reads it")
-	}
-
-	openaiBase := `{"providers": {"openai": {"keys": [{"name": "k", "value": "v", "weight": 1.0}]}}}`
-	if err := ValidateConfigSchema([]byte(openaiBase), schema); err != nil {
-		t.Fatalf("openai base config must pass before the rejection cases mean anything: %v", err)
-	}
-	for _, block := range []string{`[]`, `[{"name": "read_page", "mcp_client_name": "fetcher", "tool_name": "fetch"}]`} {
-		config := fmt.Sprintf(`{"providers": {"openai": {"keys": [{"name": "k", "value": "v", "weight": 1.0}], "injected_tools": %s}}}`, block)
-		if err := ValidateConfigSchema([]byte(config), schema); err != nil {
-			t.Errorf("%s: injected_tools rejected: %v", block, err)
-		}
-	}
-	for name, block := range map[string]string{
-		"old object shape":  `{"web_search": {"mcp_client_name": "tavily", "tool_name": "search"}}`,
-		"missing name":      `[{"mcp_client_name": "tavily", "tool_name": "search"}]`,
-		"name with a space": `[{"name": "web search", "mcp_client_name": "tavily", "tool_name": "search"}]`,
-		"missing tool_name": `[{"name": "web_search", "mcp_client_name": "tavily"}]`,
-		"empty client name": `[{"name": "web_search", "mcp_client_name": "", "tool_name": "search"}]`,
-		"unknown field":     `[{"name": "web_search", "mcp_client_name": "tavily", "tool_name": "run", "max_results": 3}]`,
-		"null entry":        `[null]`,
-	} {
-		config := fmt.Sprintf(`{"providers": {"openai": {"keys": [{"name": "k", "value": "v", "weight": 1.0}], "injected_tools": %s}}}`, block)
-		if err := ValidateConfigSchema([]byte(config), schema); err == nil {
-			t.Errorf("%s: expected injected_tools to fail validation", name)
-		}
 	}
 }
 
@@ -4762,80 +3807,6 @@ func TestValidateConfigSchema_Passthrough(t *testing.T) {
 		if err := ValidateConfigSchema([]byte(config(block)), schema); err == nil {
 			t.Errorf("%s: expected passthrough to fail validation", name)
 		}
-	}
-}
-
-// TestValidateConfigSchema_MCPOpenAPIClient pins the config.schema.json rules
-// for connection_type "openapi": openapi_config is required there and only
-// there, it must name a spec source, and only header-shaped auth types apply.
-func TestValidateConfigSchema_MCPOpenAPIClient(t *testing.T) {
-	schema := loadLocalSchema(t)
-	mcpConfig := func(client string) string {
-		return `{"mcp": {"client_configs": [` + client + `]}}`
-	}
-	for _, tc := range []struct {
-		name    string
-		client  string
-		wantErr bool
-	}{
-		{"inline spec", `{"name":"petstore","connection_type":"openapi","openapi_config":{"spec":"openapi: 3.0.3\npaths: {}"}}`, false},
-		{"spec_file with credentials and options", `{"name":"petstore","connection_type":"openapi","auth_type":"headers","headers":{"X-Tenant":"acme"},"openapi_config":{"spec_file":"specs/petstore.yaml","base_url":"https://api.example.com","security_credentials":{"ApiKeyAuth":{"value":"env.PETSTORE_KEY"},"Basic":{"username":"u","password":"env.P"}},"include_deprecated":true,"max_response_bytes":4096}}`, false},
-		{"spec_url with per-user headers", `{"name":"petstore","connection_type":"openapi","auth_type":"per_user_headers","per_user_header_keys":["X-User-Token"],"openapi_config":{"spec_url":"https://api.example.com/openapi.json"}}`, false},
-		{"spec with spec_url provenance", `{"name":"petstore","connection_type":"openapi","openapi_config":{"spec":"x","spec_url":"https://api.example.com/openapi.json"}}`, false},
-		{"file spec_url refused", `{"name":"petstore","connection_type":"openapi","openapi_config":{"spec_url":"file:///etc/openapi.json"}}`, true},
-		{"ftp base_url refused", `{"name":"petstore","connection_type":"openapi","openapi_config":{"spec":"x","base_url":"ftp://api.example.com/"}}`, true},
-		{"missing openapi_config", `{"name":"petstore","connection_type":"openapi"}`, true},
-		{"no spec source", `{"name":"petstore","connection_type":"openapi","openapi_config":{"base_url":"https://api.example.com"}}`, true},
-		{"unknown openapi_config field", `{"name":"petstore","connection_type":"openapi","openapi_config":{"spec":"x","spec_path":"y"}}`, true},
-		{"oauth auth refused", `{"name":"petstore","connection_type":"openapi","auth_type":"oauth","openapi_config":{"spec":"x"}}`, true},
-		{"token exchange refused", `{"name":"petstore","connection_type":"openapi","auth_type":"token_exchange","token_exchange":{"audience":"a"},"openapi_config":{"spec":"x"}}`, true},
-		{"openapi_config on http client", `{"name":"remote","connection_type":"http","connection_string":"https://mcp.example.com","openapi_config":{"spec":"x"}}`, true},
-		{"http client unaffected", `{"name":"remote","connection_type":"http","connection_string":"https://mcp.example.com"}`, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateConfigSchema([]byte(mcpConfig(tc.client)), schema)
-			if tc.wantErr && err == nil {
-				t.Fatalf("expected %s to fail schema validation", tc.name)
-			}
-			if !tc.wantErr && err != nil {
-				t.Fatalf("expected %s to pass schema validation, got: %v", tc.name, err)
-			}
-		})
-	}
-}
-
-// TestValidateConfigSchema_MCPPerUserAuthTypeNeedsHTTP pins the config.schema.json
-// rule matching the boot check: the per-user auth types are refused on SSE and STDIO
-// clients, and the shared auth types stay allowed there.
-func TestValidateConfigSchema_MCPPerUserAuthTypeNeedsHTTP(t *testing.T) {
-	schema := loadLocalSchema(t)
-	mcpConfig := func(client string) string {
-		return `{"mcp": {"client_configs": [` + client + `]}}`
-	}
-	for _, tc := range []struct {
-		name    string
-		client  string
-		wantErr bool
-	}{
-		{"per_user_headers on http", `{"name":"remote","connection_type":"http","connection_string":"https://mcp.example.com","auth_type":"per_user_headers","per_user_header_keys":["x-key"]}`, false},
-		{"per_user_headers on sse", `{"name":"remote","connection_type":"sse","connection_string":"https://mcp.example.com/sse","auth_type":"per_user_headers","per_user_header_keys":["x-key"]}`, true},
-		{"per_user_oauth on sse", `{"name":"remote","connection_type":"sse","connection_string":"https://mcp.example.com/sse","auth_type":"per_user_oauth"}`, true},
-		{"token_exchange on http", `{"name":"remote","connection_type":"http","connection_string":"https://mcp.example.com","auth_type":"token_exchange","token_exchange":{"audience":"a","use_idp_credentials":true}}`, false},
-		{"token_exchange on sse", `{"name":"remote","connection_type":"sse","connection_string":"https://mcp.example.com/sse","auth_type":"token_exchange","token_exchange":{"audience":"a","use_idp_credentials":true}}`, true},
-		{"per_user_headers on stdio", `{"name":"local","connection_type":"stdio","stdio_config":{"command":"npx"},"auth_type":"per_user_headers","per_user_header_keys":["x-key"]}`, true},
-		{"oauth on sse", `{"name":"remote","connection_type":"sse","connection_string":"https://mcp.example.com/sse","auth_type":"oauth"}`, false},
-		{"headers on stdio", `{"name":"local","connection_type":"stdio","stdio_config":{"command":"npx"},"auth_type":"headers"}`, false},
-		{"sse without auth_type", `{"name":"remote","connection_type":"sse","connection_string":"https://mcp.example.com/sse"}`, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateConfigSchema([]byte(mcpConfig(tc.client)), schema)
-			if tc.wantErr && err == nil {
-				t.Fatalf("expected %s to fail schema validation", tc.name)
-			}
-			if !tc.wantErr && err != nil {
-				t.Fatalf("expected %s to pass schema validation, got: %v", tc.name, err)
-			}
-		})
 	}
 }
 

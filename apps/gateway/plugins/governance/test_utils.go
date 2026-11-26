@@ -529,13 +529,13 @@ func checkDeploymentRateLimits(gs *LocalGovernanceStore, ctx context.Context, pr
 // checkScopedBudgets checks the model configs a named holder set for its own traffic, which is what
 // a grant of that identity resolves to.
 func checkScopedBudgets(gs *LocalGovernanceStore, ctx context.Context, permitType grant.PermitType, scopeID string, provider schemas.ModelProvider, model string, baselines map[string]float64) (Decision, error) {
-	budgets, _ := gs.PermitModelLimits(ctx, grant.NewPermit(permitType, scopeID, "", true, false, nil, nil), provider, model)
+	budgets, _ := gs.PermitModelLimits(ctx, grant.NewPermit(permitType, scopeID, "", true, false, nil), provider, model)
 	return gs.CheckBudgets(ctx, budgets, baselines)
 }
 
 // checkScopedRateLimits is checkScopedBudgets for rate limits.
 func checkScopedRateLimits(gs *LocalGovernanceStore, ctx context.Context, permitType grant.PermitType, scopeID string, provider schemas.ModelProvider, model string, tokens, requests map[string]int64) (Decision, error) {
-	_, rateLimits := gs.PermitModelLimits(ctx, grant.NewPermit(permitType, scopeID, "", true, false, nil, nil), provider, model)
+	_, rateLimits := gs.PermitModelLimits(ctx, grant.NewPermit(permitType, scopeID, "", true, false, nil), provider, model)
 	return gs.CheckRateLimits(ctx, rateLimits, tokens, requests)
 }
 

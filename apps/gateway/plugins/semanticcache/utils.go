@@ -90,7 +90,7 @@ func isSemanticCacheSupportedRequestType(requestType schemas.RequestType) bool {
 
 // hashSortedSet returns a deterministic hex hash for an order-insensitive
 // list of items. Some request fields are semantically sets but JSON-encoded
-// as lists (most notably Tools, where MCP's randomized map iteration would
+// as lists (most notably Tools, whose producer-side ordering would
 // otherwise perturb the request hash). The caller supplies a key extractor
 // because shapes differ across fields (e.g. ChatTool.Function.Name vs
 // ResponsesTool.Name). Use this for set-shaped fields large enough to be
@@ -964,8 +964,8 @@ func (plugin *Plugin) extractChatParametersToMetadata(params *schemas.ChatParame
 		maps.Copy(metadata, params.ExtraParams)
 	}
 	if len(params.Tools) > 0 {
-		// Tools are an order-insensitive set; producer-side ordering (notably
-		// MCP's randomized map iteration) must not perturb the request hash.
+		// Tools are an order-insensitive set; producer-side ordering must not perturb
+		// the request hash.
 		if toolsHash, err := hashSortedSet(params.Tools, func(t schemas.ChatTool) string {
 			if t.Function == nil {
 				return ""
@@ -1025,8 +1025,8 @@ func (plugin *Plugin) extractResponsesParametersToMetadata(params *schemas.Respo
 		maps.Copy(metadata, params.ExtraParams)
 	}
 	if len(params.Tools) > 0 {
-		// Tools are an order-insensitive set; producer-side ordering (notably
-		// MCP's randomized map iteration) must not perturb the request hash.
+		// Tools are an order-insensitive set; producer-side ordering must not perturb
+		// the request hash.
 		if toolsHash, err := hashSortedSet(params.Tools, func(t schemas.ResponsesTool) string {
 			if t.Name == nil {
 				return ""

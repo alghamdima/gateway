@@ -138,7 +138,7 @@ func attachLogRedactionData(ctx *schemas.BifrostContext, entry *logstore.Log, co
 // RawResponse cleared when raw-byte persistence is disabled, preventing raw bytes from
 // leaking into the store via JSON serialization.
 //
-// Every assignment to ErrorDetailsParsed (Log and MCPToolLog alike) must go through this
+// Every assignment to ErrorDetailsParsed must go through this
 // function: logstore's SerializeFields, which runs on every write path (BeforeCreate hook,
 // hybrid store, rdb batch writes), serializes ErrorDetailsParsed into the error_details
 // column and overwrites anything a caller put in ErrorDetails. Callers set only the
@@ -1215,7 +1215,7 @@ type compiledUserAgentMapping struct {
 	Regex     *regexp.Regexp
 }
 
-// LoggerPlugin implements the schemas.LLMPlugin and schemas.MCPPlugin interfaces
+// LoggerPlugin implements the schemas.LLMPlugin interface
 type LoggerPlugin struct {
 	ctx                          context.Context
 	store                        logstore.LogStore
@@ -1439,7 +1439,7 @@ func (p *LoggerPlugin) cleanupOldProcessingLogs() {
 	p.cleanupStalePendingLogs()
 }
 
-// flushStaleProcessingLogs deletes LLM and MCP rows still marked
+// flushStaleProcessingLogs deletes LLM rows still marked
 // processing after 30 minutes.
 func (p *LoggerPlugin) flushStaleProcessingLogs() {
 	// Calculate timestamp for 30 minutes ago in UTC to match log entry timestamps
@@ -3084,8 +3084,6 @@ func appendPluginLogs(serialized string, logs []schemas.PluginLogEntry) string {
 	}
 	return string(data)
 }
-
-// MCP Plugin Interface Implementation
 
 // captureRequestInput records a request's loggable input on data: the conversation (input history
 // or Responses input), params, tools and the per-kind inputs (embedding, speech, transcription,

@@ -176,7 +176,7 @@ func StoreOwnedVaultSecretVars(ctx context.Context, basePath string, model inter
 	for i := 0; i < rt.NumField(); i++ {
 		fv := rv.Field(i)
 		seg := vaultFieldSegment(rt.Field(i))
-		// map[string]SecretVar (e.g. MCP Headers): each entry gets its own secret
+		// map[string]SecretVar: each entry gets its own secret
 		// at basePath/<column>/<mapKey>. Map values are not addressable, so copy
 		// out, store (mutates the copy to a ref), then write back.
 		if fv.Type() == secretVarMapType {

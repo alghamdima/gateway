@@ -33,8 +33,6 @@ func (rt catalogFixtureTransport) RoundTrip(req *http.Request) (*http.Response, 
 		body = `{"gpt-4o-mini":{"provider":"openai","mode":"chat","input_cost_per_token":0.00000015,"output_cost_per_token":0.0000006}}`
 	case modelcatalog.DefaultModelParametersURL:
 		body = `{"gpt-4o-mini":{"supports_reasoning":false,"supports_sampling_params":true}}`
-	case modelcatalog.DefaultMCPLibraryURL:
-		body = `{"servers":[]}`
 	default:
 		return rt.fallback.RoundTrip(req)
 	}

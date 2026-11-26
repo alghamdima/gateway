@@ -22,7 +22,7 @@ func HiddenRequestTypesFromContext(ctx context.Context) []string {
 }
 
 // scopedLogsDB composes dashboard visibility with the caller's access scope.
-// Only LLM log readers use it: MCP tables do not have an object_type column.
+// Only LLM log readers use it.
 // Filtering here keeps counts, aggregates and pagination on the same row set.
 func (s *RDBLogStore) scopedLogsDB(ctx context.Context) *gorm.DB {
 	db := s.ScopedDB(ctx)

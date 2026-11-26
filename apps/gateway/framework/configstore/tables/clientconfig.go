@@ -94,7 +94,6 @@ type TableClientConfig struct {
 	CompatForceReasoningOnlyModelsToResponses bool `gorm:"column:compat_force_reasoning_only_models_to_responses;default:false" json:"-"`
 	CompatConvertDecisionToResponses          bool `gorm:"column:compat_convert_decision_to_responses;default:false" json:"-"`
 
-
 	// Config hash is used to detect the changes synced from config.json file
 	// Every time we sync the config.json file, we will update the config hash
 	ConfigHash string `gorm:"type:varchar(255);null" json:"config_hash"`

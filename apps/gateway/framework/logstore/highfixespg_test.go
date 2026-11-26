@@ -178,18 +178,6 @@ func TestHighFixesPGOwnerListUsesComposite(t *testing.T) {
 			c.value, start, now)
 		assert.Contains(t, plan, c.idx, "list filtered by %s must use %s; plan:\n%s", c.col, c.idx, plan)
 	}
-
-	require.NoError(t, db.Exec(`
-		INSERT INTO mcp_tool_logs (id, request_id, timestamp, tool_name, status, created_at, virtual_key_id, user_id)
-		SELECT 'hfm-' || g, 'hfm-' || g, ?::timestamp - (g || ' seconds')::interval, 'search', 'success', ?::timestamp,
-		       'vk-' || (g % 50), 'user-' || (g % 50)
-		FROM generate_series(1, 50000) AS g
-	`, now, now).Error)
-	require.NoError(t, db.Exec("ANALYZE mcp_tool_logs").Error)
-	plan := hfExplain(t, db,
-		"SELECT id FROM mcp_tool_logs WHERE virtual_key_id IN (?) AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 50",
-		"vk-7", start, now)
-	assert.Contains(t, plan, "idx_mcp_logs_vk_ts", "MCP list filtered by virtual key must use the composite; plan:\n%s", plan)
 }
 
 // hfInsertNamedLog writes one logs row with owner ids and names for ranking tests.

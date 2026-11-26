@@ -76,7 +76,7 @@ SELECT
     COALESCE(SUM(cached_read_tokens), 0) AS total_cached_read_tokens,
     COALESCE(SUM(cost), 0) AS total_cost,
     -- Per-category cost split, denormalized on the logs rows, so quota/usage can
-    -- surface input vs output vs additional (guardrail/MCP) alongside the total.
+    -- surface input vs output vs additional (guardrail) alongside the total.
     COALESCE(SUM(input_cost), 0) AS total_input_cost,
     COALESCE(SUM(output_cost), 0) AS total_output_cost,
     COALESCE(SUM(additional_cost), 0) AS total_additional_cost,

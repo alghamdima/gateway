@@ -57,74 +57,6 @@ func TestCache_CapacityEvictionAndIndexCleanup(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestCache_ValidatorRejectionIsMissAndRemoval(t *testing.T) {
-	type timedValue struct {
-		value     string
-		expiresAt time.Time
-	}
-	c := New(4, WithValidator(func(v timedValue) bool {
-		return time.Now().Before(v.expiresAt)
-	}))
-	_, err := c.Fill(context.Background(), "k1", func() (timedValue, string, error) {
-		return timedValue{value: "v1", expiresAt: time.Now().Add(-time.Minute)}, "id1", nil
-	})
-	require.NoError(t, err)
-	assert.Equal(t, 1, c.Len())
-
-	_, ok := c.Get("k1")
-	assert.False(t, ok, "rejected entry must be reported as a miss")
-	assert.Equal(t, 0, c.Len(), "rejected entry must be removed")
-}
-
-// TestCache_GetValidatorRejectionDoesNotEvictConcurrentlyUpdatedEntry covers
-// the race the entry.version field exists for: setIfGeneration's
-// existing-entry branch updates a value in place on the same *list.Element,
-// so element identity alone can't tell a Get (mid-validator, evaluating a
-// value it already read) that the entry has since been refreshed. Without
-// the version check, rejecting the stale value would evict the fresh one
-// installed concurrently.
-func TestCache_GetValidatorRejectionDoesNotEvictConcurrentlyUpdatedEntry(t *testing.T) {
-	validatorEntered := make(chan struct{})
-	releaseValidator := make(chan struct{})
-	var pausedOnce atomic.Bool
-	pausedOnce.Store(true)
-
-	c := New(4, WithValidator(func(v string) bool {
-		if pausedOnce.CompareAndSwap(true, false) {
-			close(validatorEntered)
-			<-releaseValidator
-		}
-		return v != "v1" // only the stale first value is rejected
-	}))
-
-	_, err := c.Fill(context.Background(), "k1", fillWith("v1", ""))
-	require.NoError(t, err)
-
-	getDone := make(chan struct{})
-	var got string
-	var ok bool
-	go func() {
-		defer close(getDone)
-		got, ok = c.Get("k1")
-	}()
-	<-validatorEntered // Get has read "v1" and is now blocked inside validator.
-
-	// While that validator call is still evaluating the stale "v1" it read,
-	// a concurrent Fill updates the same key in place to "v2".
-	_, err = c.Fill(context.Background(), "k1", fillWith("v2", ""))
-	require.NoError(t, err)
-
-	close(releaseValidator)
-	<-getDone
-
-	assert.False(t, ok, "the original Get call evaluated the stale value and must report a miss")
-	assert.Empty(t, got, "a rejected Get returns the zero value")
-
-	got2, ok2 := c.Get("k1")
-	assert.True(t, ok2, "the concurrently-installed fresh value must not have been collaterally evicted")
-	assert.Equal(t, "v2", got2)
-}
-
 func TestCache_EvictExactKey(t *testing.T) {
 	c := New[string](4)
 	_, err := c.Fill(context.Background(), "k1", fillWith("v1", "id1"))
@@ -508,14 +440,7 @@ func TestCache_IndexKeyRebindOnFullCachePreservesCapacity(t *testing.T) {
 }
 
 func TestCache_CallbacksReenteringCacheDoNotDeadlock(t *testing.T) {
-	var c *Cache[string]
-	c = New(4, WithValidator(func(string) bool {
-		// A validator that calls back into the cache must not deadlock on
-		// c.mu, which Get would still be holding if it weren't released
-		// before this callback runs.
-		c.Len()
-		return true
-	}))
+	c := New[string](4)
 	_, err := c.Fill(context.Background(), "k1", fillWith("v1", "id1"))
 	require.NoError(t, err)
 	_, err = c.Fill(context.Background(), "k2", fillWith("v2", "id2"))
@@ -524,10 +449,10 @@ func TestCache_CallbacksReenteringCacheDoNotDeadlock(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		c.Get("k1")
-
 		c.EvictWhere(func(key string) bool {
-			// Same for an EvictWhere predicate.
+			// A predicate that calls back into the cache must not deadlock on
+			// c.mu, which EvictWhere would still be holding if it weren't
+			// released before this callback runs.
 			c.Len()
 			return key == "k2"
 		})
@@ -601,14 +526,6 @@ func TestNew_PanicsOnNonPositiveCapacity(t *testing.T) {
 	assert.Panics(t, func() { New[string](-1) })
 }
 
-func TestEncodeDecodeKey_RoundTrip(t *testing.T) {
-	parts := []string{"user", "alice", "client-1"}
-	key := EncodeKey(parts...)
-	got, ok := DecodeKey(key, len(parts))
-	require.True(t, ok)
-	assert.Equal(t, parts, got)
-}
-
 // Keys are built on request paths, so one is a single allocation of its exact size, whatever its
 // parts' lengths.
 func TestEncodeKey_BuildsTheKeyInOneAllocation(t *testing.T) {
@@ -620,51 +537,20 @@ func TestEncodeKey_BuildsTheKeyInOneAllocation(t *testing.T) {
 	for _, parts := range cases {
 		var key string
 		assert.Equal(t, 1.0, testing.AllocsPerRun(100, func() { key = EncodeKey(parts...) }), "parts %q", parts)
-		got, ok := DecodeKey(key, len(parts))
-		require.True(t, ok)
-		assert.Equal(t, parts, got)
+		want := ""
+		for _, p := range parts {
+			want += fmt.Sprintf("%d:%s", len(p), p)
+		}
+		assert.Equal(t, want, key)
 	}
 }
 
-// TestEncodeDecodeKey_NoCollisionOnEmbeddedDelimiter pins the reason this
+// TestEncodeKey_NoCollisionOnEmbeddedDelimiter pins the reason this
 // codec exists over a plain separator join: a value that happens to
 // contain the separator (or, here, digits and a colon shaped like a length
 // prefix) must not let one tuple's key collide with a different tuple's.
-func TestEncodeDecodeKey_NoCollisionOnEmbeddedDelimiter(t *testing.T) {
+func TestEncodeKey_NoCollisionOnEmbeddedDelimiter(t *testing.T) {
 	keyA := EncodeKey("user", "a\x00b", "c")
 	keyB := EncodeKey("user", "a", "b\x00c")
 	assert.NotEqual(t, keyA, keyB, "distinct tuples must not alias to the same key")
-
-	gotA, ok := DecodeKey(keyA, 3)
-	require.True(t, ok)
-	assert.Equal(t, []string{"user", "a\x00b", "c"}, gotA)
-
-	gotB, ok := DecodeKey(keyB, 3)
-	require.True(t, ok)
-	assert.Equal(t, []string{"user", "a", "b\x00c"}, gotB)
-}
-
-func TestDecodeKey_RejectsMalformedInput(t *testing.T) {
-	tests := []struct {
-		name string
-		key  string
-		n    int
-	}{
-		{"empty string", "", 3},
-		{"no colon", "abc", 1},
-		{"non-numeric length", "x:abc", 1},
-		{"negative length", "-1:a", 1},
-		{"length exceeds remaining bytes", "10:ab", 1},
-		{"trailing garbage after all parts", "1:a1:btrailing", 2},
-		{"too few parts", "4:user", 2},
-		{"negative part count", "1:a", -1},
-		{"non-canonical length prefix with leading plus", "+1:a", 1},
-		{"non-canonical length prefix with leading zero", "01:a", 1},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			_, ok := DecodeKey(tc.key, tc.n)
-			assert.False(t, ok)
-		})
-	}
 }

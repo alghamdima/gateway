@@ -3,6 +3,7 @@ package configstore
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	bifrost "github.com/maximhq/bifrost/core"
@@ -125,4 +126,30 @@ func TestVaultCallbacks_SelfManagedRemovesVaultSecrets(t *testing.T) {
 		}
 	}
 	require.True(t, found, "expected vault remove for %q, got %v", valuePath, *removed)
+}
+
+func TestVaultCallbacks_NoOpWhenDisabled(t *testing.T) {
+	// No hooks installed -> VaultStoreWriteEnabled() is false -> callbacks no-op.
+	prevStore := schemas.VaultStoreHook
+	schemas.VaultStoreHook = nil
+	t.Cleanup(func() { schemas.VaultStoreHook = prevStore })
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	RegisterVaultCallbacks(db)
+	require.NoError(t, db.AutoMigrate(&tables.TableKey{}))
+
+	key := &tables.TableKey{
+		Name:     "plain-key",
+		KeyID:    "key-2",
+		Provider: "openai",
+		Value:    schemas.SecretVar{Val: "plain-secret"},
+		Models:   schemas.WhiteList{"*"},
+	}
+	require.NoError(t, db.Create(key).Error)
+
+	var row tables.TableKey
+	require.NoError(t, db.First(&row, "key_id = ?", "key-2").Error)
+	require.False(t, strings.HasPrefix(row.Value.GetRawRef(), "vault."), "no vault ref expected when disabled: %s", row.Value.GetRawRef())
+	require.Equal(t, "plain-secret", row.Value.GetValue())
 }

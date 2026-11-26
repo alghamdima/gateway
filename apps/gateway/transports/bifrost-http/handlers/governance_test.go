@@ -65,22 +65,12 @@ type mockRotateConfigStore struct {
 	clientConfigErr error
 	updates         int
 	updateErr       error
-	revokedGrants   []string // "<bf_mode>:<bf_sub>" per grant-revocation call
-	revokeErr       error
 }
 
 // ExecuteTransaction runs fn directly: the mock has no database, and its writes are
 // already all-or-nothing per call.
 func (m *mockRotateConfigStore) ExecuteTransaction(_ context.Context, fn func(tx *gorm.DB) error) error {
 	return fn(nil)
-}
-
-func (m *mockRotateConfigStore) RevokeOAuth2GrantsBySubject(_ context.Context, bfMode, bfSub string, _ ...*gorm.DB) (int64, error) {
-	if m.revokeErr != nil {
-		return 0, m.revokeErr
-	}
-	m.revokedGrants = append(m.revokedGrants, bfMode+":"+bfSub)
-	return 1, nil
 }
 
 func (m *mockRotateConfigStore) GetClientConfig(_ context.Context) (*configstore.ClientConfig, error) {
@@ -97,7 +87,6 @@ func cloneTestVirtualKey(vk *configstoreTables.TableVirtualKey) *configstoreTabl
 	clone := *vk
 	clone.Budgets = append([]configstoreTables.TableBudget(nil), vk.Budgets...)
 	clone.ProviderConfigs = append([]configstoreTables.TableVirtualKeyProviderConfig(nil), vk.ProviderConfigs...)
-	clone.MCPConfigs = append([]configstoreTables.TableVirtualKeyMCPConfig(nil), vk.MCPConfigs...)
 	return &clone
 }
 
@@ -195,66 +184,18 @@ func (m *mockRotateGovernanceManager) ReloadVirtualKey(ctx context.Context, id s
 	return m.store.GetVirtualKey(ctx, id)
 }
 
-func (m *budgetOverrideTestGovernanceManager) ReloadVirtualMCP(ctx context.Context, id uint) (*configstoreTables.TableVirtualMCP, error) {
-	return nil, nil
-}
-func (m *budgetOverrideTestGovernanceManager) RemoveVirtualMCP(ctx context.Context, id uint) error {
-	return nil
-}
-func (m *budgetOverrideTestGovernanceManager) AttachVirtualMCPToVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
-func (m *budgetOverrideTestGovernanceManager) DetachVirtualMCPFromVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
 func (m *budgetOverrideTestGovernanceManager) ReloadVirtualKeys(ctx context.Context, ids []string) error {
 	return nil
 }
 
-func (m *mockRotateGovernanceManager) ReloadVirtualMCP(ctx context.Context, id uint) (*configstoreTables.TableVirtualMCP, error) {
-	return nil, nil
-}
-func (m *mockRotateGovernanceManager) RemoveVirtualMCP(ctx context.Context, id uint) error {
-	return nil
-}
-func (m *mockRotateGovernanceManager) AttachVirtualMCPToVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
-func (m *mockRotateGovernanceManager) DetachVirtualMCPFromVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
 func (m *mockRotateGovernanceManager) ReloadVirtualKeys(ctx context.Context, ids []string) error {
 	return nil
 }
 
-func (m pricingOverrideTestGovernanceManager) ReloadVirtualMCP(ctx context.Context, id uint) (*configstoreTables.TableVirtualMCP, error) {
-	return nil, nil
-}
-func (m pricingOverrideTestGovernanceManager) RemoveVirtualMCP(ctx context.Context, id uint) error {
-	return nil
-}
-func (m pricingOverrideTestGovernanceManager) AttachVirtualMCPToVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
-func (m pricingOverrideTestGovernanceManager) DetachVirtualMCPFromVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
 func (m pricingOverrideTestGovernanceManager) ReloadVirtualKeys(ctx context.Context, ids []string) error {
 	return nil
 }
 
-func (m *providerGovernanceAdoptionManager) ReloadVirtualMCP(ctx context.Context, id uint) (*configstoreTables.TableVirtualMCP, error) {
-	return nil, nil
-}
-func (m *providerGovernanceAdoptionManager) RemoveVirtualMCP(ctx context.Context, id uint) error {
-	return nil
-}
-func (m *providerGovernanceAdoptionManager) AttachVirtualMCPToVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
-func (m *providerGovernanceAdoptionManager) DetachVirtualMCPFromVirtualKeyInMemory(ctx context.Context, vkID string, id uint) error {
-	return nil
-}
 func (m *providerGovernanceAdoptionManager) ReloadVirtualKeys(ctx context.Context, ids []string) error {
 	return nil
 }
@@ -1542,9 +1483,6 @@ func TestRotateVirtualKey_OnlyChangesValueAndReloads(t *testing.T) {
 	if ctx.Response.StatusCode() != 200 {
 		t.Fatalf("expected status 200, got %d: %s", ctx.Response.StatusCode(), string(ctx.Response.Body()))
 	}
-	if len(store.revokedGrants) != 1 || store.revokedGrants[0] != "vk:vk-1" {
-		t.Fatalf("expected the rotated key's vk-mode OAuth grants to be revoked, got %v", store.revokedGrants)
-	}
 	if store.updates != 1 {
 		t.Fatalf("expected one update, got %d", store.updates)
 	}
@@ -1570,9 +1508,6 @@ func TestRotateVirtualKey_OnlyChangesValueAndReloads(t *testing.T) {
 	}
 	if len(updated.ProviderConfigs) != 1 || updated.ProviderConfigs[0].ID != 7 {
 		t.Fatalf("rotation changed provider configs: %#v", updated.ProviderConfigs)
-	}
-	if len(updated.MCPConfigs) != 1 || updated.MCPConfigs[0].ID != 9 {
-		t.Fatalf("rotation changed MCP configs: %#v", updated.MCPConfigs)
 	}
 
 	var resp struct {
@@ -5730,21 +5665,14 @@ func TestGetVirtualKeysMetadataFilter(t *testing.T) {
 	assert.Equal(t, fasthttp.StatusBadRequest, status)
 }
 
-// TestVirtualKeyMCPConfigCallerErrorsAre400 pins that naming an MCP client that does not exist, or
-// another key's config id, is the caller's error. Both came back as 500s: the client lookup's not-found
-// and the ownership check were returned as plain errors, which the handler reports as server faults.
-func TestVirtualKeyMCPConfigCallerErrorsAre400(t *testing.T) {
+// TestVirtualKeyProviderConfigCallerErrorsAre400 pins that naming another key's provider config id is
+// the caller's error. It came back as a 500: the ownership check was returned as a plain error, which
+// the handler reports as a server fault.
+func TestVirtualKeyProviderConfigCallerErrorsAre400(t *testing.T) {
 	SetLogger(&mockLogger{})
 	ctx := context.Background()
 	store := setupPricingOverrideHandlerStore(t)
 	handler := &GovernanceHandler{configStore: store, governanceManager: &budgetOverrideTestGovernanceManager{store: store}}
-	require.NoError(t, store.CreateMCPClientConfig(ctx, &schemas.MCPClientConfig{
-		ID:               "client-alpha",
-		Name:             "alpha",
-		ConnectionType:   schemas.MCPConnectionTypeHTTP,
-		ConnectionString: schemas.NewSecretVar("http://127.0.0.1:0/mcp"),
-		ToolsToExecute:   []string{"*"},
-	}))
 	require.NoError(t, store.AddProvider(ctx, schemas.OpenAI, configstore.ProviderConfig{}))
 
 	create := func(body string) *fasthttp.RequestCtx {
@@ -5759,7 +5687,7 @@ func TestVirtualKeyMCPConfigCallerErrorsAre400(t *testing.T) {
 		return c
 	}
 	created := func(name string) *configstoreTables.TableVirtualKey {
-		c := create(`{"name":"` + name + `","mcp_configs":[{"mcp_client_name":"alpha","tools_to_execute":["echo"]}],"provider_configs":[{"provider":"openai","allowed_models":["*"],"key_ids":["*"]}]}`)
+		c := create(`{"name":"` + name + `","provider_configs":[{"provider":"openai","allowed_models":["*"],"key_ids":["*"]}]}`)
 		require.Equal(t, fasthttp.StatusOK, c.Response.StatusCode(), "create %s: %s", name, c.Response.Body())
 		var resp struct {
 			VirtualKey struct {
@@ -5769,7 +5697,6 @@ func TestVirtualKeyMCPConfigCallerErrorsAre400(t *testing.T) {
 		require.NoError(t, json.Unmarshal(c.Response.Body(), &resp))
 		vk, err := store.GetVirtualKey(ctx, resp.VirtualKey.ID)
 		require.NoError(t, err)
-		require.Len(t, vk.MCPConfigs, 1)
 		require.Len(t, vk.ProviderConfigs, 1)
 		return vk
 	}
@@ -5779,22 +5706,16 @@ func TestVirtualKeyMCPConfigCallerErrorsAre400(t *testing.T) {
 		assert.Contains(t, string(c.Response.Body()), message)
 	}
 
-	assertBadRequest(t, create(`{"name":"unknown-client","mcp_configs":[{"mcp_client_name":"no-such","tools_to_execute":["*"]}]}`), "unknown mcp_client_name: no-such")
-
 	a := created("vk-a")
 	b := created("vk-b")
-	assertBadRequest(t, update(a.ID, `{"mcp_configs":[{"mcp_client_name":"no-such","tools_to_execute":["*"]}]}`), "unknown mcp_client_name: no-such")
-	assertBadRequest(t, update(a.ID, fmt.Sprintf(`{"mcp_configs":[{"id":%d,"mcp_client_name":"alpha","tools_to_execute":["*"]}]}`, b.MCPConfigs[0].ID)),
-		fmt.Sprintf("MCP config %d does not belong to this virtual key", b.MCPConfigs[0].ID))
 	assertBadRequest(t, update(a.ID, fmt.Sprintf(`{"provider_configs":[{"id":%d,"provider":"openai","allowed_models":["*"],"key_ids":["*"]}]}`, b.ProviderConfigs[0].ID)),
 		fmt.Sprintf("provider config %d does not belong to this virtual key", b.ProviderConfigs[0].ID))
 
-	// The refused updates changed nothing.
+	// The refused update changed nothing.
 	unchanged, err := store.GetVirtualKey(ctx, a.ID)
 	require.NoError(t, err)
-	require.Len(t, unchanged.MCPConfigs, 1)
-	assert.Equal(t, a.MCPConfigs[0].ID, unchanged.MCPConfigs[0].ID)
-	assert.Equal(t, []string{"echo"}, []string(unchanged.MCPConfigs[0].ToolsToExecute))
+	require.Len(t, unchanged.ProviderConfigs, 1)
+	assert.Equal(t, a.ProviderConfigs[0].ID, unchanged.ProviderConfigs[0].ID)
 }
 
 // newOwnedBudgetsStore opens a sqlite store holding one team for the budgets to belong to.

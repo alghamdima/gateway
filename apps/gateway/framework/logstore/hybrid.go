@@ -590,8 +590,7 @@ func (h *HybridLogStore) enqueueUpload(logID string, timestamp time.Time, payloa
 // enqueueRawUpload submits a pre-serialized payload to the upload queue.
 // Drops the upload (and increments droppedUploads) when the store is closed,
 // the data is empty, the in-flight byte budget would be exceeded, or the queue
-// is full. Used by both regular log uploads (via enqueueUpload) and MCP tool
-// log uploads, which already hold raw JSON bytes.
+// is full. Used by regular log uploads (via enqueueUpload) and log merges.
 func (h *HybridLogStore) enqueueRawUpload(logID string, timestamp time.Time, key string, kind uploadKind, status string, data []byte, tags map[string]string) {
 	h.enqueueReplacingUpload(logID, timestamp, key, "", kind, status, data, tags)
 }

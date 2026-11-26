@@ -4,7 +4,7 @@
 
 ## What is Bifrost?
 
-Bifrost is a high-performance AI gateway that unifies 20+ LLM providers behind a single OpenAI-compatible API with ~11µs overhead at 5,000 RPS. It also serves as an MCP (Model Context Protocol) gateway, turning static chat models into tool-calling agents.
+Bifrost is a high-performance AI gateway that unifies 20+ LLM providers behind a single OpenAI-compatible API with ~11µs overhead at 5,000 RPS.
 
 GitHub: `maximhq/bifrost`
 
@@ -17,11 +17,10 @@ bifrost/
 ├── core/                           # Go core library — the engine
 │   ├── bifrost.go                  # Main struct, request queuing, provider lifecycle (~3.4K lines)
 │   ├── inference.go                # Inference routing, fallbacks, streaming dispatch (~1.9K lines)
-│   ├── mcp.go                     # MCP integration entry point
 │   ├── schemas/                   # ALL shared Go types — 41 files
 │   │   ├── bifrost.go             # BifrostConfig, ModelProvider enum, RequestType enum, context keys
 │   │   ├── provider.go            # Provider interface (30+ methods), NetworkConfig, ProviderConfig
-│   │   ├── plugin.go              # LLMPlugin, MCPPlugin, HTTPTransportPlugin, ObservabilityPlugin
+│   │   ├── plugin.go              # LLMPlugin, HTTPTransportPlugin, ObservabilityPlugin
 │   │   ├── context.go             # BifrostContext (custom context.Context with mutable values)
 │   │   ├── chatcompletions.go     # Chat completion request/response types
 │   │   ├── responses.go           # OpenAI Responses API types
@@ -29,7 +28,6 @@ bifrost/
 │   │   ├── images.go              # Image generation types
 │   │   ├── batch.go               # Batch operation types
 │   │   ├── files.go               # File management types
-│   │   ├── mcp.go                 # MCP types
 │   │   ├── trace.go               # Tracer interface
 │   │   └── logger.go              # Logger interface
 │   ├── providers/                 # 20+ provider implementations
@@ -42,15 +40,8 @@ bifrost/
 │   ├── pool/                      # Generic Pool[T] — dual-mode (prod: sync.Pool, debug: full tracking)
 │   │   ├── pool_prod.go           # Zero-overhead sync.Pool wrapper (default build)
 │   │   └── pool_debug.go          # Double-release/use-after-release/leak detection (-tags pooldebug)
-│   ├── mcp/                       # MCP protocol implementation
-│   │   ├── agent.go               # Agent orchestration loop (multi-turn tool calling)
-│   │   ├── clientmanager.go       # MCP client lifecycle management
-│   │   ├── toolmanager.go         # Tool registration, discovery, filtering
-│   │   ├── healthmonitor.go       # Client health monitoring
-│   │   └── codemode/starlark/     # Starlark sandbox for code-mode execution
 │   └── internal/
 │       ├── llmtests/              # LLM integration test infra (48 files, scenario-based)
-│       └── mcptests/              # MCP/Agent test infra (40+ files, mock-based)
 │
 ├── framework/                     # Data persistence, streaming, ecosystem utilities
 │   ├── configstore/               # Config storage backends (file, postgres)
@@ -70,17 +61,14 @@ bifrost/
 │       ├── server/                # Server lifecycle, route registration
 │       ├── handlers/              # 27 HTTP endpoint handlers
 │       │   ├── inference.go       # Chat/text completions, responses API (~109KB)
-│       │   ├── mcpinference.go    # MCP tool execution
 │       │   ├── governance.go      # Virtual keys, teams, customers, budgets (~100KB)
 │       │   ├── providers.go       # Provider CRUD, key management
-│       │   ├── mcp.go             # MCP client registry management
 │       │   ├── logging.go         # Log queries, stats, histograms
 │       │   ├── config.go          # System configuration
 │       │   ├── plugins.go         # Plugin CRUD
 │       │   ├── cache.go           # Cache management
 │       │   ├── session.go         # Auth/session management
 │       │   ├── health.go          # Health checks
-│       │   ├── mcpserver.go       # MCP server (SSE/streamable HTTP)
 │       │   ├── websocket.go       # WebSocket handler
 │       │   ├── devpprof.go        # Pool debug profiler endpoint (~23KB)
 │       │   └── middlewares.go     # Middleware definitions
@@ -117,7 +105,7 @@ bifrost/
 ├── docs/                          # Mintlify MDX documentation
 │   ├── docs.json                  # Navigation config
 │   ├── media/                     # Screenshots (ui-*.png naming convention)
-│   └── (architecture|features|providers|mcp|plugins|enterprise|...)
+│   └── (architecture|features|providers|plugins|enterprise|...)
 │
 ├── .claude/skills/                # Claude Code skill definitions (4 skills)
 ├── go.work                        # Go workspace — requires Go 1.27.4
@@ -160,10 +148,6 @@ make test-core PROVIDER=openai TESTCASE=TestSimpleChat  # Specific test
 make test-core PATTERN=TestStreaming      # Tests matching pattern
 make test-core DEBUG=1                   # With Delve debugger on :2345
 
-# MCP/Agent tests (mock-based, no live APIs)
-make test-mcp                            # All MCP tests
-make test-mcp TESTCASE=TestAgentLoop     # Specific test
-make test-mcp TYPE=agent                 # By category (agent|tool|connection|codemode)
 
 # Framework tests (require local backing services — bring them up FIRST)
 docker compose -f tests/docker-compose.yml up -d   # postgres, weaviate, qdrant, pinecone, and the 4 redis variants
@@ -199,14 +183,12 @@ Client HTTP Request
       → Middleware Chain (lib.ChainMiddlewares, applied per-route)
         → HTTPTransportPreHook (HTTP-level plugins, can short-circuit)
           → PreLLMHook Pipeline (auth, rate-limit, cache check — registration order)
-            → MCP Tool Discovery & Injection (if tool_choice present)
               → Provider Queue (channel-based, per-provider isolation)
                 → Worker picks up request
                   → Key Selection (~10ns weighted random)
                     → Provider API Call (fasthttp client, connection pooling)
                       → Response / SSE Stream
                 → PostLLMHook Pipeline (reverse order of PreLLMHooks)
-              → Tool Execution Loop (if tool_calls in response, MCP agent loop)
             → HTTPTransportPostHook (reverse order)
           → Response Serialization
         → HTTP Response to Client
@@ -216,7 +198,7 @@ Client HTTP Request
 
 - **Provider isolation**: Each provider has its own worker pool and queue. One provider going down doesn't cascade to others.
 - **Channel-based async**: Request routing uses Go channels (`chan *ChannelMessage`), not mutexes. The `ProviderQueue` struct manages channel lifecycle with atomic flags.
-- **Object pooling everywhere**: `sync.Pool` wrappers reduce GC pressure. Pools exist for: channel messages, response channels, error channels, stream channels, plugin pipelines, MCP requests, HTTP request/response objects, scanner buffers.
+- **Object pooling everywhere**: `sync.Pool` wrappers reduce GC pressure. Pools exist for: channel messages, response channels, error channels, stream channels, plugin pipelines, HTTP request/response objects, scanner buffers.
 - **Plugin pipeline symmetry**: Pre-hooks execute in registration order, post-hooks in **reverse** order (LIFO). For every pre-hook executed, the corresponding post-hook is guaranteed to run.
 - **Streaming**: SSE chunks flow through `chan chan *schemas.BifrostStreamChunk`. Accumulated into full response for post-hooks via `framework/streaming/accumulator.go`.
 
@@ -363,7 +345,6 @@ Four plugin interfaces exist:
 | Interface | Hook Methods | When Called |
 |-----------|-------------|------------|
 | `LLMPlugin` | `PreLLMHook`, `PostLLMHook` | Every LLM request (SDK + HTTP) |
-| `MCPPlugin` | `PreMCPHook`, `PostMCPHook` | Every MCP tool execution |
 | `HTTPTransportPlugin` | `HTTPTransportPreHook`, `HTTPTransportPostHook`, `HTTPTransportStreamChunkHook` | HTTP gateway only (not Go SDK) |
 | `ObservabilityPlugin` | `Inject(ctx, trace)` | Async, after response written to wire |
 
@@ -503,23 +484,19 @@ For reading or writing a **single field** (or a handful) inside a larger raw JSO
 
 `Bifrost` uses `atomic.Pointer` for providers and plugins lists. On updates: create new slice → atomically swap pointer. **Never mutate the slice in place** — concurrent readers would see partial state.
 
-### 15. MCP Tool Filtering is 4 Levels Deep
-
-Tool access follows: Global filter → Client-level filter → Tool-level filter → Per-request filter (HTTP headers). All four levels must agree for a tool to be available. Changes to filtering logic must respect this hierarchy.
-
-### 16. `config.schema.json` is the Source of Truth
+### 15. `config.schema.json` is the Source of Truth
 
 `transports/config.schema.json` (~2700 lines) is the authoritative definition for all `config.json` fields. Documentation examples must match. When adding config fields: update schema first → handlers → docs.
 
-### 17. UI `data-testid` Attributes Are Load-Bearing
+### 16. UI `data-testid` Attributes Are Load-Bearing
 
 E2E tests depend on `data-testid` attributes. Convention: `data-testid="<entity>-<element>-<qualifier>"`. If you rename or remove one, search `tests/e2e/` for references. If you add new interactive elements, add `data-testid`.
 
-### 18. E2E Tests — Never Marshal Payloads to Maps
+### 17. E2E Tests — Never Marshal Payloads to Maps
 
 In `tests/e2e/core/`, **never marshal API payloads to a `Record`/`Map`/plain-object and then re-serialize**. Field ordering matters for backend validation and snapshot comparisons. Construct payloads as object literals with fields in the intended order and pass directly to Playwright's `request.post({ data })`. Avoid `Object.fromEntries()`, `JSON.parse(JSON.stringify(...))` round-trips, or destructuring into an intermediate `Record<string, unknown>` — these can silently reorder fields.
 
-### 19. Framework Tests Need `tests/docker-compose.yml`, Not `framework/docker-compose.yml`
+### 18. Framework Tests Need `tests/docker-compose.yml`, Not `framework/docker-compose.yml`
 
 `make test-framework` fails ~30 tests in `framework/vectorstore` with no services running. Bring the stack up first:
 
@@ -544,7 +521,7 @@ Note that `qdrant` and `pinecone` report `(unhealthy)` in `docker compose ps` un
 
 Only `framework/vectorstore` needs any of this. Every other framework package passes with nothing running.
 
-### 20. Every URL Bifrost Emits About Itself Carries `server.base_path`
+### 19. Every URL Bifrost Emits About Itself Carries `server.base_path`
 
 Bifrost can be mounted under a URL prefix (`server.base_path`, e.g. `/bifrost` for `https://host/bifrost`). Routing, the UI shell, assets, API calls and WebSockets already handle it; the recurring regression is a **self-referencing URL or path built by hand** that assumes the domain root. Any place that prints, returns, redirects to, copies, or navigates to a Bifrost URL must go through the helpers, never string-concatenate from `/`:
 
@@ -553,19 +530,18 @@ Bifrost can be mounted under a URL prefix (`server.base_path`, e.g. `/bifrost` f
 | Go, absolute URL | `lib.BuildBaseURL(ctx, override)` (scheme + host + prefix; a valid explicit override is used instead, trimmed of surrounding whitespace and a trailing `/`, and never gets `BasePath()` appended; an invalid one falls back to the inferred URL) | `"https://" + host + "/..."` |
 | Go, root-relative path in a response body, `Location`, or `Link` header | `lib.WithBasePath("/api/...")` | `fmt.Sprintf("/api/...")` |
 | Go, scheme decisions (HSTS, cookie `Secure`, trace attributes) | `lib.RequestIsHTTPS(ctx)` | reading `X-Forwarded-Proto` yourself |
-| UI, copyable or displayed URL | `getExampleBaseUrl()` / `getEndpointUrl()` (`ui/lib/utils/port.ts`), `getExternalBaseUrl()` for MCP surfaces | `window.location.origin + "/mcp"` |
+| UI, copyable or displayed URL | `getExampleBaseUrl()` / `getEndpointUrl()` (`ui/lib/utils/port.ts`) | `window.location.origin + "/..."` |
 | UI, path label, `window.open`, `router.history.push` | `withBasePath()` (`ui/lib/utils/basePath.ts`), or `router.navigate({ href })` which applies the router basepath | a literal `/workspace/...` outside the router |
 | Docs, Helm `NOTES.txt`, Terraform, Makefile | state the prefix form next to every self URL a client or browser reaches through the proxy (`https://host/<prefix>/login`); probes and health checks that hit the service directly, bypassing the ingress, may stay on `/health` because requests are accepted without the prefix | a root-only example for a proxied URL |
 
 Rules that follow from the implementation:
 
 - **Requests are accepted with or without the prefix.** `basePathMiddleware` strips it, so route handlers and the `whitelisted_routes` allowlist always see root-relative paths. A base path whose first segment matches a route (`api`, `v1`, ...) or a dashboard page root (`workspace`, `login`, `oauth`, `agent`, `pprof`, compared case-insensitively because the TanStack basepath rewrite is) is rejected at startup by `lib.CheckBasePathCollision`.
-- **Admin-supplied public URLs are used verbatim.** `mcp_external_client_url` and the OAuth `issuer_url` must already include the prefix; the code never appends it. Say so in any help text or doc that introduces such a setting.
-- **`.well-known` discovery lives at the origin root** (RFC 8414, RFC 9728 §3.1): an issuer of `https://host/bifrost` advertises `https://host/.well-known/oauth-protected-resource/bifrost/mcp`, built by `oauth2ResourceMetadataURL`, and the proxy must forward `/.well-known/`.
+- **Admin-supplied public URLs are used verbatim.** They must already include the prefix; the code never appends it. Say so in any help text or doc that introduces such a setting.
 - **Session cookies stay `Path=/`** on purpose: a `/bifrost/`-scoped cookie would not ride the unprefixed `/api` calls the contract allows, and fasthttp's `SetCookie` keys by name so logout could not expire both paths.
-- **A redirect to a third party is marked external** with `markLocationExternal(ctx)` so `prefixLocation` leaves it alone. Otherwise, on a prefixed request, `prefixLocation` re-prefixes a root-relative `Location` and an absolute one whose authority is the request host; protocol-relative (`//host/...`) and other-host URLs are left as they are.
+- **Redirects keep the prefix.** On a prefixed request, `prefixLocation` re-prefixes a root-relative `Location` and an absolute one whose authority is the request host; protocol-relative (`//host/...`) and other-host URLs are left as they are.
 
-Tests to extend, never duplicate: Go sets the prefix with `lib.SetBasePath("/bifrost")` plus `t.Cleanup(func() { lib.SetBasePath("") })` (`lib/basepath_test.go`, `handlers/middlewares_test.go`, `handlers/mcp_test.go`); UI vitest stubs `window.__BIFROST_BASE_PATH__` (`ui/lib/utils/basePath.test.ts`, `port.test.ts`); E2E has its own worker started with `--base-path` under `tests/e2e/features/base-path/`, where every self URL the dashboard shows is asserted against `basePathOf(testInfo)`. A new self URL ships with a case in each layer it touches.
+Tests to extend, never duplicate: Go sets the prefix with `lib.SetBasePath("/bifrost")` plus `t.Cleanup(func() { lib.SetBasePath("") })` (`lib/basepath_test.go`, `handlers/middlewares_test.go`); UI vitest stubs `window.__BIFROST_BASE_PATH__` (`ui/lib/utils/basePath.test.ts`, `port.test.ts`); E2E has its own worker started with `--base-path` under `tests/e2e/features/base-path/`, where every self URL the dashboard shows is asserted against `basePathOf(testInfo)`. A new self URL ships with a case in each layer it touches.
 
 ---
 
@@ -712,23 +688,6 @@ func RunMyScenarioTest(t *testing.T, client *bifrost.Bifrost, ctx context.Contex
 - Add `Scenarios.MyScenario` flag to `ComprehensiveTestConfig`
 - Run: `make test-core PROVIDER=<name> TESTCASE=<TestName>`
 
-### MCP Tests (`core/internal/mcptests/`)
-
-Mock-based tests with `DynamicLLMMocker` and declarative setup:
-
-```go
-manager, mocker, ctx := SetupAgentTest(t, AgentTestConfig{
-    InProcessTools:   []string{"echo", "calculator"},
-    AutoExecuteTools: []string{"*"},
-    MaxDepth:         5,
-})
-// Queue mock LLM responses, assert tool execution order
-```
-
-Categories: `agent_*_test.go`, `tool_*_test.go`, `connection_*_test.go`, `codemode_*_test.go`
-
-Run: `make test-mcp TESTCASE=<TestName>`
-
 ### E2E Tests (`tests/e2e/`)
 
 Playwright tests with page objects, data factories, fixtures:
@@ -764,7 +723,7 @@ Variants:
 Add regression test cases to the provider harness (`tests/e2e/api/collections/provider-harness.json`) from a merged PR or GitHub issue. Traces the affected wire path, checks existing coverage, designs cases per harness conventions, inserts them surgically without reformatting the file, and validates via the augment and filter scripts. This is the skill the Testing section's harness-case rule points at.
 
 ### `/investigate-issue <issue-id>`
-Investigate a GitHub issue from `maximhq/bifrost`. Fetches issue details, classifies by type/area, searches codebase, traces dependencies, analyzes side effects, plans the required regression tests (unit/harness/LLM/MCP/E2E), and presents an implementation plan with per-change approval gates.
+Investigate a GitHub issue from `maximhq/bifrost`. Fetches issue details, classifies by type/area, searches codebase, traces dependencies, analyzes side effects, plans the required regression tests (unit/harness/LLM/E2E), and presents an implementation plan with per-change approval gates.
 
 ### `/resolve-pr-comments <pr-number>`
 Systematically address unresolved PR review comments. Uses GraphQL to get unresolved threads, presents each with FIX/REPLY/SKIP options, collects fixes locally, and only posts replies **after code is pushed** to remote.
@@ -790,7 +749,7 @@ Systematically address unresolved PR review comments. Uses GraphQL to get unreso
 
 ### Add a new plugin
 1. Create `plugins/<name>/` with its own `go.mod`
-2. Implement `LLMPlugin`, `MCPPlugin`, or `HTTPTransportPlugin` interface
+2. Implement `LLMPlugin` or `HTTPTransportPlugin` interface
 3. Add to `go.work`
 4. Register in transport layer or Bifrost config
 5. Add test targets to `Makefile`
@@ -826,7 +785,6 @@ Systematically address unresolved PR review comments. Uses GraphQL to get unreso
 | Config schema (source of truth) | `transports/config.schema.json` |
 | Pool debug profiler | `transports/bifrost-http/handlers/devpprof.go` |
 | LLM test infrastructure | `core/internal/llmtests/` |
-| MCP test infrastructure | `core/internal/mcptests/` |
 | E2E test infrastructure | `tests/e2e/core/` |
 | Docs navigation config | `docs/docs.json` |
 | CI/CD workflows | `.github/workflows/` |
@@ -1116,7 +1074,7 @@ Every user-visible string in `ui/` goes through i18next. That covers JSX text, t
 
 - In components: `const { t } = useTranslation("<ns>")`. Outside React: `i18n.t("key", { ns: "<ns>" })` from `@/lib/i18n`. Never write `"ns:key"`; `nsSeparator` is off.
 - Keys are typed against `ui/locales/en`, so an unknown key fails `npm run typecheck`. Do not cast `t` to get around it.
-- Namespaces: `common` (shared verbs, entity names, `validation.*`, `apiErrors.*`), `shell` (nav and layout), `login`, `observability` (logs, metrics, traces), `models` (providers, routing, pricing), `mcp`, `governance` (virtual keys, budgets, teams), `config` (settings). Reuse an existing `common` key before adding a new one.
+- Namespaces: `common` (shared verbs, entity names, `validation.*`, `apiErrors.*`), `shell` (nav and layout), `login`, `observability` (logs, metrics, traces), `models` (providers, routing, pricing), `governance` (virtual keys, budgets, teams), `config` (settings). Reuse an existing `common` key before adding a new one.
 - Adding a key: add it to `locales/en/<ns>.json` and to every other locale directory (de, es, fr, it, ja, ko, pt, ru, zh-CN, zh-TW) with a real translation, not the English text. Keep the same `{{placeholders}}`, the same `<Trans>` tags (`<b0>`, `<code1>`) and the same array lengths. Edit catalogs surgically; never re-serialize a whole file by hand.
 - One whole sentence per key. Interpolate values (`t("deleted", { name })`); never concatenate translated fragments or build sentences with `+`.
 - Plurals: `key` plus `key_other` in English, and pass `count`. Russian also needs `_few` and `_many`.

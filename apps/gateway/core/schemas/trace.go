@@ -1189,7 +1189,7 @@ const (
 	//   - Back-compat fallbacks for shape changes (e.g. comma-joined stop_sequences)
 	// =====================================================================
 	// Cumulative time (float64 ms) the request spent blocked on sockets outside
-	// Bifrost — every provider attempt, plus MCP tool calls and media fetches.
+	// Bifrost — every provider attempt, plus media fetches.
 	// Stamped on the ROOT span once per request, so connectors derive Bifrost's
 	// own cost as (root span duration - this). Deliberately not a per-attempt
 	// value: retries and fallbacks all contribute to the same total.

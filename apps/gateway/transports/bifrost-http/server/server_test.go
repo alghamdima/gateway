@@ -100,33 +100,38 @@ func (p *reloadVirtualKeyPlugin) GetName() string { return governance.PluginName
 // GetGovernanceStore returns the test governance store.
 func (p *reloadVirtualKeyPlugin) GetGovernanceStore() governance.GovernanceStore { return p.store }
 
-// reloadVirtualKeyToolManager provides an empty MCP tool set.
-type reloadVirtualKeyToolManager struct{}
+// TestReloadVirtualKeyAvoidsGovernanceSnapshot pins that reloading one key reads and replaces it
+// directly rather than through a full governance snapshot, which is what keeps a key edit cheap on
+// a deployment holding many keys.
+func TestReloadVirtualKeyAvoidsGovernanceSnapshot(t *testing.T) {
+	handlers.SetLogger(noopTestLogger{})
+	ctx := context.Background()
+	baseStore, err := governance.NewLocalGovernanceStore(ctx, governance.NewMockLogger(), nil, &configstore.GovernanceConfig{}, nil, nil)
+	if err != nil {
+		t.Fatalf("create governance store: %v", err)
+	}
+	baseStore.CreateVirtualKeyInMemory(ctx, &configstoreTables.TableVirtualKey{ID: "vk-id", Name: "old", Value: *schemas.NewSecretVar("sk-bf-old")})
+	store := &reloadVirtualKeyGovernanceStore{GovernanceStore: baseStore}
+	plugin := &reloadVirtualKeyPlugin{store: store}
+	persistedVK := &configstoreTables.TableVirtualKey{ID: "vk-id", Name: "new", Value: *schemas.NewSecretVar("sk-bf-new")}
+	config := &lib.Config{
+		ConfigStore:  &reloadVirtualKeyConfigStore{vk: persistedVK},
+		ClientConfig: &configstore.ClientConfig{},
+	}
+	plugins := []schemas.BasePlugin{plugin}
+	config.BasePlugins.Store(&plugins)
+	server := &BifrostHTTPServer{Ctx: schemas.NewBifrostContext(ctx, schemas.NoDeadline), Config: config}
 
-// GetMCPServerInstructions returns no instructions.
-func (reloadVirtualKeyToolManager) GetMCPServerInstructions(context.Context) string {
-	return ""
-}
-
-// GetAvailableMCPTools returns no tools.
-func (reloadVirtualKeyToolManager) GetAvailableMCPTools(context.Context) []schemas.ChatTool {
-	return nil
-}
-
-// ExecuteChatMCPTool is unused by these tests.
-func (reloadVirtualKeyToolManager) ExecuteChatMCPTool(context.Context, *schemas.ChatAssistantMessageToolCall) (*schemas.ChatMessage, *schemas.BifrostError) {
-	return nil, nil
-}
-
-// ExecuteResponsesMCPTool is unused by these tests.
-func (reloadVirtualKeyToolManager) ExecuteResponsesMCPTool(context.Context, *schemas.ResponsesToolMessage) (*schemas.ResponsesMessage, *schemas.BifrostError) {
-	return nil, nil
-}
-
-// perCallerNamesConfigStore counts the reads of the names in per-user discoveries.
-type perCallerNamesConfigStore struct {
-	configstore.ConfigStore
-	reads atomic.Int32
+	if _, err := server.ReloadVirtualKey(ctx, persistedVK.ID); err != nil {
+		t.Fatalf("ReloadVirtualKey returned unexpected error: %v", err)
+	}
+	if store.governanceDataCalls != 0 {
+		t.Fatalf("GetGovernanceData called %d times, want 0", store.governanceDataCalls)
+	}
+	reloaded, ok := baseStore.GetVirtualKeyByID(ctx, "vk-id")
+	if !ok || reloaded.Value.GetValue() != "sk-bf-new" {
+		t.Fatalf("store does not answer with the reloaded key: %+v", reloaded)
+	}
 }
 
 // batchReloadConfigStore serves the batched reads ReloadVirtualKeys makes and

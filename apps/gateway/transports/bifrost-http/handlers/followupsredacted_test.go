@@ -48,8 +48,8 @@ func (r *recordingRedactedKeys) requireNoEmptyLookup(t *testing.T) {
 	}
 }
 
-// keylessLogManager serves one page of logs and one MCP page that name no
-// selected key, virtual key or routing rule, and no MCP virtual keys.
+// keylessLogManager serves one page of logs that name no selected key,
+// virtual key or routing rule.
 type keylessLogManager struct {
 	logging.LogManager
 }
@@ -64,19 +64,8 @@ func (keylessLogManager) GetSessionLogs(_ context.Context, sessionID string, _ *
 	return &logstore.SessionDetailResult{SessionID: sessionID, Logs: []logstore.Log{{ID: "log-1"}}}, nil
 }
 
-// SearchMCPToolLogs returns one MCP log with no virtual key.
-func (keylessLogManager) SearchMCPToolLogs(context.Context, *logstore.MCPToolLogSearchFilters, *logstore.PaginationOptions) (*logstore.MCPToolLogSearchResult, error) {
-	return &logstore.MCPToolLogSearchResult{Logs: []logstore.MCPToolLog{{ID: "mcp-1"}}}, nil
-}
-
-// GetAvailableMCPVirtualKeys returns no virtual keys, as when no MCP log has one.
-func (keylessLogManager) GetAvailableMCPVirtualKeys(context.Context, int, string) ([]logging.KeyPair, error) {
-	return nil, nil
-}
-
-// TestFollowupsLogPagesSkipEmptyRedactedLookups pins that the logs list, the
-// session detail, the MCP logs list and the MCP virtual-key filter never ask
-// for redacted names with an empty id list when the page names none, since
+// TestFollowupsLogPagesSkipEmptyRedactedLookups pins that the logs list and
+// the session detail never ask for redacted names with an empty id list when the page names none, since
 // the store reads every row for an empty list.
 func TestFollowupsLogPagesSkipEmptyRedactedLookups(t *testing.T) {
 	SetLogger(&mockLogger{})
@@ -89,9 +78,6 @@ func TestFollowupsLogPagesSkipEmptyRedactedLookups(t *testing.T) {
 		{name: "logs", uri: "/api/logs", call: (*LoggingHandler).getLogs},
 		{name: "session", uri: "/api/logs/sessions/s-1", call: (*LoggingHandler).getLogSessionByID,
 			prep: func(ctx *fasthttp.RequestCtx) { ctx.SetUserValue("session_id", "s-1") }},
-		{name: "mcp logs", uri: "/api/mcp-logs", call: (*LoggingHandler).getMCPLogs},
-		// A search query bypasses the filter-data cache, which a bare handler lacks.
-		{name: "mcp filterdata", uri: "/api/mcp-logs/filterdata?dimensions=virtual_keys&q=x", call: (*LoggingHandler).getMCPLogsFilterData},
 	}
 	for _, route := range routes {
 		t.Run(route.name, func(t *testing.T) {

@@ -308,30 +308,6 @@ func TestResolverLookupIPAddrRespectsContextDeadline(t *testing.T) {
 	}
 }
 
-func TestIsLocalhost(t *testing.T) {
-	tests := []struct {
-		hostname string
-		want     bool
-	}{
-		{"localhost", true},
-		{"127.0.0.1", true},
-		{"::1", true},
-		{"0.0.0.0", true},
-		{"::", true},
-		{"api.openai.com", false},
-		{"10.0.0.1", false}, // private but not localhost — handled by IsPrivateIP
-		{"169.254.169.254", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.hostname, func(t *testing.T) {
-			if got := network.IsLocalhost(tt.hostname); got != tt.want {
-				t.Errorf("IsLocalhost(%q) = %v, want %v", tt.hostname, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIsPrivateIP(t *testing.T) {
 	tests := []struct {
 		ip   string

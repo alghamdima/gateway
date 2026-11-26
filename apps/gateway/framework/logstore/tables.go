@@ -255,13 +255,12 @@ type PaginationOptions struct {
 	SelectedID     string `json:"-"`
 	// SkipCount skips the total count entirely; TotalCount is left at zero. For
 	// callers that page through a window and never read the total. Honoured by
-	// SearchLogs, SearchLogsForBilling and SearchMCPToolLogs.
+	// SearchLogs and SearchLogsForBilling.
 	SkipCount bool `json:"-"`
 	// AfterTimestamp and AfterID form a keyset cursor for SortBy "timestamp": only
 	// rows strictly after (AfterTimestamp, AfterID) in the requested order are
 	// returned. Both must be set; AfterID alone is ignored. Honoured by SearchLogs
-	// and SearchLogsForBilling only: SearchMCPToolLogs ignores the cursor and
-	// pages by Offset, ordered by timestamp alone as before.
+	// and SearchLogsForBilling.
 	AfterTimestamp *time.Time `json:"-"`
 	AfterID        string     `json:"-"`
 	// OmitBillingPayloads makes SearchLogsForBilling return NULL for the modality
@@ -342,7 +341,7 @@ func (u *UserAgentMapping) BeforeCreate(tx *gorm.DB) error {
 // buckets gives an independent measure of overhead that does not rely on the
 // upstream socket accumulator. DurationUs is microseconds (overhead runs small).
 type OverheadBucket struct {
-	Name string `json:"name"` // e.g. "key.selection", "plugin.governance", "mcp", "core"
+	Name string `json:"name"` // e.g. "key.selection", "plugin.governance", "core"
 	// Not serialized: derivable from Name (plugin spans carry the "plugin." prefix), and
 	// 27% of the persisted column. In-memory only, for MetricComponent.
 	Kind       string  `json:"-"`
@@ -443,7 +442,7 @@ type Log struct {
 	TokenUsage        string   `gorm:"type:text" json:"-"`                                                // JSON serialized *schemas.LLMUsage
 	// Denormalized cost split for per-category quota aggregation. input + output +
 	// additional reconcile to the cost column. Additional holds internal sidecar
-	// costs with no input/output token category (guardrail, MCP).
+	// costs with no input/output token category (guardrail).
 	InputCost      float64  `gorm:"default:0" json:"-"`
 	OutputCost     float64  `gorm:"default:0" json:"-"`
 	AdditionalCost float64  `gorm:"default:0" json:"-"`
@@ -2161,7 +2160,7 @@ type ModelRankingEntry struct {
 	TotalTokens        int64   `json:"total_tokens"`
 	TotalCost          float64 `json:"total_cost"`
 	// Per-category cost split; sums to TotalCost. AdditionalCost holds internal
-	// sidecar costs with no input/output token category (guardrail, MCP).
+	// sidecar costs with no input/output token category (guardrail).
 	InputCost      float64 `json:"input_cost"`
 	OutputCost     float64 `json:"output_cost"`
 	AdditionalCost float64 `json:"additional_cost"`

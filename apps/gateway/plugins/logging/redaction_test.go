@@ -85,4 +85,3 @@ func TestAttachLogRedactionDataIgnoresMissingContext(t *testing.T) {
 
 	assert.Nil(t, entry.RedactionData)
 }
-

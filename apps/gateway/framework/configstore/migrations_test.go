@@ -1102,10 +1102,9 @@ func TestMigrationAddEncryptionColumns(t *testing.T) {
 	err = migrationAddEncryptionColumns(ctx, db, testMigrationLogger)
 	require.NoError(t, err)
 
-	// Verify encryption_status column exists and is backfilled on all 9 tables
+	// Verify encryption_status column exists and is backfilled on all 6 tables
 	encTables := []string{
 		"config_keys", "governance_virtual_keys", "sessions",
-		"oauth_configs", "oauth_tokens", "config_mcp_clients",
 		"config_providers", "config_vector_store", "config_plugins",
 	}
 	for _, table := range encTables {
@@ -1309,7 +1308,7 @@ func TestMigrationBackfillVirtualKeyAllowAllProvidersHash(t *testing.T) {
 
 	// The recomputed hash must match GenerateVirtualKeyHash for the row as read back.
 	var vk tables.TableVirtualKey
-	err = db.Preload("ProviderConfigs").Preload("ProviderConfigs.Keys").Preload("MCPConfigs").
+	err = db.Preload("ProviderConfigs").Preload("ProviderConfigs.Keys").
 		Where("id = ?", "vk-aap-hash-1").First(&vk).Error
 	require.NoError(t, err)
 	expected, err := GenerateVirtualKeyHash(vk)
@@ -3869,6 +3868,25 @@ func TestMigrationAddOAuthKeyConfigColumns_BoundsTheLockWait(t *testing.T) {
 	for _, column := range oauthKeyConfigColumns {
 		assert.True(t, pgDB.Migrator().HasColumn(&tables.TableKey{}, column), "column %s missing after the retry", column)
 	}
+}
+
+// TestMigrationSkillsExternalClientURL adds the skills marketplace URL column idempotently,
+// leaving existing rows without a value.
+func TestMigrationSkillsExternalClientURL(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	require.NoError(t, db.Exec("CREATE TABLE config_client (id INTEGER PRIMARY KEY)").Error)
+	require.NoError(t, migrationAddSkillsExternalClientURLColumn(ctx, db, testMigrationLogger))
+	require.True(t, db.Migrator().HasColumn("config_client", "skills_external_client_url"))
+	require.NoError(t, db.Exec("INSERT INTO config_client (id) VALUES (1)").Error)
+	require.NoError(t, migrationAddSkillsExternalClientURLColumn(ctx, db, testMigrationLogger))
+	var rows []struct {
+		ID                      int
+		SkillsExternalClientURL string
+	}
+	require.NoError(t, db.Table("config_client").Order("id").Find(&rows).Error)
+	require.Len(t, rows, 1)
+	require.Empty(t, rows[0].SkillsExternalClientURL)
 }
 
 // TestMigrationAddPassthroughJSONColumn_NonRollbackable pins that rolling the passthrough

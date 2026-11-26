@@ -354,8 +354,7 @@ func TestConvertBifrostToolsToGemini_WirePayloadPreservesDefs(t *testing.T) {
 	var chatTool schemas.ChatTool
 	require.NoError(t, json.Unmarshal([]byte(toolJSON), &chatTool))
 
-	copied := schemas.DeepCopyChatTool(chatTool)
-	geminiTools, err := convertBifrostToolsToGemini([]schemas.ChatTool{copied})
+	geminiTools, err := convertBifrostToolsToGemini([]schemas.ChatTool{chatTool})
 	require.NoError(t, err)
 	require.Len(t, geminiTools, 1)
 

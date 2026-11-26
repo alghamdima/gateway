@@ -1374,79 +1374,7 @@ func TestChatTool_ServerToolNameRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDeepCopyChatTool_PreservesServerToolFields(t *testing.T) {
-	original := ChatTool{
-		Type:                "computer_20251124",
-		Name:                "computer",
-		DeferLoading:        Ptr(true),
-		AllowedCallers:      []string{"direct", "code_execution_20250825"},
-		EagerInputStreaming: Ptr(true),
-		InputExamples: []ChatToolInputExample{
-			{Input: json.RawMessage(`{"action":"screenshot"}`), Description: Ptr("take a screenshot")},
-		},
-		MaxUses:          Ptr(5),
-		AllowedDomains:   []string{"example.com"},
-		BlockedDomains:   []string{"evil.com"},
-		UserLocation:     &ChatToolUserLocation{Type: Ptr("approximate"), City: Ptr("SF"), Region: Ptr("CA"), Country: Ptr("US"), Timezone: Ptr("America/Los_Angeles")},
-		MaxContentTokens: Ptr(1000),
-		Citations:        &ChatToolCitationsConfig{Enabled: Ptr(true)},
-		UseCache:         Ptr(true),
-		DisplayWidthPx:   Ptr(1280),
-		DisplayHeightPx:  Ptr(800),
-		DisplayNumber:    Ptr(1),
-		EnableZoom:       Ptr(true),
-		MaxCharacters:    Ptr(2000),
-		MCPServerName:    "my-server",
-		DefaultConfig:    &ChatMCPToolsetConfig{Enabled: Ptr(true), DeferLoading: Ptr(false)},
-		Configs:          map[string]*ChatMCPToolsetConfig{"tool_a": {Enabled: Ptr(false)}},
-	}
-
-	c := DeepCopyChatTool(original)
-
-	// Every server-tool field must survive the copy.
-	assert.Equal(t, ChatToolType("computer_20251124"), c.Type)
-	assert.Equal(t, "computer", c.Name)
-	require.NotNil(t, c.DeferLoading)
-	assert.True(t, *c.DeferLoading)
-	assert.Equal(t, []string{"direct", "code_execution_20250825"}, c.AllowedCallers)
-	require.NotNil(t, c.EagerInputStreaming)
-	require.Len(t, c.InputExamples, 1)
-	assert.JSONEq(t, `{"action":"screenshot"}`, string(c.InputExamples[0].Input))
-	require.NotNil(t, c.MaxUses)
-	assert.Equal(t, 5, *c.MaxUses)
-	assert.Equal(t, []string{"example.com"}, c.AllowedDomains)
-	assert.Equal(t, []string{"evil.com"}, c.BlockedDomains)
-	require.NotNil(t, c.UserLocation)
-	require.NotNil(t, c.UserLocation.City)
-	assert.Equal(t, "SF", *c.UserLocation.City)
-	require.NotNil(t, c.Citations)
-	require.NotNil(t, c.Citations.Enabled)
-	require.NotNil(t, c.MaxContentTokens)
-	require.NotNil(t, c.UseCache)
-	require.NotNil(t, c.DisplayWidthPx)
-	assert.Equal(t, 1280, *c.DisplayWidthPx)
-	require.NotNil(t, c.DisplayHeightPx)
-	require.NotNil(t, c.DisplayNumber)
-	require.NotNil(t, c.EnableZoom)
-	require.NotNil(t, c.MaxCharacters)
-	assert.Equal(t, "my-server", c.MCPServerName)
-	require.NotNil(t, c.DefaultConfig)
-	require.NotNil(t, c.DefaultConfig.Enabled)
-	require.NotNil(t, c.Configs["tool_a"])
-	require.NotNil(t, c.Configs["tool_a"].Enabled)
-
-	// The copy must be independent: mutating it must not touch the original.
-	*c.DisplayWidthPx = 9999
-	c.AllowedDomains[0] = "mutated.com"
-	*c.UserLocation.City = "NYC"
-	c.Configs["tool_a"] = nil
-	assert.Equal(t, 1280, *original.DisplayWidthPx, "original DisplayWidthPx must be unchanged")
-	assert.Equal(t, "example.com", original.AllowedDomains[0], "original AllowedDomains must be unchanged")
-	assert.Equal(t, "SF", *original.UserLocation.City, "original UserLocation.City must be unchanged")
-	assert.NotNil(t, original.Configs["tool_a"], "original Configs entry must be unchanged")
-}
-
-func TestSonic_ChatTool_DeepCopy_PreservesFullParameterSchema(t *testing.T) {
+func TestSonic_DeepCopyToolFunctionParameters_PreservesFullParameterSchema(t *testing.T) {
 	ref := "#/$defs/Preferences"
 	minItems := int64(1)
 	nullable := true
@@ -1479,11 +1407,10 @@ func TestSonic_ChatTool_DeepCopy_PreservesFullParameterSchema(t *testing.T) {
 		},
 	}
 
-	copied := DeepCopyChatTool(original)
+	copied := DeepCopyToolFunctionParameters(original.Function.Parameters)
 
-	require.NotNil(t, copied.Function)
-	require.NotNil(t, copied.Function.Parameters)
-	data, err := Marshal(copied.Function.Parameters)
+	require.NotNil(t, copied)
+	data, err := Marshal(copied)
 	require.NoError(t, err)
 	s := string(data)
 	assert.Contains(t, s, `"$defs"`)
@@ -1493,7 +1420,7 @@ func TestSonic_ChatTool_DeepCopy_PreservesFullParameterSchema(t *testing.T) {
 	assert.Contains(t, s, `"anyOf"`)
 	assert.Contains(t, s, `"nullable":true`)
 
-	copied.Function.Parameters.Defs.Set("Mutated", map[string]any{"type": "object"})
+	copied.Defs.Set("Mutated", map[string]any{"type": "object"})
 	_, exists := original.Function.Parameters.Defs.Get("Mutated")
 	assert.False(t, exists, "copy must not share $defs map with original")
 }

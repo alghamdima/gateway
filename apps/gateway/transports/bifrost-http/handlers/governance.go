@@ -5568,7 +5568,7 @@ type quotaModelSpend struct {
 	TotalTokens   int64   `json:"total_tokens"`
 	TotalCost     float64 `json:"total_cost"`
 	// Per-category cost split; sums to TotalCost. AdditionalCost holds internal
-	// sidecar costs with no input/output token category (guardrail, MCP).
+	// sidecar costs with no input/output token category (guardrail).
 	InputCost      float64 `json:"input_cost"`
 	OutputCost     float64 `json:"output_cost"`
 	AdditionalCost float64 `json:"additional_cost"`

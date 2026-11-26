@@ -55,8 +55,8 @@ var (
 // OpenTelemetry attribute value length limit defaults to unlimited
 // (https://opentelemetry.io/docs/specs/otel/common/#attribute-limits), so
 // nothing downstream bounds a caller-controlled value for us. Every ingestion
-// path (x-bf-session-id, the baggage session-id member, x-bf-mcp-session-id, and
-// the harness headers below) goes through NormalizeSessionID.
+// path (x-bf-session-id, the baggage session-id member, and the
+// harness headers below) goes through NormalizeSessionID.
 const MaxSessionIDLength = 255
 
 // NormalizeSessionID trims a caller-asserted session identifier and reports

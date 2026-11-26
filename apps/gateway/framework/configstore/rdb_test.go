@@ -4779,7 +4779,7 @@ func TestValidatePublicBaseURLLengthMatchesColumns(t *testing.T) {
 	err := ValidatePublicBaseURL(prefix + strings.Repeat("a", MaxPublicURLLength-len(prefix)+1))
 	require.ErrorContains(t, err, "at most 512 characters")
 
-	columns := map[string]string{"BifrostURL": "", "MCPExternalClientURL": "", "SkillsExternalClientURL": ""}
+	columns := map[string]string{"SkillsExternalClientURL": ""}
 	typ := reflect.TypeOf(tables.TableClientConfig{})
 	for name := range columns {
 		field, ok := typ.FieldByName(name)

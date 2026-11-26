@@ -255,14 +255,14 @@ func (bc *BifrostContext) Grant() Grant {
 // bifrostContextSelfKey is a private sentinel Value answers with the BifrostContext itself.
 // inheritedGrant reads it to find the nearest BifrostContext ancestor through a foreign wrapper -
 // a library between the transport and this code inserting its own context.WithValue, for
-// instance, as mcp-go's HandleMessage does on every request it dispatches to a registered tool.
+// instance.
 // Value delegates through any wrapper per the context.Context contract; a type assertion on the
 // concrete parent does not, so the direct walk below falls back to this when the immediate parent
 // is not itself a *BifrostContext.
 type bifrostContextSelfKey struct{}
 
 // BifrostContextFromContext returns the nearest *BifrostContext reachable from ctx: ctx itself,
-// or the one a foreign wrapper (context.WithTimeout, mcp-go's per-request WithValue, ...) was
+// or the one a foreign wrapper (context.WithTimeout, a library's per-request WithValue, ...) was
 // derived from. ok is false when no BifrostContext is in the chain. Callers that only need to
 // read request values (identity, extra headers) use this instead of wrapping ctx in a fresh
 // BifrostContext, which would start a cancellation watcher per call.
@@ -1005,7 +1005,7 @@ func (bc *BifrostContext) CalculateCost(resp *BifrostResponse) float64 {
 //     CachedWriteCost, RequestCost (flat per-request surcharge)
 //   - OutputCostDetails: TextCost, AudioCost, ImageCost, ReasoningCost,
 //     CitationCost, SearchQueriesCost
-//   - AdditionalCostDetails: GuardrailCost, MCPCost, SemanticCacheCost,
+//   - AdditionalCostDetails: GuardrailCost, SemanticCacheCost,
 //     RoutingCost (internal sidecar calls with no token category)
 //
 // The full pricing resolution applies exactly as in CalculateCost: long-context

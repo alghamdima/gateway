@@ -119,8 +119,8 @@ const (
 // Headers carrying the scalar extra_fields that have no header in body mode. Written only when
 // client.extra_fields_placement is "headers", where extra_fields is removed from the body. List
 // values are comma-joined. The large and nested fields (raw_request, raw_response,
-// routing_metadata, guardrail_debug, parse_errors, and on errors key_statuses, billed_usage,
-// mcp_auth_required) have no header and are dropped in that mode.
+// routing_metadata, guardrail_debug, parse_errors, and on errors key_statuses and
+// billed_usage) have no header and are dropped in that mode.
 const (
 	HeaderBifrostLatency                 = "x-bifrost-latency-ms"
 	HeaderBifrostPricingRequestType      = "x-bifrost-pricing-request-type"
