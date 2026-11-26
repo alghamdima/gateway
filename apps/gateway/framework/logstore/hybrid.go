@@ -7,7 +7,6 @@ import (
 	"hash/fnv"
 	"maps"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -62,7 +61,6 @@ type uploadKind uint8
 const (
 	uploadKindLog uploadKind = iota
 	uploadKindMCP
-	uploadKindAgent
 	// uploadKindLogMerge overlays the payload onto the object the row already
 	// has (BatchUpdate's reconcile of a late completion) instead of replacing it.
 	uploadKindLogMerge
@@ -245,21 +243,6 @@ func (h *HybridLogStore) processUpload(work *uploadWork) {
 		if work.status != "" && current.Status != work.status {
 			return
 		}
-	case uploadKindAgent:
-		current, err := h.inner.FindAgentLog(ctx, work.logID)
-		if err != nil {
-			h.logger.Warn("objectstore: failed to check A2A log %s before upload: %v", work.logID, err)
-			h.droppedUploads.Add(1)
-			return
-		}
-		if work.status != "" && current.Status != work.status {
-			return
-		}
-		// An update moved the row to a newer object while this upload waited, so
-		// this payload is no longer the row's and is not written.
-		if agentLogSuperseded(current, work.key) {
-			return
-		}
 	case uploadKindRelay, uploadKindRelayMerge:
 		// A row deleted while its upload waited in the queue uploads nothing.
 		if _, err := h.inner.FindRelayLog(ctx, work.logID); err != nil {
@@ -326,18 +309,6 @@ func (h *HybridLogStore) processUpload(work *uploadWork) {
 		switch work.kind {
 		case uploadKindMCP:
 			err = h.inner.UpdateMCPToolLog(dbCtx, work.logID, map[string]interface{}{"has_object": true})
-		case uploadKindAgent:
-			// Same check as before the Put: an update that moved the row to a
-			// newer object since then must not have its flag set by this one.
-			var current *AgentLog
-			if current, err = h.inner.FindAgentLog(dbCtx, work.logID); err == nil {
-				if agentLogSuperseded(current, work.key) {
-					dbCancel()
-					h.deleteObject(work.key, work.logID)
-					return
-				}
-				err = h.inner.UpdateAgentLog(dbCtx, work.logID, map[string]interface{}{"has_object": true})
-			}
 		case uploadKindRelay, uploadKindRelayMerge:
 			err = h.inner.UpdateRelayLog(dbCtx, work.logID, map[string]any{"has_object": true})
 		default:
@@ -369,8 +340,6 @@ func markTable(kind uploadKind) string {
 	switch kind {
 	case uploadKindMCP:
 		return "mcp_tool_logs"
-	case uploadKindAgent:
-		return "agent_logs"
 	case uploadKindRelay, uploadKindRelayMerge:
 		return "relay_logs"
 	default:
@@ -452,7 +421,7 @@ func (h *HybridLogStore) flushMarks(batch []hasObjectMark, final bool) []hasObje
 	for table, marks := range byTable {
 		rows := make([]HasObjectMark, len(marks))
 		for i, m := range marks {
-			rows[i] = HasObjectMark{ID: m.logID, Timestamp: m.timestamp, Key: m.key}
+			rows[i] = HasObjectMark{ID: m.logID, Timestamp: m.timestamp}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		result, err := h.marker.MarkHasObject(ctx, table, rows)
@@ -463,11 +432,6 @@ func (h *HybridLogStore) flushMarks(batch []hasObjectMark, final bool) []hasObje
 				giveUpOrRetry(m, false)
 			}
 			continue
-		}
-		// A superseded object belongs to no row: the update that replaced it
-		// already pointed the row elsewhere and deleted what it could see.
-		for _, key := range result.Superseded {
-			h.deleteObject(key, "")
 		}
 		if len(result.Missing) == 0 {
 			continue
@@ -504,12 +468,6 @@ func (h *HybridLogStore) deleteObject(key, logID string) {
 	if err := h.objects.DeleteBatch(ctx, h.withAlternateKeys(key)); err != nil {
 		h.logger.Warn("objectstore: failed to delete unreferenced object %s (log %q): %v", key, logID, err)
 	}
-}
-
-// agentLogSuperseded reports whether row now references an object other than
-// key. Rows written before payload_reference existed reference nothing.
-func agentLogSuperseded(row *AgentLog, key string) bool {
-	return row != nil && row.PayloadReference != nil && *row.PayloadReference != "" && key != "" && *row.PayloadReference != key
 }
 
 // isPayloadEmpty returns true when the payload carries no offloadable content.
@@ -662,17 +620,6 @@ func (h *HybridLogStore) logKey(timestamp time.Time, logID string) string {
 
 func (h *HybridLogStore) mcpToolKey(timestamp time.Time, logID string) string {
 	return objectKey(h.prefix, "mcp-logs", timestamp, logID, h.objectExt)
-}
-
-func (h *HybridLogStore) agentLogKey(timestamp time.Time, logID string) string {
-	return objectKey(h.prefix, "agent-logs", timestamp, logID, h.objectExt)
-}
-
-// agentLogRevisionKey is a fresh object key for an updated A2A payload, in the
-// same hour directory as agentLogKey. The row's payload_reference names it, so
-// an object at this key only ever holds the one version written there.
-func (h *HybridLogStore) agentLogRevisionKey(timestamp time.Time, logID string) string {
-	return objectKey(h.prefix, "agent-logs", timestamp, logID+".r"+strconv.FormatInt(time.Now().UnixNano(), 36), h.objectExt)
 }
 
 func (h *HybridLogStore) relayLogKey(timestamp time.Time, logID string) string {
@@ -2315,314 +2262,6 @@ func (h *HybridLogStore) UpdateMCPToolLog(ctx context.Context, id string, entry 
 	return nil
 }
 
-func (h *HybridLogStore) BatchCreateAgentLogsIfNotExists(ctx context.Context, entries []*AgentLog) ([]string, error) {
-	type pendingUpload struct {
-		id        string
-		timestamp time.Time
-		status    string
-		key       string
-		payload   []byte
-		tags      map[string]string
-	}
-	dbEntries := make([]*AgentLog, 0, len(entries))
-	uploads := make([]pendingUpload, 0, len(entries))
-	seen := make(map[string]struct{}, len(entries))
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if _, ok := seen[entry.ID]; ok {
-			continue
-		}
-		seen[entry.ID] = struct{}{}
-		dbEntry := *entry
-		if AgentLogHasPayload(entry) {
-			key := h.agentLogKey(entry.Timestamp, entry.ID)
-			payload, err := MarshalAgentLogPayload(entry)
-			if err != nil {
-				return nil, fmt.Errorf("logstore: serialize A2A log before offload: %w", err)
-			}
-			PrepareAgentLogDBEntry(&dbEntry, key)
-			uploads = append(uploads, pendingUpload{
-				id: entry.ID, timestamp: entry.Timestamp, status: entry.Status,
-				key: key, payload: payload, tags: BuildAgentLogTags(entry),
-			})
-		}
-		dbEntries = append(dbEntries, &dbEntry)
-	}
-	if len(dbEntries) == 0 {
-		return nil, nil
-	}
-	insertedIDs, err := h.inner.BatchCreateAgentLogsIfNotExists(ctx, dbEntries)
-	if err != nil {
-		return nil, err
-	}
-	inserted := make(map[string]struct{}, len(insertedIDs))
-	for _, id := range insertedIDs {
-		inserted[id] = struct{}{}
-	}
-	for _, upload := range uploads {
-		if _, ok := inserted[upload.id]; !ok {
-			continue
-		}
-		h.enqueueRawUpload(upload.id, upload.timestamp, upload.key, uploadKindAgent, upload.status, upload.payload, upload.tags)
-	}
-	return insertedIDs, nil
-}
-
-func (h *HybridLogStore) ReconcileAgentCorrelation(ctx context.Context, entries []*AgentLog) error {
-	return h.inner.ReconcileAgentCorrelation(ctx, entries)
-}
-
-func (h *HybridLogStore) FindAgentLog(ctx context.Context, id string) (*AgentLog, error) {
-	entry, err := h.inner.FindAgentLog(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	h.hydrateAgentLog(ctx, entry)
-	return entry, nil
-}
-
-func (h *HybridLogStore) FindAgentLogsForDeletion(ctx context.Context, ids []string) ([]*AgentLog, error) {
-	return h.inner.FindAgentLogsForDeletion(ctx, ids)
-}
-
-func (h *HybridLogStore) ListAgentLogHistory(ctx context.Context, filter AgentLogHistoryFilter, pagination PaginationOptions) (*AgentLogHistoryResult, error) {
-	return h.inner.ListAgentLogHistory(ctx, filter, pagination)
-}
-
-// ListAgentLogOperations hydrates payload objects for the bounded operation page.
-func (h *HybridLogStore) ListAgentLogOperations(ctx context.Context, filter AgentLogHistoryFilter, pagination PaginationOptions) (*AgentLogOperationResult, error) {
-	result, err := h.inner.ListAgentLogOperations(ctx, filter, pagination)
-	if err != nil {
-		return nil, err
-	}
-	for i := range result.Logs {
-		h.hydrateAgentLogDetail(ctx, &result.Logs[i].AgentLogDetail)
-		for j := range result.Logs[i].Events {
-			h.hydrateAgentLogDetail(ctx, &result.Logs[i].Events[j])
-		}
-	}
-	return result, nil
-}
-
-// FindAgentLogOperation hydrates the request and correlated event payload objects.
-func (h *HybridLogStore) FindAgentLogOperation(ctx context.Context, id string) (*AgentLogOperation, error) {
-	operation, err := h.inner.FindAgentLogOperation(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	h.hydrateAgentLogDetail(ctx, &operation.AgentLogDetail)
-	for i := range operation.Events {
-		h.hydrateAgentLogDetail(ctx, &operation.Events[i])
-	}
-	return operation, nil
-}
-
-// hydrateAgentLogDetail hydrates one public detail through the existing Agent log object path.
-func (h *HybridLogStore) hydrateAgentLogDetail(ctx context.Context, detail *AgentLogDetail) {
-	if !detail.hasObject || detail.contentHidden {
-		return
-	}
-	entry := &AgentLog{ID: detail.ID, Timestamp: detail.Timestamp, HasObject: detail.hasObject, ContentHidden: detail.contentHidden, PayloadReference: detail.payloadReference}
-	h.hydrateAgentLog(ctx, entry)
-	detail.RawRequest, detail.RawResponse = entry.RawRequest, entry.RawResponse
-	detail.RequestBody = entry.RequestBody
-	detail.ResponseBody = entry.ResponseBody
-	detail.EventBody = entry.EventBody
-}
-
-func (h *HybridLogStore) hydrateAgentLog(ctx context.Context, entry *AgentLog) {
-	if entry == nil || !entry.HasObject || entry.ContentHidden {
-		return
-	}
-	key := h.agentLogKey(entry.Timestamp, entry.ID)
-	if entry.PayloadReference != nil && *entry.PayloadReference != "" {
-		key = *entry.PayloadReference
-	}
-	data, _, err := h.getPayload(ctx, key)
-	if err != nil {
-		h.logger.Warn("objectstore: failed to hydrate A2A log %s: %v", entry.ID, err)
-		return
-	}
-	if err := MergeAgentLogPayloadFromJSON(entry, data); err != nil {
-		h.logger.Warn("objectstore: failed to merge A2A log %s: %v", entry.ID, err)
-	}
-}
-
-func (h *HybridLogStore) GetAgentLogStats(ctx context.Context, filter AgentLogHistoryFilter) (*AgentLogStats, error) {
-	return h.inner.GetAgentLogStats(ctx, filter)
-}
-
-// GetAgentTopAgents delegates to the database store; the ranking uses only
-// database-resident columns.
-func (h *HybridLogStore) GetAgentTopAgents(ctx context.Context, filter AgentLogHistoryFilter, limit int) (*AgentTopAgentsResult, error) {
-	return h.inner.GetAgentTopAgents(ctx, filter, limit)
-}
-
-func (h *HybridLogStore) GetAgentFilterData(ctx context.Context, dimensions []string, limit int, query string) (*AgentFilterData, error) {
-	return h.inner.GetAgentFilterData(ctx, dimensions, limit, query)
-}
-
-func (h *HybridLogStore) GetAgentHistogram(ctx context.Context, filter AgentLogHistoryFilter, bucketSizeSeconds int64) (*AgentHistogramResult, error) {
-	return h.inner.GetAgentHistogram(ctx, filter, bucketSizeSeconds)
-}
-
-func (h *HybridLogStore) hydrateAgentLogFromObject(ctx context.Context, entry *AgentLog) error {
-	if entry == nil {
-		return nil
-	}
-	key := h.agentLogKey(entry.Timestamp, entry.ID)
-	if entry.PayloadReference != nil && *entry.PayloadReference != "" {
-		key = *entry.PayloadReference
-	}
-	data, _, err := h.getPayload(ctx, key)
-	if err != nil {
-		return fmt.Errorf("objectstore: fetch Agent log payload for %s: %w", entry.ID, err)
-	}
-	if err := MergeAgentLogPayloadFromJSON(entry, data); err != nil {
-		return fmt.Errorf("objectstore: merge Agent log payload for %s: %w", entry.ID, err)
-	}
-	return nil
-}
-
-func applyAgentLogBodyUpdate(entry *AgentLog, field string, value any) error {
-	var body *string
-	switch value := value.(type) {
-	case nil:
-	case string:
-		body = &value
-	case *string:
-		body = value
-	default:
-		return fmt.Errorf("logstore: unsupported %s update type %T", field, value)
-	}
-	switch field {
-	case "request_body":
-		entry.RequestBody = body
-	case "response_body":
-		entry.ResponseBody = body
-	case "event_body":
-		entry.EventBody = body
-	case "raw_request":
-		entry.RawRequest = body
-	case "raw_response":
-		entry.RawResponse = body
-	}
-	return nil
-}
-
-func (h *HybridLogStore) UpdateAgentLog(ctx context.Context, id string, entry any) error {
-	updates, ok := entry.(map[string]interface{})
-	if !ok {
-		return h.inner.UpdateAgentLog(ctx, id, entry)
-	}
-	payloadUpdate := false
-	for _, field := range []string{"request_body", "response_body", "event_body", "raw_request", "raw_response"} {
-		if _, ok := updates[field]; ok {
-			payloadUpdate = true
-			break
-		}
-	}
-	if !payloadUpdate {
-		return h.inner.UpdateAgentLog(ctx, id, entry)
-	}
-
-	current, err := h.inner.FindAgentLog(ctx, id)
-	if err != nil {
-		return err
-	}
-	// The payload written below carries every body, so the ones this update does
-	// not touch must come from the object, not the row's previews. Each update
-	// writes a new object, so the object the row references holds exactly the
-	// version the row describes, and only if that version's upload succeeded:
-	// with has_object still false it can be there with its flip queued, or
-	// missing because the upload failed or has not run, in which case the row
-	// is all there is.
-	if current.HasObject {
-		if err := h.hydrateAgentLogFromObject(ctx, current); err != nil {
-			return err
-		}
-	} else if current.PayloadReference != nil && *current.PayloadReference != "" {
-		if err := h.hydrateAgentLogFromObject(ctx, current); err != nil && !errors.Is(err, objectstore.ErrNotFound) {
-			return err
-		}
-	}
-
-	dbUpdates := make(map[string]interface{}, len(updates)+1)
-	for field, value := range updates {
-		switch field {
-		case "request_body", "response_body", "event_body", "raw_request", "raw_response":
-			if err := applyAgentLogBodyUpdate(current, field, value); err != nil {
-				return err
-			}
-		default:
-			dbUpdates[field] = value
-		}
-	}
-	previousKey := h.agentLogKey(current.Timestamp, current.ID)
-	if current.PayloadReference != nil && *current.PayloadReference != "" {
-		previousKey = *current.PayloadReference
-	}
-	key := h.agentLogRevisionKey(current.Timestamp, current.ID)
-	payload, err := MarshalAgentLogPayload(current)
-	if err != nil {
-		return fmt.Errorf("logstore: serialize Agent log update before offload: %w", err)
-	}
-	dbEntry := *current
-	PrepareAgentLogDBEntry(&dbEntry, key)
-	dbUpdates["request_body"] = dbEntry.RequestBody
-	dbUpdates["response_body"] = dbEntry.ResponseBody
-	dbUpdates["event_body"] = dbEntry.EventBody
-	dbUpdates["raw_request"] = dbEntry.RawRequest
-	dbUpdates["raw_response"] = dbEntry.RawResponse
-	dbUpdates["payload_reference"] = dbEntry.PayloadReference
-	dbUpdates["has_object"] = false
-	if err := h.inner.UpdateAgentLog(ctx, id, dbUpdates); err != nil {
-		return err
-	}
-	// The row now references key, so the previous object is unreferenced. A
-	// queued upload or flip for it sees the new reference and stands down.
-	h.deleteObject(previousKey, current.ID)
-	h.enqueueRawUpload(current.ID, current.Timestamp, key, uploadKindAgent, current.Status, payload, BuildAgentLogTags(current))
-	return nil
-}
-
-func (h *HybridLogStore) FlushAgentLogs(ctx context.Context, since time.Time) error {
-	// Time-based row cleanup intentionally leaves objects to the bucket lifecycle
-	// policy, which must expire the A2A prefix on the same retention schedule.
-	return h.inner.FlushAgentLogs(ctx, since)
-}
-
-// DeleteAgentLogs deletes the identified Agent log rows, correlated stream-event
-// rows, and every offloaded object belonging to those rows.
-func (h *HybridLogStore) DeleteAgentLogs(ctx context.Context, ids []string) error {
-	entries, err := h.inner.FindAgentLogsForDeletion(ctx, ids)
-	if err != nil {
-		return err
-	}
-	keys := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.HasObject {
-			continue
-		}
-		key := h.agentLogKey(entry.Timestamp, entry.ID)
-		if entry.PayloadReference != nil && *entry.PayloadReference != "" {
-			key = *entry.PayloadReference
-		}
-		keys = append(keys, h.withAlternateKeys(key)...)
-	}
-	if err := h.inner.DeleteAgentLogs(ctx, ids); err != nil {
-		return err
-	}
-	if len(keys) > 0 {
-		if delErr := h.objects.DeleteBatch(ctx, keys); delErr != nil {
-			h.logger.Warn("objectstore: failed to batch delete %d A2A log objects: %v", len(keys), delErr)
-		}
-	}
-	return nil
-}
-
 // SearchMCPToolLogs searches for MCP tool logs that match the given filters and returns the results.
 func (h *HybridLogStore) SearchMCPToolLogs(ctx context.Context, filters MCPToolLogSearchFilters, pagination PaginationOptions) (*MCPToolLogSearchResult, error) {
 	return h.inner.SearchMCPToolLogs(ctx, filters, pagination)
@@ -2732,7 +2371,7 @@ func (h *HybridLogStore) SetDistributedLocker(locker DistributedLocker) {
 	}
 }
 
-// Relay Logs offload their bodies as Agent logs do: the database row keeps a preview and a
+// Relay Logs offload their bodies: the database row keeps a preview and a
 // reference, the object holds the full bodies, and FindRelayLog reads them back for the detail
 // sheet. Lists, stats and charts read the database alone. The operator's exclusions apply as they
 // do to LLM rows: object_storage_exclude_request_types naming "relay" keeps every relay row whole
@@ -2962,7 +2601,7 @@ func relayBodyUpdate(updates map[string]any, column string) (*string, bool) {
 }
 
 func (h *HybridLogStore) FlushRelayLogs(ctx context.Context, since time.Time) error {
-	// Time-based row cleanup leaves objects to the bucket lifecycle policy, as FlushAgentLogs does.
+	// Time-based row cleanup leaves objects to the bucket lifecycle policy.
 	return h.inner.FlushRelayLogs(ctx, since)
 }
 

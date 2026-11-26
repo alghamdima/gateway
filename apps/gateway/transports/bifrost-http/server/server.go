@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 	bifrost "github.com/maximhq/bifrost/core"
-	"github.com/maximhq/bifrost/core/agent"
 	"github.com/maximhq/bifrost/core/network"
 	"github.com/maximhq/bifrost/core/relay"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -284,7 +283,6 @@ type BifrostHTTPServer struct {
 	BifrostMCPToolAccess handlers.BifrostMCPToolAccess // set before StartBifrostMCP to shape tools/list per caller
 	bifrostMCPExec       *handlers.BifrostMCPExecutor
 	defaultOpenAPIURL    string // the build's default spec, used while the framework config's openapi_url is unset
-	AgentGatewayHandler  *handlers.AgentGatewayHandler
 	devPprofHandler      *handlers.DevPprofHandler
 	skillsServingHandler *handlers.SkillsServingHandler
 	IntegrationHandler   *handlers.IntegrationHandler
@@ -310,9 +308,6 @@ type BifrostHTTPServer struct {
 	// OAuth2Extensions adds grant types and discovery metadata to Bifrost's OAuth2
 	// authorization server. Nil means none; set before RegisterAPIRoutes.
 	OAuth2Extensions handlers.OAuth2Extensions
-	// AgentGatewayIdentityResolver validates pre-authenticated Authorization
-	// credentials for A2A HTTP and gRPC ingress. Optional; OSS leaves it nil.
-	AgentGatewayIdentityResolver handlers.AgentGatewayIdentityResolver
 	// ExternalQuotaBudgetResolver supplies budgets/usage for VKs whose
 	// authoritative usage is tracked outside their own budget rows (enterprise
 	// access-profile-managed VKs). Optional; wired at server init when available,
@@ -342,18 +337,13 @@ type BifrostHTTPServer struct {
 	refreshInFlightMu sync.Mutex
 	refreshInFlight   map[schemas.ModelProvider]*providerRefreshState
 
-	wsPool                *bfws.Pool
-	agentGatewayCloseOnce sync.Once
-	// agentGatewayManager backs the gRPC binding, which needs the manager
-	// directly rather than through the HTTP handler.
-	agentGatewayManager *agent.Manager
+	wsPool *bfws.Pool
 	// relays serves /relay/{name}/{path}; built by InitializeRelays together with RelaysHandler,
 	// the management handler a clustered server replays relay changes through.
-	relays                 *relay.Manager
-	RelaysHandler          *handlers.RelaysHandler
-	endpointSweeperCancel  context.CancelFunc
-	endpointSweeperMu      sync.Mutex // serializes sweeper restarts from concurrent plugin reloads
-	agentGatewayGRPCServer *handlers.AgentGatewayGRPCServer
+	relays                *relay.Manager
+	RelaysHandler         *handlers.RelaysHandler
+	endpointSweeperCancel context.CancelFunc
+	endpointSweeperMu     sync.Mutex // serializes sweeper restarts from concurrent plugin reloads
 }
 
 var logger schemas.Logger
@@ -431,10 +421,6 @@ func (s *GovernanceInMemoryStore) GetMCPClientNames() map[string]string {
 // GetMCPClientBySlug resolves an MCP client configuration by slug.
 func (s *GovernanceInMemoryStore) GetMCPClientBySlug(slug string) (string, string, bool) {
 	return s.Config.GetMCPClientBySlug(slug)
-}
-
-func (s *GovernanceInMemoryStore) GetEnabledAgents() map[string]bool {
-	return s.Config.GetEnabledAgents()
 }
 
 // AddMCPClient adds a new MCP client to the in-memory store
@@ -1659,7 +1645,6 @@ func (s *BifrostHTTPServer) ReloadClientConfigFromConfigStore(ctx context.Contex
 			DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
 			LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
 			MCPPlugins:         s.Config.GetLoadedMCPPlugins(),
-			A2APlugins:         s.Config.GetLoadedA2APlugins(),
 			RelayPlugins:       s.Config.GetLoadedRelayPlugins(),
 			MCPConfig:          mcpConfig,
 			Logger:             logger,
@@ -2765,100 +2750,6 @@ func (s *BifrostHTTPServer) StartOAuth2SweepWorker(ctx context.Context, shouldSw
 	s.OAuth2SweepWorker.start(ctx)
 }
 
-var errAgentGatewayNotInitialized = errors.New("agent gateway is not initialized")
-
-// CreateAgentRegistration persists a registration and updates its local runtime.
-func (s *BifrostHTTPServer) CreateAgentRegistration(ctx context.Context, req agent.CreateRequest) (schemas.AgentRegistrationView, error) {
-	if s.agentGatewayManager == nil {
-		return schemas.AgentRegistrationView{}, errAgentGatewayNotInitialized
-	}
-	return s.agentGatewayManager.Create(ctx, req)
-}
-
-// UpdateAgentRegistration replaces a registration and updates its local runtime.
-func (s *BifrostHTTPServer) UpdateAgentRegistration(ctx context.Context, name string, req agent.UpdateRequest) (schemas.AgentRegistrationView, error) {
-	if s.agentGatewayManager == nil {
-		return schemas.AgentRegistrationView{}, errAgentGatewayNotInitialized
-	}
-	return s.agentGatewayManager.Update(ctx, name, req)
-}
-
-// DeleteAgentRegistration deletes a registration and retires its local runtime.
-func (s *BifrostHTTPServer) DeleteAgentRegistration(ctx context.Context, name string) error {
-	if s.agentGatewayManager == nil {
-		return errAgentGatewayNotInitialized
-	}
-	return s.agentGatewayManager.Delete(ctx, name)
-}
-
-// InitializeAgentGateway constructs the shared Agent Gateway handler before any
-// routes that depend on it are registered. registrationManager owns registration
-// mutations, while vkReloader refreshes virtual keys after grant changes. nil
-// values use the local OSS implementations.
-func (s *BifrostHTTPServer) InitializeAgentGateway(ctx context.Context, registrationManager handlers.AgentRegistrationManager, vkReloader handlers.VirtualKeyReloader) error {
-	if s.AgentGatewayHandler != nil || s.Config == nil || s.Config.ConfigStore == nil {
-		return nil
-	}
-	if vkReloader == nil {
-		vkReloader = s
-	}
-	gatewayStore, ok := s.Config.ConfigStore.(agent.Store)
-	if !ok {
-		return errors.New("config store does not support agent gateway persistence")
-	}
-	managerConfig := agent.ManagerConfig{
-		AuthPolicy: handlers.AgentGatewayAuthPolicy(s.Config),
-		// Read the external URL live so admin config changes (and their cluster
-		// propagation) apply to card generation and push without a restart.
-		ExternalURLProvider:      s.Config.GetA2AExternalClientURL,
-		RawCaptureProvider:       s.Config.GetA2AStoreRawRequestResponse,
-		PrivateAllowlistProvider: s.Config.GetA2APrivateAllowlist,
-	}
-	if s.Config.ServerConfig != nil {
-		managerConfig.GRPCBaseDomain = s.Config.ServerConfig.A2AGRPCBaseDomain
-		managerConfig.GRPCPort = s.Config.ServerConfig.A2AGRPCPort
-		managerConfig.AllowPrivatePushCallbacks = s.Config.ServerConfig.A2AAllowPrivatePushCallbacks
-	}
-	if s.Client != nil {
-		managerConfig.PluginPipelineAcquire = func() agent.PluginPipeline {
-			return s.Client.AcquirePluginPipeline()
-		}
-		managerConfig.PluginPipelineRelease = func(pipeline agent.PluginPipeline) {
-			if pluginPipeline, ok := pipeline.(*bifrost.PluginPipeline); ok {
-				s.Client.ReleasePluginPipeline(pluginPipeline)
-			}
-		}
-	}
-	managerConfig.TracerProvider = func() schemas.Tracer {
-		if s.TracingMiddleware == nil {
-			return nil
-		}
-		return s.TracingMiddleware.GetTracer()
-	}
-	manager, err := agent.NewManager(ctx, gatewayStore, logger, s.Config.GetA2AExternalClientURL(), nil, managerConfig)
-	if err != nil {
-		return fmt.Errorf("failed to initialize agent gateway: %v", err)
-	}
-	s.AgentGatewayHandler = handlers.NewAgentGatewayHandler(manager, registrationManager, s.Config, vkReloader)
-	s.agentGatewayManager = manager
-	if err := s.AgentGatewayHandler.SyncEnabledAgents(ctx); err != nil {
-		manager.Close()
-		s.AgentGatewayHandler = nil
-		s.agentGatewayManager = nil
-		return fmt.Errorf("failed to initialize enabled agent configuration: %v", err)
-	}
-	agentCount := 0
-	if registrations, err := manager.List(ctx); err == nil {
-		agentCount = len(registrations)
-	}
-	pushStatus := "disabled (external client URL not configured)"
-	if s.Config.GetA2AExternalClientURL() != "" {
-		pushStatus = "enabled"
-	}
-	logger.Info("agent gateway initialized: %d registered agent(s), push notifications %s", agentCount, pushStatus)
-	return nil
-}
-
 // virtualKeyCache serves by-ID virtual key lookups from the governance in-memory
 // store (avoiding a per-request DB read) for the handlers that resolve an
 // identity to a virtual key. Best-effort: any governance store that exposes
@@ -2914,42 +2805,6 @@ func (s *BifrostHTTPServer) RegisterInferenceRoutes(ctx context.Context, middlew
 	s.MCPServerHandler.RegisterRoutes(s.Router, middlewares...)
 	if s.relays != nil {
 		handlers.NewRelayGatewayHandler(s.relays, s.Config, logger).RegisterRoutes(s.Router, middlewares...)
-	}
-	if s.AgentGatewayHandler != nil {
-		protocolMiddlewares := append([]schemas.BifrostHTTPMiddleware{}, middlewares...)
-		validator, _ := s.virtualKeyCache().(handlers.AgentGatewayVirtualKeyValidator)
-		protocolMiddlewares = append(protocolMiddlewares, handlers.AgentGatewayAuthenticationMiddleware(s.Config, validator, s.AgentGatewayIdentityResolver))
-		s.AgentGatewayHandler.RegisterProtocolRoutes(s.Router, protocolMiddlewares...)
-		// The push ingress deliberately skips the Agent Gateway authentication
-		// middleware: the upstream agent authenticates with the per-config
-		// token Bifrost minted, not with a downstream virtual key.
-		s.AgentGatewayHandler.RegisterPushIngressRoute(s.Router, middlewares...)
-		// The shared gRPC binding starts here, alongside the protocol routes,
-		// because it uses the same virtual-key validator. Routing is by dialed
-		// authority; see handlers.AgentGatewayGRPCServer.
-		if s.agentGatewayGRPCServer == nil && s.Config.ServerConfig != nil &&
-			s.Config.ServerConfig.A2AGRPCBaseDomain != "" && s.Config.ServerConfig.A2AGRPCPort > 0 {
-			grpcServer := handlers.NewAgentGatewayGRPCServer(s.agentGatewayManager, s.Config, validator, s.Config.ServerConfig.A2AGRPCBaseDomain, s.AgentGatewayIdentityResolver, s.TracingMiddleware)
-			if grpcServer != nil {
-				// Cards always advertise A2AGRPCPort (the public endpoint). The
-				// local bind port may differ when a load balancer or port mapping
-				// fronts this process, e.g. multiple nodes on one host in the dev
-				// cluster harness.
-				listenPort := s.Config.ServerConfig.A2AGRPCPort
-				if raw := os.Getenv("BIFROST_A2A_GRPC_LISTEN_PORT"); raw != "" {
-					parsed, err := strconv.Atoi(raw)
-					if err != nil || parsed <= 0 || parsed > 65535 {
-						return fmt.Errorf("invalid BIFROST_A2A_GRPC_LISTEN_PORT %q", raw)
-					}
-					listenPort = parsed
-				}
-				if err := grpcServer.Start(listenPort); err != nil {
-					return fmt.Errorf("failed to start agent gateway grpc listener: %v", err)
-				}
-				s.agentGatewayGRPCServer = grpcServer
-				logger.Info("agent gateway grpc listener started on port %d (advertised port %d) for *.%s", listenPort, s.Config.ServerConfig.A2AGRPCPort, s.Config.ServerConfig.A2AGRPCBaseDomain)
-			}
-		}
 	}
 	// One client gateway handler serves every client gateway (Claude Code, ...),
 	// so the sign-in limiters, poll tracker and verified-token cache are shared,
@@ -3125,9 +2980,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 		sessionHandler.SetSetupLock(s.AuthMiddleware)
 	}
 	featureFlagsHandler := handlers.NewFeatureFlagsHandler(s.Config.FeatureFlags, s.Config.ConfigStore)
-	if s.AgentGatewayHandler != nil {
-		s.AgentGatewayHandler.RegisterManagementRoutes(s.Router, middlewares...)
-	}
 	if s.RelaysHandler != nil {
 		s.RelaysHandler.RegisterRoutes(s.Router, middlewares...)
 	}
@@ -3614,7 +3466,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
 		LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
 		MCPPlugins:         s.Config.GetLoadedMCPPlugins(),
-		A2APlugins:         s.Config.GetLoadedA2APlugins(),
 		RelayPlugins:       s.Config.GetLoadedRelayPlugins(),
 		MCPConfig:          mcpConfig,
 		OAuth2Provider:     s.Config.OAuthProvider,
@@ -3758,21 +3609,8 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		s.wireRoutingSuggestions(routingPlugin)
 	}
 
-	// Initialize the Agent Gateway once before either management or protocol
-	// routes are registered.
+	// Initialize relays once before either management or protocol routes are registered.
 	s.InitializeRelays(s.Ctx, nil, nil)
-	if err = s.InitializeAgentGateway(s.Ctx, nil, nil); err != nil {
-		if s.WSTicketStore != nil {
-			s.WSTicketStore.Stop()
-			s.WSTicketStore = nil
-		}
-		if s.TempTokenSweepWorker != nil {
-			s.TempTokenSweepWorker.Stop()
-			s.TempTokenSweepWorker = nil
-		}
-		s.stopOAuth2Background()
-		return err
-	}
 
 	// Register routes
 	// /v1/mcp takes the /api chain. Copied now: apiMiddlewares and
@@ -3782,7 +3620,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	bifrostMCPMiddlewares := slices.Clone(apiMiddlewares)
 	err = s.RegisterAPIRoutes(s.Ctx, s, apiMiddlewares...)
 	if err != nil {
-		s.CloseAgentGateway()
 		if s.WSTicketStore != nil {
 			s.WSTicketStore.Stop()
 			s.WSTicketStore = nil
@@ -3830,7 +3667,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 
 	err = s.RegisterInferenceRoutes(s.Ctx, inferenceMiddlewares...)
 	if err != nil {
-		s.CloseAgentGateway()
 		if s.WSTicketStore != nil {
 			s.WSTicketStore.Stop()
 			s.WSTicketStore = nil
@@ -3963,17 +3799,6 @@ func (s *BifrostHTTPServer) reloadBifrostMCP(ctx context.Context) {
 	}
 }
 
-func (s *BifrostHTTPServer) CloseAgentGateway() {
-	s.agentGatewayCloseOnce.Do(func() {
-		// The gRPC listener drains first so no new operations reach the manager
-		// while it is closing its runtimes.
-		s.agentGatewayGRPCServer.Stop()
-		if s.AgentGatewayHandler != nil {
-			s.AgentGatewayHandler.Close()
-		}
-	})
-}
-
 // Start starts the HTTP server at the specified host and port
 // Also watches signals and errors
 func (s *BifrostHTTPServer) Start() error {
@@ -4037,8 +3862,6 @@ func (s *BifrostHTTPServer) Start() error {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			logger.Info("closing agent gateway...")
-			s.CloseAgentGateway()
 			logger.Info("shutting down bifrost client...")
 			s.Client.Shutdown()
 			logger.Info("bifrost client shutdown completed")

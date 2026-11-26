@@ -77,7 +77,6 @@ var bifrostMCPDeniedRoutes = bifrostMCPRouteSet(
 	"POST /litellm/genai/v1beta/models/{model}:streamGenerateContent",
 	"POST /langchain/genai/v1beta/models/{model}:streamGenerateContent",
 	"POST /pydanticai/genai/v1beta/models/{model}:streamGenerateContent",
-	"POST /agents/a2a/{name}/rest/message:stream", "POST /agents/a2a/{name}/rest/tasks/{taskId}:subscribe",
 	// The other MCP server, whose session a stateless tool call cannot hold.
 	"POST /mcp", "GET /mcp",
 	// This server: a tool that calls /v1/mcp would nest MCP inside MCP.

@@ -1754,7 +1754,7 @@ func assertPermitsAre(t *testing.T, got []schemas.Permit, want ...schemas.Permit
 
 func TestIsRelayAllowed(t *testing.T) {
 	named := NewPermit(PermitVirtualKey, "vk-1", "named", true, false, nil, nil, WithRelayPermits([]string{"tavily"}))
-	// Relays have no allow-all on any holder, as agents have none: a wide permit names every relay.
+	// Relays have no allow-all on any holder: a wide permit names every relay.
 	all := NewPermit(PermitAccessProfile, "ap-2", "all", true, false, nil, nil, WithRelayPermits([]string{"tavily", "textract"}))
 	none := NewPermit(PermitVirtualKey, "vk-3", "none", true, false, nil, nil)
 
@@ -2256,19 +2256,15 @@ func TestAccessLevels_MCPTools(t *testing.T) {
 	})
 }
 
-// Relays are capped; agents are decided by the granting level alone.
-func TestAccessLevels_AgentsAndRelays(t *testing.T) {
+// Relays are capped.
+func TestAccessLevels_Relays(t *testing.T) {
 	caller := NewPermit(PermitAccessProfile, "ap1", "Member", true, false, nil, nil,
-		WithAgentPermits([]string{"agent-a", "agent-b"}), WithRelayPermits([]string{"relay-a", "relay-b"}))
+		WithRelayPermits([]string{"relay-a", "relay-b"}))
 	team := atLevel(NewPermit(PermitTeamAccessProfile, "t1", "Team", true, false, nil, nil,
-		WithAgentPermits([]string{"agent-a"}), WithRelayPermits([]string{"relay-b"})), 1)
+		WithRelayPermits([]string{"relay-b"})), 1)
 
 	access := NewAccess(held(caller, team), Intersect, nil, "", nil)
 
-	assert.True(t, access.IsAgentAllowed("agent-a"))
-	assert.True(t, access.IsAgentAllowed("agent-b"), "the team does not vote on agents")
-	assert.False(t, access.IsAgentAllowed("agent-c"))
-	assertPermitsAre(t, access.DeniedPermitsForAgent("agent-c"), caller)
 	assert.False(t, access.IsRelayAllowed("relay-a"))
 	assert.True(t, access.IsRelayAllowed("relay-b"))
 	assertPermitsAre(t, access.DeniedPermitsForRelay("relay-a"), team)
@@ -2332,14 +2328,14 @@ type matrixPermit struct {
 // build turns a matrix permit into a real one. A refusing permit holds the provider but grants
 // something else.
 func (m matrixPermit) build(kind PermitType, level int, id string) *Permit {
-	model, agent, relay, tool := "other-model", "other-agent", "other-relay", "other_tool"
+	model, relay, tool := "other-model", "other-relay", "other_tool"
 	if m.allows {
-		model, agent, relay, tool = "gpt-4o", "agent-a", "relay-a", "read_file"
+		model, relay, tool = "gpt-4o", "relay-a", "read_file"
 	}
 	return NewPermit(kind, id, id, true, false,
 		[]schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{model}, KeyIDs: m.keys}},
 		[]schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: []string{tool}}},
-		WithAgentPermits([]string{agent}), WithRelayPermits([]string{relay}), WithLevel(level))
+		WithRelayPermits([]string{relay}), WithLevel(level))
 }
 
 // matrixLevelKinds is the permit kind at each matrix level.
@@ -2415,12 +2411,6 @@ func (c matrixCase) oracle() (callerAllows, allowed bool) {
 		callerAllows = callerAllows && anyAllows(level)
 	}
 	return callerAllows, c.compose(callerAllows)
-}
-
-// oracleAgent is the rule for agents: the granting level alone, composed with the scope.
-func (c matrixCase) oracleAgent() bool {
-	_, levels := c.present()
-	return c.compose(len(levels) > 0 && anyAllows(levels[0]))
 }
 
 // oracleKeys is the expected key restriction: granting keys narrowed by each capping level, then the
@@ -2581,9 +2571,8 @@ func TestAccessLevelsMatrix(t *testing.T) {
 			callerAllows, want := c.oracle()
 			indexes, levels := c.present()
 
-			// Every capped dimension answers to the same rule; agents answer to the granting level.
+			// Every capped dimension answers to the same rule.
 			assert.Equal(t, want, access.IsModelAllowed("openai", "gpt-4o"), "model")
-			assert.Equal(t, c.oracleAgent(), access.IsAgentAllowed("agent-a"), "agent")
 			assert.Equal(t, want, access.IsRelayAllowed("relay-a"), "relay")
 			assert.Equal(t, want, access.IsMCPToolAllowed("github-read_file"), "tool")
 			assert.Equal(t, want, slices.Contains(access.MCPToolIncludeList(), "github-read_file"), "tool include list")

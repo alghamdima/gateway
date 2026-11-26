@@ -965,7 +965,6 @@ func (p *OtelPlugin) Inject(ctx context.Context, trace *schemas.Trace) error {
 			if t.metricsExporter != nil {
 				p.recordMetricsFromTrace(ctx, t.metricsExporter, trace, t.overheadBreakdownEnabled)
 				p.recordMCPMetricsFromTrace(ctx, t.metricsExporter, trace)
-				p.recordA2AMetricsFromTrace(ctx, t.metricsExporter, trace)
 				p.recordRelayMetricsFromTrace(ctx, t.metricsExporter, trace)
 			}
 			if t.client == nil || t.breakerOpen() {
@@ -1325,63 +1324,6 @@ func (p *OtelPlugin) recordMCPMetricsFromTrace(ctx context.Context, exporter *Me
 	}
 }
 
-// buildA2ASpanAttrs builds the duration-metric dimensions for one Agent
-// operation span. Every sample carries the Bifrost operation name; JSON-RPC
-// operations additionally carry their strict-v1 method name.
-func buildA2ASpanAttrs(span *schemas.Span) []attribute.KeyValue {
-	attrs := span.Attributes
-	out := []attribute.KeyValue{
-		attribute.String(schemas.AttrBifrostA2AOperationName, schemas.GetStringAttr(attrs, schemas.AttrBifrostA2AOperationName)),
-	}
-	if method := schemas.GetStringAttr(attrs, schemas.AttrA2AMethodName); method != "" {
-		out = append(out, attribute.String(schemas.AttrA2AMethodName, method))
-	}
-	if transport := schemas.GetStringAttr(attrs, schemas.AttrBifrostA2AUpstreamTransport); transport != "" {
-		out = append(out, attribute.String(schemas.AttrBifrostA2AUpstreamTransport, transport))
-	}
-	// Governance identity: bifrost.* span attrs → flat metric label names.
-	for spanKey, labelKey := range mcpGovernanceLabelMap {
-		if v := schemas.GetStringAttr(attrs, spanKey); v != "" {
-			out = append(out, attribute.String(labelKey, v))
-		}
-	}
-	return out
-}
-
-// recordA2AMetricsFromTrace records the duration metric once per A2A op span.
-// Called from Inject alongside recordMCPMetricsFromTrace.
-func (p *OtelPlugin) recordA2AMetricsFromTrace(ctx context.Context, exporter *MetricsExporter, trace *schemas.Trace) {
-	if trace == nil || exporter == nil {
-		return
-	}
-	for _, span := range trace.Spans {
-		if span == nil || span.Kind != schemas.SpanKindA2AOperation {
-			continue
-		}
-		// Skip un-enriched spans so we never emit an empty operation dimension.
-		if schemas.GetStringAttr(span.Attributes, schemas.AttrBifrostA2AOperationName) == "" {
-			continue
-		}
-		a2aAttrs := buildA2ASpanAttrs(span)
-		if span.Status == schemas.SpanStatusError {
-			errorType := schemas.GetStringAttr(span.Attributes, schemas.AttrErrorTypeSpec)
-			if errorType == "" {
-				errorType = "_OTHER"
-			}
-			a2aAttrs = append(a2aAttrs, attribute.String(schemas.AttrErrorTypeSpec, errorType))
-		}
-		// Prefer the gateway-measured wire latency over span wall-time (which
-		// covers the PostHooks). Fall back to wall-time when it's absent.
-		var durationSeconds float64
-		if opMs := schemas.GetIntAttr(span.Attributes, schemas.AttrBifrostA2AOperationDurationMs); opMs > 0 {
-			durationSeconds = float64(opMs) / 1000.0
-		} else if !span.StartTime.IsZero() && !span.EndTime.IsZero() {
-			durationSeconds = span.EndTime.Sub(span.StartTime).Seconds()
-		}
-		exporter.RecordA2AOperationDuration(ctx, durationSeconds, a2aAttrs...)
-	}
-}
-
 // buildRelaySpanAttrs builds the metric dimensions of one relay span: the relay, the HTTP
 // method and matched route, the status code, and the governance identity. The path itself is
 // not a dimension, since an unmatched path is caller input of unbounded cardinality.
@@ -1406,7 +1348,7 @@ func buildRelaySpanAttrs(span *schemas.Span) []attribute.KeyValue {
 }
 
 // recordRelayMetricsFromTrace records the duration and cost metrics once per relay span.
-// Called from Inject alongside recordMCPMetricsFromTrace and recordA2AMetricsFromTrace.
+// Called from Inject alongside recordMCPMetricsFromTrace.
 func (p *OtelPlugin) recordRelayMetricsFromTrace(ctx context.Context, exporter *MetricsExporter, trace *schemas.Trace) {
 	if trace == nil || exporter == nil {
 		return

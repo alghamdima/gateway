@@ -68,7 +68,7 @@ func (p *LoggerPlugin) PreRelayHook(ctx *schemas.BifrostContext, req *schemas.Bi
 	}
 	pending := &pendingRelayLog{}
 	entry := &pending.entry
-	// The row id is generated, as for Agent logs: the request id can come from the caller's
+	// The row id is generated: the request id can come from the caller's
 	// x-request-id, so two calls may share it. It is kept for correlation only.
 	*entry = logstore.RelayLog{
 		ID:        uuid.New().String(),
@@ -242,7 +242,7 @@ func (p *LoggerPlugin) PostRelayHook(ctx *schemas.BifrostContext, resp *schemas.
 		}
 	}
 	// As on LLM rows: the flag says the row carries no content, whatever the reason. Content
-	// retained as hidden keeps its bodies for the hybrid store to offload, as on A2A rows; the
+	// retained as hidden keeps its bodies for the hybrid store to offload; the
 	// database row then holds none and reads never hydrate them. Query values are caller content too.
 	entry.ContentHidden = !policy.visible()
 	// Metadata and the matched headers stay when content logging is off, as on LLM and MCP rows:
@@ -450,7 +450,7 @@ func (p *LoggerPlugin) persistEvictedRelayPartial(key any, pending *pendingRelay
 }
 
 // storeOrEnqueueRelayEntry parks the row for Inject() to backfill upstream, overhead and the
-// breakdown from the completed trace, as storeOrEnqueueAgentEntry does for A2A rows. A row with
+// breakdown from the completed trace. A row with
 // no trace, or whose trace has already ended, is written as it is.
 func (p *LoggerPlugin) storeOrEnqueueRelayEntry(ctx *schemas.BifrostContext, item relayInjectEntry) {
 	traceID, _ := ctx.Value(schemas.BifrostContextKeyTraceID).(string)
@@ -496,7 +496,7 @@ func (p *LoggerPlugin) writeRelayEntryUntraced(ctx *schemas.BifrostContext, item
 }
 
 // injectRelayEntries drains the Relay rows parked for a completed trace and backfills upstream,
-// overhead and the per-span breakdown from the root span, mirroring injectAgentEntries. A trace
+// overhead and the per-span breakdown from the root span. A trace
 // carries one relay call, so every parked row takes the request-level figures.
 func (p *LoggerPlugin) injectRelayEntries(trace *schemas.Trace, joinKey string) {
 	val, ok := p.pendingRelayLogsToInject.LoadAndDelete(joinKey)

@@ -117,9 +117,6 @@ type Permit interface {
 	// MCPPermits is every MCP client the permit allows tools of.
 	MCPPermits() []MCPPermit
 
-	// AgentPermits is every Agent Gateway registration the permit allows.
-	AgentPermits() []string
-
 	// RelayPermits is every relay the permit allows by name.
 	RelayPermits() []string
 
@@ -181,9 +178,6 @@ type Access interface {
 	// to the tools actually granted is MCPToolIncludeList's job.
 	IsMCPToolAllowed(toolPattern string) bool
 
-	// IsAgentAllowed reports whether the request may call the named Agent Gateway registration.
-	IsAgentAllowed(agentName string) bool
-
 	// IsRelayAllowed reports whether the request may call the named relay.
 	IsRelayAllowed(endpointName string) bool
 
@@ -231,8 +225,6 @@ type Access interface {
 	// DeniedPermitsForModel returns the permits that refused model on provider, so the refusal can name them.
 	// An empty model asks about the provider alone. Nil when the request is allowed.
 	DeniedPermitsForModel(provider string, model string) []Permit
-	// DeniedPermitsForAgent is DeniedPermitsForModel for an Agent Gateway registration.
-	DeniedPermitsForAgent(agentName string) []Permit
 	// DeniedPermitsForRelay is DeniedPermitsForModel for a relay.
 	DeniedPermitsForRelay(endpointName string) []Permit
 	// DeniedPermitsForMCPTool is DeniedPermitsForModel for an MCP tool pattern.

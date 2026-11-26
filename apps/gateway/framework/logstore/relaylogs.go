@@ -735,7 +735,7 @@ func (s *RDBLogStore) GetRelayFilterData(ctx context.Context, dimensions []strin
 		q := s.ScopedDB(ctx).Model(&RelayLog{})
 		var src dimensionReadSource
 		// Teams, customers and business units fan out over the JSON-array columns, so a call
-		// settled under several of them lists every one, as the Agent Logs choices do.
+		// settled under several of them lists every one.
 		if from, ok := relayDimensionFanoutFrom(s.db.Dialector.Name(), idColumn); ok {
 			q = s.ScopedDB(ctx).Table("?", gorm.Expr(from))
 			q.Statement.Table = "logs"

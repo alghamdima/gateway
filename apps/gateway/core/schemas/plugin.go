@@ -33,7 +33,6 @@ type PluginType string
 const (
 	PluginTypeLLM  PluginType = "llm"
 	PluginTypeMCP  PluginType = "mcp"
-	PluginTypeA2A  PluginType = "a2a"
 	PluginTypeHTTP PluginType = "http"
 
 	PluginTypeRelay PluginType = "relay"
@@ -442,24 +441,8 @@ type MCPPlugin interface {
 	PostMCPHook(ctx *BifrostContext, resp *BifrostMCPResponse, bifrostErr *BifrostError) (*BifrostMCPResponse, *BifrostError, error)
 }
 
-// A2APlugin is the typed hook surface for Agent Gateway (A2A) traffic. It
-// mirrors MCPPlugin exactly: PreA2AHook runs in registration order and may
-// mutate the envelope or short-circuit it, PostA2AHook runs in reverse order for
-// the plugins whose pre-hook ran, and a returned Go error is non-blocking (it is
-// logged and execution continues).
-//
-// The Agent Gateway is where agent authorization is decided: PreA2AHook is the
-// phase in which a plugin (governance) denies an ungranted (virtual key, agent)
-// pair by returning a short-circuit Error, before any upstream effect.
-type A2APlugin interface {
-	BasePlugin
-
-	PreA2AHook(ctx *BifrostContext, req *BifrostA2ARequest) (*BifrostA2ARequest, *A2APluginShortCircuit, error)
-	PostA2AHook(ctx *BifrostContext, resp *BifrostA2AResponse, bifrostErr *BifrostError) (*BifrostA2AResponse, *BifrostError, error)
-}
-
 // RelayPlugin is the internal hook surface for Relays traffic
-// (/passthrough/{endpoint}/{path}); it is not a plugin users configure. It mirrors A2APlugin:
+// (/passthrough/{endpoint}/{path}); it is not a plugin users configure. It mirrors MCPPlugin:
 // PreRelayHook runs in registration order and may mutate the envelope or short-circuit
 // it (governance denies an ungranted endpoint or an exhausted budget here, before any upstream
 // effect), PostRelayHook runs in reverse order for the plugins whose pre-hook ran, and

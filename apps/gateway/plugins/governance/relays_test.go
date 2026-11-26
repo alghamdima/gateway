@@ -8,12 +8,29 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
+	"github.com/maximhq/bifrost/framework/grant"
 	"github.com/maximhq/bifrost/framework/jobaccounting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const pteTestVKValue = "sk-bf-pte"
+
+// relayVKCtx is a request context whose identity is the virtual key with this value.
+func relayVKCtx(value string) *schemas.BifrostContext {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetGrant(grant.New())
+	ctx.SetValue(schemas.BifrostContextKeyVirtualKey, value)
+	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, value), nil, nil, nil, nil, nil, nil))
+	return ctx
+}
+
+// anonymousRelayCtx is a request context that presented no credential.
+func anonymousRelayCtx() *schemas.BifrostContext {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetGrant(grant.New())
+	return ctx
+}
 
 // newPluginForEndpoints builds a governance plugin holding one virtual key with a budget and a rate
 // limit, granted the named endpoints.
@@ -71,7 +88,7 @@ func TestRelayCallsAnswerToMigratedKeyLimitsOnly(t *testing.T) {
 	providerOnly.Scope = configstoreTables.ModelConfigScopeVirtualKey
 	providerOnly.ScopeID = schemas.Ptr("vk-pte")
 	p, store := newPluginForEndpointsWith(t, []configstoreTables.TableModelConfig{*migrated, *providerOnly}, "tavily")
-	ctx := a2aVKCtx(pteTestVKValue)
+	ctx := relayVKCtx(pteTestVKValue)
 	ctx.SetValue(schemas.BifrostContextKeyRequestID, "req-pte-mc")
 	_, short, err := p.PreRelayHook(ctx, endpointReq("tavily"))
 	require.NoError(t, err)
@@ -96,7 +113,7 @@ func BenchmarkRelayHooks(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := a2aVKCtx(pteTestVKValue)
+		ctx := relayVKCtx(pteTestVKValue)
 		ctx.SetValue(schemas.BifrostContextKeyRequestID, "bench")
 		if _, short, err := p.PreRelayHook(ctx, req); err != nil || short != nil {
 			b.Fatalf("pre-hook: %v %v", err, short)
@@ -116,11 +133,11 @@ func endpointReq(name string) *schemas.BifrostRelayRequest {
 func TestPreRelayHookGrants(t *testing.T) {
 	p, _ := newPluginForEndpoints(t, "tavily")
 
-	_, short, err := p.PreRelayHook(a2aVKCtx(pteTestVKValue), endpointReq("tavily"))
+	_, short, err := p.PreRelayHook(relayVKCtx(pteTestVKValue), endpointReq("tavily"))
 	require.NoError(t, err)
 	assert.Nil(t, short, "a granted endpoint is allowed")
 
-	ctx := a2aVKCtx(pteTestVKValue)
+	ctx := relayVKCtx(pteTestVKValue)
 	_, short, err = p.PreRelayHook(ctx, endpointReq("textract"))
 	require.NoError(t, err)
 	require.NotNil(t, short)
@@ -131,18 +148,18 @@ func TestPreRelayHookGrants(t *testing.T) {
 	assert.Equal(t, true, ctx.Value(governanceRejectedContextKey))
 
 	none, _ := newPluginForEndpoints(t)
-	_, short, err = none.PreRelayHook(a2aVKCtx(pteTestVKValue), endpointReq("tavily"))
+	_, short, err = none.PreRelayHook(relayVKCtx(pteTestVKValue), endpointReq("tavily"))
 	require.NoError(t, err)
 	require.NotNil(t, short, "a key with no endpoint grant is denied by default")
 
-	_, short, err = none.PreRelayHook(anonymousA2ACtx(), endpointReq("tavily"))
+	_, short, err = none.PreRelayHook(anonymousRelayCtx(), endpointReq("tavily"))
 	require.NoError(t, err)
 	assert.Nil(t, short, "a request with no credential and no mandatory key is unrestricted, as for MCP tools")
 }
 
 func TestPostRelayHookChargesOverallLimits(t *testing.T) {
 	p, store := newPluginForEndpoints(t, "tavily")
-	ctx := a2aVKCtx(pteTestVKValue)
+	ctx := relayVKCtx(pteTestVKValue)
 	ctx.SetValue(schemas.BifrostContextKeyRequestID, "req-pte-1")
 	_, short, err := p.PreRelayHook(ctx, endpointReq("tavily"))
 	require.NoError(t, err)
@@ -154,7 +171,7 @@ func TestPostRelayHookChargesOverallLimits(t *testing.T) {
 
 	// An uncounted call (no usage: a route that is not billable) charges nothing, but it is one
 	// request against the rate limits, as a free MCP tool execution is.
-	ctx2 := a2aVKCtx(pteTestVKValue)
+	ctx2 := relayVKCtx(pteTestVKValue)
 	ctx2.SetValue(schemas.BifrostContextKeyRequestID, "req-pte-2")
 	_, _, err = p.PreRelayHook(ctx2, endpointReq("tavily"))
 	require.NoError(t, err)
@@ -173,7 +190,7 @@ func TestPostRelayHookChargesOverallLimits(t *testing.T) {
 	assert.Equal(t, []string{"pte-rl"}, limitIDsOf(ctx2.Grant().Limits().RateLimits()), "an uncounted call still answers to the rate limits settled on its grant")
 
 	// A stream the caller hung up on still answered, so it counts and is charged.
-	ctxCancel := a2aVKCtx(pteTestVKValue)
+	ctxCancel := relayVKCtx(pteTestVKValue)
 	ctxCancel.SetValue(schemas.BifrostContextKeyRequestID, "req-pte-cancel")
 	_, _, err = p.PreRelayHook(ctxCancel, endpointReq("tavily"))
 	require.NoError(t, err)
@@ -185,7 +202,7 @@ func TestPostRelayHookChargesOverallLimits(t *testing.T) {
 	}, 2*time.Second, 20*time.Millisecond, "an abandoned stream still counts one request")
 
 	// A call that never got a reply (the upstream failed) is not a request the caller made.
-	ctx3 := a2aVKCtx(pteTestVKValue)
+	ctx3 := relayVKCtx(pteTestVKValue)
 	ctx3.SetValue(schemas.BifrostContextKeyRequestID, "req-pte-3")
 	_, _, err = p.PreRelayHook(ctx3, endpointReq("tavily"))
 	require.NoError(t, err)

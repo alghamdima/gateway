@@ -354,7 +354,7 @@ func (c *RelayConfig) MergeRedacted(stored *RelayConfig) {
 		return
 	}
 	// Only a display placeholder keeps the stored value; an env. or vault reference is a real
-	// change (IsRedacted treats every reference as redacted), as the Agent Gateway does.
+	// change (IsRedacted treats every reference as redacted).
 	keep := func(in, old *SecretVar) *SecretVar {
 		if in.IsMaskedPlaceholder() && old != nil {
 			return old

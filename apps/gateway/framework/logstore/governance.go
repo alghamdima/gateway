@@ -8,11 +8,11 @@ import (
 )
 
 // governanceSnapshotTarget describes the persisted request-time attribution shared
-// by MCP and A2A logs.
+// by MCP and relay logs.
 type governanceSnapshotTarget struct {
 	virtualKeyID, virtualKeyName       **string
 	userID, userName                   **string
-	userEmail                          **string // nil for tables without a user_email column
+	userEmail                          **string
 	teamID, teamName                   **string
 	customerID, customerName           **string
 	businessUnitID, businessUnitName   **string
@@ -52,37 +52,17 @@ func (l *MCPToolLog) ApplyGovernanceContext(ctx *schemas.BifrostContext) {
 	})
 }
 
-func (l *AgentLog) ApplyGovernanceContext(ctx *schemas.BifrostContext) {
-	if l == nil {
-		return
-	}
-	applyGovernanceContext(ctx, governanceSnapshotTarget{
-		virtualKeyID: &l.VirtualKeyID, virtualKeyName: &l.VirtualKeyName,
-		userID: &l.UserID, userName: &l.UserName,
-		teamID: &l.TeamID, teamName: &l.TeamName,
-		customerID: &l.CustomerID, customerName: &l.CustomerName,
-		businessUnitID: &l.BusinessUnitID, businessUnitName: &l.BusinessUnitName,
-		projectID: &l.ProjectID, projectName: &l.ProjectName,
-		teamIDs: &l.TeamIDsParsed, teamNames: &l.TeamNamesParsed,
-		customerIDs: &l.CustomerIDsParsed, customerNames: &l.CustomerNamesParsed,
-		businessUnitIDs: &l.BusinessUnitIDsParsed, businessUnitNames: &l.BusinessUnitNamesParsed,
-		budgetIDs: &l.BudgetIDsParsed, rateLimitIDs: &l.RateLimitIDsParsed,
-	})
-}
-
 func applyGovernanceContext(ctx *schemas.BifrostContext, target governanceSnapshotTarget) {
 	if ctx == nil {
 		return
 	}
 	// Runs before the dimension loop overwrites userID: the email belongs to the user id it was read with.
-	if target.userEmail != nil {
-		if id := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID); id != "" {
-			if *target.userID == nil || **target.userID != id {
-				*target.userEmail = nil
-			}
-			if email := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserEmail); email != "" && (*target.userEmail == nil || **target.userEmail == "") {
-				*target.userEmail = &email
-			}
+	if id := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID); id != "" {
+		if *target.userID == nil || **target.userID != id {
+			*target.userEmail = nil
+		}
+		if email := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserEmail); email != "" && (*target.userEmail == nil || **target.userEmail == "") {
+			*target.userEmail = &email
 		}
 	}
 	for _, dimension := range []struct {

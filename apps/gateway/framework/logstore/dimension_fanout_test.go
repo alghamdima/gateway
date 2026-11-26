@@ -32,10 +32,6 @@ func TestDimensionFanoutFrom_PerDialect(t *testing.T) {
 		pgGot, ok := dimensionFanoutFrom("postgres", idCol)
 		require.True(t, ok)
 		assert.Equal(t, pgWant, pgGot, "postgres text is pinned by the filter matview DDL for %s", idCol)
-
-		agentGot, ok := agentDimensionFanoutFrom("postgres", idCol)
-		require.True(t, ok)
-		assert.Equal(t, strings.ReplaceAll(pgWant, "FROM logs", "FROM agent_logs"), agentGot)
 	}
 
 	// Every fan-out dimension must be wired on every dialect: a column-mapping

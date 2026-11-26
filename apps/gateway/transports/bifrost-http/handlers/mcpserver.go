@@ -1124,8 +1124,8 @@ func (h *MCPServerHandler) authenticate(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 // The prefix gate (governance.VirtualKeyPrefix) on the latter four lets real
 // provider credentials pass through untouched, so only Bifrost virtual keys are
 // picked up here. This is a projection of the shared resolver
-// (lib.ResolveVirtualKeyFromHeaders), which is what keeps MCP, inference and the
-// Agent Gateway at parity. Returns "" when no header carries a virtual key.
+// (lib.ResolveVirtualKeyFromHeaders), which is what keeps MCP and inference
+// at parity. Returns "" when no header carries a virtual key.
 func getVKFromRequest(ctx *fasthttp.RequestCtx) string {
 	vk, _ := lib.ResolveVirtualKeyFromHeaders(ctx)
 	return vk

@@ -18,7 +18,7 @@ import (
 // wires it to the core plugin pipeline (so governance and logging see every call) and to the global
 // proxy, and builds the management handler. Without a config store there is nothing to serve.
 // relayManager owns relay writes; nil uses this server, and a deployment that wraps them (cluster
-// broadcast) passes its own, as for the Agent Gateway. vkReloader reloads the keys a relay delete
+// broadcast) passes its own. vkReloader reloads the keys a relay delete
 // touches; nil uses this server.
 func (s *BifrostHTTPServer) InitializeRelays(ctx context.Context, relayManager handlers.RelayManager, vkReloader handlers.VirtualKeyReloader) {
 	if s.relays != nil || s.Config == nil || s.Config.ConfigStore == nil {

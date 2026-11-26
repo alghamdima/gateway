@@ -216,7 +216,6 @@ type PrometheusPlugin struct {
 	ActiveRequests                 *prometheus.GaugeVec
 	ProviderKeyUp                  *prometheus.GaugeVec
 	MCPToolDuration                *prometheus.HistogramVec
-	A2AOperationDuration           *prometheus.HistogramVec
 	RelayOperationDuration         *prometheus.HistogramVec
 	RelayUpstreamDuration          *prometheus.HistogramVec
 	RelayOverheadLatency           *prometheus.HistogramVec
@@ -746,12 +745,6 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 		append(defaultMCPLabels, filteredCustomLabels...),
 	)
 
-	a2aDuration := factory.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "bifrost_a2a_client_operation_duration_seconds",
-		Help:    "Duration of an A2A operation as observed by Bifrost.",
-		Buckets: mcpOperationDurationBuckets,
-	}, a2aMetricLabelNames)
-
 	// Relay calls are plain HTTP round trips; _count gives volume and error_type the error rate.
 	// They carry the custom labels (x-bf-dim-* dimensions) as the LLM metrics do, except one that
 	// would repeat a relay label.
@@ -821,7 +814,6 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 		ActiveRequests:                 bifrostActiveRequests,
 		ProviderKeyUp:                  bifrostProviderKeyUp,
 		MCPToolDuration:                bifrostMCPToolDuration,
-		A2AOperationDuration:           a2aDuration,
 		RelayOperationDuration:         relayDuration,
 		RelayUpstreamDuration:          relayUpstreamDuration,
 		RelayOverheadLatency:           relayOverhead,
@@ -1001,7 +993,6 @@ func (p *PrometheusPlugin) Inject(_ context.Context, trace *schemas.Trace) error
 	if trace == nil {
 		return nil
 	}
-	p.recordA2AMetrics(trace)
 	p.recordRelayMetrics(trace)
 	// Always drain the handoff entry so a toggle flip mid-request can't leak it.
 	joinKey := trace.InternalID

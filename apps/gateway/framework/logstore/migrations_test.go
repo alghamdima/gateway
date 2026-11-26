@@ -547,7 +547,7 @@ func TestCorrelationColumnsMigration(t *testing.T) {
 	require.NoError(t, db.Exec("INSERT INTO mcp_tool_logs (id) VALUES (?)", "mcp-existing").Error)
 
 	ctx := context.Background()
-	require.NoError(t, migrationCreateAgentLogsTable(ctx, db, testLogger{}))
+	require.NoError(t, migrationAddCorrelationColumns(ctx, db, testLogger{}))
 	for _, column := range []struct {
 		model any
 		field string
@@ -560,7 +560,7 @@ func TestCorrelationColumnsMigration(t *testing.T) {
 		require.True(t, db.Migrator().HasColumn(column.model, column.field), "missing %s", column.field)
 		require.True(t, db.Migrator().HasIndex(column.model, column.index), "missing %s", column.index)
 	}
-	require.NoError(t, migrationCreateAgentLogsTable(ctx, db, testLogger{}))
+	require.NoError(t, migrationAddCorrelationColumns(ctx, db, testLogger{}))
 
 	var logCount, mcpCount int64
 	require.NoError(t, db.Table("logs").Where("id = ?", "log-existing").Count(&logCount).Error)
@@ -569,62 +569,39 @@ func TestCorrelationColumnsMigration(t *testing.T) {
 	assert.Equal(t, int64(1), mcpCount)
 }
 
-func TestAgentLogsMigrationRollbackGuardsRecordedHistory(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	ctx := context.Background()
-
-	require.NoError(t, db.Exec("CREATE TABLE logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, migrationCreateAgentLogsTable(ctx, db, testLogger{}))
-	require.NoError(t, rollbackAgentLogsMigration(db, testLogger{}))
-	assert.False(t, db.Migrator().HasTable(&AgentLog{}), "empty Agent history is safe to drop")
-
-	require.NoError(t, db.AutoMigrate(&AgentLog{}))
-	require.NoError(t, db.Create(&AgentLog{
-		ID:         "agent-log-1",
-		Timestamp:  time.Now(),
-		RecordKind: "request",
-		Status:     "completed",
-		AgentName:  "test-agent",
-		RequestID:  "request-1",
-	}).Error)
-
-	err = rollbackAgentLogsMigration(db, testLogger{})
-	require.Error(t, err, "rollback must refuse while recorded Agent history exists")
-	assert.Contains(t, err.Error(), "agent_logs_init is non-rollbackable")
-	assert.True(t, db.Migrator().HasTable(&AgentLog{}), "a refused rollback must leave the table intact")
-
-	var surviving int64
-	require.NoError(t, db.Model(&AgentLog{}).Count(&surviving).Error)
-	assert.EqualValues(t, 1, surviving, "the recorded Agent history must survive")
-}
-
-func TestAgentLogsMigrationRollbackGuardsCorrelationData(t *testing.T) {
-	tests := []struct {
-		name   string
-		table  string
-		column string
-	}{
-		{name: "LLM Agent correlation", table: "logs", column: "agent_correlation_id"},
-		{name: "MCP session", table: "mcp_tool_logs", column: "session_id"},
-		{name: "MCP Agent correlation", table: "mcp_tool_logs", column: "agent_correlation_id"},
+// TestCorrelationColumnsMigrationRollbackGuardsRecordedValues: the rollback drops the columns while
+// they are empty and refuses, leaving them in place, once any of them holds a value.
+func TestCorrelationColumnsMigrationRollbackGuardsRecordedValues(t *testing.T) {
+	open := func(t *testing.T) *gorm.DB {
+		db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+		require.NoError(t, err)
+		require.NoError(t, db.Exec("CREATE TABLE logs (id TEXT PRIMARY KEY, session_id TEXT)").Error)
+		require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
+		require.NoError(t, migrationAddCorrelationColumns(context.Background(), db, testLogger{}))
+		return db
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-			require.NoError(t, err)
-			require.NoError(t, db.Exec("CREATE TABLE logs (id TEXT PRIMARY KEY)").Error)
-			require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
-			require.NoError(t, migrationCreateAgentLogsTable(context.Background(), db, testLogger{}))
+	t.Run("empty columns are dropped", func(t *testing.T) {
+		db := open(t)
+		// logs.session_id belongs to another migration: a value there must not block this rollback.
+		require.NoError(t, db.Table("logs").Create(map[string]interface{}{"id": "log-1", "session_id": "session-1"}).Error)
+		require.NoError(t, correlationColumnsMigration(context.Background(), testLogger{}).Rollback(db))
+		assert.False(t, db.Migrator().HasColumn("logs", "agent_correlation_id"))
+		assert.False(t, db.Migrator().HasColumn("mcp_tool_logs", "agent_correlation_id"))
+		assert.False(t, db.Migrator().HasColumn("mcp_tool_logs", "session_id"))
+		assert.True(t, db.Migrator().HasColumn("logs", "session_id"))
+	})
+	for _, tt := range []struct{ table, column string }{
+		{"logs", "agent_correlation_id"},
+		{"mcp_tool_logs", "session_id"},
+		{"mcp_tool_logs", "agent_correlation_id"},
+	} {
+		t.Run(tt.table+"."+tt.column, func(t *testing.T) {
+			db := open(t)
 			require.NoError(t, db.Table(tt.table).Create(map[string]interface{}{"id": "correlated-log", tt.column: "correlation-1"}).Error)
-
-			err = rollbackAgentLogsMigration(db, testLogger{})
+			err := correlationColumnsMigration(context.Background(), testLogger{}).Rollback(db)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "agent_logs_init is non-rollbackable")
-			assert.Contains(t, err.Error(), tt.table+"."+tt.column)
-			assert.True(t, db.Migrator().HasTable(&AgentLog{}), "a refused rollback must leave the Agent log table intact")
-			assert.True(t, db.Migrator().HasColumn(tt.table, tt.column), "a refused rollback must leave the populated correlation column intact")
+			assert.Contains(t, err.Error(), "logs_add_correlation_columns is non-rollbackable")
+			assert.True(t, db.Migrator().HasColumn(tt.table, tt.column), "a refused rollback must leave the populated column intact")
 		})
 	}
 }
@@ -926,22 +903,6 @@ func TestMigrationLockProbeWaitersHonourContext(t *testing.T) {
 	}
 	releaseOnce()
 	assert.True(t, <-first, "the in-flight probe still completes normally")
-}
-
-// TestAgentRawCaptureMigration upgrades existing Agent log tables without replacing rows.
-func TestAgentRawCaptureMigration(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "raw-migration.db")), &gorm.Config{})
-	require.NoError(t, err)
-	require.NoError(t, db.Exec("CREATE TABLE agent_logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("INSERT INTO agent_logs (id) VALUES (?)", "existing").Error)
-	for range 2 {
-		require.NoError(t, migrationAddAgentRawPayloadColumns(context.Background(), db, testLogger{}))
-	}
-	require.True(t, db.Migrator().HasColumn(&AgentLog{}, "RawRequest"))
-	require.True(t, db.Migrator().HasColumn(&AgentLog{}, "RawResponse"))
-	var count int64
-	require.NoError(t, db.Table("agent_logs").Where("id = ?", "existing").Count(&count).Error)
-	require.Equal(t, int64(1), count)
 }
 
 // TestIndexBuildersIgnoreSameNamedIndexInOtherSchema pins that the index
@@ -1340,28 +1301,6 @@ func TestMigrationAddRelayLogLargePayloadResponse(t *testing.T) {
 	var count int64
 	require.NoError(t, db.Table("relay_logs").Count(&count).Error)
 	require.Equal(t, int64(1), count)
-}
-
-func TestCallerCorrelationIDColumnMigration(t *testing.T) {
-	ctx := context.Background()
-	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "caller-correlation-id.db")}, testLogger{})
-	require.NoError(t, err)
-	db := store.db
-	require.True(t, db.Migrator().HasColumn(&AgentLog{}, "caller_correlation_id"), "the migration adds the column")
-	require.True(t, db.Migrator().HasIndex(&AgentLog{}, "idx_agent_logs_caller_correlation_id"), "the migration adds the index")
-	require.NoError(t, callerCorrelationIDColumnMigration(ctx, testLogger{}).Migrate(db), "the migration is idempotent")
-
-	now := time.Now().UTC()
-	caller := "task-parent"
-	require.NoError(t, db.Create(&AgentLog{ID: "agent-1", Timestamp: now, CreatedAt: now, RecordKind: "request", Status: "success", AgentName: "fixture", RequestID: "req-1", CallerCorrelationID: &caller}).Error)
-	err = callerCorrelationIDColumnMigration(ctx, testLogger{}).Rollback(db)
-	require.Error(t, err, "rollback must refuse while caller_correlation_id holds a value")
-	assert.Contains(t, err.Error(), "non-rollbackable")
-	assert.True(t, db.Migrator().HasColumn(&AgentLog{}, "caller_correlation_id"), "caller_correlation_id survives a refused rollback")
-
-	require.NoError(t, db.Model(&AgentLog{}).Where("id = ?", "agent-1").Update("caller_correlation_id", nil).Error)
-	require.NoError(t, callerCorrelationIDColumnMigration(ctx, testLogger{}).Rollback(db), "an empty column rolls back")
-	assert.False(t, db.Migrator().HasColumn(&AgentLog{}, "caller_correlation_id"))
 }
 
 func TestRoundTripIDColumnMigration_NonRollbackable(t *testing.T) {

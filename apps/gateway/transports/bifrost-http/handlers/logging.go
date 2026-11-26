@@ -734,7 +734,6 @@ func (h *LoggingHandler) getLogs(ctx *fasthttp.RequestCtx) {
 	if apps := string(ctx.QueryArgs().Peek("apps")); apps != "" {
 		filters.Apps = parseStringArrayParam(apps)
 	}
-	parseAgentNamesFilter(ctx, filters)
 	if sessionID := strings.TrimSpace(string(ctx.QueryArgs().Peek("session_id"))); sessionID != "" {
 		filters.SessionID = sessionID
 	}
@@ -1056,7 +1055,6 @@ func (h *LoggingHandler) getLogsStats(ctx *fasthttp.RequestCtx) {
 	if apps := string(ctx.QueryArgs().Peek("apps")); apps != "" {
 		filters.Apps = parseStringArrayParam(apps)
 	}
-	parseAgentNamesFilter(ctx, filters)
 	if sessionID := strings.TrimSpace(string(ctx.QueryArgs().Peek("session_id"))); sessionID != "" {
 		filters.SessionID = sessionID
 	}
@@ -1251,10 +1249,6 @@ func parseBucketSizeOverride(raw string, start, end *time.Time) (int64, error) {
 	return size, nil
 }
 
-func parseAgentNamesFilter(ctx *fasthttp.RequestCtx, filters *logstore.SearchFilters) {
-	filters.AgentNames = parseCommaSeparated(string(ctx.QueryArgs().Peek("agent_names")))
-}
-
 func parseAgentCorrelationIDFilter(ctx *fasthttp.RequestCtx, filters *logstore.SearchFilters) {
 	filters.AgentCorrelationID = strings.TrimSpace(string(ctx.QueryArgs().Peek("agent_correlation_id")))
 }
@@ -1350,7 +1344,6 @@ func parseHistogramFilters(ctx *fasthttp.RequestCtx) *logstore.SearchFilters {
 	if apps := string(ctx.QueryArgs().Peek("apps")); apps != "" {
 		filters.Apps = parseStringArrayParam(apps)
 	}
-	parseAgentNamesFilter(ctx, filters)
 	if sessionID := strings.TrimSpace(string(ctx.QueryArgs().Peek("session_id"))); sessionID != "" {
 		filters.SessionID = sessionID
 	}
@@ -2964,7 +2957,6 @@ type recalculateCostFilters struct {
 }
 
 func parseMCPCorrelationFilters(ctx *fasthttp.RequestCtx, filters *logstore.MCPToolLogSearchFilters) {
-	filters.AgentNames = parseCommaSeparated(string(ctx.QueryArgs().Peek("agent_names")))
 	filters.SessionID = strings.TrimSpace(string(ctx.QueryArgs().Peek("session_id")))
 	filters.AgentCorrelationID = strings.TrimSpace(string(ctx.QueryArgs().Peek("agent_correlation_id")))
 	filters.RoundTripID = strings.TrimSpace(string(ctx.QueryArgs().Peek("round_trip_id")))

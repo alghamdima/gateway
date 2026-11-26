@@ -33,9 +33,6 @@ const (
 	// there was nothing to evaluate it against. It is a wiring fault rather than a policy
 	// decision: evaluation is reached only after access has been resolved for the request.
 	DecisionAccessUnresolved Decision = "access_unresolved"
-	// DecisionAgentBlocked reports that the settled grant has no Agent Gateway permit
-	// for the requested agent. It is the A2A analogue of DecisionMCPToolBlocked.
-	DecisionAgentBlocked Decision = "agent_blocked"
 	// DecisionRelayBlocked refuses a relay the caller holds no grant for.
 	DecisionRelayBlocked Decision = "relay_blocked"
 )

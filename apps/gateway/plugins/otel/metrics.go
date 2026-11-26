@@ -68,12 +68,10 @@ type MetricsExporter struct {
 	// the error rate, so no separate MCP counters are needed.
 	mcpClientOperationDuration *syncFloat64Histogram
 
-	// A2A (Agent Gateway) metrics
-	a2aClientOperationDuration *syncFloat64Histogram
-	relayOperationDuration     *syncFloat64Histogram
-	relayUpstreamDuration      *syncFloat64Histogram
-	relayOverheadLatency       *syncFloat64Histogram
-	relayCostTotal             *syncFloat64Counter
+	relayOperationDuration *syncFloat64Histogram
+	relayUpstreamDuration  *syncFloat64Histogram
+	relayOverheadLatency   *syncFloat64Histogram
+	relayCostTotal         *syncFloat64Counter
 
 	// HTTP metrics
 	httpRequestsTotal     *syncInt64Counter
@@ -470,15 +468,6 @@ func (m *MetricsExporter) initMetrics() {
 		boundaries: mcpOperationDurationBuckets,
 	}
 
-	// Mirrors mcp.client.operation.duration; there is no A2A semconv metric yet.
-	m.a2aClientOperationDuration = &syncFloat64Histogram{
-		name:       "a2a.client.operation.duration",
-		desc:       "Duration of an A2A operation as observed by the gateway (Bifrost) from send until the response is received",
-		unit:       "s",
-		meter:      m.meter,
-		boundaries: mcpOperationDurationBuckets,
-	}
-
 	// Relay calls use the LLM latency buckets, as a passthrough call's metrics do, so a long stream
 	// is not folded into a 300s top bucket.
 	m.relayOperationDuration = &syncFloat64Histogram{
@@ -646,11 +635,6 @@ func (m *MetricsExporter) RecordRequestRetries(ctx context.Context, retries floa
 // RecordMCPOperationDuration records the mcp.client.operation.duration metric for one op.
 func (m *MetricsExporter) RecordMCPOperationDuration(ctx context.Context, durationSeconds float64, attrs ...attribute.KeyValue) {
 	m.mcpClientOperationDuration.Record(ctx, durationSeconds, metric.WithAttributes(attrs...))
-}
-
-// RecordA2AOperationDuration records the duration of one A2A (Agent Gateway) operation
-func (m *MetricsExporter) RecordA2AOperationDuration(ctx context.Context, durationSeconds float64, attrs ...attribute.KeyValue) {
-	m.a2aClientOperationDuration.Record(ctx, durationSeconds, metric.WithAttributes(attrs...))
 }
 
 // RecordRelayOperationDuration records the duration of one relay call.

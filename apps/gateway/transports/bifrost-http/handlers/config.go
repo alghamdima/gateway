@@ -221,12 +221,6 @@ func (h *ConfigHandler) getConfig(ctx *fasthttp.RequestCtx) {
 		mapConfig["env_label"] = h.store.EnvLabel
 	}
 	mapConfig["disable_onboarding"] = h.store.DisableOnboarding
-	if h.store.ServerConfig != nil && h.store.ServerConfig.A2AGRPCBaseDomain != "" && h.store.ServerConfig.A2AGRPCPort > 0 {
-		mapConfig["agent_gateway"] = map[string]any{
-			"grpc_base_domain": h.store.ServerConfig.A2AGRPCBaseDomain,
-			"grpc_port":        h.store.ServerConfig.A2AGRPCPort,
-		}
-	}
 	mapConfig["is_git_available"] = CheckGitAvailability()
 	mapConfig["skills_marketplace_base_url"] = h.store.GetSkillsExternalClientURL()
 	mapConfig["is_cache_connected"] = h.store.VectorStore != nil
@@ -377,10 +371,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("skills_external_client_url %v", err))
 		return
 	}
-	if err := configstore.ValidatePublicBaseURL(payload.ClientConfig.A2AExternalClientURL.GetValue()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("a2a_external_client_url %v", err))
-		return
-	}
 	if err := configstore.ValidatePublicBaseURL(payload.ClientConfig.BifrostURL.GetValue()); err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("bifrost_url %v", err))
 		return
@@ -506,7 +496,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// Snapshot the live config under the same lock used by reloads and runtime readers.
 	h.store.Mu.RLock()
 	currentSnapshot := *h.store.ClientConfig
-	currentSnapshot.A2APrivateAllowlist = slices.Clone(currentSnapshot.A2APrivateAllowlist)
 	h.store.Mu.RUnlock()
 	currentConfig := &currentSnapshot
 	// Build the update on an independent copy: the live config must not
@@ -744,19 +733,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		}
 	}
 
-	_, a2aAllowlistSent := clientConfigFields["a2a_private_allowlist"]
-	a2aAllowlistChanged := a2aAllowlistSent && !slices.Equal(payload.ClientConfig.A2APrivateAllowlist, currentConfig.A2APrivateAllowlist)
-	if a2aAllowlistChanged {
-		if isAuthBypassed(ctx) {
-			SendError(ctx, fasthttp.StatusForbidden, "changing a2a_private_allowlist requires an authenticated admin session; enable dashboard authentication first")
-			return
-		}
-		if _, err := network.ValidatePrivateTargetAllowlist(payload.ClientConfig.A2APrivateAllowlist); err != nil {
-			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("a2a_private_allowlist: %v", err))
-			return
-		}
-	}
-
 	// Omitted keeps the stored tokenizer families. Validated here, before any live
 	// mutation below, so a rejected name never leaves the runtime changed.
 	_, tokenizersSent := clientConfigFields["usage_estimation_tokenizers"]
@@ -855,9 +831,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	updatedConfig.MCPEnableTempTokenAuth = payload.ClientConfig.MCPEnableTempTokenAuth
 	if allowlistChanged {
 		updatedConfig.MCPOAuthPrivateAllowlist = payload.ClientConfig.MCPOAuthPrivateAllowlist
-	}
-	if a2aAllowlistChanged {
-		updatedConfig.A2APrivateAllowlist = slices.Clone(payload.ClientConfig.A2APrivateAllowlist)
 	}
 
 	if !slices.Equal(payload.ClientConfig.PrometheusLabels, currentConfig.PrometheusLabels) {
@@ -1019,19 +992,13 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// Validation is performed up front in this handler so a failure here cannot leave the process in a partial state.
 	updatedConfig.MCPExternalClientURL = payload.ClientConfig.MCPExternalClientURL
 
-	// Preserve the stored Agent Gateway URL when an older or partial client omits
+	// Preserve the stored URLs when an older or partial client omits
 	// the field. An explicit null still clears the override.
-	if _, present := clientConfigFields["a2a_store_raw_request_response"]; present {
-		updatedConfig.A2AStoreRawRequestResponse = payload.ClientConfig.A2AStoreRawRequestResponse
-	}
 	if _, present := clientConfigFields["mcp_client_metadata_url"]; present {
 		updatedConfig.MCPClientMetadataURL = payload.ClientConfig.MCPClientMetadataURL
 	}
 	if _, present := clientConfigFields["skills_external_client_url"]; present {
 		updatedConfig.SkillsExternalClientURL = payload.ClientConfig.SkillsExternalClientURL
-	}
-	if _, present := clientConfigFields["a2a_external_client_url"]; present {
-		updatedConfig.A2AExternalClientURL = payload.ClientConfig.A2AExternalClientURL
 	}
 	// Copied only when sent, so a partial save keeps them; an empty value or null resets
 	// each to its default. The reload that follows the save rebuilds /v1/mcp.

@@ -15,6 +15,7 @@ import (
 	"github.com/maximhq/bifrost/core/relay"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
+	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/transports/v2/bifrost-http/lib"
 	"github.com/valyala/fasthttp"
@@ -22,14 +23,13 @@ import (
 
 // RelaysHandler serves the Relays management API, the usage preview and the Relay Logs API. Every
 // write goes through the relay manager, which stores the row first (so the vault and encryption
-// hooks see the credential) and then updates the runtime, the way the Agent Gateway handler
-// delegates registration writes to its manager.
+// hooks see the credential) and then updates the runtime.
 type RelaysHandler struct {
 	manager      *relay.Manager
 	relayManager RelayManager
 	config       *lib.Config
 	// vkReloader refreshes the governance in-memory copy of every virtual key a relay delete
-	// took a grant from, as the Agent Gateway handler does for agent grants. Optional.
+	// took a grant from. Optional.
 	vkReloader VirtualKeyReloader
 	// redactedKeys resolves the virtual keys the filter data names, so a deleted key is dropped or
 	// labelled as the LLM logs filter data does; nil leaves the stored names as they are.
@@ -46,7 +46,7 @@ func (h *RelaysHandler) SetRedactedKeysManager(manager RedactedKeysManager) {
 
 // RelayManager owns relay mutations and the local runtime updates they require. Deployments may
 // wrap these with additional coordination (a cluster broadcast) without exposing that concern to
-// the HTTP handler, as AgentRegistrationManager does for agents.
+// the HTTP handler.
 type RelayManager interface {
 	CreateRelay(ctx context.Context, cfg *schemas.RelayConfig) (*schemas.RelayConfig, error)
 	UpdateRelay(ctx context.Context, name string, cfg *schemas.RelayConfig) (*schemas.RelayConfig, error)
@@ -264,7 +264,7 @@ func (h *RelaysHandler) delete(ctx *fasthttp.RequestCtx) {
 }
 
 // reloadGrantedVirtualKeys refreshes the in-memory copy of each key whose grant a delete took
-// away, as the Agent Gateway handler does after an agent grant change. A failed reload is
+// away. A failed reload is
 // logged; the key is refreshed on its next reload.
 func (h *RelaysHandler) reloadGrantedVirtualKeys(ctx context.Context, ids []string) {
 	if h.vkReloader == nil {
@@ -504,7 +504,7 @@ func relayAppsParam(args *fasthttp.Args) []string {
 func parseRelayLogFilters(ctx *fasthttp.RequestCtx) (logstore.RelayLogFilters, error) {
 	args := ctx.QueryArgs()
 	value := func(name string) string { return strings.TrimSpace(string(args.Peek(name))) }
-	values := func(name string) []string { return parseAgentHistoryMultiValue(args, name) }
+	values := func(name string) []string { return parseRelayMultiValue(args, name) }
 	f := logstore.RelayLogFilters{
 		EndpointNames: values("relay_names"), Methods: values("methods"), Statuses: values("status"), Kinds: values("kinds"),
 		VirtualKeyIDs: values("virtual_key_ids"), UserIDs: values("user_ids"), TeamIDs: values("team_ids"),
@@ -568,7 +568,7 @@ func (h *RelaysHandler) searchLogs(ctx *fasthttp.RequestCtx) {
 		}
 		pagination.Offset = offset
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	result, err := store.SearchRelayLogs(logCtx, filters, pagination)
 	if err != nil {
@@ -584,7 +584,7 @@ func (h *RelaysHandler) getLog(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	id, _ := ctx.UserValue("id").(string)
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	entry, err := store.FindRelayLog(logCtx, id)
 	if err != nil {
@@ -610,7 +610,7 @@ func (h *RelaysHandler) deleteLogs(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, "ids are required")
 		return
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	if err := store.DeleteRelayLogs(logCtx, req.IDs); err != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, "failed to delete relay logs")
@@ -632,7 +632,7 @@ func (h *RelaysHandler) logStats(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	stats, err := store.GetRelayLogStats(logCtx, filters)
 	if err != nil {
@@ -692,7 +692,7 @@ func (h *RelaysHandler) logHistogram(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	result, err := store.GetRelayHistogram(logCtx, filters, bucket)
 	if err != nil {
@@ -719,7 +719,7 @@ func (h *RelaysHandler) logLatencyHistogram(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
 		return
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	result, err := store.GetRelayLatencyHistogram(logCtx, filters, bucket)
 	if err != nil {
@@ -762,7 +762,7 @@ func (h *RelaysHandler) topEndpoints(ctx *fasthttp.RequestCtx) {
 		}
 		limit = parsed
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	result, err := store.GetRelayTopEndpoints(logCtx, filters, limit)
 	if err != nil {
@@ -781,7 +781,7 @@ func (h *RelaysHandler) logFilterData(ctx *fasthttp.RequestCtx) {
 	if len(dimensions) == 1 && dimensions[0] == "" {
 		dimensions = nil
 	}
-	logCtx := agentGatewayLogContext(ctx)
+	logCtx := relayLogContext(ctx)
 	defer logCtx.Cancel()
 	result, err := store.GetRelayFilterData(logCtx, dimensions, 100, strings.TrimSpace(string(ctx.QueryArgs().Peek("q"))))
 	if err != nil {
@@ -822,4 +822,41 @@ func (h *RelaysHandler) resolveRelayVirtualKeyOptions(ctx *fasthttp.RequestCtx, 
 		resolved = append(resolved, option)
 	}
 	return resolved
+}
+
+// VirtualKeyReloader reloads a virtual key from the config store into the governance in-memory
+// store, so a grant change made here is what the next authorization decision reads.
+type VirtualKeyReloader interface {
+	ReloadVirtualKey(ctx context.Context, id string) (*tables.TableVirtualKey, error)
+}
+
+func pathName(ctx *fasthttp.RequestCtx) string { v, _ := ctx.UserValue("name").(string); return v }
+
+// relayLogContext copies the request's user values into a Bifrost context for the log queries.
+func relayLogContext(ctx *fasthttp.RequestCtx) *schemas.BifrostContext {
+	logCtx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.VisitUserValuesAll(func(key, value any) {
+		logCtx.SetValue(key, value)
+	})
+	return logCtx
+}
+
+// parseRelayMultiValue reads a repeated or comma-separated query parameter, each value once.
+func parseRelayMultiValue(args *fasthttp.Args, name string) []string {
+	var out []string
+	seen := map[string]struct{}{}
+	for _, raw := range args.PeekMulti(name) {
+		for _, part := range strings.Split(string(raw), ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if _, ok := seen[part]; ok {
+				continue
+			}
+			seen[part] = struct{}{}
+			out = append(out, part)
+		}
+	}
+	return out
 }

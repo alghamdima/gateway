@@ -21,9 +21,6 @@ var ErrRoutingRulePriorityTaken = fmt.Errorf("%w", ErrAlreadyExists)
 // ErrAlreadyExists.
 var ErrDatasheetPricingClaimTaken = fmt.Errorf("pricing for this datasheet row is already set by another override: %w", ErrAlreadyExists)
 
-// ErrInvalidAgentGrant marks malformed Agent grant input supplied by a caller.
-var ErrInvalidAgentGrant = errors.New("invalid agent grant")
-
 // ErrInvalidRelayGrant reports a virtual-key grant naming an empty, duplicate or unknown endpoint.
 var ErrInvalidRelayGrant = errors.New("invalid relay grant")
 

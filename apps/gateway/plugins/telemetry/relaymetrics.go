@@ -16,8 +16,8 @@ var relayMetricLabelNames = []string{
 	"project_id", "project_name",
 }
 
-// recordRelayMetrics observes completed relay spans once, as recordA2AMetrics does for Agent
-// operations: one duration sample per call, and the USD charged for a counted one.
+// recordRelayMetrics observes completed relay spans once: one duration sample per call, and the
+// USD charged for a counted one.
 func (p *PrometheusPlugin) recordRelayMetrics(trace *schemas.Trace) {
 	for _, span := range trace.Spans {
 		if span == nil || span.Kind != schemas.SpanKindRelay {

@@ -183,3 +183,19 @@ func (s *RDBConfigStore) ReplaceVirtualKeyRelayGrants(ctx context.Context, virtu
 	}
 	return nil
 }
+
+// missingFrom returns the requested items that are absent from found, preserving
+// the order of requested.
+func missingFrom(requested, found []string) []string {
+	foundSet := make(map[string]struct{}, len(found))
+	for _, item := range found {
+		foundSet[item] = struct{}{}
+	}
+	missing := make([]string, 0, len(requested)-len(found))
+	for _, item := range requested {
+		if _, ok := foundSet[item]; !ok {
+			missing = append(missing, item)
+		}
+	}
+	return missing
+}

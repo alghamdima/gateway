@@ -150,7 +150,7 @@ func (r *relayChangeRecorder) ReloadVirtualKey(_ context.Context, id string) (*t
 }
 
 // A delete reloads every key whose grant it took away, and a failed reload does not fail the
-// delete or block the name, exactly as the Agent Gateway handler treats agent grants.
+// delete or block the name.
 func TestRelaysHandlerReloadsGrantedKeysOnDelete(t *testing.T) {
 	_, store, _ := newRelaysTestHandler(t)
 	recorder := &relayChangeRecorder{failReloads: true}

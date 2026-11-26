@@ -30,7 +30,6 @@ type BifrostConfig struct {
 	Account                  Account
 	LLMPlugins               []LLMPlugin
 	MCPPlugins               []MCPPlugin
-	A2APlugins               []A2APlugin
 	RelayPlugins             []RelayPlugin
 	OAuth2Provider           OAuth2Provider
 	MCPHeadersProvider       MCPHeadersProvider // Backend for MCPAuthTypePerUserHeaders credential storage; nil disables per-user-headers auth (resolver errors at use)
@@ -277,15 +276,14 @@ const (
 
 // BifrostContextKeyRequestType is a context key for the request type.
 const (
-	BifrostContextKeySessionToken       BifrostContextKey = "bifrost-session-token" // string (session token for authentication - set by auth middleware)
-	BifrostContextKeyAcceptedCredential BifrostContextKey = "bifrost-accepted-credential"
-	BifrostContextKeyVirtualKey         BifrostContextKey = "x-bf-vk"               // string
-	BifrostContextKeyAPIKeyName         BifrostContextKey = "x-bf-api-key"          // string (explicit key name selection)
-	BifrostContextKeyAPIKeyID           BifrostContextKey = "x-bf-api-key-id"       // string (explicit key ID selection, takes priority over name)
-	BifrostContextKeyDirectKey          BifrostContextKey = "x-bf-direct-key"       // schemas.Key (raw key supplied via x-bf-direct-key: true header; bypasses registered key pool)
-	BifrostContextKeyRequestID          BifrostContextKey = "request-id"            // string
-	BifrostContextKeyFallbackRequestID  BifrostContextKey = "fallback-request-id"   // string
-	BifrostContextKeyBillingNonce       BifrostContextKey = "bifrost-billing-nonce" // string (internally minted per physical HTTP request; makes the billing-idempotency key unforgeable since request-id may be caller-supplied via x-request-id. Never read from headers, never echoed to the caller - DO NOT SET THIS MANUALLY)
+	BifrostContextKeySessionToken      BifrostContextKey = "bifrost-session-token" // string (session token for authentication - set by auth middleware)
+	BifrostContextKeyVirtualKey        BifrostContextKey = "x-bf-vk"               // string
+	BifrostContextKeyAPIKeyName        BifrostContextKey = "x-bf-api-key"          // string (explicit key name selection)
+	BifrostContextKeyAPIKeyID          BifrostContextKey = "x-bf-api-key-id"       // string (explicit key ID selection, takes priority over name)
+	BifrostContextKeyDirectKey         BifrostContextKey = "x-bf-direct-key"       // schemas.Key (raw key supplied via x-bf-direct-key: true header; bypasses registered key pool)
+	BifrostContextKeyRequestID         BifrostContextKey = "request-id"            // string
+	BifrostContextKeyFallbackRequestID BifrostContextKey = "fallback-request-id"   // string
+	BifrostContextKeyBillingNonce      BifrostContextKey = "bifrost-billing-nonce" // string (internally minted per physical HTTP request; makes the billing-idempotency key unforgeable since request-id may be caller-supplied via x-request-id. Never read from headers, never echoed to the caller - DO NOT SET THIS MANUALLY)
 
 	// NOTE: []string is used for both keys, and by default all clients/tools are included (when nil).
 	// If "*" is present, all clients/tools are included, and [] means no clients/tools are included.
@@ -411,9 +409,6 @@ const (
 	BifrostContextKeyRealtimeEventType                   BifrostContextKey = "bifrost-realtime-event-type"                      // string
 	BifrostContextKeyRealtimeConnectionID                BifrostContextKey = "bifrost-realtime-connection-id"                   // string; transport-owned connection ID
 	BifrostContextKeyRealtimeTransport                   BifrostContextKey = "bifrost-realtime-transport"                       // string ("websocket" or "webrtc")
-	BifrostContextKeyA2ADownstreamTransport              BifrostContextKey = "bifrost-a2a-downstream-transport"                 // string (A2A binding accepted by the gateway)
-	BifrostContextKeyA2ARequestOrigin                    BifrostContextKey = "bifrost-a2a-request-origin"                       // string (absolute HTTP origin used to reach the Agent Gateway)
-	BifrostContextKeyA2AUpstreamTransport                BifrostContextKey = "bifrost-a2a-upstream-transport"                   // string (A2A binding selected for the upstream agent)
 	BifrostContextKeyRealtimeVoice                       BifrostContextKey = "bifrost-realtime-voice"                           // string
 	BifrostContextKeyRealtimePricingSurface              BifrostContextKey = "bifrost-realtime-pricing-surface"                 // PricingSurface (set by the provider when it opens the realtime session)
 	BifrostIsAsyncRequest                                BifrostContextKey = "bifrost-is-async-request"                         // bool (set by bifrost - DO NOT SET THIS MANUALLY)) - whether the request is an async request (only used in gateway)
@@ -2525,13 +2520,8 @@ type BifrostErrorExtraFields struct {
 	// MCPClientName and MCPToolName are stamped by the MCP plugin gate on every
 	// error it hands PostMCPHook, as the request named them (the tool with its
 	// client prefix), so a hook can tell which call failed. In-process only.
-	MCPClientName string `json:"-"`
-	MCPToolName   string `json:"-"`
-	// A2ARequestType and A2AAgentName are stamped by the Agent Gateway plugin gate
-	// on every wrapped error so PostA2AHook can discriminate the operation and its
-	// authorization resource from the failure path too, exactly as MCPRequestType does.
-	A2ARequestType            A2ARequestType        `json:"a2a_request_type,omitempty"`
-	A2AAgentName              string                `json:"a2a_agent_name,omitempty"`
+	MCPClientName             string                `json:"-"`
+	MCPToolName               string                `json:"-"`
 	RawRequest                interface{}           `json:"raw_request,omitempty"`
 	RawResponse               interface{}           `json:"raw_response,omitempty"`
 	ConvertedRequestType      RequestType           `json:"converted_request_type,omitempty"`

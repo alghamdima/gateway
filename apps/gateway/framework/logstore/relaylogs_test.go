@@ -283,7 +283,7 @@ func TestRelayLogContentSearch(t *testing.T) {
 	require.Len(t, page.Logs, 1, "a %% in the term is literal")
 }
 
-// TestFlushRelayLogsRemovesStaleProcessingRows pins the 30-minute reaper the LLM, MCP and A2A
+// TestFlushRelayLogsRemovesStaleProcessingRows pins the 30-minute reaper the LLM and MCP
 // tables already have: only processing rows older than the cutoff go.
 func TestFlushRelayLogsRemovesStaleProcessingRows(t *testing.T) {
 	ctx := context.Background()

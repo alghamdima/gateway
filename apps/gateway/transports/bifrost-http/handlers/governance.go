@@ -403,10 +403,7 @@ type CreateVirtualKeyRequest struct {
 	DisableContentLogging *bool `json:"disable_content_logging,omitempty"`
 	// Metadata is free-form key/value attribution (cost center, owner, ...). See
 	// configstoreTables.ValidateVirtualKeyMetadata for the rules.
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	AgentGrants []struct {
-		AgentName string `json:"agent_name" validate:"required"`
-	} `json:"agent_grants,omitempty"` // Empty means no agents allowed (deny-by-default)
+	Metadata map[string]string `json:"metadata,omitempty"`
 	// RelayGrants names the relays the key may call, one by one. Empty means no relay (deny-by-default).
 	RelayGrants []relayGrantBody `json:"relay_grants,omitempty"`
 }
@@ -472,10 +469,7 @@ type UpdateVirtualKeyRequest struct {
 	// Metadata replaces the key's metadata as a whole: omitted (or null) leaves it unchanged,
 	// {} clears it, and any other object becomes the new metadata.
 	Metadata    *map[string]string `json:"metadata,omitempty"`
-	AgentGrants []struct {
-		AgentName string `json:"agent_name" validate:"required"`
-	} `json:"agent_grants,omitempty"` // Omitted leaves grants unchanged; [] clears all grants
-	RelayGrants []relayGrantBody `json:"relay_grants,omitempty"` // Omitted leaves grants unchanged; [] clears them
+	RelayGrants []relayGrantBody   `json:"relay_grants,omitempty"` // Omitted leaves grants unchanged; [] clears them
 }
 
 var errVirtualKeyDualAssociation = errors.New("VirtualKey cannot be attached to more than one of Team, Customer or Business Unit")
@@ -2207,13 +2201,6 @@ func classifyRelayGrantError(err error) error {
 	return err
 }
 
-func classifyAgentGrantReplacementError(err error) error {
-	if errors.Is(err, configstore.ErrInvalidAgentGrant) {
-		return &badRequestError{err: err}
-	}
-	return err
-}
-
 // validateVirtualKeyProviders refuses provider configs that name one provider more than once. A
 // virtual key holds one config per provider: its per-provider budgets and rate limits are keyed by
 // the provider, and access answers for a provider from that one config's models and keys. Names are
@@ -2458,24 +2445,6 @@ func (h *GovernanceHandler) createVirtualKey(ctx *fasthttp.RequestCtx) {
 				}, tx); err != nil {
 					return err
 				}
-			}
-		}
-		if req.AgentGrants != nil {
-			// Check for duplicate AgentName values before processing
-			seenAgentNames := make(map[string]bool)
-			agentNames := make([]string, 0, len(req.AgentGrants))
-			for _, ag := range req.AgentGrants {
-				if seenAgentNames[ag.AgentName] {
-					return &badRequestError{err: fmt.Errorf("duplicate agent_name: %s", ag.AgentName)}
-				}
-				seenAgentNames[ag.AgentName] = true
-				agentNames = append(agentNames, ag.AgentName)
-			}
-			// Grants are written in the same transaction as the rest of the key, and the
-			// store validates the names before deleting anything, so unknown or empty
-			// names are the caller's fault and surface as 400.
-			if err := h.configStore.ReplaceVirtualKeyAgentGrants(ctx, vk.ID, agentNames, tx); err != nil {
-				return classifyAgentGrantReplacementError(err)
 			}
 		}
 		if req.RelayGrants != nil {
@@ -3132,25 +3101,6 @@ func (h *GovernanceHandler) updateVirtualKey(ctx *fasthttp.RequestCtx) {
 			}
 		}
 
-		// A nil AgentGrants slice means the caller omitted the field, which preserves
-		// existing grants; an explicit empty list reaches the store and clears them.
-		if req.AgentGrants != nil {
-			// Check for duplicate AgentName values among all grants before processing
-			seenAgentNames := make(map[string]bool)
-			agentNames := make([]string, 0, len(req.AgentGrants))
-			for _, ag := range req.AgentGrants {
-				if seenAgentNames[ag.AgentName] {
-					return &badRequestError{err: fmt.Errorf("duplicate agent_name: %s", ag.AgentName)}
-				}
-				seenAgentNames[ag.AgentName] = true
-				agentNames = append(agentNames, ag.AgentName)
-			}
-			// Only this VK's grants are replaced, inside the same transaction as the
-			// rest of the update, with validation performed before any deletion.
-			if err := h.configStore.ReplaceVirtualKeyAgentGrants(ctx, vk.ID, agentNames, tx); err != nil {
-				return classifyAgentGrantReplacementError(err)
-			}
-		}
 		if req.RelayGrants != nil {
 			names, err := relayGrantNames(req.RelayGrants)
 			if err != nil {

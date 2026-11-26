@@ -41,8 +41,7 @@ type ModelMatcher func(provider, model string, allowed []string) bool
 //
 // The caller's permits sit at the levels the resolver gave them (see schemas.Permit.Level). Within a
 // level they always union; levelMode says whether levels union or intersect. Under Intersect the
-// lowest level present grants and each level above it caps. Capping levels never add access, and
-// agents are decided by the granting level alone.
+// lowest level present grants and each level above it caps. Capping levels never add access.
 type Access struct {
 	// bases is every permit the caller holds, as given. Levels are read off each permit when needed.
 	bases        []schemas.Permit
@@ -293,19 +292,6 @@ func (a *Access) IsMCPToolAllowed(toolPattern string) bool {
 		return base
 	}
 	return a.compose(base, allowsTool(a.scoping, toolPattern))
-}
-
-// IsAgentAllowed implements schemas.Access.
-func (a *Access) IsAgentAllowed(agentName string) bool {
-	if a == nil || agentName == "" {
-		return false
-	}
-	// Only the granting level decides agents (see Access).
-	base := a.anyBase(func(p schemas.Permit) bool { return allowsAgent(p, agentName) })
-	if a.scoping == nil {
-		return base
-	}
-	return a.compose(base, allowsAgent(a.scoping, agentName))
 }
 
 // IsRelayAllowed implements schemas.Access.
@@ -795,14 +781,6 @@ func (a *Access) DeniedPermitsForModel(provider string, model string) []schemas.
 		return nil
 	}
 	return a.deniedBy(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }, true)
-}
-
-// DeniedPermitsForAgent implements schemas.Access.
-func (a *Access) DeniedPermitsForAgent(agentName string) []schemas.Permit {
-	if a == nil {
-		return nil
-	}
-	return a.deniedBy(func(p schemas.Permit) bool { return allowsAgent(p, agentName) }, false)
 }
 
 // DeniedPermitsForRelay implements schemas.Access.

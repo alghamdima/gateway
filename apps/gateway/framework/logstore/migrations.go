@@ -331,8 +331,7 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_owner_timestamp_indexes"}, run: migrationAddOwnerTimestampIndexes},
 	{IDs: []string{"logs_add_ranking_name_timestamp_indexes"}, run: migrationAddRankingNameTimestampIndexes},
 	{IDs: []string{"logs_add_live_session_column"}, run: migrationAddLiveSessionColumn},
-	{IDs: []string{"agent_logs_init"}, run: migrationCreateAgentLogsTable},
-	{IDs: []string{"agent_logs_add_raw_payload_columns"}, run: migrationAddAgentRawPayloadColumns},
+	{IDs: []string{"logs_add_correlation_columns"}, run: migrationAddCorrelationColumns},
 	{IDs: []string{"logs_add_matview_refresh_state_table"}, run: migrationAddMatViewRefreshStateTable},
 	{IDs: []string{"logs_add_is_passthrough_column"}, run: migrationAddIsPassthroughColumn},
 	{IDs: []string{"mcp_tool_logs_add_method_column"}, run: migrationAddMethodColumnToMCPToolLogs},
@@ -344,7 +343,6 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"relay_logs_add_large_payload_response"}, run: migrationAddRelayLogLargePayloadResponse},
 	{IDs: []string{"relay_logs_add_correlation_columns"}, run: migrationAddRelayLogCorrelationColumns},
 	{IDs: []string{"mcp_tool_logs_add_round_trip_id_column"}, run: migrationAddRoundTripIDColumnToMCPToolLogs},
-	{IDs: []string{"agent_logs_add_caller_correlation_id_column"}, run: migrationAddCallerCorrelationIDColumnToAgentLogs},
 	{IDs: []string{"logs_add_model_routing_suggestion_tables"}, run: migrationAddComplexitySuggestionTables},
 	{IDs: []string{"logs_add_model_routing_columns"}, run: migrationAddModelRoutingColumns},
 	{IDs: []string{"logs_tune_retention_autovacuum"}, run: migrationTuneRetentionAutovacuum},
@@ -2841,11 +2839,6 @@ var performanceIndexes = []performanceIndexDef{
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_agent_correlation_id ON mcp_tool_logs(agent_correlation_id) WHERE agent_correlation_id IS NOT NULL",
 	},
 	{
-		table: "agent_logs",
-		name:  "idx_agent_logs_caller_correlation_id",
-		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_agent_logs_caller_correlation_id ON agent_logs(caller_correlation_id) WHERE caller_correlation_id IS NOT NULL",
-	},
-	{
 		table: "mcp_tool_logs",
 		name:  "idx_mcp_logs_round_trip_id",
 		sql:   "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_mcp_logs_round_trip_id ON mcp_tool_logs(round_trip_id) WHERE round_trip_id IS NOT NULL",
@@ -4872,20 +4865,20 @@ func migrationAddServerSideFallbackModelColumn(ctx context.Context, db *gorm.DB,
 	return nil
 }
 
-// migrationCreateAgentLogsTable is the single unshipped relational migration for
-// Agent Gateway observability. It adds the agent correlation columns and
-// indexes to the logs and mcp_tool_logs tables and creates the agent_logs table.
-// AutoMigrate keeps table creation idempotent while the feature remains
-// unshipped and ensures fresh SQLite/PostgreSQL stores receive the same columns
-// and declared indexes. Postgres correlation indexes come from
-// performanceIndexes instead.
-func migrationCreateAgentLogsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "agent_logs_init"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
+// migrationAddCorrelationColumns adds agent_correlation_id to logs and mcp_tool_logs, and session_id
+// to mcp_tool_logs. PostgreSQL gets the indexes from the background builder (performanceIndexes);
+// other dialects create them here.
+func migrationAddCorrelationColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	opts := *migrator.DefaultOptions
 	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
+	return migrator.New(db, &opts, []*migrator.Migration{correlationColumnsMigration(ctx, logger)}).Migrate()
+}
+
+// correlationColumnsMigration refuses its rollback while a correlation column holds a value: what a
+// caller sent to tie its requests together cannot be recaptured once dropped.
+func correlationColumnsMigration(ctx context.Context, logger schemas.Logger) *migrator.Migration {
+	const migrationName = "logs_add_correlation_columns"
+	return &migrator.Migration{
 		ID: migrationName,
 		Migrate: func(tx *gorm.DB) error {
 			tx = tx.WithContext(ctx)
@@ -4895,107 +4888,47 @@ func migrationCreateAgentLogsTable(ctx context.Context, db *gorm.DB, logger sche
 			for _, column := range []struct {
 				model any
 				name  string
+				index string
 			}{
-				{&Log{}, "agent_correlation_id"},
-				{&MCPToolLog{}, "session_id"},
-				{&MCPToolLog{}, "agent_correlation_id"},
+				{&Log{}, "agent_correlation_id", "idx_logs_agent_correlation_id"},
+				{&MCPToolLog{}, "session_id", "idx_mcp_logs_session_id"},
+				{&MCPToolLog{}, "agent_correlation_id", "idx_mcp_logs_agent_correlation_id"},
 			} {
 				if err := addColumnIfNotExists(tx, logger, column.model, column.name); err != nil {
 					return err
 				}
-			}
-			if tx.Dialector.Name() != "postgres" {
-				for _, index := range []struct {
-					model any
-					name  string
-				}{
-					{&Log{}, "idx_logs_agent_correlation_id"},
-					{&MCPToolLog{}, "idx_mcp_logs_session_id"},
-					{&MCPToolLog{}, "idx_mcp_logs_agent_correlation_id"},
-				} {
-					if !tx.Migrator().HasIndex(index.model, index.name) {
-						if err := tx.Migrator().CreateIndex(index.model, index.name); err != nil {
-							return fmt.Errorf("create %s index: %w", index.name, err)
-						}
+				if tx.Dialector.Name() != "postgres" && !tx.Migrator().HasIndex(column.model, column.index) {
+					if err := tx.Migrator().CreateIndex(column.model, column.index); err != nil {
+						return fmt.Errorf("create %s index: %w", column.index, err)
 					}
 				}
 			}
-			return tx.AutoMigrate(&AgentLog{})
+			return nil
 		},
 		Rollback: func(tx *gorm.DB) error {
-			return rollbackAgentLogsMigration(tx.WithContext(ctx), logger)
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running Agent Gateway logstore migration: %w", err)
-	}
-	return nil
-}
-
-func rollbackAgentLogsMigration(tx *gorm.DB, logger schemas.Logger) error {
-	if err := boundDDLLockWait(tx); err != nil {
-		return err
-	}
-	migrator := tx.Migrator()
-	if tx.Dialector.Name() == "postgres" {
-		for _, table := range []string{"agent_logs", "logs", "mcp_tool_logs"} {
-			if migrator.HasTable(table) {
-				if err := tx.Exec("LOCK TABLE " + table + " IN ACCESS EXCLUSIVE MODE").Error; err != nil {
-					return fmt.Errorf("could not lock %s before Agent log rollback: %w", table, err)
+			tx = tx.WithContext(ctx)
+			// Two checks, because logs has a session_id of its own that this migration did not add.
+			if err := refuseRollbackWhileRecorded(tx, migrationName, []any{&Log{}, &MCPToolLog{}}, "agent_correlation_id"); err != nil {
+				return err
+			}
+			if err := refuseRollbackWhileRecorded(tx, migrationName, []any{&MCPToolLog{}}, "session_id"); err != nil {
+				return err
+			}
+			for _, column := range []struct {
+				model any
+				name  string
+			}{
+				{&MCPToolLog{}, "agent_correlation_id"},
+				{&MCPToolLog{}, "session_id"},
+				{&Log{}, "agent_correlation_id"},
+			} {
+				if err := dropColumnIfExists(tx, logger, column.model, column.name); err != nil {
+					return err
 				}
 			}
-		}
+			return nil
+		},
 	}
-
-	if migrator.HasTable(&AgentLog{}) {
-		var present []struct{ One int }
-		if err := tx.Model(&AgentLog{}).Select("1 AS one").Limit(1).Find(&present).Error; err != nil {
-			return fmt.Errorf("could not check Agent log history before rollback: %w", err)
-		}
-		if len(present) > 0 {
-			return fmt.Errorf("agent_logs_init is non-rollbackable: agent_logs holds recorded Agent history, and dropping it would delete that content rather than reverse a schema change; clear the history first if the rollback is genuinely intended")
-		}
-	}
-
-	for _, correlation := range []struct {
-		model  any
-		table  string
-		column string
-	}{
-		{&Log{}, "logs", "agent_correlation_id"},
-		{&MCPToolLog{}, "mcp_tool_logs", "session_id"},
-		{&MCPToolLog{}, "mcp_tool_logs", "agent_correlation_id"},
-	} {
-		if !migrator.HasTable(correlation.model) || !migrator.HasColumn(correlation.model, correlation.column) {
-			continue
-		}
-		var present []struct{ One int }
-		if err := tx.Table(correlation.table).Select("1 AS one").Where(correlation.column + " IS NOT NULL").Limit(1).Find(&present).Error; err != nil {
-			return fmt.Errorf("could not check %s.%s before Agent log rollback: %w", correlation.table, correlation.column, err)
-		}
-		if len(present) > 0 {
-			return fmt.Errorf("agent_logs_init is non-rollbackable: %s.%s holds recorded correlation data, and dropping it would delete that content rather than reverse a schema change; clear the correlation data first if the rollback is genuinely intended", correlation.table, correlation.column)
-		}
-	}
-
-	if migrator.HasTable(&AgentLog{}) {
-		if err := migrator.DropTable(&AgentLog{}); err != nil {
-			return err
-		}
-	}
-	for _, column := range []struct {
-		model any
-		name  string
-	}{
-		{&MCPToolLog{}, "agent_correlation_id"},
-		{&MCPToolLog{}, "session_id"},
-		{&Log{}, "agent_correlation_id"},
-	} {
-		if err := dropColumnIfExists(tx, logger, column.model, column.name); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // migrationAddBillingFidelityColumns adds the served-tier columns cost recomputation
@@ -5259,31 +5192,6 @@ func migrationAddLiveSessionColumn(ctx context.Context, db *gorm.DB, logger sche
 	return nil
 }
 
-// migrationAddAgentRawPayloadColumns adds lossless raw bodies separately from typed payloads.
-func migrationAddAgentRawPayloadColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: "agent_logs_add_raw_payload_columns",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := boundDDLLockWait(tx); err != nil {
-				return err
-			}
-			for _, field := range []string{"RawRequest", "RawResponse"} {
-				if err := addColumnIfNotExists(tx, logger, &AgentLog{}, field); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("agent_logs_add_raw_payload_columns is non-rollbackable: dropping raw payload columns would delete recorded transport bodies")
-		},
-	}})
-	return m.Migrate()
-}
-
 // migrationAddMatViewRefreshStateTable creates matview_refresh_state, the
 // cluster-wide record of when each materialized view last refreshed successfully
 // (see matViewRefreshStateDDL). Materialized views exist only on Postgres, so on
@@ -5424,54 +5332,8 @@ func roundTripIDColumnMigration(ctx context.Context, logger schemas.Logger) *mig
 	}
 }
 
-// migrationAddCallerCorrelationIDColumnToAgentLogs adds the column linking a subagent's operation to the A2A task of
-// the agent that delegated it. Older rows leave it null, so there is no backfill. Postgres builds its index
-// concurrently through performanceIndexes; other dialects create it here.
-func migrationAddCallerCorrelationIDColumnToAgentLogs(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "agent_logs_add_caller_correlation_id_column"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-	m := migrator.New(db, &opts, []*migrator.Migration{callerCorrelationIDColumnMigration(ctx, logger)})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration %s: %w", migrationName, err)
-	}
-	return nil
-}
-
-// callerCorrelationIDColumnMigration refuses its rollback while caller_correlation_id holds a value: the link from
-// a subagent's operation to its caller cannot be recaptured once dropped.
-func callerCorrelationIDColumnMigration(ctx context.Context, logger schemas.Logger) *migrator.Migration {
-	return &migrator.Migration{
-		ID: "agent_logs_add_caller_correlation_id_column",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := boundDDLLockWait(tx); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &AgentLog{}, "caller_correlation_id"); err != nil {
-				return err
-			}
-			if tx.Dialector.Name() != "postgres" && !tx.Migrator().HasIndex(&AgentLog{}, "idx_agent_logs_caller_correlation_id") {
-				if err := tx.Migrator().CreateIndex(&AgentLog{}, "idx_agent_logs_caller_correlation_id"); err != nil {
-					return fmt.Errorf("create idx_agent_logs_caller_correlation_id index: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := refuseRollbackWhileRecorded(tx, "agent_logs_add_caller_correlation_id_column", []any{&AgentLog{}}, "caller_correlation_id"); err != nil {
-				return err
-			}
-			return dropColumnIfExists(tx, logger, &AgentLog{}, "caller_correlation_id")
-		},
-	}
-}
-
 // migrationCreateRelayLogsTable creates the Relay Logs table with the indexes its
-// struct tags declare, as agent_logs_init does: AutoMigrate creates the table and
+// struct tags declare: AutoMigrate creates the table and
 // only the indexes that do not exist yet, so a rerun after a partial apply is a
 // no-op. A new table, so it takes no lock on any existing one.
 func migrationCreateRelayLogsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -5594,8 +5456,7 @@ func migrationAddRelayLogLargePayloadResponse(ctx context.Context, db *gorm.DB, 
 }
 
 // migrationAddRelayLogObjectColumns adds the columns the hybrid store uses to keep a Relay
-// Logs row's full bodies in object storage, as agent_logs_add_raw_payload_columns does for
-// Agent logs: a separate step, so a database that already ran add_relay_logs_table gets them.
+// Logs row's full bodies in object storage: a separate step, so a database that already ran add_relay_logs_table gets them.
 func migrationAddRelayLogObjectColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	opts := *migrator.DefaultOptions
 	opts.UseTransaction = true

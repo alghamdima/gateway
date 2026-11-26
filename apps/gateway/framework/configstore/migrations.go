@@ -532,9 +532,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_mcp_code_mode_limits_client_column"}, run: migrationAddMCPCodeModeLimitsClientColumn},
 	{IDs: []string{"add_compat_force_reasoning_only_models_to_responses_column"}, run: migrationAddCompatForceReasoningOnlyModelsToResponsesColumn},
 	{IDs: []string{"backfill_compat_force_reasoning_only_models_to_responses"}, run: migrationBackfillCompatForceReasoningOnlyModelsToResponses},
-	{IDs: []string{"add_agent_gateway_tables"}, run: migrationAddAgentGatewayTables},
-	{IDs: []string{"add_a2a_raw_capture_setting"}, run: migrationAddA2ARawCaptureSetting},
-	{IDs: []string{"add_agent_push_config_tenant_column"}, run: migrationAddAgentPushConfigTenantColumn},
 	{IDs: []string{"add_ignore_provider_cost_column"}, run: migrationAddIgnoreProviderCostColumn},
 	{IDs: []string{"add_100k_token_pricing_columns"}, run: migrationAdd100kTokenPricingColumns},
 	{IDs: []string{"add_decisions_pricing_columns"}, run: migrationAddDecisionsPricingColumns},
@@ -553,9 +550,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_skills_external_client_url_column"}, run: migrationAddSkillsExternalClientURLColumn},
 	{IDs: []string{"backfill_skills_external_client_url"}, run: migrationBackfillSkillsExternalClientURL},
 	{IDs: []string{"add_virtual_key_metadata_column"}, run: migrationAddVirtualKeyMetadataColumn},
-	{IDs: []string{"add_a2a_private_allowlist_column"}, run: migrationAddA2APrivateAllowlistColumn},
-	{IDs: []string{"add_agent_destination_policy_columns"}, run: migrationAddAgentDestinationPolicyColumns},
-	{IDs: []string{"drop_agent_registration_options"}, run: migrationDropAgentRegistrationOptions},
 	{IDs: []string{"add_vertex_use_session_routing_column"}, run: migrationAddVertexUseSessionRoutingColumn},
 	{IDs: []string{"add_client_config_skip_access_profile_user_virtual_key_lifecycle_columns"}, run: migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns},
 	{IDs: []string{"add_passthrough_json_column"}, run: migrationAddPassthroughJSONColumn},
@@ -1008,46 +1002,6 @@ func migrationAddAnthropicWorkloadIdentityColumn(ctx context.Context, db *gorm.D
 // column may hold a literal identity token and the federation settings of every federated key.
 func rollbackAnthropicWorkloadIdentityColumn(*gorm.DB) error {
 	return fmt.Errorf("add_anthropic_workload_identity_column is non-rollbackable: dropping anthropic_workload_identity_json would permanently delete the workload identity configuration of every Anthropic key that uses it; the column is additive and older binaries safely ignore it")
-}
-
-func rollbackAgentGatewayTables(*gorm.DB) error {
-	return fmt.Errorf("add_agent_gateway_tables is non-rollbackable: dropping Agent Gateway tables or configuration would permanently delete registrations, credentials, push configuration, or queued deliveries")
-}
-
-func migrationAddAgentGatewayTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_agent_gateway_tables"
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := tx.AutoMigrate(
-				&tables.TableAgentRegistration{},
-				&tables.TableVirtualKeyAgentGrant{},
-				&tables.TableAgentPushConfig{},
-				&tables.TableAgentPushDelivery{},
-			); err != nil {
-				return err
-			}
-			// External base URL override for Agent Gateway card and push callback URLs.
-			return addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "A2AExternalClientURL")
-		},
-		Rollback: rollbackAgentGatewayTables,
-	})
-}
-
-// migrationAddAgentPushConfigTenantColumn preserves the downstream interface
-// tenant independently of the tenant selected for the upstream Agent interface.
-func migrationAddAgentPushConfigTenantColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_agent_push_config_tenant_column"
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableAgentPushConfig{}, "tenant")
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("%s is non-rollbackable: dropping the tenant column would permanently delete the only stored copy of each push configuration's tenant", migrationName)
-		},
-	})
 }
 
 // quoteSQLiteIdentifier quotes a SQLite identifier, escaping any double quotes.
@@ -15940,19 +15894,6 @@ func migrationAddCloudflareKeyConfigColumns(ctx context.Context, db *gorm.DB, lo
 	return nil
 }
 
-// migrationAddA2ARawCaptureSetting adds the opt-in raw capture setting for existing stores.
-func migrationAddA2ARawCaptureSetting(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: "add_a2a_raw_capture_setting",
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "A2AStoreRawRequestResponse")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "A2AStoreRawRequestResponse")
-		},
-	})
-}
-
 // migrationAddVirtualKeyMetadataColumn adds the nullable metadata column to
 // governance_virtual_keys. Existing keys keep NULL (no metadata), and
 // GenerateVirtualKeyHash only hashes metadata when the key has some, so no
@@ -16000,73 +15941,6 @@ func setMigrationLockTimeout(tx *gorm.DB) error {
 		return fmt.Errorf("set migration lock_timeout: %w", err)
 	}
 	return nil
-}
-
-// migrationAddA2APrivateAllowlistColumn adds the a2a_private_allowlist_json
-// column to config_client.
-func migrationAddA2APrivateAllowlistColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_a2a_private_allowlist_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "a2a_private_allowlist_json")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "a2a_private_allowlist_json")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running a2a private allowlist column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddAgentDestinationPolicyColumns persists credential destinations and the server-owned network restriction.
-func migrationAddAgentDestinationPolicyColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: "add_agent_destination_policy_columns",
-		Migrate: func(tx *gorm.DB) error {
-			for _, column := range []string{"credential_origins", "require_public_target"} {
-				if err := addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableAgentRegistration{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("add_agent_destination_policy_columns is non-rollbackable: removing destination permissions would discard security policy")
-		},
-	})
-}
-
-// migrationDropAgentRegistrationOptions removes unused tenant and manual extension configuration.
-func migrationDropAgentRegistrationOptions(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: "drop_agent_registration_options",
-		Migrate: func(tx *gorm.DB) error {
-			for _, column := range []string{"tenant", "extension_uris"} {
-				// SQLite's GORM table reconstruction can silently retain legacy columns.
-				if tx.Dialector.Name() == "sqlite" {
-					if !tx.Migrator().HasColumn(&tables.TableAgentRegistration{}, column) {
-						continue
-					}
-					if err := tx.WithContext(ctx).Exec(dropColumnSQL(tx, "config_agent_registrations", column)).Error; err != nil {
-						return err
-					}
-					continue
-				}
-				if err := dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableAgentRegistration{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("drop_agent_registration_options is non-rollbackable: removed registration values cannot be recovered")
-		},
-	})
 }
 
 // migrationAddVertexUseSessionRoutingColumn adds the vertex_use_session_routing column to the key table.

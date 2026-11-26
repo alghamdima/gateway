@@ -94,18 +94,6 @@ type rowWindow struct {
 	ok     bool
 }
 
-// pendingAgentInjectEntries is the Agent analogue of pendingInjectEntries: request
-// rows parked by PostA2AHook until Inject backfills authoritative latency
-// numbers from the completed trace.
-type pendingAgentInjectEntries struct {
-	mu        sync.Mutex
-	entries   []*logstore.AgentLog
-	createdAt time.Time
-	// drained is set by injectAgentEntries under mu once entries has been handed
-	// to the write queue; a late park writes directly instead.
-	drained bool
-}
-
 // pendingRelayInjectEntries is the Relay analogue of pendingAgentInjectEntries: the row parked by
 // PostRelayHook until Inject backfills upstream, overhead and the breakdown from the completed trace.
 type pendingRelayInjectEntries struct {
@@ -124,13 +112,12 @@ type relayLogUpdate struct {
 }
 
 // writeQueueEntry is an entry pushed to the batch write queue.
-// Exactly one insert, partial update, transcript correction, MCP log or agent log is set.
+// Exactly one insert, partial update, transcript correction or MCP log is set.
 type writeQueueEntry struct {
 	realtimeInput     *realtimeInputUpdate
 	log               *logstore.Log
 	logUpdate         *logstore.Log
 	mcpLog            *logstore.MCPToolLog
-	agentLog          *logstore.AgentLog
 	endpointLog       *logstore.RelayLog
 	endpointLogUpdate *relayLogUpdate
 	callback          func(entry *logstore.Log)
@@ -458,21 +445,6 @@ func (p *LoggerPlugin) insertMCPLogIndividually(ctx context.Context, log *logsto
 	return true
 }
 
-// insertAgentLogIndividually is the per-row fallback for an Agent log entry.
-// It reports false when ctx ended before the row was written or dropped.
-func (p *LoggerPlugin) insertAgentLogIndividually(ctx context.Context, log *logstore.AgentLog) bool {
-	_, err := p.store.BatchCreateAgentLogsIfNotExists(ctx, []*logstore.AgentLog{log})
-	if err == nil {
-		return true
-	}
-	if ctx.Err() != nil {
-		return false
-	}
-	p.logger.Warn("individual insert failed for Agent log %s: %v", log.ID, err)
-	p.droppedRequests.Add(1)
-	return true
-}
-
 // insertEndpointLogIndividually is the per-row fallback for a Relay Logs entry. It reports
 // false when ctx ended before the row was written or dropped.
 func (p *LoggerPlugin) insertEndpointLogIndividually(ctx context.Context, log *logstore.RelayLog) bool {
@@ -532,7 +504,6 @@ func (p *LoggerPlugin) processBatch(ctx context.Context, batch []*writeQueueEntr
 	logs := make([]*logstore.Log, 0, len(batch))
 	logUpdates := make([]*logstore.Log, 0, len(batch))
 	mcpLogs := make([]*logstore.MCPToolLog, 0, len(batch))
-	agentLogs := make([]*logstore.AgentLog, 0, len(batch))
 	endpointLogs := make([]*logstore.RelayLog, 0)
 	endpointLogUpdates := make([]*relayLogUpdate, 0)
 	for _, entry := range batch {
@@ -549,9 +520,6 @@ func (p *LoggerPlugin) processBatch(ctx context.Context, batch []*writeQueueEntr
 		if entry.mcpLog != nil {
 			mcpLogs = append(mcpLogs, entry.mcpLog)
 		}
-		if entry.agentLog != nil {
-			agentLogs = append(agentLogs, entry.agentLog)
-		}
 		if entry.endpointLog != nil {
 			endpointLogs = append(endpointLogs, entry.endpointLog)
 		}
@@ -566,10 +534,6 @@ func (p *LoggerPlugin) processBatch(ctx context.Context, batch []*writeQueueEntr
 	unwrittenMCP := writeWithRecovery(p, ctx, "MCP tool log", mcpLogs, func(ctx context.Context, chunk []*logstore.MCPToolLog) error {
 		return p.store.BatchCreateMCPToolLogsIfNotExists(ctx, chunk)
 	}, p.insertMCPLogIndividually)
-	unwrittenAgent := writeWithRecovery(p, ctx, "Agent log", agentLogs, func(ctx context.Context, chunk []*logstore.AgentLog) error {
-		_, err := p.store.BatchCreateAgentLogsIfNotExists(ctx, chunk)
-		return err
-	}, p.insertAgentLogIndividually)
 	unwrittenEndpoint := writeWithRecovery(p, ctx, "relay log", endpointLogs, func(ctx context.Context, chunk []*logstore.RelayLog) error {
 		_, err := p.store.BatchCreateRelayLogsIfNotExists(ctx, chunk)
 		return err
@@ -611,7 +575,7 @@ func (p *LoggerPlugin) processBatch(ctx context.Context, batch []*writeQueueEntr
 	// than one log type is handed back whole if any part is unwritten; persisted
 	// parts are re-inserted as no-ops by conflict-safe insertion.
 	var unwritten []*writeQueueEntry
-	unwrittenCount := len(unwrittenLogs) + len(unwrittenUpdates) + len(unwrittenMCP) + len(unwrittenAgent) + len(unwrittenEndpoint) + len(unwrittenEndpointUpdates)
+	unwrittenCount := len(unwrittenLogs) + len(unwrittenUpdates) + len(unwrittenMCP) + len(unwrittenEndpoint) + len(unwrittenEndpointUpdates)
 	skip := make(map[*writeQueueEntry]struct{}, unwrittenCount)
 	if unwrittenCount > 0 {
 		pending := make(map[any]struct{}, unwrittenCount)
@@ -624,9 +588,6 @@ func (p *LoggerPlugin) processBatch(ctx context.Context, batch []*writeQueueEntr
 		for _, m := range unwrittenMCP {
 			pending[m] = struct{}{}
 		}
-		for _, a := range unwrittenAgent {
-			pending[a] = struct{}{}
-		}
 		for _, e := range unwrittenEndpoint {
 			pending[e] = struct{}{}
 		}
@@ -637,19 +598,12 @@ func (p *LoggerPlugin) processBatch(ctx context.Context, batch []*writeQueueEntr
 			_, logPending := pending[entry.log]
 			_, updatePending := pending[entry.logUpdate]
 			_, mcpPending := pending[entry.mcpLog]
-			_, agentPending := pending[entry.agentLog]
 			_, endpointPending := pending[entry.endpointLog]
 			_, endpointUpdatePending := pending[entry.endpointLogUpdate]
-			if (entry.log != nil && logPending) || (entry.logUpdate != nil && updatePending) || (entry.mcpLog != nil && mcpPending) || (entry.agentLog != nil && agentPending) || (entry.endpointLog != nil && endpointPending) || (entry.endpointLogUpdate != nil && endpointUpdatePending) {
+			if (entry.log != nil && logPending) || (entry.logUpdate != nil && updatePending) || (entry.mcpLog != nil && mcpPending) || (entry.endpointLog != nil && endpointPending) || (entry.endpointLogUpdate != nil && endpointUpdatePending) {
 				skip[entry] = struct{}{}
 				unwritten = append(unwritten, entry)
 			}
-		}
-	}
-
-	if len(agentLogs) > 0 && len(unwrittenAgent) == 0 {
-		if err := p.store.ReconcileAgentCorrelation(ctx, agentLogs); err != nil {
-			p.logger.Warn("Agent correlation reconciliation failed for %d logs: %v", len(agentLogs), err)
 		}
 	}
 
@@ -774,20 +728,6 @@ func (p *LoggerPlugin) cleanupStalePendingLogs() {
 	p.evictedRelayPartials.Range(func(key, value any) bool {
 		if marker, ok := value.(evictedRelayPartial); ok && marker.at.Before(cutoff) {
 			p.evictedRelayPartials.Delete(key)
-		}
-		return true
-	})
-	p.pendingAgentLogs.Range(func(key, value any) bool {
-		if pending, ok := value.(*logstore.AgentLog); ok && pending.Timestamp.Before(cutoff) {
-			p.pendingAgentLogs.Delete(key)
-		}
-		return true
-	})
-	p.pendingAgentLogsToInject.Range(func(key, value any) bool {
-		if pending, ok := value.(*pendingAgentInjectEntries); ok {
-			if pending.createdAt.Before(cutoff) {
-				p.pendingAgentLogsToInject.Delete(key)
-			}
 		}
 		return true
 	})
@@ -1086,23 +1026,6 @@ func (p *LoggerPlugin) enqueueMCPToolLogEntry(entry *logstore.MCPToolLog, callba
 	}
 }
 
-func (p *LoggerPlugin) enqueueAgentLogEntry(entry *logstore.AgentLog) {
-	if entry == nil || p.closed.Load() {
-		return
-	}
-	defer func() {
-		if recover() != nil {
-			p.droppedRequests.Add(1)
-		}
-	}()
-	select {
-	case p.writeQueue <- &writeQueueEntry{agentLog: entry}:
-	default:
-		p.countDrop()
-		p.logger.Warn("log write queue full, dropping A2A log entry %s", entry.ID)
-	}
-}
-
 func (p *LoggerPlugin) enqueueEndpointLogEntry(entry *logstore.RelayLog) {
 	if entry == nil || p.closed.Load() {
 		return
@@ -1167,25 +1090,6 @@ func estimateWriteQueueEntrySize(entry *writeQueueEntry) int {
 	}
 	if entry.realtimeInput != nil {
 		return len(entry.realtimeInput.raw) + len(entry.realtimeInput.connectionID) + len(entry.realtimeInput.itemID) + len(entry.realtimeInput.transcript)
-	}
-	if entry.agentLog != nil {
-		size := len(entry.agentLog.PluginLogs) + len(entry.agentLog.ErrorDetails) + 512
-		if entry.agentLog.RawRequest != nil {
-			size += len(*entry.agentLog.RawRequest)
-		}
-		if entry.agentLog.RawResponse != nil {
-			size += len(*entry.agentLog.RawResponse)
-		}
-		if entry.agentLog.RequestBody != nil {
-			size += len(*entry.agentLog.RequestBody)
-		}
-		if entry.agentLog.ResponseBody != nil {
-			size += len(*entry.agentLog.ResponseBody)
-		}
-		if entry.agentLog.EventBody != nil {
-			size += len(*entry.agentLog.EventBody)
-		}
-		return size
 	}
 	if entry.endpointLogUpdate != nil {
 		size := len(entry.endpointLogUpdate.id) + 256

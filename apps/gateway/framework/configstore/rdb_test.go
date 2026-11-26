@@ -65,7 +65,6 @@ func setupRDBTestStore(t *testing.T) *RDBConfigStore {
 		&tables.TableOAuth2RefreshToken{},
 	)
 	require.NoError(t, err, "Failed to migrate test database")
-	require.NoError(t, migrationAddAgentGatewayTables(context.Background(), db, testMigrationLogger), "Failed to migrate Agent Gateway tables")
 	require.NoError(t, migrationAddRelaysTables(context.Background(), db, testMigrationLogger), "Failed to migrate relay tables")
 
 	// Virtual MCP tables (separate call: the in-batch AutoMigrate above does not create
@@ -3196,25 +3195,6 @@ func TestGenerateClientConfigHash_VKRotationCooldown(t *testing.T) {
 	assert.NotEqual(t, baseHash, cooldownHash)
 }
 
-func TestGenerateClientConfigHash_A2AExternalClientURL(t *testing.T) {
-	base := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30}
-	baseHash, err := base.GenerateClientConfigHash()
-	require.NoError(t, err)
-
-	// Explicit clearing must change the hash so file reconciliation disables
-	// an A2A URL previously configured through the dashboard.
-	unset := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, A2AExternalClientURL: schemas.NewSecretVar("")}
-	unsetHash, err := unset.GenerateClientConfigHash()
-	require.NoError(t, err)
-	assert.NotEqual(t, baseHash, unsetHash)
-
-	// A configured URL is a meaningful config change.
-	withURL := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, A2AExternalClientURL: schemas.NewSecretVar("https://bifrost.example.com")}
-	urlHash, err := withURL.GenerateClientConfigHash()
-	require.NoError(t, err)
-	assert.NotEqual(t, baseHash, urlHash)
-}
-
 func TestGenerateClientConfigHash_ClaudeCodeGateway(t *testing.T) {
 	withGateway := func(cc *tables.ClaudeCodeGatewayConfig) *ClientConfig {
 		return &ClientConfig{
@@ -5190,30 +5170,6 @@ func TestClientConfigUnmarshal_CompatConvertDecisionToResponsesDefaultsOff(t *te
 	}
 }
 
-// TestA2ARawCaptureConfigRoundTrip verifies persistence and hash parity for raw capture.
-func TestA2ARawCaptureConfigRoundTrip(t *testing.T) {
-	store := setupRDBTestStore(t)
-	ctx := context.Background()
-	config := &ClientConfig{}
-	require.NoError(t, store.UpdateClientConfig(ctx, config))
-	config, err := store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	config.A2AStoreRawRequestResponse = true
-	require.NoError(t, store.UpdateClientConfig(ctx, config))
-	found, err := store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	require.True(t, found.A2AStoreRawRequestResponse)
-	want, err := config.GenerateClientConfigHash()
-	require.NoError(t, err)
-	got, err := found.GenerateClientConfigHash()
-	require.NoError(t, err)
-	require.Equal(t, want, got)
-	config.A2AStoreRawRequestResponse = false
-	other, err := config.GenerateClientConfigHash()
-	require.NoError(t, err)
-	require.NotEqual(t, want, other)
-}
-
 // TestGenerateClientConfigHash_SkillsExternalClientURL keeps unset hashes stable and distinguishes configured URLs.
 func TestGenerateClientConfigHash_SkillsExternalClientURL(t *testing.T) {
 	base := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30}
@@ -5285,7 +5241,7 @@ func TestValidatePublicBaseURLLengthMatchesColumns(t *testing.T) {
 	err := ValidatePublicBaseURL(prefix + strings.Repeat("a", MaxPublicURLLength-len(prefix)+1))
 	require.ErrorContains(t, err, "at most 512 characters")
 
-	columns := map[string]string{"BifrostURL": "", "MCPExternalClientURL": "", "SkillsExternalClientURL": "", "A2AExternalClientURL": ""}
+	columns := map[string]string{"BifrostURL": "", "MCPExternalClientURL": "", "SkillsExternalClientURL": ""}
 	typ := reflect.TypeOf(tables.TableClientConfig{})
 	for name := range columns {
 		field, ok := typ.FieldByName(name)
@@ -5328,8 +5284,6 @@ func trySetupPostgresVKMetadataStore(t *testing.T) *RDBConfigStore {
 		&tables.TableVirtualKeyProviderConfig{},
 		&tables.TableVirtualKeyProviderConfigKey{},
 		&tables.TableVirtualKeyMCPConfig{},
-		&tables.TableAgentRegistration{},
-		&tables.TableVirtualKeyAgentGrant{},
 		&tables.TableRelay{},
 		&tables.TableVirtualKeyRelayGrant{},
 	)

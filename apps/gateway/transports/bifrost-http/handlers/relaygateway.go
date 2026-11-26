@@ -25,7 +25,7 @@ var relayDroppedHeaders = map[string]struct{}{
 }
 
 // RelayGatewayHandler serves the relay data plane, /relay/{endpoint}/{path}, for every configured
-// relay, beside the management API in RelaysHandler the way the Agent Gateway serves both. It authenticates the caller like any inference route, strips the caller's credentials,
+// relay, beside the management API in RelaysHandler. It authenticates the caller like any inference route, strips the caller's credentials,
 // and hands the call to the manager, which runs the Relays hooks (governance and
 // logging) around the relay.
 type RelayGatewayHandler struct {

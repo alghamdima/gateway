@@ -1263,9 +1263,6 @@ func canUseMatViewFilters(f SearchFilters) bool {
 		f.ParentRequestID == "" &&
 		f.SessionID == "" &&
 		f.AgentCorrelationID == "" &&
-		// Agent filtering correlates through per-row session IDs (see
-		// applyAgentContextFilter), which the hourly view does not carry.
-		len(f.AgentNames) == 0 &&
 		!f.RootsOnly &&
 		len(f.MetadataFilters) == 0 &&
 		f.RealtimeInputItemID == "" &&

@@ -9206,7 +9206,6 @@ func TestRelaysHooksRunInPipelineOrder(t *testing.T) {
 	bifrost.tracer.Store(&tracerWrapper{tracer: &schemas.NoOpTracer{}})
 	bifrost.llmPlugins.Store(&[]schemas.LLMPlugin{})
 	bifrost.mcpPlugins.Store(&[]schemas.MCPPlugin{})
-	bifrost.a2aPlugins.Store(&[]schemas.A2APlugin{})
 	bifrost.relayPlugins.Store(&[]schemas.RelayPlugin{})
 	bifrost.pluginPipelinePool = sync.Pool{New: func() any { return &PluginPipeline{} }}
 

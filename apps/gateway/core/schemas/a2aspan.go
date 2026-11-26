@@ -1,8 +1,6 @@
 package schemas
 
-import "strings"
-
-// A2ASpanData retains captured bodies separately from attributes so connectors
+// A2ASpanData retains a relay call's captured bodies separately from attributes so connectors
 // must explicitly opt into exporting them. Values are immutable after attachment.
 type A2ASpanData struct {
 	RawRequest  string
@@ -36,34 +34,4 @@ func (s *Span) SetA2ARawPayloads(id string, data *A2ASpanData) {
 		return
 	}
 	s.A2A = data
-}
-
-// A2AStreamOutput renders the retained, validated event JSON under the span lock
-// only while id still matches. The gateway bounds count and content size.
-func (s *Span) A2AStreamOutput(id string) string {
-	if s == nil {
-		return ""
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.SpanID != id {
-		return ""
-	}
-	var output strings.Builder
-	output.WriteByte('[')
-	count := 0
-	for _, event := range s.Events {
-		if body, ok := event.Attributes[AttrOutputMessages].(string); ok {
-			if count > 0 {
-				output.WriteByte(',')
-			}
-			output.WriteString(body)
-			count++
-		}
-	}
-	if count == 0 {
-		return ""
-	}
-	output.WriteByte(']')
-	return output.String()
 }

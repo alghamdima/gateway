@@ -10,7 +10,7 @@ require (
 	github.com/maximhq/bifrost/core v1.16.0
 	github.com/maximhq/bifrost/framework v1.13.0
 	github.com/stretchr/testify v1.12.1
-	github.com/valyala/fasthttp v1.74.0
+	github.com/valyala/fasthttp v1.74.0 // indirect
 )
 
 require (

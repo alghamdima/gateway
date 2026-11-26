@@ -63,14 +63,6 @@ var chColumnOverrides = map[string]string{
 	"inc_number": "`inc_number` Int64 DEFAULT CAST(generateSnowflakeID() AS Int64)",
 }
 
-func clickhouseModelColumnOverride(model any, column string) (string, bool) {
-	if _, ok := model.(*AgentLog); ok && column == "created_at" {
-		return "`created_at` DateTime64(3) DEFAULT now64(3)", true
-	}
-	override, ok := chColumnOverrides[column]
-	return override, ok
-}
-
 // clickhouseColumnDefs parses the GORM schema for model and returns column
 // definitions ("`name` Type") for every persisted field, in struct order.
 func clickhouseColumnDefs(db *gorm.DB, model any) ([]string, error) {
@@ -83,7 +75,7 @@ func clickhouseColumnDefs(db *gorm.DB, model any) ([]string, error) {
 		if f.DBName == "" || f.IgnoreMigration {
 			continue
 		}
-		if override, ok := clickhouseModelColumnOverride(model, f.DBName); ok {
+		if override, ok := chColumnOverrides[f.DBName]; ok {
 			cols = append(cols, override)
 			continue
 		}
@@ -258,7 +250,7 @@ func clickhouseReconcileColumns(ctx context.Context, db *gorm.DB, model any, tab
 			continue
 		}
 		columnDef := fmt.Sprintf("`%s` %s", f.DBName, clickhouseColumnType(f))
-		if override, ok := clickhouseModelColumnOverride(model, f.DBName); ok {
+		if override, ok := chColumnOverrides[f.DBName]; ok {
 			columnDef = override
 		}
 		stmt := fmt.Sprintf("ALTER TABLE `%s`%s ADD COLUMN IF NOT EXISTS %s", table, onCluster, columnDef)
@@ -446,41 +438,6 @@ func migrationClickHouseLogsTable(ctx context.Context, db *gorm.DB, cluster stri
 	return clickhouseReconcileTTL(ctx, db, "logs", cluster, chLogsTTL(retentionDays), logger)
 }
 
-// migrationClickHouseAgentLogsTable creates the append-only Agent observability table.
-func migrationClickHouseAgentLogsTable(ctx context.Context, db *gorm.DB, cluster string, retentionDays int, logger schemas.Logger) error {
-	logger.Info("[logstore] clickhouse: creating table agent_logs")
-	opts := chTableOpts{
-		table:       "agent_logs",
-		partitionBy: "toYYYYMM(timestamp)",
-		orderBy:     "(timestamp, id)",
-		ttl:         chLogsTTL(retentionDays),
-		skipIndexes: []string{
-			"INDEX idx_agent_logs_agent_name agent_name TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_virtual_key_id virtual_key_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_request_id request_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_task_id task_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_context_id context_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_request_message_id request_message_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_response_message_id response_message_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_caller_correlation_id caller_correlation_id TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_operation operation TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_status status TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_record_kind record_kind TYPE bloom_filter GRANULARITY 1",
-			"INDEX idx_agent_logs_id id TYPE bloom_filter GRANULARITY 1",
-		},
-	}
-	if err := clickhouseCreateTable(ctx, db, &AgentLog{}, opts, cluster); err != nil {
-		return fmt.Errorf("clickhouse: create agent_logs table: %w", err)
-	}
-	if err := clickhouseReconcileColumns(ctx, db, &AgentLog{}, "agent_logs", cluster, logger); err != nil {
-		return err
-	}
-	if err := clickhouseReconcileSkipIndexes(ctx, db, "agent_logs", cluster, opts.skipIndexes, logger); err != nil {
-		return err
-	}
-	return clickhouseReconcileTTL(ctx, db, "agent_logs", cluster, chLogsTTL(retentionDays), logger)
-}
-
 // migrationClickHouseRelayLogsTable creates the append-only Relay Logs table.
 func migrationClickHouseRelayLogsTable(ctx context.Context, db *gorm.DB, cluster string, retentionDays int, logger schemas.Logger) error {
 	logger.Info("[logstore] clickhouse: creating table relay_logs")
@@ -580,7 +537,6 @@ func migrationClickHouseUserAgentMappingsTable(ctx context.Context, db *gorm.DB,
 // mirroring logstoreMigrationSteps for the SQL stores.
 var clickhouseMigrationSteps = []clickhouseMigrationStep{
 	migrationClickHouseLogsTable,
-	migrationClickHouseAgentLogsTable,
 	migrationClickHouseMCPToolLogsTable,
 	migrationClickHouseAsyncJobsTable,
 	migrationClickHouseUserAgentMappingsTable,

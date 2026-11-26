@@ -465,8 +465,6 @@ func convertSpanKind(kind schemas.SpanKind) tracepb.Span_SpanKind {
 		return tracepb.Span_SPAN_KIND_CLIENT
 	case schemas.SpanKindMCPClient:
 		return tracepb.Span_SPAN_KIND_CLIENT
-	case schemas.SpanKindA2AOperation:
-		return tracepb.Span_SPAN_KIND_CLIENT
 	case schemas.SpanKindRelay:
 		return tracepb.Span_SPAN_KIND_CLIENT
 	case schemas.SpanKindEmbedding:

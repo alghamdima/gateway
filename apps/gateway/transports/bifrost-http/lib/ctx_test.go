@@ -1742,9 +1742,6 @@ func (gwProviders) GetMCPClientNames() map[string]string { return nil }
 // GetMCPClientBySlug implements governance.InMemoryStore.
 func (gwProviders) GetMCPClientBySlug(string) (string, string, bool) { return "", "", false }
 
-// GetEnabledAgents implements governance.InMemoryStore.
-func (gwProviders) GetEnabledAgents() map[string]bool { return nil }
-
 // gateway is one in-process gateway: the transport's provider config and account, the governance
 // and routing plugins over their stores, core, and the session store.
 type gateway struct {

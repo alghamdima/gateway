@@ -84,7 +84,6 @@ type Permit struct {
 
 	providerPermits   []schemas.ProviderPermit
 	mcpPermits        []schemas.MCPPermit
-	agentPermits      []string
 	allowAllProviders bool
 
 	relayPermits []string
@@ -95,11 +94,6 @@ type Permit struct {
 // stable while letting a source set the occasional extra, so a resolver that does not need one is
 // unaffected.
 type PermitOption func(*Permit)
-
-// WithAgentPermits grants the named Agent Gateway registrations.
-func WithAgentPermits(agentNames []string) PermitOption {
-	return func(p *Permit) { p.agentPermits = slices.Clone(agentNames) }
-}
 
 // WithRelayPermits grants the named relays.
 func WithRelayPermits(endpointNames []string) PermitOption {
@@ -230,14 +224,6 @@ func (p *Permit) MCPPermits() []schemas.MCPPermit {
 	return cloneMCPPermits(p.mcpPermits)
 }
 
-// AgentPermits implements schemas.Permit. See ProviderPermits for why this returns a copy.
-func (p *Permit) AgentPermits() []string {
-	if p == nil {
-		return nil
-	}
-	return slices.Clone(p.agentPermits)
-}
-
 // AllowsAllProviders implements schemas.Permit.
 func (p *Permit) AllowsAllProviders() bool {
 	return p != nil && p.allowAllProviders
@@ -296,12 +282,8 @@ func blacklistsModel(p schemas.Permit, provider string, model string) bool {
 	return false
 }
 
-func allowsAgent(p schemas.Permit, agentName string) bool {
-	return !isNilPermit(p) && slices.Contains(p.AgentPermits(), agentName)
-}
-
-// allowsRelay reports whether the permit names this relay. There is no allow-all for relays, as
-// there is none for agents: a holder reaches exactly the relays it is granted.
+// allowsRelay reports whether the permit names this relay. There is no allow-all for relays:
+// a holder reaches exactly the relays it is granted.
 func allowsRelay(p schemas.Permit, endpointName string) bool {
 	return !isNilPermit(p) && slices.Contains(p.RelayPermits(), endpointName)
 }

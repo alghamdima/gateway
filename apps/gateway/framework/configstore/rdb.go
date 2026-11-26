@@ -336,7 +336,6 @@ func (s *RDBConfigStore) UpdateClientConfig(ctx context.Context, config *ClientC
 		BifrostMCPAllowWrites:                     config.BifrostMCPAllowWrites,
 		MCPCodeModeLimits:                         config.MCPCodeModeLimits,
 		MCPOAuthPrivateAllowlist:                  config.MCPOAuthPrivateAllowlist,
-		A2APrivateAllowlist:                       config.A2APrivateAllowlist,
 		MCPToolExecutionTimeout:                   config.MCPToolExecutionTimeout,
 		MCPCodeModeBindingLevel:                   config.MCPCodeModeBindingLevel,
 		MCPToolSyncInterval:                       config.MCPToolSyncInterval,
@@ -360,8 +359,6 @@ func (s *RDBConfigStore) UpdateClientConfig(ctx context.Context, config *ClientC
 		MCPExternalClientURL:                      mcpExternalURLToString(config.MCPExternalClientURL),
 		MCPClientMetadataURL:                      mcpExternalURLToString(config.MCPClientMetadataURL),
 		SkillsExternalClientURL:                   mcpExternalURLToString(config.SkillsExternalClientURL),
-		A2AStoreRawRequestResponse:                config.A2AStoreRawRequestResponse,
-		A2AExternalClientURL:                      mcpExternalURLToString(config.A2AExternalClientURL),
 		HeaderFilterConfig:                        config.HeaderFilterConfig,
 		AllowPerRequestContentStorageOverride:     config.AllowPerRequestContentStorageOverride,
 		AllowPerRequestRawOverride:                config.AllowPerRequestRawOverride,
@@ -664,7 +661,6 @@ func (s *RDBConfigStore) GetClientConfig(ctx context.Context) (*ClientConfig, er
 		BifrostMCPAllowWrites:                   dbConfig.BifrostMCPAllowWrites,
 		MCPCodeModeLimits:                       dbConfig.MCPCodeModeLimits,
 		MCPOAuthPrivateAllowlist:                dbConfig.MCPOAuthPrivateAllowlist,
-		A2APrivateAllowlist:                     dbConfig.A2APrivateAllowlist,
 		MCPToolExecutionTimeout:                 dbConfig.MCPToolExecutionTimeout,
 		MCPCodeModeBindingLevel:                 dbConfig.MCPCodeModeBindingLevel,
 		MCPToolSyncInterval:                     dbConfig.MCPToolSyncInterval,
@@ -688,8 +684,6 @@ func (s *RDBConfigStore) GetClientConfig(ctx context.Context) (*ClientConfig, er
 		MCPExternalClientURL:                    schemas.NewSecretVar(dbConfig.MCPExternalClientURL),
 		MCPClientMetadataURL:                    schemas.NewSecretVar(dbConfig.MCPClientMetadataURL),
 		SkillsExternalClientURL:                 schemas.NewSecretVar(dbConfig.SkillsExternalClientURL),
-		A2AStoreRawRequestResponse:              dbConfig.A2AStoreRawRequestResponse,
-		A2AExternalClientURL:                    schemas.NewSecretVar(dbConfig.A2AExternalClientURL),
 		HeaderFilterConfig:                      dbConfig.HeaderFilterConfig,
 		AllowPerRequestContentStorageOverride:   dbConfig.AllowPerRequestContentStorageOverride,
 		AllowPerRequestRawOverride:              dbConfig.AllowPerRequestRawOverride,
@@ -4076,7 +4070,6 @@ func preloadVirtualKeyBaseRelations(db *gorm.DB) *gorm.DB {
 		}).
 		Preload("MCPConfigs").
 		Preload("MCPConfigs.MCPClient").
-		Preload("AgentGrants").
 		Preload("RelayGrants")
 }
 
@@ -4787,10 +4780,6 @@ func (s *RDBConfigStore) DeleteVirtualKey(ctx context.Context, id string, tx ...
 		}
 		// Delete all MCP configs associated with the virtual key
 		if err := txDB.WithContext(ctx).Delete(&tables.TableVirtualKeyMCPConfig{}, "virtual_key_id = ?", id).Error; err != nil {
-			return err
-		}
-		// Delete all direct Agent Gateway grants associated with the virtual key.
-		if err := txDB.WithContext(ctx).Delete(&tables.TableVirtualKeyAgentGrant{}, "virtual_key_id = ?", id).Error; err != nil {
 			return err
 		}
 		// Delete the key's relay grants the same way; a grant must not outlive its key.

@@ -28,7 +28,6 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	bifrost "github.com/maximhq/bifrost/core"
-	"github.com/maximhq/bifrost/core/agent"
 	"github.com/maximhq/bifrost/core/mcp"
 	mcputils "github.com/maximhq/bifrost/core/mcp/utils"
 	"github.com/maximhq/bifrost/core/network"
@@ -183,21 +182,6 @@ type ServerConfig struct {
 	// internal artifact hosts. Deploy-time only - read from config.json/environment at
 	// startup, never settable via the plugin admin API. Invalid entries fail server startup.
 	PluginDownloadPrivateAllowlist []string `json:"plugin_download_private_allowlist,omitempty"`
-
-	// A2AGRPCBaseDomain and A2AGRPCPort enable the Agent Gateway's shared gRPC
-	// listener and the per-agent hostnames advertised on served cards
-	// (<agent-name>.<base-domain>:<port>). The operator must point a wildcard DNS
-	// record for *.<base-domain> at this server; requests are routed to the agent
-	// named by the first DNS label of the dialed authority. Agent names longer
-	// than 63 characters cannot form a DNS label and are not served over gRPC.
-	// A2AGRPCPort is the advertised (public) port; when a load balancer or port
-	// mapping sits in front, the BIFROST_A2A_GRPC_LISTEN_PORT environment
-	// variable overrides the local bind port without changing what cards
-	// advertise. Deploy-time only: all values are read at startup and gRPC stays
-	// disabled while the domain or advertised port is unset.
-	A2AGRPCBaseDomain            string `json:"a2a_grpc_base_domain,omitempty"`
-	A2AGRPCPort                  int    `json:"a2a_grpc_port,omitempty"`
-	A2AAllowPrivatePushCallbacks bool   `json:"a2a_allow_private_push_callbacks,omitempty"` // test environments only; default false
 }
 
 // ConfigData represents the configuration data for the Bifrost HTTP transport.
@@ -227,7 +211,6 @@ type ConfigData struct {
 	Providers          map[string]configstore.ProviderConfig `json:"providers"`
 	FrameworkConfig    *framework.FrameworkConfig            `json:"framework,omitempty"`
 	MCP                *schemas.MCPConfig                    `json:"mcp,omitempty"`
-	Agents             []*AgentRegistrationFileConfig        `json:"agents,omitempty"`
 	Relays             []*schemas.RelayConfig                `json:"relays,omitempty"`
 	DatasheetOverrides []DatasheetOverrideFileConfig         `json:"datasheet_overrides,omitempty"`
 	ModelRouters       []configstore.ModelRouter             `json:"model_routers,omitempty"`
@@ -335,72 +318,6 @@ func (v *FeatureFlagFileValue) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// AgentRegistrationFileConfig declares one Agent Gateway registration in
-// config.json. It mirrors the create API's request shape: enabled defaults to
-// true when omitted, virtual_key_ids declares the exact grant set, and
-// timestamps plus the config hash are server-managed. Auth secrets accept the
-// usual env./vault. references.
-type AgentRegistrationFileConfig struct {
-	Name                                   string                `json:"name"`
-	AgentCardURL                           string                `json:"agent_card_url"`
-	Enabled                                *bool                 `json:"enabled,omitempty"`
-	AllowByDefault                         bool                  `json:"allow_by_default,omitempty"`
-	ForwardAcceptedCredential              bool                  `json:"forward_accepted_credential,omitempty"`
-	ForwardAcceptedCredentialOverridesAuth bool                  `json:"forward_accepted_credential_overrides_auth,omitempty"`
-	DiscoveryAuth                          *schemas.UpstreamAuth `json:"discovery_auth,omitempty"`
-	RuntimeAuth                            *schemas.UpstreamAuth `json:"runtime_auth,omitempty"`
-	CredentialOrigins                      []string              `json:"credential_origins,omitempty"`
-	VirtualKeyIDs                          []string              `json:"virtual_key_ids,omitempty"`
-}
-
-// agentFileNamePattern matches the agent manager's name rule: a lowercase
-// URL-safe slug, because the name appears in gateway URLs and grant rows.
-var agentFileNamePattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
-
-// validate applies the minimal subset of the agent manager's create-time
-// validation that a file declaration must pass before touching the store.
-// The manager re-validates everything else when the gateway is initialized.
-func (a *AgentRegistrationFileConfig) validate() error {
-	name := strings.TrimSpace(a.Name)
-	if name == "" || len(name) > 255 || !agentFileNamePattern.MatchString(name) {
-		return errors.New("name must be 1-255 lowercase ASCII letters, numbers, or single hyphens, and must start and end with a letter or number")
-	}
-	parsed, err := url.ParseRequestURI(a.AgentCardURL)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil {
-		return errors.New("agent_card_url must be an absolute HTTP(S) URL without user info")
-	}
-	_, err = agent.ValidateCredentialOrigins(a.CredentialOrigins)
-	return err
-}
-
-// toRegistration converts a file declaration into the domain model the
-// configstore CRUD accepts. Slices are sorted to match the API create path so
-// hashing and grant writes stay deterministic.
-func (a *AgentRegistrationFileConfig) toRegistration() *schemas.AgentRegistration {
-	enabled := true
-	if a.Enabled != nil {
-		enabled = *a.Enabled
-	}
-	ids := slices.Clone(a.VirtualKeyIDs)
-	sort.Strings(ids)
-	origins, _ := agent.ValidateCredentialOrigins(a.CredentialOrigins)
-	now := time.Now().UTC()
-	return &schemas.AgentRegistration{
-		Name:                                   strings.TrimSpace(a.Name),
-		AgentCardURL:                           a.AgentCardURL,
-		Enabled:                                enabled,
-		AllowByDefault:                         a.AllowByDefault,
-		ForwardAcceptedCredential:              a.ForwardAcceptedCredential,
-		ForwardAcceptedCredentialOverridesAuth: a.ForwardAcceptedCredentialOverridesAuth,
-		DiscoveryAuth:                          a.DiscoveryAuth,
-		RuntimeAuth:                            a.RuntimeAuth,
-		CredentialOrigins:                      origins,
-		VirtualKeyIDs:                          ids,
-		CreatedAt:                              now,
-		UpdatedAt:                              now,
-	}
-}
-
 // normalizeSourceOfTruth returns the configured source-of-truth mode, defaulting to split.
 func normalizeSourceOfTruth(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
@@ -440,8 +357,6 @@ func (cd *ConfigData) sectionPresent(name string) bool {
 		return cd.Providers != nil
 	case "mcp":
 		return cd.MCP != nil
-	case "agents":
-		return cd.Agents != nil
 	case "relays":
 		return cd.Relays != nil
 	case "datasheet_overrides":
@@ -531,7 +446,6 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 		SetupToken         *schemas.SecretVar                    `json:"setup_token,omitempty"`
 		Providers          map[string]configstore.ProviderConfig `json:"providers"`
 		MCP                *schemas.MCPConfig                    `json:"mcp,omitempty"`
-		Agents             []*AgentRegistrationFileConfig        `json:"agents,omitempty"`
 		Relays             []*schemas.RelayConfig                `json:"relays,omitempty"`
 		DatasheetOverrides []DatasheetOverrideFileConfig         `json:"datasheet_overrides,omitempty"`
 		ModelRouters       []configstore.ModelRouter             `json:"model_routers,omitempty"`
@@ -563,7 +477,6 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 	cd.SetupToken = temp.SetupToken
 	cd.Providers = temp.Providers
 	cd.MCP = temp.MCP
-	cd.Agents = temp.Agents
 	cd.Relays = temp.Relays
 	cd.DatasheetOverrides = temp.DatasheetOverrides
 	cd.ModelRouters = temp.ModelRouters
@@ -658,10 +571,9 @@ type GovernanceFileSync struct {
 //   - Support for provider-specific key configurations (Azure, Vertex, Bedrock)
 //   - Lock-free plugin reads via atomic.Pointer for minimal hot-path latency
 type Config struct {
-	Mu              sync.RWMutex // Exported for direct access from handlers (governance plugin)
-	muMCP           sync.RWMutex
-	muEnabledAgents sync.RWMutex
-	client          *bifrost.Bifrost
+	Mu     sync.RWMutex // Exported for direct access from handlers (governance plugin)
+	muMCP  sync.RWMutex
+	client *bifrost.Bifrost
 
 	configPath string
 
@@ -690,10 +602,6 @@ type Config struct {
 	// GetOAuth2SigningKey.
 	oauth2SigningKey atomic.Pointer[configstoreTables.OAuth2SigningKey]
 
-	// enabledAgents mirrors MCP's config-owned allow-by-default lookup: membership
-	// means the registration is enabled and the value is AllowByDefault.
-	enabledAgents map[string]bool
-
 	// In-memory storage
 	ServerConfig     *ServerConfig
 	ClientConfig     *configstore.ClientConfig
@@ -720,7 +628,6 @@ type Config struct {
 	BasePlugins          atomic.Pointer[[]schemas.BasePlugin]                      // Master list of all plugins
 	LLMPlugins           atomic.Pointer[[]schemas.LLMPlugin]                       // Derived cache (auto-rebuilt)
 	MCPPlugins           atomic.Pointer[[]schemas.MCPPlugin]                       // Derived cache (auto-rebuilt)
-	A2APlugins           atomic.Pointer[[]schemas.A2APlugin]                       // Derived cache (auto-rebuilt)
 	RelayPlugins         atomic.Pointer[[]schemas.RelayPlugin]                     // Derived cache (auto-rebuilt)
 	HTTPTransportPlugins atomic.Pointer[[]schemas.HTTPTransportPlugin]             // Derived cache (auto-rebuilt)
 	ConfigMarshallers    atomic.Pointer[map[string]schemas.ConfigMarshallerPlugin] // Derived cache (auto-rebuilt)
@@ -1207,9 +1114,6 @@ func LoadConfig(ctx context.Context, configDirPath string) (*Config, error) {
 	loadGovernanceConfig(ctx, config, &configData)
 	// 8a. Model routers
 	syncModelRoutersFromFile(ctx, config, &configData)
-	// 8b. Agent Gateway registrations (after governance so file-declared virtual
-	// keys exist before agent grants referencing them are written)
-	loadAgentsConfig(ctx, config, &configData)
 	// 9. Auth config
 	if err := loadAuthConfig(ctx, config, &configData); err != nil {
 		return nil, err
@@ -1579,9 +1483,6 @@ func validateClientConfig(cc *configstore.ClientConfig) error {
 	if _, err := network.ValidatePrivateTargetAllowlist(cc.MCPOAuthPrivateAllowlist); err != nil {
 		return fmt.Errorf("mcp_oauth_private_allowlist: %w", err)
 	}
-	if _, err := network.ValidatePrivateTargetAllowlist(cc.A2APrivateAllowlist); err != nil {
-		return fmt.Errorf("a2a_private_allowlist: %w", err)
-	}
 	return nil
 }
 
@@ -1604,7 +1505,7 @@ func ApplyMCPOAuthPrivateAllowlist(entries []string) error {
 	return nil
 }
 
-// sanitizeMCPExternalOAuthURLs validates the MCP, Agent Gateway, and skills public URL overrides
+// sanitizeMCPExternalOAuthURLs validates the MCP and skills public URL overrides
 // on a ClientConfig and clears any invalid override so it cannot leak into
 // OAuth URL generation. The warning intentionally omits the offending value:
 // these fields support env-var references (`env.MY_VAR`), and echoing the
@@ -1625,10 +1526,6 @@ func sanitizeMCPExternalOAuthURLs(client *configstore.ClientConfig) {
 	if err := configstore.ValidatePublicBaseURL(client.SkillsExternalClientURL.GetValue()); err != nil {
 		logger.Warn("skills_external_client_url %v; marketplace serving will be disabled", err)
 		client.SkillsExternalClientURL = nil
-	}
-	if err := configstore.ValidatePublicBaseURL(client.A2AExternalClientURL.GetValue()); err != nil {
-		logger.Warn("a2a_external_client_url %v; Agent Gateway protocol endpoints will be disabled", err)
-		client.A2AExternalClientURL = nil
 	}
 	if err := configstore.ValidatePublicBaseURL(client.BifrostURL.GetValue()); err != nil {
 		logger.Warn("bifrost_url %v; it will be ignored and self URLs will follow the request", err)
@@ -3502,159 +3399,6 @@ func syncMCPConfigFromFile(ctx context.Context, config *Config, configData *Conf
 	}
 	fileMCPConfig.ClientConfigs = runtimeClients
 	config.MCPConfig = fileMCPConfig
-}
-
-// loadAgentsConfig reconciles Agent Gateway registrations declared under the
-// top-level "agents" section against the config store, mirroring the MCP
-// config flow: declarations are validated with a warn-and-skip policy, matched
-// against stored rows by name (the registration's primary key) using the
-// config hash for change detection, and pruned only when config.json is the
-// source of truth and the section is physically present. Only the store is
-// written here: the agent manager does not exist yet at LoadConfig time and is
-// built later (InitializeAgentGateway) from the reconciled rows. Writes go
-// through the configstore CRUD so GORM hooks encrypt secrets and grant rows
-// are kept transactional with their registration.
-func loadAgentsConfig(ctx context.Context, config *Config, configData *ConfigData) {
-	fileAgents := make([]*schemas.AgentRegistration, 0, len(configData.Agents))
-	// Every declared name, valid or not: an entry that fails validation must
-	// still protect its existing database row from the source-of-truth prune —
-	// a typo in one field must never delete a working registration.
-	declaredNames := make(map[string]bool)
-	nameCounts := make(map[string]int)
-	for _, declared := range configData.Agents {
-		if declared == nil {
-			continue
-		}
-		if name := strings.TrimSpace(declared.Name); name != "" {
-			declaredNames[name] = true
-			nameCounts[name]++
-		}
-	}
-	for _, declared := range configData.Agents {
-		if declared == nil {
-			continue
-		}
-		name := strings.TrimSpace(declared.Name)
-		if nameCounts[name] > 1 {
-			logger.Warn("skipping duplicate agent registration %q from config file", name)
-			continue
-		}
-		if err := declared.validate(); err != nil {
-			logger.Warn("skipping agent registration %q from config file: %v", declared.Name, err)
-			continue
-		}
-		fileAgents = append(fileAgents, declared.toRegistration())
-	}
-
-	if config.ConfigStore == nil {
-		if len(fileAgents) > 0 {
-			logger.Warn("config store is disabled - agent registrations from config file will not be available")
-		}
-		return
-	}
-
-	existing, err := config.ConfigStore.ListAgentRegistrations(ctx)
-	if err != nil {
-		logger.Warn("failed to load agent registrations: %v", err)
-		return
-	}
-
-	if configData.isConfigJSONSourceOfTruth() && configData.sectionPresent("agents") {
-		syncAgentRegistrationsFromFile(ctx, config, fileAgents, declaredNames, existing)
-	} else {
-		mergeAgentRegistrations(ctx, config, fileAgents, existing)
-	}
-}
-
-// mergeAgentRegistrations reconciles file declarations additively: new names
-// are created, changed ones (by config hash) are updated — grants included,
-// since virtual_key_ids participates in the hash — and stored registrations
-// absent from the file are left alone. Best-effort with per-item warnings,
-// matching the other config-section loaders.
-func mergeAgentRegistrations(ctx context.Context, config *Config, fileAgents []*schemas.AgentRegistration, existing []schemas.AgentRegistration) {
-	existingByName := make(map[string]*schemas.AgentRegistration, len(existing))
-	for i := range existing {
-		existingByName[existing[i].Name] = &existing[i]
-	}
-	for _, agent := range fileAgents {
-		fileHash, err := configstore.GenerateAgentRegistrationHash(agent)
-		if err != nil {
-			logger.Warn("failed to hash agent registration %q: %v", agent.Name, err)
-			continue
-		}
-		agent.ConfigHash = fileHash
-		if match, ok := existingByName[agent.Name]; ok {
-			if match.ConfigHash == fileHash {
-				continue
-			}
-			if err := config.ConfigStore.UpdateAgentRegistration(ctx, agent); err != nil {
-				logger.Warn("failed to update agent registration %q: %v", agent.Name, err)
-			}
-			continue
-		}
-		if err := config.ConfigStore.CreateAgentRegistration(ctx, agent); err != nil {
-			logger.Warn("failed to create agent registration %q: %v", agent.Name, err)
-		}
-	}
-}
-
-// syncAgentRegistrationsFromFile makes the database mirror the config file:
-// declarations are created or updated as in the merge path, and stored
-// registrations not present in the file — including API-created ones — are
-// deleted, grants along with them (DeleteAgentRegistration removes the grant
-// rows in the same transaction, backed by the FK cascade). Best-effort,
-// non-transactional — each step warns and continues, and a later load
-// converges. The prune fails safe: a row is only deleted when its name appears
-// in NEITHER the applied set nor the declared set, so a declaration that
-// failed validation or hashing keeps its existing registration instead of
-// removing it.
-func syncAgentRegistrationsFromFile(ctx context.Context, config *Config, fileAgents []*schemas.AgentRegistration, declaredNames map[string]bool, existing []schemas.AgentRegistration) {
-	existingByName := make(map[string]*schemas.AgentRegistration, len(existing))
-	for i := range existing {
-		existingByName[existing[i].Name] = &existing[i]
-	}
-
-	keepNames := make(map[string]bool, len(fileAgents))
-	for _, agent := range fileAgents {
-		match := existingByName[agent.Name]
-		// Mark the matched existing registration as kept before anything that
-		// can fail, so failures keep the row rather than exposing it to the
-		// prune below.
-		if match != nil {
-			keepNames[match.Name] = true
-		}
-
-		fileHash, err := configstore.GenerateAgentRegistrationHash(agent)
-		if err != nil {
-			logger.Warn("failed to hash agent registration %q: %v", agent.Name, err)
-			continue
-		}
-		agent.ConfigHash = fileHash
-
-		if match != nil {
-			if match.ConfigHash == fileHash {
-				continue
-			}
-			if err := config.ConfigStore.UpdateAgentRegistration(ctx, agent); err != nil {
-				logger.Warn("failed to update agent registration %q: %v", agent.Name, err)
-			}
-			continue
-		}
-		if err := config.ConfigStore.CreateAgentRegistration(ctx, agent); err != nil {
-			logger.Warn("failed to create agent registration %q: %v", agent.Name, err)
-			continue
-		}
-		keepNames[agent.Name] = true
-	}
-
-	for i := range existing {
-		if keepNames[existing[i].Name] || declaredNames[existing[i].Name] {
-			continue
-		}
-		if err := config.ConfigStore.DeleteAgentRegistration(ctx, existing[i].Name); err != nil {
-			logger.Warn("failed to delete agent registration %q: %v", existing[i].Name, err)
-		}
-	}
 }
 
 // loadGovernanceConfig loads and merges governance config from file
@@ -5837,21 +5581,18 @@ func updateGovernanceConfigInStore(
 			inlineBudgets := virtualKey.Budgets
 			rateLimitID := virtualKey.RateLimitID
 			// Grants are written after the key, through the same checks an update uses: left here the
-			// save would cascade them, and one name with no stored relay or agent fails the whole sync.
+			// save would cascade them, and one name with no stored relay fails the whole sync.
 			relayGrants := virtualKey.RelayGrants
-			agentGrants := virtualKey.AgentGrants
 			virtualKey.ProviderConfigs = nil
 			virtualKey.MCPConfigs = nil
 			virtualKey.Budgets = nil
 			virtualKey.RateLimitID = nil
 			virtualKey.RelayGrants = nil
-			virtualKey.AgentGrants = nil
 			// Here we wll filter provider / keys that are not available
 			if err := config.ConfigStore.CreateVirtualKey(ctx, virtualKey, tx); err != nil {
 				return fmt.Errorf("failed to create virtual key %s: %w", virtualKey.ID, err)
 			}
 			virtualKey.RelayGrants = relayGrants
-			virtualKey.AgentGrants = agentGrants
 			if len(relayGrants) > 0 && !governed.skipKeyLimits(virtualKey.ID) {
 				stored, err := relayNamesForGrants()
 				if err != nil {
@@ -5860,17 +5601,6 @@ func updateGovernanceConfigInStore(
 				if names := grantableRelayNames(relayGrantNames(relayGrants), stored, virtualKey.ID, virtualKey.Name); len(names) > 0 {
 					if err := config.ConfigStore.ReplaceVirtualKeyRelayGrants(ctx, virtualKey.ID, names, tx); err != nil {
 						return fmt.Errorf("failed to create relay grants for virtual key %s: %w", virtualKey.ID, err)
-					}
-				}
-			}
-			if len(agentGrants) > 0 {
-				names, err := grantableAgentNames(ctx, config.ConfigStore, agentGrants, virtualKey.ID, virtualKey.Name)
-				if err != nil {
-					return fmt.Errorf("failed to list agents for virtual key agent grants: %w", err)
-				}
-				if len(names) > 0 {
-					if err := config.ConfigStore.ReplaceVirtualKeyAgentGrants(ctx, virtualKey.ID, names, tx); err != nil {
-						return fmt.Errorf("failed to create agent grants for virtual key %s: %w", virtualKey.ID, err)
 					}
 				}
 			}
@@ -8465,22 +8195,6 @@ func resolveOpenAPIURL(raw string) string {
 	return resolved
 }
 
-// GetA2AExternalClientURL returns the configured external base URL used for Agent Gateway
-// push-notification callback URLs and served agent card URLs, or empty string if not
-// configured. Resolves env var references automatically.
-func (c *Config) GetA2AExternalClientURL() string {
-	c.Mu.RLock()
-	defer c.Mu.RUnlock()
-	if c.ClientConfig == nil || c.ClientConfig.A2AExternalClientURL == nil {
-		return ""
-	}
-	value := c.ClientConfig.A2AExternalClientURL.GetValue()
-	if configstore.ValidatePublicBaseURL(value) != nil {
-		return ""
-	}
-	return value
-}
-
 // GetHeaderMatcher returns the precompiled header matcher for header filtering.
 // Lock-free via atomic pointer; safe for concurrent reads from hot paths.
 func (c *Config) GetHeaderMatcher() *HeaderMatcher {
@@ -8638,44 +8352,6 @@ func (c *Config) GetMCPClientBySlug(slug string) (clientID, clientName string, o
 		}
 	}
 	return "", "", false
-}
-
-// ReplaceEnabledAgents atomically replaces enabled registration policy state.
-func (c *Config) ReplaceEnabledAgents(agents map[string]bool) {
-	c.muEnabledAgents.Lock()
-	defer c.muEnabledAgents.Unlock()
-	c.enabledAgents = make(map[string]bool, len(agents))
-	maps.Copy(c.enabledAgents, agents)
-}
-
-// SetEnabledAgent publishes or removes one registration after a successful write.
-func (c *Config) SetEnabledAgent(name string, enabled, allowOnAll bool) {
-	c.muEnabledAgents.Lock()
-	defer c.muEnabledAgents.Unlock()
-	if !enabled {
-		delete(c.enabledAgents, name)
-		return
-	}
-	if c.enabledAgents == nil {
-		c.enabledAgents = make(map[string]bool)
-	}
-	c.enabledAgents[name] = allowOnAll
-}
-
-// DeleteEnabledAgent removes a successfully deleted registration.
-func (c *Config) DeleteEnabledAgent(name string) {
-	c.muEnabledAgents.Lock()
-	defer c.muEnabledAgents.Unlock()
-	delete(c.enabledAgents, name)
-}
-
-// GetEnabledAgents returns a copy for governance hot-path decisions.
-func (c *Config) GetEnabledAgents() map[string]bool {
-	c.muEnabledAgents.RLock()
-	defer c.muEnabledAgents.RUnlock()
-	result := make(map[string]bool, len(c.enabledAgents))
-	maps.Copy(result, c.enabledAgents)
-	return result
 }
 
 // GetPluginOrder returns the names of all base plugins in their sorted placement order.
@@ -8908,17 +8584,8 @@ func (c *Config) GetLoadedMCPPlugins() []schemas.MCPPlugin {
 	return nil
 }
 
-// GetLoadedA2APlugins returns the current snapshot of loaded A2A (Agent Gateway)
-// plugins, with the same lock-free, read-only contract as GetLoadedMCPPlugins.
-func (c *Config) GetLoadedA2APlugins() []schemas.A2APlugin {
-	if plugins := c.A2APlugins.Load(); plugins != nil {
-		return slices.Clone(*plugins)
-	}
-	return nil
-}
-
 // GetLoadedRelayPlugins returns the current snapshot of loaded plugins that see
-// relay calls, with the same lock-free, read-only contract as GetLoadedA2APlugins.
+// relay calls, with the same lock-free, read-only contract as GetLoadedMCPPlugins.
 func (c *Config) GetLoadedRelayPlugins() []schemas.RelayPlugin {
 	if plugins := c.RelayPlugins.Load(); plugins != nil {
 		return slices.Clone(*plugins)
@@ -8947,12 +8614,10 @@ func (c *Config) rebuildInterfaceCaches() {
 		// Clear all caches atomically, except ConfigMarshallers which are preserved.
 		emptyLLM := []schemas.LLMPlugin{}
 		emptyMCP := []schemas.MCPPlugin{}
-		emptyA2A := []schemas.A2APlugin{}
 		emptyEndpoints := []schemas.RelayPlugin{}
 		emptyHTTP := []schemas.HTTPTransportPlugin{}
 		c.LLMPlugins.Store(&emptyLLM)
 		c.MCPPlugins.Store(&emptyMCP)
-		c.A2APlugins.Store(&emptyA2A)
 		c.RelayPlugins.Store(&emptyEndpoints)
 		c.HTTPTransportPlugins.Store(&emptyHTTP)
 		return
@@ -8961,7 +8626,6 @@ func (c *Config) rebuildInterfaceCaches() {
 	// Single pass through all plugins - check all interfaces in one iteration
 	var llm []schemas.LLMPlugin
 	var mcp []schemas.MCPPlugin
-	var a2aPlugins []schemas.A2APlugin
 	var endpointPlugins []schemas.RelayPlugin
 	var httpTransport []schemas.HTTPTransportPlugin
 
@@ -8971,9 +8635,6 @@ func (c *Config) rebuildInterfaceCaches() {
 		}
 		if mcpPlugin, ok := p.(schemas.MCPPlugin); ok {
 			mcp = append(mcp, mcpPlugin)
-		}
-		if a2aPlugin, ok := p.(schemas.A2APlugin); ok {
-			a2aPlugins = append(a2aPlugins, a2aPlugin)
 		}
 		if endpointPlugin, ok := p.(schemas.RelayPlugin); ok {
 			endpointPlugins = append(endpointPlugins, endpointPlugin)
@@ -8989,7 +8650,6 @@ func (c *Config) rebuildInterfaceCaches() {
 
 	c.LLMPlugins.Store(&llm)
 	c.MCPPlugins.Store(&mcp)
-	c.A2APlugins.Store(&a2aPlugins)
 	c.RelayPlugins.Store(&endpointPlugins)
 	c.HTTPTransportPlugins.Store(&httpTransport)
 }
@@ -11495,13 +11155,6 @@ func (g *governedConfigEntities) skipBudget(ctx context.Context, holderKind stri
 	return true
 }
 
-// GetA2AStoreRawRequestResponse reads the live Agent Gateway raw capture setting.
-func (c *Config) GetA2AStoreRawRequestResponse() bool {
-	c.Mu.RLock()
-	defer c.Mu.RUnlock()
-	return c.ClientConfig != nil && c.ClientConfig.A2AStoreRawRequestResponse
-}
-
 // RedactURLCredentials masks the parts of a URL (spec_url, base_url) that can carry a
 // credential, every query value and the userinfo (username and password),
 // keeping the rest of the address. The masked form is stable, so an update
@@ -11577,16 +11230,6 @@ func (c *Config) GetSkillsExternalClientURL() string {
 	return strings.TrimRight(value, "/")
 }
 
-// GetA2APrivateAllowlist returns a copy of the permitted private Agent Gateway destinations.
-func (c *Config) GetA2APrivateAllowlist() []string {
-	c.Mu.RLock()
-	defer c.Mu.RUnlock()
-	if c.ClientConfig == nil {
-		return nil
-	}
-	return slices.Clone(c.ClientConfig.A2APrivateAllowlist)
-}
-
 // grantableRelayNames returns the relay names a key's relay_grants in config.json can grant: each
 // name once, and only names with a stored relay. A repeated name is dropped silently; a name no
 // relay carries (a typo, or a declaration loadRelaysConfig skipped as invalid) is dropped with a
@@ -11616,34 +11259,4 @@ func relayGrantNames(grants []configstoreTables.TableVirtualKeyRelayGrant) []str
 		names = append(names, g.RelayName)
 	}
 	return names
-}
-
-// grantableAgentNames returns the agent names a new key's agent_grants in config.json can grant:
-// each name once, and only agents already stored. Agents are reconciled after governance, so an agent
-// declared in the same file is not stored yet on its first load; that grant belongs on the agent, as
-// agents[].virtual_key_ids, which the agent sync applies. A name with no stored agent is dropped with
-// a warning instead of failing the whole governance sync on the grant table's foreign key.
-func grantableAgentNames(ctx context.Context, store configstore.ConfigStore, grants []configstoreTables.TableVirtualKeyAgentGrant, vkID, vkName string) ([]string, error) {
-	registrations, err := store.ListAgentRegistrations(ctx)
-	if err != nil {
-		return nil, err
-	}
-	stored := make(map[string]bool, len(registrations))
-	for _, r := range registrations {
-		stored[r.Name] = true
-	}
-	out := make([]string, 0, len(grants))
-	seen := make(map[string]bool, len(grants))
-	for _, g := range grants {
-		if seen[g.AgentName] {
-			continue
-		}
-		seen[g.AgentName] = true
-		if !stored[g.AgentName] {
-			logger.Warn("virtual key %s (%s): agent_grants names agent %q, which is not stored yet; skipping that grant (declare it as agents[].virtual_key_ids instead)", vkID, vkName, g.AgentName)
-			continue
-		}
-		out = append(out, g.AgentName)
-	}
-	return out, nil
 }

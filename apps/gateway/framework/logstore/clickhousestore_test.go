@@ -108,7 +108,7 @@ func trySetupClickHouseStore(t testing.TB) *ClickHouseLogStore {
 		t.Skipf("ClickHouse not available, skipping test: %v", err)
 	}
 	ch := store.(*ClickHouseLogStore)
-	for _, table := range []string{"logs", "mcp_tool_logs", "agent_logs", "async_jobs"} {
+	for _, table := range []string{"logs", "mcp_tool_logs", "async_jobs"} {
 		require.NoError(t, ch.db.Exec("TRUNCATE TABLE "+table).Error)
 	}
 	t.Cleanup(func() { _ = ch.Close(context.Background()) })
@@ -291,87 +291,6 @@ func TestChServerVersionSupported(t *testing.T) {
 	for _, bad := range []string{"", "26", "x.y.z", "24.four"} {
 		_, err := chServerVersionSupported(bad)
 		assert.Error(t, err, bad)
-	}
-}
-
-func TestClickHouseReconcileAgentCorrelation(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Truncate(time.Millisecond)
-	taskID, contextID := "task-clickhouse", "context-clickhouse"
-	requestBody, responseBody := `{"message":"original request"}`, `{"message":"original response"}`
-	request := &AgentLog{ID: "ch-a2a-request", Timestamp: now, RecordKind: "request", Status: "success", AgentName: "fixture", RequestID: "ch-request-id", RequestBody: &requestBody, ResponseBody: &responseBody}
-	event := &AgentLog{ID: "ch-a2a-event", Timestamp: now.Add(time.Millisecond), RecordKind: "event", Status: "success", AgentName: "fixture", RequestID: "ch-request-id", TaskID: &taskID, ContextID: &contextID}
-
-	_, err := store.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{request})
-	require.NoError(t, err)
-	require.NoError(t, store.ReconcileAgentCorrelation(ctx, []*AgentLog{request}))
-	require.NoError(t, agentLogsCreateError(store.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{event})))
-	require.NoError(t, store.ReconcileAgentCorrelation(ctx, []*AgentLog{event}))
-
-	found, err := store.FindAgentLog(ctx, request.ID)
-	require.NoError(t, err)
-	require.Equal(t, taskID, *found.TaskID)
-	require.Equal(t, contextID, *found.ContextID)
-	require.Equal(t, &requestBody, found.RequestBody)
-	require.Equal(t, &responseBody, found.ResponseBody)
-	require.Equal(t, request.Timestamp, found.Timestamp)
-
-	// A different request for the same task inherits context through the task
-	// pass. Its event body must survive the metadata-only correlation scan too.
-	eventBody := `{"artifact":"keep this payload"}`
-	taskOnly := &AgentLog{ID: "ch-a2a-task-only", Timestamp: now.Add(2 * time.Millisecond), RecordKind: "event", Status: "success", AgentName: "fixture", RequestID: "another-request", TaskID: &taskID, EventBody: &eventBody, HasObject: true}
-	require.NoError(t, agentLogsCreateError(store.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{taskOnly})))
-	require.NoError(t, store.ReconcileAgentCorrelation(ctx, []*AgentLog{taskOnly}))
-	found, err = store.FindAgentLog(ctx, taskOnly.ID)
-	require.NoError(t, err)
-	require.Equal(t, contextID, *found.ContextID)
-	require.Equal(t, &eventBody, found.EventBody)
-	require.True(t, found.HasObject)
-
-	// Complete groups require no rewrite, even when reconciliation repeats.
-	require.NoError(t, store.ReconcileAgentCorrelation(ctx, []*AgentLog{request, event, taskOnly}))
-	found, err = store.FindAgentLog(ctx, request.ID)
-	require.NoError(t, err)
-	require.Equal(t, &requestBody, found.RequestBody)
-	require.Equal(t, &responseBody, found.ResponseBody)
-}
-
-// TestClickHouseReconcileAgentCorrelationReusedID keeps rows with the same ID
-// at different millisecond timestamps isolated in both reconciliation passes.
-func TestClickHouseReconcileAgentCorrelationReusedID(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Truncate(time.Second).Add(123 * time.Millisecond)
-	for _, pass := range []string{"request", "task"} {
-		t.Run(pass, func(t *testing.T) {
-			taskID, contextID := "task-"+pass, "context-"+pass
-			oldBody, targetBody := "old payload", "target payload"
-			old := &AgentLog{ID: "reused-" + pass, Timestamp: now.Add(-time.Hour), RecordKind: "event", Status: "success", AgentName: "other-agent", RequestID: "other-request", EventBody: &oldBody, HasObject: true}
-			target := &AgentLog{ID: old.ID, Timestamp: now, RecordKind: "event", Status: "success", AgentName: "fixture-" + pass, RequestID: "target-" + pass, EventBody: &targetBody}
-			source := &AgentLog{ID: "source-" + pass, Timestamp: now.Add(time.Millisecond), RecordKind: "event", Status: "success", AgentName: target.AgentName, RequestID: target.RequestID, TaskID: &taskID, ContextID: &contextID}
-			if pass == "task" {
-				target.TaskID = &taskID
-				source.RequestID = "different-request"
-			}
-			// Separate creates exercise the API's timestamp-bounded existence check.
-			require.NoError(t, agentLogsCreateError(store.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{old})))
-			require.NoError(t, agentLogsCreateError(store.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{target, source})))
-			require.NoError(t, store.ReconcileAgentCorrelation(ctx, []*AgentLog{target, source}))
-			var rows []AgentLog
-			require.NoError(t, store.db.Where("id = ?", old.ID).Order("timestamp").Find(&rows).Error)
-			require.Len(t, rows, 2)
-			require.Equal(t, old.Timestamp, rows[0].Timestamp)
-			require.Empty(t, rows[0].TaskID)
-			require.Empty(t, rows[0].ContextID)
-			require.Equal(t, &oldBody, rows[0].EventBody)
-			require.True(t, rows[0].HasObject)
-			require.Equal(t, target.Timestamp, rows[1].Timestamp)
-			require.Equal(t, &taskID, rows[1].TaskID)
-			require.Equal(t, &contextID, rows[1].ContextID)
-			require.Equal(t, &targetBody, rows[1].EventBody)
-			require.False(t, rows[1].HasObject)
-		})
 	}
 }
 
@@ -720,7 +639,7 @@ func BenchmarkChIDLookupContext(b *testing.B) {
 func TestClickHouseReconcileSkipIndexesMaterializesNewIndex(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	ctx := context.Background()
-	for _, idx := range []string{"idx_logs_id", "idx_logs_parent_request_id", "idx_agent_logs_id", "idx_relay_logs_id", "idx_mcp_logs_id"} {
+	for _, idx := range []string{"idx_logs_id", "idx_logs_parent_request_id", "idx_relay_logs_id", "idx_mcp_logs_id"} {
 		var n int64
 		require.NoError(t, store.db.Raw("SELECT count() FROM system.data_skipping_indices WHERE database = currentDatabase() AND name = ?", idx).Scan(&n).Error)
 		assert.Equal(t, int64(1), n, "migration must create skip index %s", idx)
@@ -1040,16 +959,8 @@ func TestClickHouseDimensionFiltersMatchFanoutRankings(t *testing.T) {
 	}, now)
 }
 
-// The agent-log team, customer and business-unit filters bound the ids as a
-// bare list inside hasAny, which ClickHouse refuses as a string, so every one
-// of them failed on this backend.
-func TestClickHouseA2AAttributionFilters(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	assertA2AAttributionFilters(t, store.RDBLogStore, store.BatchCreateAgentLogsIfNotExists)
-}
-
-// The MCP tool log team, customer and business-unit filters go through the same hasAny membership
-// SQL as agent logs, so they are pinned on this backend too.
+// The MCP tool log team, customer and business-unit filters go through the hasAny membership
+// SQL, so they are pinned on this backend too.
 func TestClickHouseMCPAttributionFilters(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	assertMCPAttributionFilters(t, store.RDBLogStore, store.BatchCreateMCPToolLogsIfNotExists)
@@ -1134,28 +1045,6 @@ func TestClickHouseDeleteLogs(t *testing.T) {
 		_, err := store.FindByID(ctx, id)
 		assert.ErrorIs(t, err, ErrNotFound, "log %s should be deleted", id)
 	}
-}
-
-func TestClickHouseDeleteAgentLogsAppliesScopeToRequestedAndCorrelatedRows(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	now := time.Now().UTC().Truncate(time.Millisecond)
-	alice, bob := "alice", "bob"
-	rows := []*AgentLog{
-		{ID: "ch-alice-request", Timestamp: now, RecordKind: "request", Status: "success", AgentName: "fixture", RequestID: "ch-shared-request", UserID: &alice},
-		{ID: "ch-alice-event", Timestamp: now.Add(time.Millisecond), RecordKind: "event", Status: "success", AgentName: "fixture", RequestID: "ch-shared-request", UserID: &alice},
-		{ID: "ch-bob-shared-event", Timestamp: now.Add(2 * time.Millisecond), RecordKind: "event", Status: "success", AgentName: "fixture", RequestID: "ch-shared-request", UserID: &bob},
-		{ID: "ch-bob-request", Timestamp: now.Add(3 * time.Millisecond), RecordKind: "request", Status: "success", AgentName: "fixture", RequestID: "ch-bob-request", UserID: &bob},
-	}
-	require.NoError(t, agentLogsCreateError(store.BatchCreateAgentLogsIfNotExists(context.Background(), rows)))
-	ctx := queryscope.WithQueryScope(context.Background(), func(db *gorm.DB) *gorm.DB {
-		return db.Where("user_id = ?", alice)
-	})
-
-	require.NoError(t, store.DeleteAgentLogs(ctx, []string{"ch-alice-request", "ch-bob-request"}))
-
-	var remaining []string
-	require.NoError(t, store.db.Model(&AgentLog{}).Order("id").Pluck("id", &remaining).Error)
-	require.Equal(t, []string{"ch-bob-request", "ch-bob-shared-event"}, remaining)
 }
 
 func TestClickHouseDeleteLogsBatch(t *testing.T) {
@@ -1265,7 +1154,7 @@ func TestClickHouseDeleteLogsBatchIsSingleLightweightMutation(t *testing.T) {
 }
 
 // TestClickHouseFlushIsLightweightAndSkipsWhenEmpty covers the minute sweep
-// from plugins/logging: LLM, MCP and A2A cleanup must use lightweight
+// from plugins/logging: LLM and MCP cleanup must use lightweight
 // deletes and must not issue any mutation when nothing is left to flush.
 func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	store := trySetupClickHouseStore(t)
@@ -1278,28 +1167,14 @@ func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	require.NoError(t, store.CreateIfNotExists(ctx, stuck))
 	require.NoError(t, store.CreateIfNotExists(ctx, done))
 	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{chTestMCPToolLog("ch-flush-mcp", old)}))
-	agents := []*AgentLog{
-		{ID: "ch-flush-agent", Timestamp: old, CreatedAt: old, Status: "processing"},
-		{ID: "ch-flush-agent-done", Timestamp: old, CreatedAt: old, Status: "success"},
-		{ID: "ch-flush-agent-fresh", Timestamp: time.Now().UTC(), CreatedAt: time.Now().UTC(), Status: "processing"},
-	}
-	require.NoError(t, agentLogsCreateError(store.BatchCreateAgentLogsIfNotExists(ctx, agents)))
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
 	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
-	agentBefore := chMutationIDs(t, store.db, "agent_logs")
 	since := time.Now().UTC().Add(-30 * time.Minute)
 	require.NoError(t, store.Flush(ctx, since))
 	require.NoError(t, store.FlushMCPToolLogs(ctx, since))
-	require.NoError(t, store.FlushAgentLogs(ctx, since))
-	_, err := store.FindAgentLog(ctx, "ch-flush-agent")
-	assert.ErrorIs(t, err, ErrNotFound)
-	for _, id := range []string{"ch-flush-agent-done", "ch-flush-agent-fresh"} {
-		_, err := store.FindAgentLog(ctx, id)
-		assert.NoError(t, err, "completed and fresh A2A rows must survive")
-	}
 
-	_, err = store.FindByID(ctx, "ch-flush-stuck")
+	_, err := store.FindByID(ctx, "ch-flush-stuck")
 	assert.ErrorIs(t, err, ErrNotFound, "stale processing row must be flushed")
 	_, err = store.FindByID(ctx, "ch-flush-done")
 	assert.NoError(t, err, "completed rows must survive the flush")
@@ -1312,21 +1187,15 @@ func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	mcpCmds := chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore)
 	require.Len(t, mcpCmds, 1, "mcp_tool_logs: one flush must issue exactly one mutation, got %v", mcpCmds)
 	assertLightweightMutations(t, "mcp_tool_logs", mcpCmds)
-	agentCmds := chNewMutationCommands(t, store.db, "agent_logs", agentBefore)
-	require.Len(t, agentCmds, 1)
-	assertLightweightMutations(t, "agent_logs", agentCmds)
 
 	// Nothing left to flush: the once-a-minute sweep must not touch the
 	// tables at all (the issue counted ~1,440 mutations per table per day).
 	logsBefore = chMutationIDs(t, store.db, "logs")
 	mcpBefore = chMutationIDs(t, store.db, "mcp_tool_logs")
-	agentBefore = chMutationIDs(t, store.db, "agent_logs")
 	require.NoError(t, store.Flush(ctx, since))
 	require.NoError(t, store.FlushMCPToolLogs(ctx, since))
-	require.NoError(t, store.FlushAgentLogs(ctx, since))
 	assert.Empty(t, chNewMutationCommands(t, store.db, "logs", logsBefore), "empty flush must not issue a mutation")
 	assert.Empty(t, chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore), "empty flush must not issue a mutation")
-	assert.Empty(t, chNewMutationCommands(t, store.db, "agent_logs", agentBefore), "empty A2A flush must not issue a mutation")
 }
 
 // TestClickHouseFlushSkipsSupersededProcessingRow: a log created as processing
@@ -1993,7 +1862,6 @@ func TestClickHouseMarkHasObject(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"mark-absent"}, result.Missing)
-	assert.Empty(t, result.Superseded, "logs rows track no object reference, so no mark is superseded")
 	for _, id := range []string{"mark-exact", "mark-zero", "mark-wrong", "mark-done"} {
 		row, err := store.FindByID(ctx, id)
 		require.NoError(t, err)
@@ -2070,105 +1938,6 @@ func TestClickHouseHybridFlushMarksMissingRows(t *testing.T) {
 	_, err = objects.Get(ctx, logKey)
 	assert.ErrorIs(t, err, objectstore.ErrNotFound, "a row still missing after the retries was deleted, so its object goes too")
 	assert.Zero(t, hybrid.DroppedUploads(), "removing a deleted row's object is not a dropped upload")
-}
-
-// TestClickHouseHybridAgentDeletedBeforeFlagRemovesObject: an A2A row deleted
-// after its object was written but before the batched has_object flip ran is
-// deleted with has_object=false, so DeleteAgentLogs leaves the object. The
-// flip that finds the row gone must remove it.
-func TestClickHouseHybridAgentDeletedBeforeFlagRemovesObject(t *testing.T) {
-	ch := trySetupClickHouseStore(t)
-	objects := objectstore.NewInMemoryObjectStore()
-	hybrid := newHybridLogStore(ch, objects, "test", hybridTestLogger{}, nil, nil)
-	t.Cleanup(func() { _ = hybrid.Close(context.Background()) })
-	ctx := context.Background()
-	ts := time.Now().UTC().Truncate(time.Millisecond)
-	body := `{"message":"to be deleted"}`
-	entry := &AgentLog{
-		ID: "agent-deleted-early", Timestamp: ts, RecordKind: "request",
-		Operation: "SendMessage", Status: "success", AgentName: "fixture", RequestID: "req-agent-deleted-early",
-		RequestBody: &body,
-	}
-	key := hybrid.agentLogKey(ts, entry.ID)
-	dbEntry := *entry
-	PrepareAgentLogDBEntry(&dbEntry, key)
-	_, err := ch.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{&dbEntry})
-	require.NoError(t, err)
-	// The upload worker's Put has run; its flip is still queued.
-	require.NoError(t, objects.Put(ctx, key, []byte(`{"request_body":"to be deleted"}`), nil))
-
-	require.NoError(t, hybrid.DeleteAgentLogs(ctx, []string{entry.ID}))
-	_, err = objects.Get(ctx, key)
-	require.NoError(t, err, "DeleteAgentLogs skips the object while has_object is false")
-
-	mark := hasObjectMark{kind: uploadKindAgent, logID: entry.ID, timestamp: ts, key: key}
-	for attempt := 1; attempt <= markMaxAttempts; attempt++ {
-		retry := hybrid.flushMarks([]hasObjectMark{mark}, false)
-		if attempt < markMaxAttempts {
-			require.Len(t, retry, 1)
-			mark = retry[0]
-		} else {
-			assert.Empty(t, retry)
-		}
-	}
-	_, err = objects.Get(ctx, key)
-	assert.ErrorIs(t, err, objectstore.ErrNotFound, "the deleted row's object must not outlive it")
-	assert.Zero(t, hybrid.DroppedUploads())
-}
-
-// TestClickHouseHybridSupersededAgentMarkLeavesFlag: payload A is written and
-// its flip is still queued when an update moves the row to payload B, whose
-// upload then fails. A's delayed flip must not set has_object, since the row's
-// object (B) does not exist; reads must show B's bodies, and A's object, which
-// no row references, must be gone.
-func TestClickHouseHybridSupersededAgentMarkLeavesFlag(t *testing.T) {
-	ch := trySetupClickHouseStore(t)
-	objects := objectstore.NewInMemoryObjectStore()
-	hybrid := newHybridLogStore(ch, objects, "test", hybridTestLogger{}, nil, nil)
-	t.Cleanup(func() { _ = hybrid.Close(context.Background()) })
-	ctx := context.Background()
-	ts := time.Now().UTC().Truncate(time.Millisecond)
-	bodyA := `{"message":"payload A"}`
-	bodyB := `{"message":"payload B"}`
-	entry := &AgentLog{
-		ID: "agent-superseded-mark", Timestamp: ts, RecordKind: "request",
-		Operation: "SendMessage", Status: "success", AgentName: "fixture", RequestID: "req-agent-superseded-mark",
-		RequestBody: &bodyA,
-	}
-	keyA := hybrid.agentLogKey(ts, entry.ID)
-	dbEntry := *entry
-	PrepareAgentLogDBEntry(&dbEntry, keyA)
-	_, err := ch.BatchCreateAgentLogsIfNotExists(ctx, []*AgentLog{&dbEntry})
-	require.NoError(t, err)
-	payloadA, err := MarshalAgentLogPayload(entry)
-	require.NoError(t, err)
-	require.NoError(t, objects.Put(ctx, keyA, payloadA, nil)) // A's Put ran; its flip is queued
-
-	objects.PutErr = assert.AnError
-	require.NoError(t, hybrid.UpdateAgentLog(ctx, entry.ID, map[string]interface{}{"request_body": bodyB}))
-	waitForUploads(t, func() bool { return hybrid.DroppedUploads() == 1 })
-	objects.PutErr = nil
-
-	assert.Empty(t, hybrid.flushMarks([]hasObjectMark{{kind: uploadKindAgent, logID: entry.ID, timestamp: ts, key: keyA}}, false))
-	row, err := ch.FindAgentLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.False(t, row.HasObject, "a mark for a superseded object must not flag the row")
-	require.NotNil(t, row.PayloadReference)
-	assert.NotEqual(t, keyA, *row.PayloadReference)
-	found, err := hybrid.FindAgentLog(ctx, entry.ID)
-	require.NoError(t, err)
-	require.NotNil(t, found.RequestBody)
-	assert.Equal(t, bodyB, *found.RequestBody)
-	_, err = objects.Get(ctx, keyA)
-	assert.ErrorIs(t, err, objectstore.ErrNotFound, "the superseded object must be deleted")
-
-	// A mark for the object the row does reference still applies.
-	result, err := ch.MarkHasObject(ctx, "agent_logs", []HasObjectMark{{ID: entry.ID, Timestamp: ts, Key: *row.PayloadReference}})
-	require.NoError(t, err)
-	assert.Empty(t, result.Superseded)
-	row, err = ch.FindAgentLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.True(t, row.HasObject)
 }
 
 // BenchmarkClickHouseUpdateHasObject measures the hybrid store's has_object

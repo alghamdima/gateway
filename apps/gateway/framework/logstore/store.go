@@ -238,27 +238,6 @@ type LogStore interface {
 	// GetDistinctMCPKeyPairs returns one MCP tool log dimension's id/name pairs for the filter sidebar.
 	GetDistinctMCPKeyPairs(ctx context.Context, idCol, nameCol string, limit int, query string) ([]KeyPairResult, error)
 
-	// Agent Gateway log methods.
-	BatchCreateAgentLogsIfNotExists(ctx context.Context, entries []*AgentLog) ([]string, error)
-	// ReconcileAgentCorrelation fills missing task and context IDs from persisted
-	// rows related to the inserted entries. Existing values are never changed.
-	ReconcileAgentCorrelation(ctx context.Context, entries []*AgentLog) error
-	FindAgentLog(ctx context.Context, id string) (*AgentLog, error)
-	FindAgentLogsForDeletion(ctx context.Context, ids []string) ([]*AgentLog, error)
-	ListAgentLogHistory(ctx context.Context, filter AgentLogHistoryFilter, pagination PaginationOptions) (*AgentLogHistoryResult, error)
-	ListAgentLogOperations(ctx context.Context, filter AgentLogHistoryFilter, pagination PaginationOptions) (*AgentLogOperationResult, error)
-	FindAgentLogOperation(ctx context.Context, id string) (*AgentLogOperation, error)
-	GetAgentLogStats(ctx context.Context, filter AgentLogHistoryFilter) (*AgentLogStats, error)
-	GetAgentHistogram(ctx context.Context, filter AgentLogHistoryFilter, bucketSizeSeconds int64) (*AgentHistogramResult, error)
-	GetAgentTopAgents(ctx context.Context, filter AgentLogHistoryFilter, limit int) (*AgentTopAgentsResult, error)
-	GetAgentFilterData(ctx context.Context, dimensions []string, limit int, query string) (*AgentFilterData, error)
-	UpdateAgentLog(ctx context.Context, id string, entry any) error
-	// DeleteAgentLogs deletes the identified rows together with every row sharing
-	// their request IDs, so an operation's correlated stream events never
-	// outlive the aggregate request row shown in the UI.
-	DeleteAgentLogs(ctx context.Context, ids []string) error
-	FlushAgentLogs(ctx context.Context, since time.Time) error
-
 	// Relay log methods (Relay Logs).
 	BatchCreateRelayLogsIfNotExists(ctx context.Context, entries []*RelayLog) ([]string, error)
 	FindRelayLog(ctx context.Context, id string) (*RelayLog, error)

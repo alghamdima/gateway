@@ -1293,8 +1293,6 @@ func TestTriggerMigrations_FreshDB(t *testing.T) {
 		&tables.TableVirtualKeyProviderConfig{},
 		&tables.TableVirtualKeyMCPConfig{},
 		&tables.TableNotification{},
-		&tables.TableAgentRegistration{},
-		&tables.TableVirtualKeyAgentGrant{},
 	}
 
 	migrator := db.Migrator()
@@ -1302,34 +1300,6 @@ func TestTriggerMigrations_FreshDB(t *testing.T) {
 		assert.True(t, migrator.HasTable(table), "table should exist: %T", table)
 	}
 	assert.True(t, migrator.HasColumn(&tables.TableModelPricing{}, "is_deprecated"), "model pricing is_deprecated column should exist")
-	assert.False(t, migrator.HasColumn(&tables.TableVirtualKey{}, "agent_grants"), "agent_grants is a has-many association, not a database column")
-}
-
-func TestMigrationAddAgentGatewayTables_UpgradesExistingDatabase(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-
-	// The shipped foundational migration must not create Agent Gateway tables.
-	require.NoError(t, migrationInit(ctx, db, testMigrationLogger))
-	require.False(t, db.Migrator().HasTable(&tables.TableAgentRegistration{}), "init must not create Agent Gateway tables")
-	require.False(t, db.Migrator().HasTable(&tables.TableVirtualKeyAgentGrant{}), "init must not create Agent Gateway tables")
-
-	require.NoError(t, migrationAddAgentGatewayTables(ctx, db, testMigrationLogger))
-	require.True(t, db.Migrator().HasTable(&tables.TableAgentRegistration{}))
-	require.True(t, db.Migrator().HasTable(&tables.TableVirtualKeyAgentGrant{}))
-	require.True(t, db.Migrator().HasTable(&tables.TableAgentPushConfig{}))
-	require.True(t, db.Migrator().HasTable(&tables.TableAgentPushDelivery{}))
-	require.False(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "extension_uris"))
-	require.True(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "forward_accepted_credential_overrides_auth"))
-
-	var grantDDL string
-	require.NoError(t, db.Raw("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", tables.TableVirtualKeyAgentGrant{}.TableName()).Scan(&grantDDL).Error)
-	assert.Contains(t, grantDDL, "REFERENCES", "grant table should carry foreign key constraints")
-	assert.Contains(t, grantDDL, "ON DELETE CASCADE", "grant table foreign keys should cascade on delete")
-
-	// Re-running is a no-op on an already upgraded database.
-	require.NoError(t, migrationAddAgentGatewayTables(ctx, db, testMigrationLogger))
-	require.True(t, db.Migrator().HasTable(&tables.TableVirtualKeyAgentGrant{}))
 }
 
 func TestTriggerMigrations_Idempotent(t *testing.T) {
@@ -4780,21 +4750,6 @@ func TestMigrationAddVirtualKeyDisableContentLoggingColumn_NonRollbackable(t *te
 	assert.True(t, *got.DisableContentLogging, "the surviving decision must be untouched")
 }
 
-func TestMigrationAddAgentGatewayTables_NonRollbackable(t *testing.T) {
-	db := setupTestDB(t)
-	require.NoError(t, db.AutoMigrate(&tables.TableClientConfig{}))
-	require.NoError(t, migrationAddAgentGatewayTables(context.Background(), db, testMigrationLogger))
-
-	err := rollbackAgentGatewayTables(db)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "non-rollbackable")
-	assert.True(t, db.Migrator().HasTable(&tables.TableAgentRegistration{}))
-	assert.True(t, db.Migrator().HasTable(&tables.TableVirtualKeyAgentGrant{}))
-	assert.True(t, db.Migrator().HasTable(&tables.TableAgentPushConfig{}))
-	assert.True(t, db.Migrator().HasTable(&tables.TableAgentPushDelivery{}))
-	assert.True(t, db.Migrator().HasColumn(&tables.TableClientConfig{}, "A2AExternalClientURL"))
-}
-
 func TestMigrationAddClientConfigDeleteExpiredVirtualKeysColumn(t *testing.T) {
 	db := setupVKTestDBWithoutRotationColumns(t)
 	ctx := context.Background()
@@ -5571,20 +5526,6 @@ func TestMigrationAddMCPClientDiscoveredToolDetailsColumnBoundsLockWait(t *testi
 	assert.True(t, postgresconn.IsLockNotAvailableError(err), "expected lock_not_available, got: %v", err)
 }
 
-// TestA2ARawCaptureSettingMigration defaults existing deployments to capture disabled.
-func TestA2ARawCaptureSettingMigration(t *testing.T) {
-	db := setupTestDB(t)
-	require.NoError(t, db.Exec("CREATE TABLE config_client (id INTEGER PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("INSERT INTO config_client (id) VALUES (1)").Error)
-	for range 2 {
-		require.NoError(t, migrationAddA2ARawCaptureSetting(context.Background(), db, testMigrationLogger))
-	}
-	require.True(t, db.Migrator().HasColumn(&tables.TableClientConfig{}, "A2AStoreRawRequestResponse"))
-	var enabled bool
-	require.NoError(t, db.Table("config_client").Select("a2a_store_raw_request_response").Where("id = 1").Scan(&enabled).Error)
-	require.False(t, enabled)
-}
-
 // TestMigrationAddMCPClientOpenAPIColumns_RollbackRefuses: the openapi columns
 // hold the only stored copy of a client's spec and its encrypted credentials,
 // so both rollbacks refuse rather than drop them and report success.
@@ -5706,55 +5647,6 @@ func TestMigrationSkillsURLSkipsPrivateComponents(t *testing.T) {
 		require.Empty(t, row.SkillsExternalClientURL)
 	}
 	require.Equal(t, "https://safe.example/path", rows[4].SkillsExternalClientURL)
-}
-
-// TestMigrationAddAgentDestinationPolicyColumns preserves registrations when upgrading the old table.
-func TestMigrationAddAgentDestinationPolicyColumns(t *testing.T) {
-	db := setupTestDB(t)
-	require.NoError(t, db.Exec("CREATE TABLE config_agent_registrations (name TEXT PRIMARY KEY, agent_card_url TEXT NOT NULL)").Error)
-	require.NoError(t, db.Exec("INSERT INTO config_agent_registrations (name, agent_card_url) VALUES (?, ?)", "existing", "https://cards.example.com").Error)
-	require.NoError(t, migrationAddAgentDestinationPolicyColumns(context.Background(), db, testMigrationLogger))
-	require.True(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "credential_origins"))
-	require.True(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "require_public_target"))
-	var row struct {
-		Name                string
-		RequirePublicTarget bool
-	}
-	require.NoError(t, db.Table("config_agent_registrations").Select("name, require_public_target").First(&row).Error)
-	require.Equal(t, "existing", row.Name)
-	require.False(t, row.RequirePublicTarget)
-	require.NoError(t, migrationAddAgentDestinationPolicyColumns(context.Background(), db, testMigrationLogger))
-}
-
-// TestDropAgentRegistrationOptions preserves registrations and protocol tenants during upgrade.
-func TestDropAgentRegistrationOptions(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-	require.NoError(t, db.AutoMigrate(&tables.TableAgentRegistration{}, &tables.TableAgentPushConfig{}))
-	require.NoError(t, db.Exec("ALTER TABLE config_agent_registrations ADD COLUMN tenant TEXT").Error)
-	require.NoError(t, db.Exec("ALTER TABLE config_agent_registrations ADD COLUMN extension_uris TEXT").Error)
-	require.NoError(t, db.Exec("INSERT INTO config_agent_registrations (name, agent_card_url, tenant, extension_uris, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", "fixture", "https://example.com/card", "unused", "[]", time.Now(), time.Now()).Error)
-	require.NoError(t, migrationDropAgentRegistrationOptions(ctx, db, testMigrationLogger))
-	require.False(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "tenant"))
-	require.False(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "extension_uris"))
-	require.True(t, db.Migrator().HasColumn(&tables.TableAgentPushConfig{}, "tenant"))
-	var row tables.TableAgentRegistration
-	require.NoError(t, db.First(&row, "name = ?", "fixture").Error)
-	require.Equal(t, "https://example.com/card", row.AgentCardURL)
-	require.NoError(t, migrationDropAgentRegistrationOptions(ctx, db, testMigrationLogger))
-}
-
-// TestDropAgentRegistrationOptionsWithoutLegacyColumns covers direct upgrades and fresh installs.
-func TestDropAgentRegistrationOptionsWithoutLegacyColumns(t *testing.T) {
-	db := setupTestDB(t)
-	require.NoError(t, db.AutoMigrate(&tables.TableAgentRegistration{}))
-	require.NoError(t, db.Create(&tables.TableAgentRegistration{Name: "existing", AgentCardURL: "https://example.com/card"}).Error)
-	require.NoError(t, migrationDropAgentRegistrationOptions(context.Background(), db, testMigrationLogger))
-	require.False(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "tenant"))
-	require.False(t, db.Migrator().HasColumn(&tables.TableAgentRegistration{}, "extension_uris"))
-	var count int64
-	require.NoError(t, db.Model(&tables.TableAgentRegistration{}).Count(&count).Error)
-	require.EqualValues(t, 1, count)
 }
 
 // TestMigrationAddPassthroughJSONColumn_NonRollbackable pins that rolling the passthrough

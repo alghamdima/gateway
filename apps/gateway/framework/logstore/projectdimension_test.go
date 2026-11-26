@@ -61,52 +61,6 @@ func TestProjectFilterNarrowsTheRawQuery(t *testing.T) {
 	assert.EqualValues(t, 0, countWith(SearchFilters{ProjectIDs: []string{"proj-missing"}}))
 }
 
-func TestAgentFilterCorrelatesThroughContextsWithinTimeRange(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&Log{}, &MCPToolLog{}, &AgentLog{}))
-	store := &RDBLogStore{db: db, logger: bifrost.NewDefaultLogger(schemas.LogLevelInfo)}
-
-	now := time.Now().UTC()
-	insideStart, insideEnd := now.Add(-time.Minute), now.Add(time.Minute)
-	outside := now.Add(-time.Hour)
-	for _, row := range []struct {
-		id, agent, context string
-		timestamp          time.Time
-	}{
-		{"agent-a-inside", "agent-a", "context-a", now},
-		{"agent-a-outside", "agent-a", "context-old", outside},
-		{"agent-b-inside", "agent-b", "context-b", now},
-	} {
-		contextID := row.context
-		require.NoError(t, db.Create(&AgentLog{
-			ID:         row.id,
-			Timestamp:  row.timestamp,
-			CreatedAt:  row.timestamp,
-			RecordKind: "request",
-			Operation:  "SendMessage",
-			Status:     "success",
-			AgentName:  row.agent,
-			RequestID:  row.id,
-			ContextID:  &contextID,
-		}).Error)
-	}
-
-	for _, contextID := range []string{"context-a", "context-old", "context-b", "context-unrelated"} {
-		sessionID := contextID
-		require.NoError(t, db.Create(&Log{ID: "llm-" + contextID, Timestamp: now, Status: "success", SessionID: &sessionID}).Error)
-		require.NoError(t, db.Create(&MCPToolLog{ID: "mcp-" + contextID, Timestamp: now, ToolName: "tool", SessionID: &sessionID}).Error)
-	}
-
-	llmFilters := SearchFilters{AgentNames: []string{"agent-a"}, StartTime: &insideStart, EndTime: &insideEnd}
-	mcpFilters := MCPToolLogSearchFilters{AgentNames: []string{"agent-a"}, StartTime: &insideStart, EndTime: &insideEnd}
-	var llmIDs, mcpIDs []string
-	require.NoError(t, store.applyFilters(db.Model(&Log{}), llmFilters).Pluck("id", &llmIDs).Error)
-	require.NoError(t, store.applyMCPFilters(db.Model(&MCPToolLog{}), mcpFilters).Pluck("id", &mcpIDs).Error)
-	assert.Equal(t, []string{"llm-context-a"}, llmIDs)
-	assert.Equal(t, []string{"mcp-context-a"}, mcpIDs)
-}
-
 func TestCorrelationFiltersAreExactScalars(t *testing.T) {
 	s := newProjectDimensionStore(t)
 	mcpDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})

@@ -127,7 +127,6 @@ type ClientConfig struct {
 	BifrostMCPAllowWrites                   *bool                                 `json:"bifrost_mcp_allow_writes,omitempty"`            // Whether /v1/mcp serves non-GET /api tools; nil is true
 	MCPCodeModeLimits                       *schemas.MCPCodeModeLimits            `json:"mcp_code_mode_limits,omitempty"`                // Per-execution code mode limits; nil or zero fields use the defaults
 	MCPOAuthPrivateAllowlist                []string                              `json:"mcp_oauth_private_allowlist,omitempty"`         // Private hosts, IPs and CIDRs the MCP OAuth chain may reach for clients registered with admin auth
-	A2APrivateAllowlist                     []string                              `json:"a2a_private_allowlist,omitempty"`               // Private hosts, IPs and CIDRs the Agent Gateway may reach for clients registered with admin auth
 	MCPToolExecutionTimeout                 int                                   `json:"mcp_tool_execution_timeout"`                    // The timeout for individual tool execution in seconds
 	MCPCodeModeBindingLevel                 string                                `json:"mcp_code_mode_binding_level"`                   // Code mode binding level: "server" or "tool"
 	MCPToolSyncInterval                     int                                   `json:"mcp_tool_sync_interval"`                        // Global tool sync interval in minutes (default: 10, 0 = built-in default)
@@ -152,12 +151,10 @@ type ClientConfig struct {
 	MCPExternalClientURL                    *schemas.SecretVar                    `json:"mcp_external_client_url,omitempty"`             // Public base URL used as redirect_uri when Bifrost acts as an OAuth client to upstream MCP servers. Supports env var syntax ("env.MY_VAR")
 	MCPClientMetadataURL                    *schemas.SecretVar                    `json:"mcp_client_metadata_url,omitempty"`             // Full URL where Bifrost's Client ID Metadata Document is hosted; empty serves it under mcp_external_client_url
 	SkillsExternalClientURL                 *schemas.SecretVar                    `json:"skills_external_client_url,omitempty"`          // Public base URL for Skills Repository marketplaces; empty disables marketplace serving
-	A2AStoreRawRequestResponse              bool                                  `json:"a2a_store_raw_request_response"`
-	A2AExternalClientURL                    *schemas.SecretVar                    `json:"a2a_external_client_url,omitempty"` // Public base URL used for Agent Gateway push-notification callback URLs and served agent card URLs. Supports env var syntax ("env.MY_VAR") and vault refs
-	MCPServerAuthMode                       tables.MCPServerAuthMode              `json:"mcp_server_auth_mode,omitempty"`    // How /mcp authenticates inbound clients: headers (default), both, or oauth.
-	OAuth2ServerConfig                      *tables.OAuth2ServerConfig            `json:"oauth2_server_config,omitempty"`    // OAuth2 AS-specific settings (IssuerURL, token TTLs). Only relevant when MCPServerAuthMode is both or oauth.
-	ConfigHash                              string                                `json:"-"`                                 // Config hash for reconciliation (not serialized)
-	DumpErrorsInConsoleLogs                 bool                                  `json:"dump_errors_in_console_logs"`       // Dump error details in console logs
+	MCPServerAuthMode                       tables.MCPServerAuthMode              `json:"mcp_server_auth_mode,omitempty"`                // How /mcp authenticates inbound clients: headers (default), both, or oauth.
+	OAuth2ServerConfig                      *tables.OAuth2ServerConfig            `json:"oauth2_server_config,omitempty"`                // OAuth2 AS-specific settings (IssuerURL, token TTLs). Only relevant when MCPServerAuthMode is both or oauth.
+	ConfigHash                              string                                `json:"-"`                                             // Config hash for reconciliation (not serialized)
+	DumpErrorsInConsoleLogs                 bool                                  `json:"dump_errors_in_console_logs"`                   // Dump error details in console logs
 }
 
 // IsMCPOAuthDiscoveryEnabled reports whether the well-known OAuth discovery
@@ -397,14 +394,6 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 		hash.Write([]byte("mcpOAuthPrivateAllowlist:"))
 		hash.Write(data)
 	}
-	if c.A2APrivateAllowlist != nil {
-		data, err := sortedStringsJSON(c.A2APrivateAllowlist)
-		if err != nil {
-			return "", err
-		}
-		hash.Write([]byte("a2aPrivateAllowlist:"))
-		hash.Write(data)
-	}
 
 	// Hash integer fields
 	data, err := sonic.Marshal(c.InitialPoolSize)
@@ -578,17 +567,6 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 		}
 	}
 
-	// Only hashed when set to avoid hash churn on existing configs that predate the field.
-	if c.A2AStoreRawRequestResponse {
-		hash.Write([]byte("a2aStoreRawRequestResponse:true"))
-	}
-	if c.A2AExternalClientURL != nil {
-		if c.A2AExternalClientURL.IsFromSecret() {
-			hash.Write([]byte("a2aExternalClientURL:ref:" + c.A2AExternalClientURL.GetRawRef()))
-		} else {
-			hash.Write([]byte("a2aExternalClientURL:val:" + c.A2AExternalClientURL.GetValue()))
-		}
-	}
 	// Length-prefixed, so where each value ends is unambiguous: a URL whose path
 	// ends in the next field's text must not hash like a shorter URL with that
 	// field set. Each is written only when set, so configs without them keep their hash.
@@ -726,9 +704,6 @@ func (c *ClientConfig) Redacted() ClientConfig {
 	}
 	if c.MCPClientMetadataURL != nil && c.MCPClientMetadataURL.IsFromSecret() {
 		out.MCPClientMetadataURL = c.MCPClientMetadataURL.Redacted()
-	}
-	if c.A2AExternalClientURL != nil && c.A2AExternalClientURL.IsFromSecret() {
-		out.A2AExternalClientURL = c.A2AExternalClientURL.Redacted()
 	}
 	if c.BifrostURL != nil && c.BifrostURL.IsFromSecret() {
 		out.BifrostURL = c.BifrostURL.Redacted()
@@ -2565,96 +2540,6 @@ func MCPClientHashMatchesLegacyCodeMode(m tables.TableMCPClient, storedHash stri
 	return legacy == storedHash, nil
 }
 
-// hashAgentSecretVar contributes a SecretVar to an agent registration hash.
-// Secret-backed values hash their reference so an unresolved env/vault ref is
-// stable across boots; literal values hash the value itself.
-func hashAgentSecretVar(h hash.Hash, label string, v *schemas.SecretVar) {
-	if v == nil {
-		return
-	}
-	if v.IsFromSecret() {
-		writeHashField(h, label+":ref", v.GetRawRef())
-	} else {
-		writeHashField(h, label+":val", v.Val)
-	}
-}
-
-// hashAgentUpstreamAuth contributes one upstream auth block to an agent
-// registration hash. Maps and slices are sorted for deterministic hashing.
-func hashAgentUpstreamAuth(h hash.Hash, label string, auth *schemas.UpstreamAuth) {
-	if auth == nil {
-		return
-	}
-	writeHashField(h, label+":type", string(auth.Type))
-	writeHashField(h, label+":advanced", strconv.FormatBool(auth.Advanced))
-	if len(auth.Headers) > 0 {
-		keys := make([]string, 0, len(auth.Headers))
-		for k := range auth.Headers {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			value := auth.Headers[k]
-			hashAgentSecretVar(h, label+":header:"+k, &value)
-		}
-	}
-	schemes := make([]string, len(auth.SecuritySchemes))
-	copy(schemes, auth.SecuritySchemes)
-	sort.Strings(schemes)
-	for _, scheme := range schemes {
-		writeHashField(h, label+":scheme", scheme)
-	}
-	if auth.OAuth != nil {
-		writeHashField(h, label+":oauth:provider_url", auth.OAuth.ProviderURL)
-		writeHashField(h, label+":oauth:discovery_url", auth.OAuth.DiscoveryURL)
-		writeHashField(h, label+":oauth:token_url", auth.OAuth.TokenURL)
-		writeHashField(h, label+":oauth:resource", auth.OAuth.Resource)
-		hashAgentSecretVar(h, label+":oauth:client_id", auth.OAuth.ClientID)
-		hashAgentSecretVar(h, label+":oauth:client_secret", auth.OAuth.ClientSecret)
-		scopes := make([]string, len(auth.OAuth.Scopes))
-		copy(scopes, auth.OAuth.Scopes)
-		sort.Strings(scopes)
-		for _, scope := range scopes {
-			writeHashField(h, label+":oauth:scope", scope)
-		}
-	}
-	if auth.TLS != nil {
-		writeHashField(h, label+":tls:insecure_skip_verify", strconv.FormatBool(auth.TLS.InsecureSkipVerify))
-		hashAgentSecretVar(h, label+":tls:ca_cert_pem", auth.TLS.CACertPEM)
-		hashAgentSecretVar(h, label+":tls:client_cert_pem", auth.TLS.ClientCertPEM)
-		hashAgentSecretVar(h, label+":tls:client_key_pem", auth.TLS.ClientKeyPEM)
-	}
-}
-
-// GenerateAgentRegistrationHash generates a SHA256 hash of an Agent Gateway
-// registration's admin-declared fields, including its virtual-key grants. It
-// is used to detect changes between config.json and database config.
-// Timestamps and the stored hash itself are excluded.
-func GenerateAgentRegistrationHash(r *schemas.AgentRegistration) (string, error) {
-	hash := sha256.New()
-	writeHashField(hash, "name", r.Name)
-	writeHashField(hash, "agent_card_url", r.AgentCardURL)
-	writeHashField(hash, "enabled", strconv.FormatBool(r.Enabled))
-	writeHashField(hash, "allow_by_default", strconv.FormatBool(r.AllowByDefault))
-	writeHashField(hash, "forward_accepted_credential", strconv.FormatBool(r.ForwardAcceptedCredential))
-	writeHashField(hash, "forward_accepted_credential_overrides_auth", strconv.FormatBool(r.ForwardAcceptedCredentialOverridesAuth))
-	writeHashField(hash, "require_public_target", strconv.FormatBool(r.RequirePublicTarget))
-	origins := append([]string(nil), r.CredentialOrigins...)
-	sort.Strings(origins)
-	for _, origin := range origins {
-		writeHashField(hash, "credential_origin", origin)
-	}
-	ids := make([]string, len(r.VirtualKeyIDs))
-	copy(ids, r.VirtualKeyIDs)
-	sort.Strings(ids)
-	for _, id := range ids {
-		writeHashField(hash, "virtual_key_id", id)
-	}
-	hashAgentUpstreamAuth(hash, "discovery_auth", r.DiscoveryAuth)
-	hashAgentUpstreamAuth(hash, "runtime_auth", r.RuntimeAuth)
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
 // GenerateRelayHash generates a SHA256 hash of a relay as config.json declares it, the way
 // ProviderConfig.GenerateConfigHash hashes a provider: each field is written on its own and each
 // optional block only when set, so a field added to RelayConfig does not move the hash of every
@@ -2976,7 +2861,7 @@ func ValidateOpenAPIURL(value string) error {
 }
 
 // MaxPublicURLLength is the longest public URL a setting accepts: bifrost_url
-// and the MCP, Skills and A2A external client URLs are stored in varchar(512)
+// and the MCP and Skills external client URLs are stored in varchar(512)
 // columns, so a longer value would be accepted and then fail to save.
 const MaxPublicURLLength = 512
 
