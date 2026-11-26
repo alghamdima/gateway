@@ -63,6 +63,7 @@ Findings from reviews or subagents are claims: verify them in the code before bu
 | Task                  | Start here                                                                                               |
 | --------------------- | -------------------------------------------------------------------------------------------------------- |
 | Where things stand    | `docs/platform/STATE.md`, then `PLAN.md` and `adr/`                                                      |
+| What to build next    | `docs/platform/SPEC.md` (features, status, done-when, build order, open decisions)                       |
 | A product feature     | `packages/api/src/modules/<feature>` (keys, credits, activity, data-policy, pricing, reconciliation, v1) |
 | Admin (staff) feature | `packages/api/src/modules/admin/<feature>` and `apps/web/src/modules/admin/<feature>`                    |
 | Access of staff roles | `packages/api/src/modules/admin/access.ts` (a route with no rule is refused)                             |

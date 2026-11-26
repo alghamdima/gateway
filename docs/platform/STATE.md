@@ -2,7 +2,7 @@
 
 Read this first. It says what the product is, where everything lives, what is done, what is next and what waits on the owner, so that nobody has to read the whole repository to continue. Last updated 2026-11-26.
 
-The long form is in `PLAN.md` (steps and their status), `ARCHITECTURE.md` and `adr/` (one file per decision). When this file and the code disagree, the code is right: fix this file.
+**What to build next is in `SPEC.md`**: every feature of the product, compared with OpenRouter, with its status, where it lives, when it is done and the build order; the owner's open decisions are its section 3. The long form of the history is in `PLAN.md` (steps and their status), `ARCHITECTURE.md` and `adr/` (one file per decision). When this file and the code disagree, the code is right: fix this file.
 
 ## The product
 
