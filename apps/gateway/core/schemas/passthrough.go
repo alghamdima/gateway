@@ -148,7 +148,7 @@ type BifrostPassthroughRequest struct {
 	BodySource   BodySource          // multipart body as an exact-length stream, set instead of Body; see PassthroughBodySourceSender
 	Form         *multipart.Form     // parsed multipart form (fields, file headers) behind BodySource; valid during the request
 	FormTypes    map[string][]string // Content-Type of each Form.Value part, by name and index; nil when unknown
-	SafeHeaders  map[string]string   // client headers; auth stripped unless the caller's OAuth/JWT bearer is the upstream credential (Anthropic sk-ant-oat, OpenAI JWT)
+	SafeHeaders  map[string]string   // client headers; caller credentials (Authorization, API key headers) always stripped
 }
 
 // PassthroughBodySourceSender is implemented by providers whose Passthrough and

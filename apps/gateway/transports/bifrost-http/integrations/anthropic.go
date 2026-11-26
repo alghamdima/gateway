@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -410,27 +411,20 @@ func checkAnthropicPassthrough(ctx *fasthttp.RequestCtx, bifrostCtx *schemas.Bif
 	headers := extractHeadersFromRequest(ctx)
 	schemas.ExtractAndSetUserAgentFromHeaders(headers, bifrostCtx)
 
-	// Check if anthropic oauth headers are present
+	// Claude Code on a Claude model: the raw body is forwarded, with our provider key.
 	if shouldUsePassthrough(bifrostCtx, provider, model, "") {
 		bifrostCtx.SetValue(schemas.BifrostContextKeyPassthroughOverridesPresent, true)
 		bifrostCtx.SetValue(schemas.BifrostContextKeyUseRawRequestBody, true)
 		bifrostCtx.SetValue(schemas.BifrostContextKeySendBackRawResponse, true)
-		if !isAnthropicAPIKeyAuth(ctx) && (provider == schemas.Anthropic || provider == "") {
-			url := extractExactPath(ctx)
-			if !strings.HasPrefix(url, "/") {
-				url = "/" + url
-			}
-			bifrostCtx.SetValue(schemas.BifrostContextKeyPassthroughHeaders, headers)
-			bifrostCtx.SetValue(schemas.BifrostContextKeyURLPath, url)
-			// This key is also used in IsClaudeCodeMaxMode
-			// So if you are changing the behaviour of this key, make sure to change IsClaudeCodeMaxMode as well
-			bifrostCtx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
-		} else {
-			// API key flow: pass only whitelisted safe headers (like anthropic-beta for feature detection)
-			passthroughHeaders := extractPassthroughHeaders(headers)
-			if len(passthroughHeaders) > 0 {
-				bifrostCtx.SetValue(schemas.BifrostContextKeyExtraHeaders, passthroughHeaders)
-			}
+		// Only whitelisted safe headers (like anthropic-beta for feature detection) go upstream;
+		// the caller's Authorization and x-api-key never do, whatever they carry.
+		// Merged into what x-bf-eh-* already put there, so those headers survive.
+		if passthroughHeaders := extractPassthroughHeaders(headers); len(passthroughHeaders) > 0 {
+			extraHeaders, _ := bifrostCtx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string)
+			merged := make(map[string][]string, len(extraHeaders)+len(passthroughHeaders))
+			maps.Copy(merged, extraHeaders)
+			maps.Copy(merged, passthroughHeaders)
+			bifrostCtx.SetValue(schemas.BifrostContextKeyExtraHeaders, merged)
 		}
 		// These providers convert output_config.format through Bifrost, including
 		// their client-facing response events, so the raw request text rewriter

@@ -461,15 +461,14 @@ func TestCheckAnthropicPassthrough_VertexBetaKeepsNativeResponseForwarding(t *te
 	}
 }
 
-// TestCheckAnthropicPassthrough_OAuthHeaderRouting locks in the split that stopped Bifrost
-// leaking x-bf-vk upstream and breaking Bedrock's SigV4. In OAuth mode the caller's raw
-// headers must land ONLY in the Anthropic-only passthrough key; BifrostContextKeyExtraHeaders
-// is read by every provider, so anything placed there reaches Bedrock/Vertex/Azure too.
-func TestCheckAnthropicPassthrough_OAuthHeaderRouting(t *testing.T) {
+// TestCheckAnthropicPassthrough_CallerCredentialNotForwarded locks in that a caller's own
+// Anthropic credential (Claude Code's subscription token, "Bearer sk-ant-oat...") is never
+// forwarded upstream: only the whitelisted anthropic-* headers reach the every-provider
+// ExtraHeaders key, which the provider sends beside our configured key.
+func TestCheckAnthropicPassthrough_CallerCredentialNotForwarded(t *testing.T) {
 	reqCtx := &fasthttp.RequestCtx{}
 	reqCtx.Request.Header.SetMethod(fasthttp.MethodPost)
 	reqCtx.Request.Header.Set("user-agent", "claude-code/1.0")
-	// OAuth mode: an sk-ant-oat bearer and no x-api-key.
 	reqCtx.Request.Header.Set("Authorization", "Bearer sk-ant-oat01-caller-token")
 	reqCtx.Request.Header.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
 	reqCtx.Request.Header.Set("x-bf-vk", "sk-bf-must-not-leak")
@@ -478,8 +477,7 @@ func TestCheckAnthropicPassthrough_OAuthHeaderRouting(t *testing.T) {
 
 	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
 	defer cancel()
-	// Whatever x-bf-eh-* already put in ExtraHeaders must survive: the OAuth branch used to
-	// overwrite this key wholesale, silently dropping caller-requested forwarded headers.
+	// Whatever x-bf-eh-* already put in ExtraHeaders must survive.
 	bifrostCtx.SetValue(schemas.BifrostContextKeyExtraHeaders, map[string][]string{
 		"my-custom-header": {"kept"},
 	})
@@ -488,15 +486,11 @@ func TestCheckAnthropicPassthrough_OAuthHeaderRouting(t *testing.T) {
 	if err := checkAnthropicPassthrough(reqCtx, bifrostCtx, req); err != nil {
 		t.Fatalf("checkAnthropicPassthrough: %v", err)
 	}
-
-	// The transport must be able to write the reserved key (restricted writes gate plugins,
-	// not the transport). If this is empty, OAuth passthrough is dead.
-	passthrough, ok := bifrostCtx.Value(schemas.BifrostContextKeyPassthroughHeaders).(map[string][]string)
-	if !ok || len(passthrough) == 0 {
-		t.Fatalf("passthrough headers were not set — OAuth would lose the caller's credential")
+	if useRaw, _ := bifrostCtx.Value(schemas.BifrostContextKeyUseRawRequestBody).(bool); !useRaw {
+		t.Fatal("Claude Code on a Claude model must keep raw request-body passthrough")
 	}
-	// fasthttp canonicalizes header names, so look up case-insensitively (the product code
-	// does the same via strings.ToLower / EqualFold at every check).
+
+	// fasthttp canonicalizes header names, so look up case-insensitively.
 	lookup := func(m map[string][]string, name string) []string {
 		for k, v := range m {
 			if strings.EqualFold(k, name) {
@@ -505,19 +499,16 @@ func TestCheckAnthropicPassthrough_OAuthHeaderRouting(t *testing.T) {
 		}
 		return nil
 	}
-	if got := lookup(passthrough, "authorization"); len(got) == 0 || got[0] != "Bearer sk-ant-oat01-caller-token" {
-		t.Errorf("caller OAuth token missing from passthrough set: %v", got)
-	}
-
 	extra, _ := bifrostCtx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string)
-	// x-bf-eh-* survives.
 	if got := lookup(extra, "my-custom-header"); len(got) == 0 || got[0] != "kept" {
 		t.Errorf("x-bf-eh-* header was clobbered: %v", extra)
 	}
-	// Nothing the caller sent may sit in the every-provider key.
-	for _, leaked := range []string{"authorization", "x-bf-vk", "x-forwarded-for", "x-claude-code-session-id"} {
+	if got := lookup(extra, "anthropic-beta"); len(got) == 0 || got[0] != "interleaved-thinking-2025-05-14" {
+		t.Errorf("anthropic-beta was not forwarded: %v", extra)
+	}
+	for _, leaked := range []string{"authorization", "x-api-key", "x-bf-vk", "x-forwarded-for", "x-claude-code-session-id"} {
 		if lookup(extra, leaked) != nil {
-			t.Errorf("%q reached BifrostContextKeyExtraHeaders — every provider forwards that key", leaked)
+			t.Errorf("%q reached BifrostContextKeyExtraHeaders, so it would be sent upstream", leaked)
 		}
 	}
 }

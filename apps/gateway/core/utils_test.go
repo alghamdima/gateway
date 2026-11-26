@@ -916,7 +916,6 @@ func TestClearContextForInternalRequestShedsEveryKeyOnFreshChild(t *testing.T) {
 		schemas.BifrostContextKeyAPIKeyName:            "caller-api-key-name",
 		schemas.BifrostContextKeyRoutingPinnedAPIKeyID: "caller-pinned-key",
 		schemas.BifrostContextKeyExtraHeaders:          map[string]string{"x-caller": "secret"},
-		schemas.BifrostContextKeyPassthroughHeaders:    map[string]string{"x-caller": "secret"},
 		schemas.BifrostContextKeyURLPath:               "/v1/caller/path",
 	}
 

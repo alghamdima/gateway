@@ -83,12 +83,6 @@ func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
 	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.SageMaker || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks
 }
 
-// isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag
-// is set where the caller's OAuth token is the upstream credential: Claude Code on Anthropic.
-func isKeySkippingAllowed(baseProvider schemas.ModelProvider) bool {
-	return baseProvider == schemas.Anthropic
-}
-
 // calculateBackoff implements exponential backoff with jitter for retry attempts.
 func calculateBackoff(attempt int, config *schemas.ProviderConfig) time.Duration {
 	// Calculate an exponential backoff: initial * 2^attempt
@@ -481,7 +475,7 @@ func restoreProviderResponseHeaders(ctx *schemas.BifrostContext, headers map[str
 // Two categories are cleared:
 //
 //   - Key routing: key-selection state resolved for the caller's provider
-//     (governance key allow-list, pinned/direct keys, key-selection skip). An
+//     (governance key allow-list, pinned/direct keys). An
 //     internal request typically targets a different provider, and when it
 //     skips the plugin pipeline this state is never re-resolved — inherited,
 //     it is applied against the wrong provider's key pool and rejects every
@@ -543,7 +537,6 @@ func ClearContextForInternalRequest(ctx *schemas.BifrostContext) {
 	ctx.ClearValue(schemas.BifrostContextKeyAPIKeyID)
 	ctx.ClearValue(schemas.BifrostContextKeyAPIKeyName)
 	ctx.ClearValue(schemas.BifrostContextKeyDirectKey)
-	ctx.ClearValue(schemas.BifrostContextKeySkipKeySelection)
 	ctx.ClearValue(schemas.BifrostContextKeyLoadBalancerAttempt)
 	// Body transport.
 	ctx.ClearValue(schemas.BifrostContextKeyUseRawRequestBody)
@@ -554,7 +547,6 @@ func ClearContextForInternalRequest(ctx *schemas.BifrostContext) {
 	ctx.ClearValue(schemas.BifrostContextKeyLargePayloadMode)
 	ctx.ClearValue(schemas.BifrostContextKeyLargeResponseMode)
 	ctx.ClearValue(schemas.BifrostContextKeyExtraHeaders)
-	ctx.ClearValue(schemas.BifrostContextKeyPassthroughHeaders)
 	ctx.ClearValue(schemas.BifrostContextKeyURLPath)
 }
 

@@ -22,7 +22,7 @@ func TestExtraHeaderSpanAttribute(t *testing.T) {
 		{"virtual key dropped entirely", "x-bf-vk", []string{"sk-bf-secret"}, false, nil},
 		{"virtual key dropped case-insensitively", "X-BF-VK", []string{"sk-bf-secret"}, false, nil},
 		{"other x-bf-* still exported", "x-bf-custom", []string{"v"}, true, "v"},
-		{"authorization redacted", "authorization", []string{"Bearer sk-ant-oat01"}, true, schemas.RedactedAttrValue},
+		{"authorization redacted", "authorization", []string{"Bearer sk-ant-api03-secret"}, true, schemas.RedactedAttrValue},
 		{"api key redacted", "x-api-key", []string{"sk-ant-key"}, true, schemas.RedactedAttrValue},
 		{"cloudflare access jwt redacted", "Cf-Access-Jwt-Assertion", []string{"eyJ.jwt.sig"}, true, schemas.RedactedAttrValue},
 		{"cloudflare access family redacted", "cf-access-client-secret", []string{"cf-secret"}, true, schemas.RedactedAttrValue},

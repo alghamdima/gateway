@@ -1640,11 +1640,9 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyChecksPass(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-// TestPreLLMHook_SkipKeySelection verifies SkipKeySelection (Claude Code OAuth/max mode) does not
-// bypass governance: the request is governed like any other. With a VK it is fully evaluated;
-// keyless requests follow IsVkMandatory. The skip flag never changes the governance outcome — the
-// OAuth token passthrough is handled independently in core key selection.
-func TestPreLLMHook_SkipKeySelection(t *testing.T) {
+// TestPreLLMHook_VirtualKeyGoverned verifies that with a VK the request is fully evaluated and
+// keyless requests follow IsVkMandatory.
+func TestPreLLMHook_VirtualKeyGoverned(t *testing.T) {
 	logger := NewMockLogger()
 	// Valid VK whose budget is already exceeded, so enforcement is observable when it runs.
 	vkBudget := buildBudgetWithUsage("vk-budget1", 100.0, 100.1, "1h")
@@ -1657,17 +1655,15 @@ func TestPreLLMHook_SkipKeySelection(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		skipKeySelection   bool
 		virtualKey         string
 		isVkMandatory      bool
 		expectShortCircuit bool
 		msgContains        string
 	}{
-		{name: "skip + no VK rejected when VK mandatory", skipKeySelection: true, virtualKey: "", isVkMandatory: true, expectShortCircuit: true, msgContains: "virtual key is required"},
-		{name: "skip + no VK allowed when VK not mandatory", skipKeySelection: true, virtualKey: "", isVkMandatory: false, expectShortCircuit: false},
-		{name: "skip + valid VK is enforced (budget exceeded)", skipKeySelection: true, virtualKey: "sk-bf-test", isVkMandatory: false, expectShortCircuit: true, msgContains: "budget exceeded"},
-		{name: "skip + unknown VK is rejected", skipKeySelection: true, virtualKey: "sk-bf-unknown", isVkMandatory: false, expectShortCircuit: true, msgContains: "not found"},
-		{name: "no skip + valid VK enforced identically", skipKeySelection: false, virtualKey: "sk-bf-test", isVkMandatory: false, expectShortCircuit: true, msgContains: "budget exceeded"},
+		{name: "no VK rejected when VK mandatory", virtualKey: "", isVkMandatory: true, expectShortCircuit: true, msgContains: "virtual key is required"},
+		{name: "no VK allowed when VK not mandatory", virtualKey: "", isVkMandatory: false, expectShortCircuit: false},
+		{name: "valid VK is enforced (budget exceeded)", virtualKey: "sk-bf-test", isVkMandatory: false, expectShortCircuit: true, msgContains: "budget exceeded"},
+		{name: "unknown VK is rejected", virtualKey: "sk-bf-unknown", isVkMandatory: false, expectShortCircuit: true, msgContains: "not found"},
 	}
 
 	for _, tc := range tests {
@@ -1680,9 +1676,6 @@ func TestPreLLMHook_SkipKeySelection(t *testing.T) {
 				parentCtx = context.WithValue(parentCtx, schemas.BifrostContextKeyVirtualKey, tc.virtualKey)
 			}
 			ctx := grantedCtx(parentCtx)
-			if tc.skipKeySelection {
-				ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
-			}
 			req := &schemas.BifrostRequest{
 				RequestType: schemas.ChatCompletionRequest,
 				ChatRequest: &schemas.BifrostChatRequest{
@@ -1704,11 +1697,10 @@ func TestPreLLMHook_SkipKeySelection(t *testing.T) {
 	}
 }
 
-// TestPreLLMHook_RequiredHeaders_SkipKeySelection covers required-headers enforcement on
-// SkipKeySelection (OAuth/max-mode) requests. validateRequiredHeaders now runs unconditionally as
-// the first check in PreLLMHook, so an OAuth request missing a configured required header must
-// short-circuit — a path that was unreachable while SkipKeySelection bypassed governance.
-func TestPreLLMHook_RequiredHeaders_SkipKeySelection(t *testing.T) {
+// TestPreLLMHook_RequiredHeaders covers required-headers enforcement: validateRequiredHeaders runs
+// as the first check in PreLLMHook, so a request missing a configured required header must
+// short-circuit.
+func TestPreLLMHook_RequiredHeaders(t *testing.T) {
 	logger := NewMockLogger()
 	store, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{}, nil, nil)
 	require.NoError(t, err)
@@ -1724,15 +1716,14 @@ func TestPreLLMHook_RequiredHeaders_SkipKeySelection(t *testing.T) {
 		headers            map[string]string
 		expectShortCircuit bool
 	}{
-		{name: "skip request missing required header is rejected", headers: nil, expectShortCircuit: true},
-		{name: "skip request with required header passes the check", headers: map[string]string{"x-required-header": "present"}, expectShortCircuit: false},
+		{name: "request missing required header is rejected", headers: nil, expectShortCircuit: true},
+		{name: "request with required header passes the check", headers: map[string]string{"x-required-header": "present"}, expectShortCircuit: false},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyRequestID, "req-1")
 			ctx := grantedCtx(parentCtx)
-			ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
 			if tc.headers != nil {
 				ctx.SetValue(schemas.BifrostContextKeyRequestHeaders, tc.headers)
 			}

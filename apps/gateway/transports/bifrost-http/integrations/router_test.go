@@ -1029,46 +1029,28 @@ func TestExtractPassthroughModel(t *testing.T) {
 	}
 }
 
-// Caller-auth forwarding for passthrough routes: OAuth/JWT bearer tokens are the
-// upstream credential (Claude Code) and must survive to the provider,
-// while plain API keys keep the strip-and-inject behavior.
-func TestApplyPassthroughCallerAuth_AnthropicOAuthForwarded(t *testing.T) {
-	bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
-	defer cancel()
-	safeHeaders := map[string]string{}
-	applyPassthroughCallerAuth(bifrostCtx, safeHeaders, schemas.Anthropic, "Bearer sk-ant-oat01-caller-token", "")
-	if got := safeHeaders["authorization"]; got != "Bearer sk-ant-oat01-caller-token" {
-		t.Fatalf("expected OAuth token forwarded in safe headers, got %q", got)
-	}
-	if skip, _ := bifrostCtx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); !skip {
-		t.Fatal("expected SkipKeySelection to be set for OAuth passthrough")
-	}
-}
-
-func TestApplyPassthroughCallerAuth_APIKeysStayStripped(t *testing.T) {
-	for name, tc := range map[string]struct {
-		provider    schemas.ModelProvider
-		auth        string
-		upstreamURL string
-	}{
-		"openai plain api key":      {schemas.OpenAI, "Bearer sk-plain-api-key", ""},
-		"anthropic api key bearer":  {schemas.Anthropic, "Bearer sk-ant-api03-key", ""},
-		"provider override bedrock": {schemas.Bedrock, "Bearer sk-ant-oat01-caller-token", ""},
-		"openai two-segment token":  {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.c2ln", ""},
-		"http upstream override":    {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "http://mock.local"},
-		"openai jwt on openai api":  {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", ""},
-		"openai jwt on other https": {schemas.OpenAI, "Bearer eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsInN1YiI6InN5bnRoZXRpYyJ9.c2ln", "https://api.example.com"},
+// TestPassthroughSafeHeaders_CallerCredentialsNeverForwarded: on a passthrough route the
+// provider authenticates with our configured key, so no caller credential is forwarded upstream,
+// not even a caller's own Anthropic subscription token ("Bearer sk-ant-oat...").
+func TestPassthroughSafeHeaders_CallerCredentialsNeverForwarded(t *testing.T) {
+	for name, header := range map[string][2]string{
+		"anthropic subscription bearer": {"Authorization", "Bearer sk-ant-oat01-caller-token"},
+		"anthropic api key bearer":      {"Authorization", "Bearer sk-ant-api03-key"},
+		"virtual key bearer":            {"Authorization", "Bearer sk-bf-virtual-key"},
+		"x-api-key":                     {"x-api-key", "sk-ant-api03-key"},
+		"api-key":                       {"api-key", "azure-key"},
+		"x-goog-api-key":                {"x-goog-api-key", "goog-key"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			bifrostCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
-			defer cancel()
-			safeHeaders := map[string]string{}
-			applyPassthroughCallerAuth(bifrostCtx, safeHeaders, tc.provider, tc.auth, tc.upstreamURL)
-			if _, ok := safeHeaders["authorization"]; ok {
-				t.Fatal("authorization must stay stripped")
+			ctx := &fasthttp.RequestCtx{}
+			ctx.Request.Header.Set(header[0], header[1])
+			ctx.Request.Header.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
+			safeHeaders := PassthroughSafeHeaders(ctx)
+			if v, ok := safeHeaders[strings.ToLower(header[0])]; ok {
+				t.Fatalf("%s must not be forwarded upstream, got %q", header[0], v)
 			}
-			if _, ok := bifrostCtx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); ok {
-				t.Fatal("SkipKeySelection must not be set")
+			if got := safeHeaders["anthropic-beta"]; got != "interleaved-thinking-2025-05-14" {
+				t.Fatalf("anthropic-beta = %q, want it forwarded", got)
 			}
 		})
 	}
@@ -2250,10 +2232,9 @@ func (openAIPassthroughAccount) GetConfigForProvider(schemas.ModelProvider) (*sc
 
 // passthroughReceipt witnesses the real router-to-core request before an explicit synthetic policy denial.
 type passthroughReceipt struct {
-	request          *schemas.BifrostRequest
-	skipKeySelection bool
-	skipModelCheck   bool
-	modelListFilter  schemas.PassthroughModelListFilter
+	request         *schemas.BifrostRequest
+	skipModelCheck  bool
+	modelListFilter schemas.PassthroughModelListFilter
 }
 
 // GetName identifies the isolated test plugin.
@@ -2271,7 +2252,6 @@ func (*passthroughReceipt) PreRequestHook(*schemas.BifrostContext, *schemas.Bifr
 func (p *passthroughReceipt) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
 	snapshot := *req
 	p.request = &snapshot
-	p.skipKeySelection, _ = ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool)
 	p.skipModelCheck, _ = ctx.Value(schemas.BifrostContextKeySkipModelCheck).(bool)
 	p.modelListFilter, _ = ctx.Value(schemas.BifrostContextKeyPassthroughModelListFilter).(schemas.PassthroughModelListFilter)
 	status := 403

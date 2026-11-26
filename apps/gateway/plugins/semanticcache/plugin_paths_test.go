@@ -638,7 +638,6 @@ func TestGenerateEmbedding_ClearsInheritedKeyRoutingState(t *testing.T) {
 	ctx.SetValue(schemas.BifrostContextKeyAPIKeyID, "chat-provider-key-id")
 	ctx.SetValue(schemas.BifrostContextKeyAPIKeyName, "chat-provider-key-name")
 	ctx.SetValue(schemas.BifrostContextKeyDirectKey, schemas.Key{ID: "direct-key-id"})
-	ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
 	// Body-transport state from the caller's request. Inherited raw-body
 	// passthrough makes providers send the internal request's (absent) raw
 	// body instead of converting it; inherited large-payload mode streams the
@@ -675,7 +674,6 @@ func TestGenerateEmbedding_ClearsInheritedKeyRoutingState(t *testing.T) {
 		schemas.BifrostContextKeyAPIKeyID,
 		schemas.BifrostContextKeyAPIKeyName,
 		schemas.BifrostContextKeyDirectKey,
-		schemas.BifrostContextKeySkipKeySelection,
 		schemas.BifrostContextKeyUseRawRequestBody,
 		schemas.BifrostContextKeyPassthroughOverridesPresent,
 		schemas.BifrostContextKeyLargePayloadMode,

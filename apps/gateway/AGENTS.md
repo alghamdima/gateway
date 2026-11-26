@@ -235,7 +235,6 @@ ctx.WithValue(key, value)    // Chainable variant
 - `BifrostContextKeyRequestID` — Request ID
 - `BifrostContextKeyExtraHeaders` — Extra headers to forward to provider
 - `BifrostContextKeyURLPath` — Custom URL path for provider
-- `BifrostContextKeySkipKeySelection` — Skip key selection (pass empty key)
 - `BifrostContextKeyUseRawRequestBody` — Send raw body directly to provider
 
 **Gotcha**: `BlockRestrictedWrites()` silently drops writes to reserved keys. This prevents plugins from accidentally overwriting internal state.

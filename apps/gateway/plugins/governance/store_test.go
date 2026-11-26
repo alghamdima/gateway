@@ -2472,7 +2472,6 @@ func TestGovernanceStore_CollectModelConfigsForKeyAliases(t *testing.T) {
 			"literal marker":               context.WithValue(ctx, literalLimitsContextKey, true),
 			"literal on a bifrost context": bifrostCtx(literalLimitsContextKey, true),
 			"direct key":                   bifrostCtx(schemas.BifrostContextKeyDirectKey, schemas.Key{ID: "direct"}),
-			"skip key selection":           bifrostCtx(schemas.BifrostContextKeySkipKeySelection, true),
 		} {
 			assert.Nil(t, store.aliasTargets(marked, &provider, "claude-sonnet"), name)
 			assert.Empty(t, ids(store.collectModelConfigsFor(marked, global, "", "claude-sonnet", &provider, store.aliasTargets(marked, &provider, "claude-sonnet"))), name)

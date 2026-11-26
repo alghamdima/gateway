@@ -746,7 +746,7 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 	// refusals first, and a caller whose credential is dead must be told that before anything about
 	// how the request would have been funded.
 	//
-	// A model that runs as written (a literal batch item, a direct key, skip key selection) was admitted
+	// A model that runs as written (a literal batch item, a direct key) was admitted
 	// by the literal access, so its limits are gathered from that access too: the alias-aware one
 	// drops a permit whose blacklist names an alias target, and that permit's limits with it.
 	limits, limitsErr := func() (schemas.Limits, error) {
@@ -1068,8 +1068,8 @@ func contextOf(ctx *schemas.BifrostContext) context.Context {
 // The pin is consulted only when the unpinned keys refuse the alias. Narrowing a set of keys that
 // all map the name to an allowed model can only turn the answer into a refusal where the pin names
 // no key that can serve the name, and core refuses that request at key selection anyway; so the
-// common alias request reads nothing from the context. A request that runs as written (a direct key,
-// skip key selection) never has an alias resolved, but is admitted on the literal access (see
+// common alias request reads nothing from the context. A request that runs as written (a direct key)
+// never has an alias resolved, but is admitted on the literal access (see
 // literalAccessFor), so this access only widens what such a request may be told it reaches.
 func allowedThroughKeys(ctx context.Context, catalog *modelcatalog.ModelCatalog, provider schemas.ModelProvider, model string, providerConfig *configstore.ProviderConfig, allowed, keyIDs []string) bool {
 	if providerConfig == nil || !modelcatalog.HasKeyAliases(providerConfig.Keys) {

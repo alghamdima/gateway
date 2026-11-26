@@ -3951,7 +3951,6 @@ func TestClearAnthropicPassthroughForNonNativeProvider(t *testing.T) {
 				ctx.SetValue(k, true)
 			}
 
-			ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
 			ctx.SetValue(schemas.BifrostContextKeyURLPath, "/v1/messages")
 
 			clearAnthropicPassthroughForNonNativeProvider(ctx, tt.baseProvider, tt.model)
@@ -3972,15 +3971,6 @@ func TestClearAnthropicPassthroughForNonNativeProvider(t *testing.T) {
 			}
 			if !tt.wantCleared && callerPath != "/v1/messages" {
 				t.Errorf("URLPath = %q, want %q preserved", callerPath, "/v1/messages")
-			}
-
-			// SkipKeySelection must survive: it also drives IsClaudeCodeMaxMode, which suppresses
-			// x-api-key on the Anthropic provider. Clearing it here would make an Anthropic
-			// fallback after a non-native attempt send the account key alongside the caller's
-			// OAuth token. The flag is gated at the key-selection read site instead —
-			// see isKeySkippingAllowed.
-			if skip, _ := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); !skip {
-				t.Error("SkipKeySelection was cleared; it must be gated at the read site, not mutated per attempt")
 			}
 		})
 	}
@@ -4129,11 +4119,10 @@ func TestShouldContinueWithFallbacksStopsOnNilError(t *testing.T) {
 	}
 }
 
-// TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvider verifies that the
-// Claude Code OAuth key-selection skip applies only when the attempt resolved to Anthropic. A
-// governance routing rule can rewrite provider/model after the transport set the flag, and every
-// non-Anthropic provider authenticates with its own configured key — so it must still get one.
-func TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvider(t *testing.T) {
+// TestSelectKeyFromProviderForModelWithPool_EveryProviderSelectsItsOwnKey verifies that every
+// provider, Anthropic included, authenticates with its own configured key: no caller credential
+// stands in for it.
+func TestSelectKeyFromProviderForModelWithPool_EveryProviderSelectsItsOwnKey(t *testing.T) {
 	account := NewMockAccount()
 	account.SetKeysForProvider(schemas.Anthropic, []schemas.Key{
 		{ID: "anthropic-key", Name: "anthropic-key", Value: schemas.SecretVar{Val: "sk-ant"}, Models: []string{"*"}, Weight: 1.0},
@@ -4151,9 +4140,10 @@ func TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvid
 		requestType schemas.RequestType
 		provider    schemas.ModelProvider
 		model       string
-		wantKeyID   string // "" means the pool must be empty (key selection skipped)
+		wantKeyID   string
 	}{
-		{"anthropic keeps the skip", schemas.ResponsesRequest, schemas.Anthropic, "claude-opus-4-5", ""},
+		{"anthropic selects its own key", schemas.ResponsesRequest, schemas.Anthropic, "claude-opus-4-5", "anthropic-key"},
+		{"anthropic passthrough selects its own key", schemas.PassthroughStreamRequest, schemas.Anthropic, "claude-opus-4-5", "anthropic-key"},
 		{"fireworks selects its own key", schemas.ResponsesRequest, schemas.Fireworks, "accounts/fireworks/models/kimi-k2p7-code", "fireworks-key"},
 		{"openai passthrough selects its own key", schemas.PassthroughStreamRequest, schemas.OpenAI, "gpt-5.5", "openai-key"},
 		{"openai inference selects its own key", schemas.ResponsesRequest, schemas.OpenAI, "gpt-5.5", "openai-key"},
@@ -4162,7 +4152,6 @@ func TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvid
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-			ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
 
 			keys, canRotate, err := bifrost.selectKeyFromProviderForModelWithPool(ctx, tt.requestType, tt.provider, tt.model, tt.provider)
 			if err != nil {
@@ -4170,12 +4159,6 @@ func TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvid
 			}
 			if canRotate {
 				t.Error("canRotate = true, want false")
-			}
-			if tt.wantKeyID == "" {
-				if len(keys) != 0 {
-					t.Fatalf("got %d keys, want an empty pool (key selection skipped)", len(keys))
-				}
-				return
 			}
 			if len(keys) != 1 || keys[0].ID != tt.wantKeyID {
 				t.Fatalf("got %v, want a single key %q", keys, tt.wantKeyID)

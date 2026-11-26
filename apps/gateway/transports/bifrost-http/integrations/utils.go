@@ -447,31 +447,6 @@ func getResultTTLFromHeaderWithDefault(ctx *fasthttp.RequestCtx, defaultTTL int)
 	return resultTTLInt
 }
 
-// isAnthropicAPIKeyAuth checks if the request uses standard API key authentication.
-// Returns true for API key auth (x-api-key header), false for OAuth (Bearer sk-ant-oat*).
-// This is required for Claude Code specifically, which may use OAuth authentication.
-// Default behavior is to assume API mode when neither x-api-key nor OAuth token is present.
-func isAnthropicAPIKeyAuth(ctx *fasthttp.RequestCtx) bool {
-	// If x-api-key header is present - this is definitely API mode
-	if apiKey := string(ctx.Request.Header.Peek("x-api-key")); apiKey != "" {
-		return true
-	}
-	// Check for OAuth token in Authorization header
-	if authHeader := string(ctx.Request.Header.Peek("Authorization")); authHeader != "" {
-		if isAnthropicOAuthBearer(authHeader) {
-			return false // OAuth mode, NOT API
-		}
-	}
-	// Default to API mode
-	return true
-}
-
-// isAnthropicOAuthBearer reports whether the Authorization header value carries an
-// Anthropic OAuth access token (e.g. Claude Code's "Bearer sk-ant-oat01-...").
-func isAnthropicOAuthBearer(authHeader string) bool {
-	return strings.HasPrefix(strings.ToLower(authHeader), "bearer sk-ant-oat")
-}
-
 // resolveLargePayloadMetadata returns metadata from the sync context key,
 // falling back to a non-blocking read from the deferred channel.
 // If deferred metadata is resolved, it is cached in the sync key for later readers.

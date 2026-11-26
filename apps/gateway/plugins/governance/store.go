@@ -2148,8 +2148,8 @@ type settledAliasTargets struct {
 }
 
 // runsAsWritten reports whether the model on ctx reaches the provider exactly as the client named
-// it: the caller marked it literal, or the credential skips key selection, so no key alias is
-// ever applied.
+// it: the caller marked it literal, or a direct key skips key selection, so no key alias is ever
+// applied.
 func runsAsWritten(ctx context.Context) bool {
 	if ctx == nil {
 		return false
@@ -2157,11 +2157,8 @@ func runsAsWritten(ctx context.Context) bool {
 	if literal, _ := ctx.Value(literalLimitsContextKey).(bool); literal {
 		return true
 	}
-	if _, direct := ctx.Value(schemas.BifrostContextKeyDirectKey).(schemas.Key); direct {
-		return true
-	}
-	skip, _ := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool)
-	return skip
+	_, direct := ctx.Value(schemas.BifrostContextKeyDirectKey).(schemas.Key)
+	return direct
 }
 
 // aliasTargets returns the models the provider's eligible keys map the requested name to, or nil

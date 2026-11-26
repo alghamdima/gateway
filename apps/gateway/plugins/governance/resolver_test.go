@@ -1573,13 +1573,12 @@ func TestAllowedModelsMatchKeyAliasesThroughTheHookChain(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
-	// A direct key or a skip-key-selection credential bypasses key selection, so the alias is never
-	// resolved and the provider runs the name as sent: those requests are held to the literal name.
+	// A direct key bypasses key selection, so the alias is never resolved and the provider runs the
+	// name as sent: those requests are held to the literal name.
 	// The values are set with SetValue directly (the restricted-writes block is not enabled here).
 	const (
 		normal = iota
 		directKey
-		skipKeySelection
 	)
 	for _, tc := range []struct {
 		model   string
@@ -1592,16 +1591,11 @@ func TestAllowedModelsMatchKeyAliasesThroughTheHookChain(t *testing.T) {
 		{"not-an-alias", normal, true},
 		{"best-gpt", directKey, true},
 		{"gpt-4o", directKey, false},
-		{"best-gpt", skipKeySelection, true},
-		{"gpt-4o", skipKeySelection, false},
 	} {
 		t.Run(fmt.Sprintf("%s/cred%d", tc.model, tc.cred), func(t *testing.T) {
 			ctx := presentCtx(accessTestVKValue)
-			switch tc.cred {
-			case directKey:
+			if tc.cred == directKey {
 				ctx.SetValue(schemas.BifrostContextKeyDirectKey, schemas.Key{ID: "direct"})
-			case skipKeySelection:
-				ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
 			}
 			req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest, ChatRequest: &schemas.BifrostChatRequest{Provider: schemas.OpenAI, Model: tc.model}}
 			require.NoError(t, plugin.PreRequestHook(ctx, req))
@@ -2076,7 +2070,7 @@ func TestBlacklistHoldsAliasTargetsThroughTheHookChain(t *testing.T) {
 	assert.Equal(t, literalLookups, aliasLookups)
 }
 
-// A request that runs its model as written (a direct key, or a skip-key-selection credential) is
+// A request that runs its model as written (a direct key) is
 // admitted by the literal access, and its limits must come from that same access. The alias-aware
 // one drops a permit whose blacklist names the alias target, and with it the permit's provider rate
 // limit, so an exhausted limit stopped applying to exactly the requests the literal check admits.
@@ -2109,9 +2103,6 @@ func TestLiteralRequestsKeepProviderLimitsWhenAnAliasTargetIsBlacklisted(t *test
 			{"direct key", func(ctx *schemas.BifrostContext) {
 				ctx.SetValue(schemas.BifrostContextKeyDirectKey, schemas.Key{ID: "direct"})
 			}},
-			{"skip key selection", func(ctx *schemas.BifrostContext) {
-				ctx.SetValue(schemas.BifrostContextKeySkipKeySelection, true)
-			}},
 		} {
 			t.Run(catalog.name+"/"+cred.name, func(t *testing.T) {
 				ctx := presentCtx(accessTestVKValue)
@@ -2130,7 +2121,7 @@ func TestLiteralRequestsKeepProviderLimitsWhenAnAliasTargetIsBlacklisted(t *test
 }
 
 // BenchmarkLiteralAccessFor is the extra work limit settlement now does for a request that runs its
-// model as written (a literal batch item, a direct key, skip key selection): one rebuild of the
+// model as written (a literal batch item, a direct key): one rebuild of the
 // access without alias targets. Requests that go through key selection never reach it.
 func BenchmarkLiteralAccessFor(b *testing.B) {
 	vk := buildVirtualKeyWithProviders("vk-bench", accessTestVKValue, "bench-vk", []configstoreTables.TableVirtualKeyProviderConfig{

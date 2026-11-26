@@ -332,7 +332,6 @@ core	github.com/maximhq/bifrost/core	TestScenarioUnpinnedRuleFallbackSpreadsWith
 core	github.com/maximhq/bifrost/core	TestScenarioZeroRetriesStillWalksDeadKeys	pass
 core	github.com/maximhq/bifrost/core	TestSelectKeyForProviderRequestTypeKeepsTheSessionKey	pass
 core	github.com/maximhq/bifrost/core	TestSelectKeyForProviderRequestType_AdditionalModels	pass
-core	github.com/maximhq/bifrost/core	TestSelectKeyFromProviderForModelWithPool_SkipKeySelectionGatedOnBaseProvider	pass
 core	github.com/maximhq/bifrost/core	TestSelectKeyFromProviderForModel_BlacklistedModels	pass
 core	github.com/maximhq/bifrost/core	TestSelectKeyFromProviderForModel_NoStickinessWithoutSessionID	pass
 core	github.com/maximhq/bifrost/core	TestSelectKeyFromProviderForModel_SessionStickiness	pass
@@ -560,7 +559,6 @@ core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeade
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeadersToContext_PerProvider	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeadersToContext_ServerSideFallback	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeadersToContext_TaskBudgets	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeaders_HonoursCallerVersionFromPassthroughKey	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeaders_InlineDefinitionCarriesItsOwnBetas	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeaders_PerMessageEffortInjectsMidConversationOutputConfig	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAddMissingBetaHeaders_SingleMCPClientDate	pass
@@ -605,7 +603,6 @@ core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicMessageRes
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicMessageStartSafeguardResultsRoundTrip	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicModelRetrieve	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicOpenAICompatibleToolPathsNormalizeRootOneOf	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicPassthroughHeaders_IsReserved	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicPassthroughStreamUsage	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicPassthroughStreamUsage_ContainerSession	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestAnthropicPassthrough_ReproducesBugWithoutFix	pass
@@ -898,8 +895,6 @@ core	github.com/maximhq/bifrost/core/providers/anthropic	TestMaxTokensClampedToM
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestMayCarryPerMessageOutputConfig	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestMayCarryToolChangeBlocks	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestMergeBetaHeaders	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestMergeBetaHeaders_DedupesAcrossBothKeys	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestMergeBetaHeaders_ReadsPassthroughKey	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestMessageDeltaEmptyStopReasonRendersNull	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestMessageDeltaStopMetadataStillCarriesTheRequiredStopFields	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestMessageDeltaWithoutAnUpstreamDeltaObjectIsServed	pass
@@ -1022,11 +1017,6 @@ core	github.com/maximhq/bifrost/core/providers/anthropic	TestServerSideFallbackM
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestServerSideFallbackModel_SurvivesPopulateRoutingInfo	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestServerToolCacheControlStripLeavesSourceUnchanged	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestServerToolGatesHostFlagBoundsCatalog	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestSetPassthroughHeaders_ContentTypeSurvivesEitherOrdering	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestSetPassthroughHeaders_FiltersAcceptEncodingToSupportedCodecs	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestSetPassthroughHeaders_ForwardsCallerCredentialButNotInternals	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestSetPassthroughHeaders_NoOpWithoutKey	pass
-core	github.com/maximhq/bifrost/core/providers/anthropic	TestSetPassthroughHeaders_OnlyAnthropicReceivesThem	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestShedWitnessRestoresNothing	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestSonnet55PredicateNarrowness	pass
 core	github.com/maximhq/bifrost/core/providers/anthropic	TestSonnet55StockVersusPatchedSurface	pass
@@ -4140,7 +4130,6 @@ core	github.com/maximhq/bifrost/core/providers/utils	TestStreamTerminalDetectorO
 core	github.com/maximhq/bifrost/core/providers/utils	TestStreamTerminalDetectorObserveChunkVertexErrorArray	pass
 core	github.com/maximhq/bifrost/core/providers/utils	TestStreamingConnsCountDoesNotDrift	pass
 core	github.com/maximhq/bifrost/core/providers/utils	TestStreamingPoolSurvivesCancelledStreams	pass
-core	github.com/maximhq/bifrost/core/providers/utils	TestStripCallerAuthForInsecureURL	pass
 core	github.com/maximhq/bifrost/core/providers/utils	TestStripChatCachePoints	pass
 core	github.com/maximhq/bifrost/core/providers/utils	TestStripRegexLookaround	pass
 core	github.com/maximhq/bifrost/core/providers/utils	TestStripThoughtSignature	pass
@@ -8073,8 +8062,6 @@ plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreLLMHook_
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreLLMHook_ProviderSpecificModelBudget_DifferentProvider_Passes_NoVirtualKey	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreLLMHook_ProviderSpecificModelRateLimit_DifferentProvider_Passes_NoVirtualKey	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreLLMHook_ProviderSpecificModelRateLimit_DifferentProvider_Passes_NoVirtualKey_RequestLimit	pass
-plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreLLMHook_RequiredHeaders_SkipKeySelection	pass
-plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreLLMHook_SkipKeySelection	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreRequestHookRecordsAccess	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreRequestHookWithoutACredentialRecordsNothing	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestPreRequestHookWithoutAGrantReportsTheFault	pass
@@ -8530,7 +8517,6 @@ plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_Statis
 plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_ValidationErrors	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	-	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	TestInitRequiresACatalog	pass
-plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	TestKeySelectionBypass	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	TestPreRequestHook	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	TestResolveProviderFromCatalog	pass
 plugins/otel	github.com/maximhq/bifrost/plugins/otel	-	fail
@@ -10413,8 +10399,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	Te
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestAnthropicMessagesResponsesConverterSkipsRawAfterInjectedTools	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestAnthropicMessagesStreamDeclaresItsCleanup	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestAnthropicRefuseThreadContinue_EdgeCases	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestApplyPassthroughCallerAuth_APIKeysStayStripped	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestApplyPassthroughCallerAuth_AnthropicOAuthForwarded	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestAzureDeploymentChatForwardsUnknownTopLevelFields	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestAzureOpenAIMountIsAnAzureRequest	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestAzureOpenAIRoutesOnResourceBaseURL	pass
@@ -10430,7 +10414,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	Te
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestBedrockInvokeTypedTitanResponseLangChainLeavesEnvelopeUnchanged	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestBedrockPassthroughRouterStreamsOnlyInvokeAgent	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestBedrockPassthroughRouterTargetsBedrockAtItsOwnPrefix	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestCheckAnthropicPassthrough_OAuthHeaderRouting	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestCheckAnthropicPassthrough_OutputConfigEscapeHatch	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestCheckAnthropicPassthrough_ProviderPrefixedClaudeModel	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations	TestCheckAnthropicPassthrough_VertexBetaKeepsNativeResponseForwarding	pass

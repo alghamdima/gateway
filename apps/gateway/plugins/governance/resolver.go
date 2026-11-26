@@ -161,11 +161,10 @@ func (r *BudgetResolver) evaluateAccess(ctx *schemas.BifrostContext, evaluationR
 		}
 	}
 	if !skipModelCheck && !providerUnconfigured && (IsModelRequiredForRequest(requestType) || (checkModelIfPresent && model != "")) {
-		// A batch item's model, and any request whose credential bypasses key selection (a direct
-		// key, or a bearer that is the credential itself), reaches the provider as written: no key
-		// alias is resolved for it, so it is held to its literal name.
+		// A batch item's model, and a request whose direct key bypasses key selection, reaches the
+		// provider as written: no key alias is resolved for it, so it is held to its literal name.
 		modelAccess := access
-		if evaluationRequest.LiteralModel || hasDirectKeyAuth(ctx) || bifrost.GetBoolFromContext(ctx, schemas.BifrostContextKeySkipKeySelection) {
+		if evaluationRequest.LiteralModel || hasDirectKeyAuth(ctx) {
 			modelAccess = r.literalAccess(access)
 		}
 		if !modelAccess.IsModelAllowed(string(provider), model) {

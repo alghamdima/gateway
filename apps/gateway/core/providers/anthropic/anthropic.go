@@ -187,13 +187,13 @@ func extractAnthropicResponsesUsageFromPrefetch(data []byte) *schemas.ResponsesR
 }
 
 // anthropicRequestHeaders builds the auth/version headers for an Anthropic request: the API
-// version plus the key's credential when a key is present and Claude Code max-mode is off. Shared by the
+// version plus the key's credential when a key is present. Shared by the
 // provider's unary (completeRequest / HandleAnthropic*Request) and streaming paths.
-func (provider *AnthropicProvider) anthropicRequestHeaders(ctx *schemas.BifrostContext, key schemas.Key) map[string]string {
+func (provider *AnthropicProvider) anthropicRequestHeaders(key schemas.Key) map[string]string {
 	headers := map[string]string{
 		"anthropic-version": provider.apiVersion,
 	}
-	if key.Value.GetValue() != "" && !IsClaudeCodeMaxMode(ctx) {
+	if key.Value.GetValue() != "" {
 		setKeyAuthHeaders(headers, key)
 	}
 	return headers
@@ -259,9 +259,6 @@ func completeRequest(
 
 	// Set network-config extra headers, excluding anthropic-beta (set explicitly below).
 	providerUtils.SetExtraHeaders(ctx, req, extraHeaders, []string{AnthropicBetaHeader})
-	// OAuth passthrough: forward the caller's raw headers, whose token is the upstream
-	// credential. Skips anthropic-beta — MergeBetaHeaders below owns the final value.
-	providerUtils.SetPassthroughHeaders(ctx, req, providerName, []string{AnthropicBetaHeader})
 
 	// Force JSON content type after extra headers so network config can't override it
 	// (matches the original per-provider completeRequest ordering).
@@ -547,7 +544,7 @@ func (provider *AnthropicProvider) TextCompletion(ctx *schemas.BifrostContext, k
 	}
 
 	// Use struct directly for JSON marshaling (no beta headers for text completion)
-	responseBody, latency, providerResponseHeaders, err := completeRequest(ctx, provider.client, provider.buildRequestURL(ctx, "/v1/complete", schemas.TextCompletionRequest), jsonData, provider.anthropicRequestHeaders(ctx, key), provider.networkConfig.ExtraHeaders, provider.networkConfig.BetaHeaderOverrides, provider.GetProviderKey(), schemas.TextCompletionRequest, nil, provider.logger)
+	responseBody, latency, providerResponseHeaders, err := completeRequest(ctx, provider.client, provider.buildRequestURL(ctx, "/v1/complete", schemas.TextCompletionRequest), jsonData, provider.anthropicRequestHeaders(key), provider.networkConfig.ExtraHeaders, provider.networkConfig.BetaHeaderOverrides, provider.GetProviderKey(), schemas.TextCompletionRequest, nil, provider.logger)
 	if providerResponseHeaders != nil {
 		ctx.SetValue(schemas.BifrostContextKeyProviderResponseHeaders, providerResponseHeaders)
 	}
@@ -628,7 +625,7 @@ func (provider *AnthropicProvider) ChatCompletion(ctx *schemas.BifrostContext, k
 			ShouldSendBackRawRequest:  provider.sendBackRawRequest,
 			ShouldSendBackRawResponse: provider.sendBackRawResponse,
 		},
-		provider.anthropicRequestHeaders(ctx, key),
+		provider.anthropicRequestHeaders(key),
 		provider.networkConfig.ExtraHeaders,
 		nil,
 		provider.logger,
@@ -741,7 +738,7 @@ func (provider *AnthropicProvider) ChatCompletionStream(ctx *schemas.BifrostCont
 		"Cache-Control":     "no-cache",
 	}
 
-	if key.Value.GetValue() != "" && !IsClaudeCodeMaxMode(ctx) {
+	if key.Value.GetValue() != "" {
 		setKeyAuthHeaders(headers, key)
 	}
 
@@ -1041,9 +1038,6 @@ func HandleAnthropicChatCompletionStreaming(
 	req.Header.SetContentType("application/json")
 
 	providerUtils.SetExtraHeaders(ctx, req, extraHeaders, []string{AnthropicBetaHeader})
-	// OAuth passthrough: forward the caller's raw headers, whose token is the upstream
-	// credential. Skips anthropic-beta — MergeBetaHeaders below owns the final value.
-	providerUtils.SetPassthroughHeadersForStreaming(ctx, req, providerName, []string{AnthropicBetaHeader})
 
 	if betaHeaders := FilterBetaHeadersForProvider(MergeBetaHeaders(ctx, extraHeaders), providerName, betaHeaderOverrides); len(betaHeaders) > 0 {
 		req.Header.Set(AnthropicBetaHeader, strings.Join(betaHeaders, ","))
@@ -1546,7 +1540,7 @@ func (provider *AnthropicProvider) Responses(ctx *schemas.BifrostContext, key sc
 			ShouldSendBackRawRequest:  provider.sendBackRawRequest,
 			ShouldSendBackRawResponse: provider.sendBackRawResponse,
 		},
-		provider.anthropicRequestHeaders(ctx, key),
+		provider.anthropicRequestHeaders(key),
 		provider.networkConfig.ExtraHeaders,
 		nil,
 		provider.logger,
@@ -1664,7 +1658,7 @@ func (provider *AnthropicProvider) ResponsesStream(ctx *schemas.BifrostContext, 
 		"Cache-Control":     "no-cache",
 	}
 
-	if key.Value.GetValue() != "" && !IsClaudeCodeMaxMode(ctx) {
+	if key.Value.GetValue() != "" {
 		setKeyAuthHeaders(headers, key)
 	}
 
@@ -1721,9 +1715,6 @@ func HandleAnthropicResponsesStream(
 	req.Header.SetContentType("application/json")
 
 	providerUtils.SetExtraHeaders(ctx, req, extraHeaders, []string{AnthropicBetaHeader})
-	// OAuth passthrough: forward the caller's raw headers, whose token is the upstream
-	// credential. Skips anthropic-beta — MergeBetaHeaders below owns the final value.
-	providerUtils.SetPassthroughHeadersForStreaming(ctx, req, providerName, []string{AnthropicBetaHeader})
 
 	if betaHeaders := FilterBetaHeadersForProvider(MergeBetaHeaders(ctx, extraHeaders), providerName, betaHeaderOverrides); len(betaHeaders) > 0 {
 		req.Header.Set(AnthropicBetaHeader, strings.Join(betaHeaders, ","))
@@ -3328,7 +3319,7 @@ func (provider *AnthropicProvider) CountTokens(ctx *schemas.BifrostContext, key 
 			ShouldSendBackRawRequest:  provider.sendBackRawRequest,
 			ShouldSendBackRawResponse: provider.sendBackRawResponse,
 		},
-		provider.anthropicRequestHeaders(ctx, key),
+		provider.anthropicRequestHeaders(key),
 		provider.networkConfig.ExtraHeaders,
 		nil,
 		provider.logger,
@@ -3510,7 +3501,6 @@ func (provider *AnthropicProvider) Passthrough(
 
 	providerUtils.SetExtraHeaders(ctx, fasthttpReq, provider.networkConfig.ExtraHeaders, nil)
 
-	providerUtils.StripCallerAuthForInsecureURL(url, req.SafeHeaders)
 	for k, v := range req.SafeHeaders {
 		fasthttpReq.Header.Set(k, v)
 	}
@@ -3588,7 +3578,6 @@ func (provider *AnthropicProvider) PassthroughStream(
 
 	providerUtils.SetExtraHeaders(ctx, fasthttpReq, provider.networkConfig.ExtraHeaders, nil)
 
-	providerUtils.StripCallerAuthForInsecureURL(url, req.SafeHeaders)
 	for k, v := range req.SafeHeaders {
 		fasthttpReq.Header.Set(k, v)
 	}

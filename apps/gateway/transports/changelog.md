@@ -66,7 +66,6 @@
 - **GenAI Audio by URL** - A `/genai` request with an audio `fileData` URL is answered as a multimodal prompt instead of being rejected as a transcription
 - **Vertex Model Listing** - Model listing on `us` and `eu` keys uses the same regional endpoint host as inference, and token errors show the underlying cause
 - **allowed_models and Key Aliases** - A virtual key that allows a model also allows a key alias that resolves to it (thanks [@aharshit123456](https://github.com/aharshit123456)!)
-- **Unprefixed Models on Keyless Providers** - Catalog-based provider resolution honours `SkipKeySelection`, so bare Claude Code model names work on the Anthropic passthrough (thanks [@cgtarmenta](https://github.com/cgtarmenta)!)
 - **Model Parameters After URL Sync** - Stored model parameters stay in effect after the background model-parameters URL sync (thanks [@Constantine3](https://github.com/Constantine3)!)
 - **Deterministic Config Hashes** - Provider config hashes no longer change with map order, so API-added keys are not dropped on restart (thanks [@rojinebrahimi](https://github.com/rojinebrahimi)!)
 - **Seedance Video Tokens** - Seedance video settlements record their output tokens, so logs show them and virtual key token limits count them

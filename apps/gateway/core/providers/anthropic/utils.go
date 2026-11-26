@@ -2824,18 +2824,8 @@ func addMissingBetaHeadersToContext(ctx *schemas.BifrostContext, req *AnthropicM
 	existing := extraHeaders[AnthropicBetaHeader]
 	// Passthrough wins: skip auto-injected headers when a same-prefix header already exists
 	// from passthrough. This prevents conflicting versions (e.g. mcp-client-2025-04-04 +
-	// mcp-client-2025-11-20) in the same request. On the OAuth path the caller's own
-	// anthropic-beta lives in the passthrough key rather than here, so check both — otherwise
-	// this sees nothing, injects its own version, and MergeBetaHeaders (which dedups by exact
-	// token, not by prefix) forwards both.
+	// mcp-client-2025-11-20) in the same request.
 	claimed := existing
-	if passthrough, ok := ctx.Value(schemas.BifrostContextKeyPassthroughHeaders).(map[string][]string); ok {
-		for k, vals := range passthrough {
-			if strings.EqualFold(k, AnthropicBetaHeader) {
-				claimed = append(append(make([]string, 0, len(claimed)+len(vals)), claimed...), vals...)
-			}
-		}
-	}
 	for _, h := range headers {
 		if !betaHeaderPrefixExists(claimed, h) {
 			existing = append(existing, h)
@@ -3508,21 +3498,13 @@ func MergeBetaHeaders(ctx context.Context, providerExtraHeaders map[string]schem
 		}
 	}
 
-	for _, key := range []schemas.BifrostContextKey{
-		schemas.BifrostContextKeyExtraHeaders,
-		schemas.BifrostContextKeyPassthroughHeaders,
-	} {
-		ctxHeaders, ok := ctx.Value(key).(map[string][]string)
-		if !ok {
+	ctxHeaders, _ := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string)
+	for k, vals := range ctxHeaders {
+		if !strings.EqualFold(k, AnthropicBetaHeader) {
 			continue
 		}
-		for k, vals := range ctxHeaders {
-			if !strings.EqualFold(k, AnthropicBetaHeader) {
-				continue
-			}
-			for _, v := range vals {
-				add(v)
-			}
+		for _, v := range vals {
+			add(v)
 		}
 	}
 	return all
@@ -5470,14 +5452,6 @@ func anthropicExtractFloat64(v interface{}) (float64, bool) {
 	default:
 		return 0, false
 	}
-}
-
-// IsClaudeCodeMaxMode checks if the request is a Claude Code max mode request.
-// In the max mode - we don't need to forward the key
-func IsClaudeCodeMaxMode(ctx *schemas.BifrostContext) bool {
-	userAgent, _ := ctx.Value(schemas.BifrostContextKeyUserAgent).(string)
-	skipKeySelection, _ := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool)
-	return schemas.ClaudeCLI.Matches(userAgent) && skipKeySelection
 }
 
 // IsClaudeCodeRequest checks if the request is a Claude Code request.

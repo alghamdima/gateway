@@ -6551,14 +6551,6 @@ func executeRequestWithRetries[T any](
 		if extraHeaders, ok := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string); ok {
 			exportHeaderAttributes(extraHeaders)
 		}
-		// The Anthropic OAuth passthrough set no longer reaches ExtraHeaders (only the
-		// Anthropic provider forwards it), but the caller metadata it carries — x-app,
-		// x-claude-code-session-id, x-stainless-* — is what attribution keys on, and it was
-		// traced before the split. Merge it back in so observability is unchanged. Tracing
-		// only: this does not put those headers back on any provider request.
-		if passthrough, ok := ctx.Value(schemas.BifrostContextKeyPassthroughHeaders).(map[string][]string); ok {
-			exportHeaderAttributes(passthrough)
-		}
 
 		// Make the LLM call the active span before attribute-population so that phase
 		// nests inside it rather than the preceding span (no valueCtx alloc; StartSpanID
@@ -7295,7 +7287,7 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 					}
 
 					if len(supportedKeys) == 0 {
-						// SkipKeySelection path — keyProvider stays nil, zero Key is used.
+						// The pool builder errors instead of returning no key; keyProvider stays nil.
 					} else if !canRotate {
 						// Fixed key (explicit ID/name, session stickiness): always
 						// return the same key — *unless* it has been marked permanently
@@ -9716,7 +9708,6 @@ func callAcrossKeys[T any](ctx *schemas.BifrostContext, key schemas.Key, keys []
 // via the keyProvider closure built by the caller.
 //
 // canRotate=false is returned for cases where the caller must always use the same key:
-//   - SkipKeySelection (Claude Code OAuth passthrough to Anthropic; empty slice returned)
 //   - Explicit BifrostContextKeyAPIKeyID / APIKeyName (user pinned a specific key)
 //   - Session affinity (the registered policy named a key for the request's session). The
 //     pool is that key followed by the rest of the eligible keys, which the request moves to
@@ -9733,11 +9724,6 @@ func (bifrost *Bifrost) selectKeyFromProviderForModelWithPool(ctx *schemas.Bifro
 		if key, ok := ctx.Value(schemas.BifrostContextKeyDirectKey).(schemas.Key); ok {
 			return []schemas.Key{key}, false, nil
 		}
-	}
-
-	// SkipKeySelection: the caller's OAuth token is the credential — return empty pool, no rotation.
-	if skipKeySelection, ok := ctx.Value(schemas.BifrostContextKeySkipKeySelection).(bool); ok && skipKeySelection && isKeySkippingAllowed(baseProviderType) {
-		return []schemas.Key{}, false, nil
 	}
 
 	// Get keys for provider
