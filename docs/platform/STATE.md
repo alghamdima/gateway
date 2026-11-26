@@ -1,6 +1,6 @@
 # Project state
 
-Read this first. It says what the product is, where everything lives, what is done, what is next and what waits on the owner, so that nobody has to read the whole repository to continue. Last updated 2026-11-25. **Work in flight: read `HANDOFF.md` first.**
+Read this first. It says what the product is, where everything lives, what is done, what is next and what waits on the owner, so that nobody has to read the whole repository to continue. Last updated 2026-11-26.
 
 The long form is in `PLAN.md` (steps and their status), `ARCHITECTURE.md` and `adr/` (one file per decision). When this file and the code disagree, the code is right: fix this file.
 
@@ -54,12 +54,14 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - Admin: users, organizations (credits, rate limit, data policy), pricing (our fee per provider and the top-up fee), providers and their keys, the request log, the audit log, reconciliation. Staff roles admin, finance and support, all with two-factor sign-in.
 - Brand: the control plane says Lemru everywhere; CI fails if the template's name comes back outside an allowlist.
 - One frontend (ADR 0016): the gateway's own UI is deleted. `GET /` on the gateway is a 404.
+- The gateway features outside the product are removed, each with its code, routes, schemas, migrations, tests and baseline rows, and listed in `apps/gateway/MODIFICATIONS.md` ("Features outside the product"): RSS feeds, outbound webhooks, Warp (the internal chat), the prompt repository, the Agent Gateway (A2A), relays and MCP (with its OAuth2 server, the Claude Code gateway sign-in and temporary tokens). Code that only MCP used was found with `deadcode` and removed. The `Makefile` has `build` only.
+- Switched off, not removed: speech, transcription, images, video, realtime, rerank, batch and files keep their code and routes; `plugins/credits` refuses them with a 403 until each is switched on.
 - English only. Spanish was removed.
 - The template's leftovers are gone: seven analytics vendors (PostHog stays), demo charts, demo blog posts, the chat demo.
 
 ## What is next, in order
 
-1. **Remove gateway features that are not part of the product**, one at a time, each with its tests: MCP, agents, relays, the internal chat (`framework/warp`), RSS, webhooks, the prompt repository. `docs/` and `examples/` under `apps/gateway` go with MCP, whose tests are what reads them. After MCP, replace the 3,000-line `Makefile` with one that has `build` only: `scripts/test-baseline.sh` still calls `make setup-mcp-tests`.
+1. **Switch on the request types, one at a time** (`PLAN.md`, "Switching on request types"): first end-to-end tests for embeddings and responses, which are billed already; then speech and transcription; then images; realtime, rerank, batch and files later.
 2. **The playground.** The template's chat demo is removed (page, API route and the `ai` packages): it called OpenAI directly for any signed-in user, outside credits and outside the data policy. The owner wants a playground like OpenRouter's chat. Build it as a new module that calls the gateway with the organization's key, so credits and the data policy apply.
 3. **Response cache, opt-in.** The owner keeps the gateway's semantic cache and routing between providers. The cache must be off unless the customer asks for it per request (OpenRouter does it with a header), and never on in the in-Kingdom deployment or for an organization whose policy forbids retention.
 4. **Arabic**, with right-to-left layout, in the web app and in emails.
@@ -73,7 +75,7 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - The chargeback rule (proposal: suspend the organization's keys when a dispute opens; deduct the amount if it is lost).
 - Legal pages: the three under `packages/cms` are the template's text.
 - Analytics: PostHog is the one provider left. As configured it contacts its host before the visitor consents.
-- GitHub Actions: since 2026-11-25 09:34 UTC every job on the repository ends within seconds without running a step. It is an account matter, not the code.
+- GitHub: the repository moved to `Lem-ru-sa/Lemru-sa` (pushes to `origin` still land there) and `feat/ai-gateway` is its default branch. On the old name every Actions job has ended within seconds without running a step since 2026-11-25 09:34 UTC (an account matter, not the code); on the new one Actions shows no workflows. The owner enables Actions there and decides what `main` holds. Until then every check runs locally (below), and CI is not re-run.
 
 ## How to check your work
 
@@ -86,9 +88,12 @@ env -u SKIP_ENV_VALIDATION pnpm with-env pnpm -F @workspace/api exec vitest run
 pnpm with-env pnpm --filter web build      # catches what the type check does not, such as a missing Suspense
 # gateway
 (cd apps/gateway && make build LOCAL=1)
-bash apps/gateway/scripts/test.sh transports          # one module against the recorded baseline
+bash apps/gateway/scripts/test.sh                     # every module against the recorded baseline (about an hour)
 (cd apps/gateway/plugins/credits && CREDITS_TEST_DATABASE_URL=... CREDITS_E2E_BINARY=$PWD/../../tmp/bifrost-http go test -count=1 -race ./...)
+bash apps/gateway/scripts/verify.sh brand.json        # rename acceptance; the brand's domain must resolve
 ```
+
+In a fresh cloud container: `service postgresql start`, create a login role and database (`turbostarter`/`core` matches the credits test), copy `.env.example` to `.env.local` with that `DATABASE_URL`, run the migrations, and give the web build placeholder values for the variables it asks for (PostHog, Better Auth, Stripe, email, S3); `.env.local` is ignored by git. `verify.sh` needs a domain that resolves: until the owner registers one, pass a copy of `scripts/rename/brand.example.json` with a domain that does. After deleting gateway tests, `python3 apps/gateway/scripts/prune-baseline.py --show` lists the baseline rows they leave behind, and `--write` drops them.
 
 House rules that have caught real bugs here:
 

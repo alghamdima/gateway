@@ -366,7 +366,24 @@ Steps:
 
 Done outside these steps (2026-11-25): the import check, `patches/` and `scripts/import.sh` are retired, because the tree is ours and is edited directly, with every change listed in `apps/gateway/MODIFICATIONS.md`; `.claude/` (upstream's agent tooling) and `recipes/` (deployment recipes we do not use) are deleted. `docs/`, `examples/`, `helm-charts/` and `tests/` hold only what Go tests read (the MCP test servers, the OpenAPI spec, a pricing fixture, the compose file for test services), so each goes with the feature whose tests read it, not before.
 
-Later, one feature at a time, each with its tests: the Go code of features that are not part of the product (MCP, agents, relays, the internal chat, RSS, webhooks, prompts). The semantic cache and routing between providers wait for the owner's word.
+Gateway cleanup (task #41). Done 2026-11-26: the Go code of the seven features that are not part of the product is removed, one at a time, each with its code, routes, schemas, migrations, tests and baseline rows: RSS feeds, outbound webhooks, Warp (the internal chat), the prompt repository, the Agent Gateway (A2A), relays and MCP (with its OAuth2 server, the Claude Code gateway sign-in, temporary tokens and the code only it used, found with `deadcode`). `docs/openapi` and `examples/mcps` went with MCP, and the `Makefile` has `build` only. Every removal is listed in `apps/gateway/MODIFICATIONS.md`. Checked each time: build and vet in all 14 modules, `scripts/test.sh` against the baseline, the credits end-to-end test with `-race`, and the control-plane routes the web app uses. The semantic cache and routing between providers stay, by the owner's word.
+
+### Switching on request types (owner, 2026-11-26)
+
+`plugins/credits` charges text only today (chat, responses, text completions, embeddings) and refuses every other request type with a 403 (`classify` in `apps/gateway/plugins/credits/plugin.go`), because their cost cannot be bounded before the call yet. Their code stays in the engine. Each one is switched on by itself, with:
+
+1. a way to bound the worst-case cost before the call, for the reserve;
+2. a price source;
+3. a settle from the real usage;
+4. an end-to-end test in `plugins/credits`;
+5. then it is allowed in `classify`.
+
+Order:
+
+1. End-to-end tests for embeddings and responses, which are billed already but have none.
+2. Speech (TTS) and transcription (STT).
+3. Images.
+4. Realtime, rerank, batch and files, later.
 
 Order: before Arabic and before the gateway rename, so neither is done on a UI that is about to be deleted.
 
