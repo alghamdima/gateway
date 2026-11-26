@@ -233,6 +233,6 @@ Decisions before building: whether customers see `upstream_inference_cost` / `us
 
 Captured on 2026-11-27 from a new personal account (pay-as-you-go), read-only, with personal data masked: [`openrouter/openrouter-flows.md`](openrouter/openrouter-flows.md) and its screenshots in [`openrouter/`](openrouter/). It covers the models catalog and model detail, chat, credits and the purchase gate, activity, logs, keys, BYOK, routing, privacy and workspaces.
 
-Not captured yet: an organization account (members, roles, invites, org credits and billing), a request's detail and a filled logs row (the account had no requests), the purchase steps after the billing address (amount, fee line), auto top-up once configured, and a key after creation.
+The organization account (members, roles, invitations, org credits, security, workspaces) and one free request (logs row, generation detail with its raw JSON, upstream attempts, activity after it) are in [`openrouter/openrouter-flows-org.md`](openrouter/openrouter-flows-org.md). Not captured yet: the purchase steps after the billing address (amount, fee line), auto top-up once configured, and a key after creation.
 
 The two corrections it brings to this file: OpenRouter takes its platform fee when credits are bought (5.5% on Standard), not per request; and its logs keep each upstream attempt, including failed fallbacks, on a separate tab.
