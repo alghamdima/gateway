@@ -18,9 +18,6 @@ const (
 	CredentialSessionToken CredentialKind = "session_token"
 	// CredentialIdentityToken marks a token the identity provider issued for the user.
 	CredentialIdentityToken CredentialKind = "idp_jwt"
-	// CredentialMCPToken marks a token this deployment's own authorization server issued to an MCP
-	// client.
-	CredentialMCPToken CredentialKind = "mcp_jwt"
 	// CredentialAPIKey marks a management API key.
 	CredentialAPIKey CredentialKind = "api_key"
 	// CredentialEdgeSession marks a Bifrost Edge agent's session token. Its value is the user's ID.

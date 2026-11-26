@@ -29,22 +29,12 @@ func permitWithProviders(permitType grant.PermitType, id, name string, providers
 			KeyIDs:        []string{"*"},
 		})
 	}
-	return grant.NewPermit(permitType, id, name, true, false, providerPermits, nil)
+	return grant.NewPermit(permitType, id, name, true, false, providerPermits)
 }
 
 // ---------------------------------------------------------------------------
 // the built-in virtual key source
 // ---------------------------------------------------------------------------
-
-func vkMCPConfig(clientID, clientName string, tools ...string) configstoreTables.TableVirtualKeyMCPConfig {
-	return configstoreTables.TableVirtualKeyMCPConfig{
-		MCPClient: configstoreTables.TableMCPClient{
-			ClientID: clientID,
-			Name:     clientName,
-		},
-		ToolsToExecute: schemas.WhiteList(tools),
-	}
-}
 
 // vkPermit builds the permit a key confers, with the given clients allowed by default. The builder
 // belongs to the store that owns the key data, so tests reach it through one.
@@ -328,182 +318,9 @@ func TestPermitForVirtualKey_LimitsOfTwoConfigsForOneProvider(t *testing.T) {
 	assert.Equal(t, []string{"rl-first", "rl-second"}, []string{rateLimits[0].ID, rateLimits[1].ID})
 }
 
-func TestPermitForVirtualKey_MCPPermits(t *testing.T) {
-	t.Run("the key's own configs are carried through", func(t *testing.T) {
-		vk := buildVirtualKey("vk-1", "sk-bf-test", "Key", true)
-		vk.MCPConfigs = []configstoreTables.TableVirtualKeyMCPConfig{
-			vkMCPConfig("github-id", "github", "read_file"),
-			vkMCPConfig("slack-id", "slack", "*"),
-		}
-
-		permit := vkPermit(vk, nil)
-
-		require.Len(t, permit.MCPPermits(), 2)
-		assert.Equal(t, schemas.MCPPermit{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}}, permit.MCPPermits()[0])
-		assert.Equal(t, schemas.MCPPermit{Client: "slack-id", ClientName: "slack", Tools: []string{"*"}}, permit.MCPPermits()[1])
-	})
-
-	t.Run("clients open to every key grant all their tools", func(t *testing.T) {
-		vk := buildVirtualKey("vk-1", "sk-bf-test", "Key", true)
-		open := map[string]string{"jira-id": "jira"}
-
-		permit := vkPermit(vk, open)
-
-		require.Len(t, permit.MCPPermits(), 1)
-		assert.Equal(t, schemas.MCPPermit{Client: "jira-id", ClientName: "jira", Tools: []string{"*"}}, permit.MCPPermits()[0])
-	})
-
-	t.Run("a config with no tools owns its client: dropped, and not reopened by the default", func(t *testing.T) {
-		vk := buildVirtualKey("vk-1", "sk-bf-test", "Key", true)
-		vk.MCPConfigs = []configstoreTables.TableVirtualKeyMCPConfig{
-			vkMCPConfig("github-id", "github", "read_file"),
-			// Configured with no tool: no permit, but still the key's to decide, so the default must not reopen it.
-			vkMCPConfig("jira-id", "jira"),
-		}
-		open := map[string]string{"github-id": "github", "jira-id": "jira", "slack-id": "slack"}
-
-		permit := vkPermit(vk, open)
-
-		require.Len(t, permit.MCPPermits(), 2)
-		assert.Equal(t, schemas.WhiteList{"read_file"}, permit.MCPPermits()[0].Tools, "not widened to all tools")
-		assert.Equal(t, "slack-id", permit.MCPPermits()[1].Client, "only the unconfigured client is added")
-		for _, mp := range permit.MCPPermits() {
-			assert.NotEqual(t, "jira-id", mp.Client, "a client configured with no tools is dropped, not reopened by the default")
-		}
-	})
-
-	t.Run("open clients are ordered, so the permit is stable", func(t *testing.T) {
-		vk := buildVirtualKey("vk-1", "sk-bf-test", "Key", true)
-		open := map[string]string{"c-id": "c", "a-id": "a", "b-id": "b"}
-
-		for range 8 {
-			permit := vkPermit(vk, open)
-			require.Len(t, permit.MCPPermits(), 3)
-			assert.Equal(t, []string{"a-id", "b-id", "c-id"}, []string{
-				permit.MCPPermits()[0].Client,
-				permit.MCPPermits()[1].Client,
-				permit.MCPPermits()[2].Client,
-			}, "map iteration order must not leak into the permit")
-		}
-	})
-}
-
 // ---------------------------------------------------------------------------
 // equivalence with the existing virtual-key walkers
 // ---------------------------------------------------------------------------
-
-// mcpScenarios covers the shapes the MCP permit rules distinguish (configured or not, unrestricted
-// or specific, empty, and open-to-every-key with and without a config) with the include list and
-// the per-tool answers each one must produce.
-func mcpScenarios() []struct {
-	name            string
-	vk              *configstoreTables.TableVirtualKey
-	open            map[string]string
-	wantIncludeList []string
-	wantTool        map[string]bool
-} {
-	withConfigs := func(configs ...configstoreTables.TableVirtualKeyMCPConfig) *configstoreTables.TableVirtualKey {
-		vk := buildVirtualKey("vk-1", "sk-bf-test", "Key", true)
-		vk.MCPConfigs = configs
-		return vk
-	}
-
-	return []struct {
-		name            string
-		vk              *configstoreTables.TableVirtualKey
-		open            map[string]string
-		wantIncludeList []string
-		wantTool        map[string]bool
-	}{
-		{
-			name:            "nothing configured, nothing open",
-			vk:              withConfigs(),
-			wantIncludeList: []string{},
-			wantTool:        map[string]bool{"github-read_file": false, "github-*": false},
-		},
-		{
-			name:            "specific tools",
-			vk:              withConfigs(vkMCPConfig("github-id", "github", "read_file", "list_issues")),
-			wantIncludeList: []string{"github-read_file", "github-list_issues"},
-			wantTool: map[string]bool{
-				"github-read_file": true, "github-list_issues": true,
-				"github-delete_repo": false, "github-*": true, "slack-post": false,
-			},
-		},
-		{
-			name:            "unrestricted client",
-			vk:              withConfigs(vkMCPConfig("github-id", "github", "*")),
-			wantIncludeList: []string{"github-*"},
-			wantTool:        map[string]bool{"github-anything": true, "github-*": true, "slack-post": false},
-		},
-		{
-			name:            "client configured with no tools",
-			vk:              withConfigs(vkMCPConfig("github-id", "github")),
-			wantIncludeList: []string{},
-			wantTool:        map[string]bool{"github-read_file": false, "github-*": false},
-		},
-		{
-			name:            "only an open client",
-			vk:              withConfigs(),
-			open:            map[string]string{"jira-id": "jira"},
-			wantIncludeList: []string{"jira-*"},
-			wantTool:        map[string]bool{"jira-create_issue": true, "jira-*": true, "github-read_file": false},
-		},
-		{
-			name:            "open client also configured specifically",
-			vk:              withConfigs(vkMCPConfig("jira-id", "jira", "create_issue")),
-			open:            map[string]string{"jira-id": "jira"},
-			wantIncludeList: []string{"jira-create_issue"},
-			wantTool:        map[string]bool{"jira-create_issue": true, "jira-delete_issue": false, "jira-*": true},
-		},
-		{
-			name:            "open client configured with no tools",
-			vk:              withConfigs(vkMCPConfig("jira-id", "jira")),
-			open:            map[string]string{"jira-id": "jira"},
-			wantIncludeList: []string{},
-			wantTool:        map[string]bool{"jira-create_issue": false, "jira-*": false},
-		},
-		{
-			name:            "several clients, mixed",
-			vk:              withConfigs(vkMCPConfig("github-id", "github", "read_file"), vkMCPConfig("slack-id", "slack", "*")),
-			open:            map[string]string{"jira-id": "jira", "github-id": "github"},
-			wantIncludeList: []string{"github-read_file", "slack-*", "jira-*"},
-			wantTool: map[string]bool{
-				"github-read_file": true, "github-delete_repo": false,
-				"slack-post_message": true, "jira-create_issue": true, "unknown-tool": false,
-			},
-		},
-	}
-}
-
-func TestPermitForVirtualKey_MCPToolIncludeList(t *testing.T) {
-	// The include-tools list a key produces, across the shapes the MCP permit rules distinguish.
-	// The fold is the only implementation of those rules, so these are the expectations themselves
-	// rather than a comparison against a second one.
-	for _, scenario := range mcpScenarios() {
-		t.Run(scenario.name, func(t *testing.T) {
-			got := vkAccess(scenario.vk, scenario.open).MCPToolIncludeList()
-
-			assert.ElementsMatch(t, scenario.wantIncludeList, got)
-		})
-	}
-}
-
-func TestPermitForVirtualKey_ToolChecks(t *testing.T) {
-	// Per-tool decisions over the same shapes: an explicit config owns its client and is never
-	// widened by an open client, an unrestricted config grants every tool, an empty one grants
-	// none, and a wildcard pattern asks whether the client is granted anything at all.
-	for _, scenario := range mcpScenarios() {
-		t.Run(scenario.name, func(t *testing.T) {
-			access := vkAccess(scenario.vk, scenario.open)
-
-			for pattern, want := range scenario.wantTool {
-				assert.Equal(t, want, access.IsMCPToolAllowed(pattern), "pattern %q", pattern)
-			}
-			assert.False(t, access.IsMCPToolAllowed(""), "an empty pattern names no tool")
-		})
-	}
-}
 
 func TestPermitForVirtualKey_ProviderAndModelRules(t *testing.T) {
 	// The rules the key's own permit must keep: a provider with no config is not permitted, a
@@ -614,19 +431,19 @@ func newAccessTestPlugin(t testing.TB, vk *configstoreTables.TableVirtualKey, wr
 	}
 
 	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)},
-		logger, store, nil, nil, nil, nil)
+		logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 	return plugin
 }
 
 func TestResolveAccess(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 
 	t.Run("a store that knows only keys answers with the key's own permit", func(t *testing.T) {
 		plugin := newAccessTestPlugin(t, vk, nil)
 
-		access, err := plugin.ResolveAccess(newPreRequestCtx(nil, nil))
+		access, err := plugin.ResolveAccess(newPreRequestCtx())
 
 		require.NoError(t, err)
 		require.NotNil(t, access)
@@ -636,7 +453,6 @@ func TestResolveAccess(t *testing.T) {
 		assert.Equal(t, vk.ID, access.Bases()[0].ID())
 		assert.Equal(t, string(grant.PermitVirtualKey), access.Bases()[0].Type())
 		assert.True(t, access.IsModelAllowed("openai", "gpt-4o"))
-		assert.True(t, access.IsMCPToolAllowed("sentry-read_file"))
 	})
 
 	t.Run("a permit the store scopes the request with is folded in", func(t *testing.T) {
@@ -646,7 +462,7 @@ func TestResolveAccess(t *testing.T) {
 		}
 		plugin := newAccessTestPlugin(t, vk, store)
 
-		access, err := plugin.ResolveAccess(newPreRequestCtx(nil, nil))
+		access, err := plugin.ResolveAccess(newPreRequestCtx())
 
 		require.NoError(t, err)
 		require.NotNil(t, access)
@@ -661,11 +477,11 @@ func TestResolveAccess(t *testing.T) {
 		// The key allows every openai model and the team only one, so only that one is left.
 		team := grant.NewPermit(grant.PermitTeamAccessProfile, "t1", "Team", true, false, []schemas.ProviderPermit{{
 			Provider: "openai", AllowedModels: []string{"gpt-4o-mini"}, KeyIDs: []string{"*"},
-		}}, nil, grant.WithLevel(1))
+		}}, grant.WithLevel(1))
 		store := &permitStore{above: []schemas.Permit{team}, levelMode: grant.Intersect}
 		plugin := newAccessTestPlugin(t, vk, store)
 
-		access, err := plugin.ResolveAccess(newPreRequestCtx(nil, nil))
+		access, err := plugin.ResolveAccess(newPreRequestCtx())
 
 		require.NoError(t, err)
 		require.NotNil(t, access)
@@ -724,10 +540,10 @@ func TestResolveAccess(t *testing.T) {
 // grant and gets the same object back, without the store being asked again, which is what lets
 // every path that might be the first to see a request call this unconditionally.
 func TestResolveAccessResolvesOnce(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	store := &permitStore{}
 	plugin := newAccessTestPlugin(t, vk, store)
-	ctx := newPreRequestCtx(nil, nil)
+	ctx := newPreRequestCtx()
 
 	first, err := plugin.ResolveAccess(ctx)
 	require.NoError(t, err)
@@ -746,10 +562,10 @@ func TestResolveAccessResolvesOnce(t *testing.T) {
 // a request that fails over changes its provider, not its caller: the next attempt reads the same
 // access and settles only its own limits again (see TestResolveLimits).
 func TestResolveAccessHoldsAcrossAttempts(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	store := &permitStore{}
 	plugin := newAccessTestPlugin(t, vk, store)
-	ctx := newPreRequestCtx(nil, nil)
+	ctx := newPreRequestCtx()
 
 	first, err := plugin.ResolveAccess(ctx)
 	require.NoError(t, err)
@@ -773,7 +589,7 @@ func TestResolveAccessHoldsAcrossAttempts(t *testing.T) {
 // indistinguishable from one nobody has resolved yet. Asking repeatedly re-asks the store, which is
 // the price of not caching a negative.
 func TestResolveAccessRecordsNothingForAnUnresolvableCredential(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	store := &permitStore{}
 	plugin := newAccessTestPlugin(t, vk, store)
 	ctx := presentCtx("sk-bf-unknown")
@@ -796,7 +612,7 @@ func TestResolveAccessCompletesTheIdentity(t *testing.T) {
 	team := buildTeam("team-1", "Platform", nil)
 	team.CustomerID = &customer.ID
 	team.Customer = customer
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	vk.TeamID = &team.ID
 	vk.Team = team
 
@@ -807,20 +623,20 @@ func TestResolveAccessCompletesTheIdentity(t *testing.T) {
 		Customers:   []configstoreTables.TableCustomer{*customer},
 	}, nil, &mockInMemoryStore{})
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
 	// As the transport leaves it: the credential settled, nothing resolved.
 	ctx := emptyCtx()
-	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, mcpTestVKValue), nil, nil, nil, nil, nil, nil))
+	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
 
 	_, err = plugin.ResolveAccess(ctx)
 	require.NoError(t, err)
 
 	identity := ctx.Grant().Identity()
 	require.NotNil(t, identity)
-	assert.Equal(t, grant.NewCredential(grant.CredentialVirtualKey, mcpTestVKValue), identity.Credential(), "what was presented is kept")
+	assert.Equal(t, grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), identity.Credential(), "what was presented is kept")
 	require.NotNil(t, identity.VirtualKey())
 	assert.Equal(t, vk.ID, identity.VirtualKey().ID)
 	assert.Equal(t, vk.Name, identity.VirtualKey().Name)
@@ -847,7 +663,7 @@ func TestResolveAccessStampsContentLoggingDecision(t *testing.T) {
 		{name: "on is stamped as false", decision: new(false)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vk := buildVKForMCPStamping(nil)
+			vk := buildAccessTestVK()
 			vk.DisableContentLogging = tc.decision
 
 			logger := NewMockLogger()
@@ -855,12 +671,12 @@ func TestResolveAccessStampsContentLoggingDecision(t *testing.T) {
 				VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 			}, nil, &mockInMemoryStore{})
 			require.NoError(t, err)
-			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil, nil)
+			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
 			ctx := emptyCtx()
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, mcpTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
 
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
@@ -891,7 +707,7 @@ func TestResolveAccessMarksTraceWhenContentLoggingOff(t *testing.T) {
 		{name: "inherit leaves the root span alone", decision: nil, marked: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vk := buildVKForMCPStamping(nil)
+			vk := buildAccessTestVK()
 			vk.DisableContentLogging = tc.decision
 
 			logger := NewMockLogger()
@@ -899,7 +715,7 @@ func TestResolveAccessMarksTraceWhenContentLoggingOff(t *testing.T) {
 				VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 			}, nil, &mockInMemoryStore{})
 			require.NoError(t, err)
-			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil, nil)
+			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -915,7 +731,7 @@ func TestResolveAccessMarksTraceWhenContentLoggingOff(t *testing.T) {
 			ctx.SetValue(schemas.BifrostContextKeyTraceID, traceID)
 			_, handle := tracer.StartSpanID(ctx, "request", schemas.SpanKindHTTPRequest)
 			require.NotNil(t, handle, "root span must open for the trace")
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, mcpTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
 
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
@@ -960,13 +776,13 @@ func TestPresentedVirtualKey(t *testing.T) {
 }
 
 func TestPreRequestHookRecordsAccess(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	store := &permitStore{
 		scoping: permitWithProviders("other", "o1", "Other", "anthropic"),
 		mode:    grant.Union,
 	}
 	plugin := newAccessTestPlugin(t, vk, store)
-	ctx := newPreRequestCtx(nil, nil)
+	ctx := newPreRequestCtx()
 
 	require.NoError(t, plugin.PreRequestHook(ctx, newChatRequest()))
 
@@ -979,7 +795,7 @@ func TestPreRequestHookRecordsAccess(t *testing.T) {
 }
 
 func TestPreRequestHookWithoutACredentialRecordsNothing(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	plugin := newAccessTestPlugin(t, vk, nil)
 	ctx := emptyCtx()
 
@@ -990,11 +806,10 @@ func TestPreRequestHookWithoutACredentialRecordsNothing(t *testing.T) {
 	assert.Nil(t, ctx.Grant().Access())
 
 	// And nothing narrowed its tools to the empty set on the way through.
-	assert.Nil(t, ctx.Value(schemas.MCPContextKeyIncludeTools))
 }
 
 func TestPreRequestHookWithoutAGrantReportsTheFault(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	plugin := newAccessTestPlugin(t, vk, nil)
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 
@@ -1007,7 +822,7 @@ func TestPreRequestHookWithoutAGrantReportsTheFault(t *testing.T) {
 // hot-path cost
 // ---------------------------------------------------------------------------
 
-// benchVK is a key of a realistic size: several providers, several MCP clients.
+// benchVK is a key of a realistic size: several providers.
 func benchVK() *configstoreTables.TableVirtualKey {
 	vk := buildVirtualKey("vk-bench", "sk-bf-bench", "bench-key", true)
 	for _, provider := range []string{"openai", "anthropic", "bedrock", "vertex", "groq"} {
@@ -1017,9 +832,6 @@ func benchVK() *configstoreTables.TableVirtualKey {
 			AllowAllKeys:  true,
 			Weight:        schemas.Ptr(1.0),
 		})
-	}
-	for _, client := range []string{"github", "slack", "jira"} {
-		vk.MCPConfigs = append(vk.MCPConfigs, vkMCPConfig(client+"-id", client, "read", "write"))
 	}
 	return vk
 }
@@ -1038,7 +850,7 @@ func benchStore(b *testing.B, vk *configstoreTables.TableVirtualKey) *LocalGover
 func benchPlugin(b *testing.B, store *LocalGovernanceStore) *GovernancePlugin {
 	b.Helper()
 	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)},
-		NewMockLogger(), store, nil, nil, nil, store.inMemoryStore)
+		NewMockLogger(), store, nil, nil, store.inMemoryStore)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -1084,8 +896,6 @@ func BenchmarkAccessChecks(b *testing.B) {
 	for b.Loop() {
 		_ = access.IsProviderAllowed("groq")
 		_ = access.IsModelAllowed("groq", "o3")
-		_ = access.MCPToolIncludeList()
-		_ = access.IsMCPToolAllowed("github-read")
 	}
 }
 
@@ -1154,7 +964,7 @@ func TestFilterModelsForAccess(t *testing.T) {
 // Evaluation is the funnel every caller passes through, so the permits a request holds without a
 // key are enforced there too, not only where a key is presented.
 func TestEvaluateEnforcesPermitsHeldWithoutAKey(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	held := permitWithProviders("other", "h1", "Holder", "openai")
 
 	t.Run("a provider the request does not hold is refused", func(t *testing.T) {
@@ -1220,7 +1030,7 @@ func TestEvaluateEnforcesPermitsHeldWithoutAKey(t *testing.T) {
 // an anonymous request. The two are indistinguishable from the access alone (there is none either
 // way), so the funnel separates them by asking whether anything was presented at all.
 func TestEvaluateRefusesAPresentedCredentialThatGrantsNothing(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	plugin := newAccessTestPlugin(t, vk, nil)
 
 	t.Run("a credential that resolves to nothing is refused", func(t *testing.T) {
@@ -1309,7 +1119,7 @@ func TestEvaluateRefusesAPresentedCredentialThatGrantsNothing(t *testing.T) {
 // exactly the requests the setting exists to admit: its own message offers a user token as an
 // alternative.
 func TestMandatoryAuthAcceptsAnAuthenticatedIdentity(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	logger := NewMockLogger()
 	local, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
@@ -1317,7 +1127,7 @@ func TestMandatoryAuthAcceptsAnAuthenticatedIdentity(t *testing.T) {
 	require.NoError(t, err)
 
 	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(true)},
-		logger, local, nil, nil, nil, nil)
+		logger, local, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -1371,7 +1181,7 @@ func TestMandatoryAuthAcceptsAnAuthenticatedIdentity(t *testing.T) {
 // A signed-in user nothing grants access to is refused as access not found, as is a presented key
 // that resolves to nothing and a credential that names no user.
 func TestEvaluateRefusesAnUngrantedUser(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	logger := NewMockLogger()
 	local, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
@@ -1379,7 +1189,7 @@ func TestEvaluateRefusesAnUngrantedUser(t *testing.T) {
 	require.NoError(t, err)
 
 	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)},
-		logger, local, nil, nil, nil, nil)
+		logger, local, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -1423,9 +1233,9 @@ func TestEvaluateRefusesAnUngrantedUser(t *testing.T) {
 // distinctly, and inactive wins when a key is both: a key switched off is not a key that ran out.
 func TestEvaluateRefusesAPermitThatMayNotBeUsed(t *testing.T) {
 	newPlugin := func(t *testing.T, mutate func(vk *configstoreTables.TableVirtualKey)) (*GovernancePlugin, *schemas.BifrostContext) {
-		vk := buildVKForMCPStamping([]string{"read_file"})
+		vk := buildAccessTestVK()
 		mutate(vk)
-		return newAccessTestPlugin(t, vk, nil), newPreRequestCtx(nil, nil)
+		return newAccessTestPlugin(t, vk, nil), newPreRequestCtx()
 	}
 	request := &EvaluationRequest{
 		RequestType: schemas.ChatCompletionRequest,
@@ -1521,13 +1331,13 @@ func TestPermitFindsItsOwnScopedModelConfigs(t *testing.T) {
 // not whether the permit may still be used), so if this step asks only about the bases, a dead
 // scoping permit goes on permitting everything it names, with nothing anywhere to catch it.
 func TestEvaluateJudgesEveryPermit(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	base := permitWithProviders("other", "h1", "Holder", "openai")
 	request := &EvaluationRequest{Provider: schemas.OpenAI, Model: "gpt-4o"}
 
 	scopingIn := func(isActive, isExpired bool) *permitStore {
 		providers := permitWithProviders("scope", "s1", "Scope", "openai").ProviderPermits()
-		scoping := grant.NewPermit("scope", "s1", "Scope", isActive, isExpired, providers, nil)
+		scoping := grant.NewPermit("scope", "s1", "Scope", isActive, isExpired, providers)
 		return &permitStore{baseOverride: base, scoping: scoping, mode: grant.Intersect}
 	}
 
@@ -1568,7 +1378,7 @@ func TestEvaluateJudgesEveryPermit(t *testing.T) {
 // was missing or merely not theirs, for the same reason the credential one does not distinguish
 // "does not exist" from "has been revoked".
 func TestEvaluateRefusesARequestNothingScoped(t *testing.T) {
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	base := permitWithProviders("other", "h1", "Holder", "openai")
 
 	// A request names a project by header, and whatever resolves it stamps the resolved id once the
@@ -1685,7 +1495,7 @@ func (s *settlingErrorStore) GatherLimits(ctx *schemas.BifrostContext, access sc
 // newSettlingErrorTestPlugin builds a plugin whose store fails to settle limits with err.
 func newSettlingErrorTestPlugin(t *testing.T, err error) *GovernancePlugin {
 	t.Helper()
-	vk := buildVKForMCPStamping(nil)
+	vk := buildAccessTestVK()
 	logger := NewMockLogger()
 	local, localErr := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
@@ -1693,7 +1503,7 @@ func newSettlingErrorTestPlugin(t *testing.T, err error) *GovernancePlugin {
 	require.NoError(t, localErr)
 
 	plugin, initErr := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)},
-		logger, &settlingErrorStore{GovernanceStore: local, err: err}, nil, nil, nil, nil)
+		logger, &settlingErrorStore{GovernanceStore: local, err: err}, nil, nil, nil)
 	require.NoError(t, initErr)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 	return plugin

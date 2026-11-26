@@ -203,54 +203,6 @@ func (pc *TableVirtualKeyProviderConfig) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
-type TableVirtualKeyMCPConfig struct {
-	ID             uint              `gorm:"primaryKey;autoIncrement" json:"id"`
-	VirtualKeyID   string            `gorm:"type:varchar(255);not null;uniqueIndex:idx_vk_mcpclient" json:"virtual_key_id"`
-	MCPClientID    uint              `gorm:"not null;uniqueIndex:idx_vk_mcpclient;index:idx_vk_mcp_configs_mcp_client_id" json:"mcp_client_id"`
-	MCPClient      TableMCPClient    `gorm:"foreignKey:MCPClientID" json:"mcp_client"`
-	ToolsToExecute schemas.WhiteList `gorm:"type:text;serializer:json" json:"tools_to_execute"`
-
-	// MCPClientName is used during config file parsing to resolve the MCP client by name.
-	// This field is not persisted to the database - it's only used to capture
-	// "mcp_client_name" from config.json and then resolve it to MCPClientID.
-	MCPClientName string `gorm:"-" json:"-"`
-}
-
-// TableName sets the table name for each model
-func (TableVirtualKeyMCPConfig) TableName() string {
-	return "governance_virtual_key_mcp_configs"
-}
-
-// BeforeSave validates WhiteList fields before GORM persists the record.
-func (mc *TableVirtualKeyMCPConfig) BeforeSave(tx *gorm.DB) error {
-	if err := mc.ToolsToExecute.Validate(); err != nil {
-		return fmt.Errorf("invalid tools_to_execute: %w", err)
-	}
-	return nil
-}
-
-// UnmarshalJSON custom unmarshaller to handle both "mcp_client_id" (database format)
-// and "mcp_client_name" (config file format) for MCP client references.
-func (mc *TableVirtualKeyMCPConfig) UnmarshalJSON(data []byte) error {
-	// Temporary struct to capture all fields including mcp_client_name
-	type Alias TableVirtualKeyMCPConfig
-	type TempMCPConfig struct {
-		Alias
-		MCPClientName string `json:"mcp_client_name"` // Config file format: MCP client name
-	}
-	var temp TempMCPConfig
-	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
-	}
-	// Copy all standard fields
-	*mc = TableVirtualKeyMCPConfig(temp.Alias)
-	// Capture mcp_client_name for later resolution to MCPClientID
-	if temp.MCPClientName != "" {
-		mc.MCPClientName = temp.MCPClientName
-	}
-	return nil
-}
-
 // TableVirtualKey represents a virtual key with budget, rate limits, and team/customer association
 type TableVirtualKey struct {
 	ID                string                          `gorm:"primaryKey;type:varchar(255);index:idx_virtual_keys_created_at_id,priority:2" json:"id"`
@@ -261,7 +213,6 @@ type TableVirtualKey struct {
 	ExpiresAt         *time.Time                      `gorm:"type:timestamp;null" json:"expires_at,omitempty"`                             // Optional expiry; nil means never expires
 	DeleteAfterExpire *bool                           `gorm:"type:boolean" json:"delete_after_expire,omitempty"`                           // Nil inherits client.delete_expired_virtual_keys; true/false override it for this key
 	ProviderConfigs   []TableVirtualKeyProviderConfig `gorm:"foreignKey:VirtualKeyID;constraint:OnDelete:CASCADE" json:"provider_configs"` // Empty means no providers allowed (deny-by-default)
-	MCPConfigs        []TableVirtualKeyMCPConfig      `gorm:"foreignKey:VirtualKeyID;constraint:OnDelete:CASCADE" json:"mcp_configs"`
 
 	// Foreign key relationships. TeamID, CustomerID and BusinessUnitID are mutually exclusive: a
 	// key belongs to at most one owner, which is what decides whose money it spends and whose

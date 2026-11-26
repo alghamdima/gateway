@@ -797,11 +797,6 @@ func TestFilterPlugins(t *testing.T) {
 		assert.Len(t, httpPlugins, 1, "hello-world should implement HTTPTransportPlugin")
 	})
 
-	t.Run("FilterMCPPlugins", func(t *testing.T) {
-		mcpPlugins := FilterMCPPlugins(plugins)
-		assert.Len(t, mcpPlugins, 0, "hello-world does not implement MCPPlugin")
-	})
-
 	t.Run("FilterObservabilityPlugins", func(t *testing.T) {
 		obsPlugins := FilterObservabilityPlugins(plugins)
 		assert.Len(t, obsPlugins, 0, "hello-world does not implement ObservabilityPlugin")
@@ -824,28 +819,6 @@ func TestLoadPluginWithOptionalHooks(t *testing.T) {
 	// Test that DynamicPlugin properly handles unimplemented methods by returning no-op values
 	dynamicPlugin, ok := plugin.(*DynamicPlugin)
 	require.True(t, ok, "Plugin should be a DynamicPlugin")
-
-	// Test MCP hooks (not implemented by hello-world plugin)
-	t.Run("UnimplementedMCPHooks", func(t *testing.T) {
-		ctx := context.Background()
-		pluginCtx, cancel := schemas.NewBifrostContextWithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		// PreMCPHook should return no-op values
-		mcpReq := &schemas.BifrostMCPRequest{}
-		returnedReq, shortCircuit, err := dynamicPlugin.PreMCPHook(pluginCtx, mcpReq)
-		assert.NoError(t, err, "PreMCPHook should not error for unimplemented hook")
-		assert.Equal(t, mcpReq, returnedReq, "PreMCPHook should return original request")
-		assert.Nil(t, shortCircuit, "PreMCPHook should return nil short circuit")
-
-		// PostMCPHook should return no-op values
-		mcpResp := &schemas.BifrostMCPResponse{}
-		bifrostErr := &schemas.BifrostError{}
-		returnedResp, returnedErr, hookErr := dynamicPlugin.PostMCPHook(pluginCtx, mcpResp, bifrostErr)
-		assert.NoError(t, hookErr, "PostMCPHook should not error for unimplemented hook")
-		assert.Equal(t, mcpResp, returnedResp, "PostMCPHook should return original response")
-		assert.Equal(t, bifrostErr, returnedErr, "PostMCPHook should return original error")
-	})
 
 	// Test Observability hooks (not implemented by hello-world plugin)
 	t.Run("UnimplementedObservabilityHooks", func(t *testing.T) {

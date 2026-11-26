@@ -367,44 +367,6 @@ func (s *ClickHouseLogStore) BatchCreateIfNotExists(ctx context.Context, entries
 	})
 }
 
-// BatchCreateMCPToolLogsIfNotExists inserts the MCP tool log entries whose
-// ids are not already present. See CreateIfNotExists.
-func (s *ClickHouseLogStore) BatchCreateMCPToolLogsIfNotExists(ctx context.Context, entries []*MCPToolLog) error {
-	if len(entries) == 0 {
-		return nil
-	}
-	// Batch-wide dedup for the same reason as BatchCreateIfNotExists above.
-	seen := make(map[string]struct{}, len(entries))
-	return forEachRMWChunk(entries, func(chunk []*MCPToolLog) error {
-		fresh := make([]*MCPToolLog, 0, len(chunk))
-		ids := make([]string, 0, len(chunk))
-		for _, e := range chunk {
-			if e == nil {
-				continue
-			}
-			if _, ok := seen[e.ID]; ok {
-				continue
-			}
-			seen[e.ID] = struct{}{}
-			fresh = append(fresh, e)
-			ids = append(ids, e.ID)
-		}
-		if len(fresh) == 0 {
-			return nil
-		}
-		defer s.lockRMWBatch("mcp_tool_logs", ids)()
-		missing, err := chFilterMissing(ctx, s.db, "mcp_tool_logs", fresh, func(l *MCPToolLog) string { return l.ID }, func(l *MCPToolLog) time.Time { return l.Timestamp })
-		if err != nil {
-			return err
-		}
-		if len(missing) == 0 {
-			return nil
-		}
-		// Omit inc_number so ClickHouse's DEFAULT generateSnowflakeID() fires.
-		return s.db.WithContext(ctx).Omit("inc_number").Create(&missing).Error
-	})
-}
-
 // --- Point lookups by id ---
 
 // chLogTimestampWindow is how far either side of a FindByID timestamp hint the
@@ -413,7 +375,7 @@ func (s *ClickHouseLogStore) BatchCreateMCPToolLogsIfNotExists(ctx context.Conte
 const chLogTimestampWindow = time.Second
 
 // chIDLookupTables are the tables whose rows are read back by id under FINAL.
-var chIDLookupTables = []string{"logs", "mcp_tool_logs"}
+var chIDLookupTables = []string{"logs"}
 
 // chMutableSkipIndexes lists, as an ignore_data_skipping_indices value, every
 // skip index on chIDLookupTables except those on id. Names that do not exist on
@@ -637,8 +599,6 @@ func (s *ClickHouseLogStore) MarkHasObject(ctx context.Context, table string, ma
 	switch table {
 	case "logs":
 		return chMarkHasObject(ctx, s, table, marks, func(r *Log) (string, *bool) { return r.ID, &r.HasObject })
-	case "mcp_tool_logs":
-		return chMarkHasObject(ctx, s, table, marks, func(r *MCPToolLog) (string, *bool) { return r.ID, &r.HasObject })
 	default:
 		return HasObjectMarkResult{}, fmt.Errorf("clickhouse: MarkHasObject: unsupported table %q", table)
 	}
@@ -829,46 +789,6 @@ func (s *ClickHouseLogStore) BatchUpdate(ctx context.Context, entries []*Log) er
 	})
 }
 
-// UpdateMCPToolLog applies an update to an MCP tool log row via read-modify-write.
-func (s *ClickHouseLogStore) UpdateMCPToolLog(ctx context.Context, id string, entry any) error {
-	st, err := chParseSchema(s.db, &MCPToolLog{})
-	if err != nil {
-		return err
-	}
-	defer s.lockRMW("mcp_tool_logs", id)()
-	var existing MCPToolLog
-	if err := s.chFindForUpdate(ctx, &existing, id); err != nil {
-		return err
-	}
-	dest := reflect.ValueOf(&existing).Elem()
-	switch v := entry.(type) {
-	case map[string]interface{}:
-		if err := chApplyUpdateMap(ctx, st, dest, v); err != nil {
-			return err
-		}
-	case *MCPToolLog:
-		if v == nil {
-			return fmt.Errorf("clickhouse: nil *MCPToolLog update")
-		}
-		if err := v.SerializeFields(); err != nil {
-			return err
-		}
-		if err := chApplyStructUpdate(ctx, st, dest, reflect.ValueOf(v).Elem()); err != nil {
-			return err
-		}
-	case MCPToolLog:
-		if err := v.SerializeFields(); err != nil {
-			return err
-		}
-		if err := chApplyStructUpdate(ctx, st, dest, reflect.ValueOf(&v).Elem()); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("clickhouse: unsupported UpdateMCPToolLog entry type %T", entry)
-	}
-	return s.chReinsert(ctx, &existing)
-}
-
 // chLightweightDelete issues a ClickHouse lightweight DELETE through raw Exec,
 // bypassing the GORM driver's rewrite of Delete() into a heavyweight
 // `ALTER TABLE ... DELETE`. ClickHouse records it as
@@ -1037,29 +957,12 @@ func (s *ClickHouseLogStore) DeleteLogs(ctx context.Context, ids []string) error
 	return s.chLightweightDelete(ctx, "logs", "id IN ?", ids)
 }
 
-// DeleteMCPToolLogs deletes multiple MCP tool log entries by id with one
-// lightweight delete.
-func (s *ClickHouseLogStore) DeleteMCPToolLogs(ctx context.Context, ids []string) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	return s.chLightweightDelete(ctx, "mcp_tool_logs", "id IN ?", ids)
-}
-
 // Flush removes stale processing log rows. Overridden so the minute sweep is
 // a probe plus at most one lightweight delete. The error text matches the
 // SQL stores so the logging plugin's warnings are unchanged.
 func (s *ClickHouseLogStore) Flush(ctx context.Context, since time.Time) error {
 	if err := s.chFlushProcessing(ctx, "logs", since); err != nil {
 		return fmt.Errorf("failed to cleanup old processing logs: %w", err)
-	}
-	return nil
-}
-
-// FlushMCPToolLogs removes stale processing MCP tool log rows. See Flush.
-func (s *ClickHouseLogStore) FlushMCPToolLogs(ctx context.Context, since time.Time) error {
-	if err := s.chFlushProcessing(ctx, "mcp_tool_logs", since); err != nil {
-		return fmt.Errorf("failed to cleanup old processing MCP tool logs: %w", err)
 	}
 	return nil
 }

@@ -47,20 +47,6 @@ func (m *recordingRetentionManager) DeleteMCPToolLogsBatch(_ context.Context, _ 
 	return m.mcpCounts[len(m.mcpBatches)-1], nil
 }
 
-// TestHighFixesCleanerUsesLargeBatchesAndCleansMCP pins H2: the cleaner deletes
-// in batches of 5000 (100 could not keep up with 5.6M expired rows per day) and
-// runs the same retention over mcp_tool_logs, which previously had none.
-func TestHighFixesCleanerUsesLargeBatchesAndCleansMCP(t *testing.T) {
-	m := &recordingRetentionManager{
-		logCounts: []int64{5000, 5000, 12},
-		mcpCounts: []int64{5000, 3},
-	}
-	NewLogsCleaner(m, CleanerConfig{RetentionDays: 7}, testLogger{}).cleanupOldLogs(context.Background())
-
-	require.Equal(t, []int{5000, 5000, 5000, 5000}, m.logBatches, "logs must be deleted 5000 rows at a time until an empty batch")
-	require.Equal(t, []int{5000, 5000, 5000}, m.mcpBatches, "mcp_tool_logs must get the same retention pass")
-}
-
 // backlogRetentionManager simulates a logs table that never finishes draining:
 // every logs batch is full (or fails, when logErr is set). It counts the MCP
 // batches the cleaner still gets to run.
@@ -90,46 +76,12 @@ func (m *backlogRetentionManager) DeleteMCPToolLogsBatch(_ context.Context, _ ti
 	return 0, nil
 }
 
-// TestHighFixesCleanerMCPNotStarvedByLogsBacklog pins that mcp_tool_logs get a
-// share of every retention pass: a logs backlog that outlasts the pass deadline,
-// or a logs delete that keeps failing, must not skip MCP retention forever. A
-// pass that was stopped (parent ctx cancelled) still ends without touching MCP.
-func TestHighFixesCleanerMCPNotStarvedByLogsBacklog(t *testing.T) {
-	t.Run("logs backlog outlasts the deadline", func(t *testing.T) {
-		m := &backlogRetentionManager{}
-		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-		defer cancel()
-		NewLogsCleaner(m, CleanerConfig{RetentionDays: 7}, testLogger{}).cleanupOldLogs(ctx)
-		require.Positive(t, m.mcpBatches.Load(), "a logs backlog must not starve MCP tool-log retention")
-	})
-	t.Run("logs delete fails", func(t *testing.T) {
-		m := &backlogRetentionManager{logErr: fmt.Errorf("lock timeout")}
-		NewLogsCleaner(m, CleanerConfig{RetentionDays: 7}, testLogger{}).cleanupOldLogs(context.Background())
-		require.Positive(t, m.mcpBatches.Load(), "a failing logs delete must not skip MCP tool-log retention")
-	})
-	t.Run("stopped pass", func(t *testing.T) {
-		m := &backlogRetentionManager{}
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		NewLogsCleaner(m, CleanerConfig{RetentionDays: 7}, testLogger{}).cleanupOldLogs(ctx)
-		require.Zero(t, m.mcpBatches.Load(), "a stopped pass must not start MCP retention")
-	})
-}
-
 // hfInsertLogAt inserts a minimal logs row with explicit timestamp and created_at.
 func hfInsertLogAt(t *testing.T, store *RDBLogStore, id string, ts time.Time) {
 	t.Helper()
 	require.NoError(t, store.Create(context.Background(), &Log{
 		ID: id, Timestamp: ts, CreatedAt: ts, Object: "chat_completion",
 		Provider: "openai", Model: "gpt-4o", Status: "success",
-	}))
-}
-
-// hfInsertMCPAt inserts a minimal mcp_tool_logs row with explicit timestamps.
-func hfInsertMCPAt(t *testing.T, store *RDBLogStore, id string, ts time.Time) {
-	t.Helper()
-	require.NoError(t, store.CreateMCPToolLog(context.Background(), &MCPToolLog{
-		ID: id, RequestID: id, Timestamp: ts, CreatedAt: ts, ToolName: "search", Status: "success",
 	}))
 }
 
@@ -160,11 +112,6 @@ func TestHighFixesDeleteLogsBatchOldestFirst(t *testing.T) {
 	require.Equal(t, int64(2), deleted)
 	require.Equal(t, []string{"fresh", "old-10d"}, hfLogIDs(t, store.db, "logs"), "the two oldest expired rows go first")
 
-	hfInsertMCPAt(t, store, "m-old-10d", now.AddDate(0, 0, -10))
-	hfInsertMCPAt(t, store, "m-old-20d", now.AddDate(0, 0, -20))
-	hfInsertMCPAt(t, store, "m-old-30d", now.AddDate(0, 0, -30))
-	hfInsertMCPAt(t, store, "m-fresh", now)
-	deleted, err = store.DeleteMCPToolLogsBatch(ctx, now.AddDate(0, 0, -5), 2)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deleted)
 	require.Equal(t, []string{"m-fresh", "m-old-10d"}, hfLogIDs(t, store.db, "mcp_tool_logs"))
@@ -179,10 +126,8 @@ func TestHighFixesCleanerRetentionEndToEnd(t *testing.T) {
 
 	for i := range 7 {
 		hfInsertLogAt(t, store, fmt.Sprintf("log-old-%d", i), now.AddDate(0, 0, -30-i))
-		hfInsertMCPAt(t, store, fmt.Sprintf("mcp-old-%d", i), now.AddDate(0, 0, -30-i))
 	}
 	hfInsertLogAt(t, store, "log-new", now.AddDate(0, 0, -1))
-	hfInsertMCPAt(t, store, "mcp-new", now.AddDate(0, 0, -1))
 	// timestamp inside retention but created_at outside it: logs retention is
 	// keyed on created_at, exactly as before.
 	require.NoError(t, store.Create(context.Background(), &Log{
@@ -193,7 +138,6 @@ func TestHighFixesCleanerRetentionEndToEnd(t *testing.T) {
 	NewLogsCleaner(store, CleanerConfig{RetentionDays: 7}, testLogger{}).cleanupOldLogs(context.Background())
 
 	assert.Equal(t, []string{"log-new"}, hfLogIDs(t, store.db, "logs"))
-	assert.Equal(t, []string{"mcp-new"}, hfLogIDs(t, store.db, "mcp_tool_logs"))
 }
 
 // TestLogsCleanerUpdateRetentionDays verifies changed and default retention for both log tables.
@@ -217,7 +161,6 @@ func TestLogsCleanerUpdateRetentionDays(t *testing.T) {
 				id := fmt.Sprintf("age-%d", age)
 				ts := now.AddDate(0, 0, -age)
 				hfInsertLogAt(t, store, id, ts)
-				hfInsertMCPAt(t, store, id, ts)
 			}
 			cleaner.UpdateRetentionDays(tc.updatedDays)
 			cleaner.cleanupOldLogs(context.Background())
@@ -226,7 +169,6 @@ func TestLogsCleanerUpdateRetentionDays(t *testing.T) {
 				want = append(want, "age-500")
 			}
 			assert.Equal(t, want, hfLogIDs(t, store.db, "logs"))
-			assert.Equal(t, want, hfLogIDs(t, store.db, "mcp_tool_logs"))
 		})
 	}
 }
@@ -295,13 +237,11 @@ func TestLogsCleanerRetentionUpdateConcurrent(t *testing.T) {
 // hfOwnerTimestampIndexes are the H4 composite indexes, per table.
 var hfOwnerTimestampIndexes = map[string][]string{
 	"logs":          {"idx_logs_vk_ts", "idx_logs_user_ts", "idx_logs_team_ts"},
-	"mcp_tool_logs": {"idx_mcp_logs_vk_ts", "idx_mcp_logs_user_ts", "idx_mcp_logs_team_ts"},
 }
 
 // hfReplacedSingleIndexes are the single-column indexes the composites replace.
 var hfReplacedSingleIndexes = map[string][]string{
-	"logs":          {"idx_logs_virtual_key_id", "idx_logs_user_id", "idx_logs_team_id"},
-	"mcp_tool_logs": {"idx_mcp_logs_virtual_key_id", "idx_mcp_logs_user_id", "idx_mcp_logs_team_id"},
+	"logs": {"idx_logs_virtual_key_id", "idx_logs_user_id", "idx_logs_team_id"},
 }
 
 // TestHighFixesCreateTableBuildsOwnerTimestampIndexes pins that a fresh install
@@ -312,12 +252,8 @@ func TestHighFixesCreateTableBuildsOwnerTimestampIndexes(t *testing.T) {
 	dsn := "file:" + url.QueryEscape(t.Name()) + "?mode=memory&cache=shared"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
-	require.NoError(t, db.Migrator().CreateTable(&Log{}, &MCPToolLog{}))
 	for _, name := range hfOwnerTimestampIndexes["logs"] {
 		assert.True(t, db.Migrator().HasIndex(&Log{}, name), "fresh logs table must have %s", name)
-	}
-	for _, name := range hfOwnerTimestampIndexes["mcp_tool_logs"] {
-		assert.True(t, db.Migrator().HasIndex(&MCPToolLog{}, name), "fresh mcp_tool_logs table must have %s", name)
 	}
 
 	store := newTestSQLiteStore(t)
@@ -409,14 +345,10 @@ func TestHighFixesSearchCountIsExact(t *testing.T) {
 	assert.Len(t, res.Logs, 10)
 
 	hfBulkInsertMCP(t, store.db, "mcp-few-", 3)
-	mres, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 10})
 	require.NoError(t, err)
-	assert.Equal(t, int64(3), mres.Pagination.TotalCount)
 
 	hfBulkInsertMCP(t, store.db, "mcp-many-", many)
-	mres, err = store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 10})
 	require.NoError(t, err)
-	assert.Equal(t, int64(many+3), mres.Pagination.TotalCount, "the MCP logs count must be exact above 10,000")
 }
 
 // TestHighFixesKeysetPagination pins the (timestamp, id) keyset cursor: pages
@@ -566,25 +498,3 @@ func TestHighFixesErrorDimensionsBoundByFailedStatus(t *testing.T) {
 	assert.GreaterOrEqual(t, bounded, 9, "every error-dimension scan must carry the failed-status predicate")
 }
 
-// TestHighFixesMCPSearchIgnoresKeysetCursor pins what PaginationOptions documents:
-// the keyset cursor is honoured by the LLM log searches only, and
-// SearchMCPToolLogs pages by Offset exactly as before, so a cursor set on its
-// options changes nothing.
-func TestHighFixesMCPSearchIgnoresKeysetCursor(t *testing.T) {
-	store := newTestSQLiteStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Truncate(time.Second)
-	hfInsertMCPAt(t, store, "mcp-1", now.Add(-3*time.Minute))
-	hfInsertMCPAt(t, store, "mcp-2", now.Add(-2*time.Minute))
-	hfInsertMCPAt(t, store, "mcp-3", now.Add(-1*time.Minute))
-
-	plain, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 10})
-	require.NoError(t, err)
-	newest := now.Add(-1 * time.Minute)
-	withCursor, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 10, AfterTimestamp: &newest, AfterID: "mcp-3"})
-	require.NoError(t, err)
-	require.Len(t, withCursor.Logs, 3, "the MCP search must ignore the keyset cursor")
-	for i := range plain.Logs {
-		require.Equal(t, plain.Logs[i].ID, withCursor.Logs[i].ID)
-	}
-}

@@ -83,7 +83,7 @@ func liveStartRequest(model string) *schemas.BifrostRequest {
 
 func TestLiveSessionLogsAsOneRowWithItsDelegations(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	// The first voice unit opens the session; the row is registered under the session id.
@@ -199,7 +199,7 @@ func TestLiveSessionLogsAsOneRowWithItsDelegations(t *testing.T) {
 
 func TestLiveSessionEndingOnARefusalKeepsItsRow(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	_, _, err = plugin.PreLLMHook(liveUnitCtx("bfsess-2", "unit-1", "voice", true, false), liveStartRequest("gpt-live-1"))
@@ -233,7 +233,7 @@ func TestLiveSessionEndingOnARefusalKeepsItsRow(t *testing.T) {
 
 func TestLiveSessionRowStaysSuccessfulWhenADelegationFails(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	_, _, err = plugin.PreLLMHook(liveUnitCtx("bfsess-5", "unit-1", "voice", true, false), liveStartRequest("gpt-live-1"))
@@ -271,7 +271,7 @@ func TestLiveSessionRowStaysSuccessfulWhenADelegationFails(t *testing.T) {
 
 func TestLiveSessionPendingEntryOutlivesIdleEviction(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	// Two sessions admitted long before the TTL: one keeps closing units, the other went silent.
@@ -315,7 +315,7 @@ func TestLiveSessionPendingEntryOutlivesIdleEviction(t *testing.T) {
 
 func TestLiveContentDownloadLogsItsOwnRow(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	// A recording download is an ordinary request like a file download, with the provider's
@@ -356,7 +356,7 @@ func TestLiveContentDownloadLogsItsOwnRow(t *testing.T) {
 // looking like a call where nothing was said.
 func TestLiveSessionRowFollowsTheContentPolicy(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	hidden := func(sessionID, requestID string, start, end bool) *schemas.BifrostContext {
@@ -385,7 +385,7 @@ func TestLiveSessionRowFollowsTheContentPolicy(t *testing.T) {
 // context the meter stamps, instead of writing neither.
 func TestLiveSessionAbortedRowKeepsItsSessionFacts(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	_, _, err = plugin.PreLLMHook(liveUnitCtx("bfsess-aborted", "unit-1", "voice", true, false), liveStartRequest("gpt-live-1"))
@@ -414,7 +414,7 @@ func TestLiveSessionSetupFailureKeepsBilledUsage(t *testing.T) {
 	ds := datasheet.New(nil, testLogger{}, datasheet.Config{URL: "file://" + path})
 	require.NoError(t, ds.LoadFromURLIntoMemory(context.Background()))
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, modelcatalog.NewTestCatalogWithDatasheet(ds), nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, modelcatalog.NewTestCatalogWithDatasheet(ds))
 	require.NoError(t, err)
 
 	_, _, err = plugin.PreLLMHook(liveUnitCtx("bfsess-billed-abort", "voice-1", "voice", true, false), liveStartRequest("gpt-live-1"))
@@ -468,7 +468,7 @@ func TestLiveSessionTerminalBackendFailure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newTestStore(t)
-			plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+			plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 			require.NoError(t, err)
 			_, _, err = plugin.PreLLMHook(liveUnitCtx("bfsess-failed", "voice-1", "voice", true, false), liveStartRequest("gpt-live-1"))
 			require.NoError(t, err)
@@ -508,7 +508,7 @@ func TestLiveSessionTerminalBackendFailure(t *testing.T) {
 // session's row.
 func TestLiveSidebandIsLoggedAsItsOwnRow(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	ctx.SetValue(schemas.BifrostContextKeyRequestID, "sb-1")
@@ -545,7 +545,7 @@ func TestLiveSidebandIsLoggedAsItsOwnRow(t *testing.T) {
 // metadata on a key collision (realtime_transport here), and the key's other entries must land.
 func TestLiveSessionRowKeepsVirtualKeyMetadata(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	vkMetadata := map[string]string{"cost_center": "cc-live", "realtime_transport": "vk-wins"}

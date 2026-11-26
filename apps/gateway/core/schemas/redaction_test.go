@@ -268,7 +268,7 @@ func TestCostAttributesReconcileToTotal(t *testing.T) {
 			ReasoningCost: 0.10, CitationCost: 0.03, SearchQueriesCost: 0.02,
 		},
 		AdditionalCostDetails: &AdditionalCostDetails{
-			GuardrailCost: 0.08, MCPCost: 0.06, SemanticCacheCost: 0.04, RoutingCost: 0.02,
+			GuardrailCost: 0.14, SemanticCacheCost: 0.04, RoutingCost: 0.02,
 		},
 	}
 	attrs := CostAttributes(cost)
@@ -300,7 +300,7 @@ func TestCostAttributesReconcileToTotal(t *testing.T) {
 			f(AttrBifrostCostOutputReasoning)+f(AttrBifrostCostOutputCitation)+f(AttrBifrostCostOutputSearch),
 		f(AttrBifrostCostOutput))
 	near("additional details sum to additional side",
-		f(AttrBifrostCostGuardrail)+f(AttrBifrostCostMCP)+f(AttrBifrostCostSemanticCache)+f(AttrBifrostCostRouting),
+		f(AttrBifrostCostGuardrail)+f(AttrBifrostCostSemanticCache)+f(AttrBifrostCostRouting),
 		f(AttrBifrostCostAdditional))
 }
 

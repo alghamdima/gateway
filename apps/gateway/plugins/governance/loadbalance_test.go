@@ -158,7 +158,7 @@ func TestLoadBalanceProvider_ComposedProviderParticipates(t *testing.T) {
 		AllowedModels: []string{"*"},
 		KeyIDs:        []string{"key-shared"},
 		Weight:        schemas.Ptr(2.0),
-	}}, nil)
+	}})
 	p := newLoadBalanceTestPluginWithStore(t, vk, &permitStore{
 		scoping: contributed,
 		mode:    grant.Union,
@@ -315,7 +315,7 @@ func TestLoadBalanceProvider_GrantsHeldWithoutAKeyAreBalanced(t *testing.T) {
 		AllowedModels: []string{"*"},
 		KeyIDs:        []string{"key-shared"},
 		Weight:        schemas.Ptr(2.0),
-	}}, nil)
+	}})
 	p := newLoadBalanceTestPluginWithStore(t, vk, &permitStore{baseOverride: held})
 
 	req := &schemas.BifrostRequest{

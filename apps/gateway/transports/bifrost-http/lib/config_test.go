@@ -372,7 +372,6 @@ import (
 	"github.com/google/uuid"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 	bifrost "github.com/maximhq/bifrost/core"
-	"github.com/maximhq/bifrost/core/mcp"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework"
 	"github.com/maximhq/bifrost/framework/configstore"
@@ -381,7 +380,6 @@ import (
 	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/featureflags"
 	"github.com/maximhq/bifrost/framework/logstore"
-	"github.com/maximhq/bifrost/framework/mcpcatalog"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/framework/objectstore"
 	"github.com/maximhq/bifrost/framework/vectorstore"
@@ -678,7 +676,6 @@ type MockConfigStore struct {
 
 	clientConfig     *configstore.ClientConfig
 	providers        map[schemas.ModelProvider]configstore.ProviderConfig
-	mcpConfig        *schemas.MCPConfig
 	governanceConfig *configstore.GovernanceConfig
 	authConfig       *configstore.AuthConfig
 	frameworkConfig  *tables.TableFrameworkConfig
@@ -690,12 +687,6 @@ type MockConfigStore struct {
 	// Track update calls for verification
 	clientConfigUpdated    bool
 	providersConfigUpdated bool
-	mcpConfigsCreated      []*schemas.MCPClientConfig
-	mcpClientConfigUpdates []struct {
-		ID     string
-		Config tables.TableMCPClient
-	}
-	mcpClientConfigHashUpdates [][3]string // client ID, old hash, new hash
 	governanceItemsCreated     struct {
 		budgets     []tables.TableBudget
 		rateLimits  []tables.TableRateLimit
@@ -724,50 +715,11 @@ func NewMockConfigStore() *MockConfigStore {
 func (m *MockConfigStore) RefreshConnectionPool(ctx context.Context) error {
 	return nil
 }
-func (m *MockConfigStore) GetOAuth2SigningKey(ctx context.Context) (*tables.OAuth2SigningKey, error) {
-	return &tables.OAuth2SigningKey{}, nil
-}
-func (m *MockConfigStore) CreateOAuth2Client(ctx context.Context, client *tables.TableOAuth2Client) error {
-	return nil
-}
-func (m *MockConfigStore) GetOAuth2ClientByClientID(ctx context.Context, clientID string) (*tables.TableOAuth2Client, error) {
-	return nil, configstore.ErrNotFound
-}
-func (m *MockConfigStore) CreateOAuth2AuthorizeRequest(ctx context.Context, req *tables.TableOAuth2AuthorizeRequest) error {
-	return nil
-}
-func (m *MockConfigStore) GetOAuth2AuthorizeRequestByID(ctx context.Context, id string) (*tables.TableOAuth2AuthorizeRequest, error) {
-	return nil, configstore.ErrNotFound
-}
-func (m *MockConfigStore) GetOAuth2AuthorizeRequestByCodeHash(ctx context.Context, codeHash string) (*tables.TableOAuth2AuthorizeRequest, error) {
-	return nil, configstore.ErrNotFound
-}
-func (m *MockConfigStore) GetOAuth2AuthorizeRequestByDeviceCodeHash(ctx context.Context, deviceCodeHash string) (*tables.TableOAuth2AuthorizeRequest, error) {
-	return nil, configstore.ErrNotFound
-}
-func (m *MockConfigStore) GetPendingOAuth2AuthorizeRequestByUserCodeHash(ctx context.Context, userCodeHash string) (*tables.TableOAuth2AuthorizeRequest, error) {
-	return nil, configstore.ErrNotFound
-}
-func (m *MockConfigStore) ConsentOAuth2AuthorizeRequest(ctx context.Context, req *tables.TableOAuth2AuthorizeRequest) error {
-	return nil
-}
 func (m *MockConfigStore) DenyOAuth2AuthorizeRequest(ctx context.Context, id string) error {
 	return nil
 }
 func (m *MockConfigStore) SweepExpiredOAuth2AuthorizeRequests(ctx context.Context) error {
 	return nil
-}
-func (m *MockConfigStore) GetOAuth2RefreshTokenByHash(ctx context.Context, hash string) (*tables.TableOAuth2RefreshToken, error) {
-	return nil, configstore.ErrNotFound
-}
-func (m *MockConfigStore) ConsumeOAuth2AuthorizeRequest(ctx context.Context, requestID string, rt *tables.TableOAuth2RefreshToken) error {
-	return nil
-}
-func (m *MockConfigStore) RotateOAuth2RefreshToken(ctx context.Context, oldID string, newRT *tables.TableOAuth2RefreshToken) error {
-	return nil
-}
-func (m *MockConfigStore) GetOAuth2RefreshTokenByHashAny(ctx context.Context, hash string) (*tables.TableOAuth2RefreshToken, error) {
-	return nil, configstore.ErrNotFound
 }
 func (m *MockConfigStore) RevokeOAuth2RefreshTokensByFamilyID(ctx context.Context, familyID string) (int64, error) {
 	return 0, nil
@@ -784,12 +736,6 @@ func (m *MockConfigStore) SweepOAuth2RefreshTokens(ctx context.Context, revokedO
 func (m *MockConfigStore) SweepOrphanedOAuth2Clients(ctx context.Context, registeredOlderThan time.Duration) (int64, error) {
 	return 0, nil
 }
-func (m *MockConfigStore) ListOAuth2Sessions(ctx context.Context, params configstore.OAuth2SessionsQueryParams) ([]configstore.OAuth2SessionRow, int64, error) {
-	return nil, 0, nil
-}
-func (m *MockConfigStore) GetOAuth2SessionByID(ctx context.Context, id string) (*tables.TableOAuth2RefreshToken, error) {
-	return nil, configstore.ErrNotFound
-}
 func (m *MockConfigStore) RevokeOAuth2Session(ctx context.Context, id string) error {
 	return nil
 }
@@ -800,14 +746,6 @@ func (m *MockConfigStore) DB() *gorm.DB                                         
 func (m *MockConfigStore) ScopedDB(ctx context.Context, tx ...*gorm.DB) *gorm.DB { return nil }
 func (m *MockConfigStore) ExecuteTransaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return fn(nil)
-}
-
-func (m *MockConfigStore) GetOauthConfigByID(ctx context.Context, id string) (*tables.TableOauthConfig, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetOauthConfigsByIDs(ctx context.Context, ids []string) (map[string]*tables.TableOauthConfig, error) {
-	return nil, nil
 }
 
 func (m *MockConfigStore) RunMigration(context.Context, func(context.Context, *gorm.DB) error) error {
@@ -928,128 +866,9 @@ func (m *MockConfigStore) DeleteProviderKey(ctx context.Context, provider schema
 	return configstore.ErrNotFound
 }
 
-// MCP config
-func (m *MockConfigStore) GetMCPConfig(ctx context.Context) (*schemas.MCPConfig, error) {
-	return m.mcpConfig, nil
-}
-
-func (m *MockConfigStore) GetMCPClientByID(ctx context.Context, id string) (*tables.TableMCPClient, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetMCPClientConfigByID(ctx context.Context, id string) (*schemas.MCPClientConfig, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetMCPClientByName(ctx context.Context, name string) (*tables.TableMCPClient, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) CreateMCPClientConfig(ctx context.Context, clientConfig *schemas.MCPClientConfig) error {
-	m.mcpConfig.ClientConfigs = append(m.mcpConfig.ClientConfigs, clientConfig)
-	m.mcpConfigsCreated = append(m.mcpConfigsCreated, clientConfig)
-	return nil
-}
-
-func (m *MockConfigStore) UpdateMCPClientConfig(ctx context.Context, id string, clientConfig *tables.TableMCPClient) error {
-	m.mcpClientConfigUpdates = append(m.mcpClientConfigUpdates, struct {
-		ID     string
-		Config tables.TableMCPClient
-	}{
-		ID:     id,
-		Config: *clientConfig,
-	})
-
-	// Initialize m.mcpConfig if nil (same pattern as CreateMCPClientConfig)
-	if m.mcpConfig == nil {
-		m.mcpConfig = &schemas.MCPConfig{
-			ClientConfigs: []*schemas.MCPClientConfig{},
-		}
-	}
-
-	// Update the in-memory state to ensure GetMCPConfig returns updated data
-	for i := range m.mcpConfig.ClientConfigs {
-		if m.mcpConfig.ClientConfigs[i].ID == id {
-			// Found the entry, update it with the new config
-			m.mcpConfig.ClientConfigs[i] = &schemas.MCPClientConfig{
-				ID:                  clientConfig.ClientID,
-				Name:                clientConfig.Name,
-				EndpointSlug:        m.mcpConfig.ClientConfigs[i].EndpointSlug, // immutable: the real store never updates it
-				IsCodeModeClient:    clientConfig.IsCodeModeClient,
-				ServerTypeOnSlug:    clientConfig.ServerTypeOnSlug,
-				ConnectionType:      schemas.MCPConnectionType(clientConfig.ConnectionType),
-				ConnectionString:    clientConfig.ConnectionString,
-				StdioConfig:         clientConfig.StdioConfig,
-				Headers:             clientConfig.Headers,
-				ToolsToExecute:      clientConfig.ToolsToExecute,
-				ToolsToAutoExecute:  clientConfig.ToolsToAutoExecute,
-				AllowedExtraHeaders: clientConfig.AllowedExtraHeaders,
-			}
-			return nil
-		}
-	}
-	// If not found, create a new entry (similar to CreateMCPClientConfig behavior)
-	m.mcpConfig.ClientConfigs = append(m.mcpConfig.ClientConfigs, &schemas.MCPClientConfig{
-		ID:                  clientConfig.ClientID,
-		Name:                clientConfig.Name,
-		IsCodeModeClient:    clientConfig.IsCodeModeClient,
-		ServerTypeOnSlug:    clientConfig.ServerTypeOnSlug,
-		ConnectionType:      schemas.MCPConnectionType(clientConfig.ConnectionType),
-		ConnectionString:    clientConfig.ConnectionString,
-		StdioConfig:         clientConfig.StdioConfig,
-		Headers:             clientConfig.Headers,
-		ToolsToExecute:      clientConfig.ToolsToExecute,
-		ToolsToAutoExecute:  clientConfig.ToolsToAutoExecute,
-		AllowedExtraHeaders: clientConfig.AllowedExtraHeaders,
-	})
-
-	return nil
-}
-
 func (m *MockConfigStore) UpdateMCPClientConfigHash(ctx context.Context, clientID, oldHash, newHash string) (bool, error) {
 	m.mcpClientConfigHashUpdates = append(m.mcpClientConfigHashUpdates, [3]string{clientID, oldHash, newHash})
 	return true, nil
-}
-
-func (m *MockConfigStore) UpdateMCPClientDiscovery(ctx context.Context, clientID string, discovery *schemas.MCPDiscovery) error {
-	if m.mcpConfig != nil {
-		for _, cfg := range m.mcpConfig.ClientConfigs {
-			if cfg.ID == clientID {
-				cfg.DiscoveredTools = discovery.Tools
-				cfg.DiscoveredInstructions = discovery.Instructions
-				cfg.DiscoveredResources = discovery.Resources
-				cfg.DiscoveredResourceTemplates = discovery.ResourceTemplates
-				cfg.DiscoveredPrompts = discovery.Prompts
-				return nil
-			}
-		}
-	}
-	return configstore.ErrNotFound
-}
-
-func (m *MockConfigStore) GetMCPClientsPaginated(ctx context.Context, params configstore.MCPClientsQueryParams) ([]tables.TableMCPClient, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *MockConfigStore) GetMCPLibraryPaginated(ctx context.Context, params configstore.MCPLibraryQueryParams) ([]tables.TableMCPLibrary, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *MockConfigStore) GetMCPLibraryFilterData(ctx context.Context) (*configstore.MCPLibraryFilterData, error) {
-	return &configstore.MCPLibraryFilterData{
-		Categories:      []string{},
-		ConnectionTypes: []string{},
-		AuthTypes:       []string{},
-		Tags:            []string{},
-	}, nil
-}
-
-func (m *MockConfigStore) UpsertMCPLibraryEntry(ctx context.Context, entry *tables.TableMCPLibrary, tx ...*gorm.DB) error {
-	return nil
-}
-
-func (m *MockConfigStore) CreateCustomMCPLibraryEntry(ctx context.Context, entry *tables.TableMCPLibrary) error {
-	return nil
 }
 
 func (m *MockConfigStore) SoftDeleteMCPLibraryEntry(ctx context.Context, id uint) error {
@@ -1323,18 +1142,6 @@ func (m *MockConfigStore) GetVirtualKeyQuotaByValue(ctx context.Context, value s
 	return nil, nil
 }
 
-func (m *MockConfigStore) GetVirtualKeyMCPConfigsByMCPClientID(ctx context.Context, mcpClientID uint) ([]tables.TableVirtualKeyMCPConfig, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetVirtualKeyMCPConfigsByMCPClientIDs(ctx context.Context, mcpClientIDs []uint) ([]tables.TableVirtualKeyMCPConfig, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetVirtualKeyMCPConfigsByMCPClientStringIDs(ctx context.Context, clientIDs []string) ([]tables.TableVirtualKeyMCPConfig, error) {
-	return nil, nil
-}
-
 // Virtual key provider config
 func (m *MockConfigStore) GetVirtualKeyProviderConfigs(ctx context.Context, virtualKeyID string) ([]tables.TableVirtualKeyProviderConfig, error) {
 	return nil, nil
@@ -1353,19 +1160,6 @@ func (m *MockConfigStore) ReplaceVirtualKeyProviderConfigs(ctx context.Context, 
 }
 
 func (m *MockConfigStore) DeleteVirtualKeyProviderConfig(ctx context.Context, id uint, tx ...*gorm.DB) error {
-	return nil
-}
-
-// Virtual key MCP config
-func (m *MockConfigStore) GetVirtualKeyMCPConfigs(ctx context.Context, virtualKeyID string) ([]tables.TableVirtualKeyMCPConfig, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) CreateVirtualKeyMCPConfig(ctx context.Context, virtualKeyMCPConfig *tables.TableVirtualKeyMCPConfig, tx ...*gorm.DB) error {
-	return nil
-}
-
-func (m *MockConfigStore) UpdateVirtualKeyMCPConfig(ctx context.Context, virtualKeyMCPConfig *tables.TableVirtualKeyMCPConfig, tx ...*gorm.DB) error {
 	return nil
 }
 
@@ -1523,15 +1317,6 @@ func (m *MockConfigStore) CreateSession(ctx context.Context, session *tables.Ses
 
 func (m *MockConfigStore) DeleteSession(ctx context.Context, token string) error {
 	return nil
-}
-
-// Temp token
-func (m *MockConfigStore) CreateTempToken(ctx context.Context, token *tables.TempToken, tx ...*gorm.DB) error {
-	return nil
-}
-
-func (m *MockConfigStore) GetTempTokenByHash(ctx context.Context, tokenHash string) (*tables.TempToken, error) {
-	return nil, nil
 }
 
 func (m *MockConfigStore) DeleteTempTokensByResourceID(ctx context.Context, scope, resourceID string, tx ...*gorm.DB) (int64, error) {
@@ -1765,14 +1550,6 @@ func (m *MockConfigStore) UpsertPlugin(ctx context.Context, plugin *tables.Table
 }
 
 // OAuth config
-
-func (m *MockConfigStore) GetOauthConfigByState(ctx context.Context, state string) (*tables.TableOauthConfig, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetOauthConfigByTokenID(ctx context.Context, tokenID string) (*tables.TableOauthConfig, error) {
-	return nil, nil
-}
 
 func (m *MockConfigStore) CreateOauthConfig(ctx context.Context, config *tables.TableOauthConfig) error {
 	return nil
@@ -2814,7 +2591,6 @@ func TestLoadConfig_OAuthDiscoveryWithoutIssuerURLFailsBoot(t *testing.T) {
 	tempDir := createTempDir(t)
 	createConfigFile(t, tempDir, &ConfigData{
 		Client: &configstore.ClientConfig{
-			MCPServerAuthMode: tables.MCPServerAuthModeOAuth,
 		},
 	})
 
@@ -2834,11 +2610,6 @@ func TestLoadConfig_AuthCodeTTLAboveMaxFailsBoot(t *testing.T) {
 	tempDir := createTempDir(t)
 	createConfigFile(t, tempDir, &ConfigData{
 		Client: &configstore.ClientConfig{
-			MCPServerAuthMode: tables.MCPServerAuthModeOAuth,
-			OAuth2ServerConfig: &tables.OAuth2ServerConfig{
-				AuthCodeTTL:    5000,
-				AccessTokenTTL: tables.DefaultAccessTokenTTL,
-			},
 		},
 	})
 
@@ -2862,11 +2633,6 @@ func TestLoadConfig_RedirectURIControlCharacterFailsBootBeforeHashing(t *testing
 		return &ConfigData{
 			Client: &configstore.ClientConfig{
 				InitialPoolSize: 10, EnableLogging: new(true), MaxRequestBodySizeMB: 100,
-				OAuth2ServerConfig: &tables.OAuth2ServerConfig{
-					IssuerURL:           schemas.NewSecretVar("https://bifrost.example.com"),
-					AllowedRedirectURIs: []string{uri},
-					Gateways:            gateways,
-				},
 			},
 			ConfigStoreConfig: &configstore.Config{Enabled: true, Type: configstore.ConfigStoreTypeSQLite, Config: &configstore.SQLiteConfig{Path: filepath.Join(tempDir, "config.db")}},
 		}
@@ -8692,14 +8458,6 @@ func TestGenerateVirtualKeyHash_WithMCPConfigs(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-		},
 	}
 
 	hash1, err := configstore.GenerateVirtualKeyHash(vk1)
@@ -8718,14 +8476,6 @@ func TestGenerateVirtualKeyHash_WithMCPConfigs(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    2, // Different MCP client ID
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-		},
 	}
 
 	hash2, err := configstore.GenerateVirtualKeyHash(vk2)
@@ -8744,14 +8494,6 @@ func TestGenerateVirtualKeyHash_WithMCPConfigs(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool3"}, // Different tools
-			},
-		},
 	}
 
 	hash3, err := configstore.GenerateVirtualKeyHash(vk3)
@@ -11140,12 +10882,6 @@ func TestGenerateVirtualKeyHash_MCPConfigChanges(t *testing.T) {
 		Description: "Test",
 		Value:       *schemas.NewSecretVar("vk_test123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-		},
 	}
 
 	// VK with different MCP client ID
@@ -11155,12 +10891,6 @@ func TestGenerateVirtualKeyHash_MCPConfigChanges(t *testing.T) {
 		Description: "Test",
 		Value:       *schemas.NewSecretVar("vk_test123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				MCPClientID:    2, // Different client
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-		},
 	}
 
 	// VK with different tools
@@ -11170,12 +10900,6 @@ func TestGenerateVirtualKeyHash_MCPConfigChanges(t *testing.T) {
 		Description: "Test",
 		Value:       *schemas.NewSecretVar("vk_test123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool3", "tool4"}, // Different tools
-			},
-		},
 	}
 
 	// VK with multiple MCP configs
@@ -11185,16 +10909,6 @@ func TestGenerateVirtualKeyHash_MCPConfigChanges(t *testing.T) {
 		Description: "Test",
 		Value:       *schemas.NewSecretVar("vk_test123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-			{
-				MCPClientID:    2,
-				ToolsToExecute: []string{"tool3"},
-			},
-		},
 	}
 
 	hashBase, err := configstore.GenerateVirtualKeyHash(vkBase)
@@ -11249,12 +10963,6 @@ func TestGenerateVirtualKeyHash_MCPConfigChanges(t *testing.T) {
 		Description: "Test",
 		Value:       *schemas.NewSecretVar("vk_test123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-		},
 	}
 	hashSame, err := configstore.GenerateVirtualKeyHash(vkSame)
 	if err != nil {
@@ -11322,7 +11030,6 @@ func TestSQLite_VirtualKey_WithMCPConfigs(t *testing.T) {
 	// Create MCP config for the virtual key
 	mcpConfig := tables.TableVirtualKeyMCPConfig{
 		VirtualKeyID:   "vk-1",
-		MCPClientID:    mcpClient.ID,
 		ToolsToExecute: []string{"tool1", "tool2"},
 	}
 	err = config1.ConfigStore.CreateVirtualKeyMCPConfig(ctx, &mcpConfig)
@@ -11418,7 +11125,6 @@ func TestSQLite_VKMCPConfig_Reconciliation(t *testing.T) {
 	// Create initial MCP config for VK (simulates being added via dashboard, not in file)
 	mcpConfig := tables.TableVirtualKeyMCPConfig{
 		VirtualKeyID:   "vk-1",
-		MCPClientID:    mcpClient1.ID,
 		ToolsToExecute: []string{"tool1"},
 	}
 	err = config1.ConfigStore.CreateVirtualKeyMCPConfig(ctx, &mcpConfig)
@@ -11450,12 +11156,6 @@ func TestSQLite_VKMCPConfig_Reconciliation(t *testing.T) {
 			Description: "VK for MCP reconciliation test",
 			Value:       *schemas.NewSecretVar("vk_test123"),
 			IsActive:    schemas.Ptr(true),
-			MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-				{
-					MCPClientID:    mcpClient2.ID, // Different MCP client - will be created
-					ToolsToExecute: []string{"tool2", "tool3"},
-				},
-			},
 		},
 	}
 
@@ -11740,7 +11440,6 @@ func TestSQLite_VirtualKey_DashboardMCPConfig_DeletedOnFileChange(t *testing.T) 
 	// Add MCP config for client 1 (will be in config.json)
 	mcpConfig1 := tables.TableVirtualKeyMCPConfig{
 		VirtualKeyID:   "vk-1",
-		MCPClientID:    mcpClient1.ID,
 		ToolsToExecute: []string{"tool1"},
 	}
 	err = config1.ConfigStore.CreateVirtualKeyMCPConfig(ctx, &mcpConfig1)
@@ -11758,7 +11457,6 @@ func TestSQLite_VirtualKey_DashboardMCPConfig_DeletedOnFileChange(t *testing.T) 
 	// Step 3: Simulate dashboard adding MCP config for client 2
 	mcpConfig2 := tables.TableVirtualKeyMCPConfig{
 		VirtualKeyID:   "vk-1",
-		MCPClientID:    mcpClient2.ID,
 		ToolsToExecute: []string{"dashboard-tool"},
 	}
 	err = config1.ConfigStore.CreateVirtualKeyMCPConfig(ctx, &mcpConfig2)
@@ -11786,12 +11484,6 @@ func TestSQLite_VirtualKey_DashboardMCPConfig_DeletedOnFileChange(t *testing.T) 
 			Description: "VK for dashboard MCP config preservation test",
 			Value:       *schemas.NewSecretVar("vk_test123"),
 			IsActive:    schemas.Ptr(true),
-			MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-				{
-					MCPClientID:    mcpClient1.ID,
-					ToolsToExecute: []string{"tool1", "tool2"}, // Changed - adds tool2, triggers hash mismatch
-				},
-			},
 		},
 	}
 
@@ -11907,10 +11599,6 @@ func TestSQLite_VKMCPConfig_AddRemove(t *testing.T) {
 			Description: "VK for add/remove test",
 			Value:       *schemas.NewSecretVar("vk_test123"),
 			IsActive:    schemas.Ptr(true),
-			MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-				{MCPClientID: mcpClient1.ID, ToolsToExecute: []string{"tool1"}},
-				{MCPClientID: mcpClient2.ID, ToolsToExecute: []string{"tool2"}},
-			},
 		},
 	}
 	configData2 := makeConfigDataWithVirtualKeysAndDir(providers, vks2, tempDir)
@@ -11939,10 +11627,6 @@ func TestSQLite_VKMCPConfig_AddRemove(t *testing.T) {
 			Description: "VK for add/remove test",
 			Value:       *schemas.NewSecretVar("vk_test123"),
 			IsActive:    schemas.Ptr(true),
-			MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-				{MCPClientID: mcpClient1.ID, ToolsToExecute: []string{"tool1"}},
-				// mcpClient2 removed from file
-			},
 		},
 	}
 	configData3 := makeConfigDataWithVirtualKeysAndDir(providers, vks3, tempDir)
@@ -12016,9 +11700,6 @@ func TestSQLite_VKMCPConfig_UpdateTools(t *testing.T) {
 		Description: "Test",
 		Value:       *schemas.NewSecretVar("vk_test123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{MCPClientID: mcpClient.ID, ToolsToExecute: []string{"tool1", "tool2"}},
-		},
 	}
 	hash, _ := configstore.GenerateVirtualKeyHash(vk)
 	vk.ConfigHash = hash
@@ -12026,7 +11707,6 @@ func TestSQLite_VKMCPConfig_UpdateTools(t *testing.T) {
 
 	mcpConfigToCreate := tables.TableVirtualKeyMCPConfig{
 		VirtualKeyID:   "vk-1",
-		MCPClientID:    mcpClient.ID,
 		ToolsToExecute: []string{"tool1", "tool2"},
 	}
 	config1.ConfigStore.CreateVirtualKeyMCPConfig(ctx, &mcpConfigToCreate)
@@ -12041,9 +11721,6 @@ func TestSQLite_VKMCPConfig_UpdateTools(t *testing.T) {
 			Description: "Test",
 			Value:       *schemas.NewSecretVar("vk_test123"),
 			IsActive:    schemas.Ptr(true),
-			MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-				{MCPClientID: mcpClient.ID, ToolsToExecute: []string{"tool3", "tool4", "tool5"}}, // Different tools
-			},
 		},
 	}
 	configData2 := makeConfigDataWithVirtualKeysAndDir(providers, vks, tempDir)
@@ -12118,12 +11795,6 @@ func TestSQLite_VK_ProviderAndMCPConfigs_Combined(t *testing.T) {
 					Provider:      "openai",
 					Weight:        ptrFloat64(1.5),
 					AllowedModels: []string{"gpt-4"},
-				},
-			},
-			MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-				{
-					MCPClientID:    mcpClient.ID,
-					ToolsToExecute: []string{"tool1", "tool2"},
 				},
 			},
 		},
@@ -12837,26 +12508,6 @@ func TestGenerateVirtualKeyHash_StableMCPConfigOrdering(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1"},
-			},
-			{
-				ID:             2,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    2,
-				ToolsToExecute: []string{"tool2"},
-			},
-			{
-				ID:             3,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    3,
-				ToolsToExecute: []string{"tool3"},
-			},
-		},
 	}
 
 	// VK with MCP configs in order B (reversed)
@@ -12866,26 +12517,6 @@ func TestGenerateVirtualKeyHash_StableMCPConfigOrdering(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             3,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    3,
-				ToolsToExecute: []string{"tool3"},
-			},
-			{
-				ID:             2,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    2,
-				ToolsToExecute: []string{"tool2"},
-			},
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1"},
-			},
-		},
 	}
 
 	// VK with MCP configs in order C (mixed)
@@ -12895,26 +12526,6 @@ func TestGenerateVirtualKeyHash_StableMCPConfigOrdering(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             2,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    2,
-				ToolsToExecute: []string{"tool2"},
-			},
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1"},
-			},
-			{
-				ID:             3,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    3,
-				ToolsToExecute: []string{"tool3"},
-			},
-		},
 	}
 
 	hashA, err := configstore.GenerateVirtualKeyHash(vkOrderA)
@@ -12952,14 +12563,6 @@ func TestGenerateVirtualKeyHash_StableToolsToExecuteOrdering(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool-a", "tool-b", "tool-c", "tool-d"},
-			},
-		},
 	}
 
 	// VK with ToolsToExecute in order B (reversed)
@@ -12969,14 +12572,6 @@ func TestGenerateVirtualKeyHash_StableToolsToExecuteOrdering(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool-d", "tool-c", "tool-b", "tool-a"},
-			},
-		},
 	}
 
 	// VK with ToolsToExecute in order C (mixed)
@@ -12986,14 +12581,6 @@ func TestGenerateVirtualKeyHash_StableToolsToExecuteOrdering(t *testing.T) {
 		Description: "Test virtual key",
 		Value:       *schemas.NewSecretVar("vk_abc123"),
 		IsActive:    schemas.Ptr(true),
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				VirtualKeyID:   "vk-1",
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool-c", "tool-a", "tool-d", "tool-b"},
-			},
-		},
 	}
 
 	hashA, err := configstore.GenerateVirtualKeyHash(vkOrderA)
@@ -13052,18 +12639,6 @@ func TestGenerateVirtualKeyHash_StableCombinedOrdering(t *testing.T) {
 				},
 			},
 		},
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             1,
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool1", "tool2"},
-			},
-			{
-				ID:             2,
-				MCPClientID:    2,
-				ToolsToExecute: []string{"tool3", "tool4"},
-			},
-		},
 	}
 
 	// VK with all elements in order B (everything reversed/shuffled)
@@ -13092,18 +12667,6 @@ func TestGenerateVirtualKeyHash_StableCombinedOrdering(t *testing.T) {
 					{KeyID: "key-2"}, // reversed
 					{KeyID: "key-1"},
 				},
-			},
-		},
-		MCPConfigs: []tables.TableVirtualKeyMCPConfig{
-			{
-				ID:             2,
-				MCPClientID:    2,
-				ToolsToExecute: []string{"tool4", "tool3"}, // reversed
-			},
-			{
-				ID:             1,
-				MCPClientID:    1,
-				ToolsToExecute: []string{"tool2", "tool1"}, // reversed
 			},
 		},
 	}
@@ -20536,8 +20099,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 			PricingURL:             &uiEditedURL,
 			PricingSyncInterval:    &uiEditedSync,
 			ModelParametersURL:     &defaultModelParamsURL,
-			MCPLibraryURL:          &defaultMCPLibraryURL,
-			MCPLibrarySyncInterval: &defaultSyncSeconds,
 			// Populated so this stays a pure precedence test: a nil column is a
 			// backfill case and would set needsDBUpdate on its own.
 			LiveModelsSyncInterval: &defaultLiveModelsSyncSeconds,
@@ -20739,8 +20300,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 			PricingURL:             &defaultURL,
 			PricingSyncInterval:    &defaultSyncSeconds,
 			ModelParametersURL:     &defaultModelParamsURL,
-			MCPLibraryURL:          &defaultMCPLibraryURL,
-			MCPLibrarySyncInterval: &defaultSyncSeconds,
 			LiveModelsSyncInterval: &disabled,
 		}
 		_, fromDB, _ := ResolveFrameworkPricingConfig(dbConfig, nil)
@@ -20782,8 +20341,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 			PricingURL:             &defaultURL,
 			PricingSyncInterval:    &defaultSyncSeconds,
 			ModelParametersURL:     &defaultModelParamsURL,
-			MCPLibraryURL:          &defaultMCPLibraryURL,
-			MCPLibrarySyncInterval: &defaultSyncSeconds,
 			LiveModelsSyncInterval: &uiEdited,
 			ConfigHash:             storedHash,
 		}
@@ -20803,8 +20360,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 			PricingURL:             &defaultURL,
 			PricingSyncInterval:    &defaultSyncSeconds,
 			ModelParametersURL:     &defaultModelParamsURL,
-			MCPLibraryURL:          &defaultMCPLibraryURL,
-			MCPLibrarySyncInterval: &defaultSyncSeconds,
 			LiveModelsSyncInterval: &uiEdited,
 			ConfigHash:             "stale-hash-from-a-previous-file",
 		}
@@ -20822,8 +20377,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		mcpSyncSeconds := int64((2 * time.Hour).Seconds())
 		fileConfig := &framework.FrameworkConfig{
 			Pricing: &modelcatalog.Config{
-				MCPLibraryURL:          &mcpURL,
-				MCPLibrarySyncInterval: &mcpSyncSeconds,
 			},
 		}
 
@@ -20842,14 +20395,10 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		dbMCPSyncSeconds := int64((24 * time.Hour).Seconds())
 		dbConfig := &tables.TableFrameworkConfig{
 			ID:                     11,
-			MCPLibraryURL:          &dbMCPURL,
-			MCPLibrarySyncInterval: &dbMCPSyncSeconds,
 			ConfigHash:             "old-hash",
 		}
 		fileConfig := &framework.FrameworkConfig{
 			Pricing: &modelcatalog.Config{
-				MCPLibraryURL:          &mcpURL,
-				MCPLibrarySyncInterval: &mcpSyncSeconds,
 			},
 		}
 
@@ -20865,8 +20414,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		fileMCPURL := "https://file.example.com/mcp-library.json"
 		fileMCPSyncSeconds := int64((2 * time.Hour).Seconds())
 		storedHash, err := configstore.GenerateFrameworkConfigHash(nil, nil, nil, configstore.FrameworkConfigHashOptions{
-			MCPLibraryURL:          &fileMCPURL,
-			MCPLibrarySyncInterval: &fileMCPSyncSeconds,
 		})
 		require.NoError(t, err)
 		uiEditedMCPURL := "https://ui.example.com/mcp-library.json"
@@ -20876,8 +20423,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 			PricingURL:             &defaultURL,
 			PricingSyncInterval:    &defaultSyncSeconds,
 			ModelParametersURL:     &defaultModelParamsURL,
-			MCPLibraryURL:          &uiEditedMCPURL,
-			MCPLibrarySyncInterval: &uiEditedMCPSyncSeconds,
 			// Populated so this stays a pure precedence test: a nil column is a
 			// backfill case and would set needsDBUpdate on its own.
 			LiveModelsSyncInterval: &defaultLiveModelsSyncSeconds,
@@ -20885,8 +20430,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		}
 		fileConfig := &framework.FrameworkConfig{
 			Pricing: &modelcatalog.Config{
-				MCPLibraryURL:          &fileMCPURL,
-				MCPLibrarySyncInterval: &fileMCPSyncSeconds,
 			},
 		}
 
@@ -20902,7 +20445,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		tooLow := int64(1800)
 		fileConfig := &framework.FrameworkConfig{
 			Pricing: &modelcatalog.Config{
-				MCPLibrarySyncInterval: &tooLow,
 			},
 		}
 
@@ -20950,8 +20492,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		disabledDBSync := modelcatalog.MCPLibrarySyncDisabled
 		dbConfig := &tables.TableFrameworkConfig{
 			ID:                     10,
-			MCPLibraryURL:          &defaultMCPLibraryURL,
-			MCPLibrarySyncInterval: &disabledDBSync,
 		}
 
 		normalizedTable, normalizedModelCatalog, _ := ResolveFrameworkPricingConfig(dbConfig, nil)
@@ -20963,8 +20503,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		invalidDBSync := int64(-1)
 		dbConfig := &tables.TableFrameworkConfig{
 			ID:                     10,
-			MCPLibraryURL:          &defaultMCPLibraryURL,
-			MCPLibrarySyncInterval: &invalidDBSync,
 		}
 
 		normalizedTable, normalizedModelCatalog, needsDBUpdate := ResolveFrameworkPricingConfig(dbConfig, nil)
@@ -21165,8 +20703,6 @@ func TestResolveFrameworkPricingConfig(t *testing.T) {
 		fullDB := func(openAPIURL *string, hash string) *tables.TableFrameworkConfig {
 			return &tables.TableFrameworkConfig{
 				ID: 9, PricingURL: &defaultURL, PricingSyncInterval: &defaultSyncSeconds, ModelParametersURL: &defaultModelParamsURL,
-				MCPLibraryURL: &defaultMCPLibraryURL, MCPLibrarySyncInterval: &defaultSyncSeconds, LiveModelsSyncInterval: &defaultLiveModelsSyncSeconds,
-				OpenAPIURL: openAPIURL, ConfigHash: hash,
 			}
 		}
 		withOpenAPI := func(value string) *framework.FrameworkConfig {
@@ -23586,12 +23122,6 @@ func TestUpdateClientConfig_PersistsExplicitZeroToolSyncInterval(t *testing.T) {
 // resolve, so /mcp/<slug> is not served (admit returns 403) for a disabled direct client.
 func TestGetMCPClientBySlugSkipsDisabled(t *testing.T) {
 	c := &Config{
-		MCPConfig: &schemas.MCPConfig{
-			ClientConfigs: []*schemas.MCPClientConfig{
-				{ID: "enabled-id", Name: "Enabled", EndpointSlug: "live-slug"},
-				{ID: "disabled-id", Name: "Disabled", EndpointSlug: "dead-slug", Disabled: true},
-			},
-		},
 	}
 
 	id, name, ok := c.GetMCPClientBySlug("live-slug")
@@ -23915,12 +23445,6 @@ func TestLoadMCPConfig_FileReloadKeepsSavedExposeLists(t *testing.T) {
 	assert.Equal(t, schemas.WhiteList{"file:///handbook.md"}, stored.ResourcesToExpose)
 }
 
-// staleMCPReadStore answers GetMCPConfig with what a node read before a peer's insert committed.
-type staleMCPReadStore struct {
-	configstore.ConfigStore
-	stale *schemas.MCPConfig
-}
-
 func (s *staleMCPReadStore) GetMCPConfig(context.Context) (*schemas.MCPConfig, error) {
 	return s.stale, nil
 }
@@ -24238,7 +23762,6 @@ func TestLoadMCPConfig_TurningPerUserDiscoveryOnOrOffInTheFile(t *testing.T) {
 	assert.NotEqual(t, schemas.Ptr(true), wiki.PerUserDiscovery, "refused for a shared auth type, and the stored client kept")
 
 	require.NoError(t, store.UpsertMCPPerUserDiscovery(ctx, &tables.TableMCPPerUserDiscovery{
-		MCPClientID: notesID, AuthMode: string(schemas.MCPAuthModeUser), UserID: schemas.Ptr("alice"), Tools: tools, DiscoveryHash: "hash-alice", DiscoveredAt: time.Now(),
 	}))
 	third := &Config{ConfigStore: store, ClientConfig: &configstore.ClientConfig{}}
 	loadMCPConfig(ctx, third, &ConfigData{MCP: fileMCP(nil), SourceOfTruth: SourceOfTruthConfigJSON})

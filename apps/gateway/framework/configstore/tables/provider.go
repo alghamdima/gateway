@@ -23,7 +23,6 @@ type TableProvider struct {
 	CustomProviderConfigJSON string    `gorm:"type:text" json:"-"`                                // JSON serialized schemas.CustomProviderConfig
 	OpenAIConfigJSON         string    `gorm:"type:text" json:"-"`                                // JSON serialized schemas.OpenAIConfig
 	PromptCacheJSON          string    `gorm:"type:text" json:"-"`                                // JSON serialized schemas.PromptCacheConfig
-	InjectedToolsJSON        string    `gorm:"type:text" json:"-"`                                // JSON serialized schemas.InjectedToolsConfig
 	PassthroughJSON          string    `gorm:"type:text" json:"-"`                                // JSON serialized schemas.PassthroughPolicy
 	SendBackRawRequest       bool      `json:"send_back_raw_request"`
 	SendBackRawResponse      bool      `json:"send_back_raw_response"`
@@ -44,7 +43,6 @@ type TableProvider struct {
 	CustomProviderConfig *schemas.CustomProviderConfig `gorm:"-" json:"custom_provider_config,omitempty"`
 	OpenAIConfig         *schemas.OpenAIConfig         `gorm:"-" json:"openai_config,omitempty"`
 	PromptCache          *schemas.PromptCacheConfig    `gorm:"-" json:"prompt_cache,omitempty"`
-	InjectedTools        []schemas.InjectedTool        `gorm:"-" json:"injected_tools,omitempty"`
 	Passthrough          *schemas.PassthroughPolicy    `gorm:"-" json:"passthrough,omitempty"`
 
 	// Foreign keys
@@ -126,15 +124,6 @@ func (p *TableProvider) BeforeSave(tx *gorm.DB) error {
 		p.PromptCacheJSON = string(data)
 	} else {
 		p.PromptCacheJSON = ""
-	}
-	if len(p.InjectedTools) > 0 {
-		data, err := json.Marshal(p.InjectedTools)
-		if err != nil {
-			return err
-		}
-		p.InjectedToolsJSON = string(data)
-	} else {
-		p.InjectedToolsJSON = ""
 	}
 	if p.Passthrough != nil {
 		data, err := json.Marshal(p.Passthrough)
@@ -222,14 +211,6 @@ func (p *TableProvider) AfterFind(tx *gorm.DB) error {
 			return err
 		}
 		p.PromptCache = &promptCache
-	}
-
-	if p.InjectedToolsJSON != "" {
-		var injectedTools []schemas.InjectedTool
-		if err := json.Unmarshal([]byte(p.InjectedToolsJSON), &injectedTools); err != nil {
-			return err
-		}
-		p.InjectedTools = injectedTools
 	}
 
 	if p.PassthroughJSON != "" {

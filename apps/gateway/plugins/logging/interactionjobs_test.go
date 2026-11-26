@@ -84,7 +84,7 @@ func sendInteraction(t *testing.T, plugin *LoggerPlugin, requestID, method, path
 func TestPostLLMHookBillsAnInteractionRunOnce(t *testing.T) {
 	store := newTestStore(t)
 	bs := newFakeBatchStore()
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t), nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t))
 	require.NoError(t, err)
 
 	usage := &schemas.BifrostPassthroughUsage{LLMUsage: &schemas.BifrostLLMUsage{PromptTokens: 361700, CompletionTokens: 33400, TotalTokens: 395100}}
@@ -143,7 +143,7 @@ func TestPostLLMHookBillsAnInteractionRunOnce(t *testing.T) {
 func TestPostLLMHookIgnoresAnInteractionItNeverSawCreated(t *testing.T) {
 	store := newTestStore(t)
 	bs := newFakeBatchStore()
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t), nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t))
 	require.NoError(t, err)
 
 	sendInteractionRead(t, plugin, "req-int-foreign", "GET", "/interactions/int_foreign", &schemas.BifrostPassthroughJob{
@@ -164,7 +164,7 @@ func TestPostLLMHookIgnoresAnInteractionItNeverSawCreated(t *testing.T) {
 func TestPostLLMHookLateReadLeavesASettledInteractionAlone(t *testing.T) {
 	store := newTestStore(t)
 	bs := newFakeBatchStore()
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t), nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t))
 	require.NoError(t, err)
 
 	sendInteractionRead(t, plugin, "req-late-create", "POST", "/interactions", &schemas.BifrostPassthroughJob{
@@ -198,7 +198,7 @@ func TestPostLLMHookLateReadLeavesASettledInteractionAlone(t *testing.T) {
 func TestPostLLMHookSettlesAStreamedInteractionWhenItEnds(t *testing.T) {
 	store := newTestStore(t)
 	bs := newFakeBatchStore()
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t), nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, bs, newInteractionPricingManager(t))
 	require.NoError(t, err)
 
 	sendInteraction(t, plugin, "req-int-stream", "POST", "/interactions", &schemas.BifrostPassthroughJob{

@@ -277,11 +277,11 @@ func TestConvertTraceRequestHeaderFiltering(t *testing.T) {
 // TestConvertSpanKindExhaustive is the D drift guard: every schemas.SpanKind* value (except the
 // deliberately-unspecified zero value) must map to a concrete, non-UNSPECIFIED OTEL kind. A new
 // SpanKind added to core without a case in convertSpanKind falls through to UNSPECIFIED and is
-// caught here (this is how SpanKindMCPClient's missing mapping was found).
+// caught here.
 func TestConvertSpanKindExhaustive(t *testing.T) {
 	allKinds := []schemas.SpanKind{
-		schemas.SpanKindLLMCall, schemas.SpanKindPlugin, schemas.SpanKindMCPTool,
-		schemas.SpanKindMCPClient, schemas.SpanKindRetry, schemas.SpanKindFallback,
+		schemas.SpanKindLLMCall, schemas.SpanKindPlugin,
+		schemas.SpanKindRetry, schemas.SpanKindFallback,
 		schemas.SpanKindHTTPRequest, schemas.SpanKindEmbedding, schemas.SpanKindSpeech,
 		schemas.SpanKindTranscription, schemas.SpanKindInternal,
 	}

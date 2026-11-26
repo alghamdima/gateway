@@ -1,15 +1,9 @@
 package schemas
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
-
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // FlattenToolResultMedia replaces every block keep rejects with a placeholder naming it, for providers
@@ -242,28 +236,6 @@ func MediaPlaceholder(kind string, base64Len int) string {
 	return fmt.Sprintf("[%s, %s returned by the tool, not shown]", kind, base64Size(base64Len))
 }
 
-// mcpAppPlaceholder stands in for an MCP App's HTML in logs: the app's static code, not data, and
-// hundreds of KB per render. The hash still shows when the app changed.
-func mcpAppPlaceholder(html string) string {
-	sum := sha256.Sum256([]byte(html))
-	return mcpAppPlaceholderFor(len(html), sum[:])
-}
-
-// mcpAppBlobPlaceholder is mcpAppPlaceholder for HTML served as base64, hashed as it decodes; a blob that is
-// not valid base64 gets the generic placeholder.
-func mcpAppBlobPlaceholder(blob string) string {
-	h := sha256.New()
-	n, err := io.Copy(h, base64.NewDecoder(base64.StdEncoding, strings.NewReader(blob)))
-	if err != nil {
-		return MediaPlaceholder(MCPAppsMimeType, len(blob))
-	}
-	return mcpAppPlaceholderFor(int(n), h.Sum(nil))
-}
-
-func mcpAppPlaceholderFor(size int, sum []byte) string {
-	return fmt.Sprintf("[MCP App HTML, %s, sha256 %s, not shown]", byteSize(size), hex.EncodeToString(sum[:8]))
-}
-
 // base64Size is the decoded size of n base64 characters, in readable units.
 func base64Size(n int) string {
 	return byteSize(n / 4 * 3)
@@ -278,103 +250,4 @@ func byteSize(size int) string {
 		return fmt.Sprintf("%d KB", size>>10)
 	}
 	return fmt.Sprintf("%d bytes", size)
-}
-
-// ResourceContentsForLog returns result's contents with every blob replaced by a placeholder.
-func ResourceContentsForLog(result *mcp.ReadResourceResult) []mcp.ResourceContents {
-	if result == nil {
-		return nil
-	}
-	contents := make([]mcp.ResourceContents, len(result.Contents))
-	for i, content := range result.Contents {
-		contents[i] = resourceContentsForLog(content)
-	}
-	return contents
-}
-
-// PromptForLog returns result with image, audio and blob data replaced by placeholders; result is not mutated.
-func PromptForLog(result *mcp.GetPromptResult) *mcp.GetPromptResult {
-	if result == nil {
-		return nil
-	}
-	logged := *result
-	logged.Messages = make([]mcp.PromptMessage, len(result.Messages))
-	for i, message := range result.Messages {
-		logged.Messages[i] = message
-		logged.Messages[i].Content = contentForLog(message.Content)
-	}
-	return &logged
-}
-
-// contentForLog returns content with its media replaced by placeholders; content is not mutated.
-func contentForLog(content mcp.Content) mcp.Content {
-	switch c := content.(type) {
-	case mcp.ImageContent:
-		c.Data = MediaPlaceholder(c.MIMEType, len(c.Data))
-		return c
-	case mcp.AudioContent:
-		c.Data = MediaPlaceholder(c.MIMEType, len(c.Data))
-		return c
-	case mcp.EmbeddedResource:
-		c.Resource = resourceContentsForLog(c.Resource)
-		return c
-	case mcp.ToolResultContent:
-		nested := make([]mcp.Content, len(c.Content))
-		for i, item := range c.Content {
-			nested[i] = contentForLog(item)
-		}
-		c.Content = nested
-		return c
-	case *mcp.ImageContent:
-		if c != nil {
-			return contentForLog(*c)
-		}
-	case *mcp.AudioContent:
-		if c != nil {
-			return contentForLog(*c)
-		}
-	case *mcp.EmbeddedResource:
-		if c != nil {
-			return contentForLog(*c)
-		}
-	case *mcp.ToolResultContent:
-		if c != nil {
-			return contentForLog(*c)
-		}
-	}
-	return content
-}
-
-// blobPlaceholder stands in for a resource blob: an MCP App's HTML by its size and hash, anything else by its size.
-func blobPlaceholder(mimeType, blob string) string {
-	if mimeType == MCPAppsMimeType {
-		return mcpAppBlobPlaceholder(blob)
-	}
-	return MediaPlaceholder(mimeType, len(blob))
-}
-
-func resourceContentsForLog(content mcp.ResourceContents) mcp.ResourceContents {
-	switch blob := content.(type) {
-	case mcp.TextResourceContents:
-		if blob.MIMEType == MCPAppsMimeType {
-			blob.Text = mcpAppPlaceholder(blob.Text)
-		}
-		return blob
-	case *mcp.TextResourceContents:
-		if blob != nil && blob.MIMEType == MCPAppsMimeType {
-			logged := *blob
-			logged.Text = mcpAppPlaceholder(blob.Text)
-			return logged
-		}
-	case mcp.BlobResourceContents:
-		blob.Blob = blobPlaceholder(blob.MIMEType, blob.Blob)
-		return blob
-	case *mcp.BlobResourceContents:
-		if blob != nil {
-			logged := *blob
-			logged.Blob = blobPlaceholder(blob.MIMEType, blob.Blob)
-			return logged
-		}
-	}
-	return content
 }

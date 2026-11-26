@@ -71,16 +71,6 @@ func waitForOffload(t *testing.T, inner LogStore, id string) {
 	})
 }
 
-// waitForMCPOffload is waitForOffload for MCP tool logs: it waits for the row's
-// has_object flag, which processUpload commits only after the object Put.
-func waitForMCPOffload(t *testing.T, inner LogStore, id string) {
-	t.Helper()
-	waitForUploads(t, func() bool {
-		row, err := inner.FindMCPToolLog(context.Background(), id)
-		return err == nil && row.HasObject
-	})
-}
-
 func TestHybridScopedDBDelegatesToInnerRDBStore(t *testing.T) {
 	hybrid, _, _ := newTestHybrid(t)
 	defer hybrid.Close(context.Background())
@@ -396,304 +386,6 @@ func TestHybrid_FindByID_GracefulDegradation(t *testing.T) {
 	assert.NotEmpty(t, found.InputHistory, "last message should be retained in DB")
 	// But other payload fields (output_message, params, etc.) should be empty.
 	assert.Empty(t, found.OutputMessage, "output should be empty when S3 fails")
-}
-
-func TestHybrid_CreateAndFindMCPToolLog(t *testing.T) {
-	hybrid, inner, objStore := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	longInput := ""
-	for i := 0; i < 260; i++ {
-		longInput += "a"
-	}
-	entry := &MCPToolLog{
-		ID:          "mcp-1",
-		RequestID:   "req-1",
-		Timestamp:   time.Now().UTC(),
-		ToolName:    "echo",
-		ServerLabel: "local",
-		Status:      "success",
-		ArgumentsParsed: map[string]any{
-			"input": longInput,
-		},
-		ResultParsed: map[string]any{
-			"ok": true,
-		},
-		RedactionMapping: `plain:{"input":{"EMAIL-1":"private@example.com"}}`,
-	}
-
-	require.NoError(t, hybrid.CreateMCPToolLog(ctx, entry))
-	waitForUploads(t, func() bool { return objStore.Len() == 1 })
-
-	dbOnly, err := inner.FindMCPToolLog(ctx, "mcp-1")
-	require.NoError(t, err)
-	assert.True(t, dbOnly.HasObject)
-	assert.Empty(t, dbOnly.Result)
-	assert.Nil(t, dbOnly.ResultParsed)
-	assert.Equal(t, entry.RedactionMapping, dbOnly.RedactionMapping)
-	preview, ok := dbOnly.ArgumentsParsed.(string)
-	require.True(t, ok)
-	assert.Len(t, []rune(preview), 200)
-
-	found, err := hybrid.FindMCPToolLog(ctx, "mcp-1")
-	require.NoError(t, err)
-	assert.True(t, found.HasObject)
-	assert.Equal(t, longInput, found.ArgumentsParsed.(map[string]interface{})["input"])
-	assert.Equal(t, true, found.ResultParsed.(map[string]interface{})["ok"])
-	assert.Equal(t, entry.RedactionMapping, found.RedactionMapping)
-}
-
-func TestHybrid_BatchCreateMCPToolLogsIfNotExists(t *testing.T) {
-	hybrid, inner, _ := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	longInput := ""
-	for i := 0; i < 260; i++ {
-		longInput += "b"
-	}
-	entries := []*MCPToolLog{
-		{
-			ID:          "mcp-batch-1",
-			RequestID:   "req-batch-1",
-			Timestamp:   time.Now().UTC(),
-			ToolName:    "search",
-			ServerLabel: "docs",
-			Status:      "success",
-			ArgumentsParsed: map[string]any{
-				"query": longInput,
-			},
-			ResultParsed: map[string]any{
-				"answer": "done",
-			},
-		},
-		{
-			ID:          "mcp-batch-2",
-			RequestID:   "req-batch-2",
-			Timestamp:   time.Now().UTC(),
-			ToolName:    "echo",
-			ServerLabel: "local",
-			Status:      "error",
-			ArgumentsParsed: map[string]any{
-				"input": "short",
-			},
-			ErrorDetailsParsed: &schemas.BifrostError{
-				IsBifrostError: true,
-				Error: &schemas.ErrorField{
-					Message: "failed",
-				},
-			},
-		},
-	}
-
-	require.NoError(t, hybrid.BatchCreateMCPToolLogsIfNotExists(ctx, entries))
-	waitForMCPOffload(t, inner, "mcp-batch-1")
-	waitForMCPOffload(t, inner, "mcp-batch-2")
-
-	dbOnly, err := inner.FindMCPToolLog(ctx, "mcp-batch-1")
-	require.NoError(t, err)
-	assert.True(t, dbOnly.HasObject)
-	assert.Empty(t, dbOnly.Result)
-	assert.Empty(t, dbOnly.ErrorDetails)
-	preview, ok := dbOnly.ArgumentsParsed.(string)
-	require.True(t, ok)
-	assert.Len(t, []rune(preview), 200)
-
-	found, err := hybrid.FindMCPToolLog(ctx, "mcp-batch-1")
-	require.NoError(t, err)
-	assert.Equal(t, longInput, found.ArgumentsParsed.(map[string]interface{})["query"])
-	assert.Equal(t, "done", found.ResultParsed.(map[string]interface{})["answer"])
-
-	foundError, err := hybrid.FindMCPToolLog(ctx, "mcp-batch-2")
-	require.NoError(t, err)
-	require.NotNil(t, foundError.ErrorDetailsParsed)
-	assert.Equal(t, "failed", foundError.ErrorDetailsParsed.Error.Message)
-
-	require.NoError(t, hybrid.BatchCreateMCPToolLogsIfNotExists(ctx, entries))
-	var count int64
-	require.NoError(t, inner.(*RDBLogStore).db.WithContext(ctx).Model(&MCPToolLog{}).Where("id IN ?", []string{"mcp-batch-1", "mcp-batch-2"}).Count(&count).Error)
-	assert.Equal(t, int64(2), count)
-}
-
-func TestHybrid_UpdateMCPToolLogOffloadsFullLog(t *testing.T) {
-	hybrid, inner, _ := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	entry := &MCPToolLog{
-		ID:          "mcp-update",
-		RequestID:   "req-update",
-		Timestamp:   time.Now().UTC(),
-		ToolName:    "search",
-		ServerLabel: "docs",
-		Status:      "processing",
-		ArgumentsParsed: map[string]any{
-			"query": "find this",
-		},
-	}
-	require.NoError(t, hybrid.CreateMCPToolLog(ctx, entry))
-	waitForMCPOffload(t, inner, entry.ID)
-
-	require.NoError(t, hybrid.UpdateMCPToolLog(ctx, entry.ID, MCPToolLog{
-		Status:           "success",
-		RedactionMapping: `plain:{"output":{"EMAIL-2":"result@example.com"}}`,
-		ResultParsed: map[string]any{
-			"answer": "done",
-		},
-	}))
-
-	waitForUploads(t, func() bool {
-		found, err := hybrid.FindMCPToolLog(ctx, entry.ID)
-		if err != nil || found.ResultParsed == nil {
-			return false
-		}
-		result, ok := found.ResultParsed.(map[string]interface{})
-		return ok && result["answer"] == "done"
-	})
-
-	dbOnly, err := inner.FindMCPToolLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.True(t, dbOnly.HasObject)
-	assert.Equal(t, "success", dbOnly.Status)
-	assert.Empty(t, dbOnly.Result)
-	assert.Nil(t, dbOnly.ResultParsed)
-	assert.Contains(t, dbOnly.RedactionMapping, "result@example.com")
-
-	found, err := hybrid.FindMCPToolLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "find this", found.ArgumentsParsed.(map[string]interface{})["query"])
-	assert.Equal(t, "done", found.ResultParsed.(map[string]interface{})["answer"])
-	assert.Equal(t, dbOnly.RedactionMapping, found.RedactionMapping)
-}
-
-func TestHybrid_UpdateMCPToolLogRequiresObjectHydration(t *testing.T) {
-	hybrid, inner, objStore := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	entry := &MCPToolLog{
-		ID:          "mcp-hydration-fail",
-		RequestID:   "req-hydration-fail",
-		Timestamp:   time.Now().UTC(),
-		ToolName:    "search",
-		ServerLabel: "docs",
-		Status:      "success",
-		ArgumentsParsed: map[string]any{
-			"query": "full input",
-		},
-		ResultParsed: map[string]any{
-			"answer": "original",
-		},
-	}
-	require.NoError(t, hybrid.CreateMCPToolLog(ctx, entry))
-	waitForMCPOffload(t, inner, entry.ID)
-
-	objStore.GetErr = assert.AnError
-	err := hybrid.UpdateMCPToolLog(ctx, entry.ID, MCPToolLog{
-		Status: "success",
-		ResultParsed: map[string]any{
-			"answer": "updated",
-		},
-	})
-	require.Error(t, err)
-	objStore.GetErr = nil
-
-	found, err := hybrid.FindMCPToolLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "full input", found.ArgumentsParsed.(map[string]interface{})["query"])
-	assert.Equal(t, "original", found.ResultParsed.(map[string]interface{})["answer"])
-
-	dbOnly, err := inner.FindMCPToolLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "success", dbOnly.Status)
-}
-
-func TestHybrid_UpdateMCPToolLogHydratesObjectBeforeHasObjectMarker(t *testing.T) {
-	hybrid, inner, objStore := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	longInput := ""
-	for i := 0; i < 260; i++ {
-		longInput += "q"
-	}
-	entry := &MCPToolLog{
-		ID:          "mcp-has-object-false",
-		RequestID:   "req-has-object-false",
-		Timestamp:   time.Now().UTC(),
-		ToolName:    "search",
-		ServerLabel: "docs",
-		Status:      "processing",
-		ArgumentsParsed: map[string]any{
-			"query": longInput,
-		},
-	}
-	payload, err := MarshalMCPToolLogPayload(entry)
-	require.NoError(t, err)
-	dbEntry := *entry
-	PrepareMCPToolDBEntry(&dbEntry)
-	require.NoError(t, inner.CreateMCPToolLog(ctx, &dbEntry))
-	require.NoError(t, objStore.Put(ctx, MCPToolObjectKey(hybrid.prefix, entry.Timestamp, entry.ID), payload, BuildMCPToolTags(entry)))
-
-	require.NoError(t, hybrid.UpdateMCPToolLog(ctx, entry.ID, MCPToolLog{
-		Status: "success",
-		ResultParsed: map[string]any{
-			"answer": "done",
-		},
-	}))
-	waitForUploads(t, func() bool {
-		found, err := hybrid.FindMCPToolLog(ctx, entry.ID)
-		if err != nil || found.ResultParsed == nil {
-			return false
-		}
-		result, ok := found.ResultParsed.(map[string]interface{})
-		return ok && result["answer"] == "done"
-	})
-
-	found, err := hybrid.FindMCPToolLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.Equal(t, longInput, found.ArgumentsParsed.(map[string]interface{})["query"])
-	assert.Equal(t, "done", found.ResultParsed.(map[string]interface{})["answer"])
-}
-
-func TestHybrid_ProcessMCPUploadSkipsMissingRowsWithEmptyStatus(t *testing.T) {
-	hybrid, _, objStore := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-
-	hybrid.processUpload(&uploadWork{
-		logID:     "mcp-missing-row",
-		timestamp: time.Now().UTC(),
-		key:       MCPToolObjectKey(hybrid.prefix, time.Now().UTC(), "mcp-missing-row"),
-		kind:      uploadKindMCP,
-		payload:   []byte(`{"id":"mcp-missing-row"}`),
-	})
-
-	assert.Equal(t, 0, objStore.Len())
-	assert.Equal(t, int64(1), hybrid.DroppedUploads())
-}
-
-func TestHybrid_DeleteMCPToolLogsDeletesObjects(t *testing.T) {
-	hybrid, inner, objStore := newTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	entry := &MCPToolLog{
-		ID:          "mcp-delete",
-		RequestID:   "req-delete",
-		Timestamp:   time.Now().UTC(),
-		ToolName:    "echo",
-		ServerLabel: "local",
-		Status:      "success",
-		ArgumentsParsed: map[string]any{
-			"input": "delete me",
-		},
-	}
-	require.NoError(t, hybrid.CreateMCPToolLog(ctx, entry))
-	waitForMCPOffload(t, inner, entry.ID)
-
-	require.NoError(t, hybrid.DeleteMCPToolLogs(ctx, []string{entry.ID}))
-	assert.Equal(t, 0, objStore.Len())
 }
 
 func TestHybrid_PutFailureDropsUpload(t *testing.T) {
@@ -1782,32 +1474,6 @@ func TestHybrid_ParquetFormat_BatchUpdateMergesIntoStoredObject(t *testing.T) {
 	assert.Contains(t, found.OutputMessage, output)
 }
 
-func TestHybrid_ParquetFormat_MCPToolLogRoundTrip(t *testing.T) {
-	hybrid, inner, objStore := newParquetTestHybrid(t)
-	defer hybrid.Close(context.Background())
-	ctx := context.Background()
-
-	entry := &MCPToolLog{
-		ID: "pq-mcp-1", RequestID: "req-pq-mcp", Timestamp: time.Now().UTC(), ToolName: "echo", ServerLabel: "local", Status: "success",
-		ArgumentsParsed: map[string]any{"input": strings.Repeat("a", 260)},
-		ResultParsed:    map[string]any{"ok": true, "count": 3},
-	}
-	require.NoError(t, hybrid.CreateMCPToolLog(ctx, entry))
-	waitForMCPOffload(t, inner, entry.ID)
-
-	key := objectKey("test", "mcp-logs", entry.Timestamp, entry.ID, parquetObjectExt)
-	requireParquetObject(t, objStore, key)
-
-	found, err := hybrid.FindMCPToolLog(ctx, entry.ID)
-	require.NoError(t, err)
-	assert.Equal(t, strings.Repeat("a", 260), found.ArgumentsParsed.(map[string]interface{})["input"])
-	assert.Equal(t, true, found.ResultParsed.(map[string]interface{})["ok"])
-	assert.EqualValues(t, 3, found.ResultParsed.(map[string]interface{})["count"])
-
-	require.NoError(t, hybrid.DeleteMCPToolLogs(ctx, []string{entry.ID}))
-	assert.Equal(t, 0, objStore.Len())
-}
-
 // A deployment that switches object_storage.format from json to parquet keeps
 // serving, merging and deleting the objects it wrote before the switch.
 func TestHybrid_ParquetFormat_ReadsLegacyJSONObjects(t *testing.T) {
@@ -1877,13 +1543,6 @@ func TestHybrid_JSONFormat_ReadsParquetObjectsAfterSwitchBack(t *testing.T) {
 	parquetKey := objectKey("test", "logs", ts, entry.ID, parquetObjectExt)
 	require.Equal(t, []string{parquetKey}, objStore.Keys())
 
-	mcp := &MCPToolLog{
-		ID: "switch-back-mcp", RequestID: "req-switch-back", Timestamp: ts, ToolName: "search", ServerLabel: "docs", Status: "processing",
-		ArgumentsParsed: map[string]any{"query": "from parquet"},
-	}
-	require.NoError(t, parquetHybrid.CreateMCPToolLog(ctx, mcp))
-	waitForMCPOffload(t, inner, mcp.ID)
-
 	hybrid := newHybridLogStore(inner, objStore, "test", hybridTestLogger{}, nil, nil)
 	hybrid.setObjectFormat(objectstore.FormatJSON, objectstore.CompressionGzip)
 	defer hybrid.Close(ctx)
@@ -1891,11 +1550,6 @@ func TestHybrid_JSONFormat_ReadsParquetObjectsAfterSwitchBack(t *testing.T) {
 	found, err := hybrid.FindByID(ctx, entry.ID)
 	require.NoError(t, err)
 	assert.Contains(t, found.InputHistory, input, "parquet object is still served after switching back to json")
-	foundMCP, err := hybrid.FindMCPToolLog(ctx, mcp.ID)
-	require.NoError(t, err)
-	args, ok := foundMCP.ArgumentsParsed.(map[string]interface{})
-	require.True(t, ok, "MCP arguments not hydrated from the parquet object, got %#v", foundMCP.ArgumentsParsed)
-	assert.Equal(t, "from parquet", args["query"])
 
 	require.NoError(t, hybrid.BatchUpdate(ctx, []*Log{{ID: entry.ID, Status: "success", OutputMessageParsed: &schemas.ChatMessage{
 		Role: schemas.ChatMessageRoleAssistant, Content: &schemas.ChatMessageContent{ContentStr: &output},
@@ -1910,22 +1564,8 @@ func TestHybrid_JSONFormat_ReadsParquetObjectsAfterSwitchBack(t *testing.T) {
 	assert.Contains(t, string(data), input, "merge keeps the input stored in the parquet object")
 	waitForUploads(t, func() bool { _, err := objStore.Get(ctx, parquetKey); return err != nil })
 
-	require.NoError(t, hybrid.UpdateMCPToolLog(ctx, mcp.ID, MCPToolLog{Status: "success", ResultParsed: map[string]any{"answer": "done"}}))
-	mcpJSONKey := MCPToolObjectKey("test", ts, mcp.ID)
-	waitForUploads(t, func() bool { _, err := objStore.Get(ctx, mcpJSONKey); return err == nil })
-	waitForUploads(t, func() bool {
-		_, err := objStore.Get(ctx, objectKey("test", "mcp-logs", ts, mcp.ID, parquetObjectExt))
-		return err != nil
-	})
-	foundMCP, err = hybrid.FindMCPToolLog(ctx, mcp.ID)
-	require.NoError(t, err)
-	args, ok = foundMCP.ArgumentsParsed.(map[string]interface{})
-	require.True(t, ok, "MCP arguments not hydrated after update, got %#v", foundMCP.ArgumentsParsed)
-	assert.Equal(t, "from parquet", args["query"], "update keeps the parquet-era arguments")
-
-	assert.ElementsMatch(t, []string{jsonKey, mcpJSONKey}, objStore.Keys(), "each log keeps a single object")
+	assert.ElementsMatch(t, []string{jsonKey}, objStore.Keys(), "each log keeps a single object")
 	require.NoError(t, hybrid.DeleteLog(ctx, entry.ID))
-	require.NoError(t, hybrid.DeleteMCPToolLogs(ctx, []string{mcp.ID}))
 	assert.Equal(t, 0, objStore.Len())
 }
 

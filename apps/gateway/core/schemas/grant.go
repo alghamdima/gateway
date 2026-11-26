@@ -114,8 +114,6 @@ type Permit interface {
 
 	// ProviderPermits is every provider the permit allows, with what each allows.
 	ProviderPermits() []ProviderPermit
-	// MCPPermits is every MCP client the permit allows tools of.
-	MCPPermits() []MCPPermit
 
 	// AllowsAllProviders reports whether the permit grants every provider, including ones it holds no
 	// provider permit for. It coexists with ProviderPermits: a provider the permit lists still has
@@ -169,11 +167,6 @@ type Access interface {
 	// an uploaded file: an access for which this is false has a model restriction that only a
 	// named model lets it apply.
 	AllowsEveryModel(provider string) bool
-	// IsMCPToolAllowed reports whether the request may execute toolPattern, which is either
-	// "<client>-<tool>" or the "<client>-*" wildcard standing for every tool of a client. A
-	// wildcard is permitted when the client is granted any tool at all; narrowing a wildcard down
-	// to the tools actually granted is MCPToolIncludeList's job.
-	IsMCPToolAllowed(toolPattern string) bool
 
 	// PermitsForModel returns the permits the request answers to for model on provider: every one
 	// of the caller's permits that permits the pair, then every capping level permit that permits
@@ -205,22 +198,9 @@ type Access interface {
 	// provider.
 	GrantedProvidersForModel(model string) []string
 
-	// MCPToolIncludeList returns the tool patterns the request may execute, as "<client>-<tool>"
-	// entries and "<client>-*" wildcards for clients granted every tool. An empty result means no
-	// tool may be executed.
-	MCPToolIncludeList() []string
-	// NarrowMCPToolIncludeList narrows a tool list the caller asked for down to what this access
-	// permits, so a request-supplied include list can only ever narrow the access, never widen it.
-	// The result is never nil: an empty list permits no tool, which downstream has to tell apart
-	// from no list having been supplied at all. A request with no access is not narrowed at all,
-	// which is the caller's to notice before asking.
-	NarrowMCPToolIncludeList(requested []string) []string
-
 	// DeniedPermitsForModel returns the permits that refused model on provider, so the refusal can name them.
 	// An empty model asks about the provider alone. Nil when the request is allowed.
 	DeniedPermitsForModel(provider string, model string) []Permit
-	// DeniedPermitsForMCPTool is DeniedPermitsForModel for an MCP tool pattern.
-	DeniedPermitsForMCPTool(toolPattern string) []Permit
 }
 
 // Limits is what an attempt answers to once its provider and model are settled: every budget and
@@ -253,15 +233,6 @@ type ProviderPermit struct {
 	//                  candidate. Unlike the permissions, this does not compose: there is no
 	//                  meaningful intersection of two preferences, so a scoping permit that
 	//                  expresses one wins as the more specific context.
-}
-
-// MCPPermit is permission to execute tools of one MCP client.
-type MCPPermit struct {
-	Client string // stable client identifier; identifies the client across renames and
-	//                decides which permit applies to a client
-	ClientName string    // client name, as used in "<client>-<tool>" tool patterns
-	Tools      WhiteList // ["*"] allows every tool of the client; empty allows none. Matched
-	//                       against the tool's own name, after the "<client>-" prefix is trimmed.
 }
 
 // ProviderCandidate is one way a request could be served: a provider, with the weight and keys it

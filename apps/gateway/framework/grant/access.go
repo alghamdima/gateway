@@ -2,7 +2,6 @@ package grant
 
 import (
 	"slices"
-	"strings"
 
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -31,7 +30,7 @@ type ModelMatcher func(provider, model string, allowed []string) bool
 // second has to answer to what is in force when it runs.
 //
 // The caller's permits are a list because a caller can hold several at once, and they are read as
-// one, as if they were a single permit holding all of their provider and MCP permits: what any of
+// one, as if they were a single permit holding all of their provider permits: what any of
 // them permits, the caller may reach; any key any of them allows may serve the request; and every
 // one of them that permits the pair pays for it (see PermitsForModel). Their order is the order the
 // resolver gave them, and is the order candidates and refusals are reported in.
@@ -274,24 +273,6 @@ func permitAllowsEveryModel(p schemas.Permit, provider string) bool {
 		return p.AllowsAllProviders()
 	}
 	return unrestricted
-}
-
-// IsMCPToolAllowed implements schemas.Access. A "<client>-*" wildcard is answered from the effective
-// tool list, so it's allowed only when some tool of the client survives composition.
-func (a *Access) IsMCPToolAllowed(toolPattern string) bool {
-	if a == nil || toolPattern == "" {
-		return false
-	}
-	if clientName, isWildcard := strings.CutSuffix(toolPattern, "-"+Wildcard); isWildcard {
-		return slices.ContainsFunc(a.MCPToolIncludeList(), func(entry string) bool {
-			return strings.HasPrefix(entry, clientName+"-")
-		})
-	}
-	base := a.callerAllows(func(p schemas.Permit) bool { return allowsTool(p, toolPattern) })
-	if a.scoping == nil {
-		return base
-	}
-	return a.compose(base, allowsTool(a.scoping, toolPattern))
 }
 
 // PermitsForModel implements schemas.Access.
@@ -617,145 +598,6 @@ func (a *Access) providerPermitCount() int {
 	return count
 }
 
-// MCPToolIncludeList implements schemas.Access.
-//
-// The caller's permits are read as one, so their entries are merged in order before the scoping
-// permit is composed on: a tool any of them grants, the caller may execute.
-func (a *Access) MCPToolIncludeList() []string {
-	if a == nil {
-		return nil
-	}
-
-	merged := newUniqueEntries(0)
-	for _, base := range a.granting() {
-		for _, entry := range mcpEntries(base) {
-			merged.add(entry)
-		}
-	}
-	base := merged.list()
-	for _, level := range a.levelsAbove() {
-		layer := a.permitsAt(level)
-		base = intersectMCPEntries(base, layer, layerMCPEntries(layer))
-	}
-	if !a.IsScoped() {
-		return base
-	}
-	return a.composeMCPEntries(base, mcpEntries(a.scoping))
-}
-
-// NarrowMCPToolIncludeList implements schemas.Access.
-//
-// A "<client>-*" wildcard is kept as a wildcard only when the access grants that client every
-// tool, because downstream a wildcard reads as every tool of the client; otherwise it is replaced by
-// the specific tools the access grants for that client, which may be none. A specific entry is kept
-// when the access permits it. Empty entries and repeats are dropped. No access at all permits
-// nothing.
-func (a *Access) NarrowMCPToolIncludeList(requested []string) []string {
-	kept := newUniqueEntries(len(requested))
-	granted := a.MCPToolIncludeList()
-	grantedSet := make(map[string]struct{}, len(granted))
-	for _, entry := range granted {
-		grantedSet[entry] = struct{}{}
-	}
-	for _, entry := range requested {
-		if entry == "" {
-			continue
-		}
-		clientName, isWildcard := strings.CutSuffix(entry, "-"+Wildcard)
-		if !isWildcard {
-			if a.IsMCPToolAllowed(entry) {
-				kept.add(entry)
-			}
-			continue
-		}
-		if _, everyTool := grantedSet[entry]; everyTool {
-			kept.add(entry)
-			continue
-		}
-		for _, grantedEntry := range granted {
-			if strings.HasPrefix(grantedEntry, clientName+"-") {
-				kept.add(grantedEntry)
-			}
-		}
-	}
-	return kept.list()
-}
-
-// composeMCPEntries folds the caller's tool patterns with the scoping permit's under the request's
-// mode, the counterpart of compose for verdicts and composeKeyIDs for provider keys. An
-// unrecognized mode permits nothing, as everywhere else.
-//
-// The scoping permit is read off the receiver rather than passed in, because scoped has to be that
-// permit's own expansion: narrowing asks the permit questions its expansion cannot answer, so a
-// caller free to supply entries from elsewhere could quietly widen access.
-func (a *Access) composeMCPEntries(base, scoped []string) []string {
-	switch a.mode {
-	case Union:
-		merged := newUniqueEntries(len(base) + len(scoped))
-		for _, entry := range base {
-			merged.add(entry)
-		}
-		for _, entry := range scoped {
-			merged.add(entry)
-		}
-		return merged.list()
-	case Intersect:
-		return intersectMCPEntries(base, []schemas.Permit{a.scoping}, scoped)
-	}
-	return []string{}
-}
-
-// intersectMCPEntries keeps the caller's tool patterns that the narrowing permits also allow; scoped
-// is those permits' own expansion. A "<client>-*" wildcard survives only if both sides have it, and
-// is otherwise replaced by the narrowing side's specific tools for that client.
-func intersectMCPEntries(base []string, narrowing []schemas.Permit, scoped []string) []string {
-	scopedSet := make(map[string]struct{}, len(scoped))
-	for _, entry := range scoped {
-		scopedSet[entry] = struct{}{}
-	}
-	kept := newUniqueEntries(len(base))
-	for _, entry := range base {
-		clientName, isWildcard := strings.CutSuffix(entry, "-"+Wildcard)
-		if !isWildcard {
-			if anyPermitAllowsTool(narrowing, entry) {
-				kept.add(entry)
-			}
-			continue
-		}
-		if _, unrestrictedOnBothSides := scopedSet[entry]; unrestrictedOnBothSides {
-			kept.add(entry)
-			continue
-		}
-		for _, scopedEntry := range scoped {
-			if strings.HasPrefix(scopedEntry, clientName+"-") {
-				kept.add(scopedEntry)
-			}
-		}
-	}
-	return kept.list()
-}
-
-// anyPermitAllowsTool reports whether any of permits allows toolPattern.
-func anyPermitAllowsTool(permits []schemas.Permit, toolPattern string) bool {
-	for _, permit := range permits {
-		if allowsTool(permit, toolPattern) {
-			return true
-		}
-	}
-	return false
-}
-
-// layerMCPEntries merges a level's tool patterns in order, reading the level as one permit.
-func layerMCPEntries(layer []schemas.Permit) []string {
-	merged := newUniqueEntries(0)
-	for _, permit := range layer {
-		for _, entry := range mcpEntries(permit) {
-			merged.add(entry)
-		}
-	}
-	return merged.list()
-}
-
 // DeniedPermitsForModel implements schemas.Access.
 //
 // What is named is whatever refused and whose permission would have changed the answer. The
@@ -769,24 +611,6 @@ func (a *Access) DeniedPermitsForModel(provider string, model string) []schemas.
 		return nil
 	}
 	return a.deniedBy(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }, true)
-}
-
-// DeniedPermitsForMCPTool implements schemas.Access.
-func (a *Access) DeniedPermitsForMCPTool(toolPattern string) []schemas.Permit {
-	if a == nil {
-		return nil
-	}
-	denied := a.deniedBy(func(p schemas.Permit) bool { return allowsTool(p, toolPattern) }, true)
-	// Each side grants the client some tool but none in common: name what narrowed them away.
-	if len(denied) == 0 && !a.IsMCPToolAllowed(toolPattern) {
-		for _, level := range a.levelsAbove() {
-			denied = append(denied, a.permitsAt(level)...)
-		}
-		if a.scoping != nil && a.mode == Intersect {
-			denied = append(denied, a.scoping)
-		}
-	}
-	return denied
 }
 
 // deniedBy identifies which permits refused, given a verdict per permit.

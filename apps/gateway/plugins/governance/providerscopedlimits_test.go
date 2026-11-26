@@ -215,7 +215,7 @@ func TestARequestIsChargedOnlyToTheProviderConfigItUsed(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			store := providerScopeTestStore(t)
-			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, NewMockLogger(), store, nil, providerScopeTestCatalog(t), nil, nil)
+			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, NewMockLogger(), store, nil, providerScopeTestCatalog(t), nil)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 

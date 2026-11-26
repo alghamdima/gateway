@@ -1231,7 +1231,7 @@ func TestPreLLMHook_ProviderBudgetExceeded_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1258,7 +1258,7 @@ func TestPreLLMHook_ProviderRateLimitExceeded_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1285,7 +1285,7 @@ func TestPreLLMHook_ModelBudgetExceeded_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1312,7 +1312,7 @@ func TestPreLLMHook_ModelRateLimitExceeded_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1339,7 +1339,7 @@ func TestPreLLMHook_ModelRateLimitExceeded_NoVirtualKey_RequestLimit(t *testing.
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1374,7 +1374,7 @@ func TestPreLLMHook_AllChecksPass_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1406,7 +1406,7 @@ func TestPreLLMHook_ProviderBudgetThenModelBudget_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1436,7 +1436,7 @@ func TestPreLLMHook_ProviderSpecificModelBudget_DifferentProvider_Passes_NoVirtu
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1465,7 +1465,7 @@ func TestPreLLMHook_ProviderSpecificModelRateLimit_DifferentProvider_Passes_NoVi
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1494,7 +1494,7 @@ func TestPreLLMHook_ProviderSpecificModelRateLimit_DifferentProvider_Passes_NoVi
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	ctx := emptyCtx()
@@ -1527,7 +1527,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyBudgetExceeded(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1558,7 +1558,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyRateLimitExceeded_Token(t *testi
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1589,7 +1589,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyRateLimitExceeded_Request(t *tes
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1621,7 +1621,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyChecksPass(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1672,7 +1672,7 @@ func TestPreLLMHook_SkipKeySelection(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(tc.isVkMandatory)}, logger, store, nil, nil, nil, nil)
+			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(tc.isVkMandatory)}, logger, store, nil, nil, nil)
 			require.NoError(t, err)
 
 			parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyRequestID, "req-1")
@@ -1716,7 +1716,7 @@ func TestPreLLMHook_RequiredHeaders_SkipKeySelection(t *testing.T) {
 	plugin, err := InitFromStore(context.Background(), &Config{
 		IsVkMandatory:   boolPtr(false),
 		RequiredHeaders: &[]string{"x-required-header"},
-	}, logger, store, nil, nil, nil, nil)
+	}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1764,7 +1764,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyNotFound(t *testing.T) {
 	store, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-nonexistent")
@@ -1793,7 +1793,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyBlocked(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1825,7 +1825,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyProviderBlocked(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1857,7 +1857,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyModelBlocked(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1894,7 +1894,7 @@ func TestPreLLMHook_ModelProviderPass_VirtualKeyBudgetExceeded_WithModelPermitPr
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	parentCtx := context.WithValue(context.Background(), schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
@@ -1929,7 +1929,7 @@ func TestPostHook_UpdatesProviderBudgetUsage_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	// First request: PreLLMHook should pass, PostHook updates usage
@@ -1998,7 +1998,7 @@ func TestPostHook_UpdatesProviderRateLimitUsage_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	// First request: PreLLMHook should pass, PostHook updates usage to 10000
@@ -2065,7 +2065,7 @@ func TestPostHook_TracksVirtualKeyUsageWhenUserIDPresent(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	defer plugin.Cleanup()
 
@@ -2119,7 +2119,7 @@ func TestPostHook_SkipVirtualKeyUsageTrackingFlag(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	defer plugin.Cleanup()
 
@@ -2165,89 +2165,6 @@ func TestPostHook_SkipVirtualKeyUsageTrackingFlag(t *testing.T) {
 	assert.Equal(t, "user1", bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID))
 }
 
-// TestPostMCPHook_TracksVirtualKeyUsageWhenUserIDPresent verifies user
-// attribution does not suppress MCP VK request usage tracking.
-func TestPostMCPHook_TracksVirtualKeyUsageWhenUserIDPresent(t *testing.T) {
-	logger := NewMockLogger()
-	rateLimit := buildRateLimitWithUsage("vk-rl", 10000, 0, 1000, 0)
-	vk := buildVirtualKeyWithRateLimit("vk1", "sk-bf-test", "Test VK", rateLimit)
-	store, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
-		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
-		RateLimits:  []configstoreTables.TableRateLimit{*rateLimit},
-	}, nil, nil)
-	require.NoError(t, err)
-
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
-	require.NoError(t, err)
-	defer plugin.Cleanup()
-
-	ctx := resolverCtx(store, "sk-bf-test")
-	ctx.SetValue(schemas.BifrostContextKeyUserID, "user1")
-	// Evaluating the tool call settles the limits it answers to, and billing reads them from there.
-	// Tool execution names no provider and no model, so what it answers to is whatever funds the
-	// holder.
-	settled, settleErr := resolveLimits(ctx, store, "", "")
-	require.NoError(t, settleErr)
-	require.NotNil(t, settled)
-	resp := &schemas.BifrostMCPResponse{
-		ExtraFields: schemas.BifrostMCPResponseExtraFields{
-			MCPRequestType: schemas.MCPRequestTypeExecuteTool,
-			ClientName:     "client",
-			ToolName:       "tool",
-		},
-	}
-
-	_, _, err = plugin.PostMCPHook(ctx, resp, nil)
-	require.NoError(t, err)
-	plugin.wg.Wait()
-
-	updated, exists := store.GetGovernanceData(context.Background()).RateLimits["vk-rl"]
-	require.True(t, exists)
-	assert.Equal(t, int64(0), updated.TokenCurrentUsage)
-	assert.Equal(t, int64(1), updated.RequestCurrentUsage)
-}
-
-// TestPostMCPHook_SkipVirtualKeyUsageTrackingFlag verifies MCP callers can
-// explicitly suppress VK usage while preserving user attribution.
-func TestPostMCPHook_SkipVirtualKeyUsageTrackingFlag(t *testing.T) {
-	logger := NewMockLogger()
-	rateLimit := buildRateLimitWithUsage("vk-rl", 10000, 0, 1000, 0)
-	vk := buildVirtualKeyWithRateLimit("vk1", "sk-bf-test", "Test VK", rateLimit)
-	store, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
-		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
-		RateLimits:  []configstoreTables.TableRateLimit{*rateLimit},
-	}, nil, nil)
-	require.NoError(t, err)
-
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
-	require.NoError(t, err)
-	defer plugin.Cleanup()
-
-	ctx := resolverCtx(store, "sk-bf-test")
-	ctx.SetValue(schemas.BifrostContextKeyUserID, "user1")
-	ctx.SetValue(schemas.BifrostContextKeySkipVirtualKeyUsageTracking, true)
-	settled, settleErr := resolveLimits(ctx, store, "", "")
-	require.NoError(t, settleErr)
-	require.NotNil(t, settled)
-	resp := &schemas.BifrostMCPResponse{
-		ExtraFields: schemas.BifrostMCPResponseExtraFields{
-			MCPRequestType: schemas.MCPRequestTypeExecuteTool,
-			ClientName:     "client",
-			ToolName:       "tool",
-		},
-	}
-
-	_, _, err = plugin.PostMCPHook(ctx, resp, nil)
-	require.NoError(t, err)
-	plugin.wg.Wait()
-
-	updated, exists := store.GetGovernanceData(context.Background()).RateLimits["vk-rl"]
-	require.True(t, exists)
-	assert.Equal(t, int64(0), updated.TokenCurrentUsage)
-	assert.Equal(t, int64(0), updated.RequestCurrentUsage)
-	assert.Equal(t, "user1", bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID))
-}
-
 func TestPostHook_UpdatesModelBudgetUsage_NoVirtualKey(t *testing.T) {
 	logger := NewMockLogger()
 	// Set budget with initial usage close to limit to test the flow
@@ -2260,7 +2177,7 @@ func TestPostHook_UpdatesModelBudgetUsage_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	// First request: PreLLMHook should pass, PostHook updates usage
@@ -2329,7 +2246,7 @@ func TestPostHook_UpdatesModelRateLimitUsage_NoVirtualKey(t *testing.T) {
 	}, nil, nil)
 	require.NoError(t, err)
 
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 
 	// First request: PreLLMHook should pass, PostHook updates usage to 10000
@@ -2710,7 +2627,7 @@ func TestStore_ScopedAndGlobalModelBudgetsBothApply(t *testing.T) {
 	require.NoError(t, err)
 
 	// The holder has no model config of its own, so only the deployment's applies, and it refuses.
-	holderBudgets, _ := store.PermitModelLimits(context.Background(), grant.NewPermit(grant.PermitVirtualKey, vk.ID, "", true, false, nil, nil), schemas.OpenAI, "gpt-4")
+	holderBudgets, _ := store.PermitModelLimits(context.Background(), grant.NewPermit(grant.PermitVirtualKey, vk.ID, "", true, false, nil), schemas.OpenAI, "gpt-4")
 	require.Empty(t, holderBudgets, "nothing of the holder's")
 	budgets, _ := store.GlobalModelLimits(context.Background(), schemas.OpenAI, "gpt-4")
 	require.Len(t, budgets, 1, "the deployment's model budget")

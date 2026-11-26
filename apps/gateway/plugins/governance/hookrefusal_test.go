@@ -32,7 +32,7 @@ const refusalTestUnknownVKValue = "sk-bf-refusal-revoked"
 // one resolved to.
 func refusalTestPlugin(t *testing.T, mutate func(vk *configstoreTables.TableVirtualKey)) *GovernancePlugin {
 	t.Helper()
-	vk := buildVKForMCPStamping([]string{"read_file"})
+	vk := buildAccessTestVK()
 	if mutate != nil {
 		mutate(vk)
 	}
@@ -86,7 +86,7 @@ func TestPreLLMHookRefusesAnInactiveGrant(t *testing.T) {
 		vk.IsActive = &inactive
 	})
 
-	bifrostErr := refusalTestRefusalFor(t, plugin, newPreRequestCtx(nil, nil))
+	bifrostErr := refusalTestRefusalFor(t, plugin, newPreRequestCtx())
 
 	require.NotNil(t, bifrostErr.StatusCode)
 	assert.Equal(t, 403, *bifrostErr.StatusCode, "the credential is real, so this is a permission answer")
@@ -102,7 +102,7 @@ func TestPreLLMHookRefusesAnExpiredGrant(t *testing.T) {
 	past := time.Now().UTC().Add(-time.Second)
 	plugin := refusalTestPlugin(t, func(vk *configstoreTables.TableVirtualKey) { vk.ExpiresAt = &past })
 
-	bifrostErr := refusalTestRefusalFor(t, plugin, newPreRequestCtx(nil, nil))
+	bifrostErr := refusalTestRefusalFor(t, plugin, newPreRequestCtx())
 
 	require.NotNil(t, bifrostErr.StatusCode)
 	assert.Equal(t, 403, *bifrostErr.StatusCode)

@@ -29,7 +29,6 @@ import (
 	configtables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
-	"github.com/maximhq/bifrost/framework/oauth2"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/transports/v2/bifrost-http/lib"
@@ -51,8 +50,8 @@ func (a inferenceSetupAccount) GetConfigForProvider(p schemas.ModelProvider) (*s
 
 func TestUpdateConfig_InferenceAuthBlocksUpstream(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: setupConfigManager{store: store, validToken: true}}
 	setup := putConfigCtx(`{"client_config":{"log_retention_days":7},"auth_config":{"is_enabled":true,"admin_username":"admin","admin_password":"StrongPassword1!"}}`)
 	h.updateConfig(setup)
@@ -77,7 +76,7 @@ func TestUpdateConfig_InferenceAuthBlocksUpstream(t *testing.T) {
 		&configstore.GovernanceConfig{VirtualKeys: []configtables.TableVirtualKey{{
 			ID: "setup-vk", Name: "setup-vk", Value: *schemas.NewSecretVar("sk-bf-setup"), IsActive: new(true),
 			ProviderConfigs: []configtables.TableVirtualKeyProviderConfig{{Provider: "openai", AllowedModels: schemas.WhiteList{"*"}, AllowAllKeys: true}},
-		}}}, nil, nil, nil)
+		}}}, nil, nil)
 	require.NoError(t, err)
 	client, err := bifrost.Init(t.Context(), schemas.BifrostConfig{
 		Account: inferenceSetupAccount{url: upstream.URL}, Logger: log, LLMPlugins: []schemas.LLMPlugin{plugin},
@@ -145,8 +144,8 @@ func TestUpdateConfig_InferenceAuthStoreFailures(t *testing.T) {
 	SetLogger(&mockLogger{})
 	for _, failure := range []string{"read", "write"} {
 		t.Run(failure, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(inferenceSetupFailureStore{store, failure}, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(inferenceSetupFailureStore{store, failure}, false)
 			require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 			h := &ConfigHandler{store: cfg, configManager: setupConfigManager{store: store, validToken: true}}
 			ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"auth_config":{"is_enabled":true,"admin_username":"admin","admin_password":"StrongPassword1!"}}`)
@@ -185,8 +184,8 @@ func TestUpdateConfig_InferenceAuthSetup(t *testing.T) {
 		{"unhashable setup password", "", strings.Repeat("StrongPassword1!", 10), false, false, true, false, 400},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			cfg.ClientConfig.EnforceAuthOnInference = tt.initial
 			require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 			if tt.existing {
@@ -242,8 +241,8 @@ func TestUpdateConfig_FirstAdminAcceptsSetupTokenHeader(t *testing.T) {
 		{name: "no token anywhere", setupAuthed: false, status: 403},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 			h := &ConfigHandler{store: cfg, configManager: setupConfigManager{store: store, validToken: false}}
 			ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"auth_config":{"is_enabled":true,"admin_username":"admin","admin_password":"StrongPassword1!"}}`)
@@ -284,7 +283,7 @@ func TestIsAuthEnabled_ReportsSetupLockState(t *testing.T) {
 		{name: "auth enabled", gate: true, token: token, admin: enabled, wantConfig: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
+			store := newRealConfigStore(t)
 			if tt.admin != nil {
 				require.NoError(t, store.UpdateAuthConfig(bgCtx(), tt.admin))
 			}
@@ -321,7 +320,7 @@ func TestStartSetupSession_IssuesHttpOnlyCookie(t *testing.T) {
 	newLocked := func() (*SessionHandler, *AuthMiddleware) {
 		am := &AuthMiddleware{}
 		am.setupToken.Store(&token)
-		h := &SessionHandler{configStore: newRealOAuth2Store(t)}
+		h := &SessionHandler{configStore: newRealConfigStore(t)}
 		h.SetSetupLock(am)
 		return h, am
 	}
@@ -373,7 +372,7 @@ func TestStartSetupSession_IssuesHttpOnlyCookie(t *testing.T) {
 		}
 	})
 	t.Run("lock not active", func(t *testing.T) {
-		enterprise := &SessionHandler{configStore: newRealOAuth2Store(t)}
+		enterprise := &SessionHandler{configStore: newRealConfigStore(t)}
 		assert.Equal(t, 409, post(enterprise, token).Response.StatusCode(), "no gate installed")
 		h, am := newLocked()
 		am.UpdateAuthConfig(&configstore.AuthConfig{AdminUserName: schemas.NewSecretVar("admin"), AdminPassword: schemas.NewSecretVar("x"), IsEnabled: true})
@@ -398,8 +397,8 @@ func TestStartSetupSession_IssuesHttpOnlyCookie(t *testing.T) {
 // payload shape) can then log in with exactly the credentials it was created with.
 func TestUpdateConfig_SetupTokenFirstAdminCanLogIn(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: setupConfigManager{store: store, validToken: false}}
 	ctx := putConfigCtx(`{"client_config":{"log_retention_days":7},"auth_config":{"is_enabled":true,"admin_username":{"value":"admin","ref":""},"admin_password":{"value":"StrongPassword1!","ref":""}}}`)
@@ -467,8 +466,8 @@ func TestGetPasswordPolicyFailures(t *testing.T) {
 // when sent: a partial save from an API client must not turn a stored false back on.
 func TestUpdateConfig_EnforceVKObjectOwnershipPresence(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.EnforceVKObjectOwnership = false
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
@@ -515,8 +514,8 @@ func TestUpdateConfig_EnforceVKObjectOwnershipPresence(t *testing.T) {
 // user key lifecycle back to access profiles, and that the two move independently.
 func TestUpdateConfig_SkipAccessProfileUserVirtualKeyLifecyclePresence(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.SkipAccessProfileUserVirtualKeyCreation = true
 	cfg.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion = true
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
@@ -575,8 +574,8 @@ func TestUpdateConfig_SkipAccessProfileUserVirtualKeyLifecyclePresence(t *testin
 // changes.
 func TestUpdateConfig_MCPOpenAPIMaxSpecMB(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.MCPOpenAPIMaxSpecMB = 64
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
@@ -624,8 +623,8 @@ func TestUpdateConfig_MCPOpenAPIMaxSpecMB(t *testing.T) {
 // changes; and allow_writes false is stored as false, not reset to the default.
 func TestUpdateConfig_BifrostURLAndBifrostMCPSettings(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	stored := func() *configstore.ClientConfig {
@@ -675,8 +674,8 @@ func TestUpdateConfig_BifrostURLAndBifrostMCPSettings(t *testing.T) {
 // clears it, so the Bifrost MCP reads the build's default spec again.
 func TestUpdateConfig_FrameworkOpenAPIURL(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	stored := func() *string {
@@ -725,8 +724,8 @@ func TestUpdateConfig_FrameworkOpenAPIURL(t *testing.T) {
 // and anything other than body/headers is refused before any live mutation.
 func TestUpdateConfig_ExtraFieldsPlacement(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	stored := func() configtables.ExtraFieldsPlacement {
@@ -775,8 +774,8 @@ func TestUpdateConfig_ExtraFieldsPlacement(t *testing.T) {
 // by their collector's endpoint, so removing a collector cannot move a secret onto another.
 func TestUpdateConfig_ClientGatewayTelemetryPlainHeaders(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	dest := func(endpoint, header string) string {
@@ -853,8 +852,8 @@ func TestUpdateConfig_ClientGatewayTelemetryDestinations(t *testing.T) {
 	SetLogger(&mockLogger{})
 	t.Setenv("BIFROST_TEST_OTEL_TOKEN", "otel-token")
 	t.Setenv("BIFROST_TEST_SERVER_SECRET", "server-secret")
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	body := func(endpoint, header string, enabled bool) string {
@@ -914,8 +913,8 @@ func TestUpdateConfig_ClientGatewayTelemetryDestinations(t *testing.T) {
 // telemetry attributes, while switching it off stays allowed.
 func TestUpdateConfig_ClientGatewayNeedsAdminWhileBypassed(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	body := func(enabled bool, managed, drop string) string {
@@ -952,8 +951,8 @@ func TestUpdateConfig_ClientGatewayNeedsAdminWhileBypassed(t *testing.T) {
 // and anything other than union/intersect is refused before any live mutation.
 func TestUpdateConfig_EntityAccessProfileMode(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	stored := func() configtables.EntityAccessProfileMode {
@@ -1002,8 +1001,8 @@ func TestUpdateConfig_EntityAccessProfileMode(t *testing.T) {
 // but not change it; entries the policy can never honor are refused.
 func TestUpdateConfig_MCPOAuthPrivateAllowlist(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	persistedAllowlist := func() []string {
@@ -1076,8 +1075,8 @@ func TestUpdateConfig_MCPOAuthPrivateAllowlistRemovalSurvivesFailedReload(t *tes
 		require.NoError(t, lib.ApplyMCPOAuthPrivateAllowlist(nil))
 	})
 
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.MCPOAuthPrivateAllowlist = []string{"127.0.0.1"}
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	require.NoError(t, lib.ApplyMCPOAuthPrivateAllowlist(cfg.ClientConfig.MCPOAuthPrivateAllowlist))
@@ -1118,8 +1117,8 @@ func TestUpdateConfig_EmptyDatasheetURLsResetToDefaults(t *testing.T) {
 	checkURLAccessibilityDialContext = (&net.Dialer{}).DialContext
 	t.Cleanup(func() { checkURLAccessibilityDialContext = prevDial })
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 	// A loopback datasheet server passes the accessibility check; file:// URLs
@@ -1158,8 +1157,8 @@ func TestUpdateConfig_EmptyDatasheetURLsResetToDefaults(t *testing.T) {
 // seconds. Anything else is refused rather than stored.
 func TestUpdateConfig_MCPLibrarySyncInterval(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	put := func(seconds int64) *fasthttp.RequestCtx {
 		ctx := putConfigCtx(fmt.Sprintf(`{"client_config":{"log_retention_days":7},"framework_config":{"mcp_library_sync_interval":%d}}`, seconds))
@@ -1201,8 +1200,8 @@ func TestUpdateConfig_FrameworkConfigStoreFailureLeavesRuntimeUnchanged(t *testi
 	checkURLAccessibilityDialContext = (&net.Dialer{}).DialContext
 	t.Cleanup(func() { checkURLAccessibilityDialContext = prevDial })
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(failingFrameworkConfigStore{store}, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(failingFrameworkConfigStore{store}, false)
 	before := cfg.FrameworkConfig
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
@@ -1254,13 +1253,13 @@ func TestUpdateProxyConfig_InterceptionGuardWhenAuthBypassed(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
+			store := newRealConfigStore(t)
 			seed := tc.stored
 			if seed == nil {
 				seed = &configtables.GlobalProxyConfig{Enabled: true, Type: "http", URL: storedURL, Timeout: 10, EnableForInference: true}
 			}
 			require.NoError(t, store.UpdateProxyConfig(context.Background(), seed))
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			cfg := newTestConfig(store, false)
 			h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 			ctx := newTestRequestCtx(tc.body)
@@ -1434,8 +1433,8 @@ func TestCheckURLAccessibility_DoesNotReflectTransportErrors(t *testing.T) {
 // TestLoadConfig_OAuthDiscoveryWithoutIssuerURLFailsBoot in lib.
 func TestUpdateConfig_RejectsOAuthModeWithoutIssuerURL(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	// The shared fixture pins an issuer so the issuance tests clear this rule; this test is
 	// about the rule itself, so start from a headers-mode config with no issuer stored.
 	cfg.ClientConfig.OAuth2ServerConfig = nil
@@ -1455,8 +1454,8 @@ func TestUpdateConfig_RejectsOAuthModeWithoutIssuerURL(t *testing.T) {
 // catalog URLs: PUT /api/config answers 400 and persists nothing.
 func TestUpdateConfig_RejectsFileURLsOverAPI(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 	for _, field := range []string{"pricing_url", "model_parameters_url", "mcp_library_url"} {
@@ -1484,14 +1483,13 @@ func TestUpdateConfig_RejectsFileURLsOverAPI(t *testing.T) {
 // file:// URL is still refused.
 func TestUpdateConfig_UnchangedFileURLsPassOverAPI(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
+	store := newRealConfigStore(t)
 	const stored = "file:///var/lib/bifrost/catalog.json"
 	require.NoError(t, store.UpdateFrameworkConfig(bgCtx(), &configtables.TableFrameworkConfig{
 		PricingURL:         bifrost.Ptr(stored),
 		ModelParametersURL: bifrost.Ptr(stored),
-		MCPLibraryURL:      bifrost.Ptr(stored),
 	}))
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 	for _, field := range []string{"pricing_url", "model_parameters_url", "mcp_library_url"} {
@@ -1528,8 +1526,8 @@ func TestUpdateProxyConfig_RejectsLinkLocalURL(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 			ctx := newTestRequestCtx(`{"enabled":true,"type":"http","url":"` + tc.url + `","timeout":0}`)
@@ -1614,7 +1612,7 @@ func TestUpdateConfig_StoredCredentialsRequireProofWhenAuthBypassed(t *testing.T
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
+			store := newRealConfigStore(t)
 			hash, err := encrypt.Hash(storedPass)
 			require.NoError(t, err)
 			require.NoError(t, store.UpdateAuthConfig(context.Background(), &configstore.AuthConfig{
@@ -1622,7 +1620,7 @@ func TestUpdateConfig_StoredCredentialsRequireProofWhenAuthBypassed(t *testing.T
 				AdminPassword: schemas.NewSecretVar(hash),
 				IsEnabled:     false,
 			}))
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			cfg := newTestConfig(store, false)
 			h := &ConfigHandler{store: cfg, configManager: authConfigTestManager{store: store, setupToken: setupToken}}
 
 			ctx := putConfigCtx(tc.body)
@@ -1664,8 +1662,8 @@ func TestUpdateConfig_FirstAdminStillRequiresSetupToken(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			h := &ConfigHandler{store: cfg, configManager: authConfigTestManager{store: store, setupToken: setupToken}}
 
 			ctx := putConfigCtx(tc.body)
@@ -1704,8 +1702,8 @@ func (r *recordingToolManagerConfig) UpdateMCPToolManagerConfig(_ context.Contex
 
 func TestUpdateConfig_MCPCodeModeLimits(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.MCPConfig = &schemas.MCPConfig{}
 	recorder := &recordingToolManagerConfig{}
 	h := &ConfigHandler{store: cfg, configManager: recorder}
@@ -1791,8 +1789,8 @@ func (m *recordingCompatConfigManager) RemovePlugin(_ context.Context, name stri
 // header overrides keep working.
 func TestUpdateConfig_CompatAllFlagsOffKeepsPluginLoaded(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.Compat = configstore.CompatConfig{ConvertTextToChat: true}
 	cm := &recordingCompatConfigManager{}
 	h := &ConfigHandler{store: cfg, configManager: cm}
@@ -1812,8 +1810,8 @@ const compatAllOffPayload = `{"client_config":{"log_retention_days":7,"compat":{
 // reaches the compat plugin, so runtime compat cannot run ahead of the database.
 func TestUpdateConfig_CompatReloadWaitsForPersistence(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(inferenceSetupFailureStore{store, "write"}, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(inferenceSetupFailureStore{store, "write"}, false)
 	cfg.ClientConfig.Compat = configstore.CompatConfig{ConvertTextToChat: true}
 	cm := &recordingCompatConfigManager{}
 	h := &ConfigHandler{store: cfg, configManager: cm}
@@ -1830,8 +1828,8 @@ func TestUpdateConfig_CompatReloadWaitsForPersistence(t *testing.T) {
 // compat reload after a successful save rolls the persisted compat setting back.
 func TestUpdateConfig_CompatReloadFailureRestoresPersistedConfig(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.Compat = configstore.CompatConfig{ConvertTextToChat: true}
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	cm := &recordingCompatConfigManager{failReload: true}
@@ -1866,9 +1864,9 @@ func (s failingRestoreStore) UpdateClientConfig(ctx context.Context, c *configst
 // is reported as a server error instead of the clean-rollback 400.
 func TestUpdateConfig_CompatReloadFailureReportsFailedRestore(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
+	store := newRealConfigStore(t)
 	writes := 0
-	cfg := newTestOAuth2Config(failingRestoreStore{store, &writes}, configtables.MCPServerAuthModeHeaders, false)
+	cfg := newTestConfig(failingRestoreStore{store, &writes}, false)
 	cfg.ClientConfig.Compat = configstore.CompatConfig{ConvertTextToChat: true}
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	cm := &recordingCompatConfigManager{failReload: true}
@@ -1905,8 +1903,8 @@ func TestGetConfigSkillsMarketplaceURL(t *testing.T) {
 // TestUpdateConfig_SkillsExternalClientURLPresence pins persistence and partial-update semantics.
 func TestUpdateConfig_SkillsExternalClientURLPresence(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	cfg.ClientConfig.SkillsExternalClientURL = schemas.NewSecretVar("https://bifrost.example.com")
 	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
@@ -1936,8 +1934,8 @@ func TestUpdateConfig_SkillsExternalClientURLPresence(t *testing.T) {
 func TestUpdateConfig_MCPClientMetadataURL(t *testing.T) {
 	SetLogger(&mockLogger{})
 	const hosted = "https://public.example.com/bifrost/client.json"
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 	set := putConfigCtx(fmt.Sprintf(`{"client_config":{"log_retention_days":8,"mcp_client_metadata_url":%q}}`, hosted))
@@ -1979,8 +1977,8 @@ func TestUpdateConfig_MCPClientMetadataURL(t *testing.T) {
 func TestUpdateConfigRejectsPrivateSkillsURLComponents(t *testing.T) {
 	SetLogger(&mockLogger{})
 	for _, value := range []string{"https://user:password@example.com", "https://example.com?token=private", "https://example.com?"} {
-		store := newRealOAuth2Store(t)
-		cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+		store := newRealConfigStore(t)
+		cfg := newTestConfig(store, false)
 		h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 		ctx := putConfigCtx(fmt.Sprintf(`{"client_config":{"log_retention_days":8,"skills_external_client_url":%q}}`, value))
 		h.updateConfig(ctx)
@@ -2044,8 +2042,8 @@ func TestUpdateProxyConfig_ProxyTypes(t *testing.T) {
 		{"proxy CA that is not PEM", `{"enabled":true,"type":"http","url":"https://10.0.0.5:3129","ca_cert_pem":"not a certificate"}`, fasthttp.StatusBadRequest, "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			manager := &proxyReloadRecorder{}
 			h := &ConfigHandler{store: cfg, configManager: manager}
 
@@ -2088,8 +2086,8 @@ func TestProxyConfig_URLPasswordRedacted(t *testing.T) {
 		{"http", "http", "http://svc:s3cret@10.0.0.5:3128", "http://svc:<redacted>@10.0.0.5:3128"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			h := &ConfigHandler{store: cfg, configManager: &proxyReloadRecorder{}}
 			require.NoError(t, store.UpdateProxyConfig(bgCtx(), &configtables.GlobalProxyConfig{
 				Enabled: true, Type: network.GlobalProxyType(tc.proxy), URL: tc.stored, EnableForInference: true,
@@ -2124,8 +2122,8 @@ func TestProxyConfig_URLPasswordRedacted(t *testing.T) {
 
 	// With no stored password, the placeholder is dropped rather than saved as one.
 	t.Run("no stored password", func(t *testing.T) {
-		store := newRealOAuth2Store(t)
-		cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+		store := newRealConfigStore(t)
+		cfg := newTestConfig(store, false)
 		h := &ConfigHandler{store: cfg, configManager: &proxyReloadRecorder{}}
 		put := putConfigCtx(`{"enabled":true,"type":"socks5","url":"socks5://svc:<redacted>@10.0.0.5:1080"}`)
 		h.updateProxyConfig(put)
@@ -2150,8 +2148,8 @@ func TestUpdateProxyConfig_ErrorsDoNotEchoURLPassword(t *testing.T) {
 		{"wrong scheme", "http://svc:<redacted>@10.0.0.5:1080"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newRealOAuth2Store(t)
-			cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+			store := newRealConfigStore(t)
+			cfg := newTestConfig(store, false)
 			h := &ConfigHandler{store: cfg, configManager: &proxyReloadRecorder{}}
 			require.NoError(t, store.UpdateProxyConfig(bgCtx(), &configtables.GlobalProxyConfig{
 				Enabled: true, Type: network.GlobalProxyTypeSOCKS5, URL: "socks5://svc:s3cret@10.0.0.5:1080",

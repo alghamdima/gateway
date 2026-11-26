@@ -1531,68 +1531,6 @@ func assertMovesAssistantReasoningToAlias(t *testing.T, provider schemas.ModelPr
 	}
 }
 
-// TestToOpenAIChatRequest_AnnotationsNotInWirePayload verifies that MCPToolAnnotations
-// (stored on ChatTool with json:"-") are never included in the JSON body sent to OpenAI.
-func TestToOpenAIChatRequest_AnnotationsNotInWirePayload(t *testing.T) {
-	readOnly := true
-
-	bifrostReq := &schemas.BifrostChatRequest{
-		Provider: schemas.OpenAI,
-		Model:    "gpt-4o",
-		Input: []schemas.ChatMessage{
-			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hello")}},
-		},
-		Params: &schemas.ChatParameters{
-			Tools: []schemas.ChatTool{
-				{
-					Type: schemas.ChatToolTypeFunction,
-					Function: &schemas.ChatToolFunction{
-						Name:        "read_file",
-						Description: schemas.Ptr("Read a file"),
-						Parameters: &schemas.ToolFunctionParameters{
-							Type: "object",
-							Properties: schemas.NewOrderedMapFromPairs(
-								schemas.KV("path", map[string]interface{}{"type": "string"}),
-							),
-							Required: []string{"path"},
-						},
-					},
-					Annotations: &schemas.MCPToolAnnotations{
-						Title:        "File Reader",
-						ReadOnlyHint: &readOnly,
-					},
-				},
-			},
-		},
-	}
-
-	ctx, cancel := schemas.NewBifrostContextWithCancel(nil)
-	defer cancel()
-
-	result := ToOpenAIChatRequest(ctx, bifrostReq)
-	require.NotNil(t, result)
-
-	wireBody, err := json.Marshal(result)
-	require.NoError(t, err)
-	s := string(wireBody)
-
-	// Annotations must be absent from the wire payload
-	if strings.Contains(s, "annotations") {
-		t.Errorf("annotations field leaked into OpenAI wire payload: %s", s)
-	}
-	if strings.Contains(s, "readOnlyHint") {
-		t.Errorf("readOnlyHint leaked into OpenAI wire payload: %s", s)
-	}
-	if strings.Contains(s, "File Reader") {
-		t.Errorf("annotation title leaked into OpenAI wire payload: %s", s)
-	}
-
-	// The function definition must still be intact
-	if !strings.Contains(s, "read_file") {
-		t.Errorf("function name missing from OpenAI wire payload: %s", s)
-	}
-}
-
 func TestApplyXAICompatibility(t *testing.T) {
 	tests := []struct {
 		name     string

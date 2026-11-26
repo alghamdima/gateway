@@ -84,30 +84,6 @@ func TestSanitizeErrorForLoggingNilError(t *testing.T) {
 	}
 }
 
-// MCPToolLog counterpart: same sanitization semantics through its own
-// SerializeFields.
-func TestSanitizedMCPErrorDetailsSurviveSerializeFields(t *testing.T) {
-	entry := &logstore.MCPToolLog{ID: "mcp-1"}
-	entry.ErrorDetailsParsed = sanitizeErrorForLogging(errorWithRawPayloads(), false, false)
-
-	if entry.ErrorDetailsParsed == nil {
-		t.Fatal("ErrorDetailsParsed should be set")
-	}
-	if entry.ErrorDetailsParsed.ExtraFields.RawRequest != nil ||
-		entry.ErrorDetailsParsed.ExtraFields.RawResponse != nil {
-		t.Error("ErrorDetailsParsed should not retain raw payloads when content logging is disabled")
-	}
-	if err := entry.SerializeFields(); err != nil {
-		t.Fatalf("SerializeFields() error: %v", err)
-	}
-	if strings.Contains(entry.ErrorDetails, "RAW_REQUEST_MARKER") {
-		t.Error("serialized ErrorDetails must not contain raw payloads when content logging is disabled")
-	}
-	if !strings.Contains(entry.ErrorDetails, "provider rejected request") {
-		t.Error("serialized ErrorDetails should still contain the error message")
-	}
-}
-
 // Update-path regression: updateLogEntry must sanitize UpdateLogData.ErrorDetails
 // before SerializeFields copies it into the error_details column update.
 func TestUpdateLogEntrySanitizesErrorDetails(t *testing.T) {

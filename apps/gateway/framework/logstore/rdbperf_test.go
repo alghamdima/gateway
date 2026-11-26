@@ -469,42 +469,6 @@ func TestGetNodeUsageAfterIncludesSameTimestampGreaterLogIDs(t *testing.T) {
 	}
 }
 
-func TestMCPToolLogCreateSerializesFields(t *testing.T) {
-	store := newTestSQLiteStore(t)
-
-	entry := &MCPToolLog{
-		ID:        "mcp-1",
-		Timestamp: time.Now().UTC(),
-		ToolName:  "echo",
-		Status:    "success",
-		ArgumentsParsed: map[string]any{
-			"message": "hello",
-		},
-		ResultParsed: map[string]any{
-			"ok": true,
-		},
-		RedactionMapping: `plain:{"input":{"EMAIL-1":"private@example.com"}}`,
-	}
-
-	if err := store.CreateMCPToolLog(context.Background(), entry); err != nil {
-		t.Fatalf("CreateMCPToolLog() error = %v", err)
-	}
-
-	logEntry, err := store.FindMCPToolLog(context.Background(), entry.ID)
-	if err != nil {
-		t.Fatalf("FindMCPToolLog() error = %v", err)
-	}
-	if logEntry.Arguments == "" {
-		t.Fatalf("expected Arguments to be serialized")
-	}
-	if logEntry.Result == "" {
-		t.Fatalf("expected Result to be serialized")
-	}
-	if logEntry.RedactionMapping != entry.RedactionMapping {
-		t.Fatalf("RedactionMapping = %q, want %q", logEntry.RedactionMapping, entry.RedactionMapping)
-	}
-}
-
 func TestBuildBulkUpdateCostPostgresSQL(t *testing.T) {
 	updates := map[string]CostUpdate{
 		"log-a": {Total: 1.25, Input: 1.0, Output: 0.2, Additional: 0.05},
@@ -569,42 +533,6 @@ func TestUpdateSerializesStructEntry(t *testing.T) {
 	}
 	if logEntry.TotalTokens != 10 {
 		t.Fatalf("expected TotalTokens to be updated, got %d", logEntry.TotalTokens)
-	}
-}
-
-func TestUpdateMCPToolLogSerializesStructEntry(t *testing.T) {
-	store := newTestSQLiteStore(t)
-	now := time.Now().UTC()
-	entry := &MCPToolLog{
-		ID:        "mcp-update",
-		Timestamp: now,
-		ToolName:  "echo",
-		Status:    "processing",
-	}
-
-	if err := store.CreateMCPToolLog(context.Background(), entry); err != nil {
-		t.Fatalf("CreateMCPToolLog() error = %v", err)
-	}
-
-	if err := store.UpdateMCPToolLog(context.Background(), entry.ID, MCPToolLog{
-		Status:           "success",
-		RedactionMapping: `plain:{"output":{"EMAIL-2":"result@example.com"}}`,
-		ResultParsed: map[string]any{
-			"message": "done",
-		},
-	}); err != nil {
-		t.Fatalf("UpdateMCPToolLog() error = %v", err)
-	}
-
-	logEntry, err := store.FindMCPToolLog(context.Background(), entry.ID)
-	if err != nil {
-		t.Fatalf("FindMCPToolLog() error = %v", err)
-	}
-	if logEntry.Result == "" {
-		t.Fatalf("expected Result to be serialized on UpdateMCPToolLog")
-	}
-	if logEntry.RedactionMapping == "" {
-		t.Fatal("expected RedactionMapping to be updated")
 	}
 }
 

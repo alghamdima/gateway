@@ -29,12 +29,6 @@ const (
 	// indefinitely. The next run continues where this one stopped.
 	cleanupRunCeiling = 6 * time.Hour
 
-	// cleanupLogsShareNum/cleanupLogsShareDen is the share of a pass's remaining
-	// time the logs table may use when other tables are cleaned too; the rest is
-	// reserved so a logs backlog cannot starve retention on mcp_tool_logs.
-	cleanupLogsShareNum = 5
-	cleanupLogsShareDen = 6
-
 	// cleanupProgressEvery is how many batches pass between Debug progress lines.
 	cleanupProgressEvery = 100
 
@@ -45,14 +39,6 @@ const (
 // LogRetentionManager defines the interface for managing log retention and deletion
 type LogRetentionManager interface {
 	DeleteLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (deletedCount int64, err error)
-}
-
-// MCPToolLogRetentionManager is implemented by stores that can also expire
-// mcp_tool_logs rows. It is a separate, optional interface so wrappers that
-// only implement LogRetentionManager keep compiling; the cleaner applies MCP
-// retention when the manager it was given implements this too.
-type MCPToolLogRetentionManager interface {
-	DeleteMCPToolLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (deletedCount int64, err error)
 }
 
 // RetentionScheduler is how the cleaner reads a store's retention interval; every LogStore implements it.
@@ -171,9 +157,8 @@ func (c *LogsCleaner) runCleanupPass(stopCh <-chan struct{}) {
 	c.cleanupOldLogs(ctx)
 }
 
-// cleanupOldLogs deletes logs, and MCP tool logs when the
-// manager supports them, older than the retention period. Each table is drained
-// in batches until no expired rows remain or ctx ends.
+// cleanupOldLogs deletes logs older than the retention period, in batches, until no
+// expired rows remain or ctx ends.
 func (c *LogsCleaner) cleanupOldLogs(ctx context.Context) {
 	c.mu.Lock()
 	retentionDays := c.config.RetentionDays
@@ -186,43 +171,7 @@ func (c *LogsCleaner) cleanupOldLogs(ctx context.Context) {
 	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
 	c.logger.Info("starting log cleanup: deleting logs older than %s (retention: %d days)", cutoff.Format(time.RFC3339), retentionDays)
 
-	mcp, hasMCP := c.manager.(MCPToolLogRetentionManager)
-	// A logs backlog can outlast the whole pass, and a logs delete can fail on
-	// every run. Neither may starve the tables after it of retention, so logs get
-	// their own sub-deadline that leaves a reserved share of the pass for the
-	// rest, and the rest run whatever the logs outcome, unless the pass itself
-	// has ended (stopped or past its deadline).
-	logsCtx, cancelLogs := ctx, context.CancelFunc(func() {})
-	if deadline, ok := ctx.Deadline(); ok && hasMCP {
-		logsBudget := time.Until(deadline) * cleanupLogsShareNum / cleanupLogsShareDen
-		logsCtx, cancelLogs = context.WithTimeout(ctx, logsBudget)
-	}
-	c.drainExpired(logsCtx, "logs", cutoff, c.manager.DeleteLogsBatch)
-	cancelLogs()
-
-	// The tables after logs share what logs left. Each may use an equal part of
-	// the time remaining when it starts, so an endless backlog on one cannot
-	// starve the ones after it; time a table does not use passes to the rest,
-	// and the last may use all that remains.
-	type expiringTable struct {
-		label       string
-		deleteBatch func(context.Context, time.Time, int) (int64, error)
-	}
-	var rest []expiringTable
-	if hasMCP {
-		rest = append(rest, expiringTable{"MCP tool logs", mcp.DeleteMCPToolLogsBatch})
-	}
-	for index, table := range rest {
-		if ctx.Err() != nil {
-			return
-		}
-		tableCtx, cancelTable := ctx, context.CancelFunc(func() {})
-		if deadline, ok := ctx.Deadline(); ok && index < len(rest)-1 {
-			tableCtx, cancelTable = context.WithTimeout(ctx, time.Until(deadline)/time.Duration(len(rest)-index))
-		}
-		c.drainExpired(tableCtx, table.label, cutoff, table.deleteBatch)
-		cancelTable()
-	}
+	c.drainExpired(ctx, "logs", cutoff, c.manager.DeleteLogsBatch)
 }
 
 // drainExpired calls deleteBatch until it deletes nothing, another replica holds the table, or ctx ends.

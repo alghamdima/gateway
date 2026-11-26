@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
@@ -29,13 +28,6 @@ func auditVirtualKey(vk *configstoreTables.TableVirtualKey) json.RawMessage {
 				pc.Keys = keys
 			}
 			c.ProviderConfigs[i] = pc
-		}
-	}
-	if vk.MCPConfigs != nil {
-		c.MCPConfigs = make([]configstoreTables.TableVirtualKeyMCPConfig, len(vk.MCPConfigs))
-		for i, mc := range vk.MCPConfigs {
-			mc.MCPClient = configstoreTables.TableMCPClient{ID: mc.MCPClient.ID, ClientID: mc.MCPClient.ClientID, Name: mc.MCPClient.Name}
-			c.MCPConfigs[i] = mc
 		}
 	}
 	return lib.AuditSnapshot(c, "value")
@@ -78,60 +70,6 @@ func auditProviderConfig(cfg *configstore.ProviderConfig) json.RawMessage {
 	return lib.AuditSnapshot(cfg, "keys")
 }
 
-// auditMCPClient snapshots a redacted copy of an MCP client config, also masking credentials embedded in its connection URL
-// and STDIO command line: every argument, and the value of each inline KEY=value env entry (the names stay).
-func auditMCPClient(store *lib.Config, cfg *schemas.MCPClientConfig) json.RawMessage {
-	if store == nil || cfg == nil {
-		return nil
-	}
-	c := *cfg
-	if c.StdioConfig != nil {
-		stdio := *c.StdioConfig
-		stdio.Args = make([]string, len(c.StdioConfig.Args))
-		for i := range stdio.Args {
-			stdio.Args[i] = "<redacted>"
-		}
-		stdio.Envs = make([]string, len(c.StdioConfig.Envs))
-		for i, env := range c.StdioConfig.Envs {
-			if name, _, hasValue := strings.Cut(env, "="); hasValue {
-				env = name + "=<redacted>"
-			}
-			stdio.Envs[i] = env
-		}
-		c.StdioConfig = &stdio
-	}
-	redacted := store.RedactMCPClientConfig(&c)
-	if redacted.ConnectionString != nil && !redacted.ConnectionString.IsFromSecret() {
-		redacted.ConnectionString = schemas.NewSecretVar(lib.RedactURLCredentials(redacted.ConnectionString.GetValue()))
-	}
-	return lib.AuditSnapshot(redacted)
-}
-
-// mcpClientAfterUpdate overlays an update's resolved config on the existing
-// client, keeping the fields the update handler does not rebuild (slug, OAuth
-// view, state, pending OAuth, an untouched OpenAPI block) so the audit diff does
-// not report them as cleared.
-func mcpClientAfterUpdate(existing, updated *schemas.MCPClientConfig) *schemas.MCPClientConfig {
-	if updated == nil || existing == nil {
-		return updated
-	}
-	c := *updated
-	c.EndpointSlug = existing.EndpointSlug
-	c.OauthClientID = existing.OauthClientID
-	c.OauthClientSecret = existing.OauthClientSecret
-	c.OauthAuthorizeURL = existing.OauthAuthorizeURL
-	c.OauthTokenURL = existing.OauthTokenURL
-	c.OauthRegistrationURL = existing.OauthRegistrationURL
-	c.OauthScopes = existing.OauthScopes
-	c.OauthResource = existing.OauthResource
-	c.State = existing.State
-	c.PendingOAuthConfig = existing.PendingOAuthConfig
-	if c.OpenAPIConfig == nil {
-		c.OpenAPIConfig = existing.OpenAPIConfig
-	}
-	return &c
-}
-
 // auditDeletedIDsLimit caps how many IDs a bulk delete puts in its audit snapshot.
 const auditDeletedIDsLimit = 100
 
@@ -146,19 +84,6 @@ func auditDeletedIDs(ids []string) map[string]any {
 		snap["ids"] = ids
 	}
 	return snap
-}
-
-// findMCPClientConfig returns the in-memory MCP client config with the given id, or nil.
-func findMCPClientConfig(store *lib.Config, id string) *schemas.MCPClientConfig {
-	if store == nil || store.MCPConfig == nil {
-		return nil
-	}
-	for _, client := range store.MCPConfig.ClientConfigs {
-		if client != nil && client.ID == id {
-			return client
-		}
-	}
-	return nil
 }
 
 // pluginAuditSnapshot is the audit view of a plugin; Config is set only when the plugin itself redacted it.

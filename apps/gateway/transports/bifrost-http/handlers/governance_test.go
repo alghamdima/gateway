@@ -1528,9 +1528,6 @@ func TestRotateVirtualKey_OnlyChangesValueAndReloads(t *testing.T) {
 				ProviderConfigs: []configstoreTables.TableVirtualKeyProviderConfig{
 					{ID: 7, VirtualKeyID: "vk-1", Provider: "openai"},
 				},
-				MCPConfigs: []configstoreTables.TableVirtualKeyMCPConfig{
-					{ID: 9, VirtualKeyID: "vk-1", MCPClientID: 3},
-				},
 			},
 		},
 	}

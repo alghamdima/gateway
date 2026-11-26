@@ -27,7 +27,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/encrypt"
-	"github.com/maximhq/bifrost/framework/temptoken"
 	"github.com/maximhq/bifrost/framework/tracing"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations"
@@ -394,10 +393,8 @@ type corsMiddlewareConfig struct {
 
 // defaultCorsAllowedHeaders are allowed on every route. SetupTokenHeader is sent by the dashboard
 // on every call while the OSS setup lock is active, so a UI served from another origin must be able
-// to preflight it. The MCP Streamable HTTP headers ride on every request a browser MCP client makes
-// after initialize, and on every 2026-07-28 request.
-var defaultCorsAllowedHeaders = []string{"Content-Type", "Authorization", "X-Requested-With", "X-Stainless-Timeout", "X-Api-Key", "X-OpenAI-Agents-SDK", "X-Operation-ID", "X-Bifrost-View-As", SetupTokenHeader,
-	"MCP-Protocol-Version", "Mcp-Session-Id", "Mcp-Method", "Mcp-Name", "Last-Event-ID"}
+// to preflight it.
+var defaultCorsAllowedHeaders = []string{"Content-Type", "Authorization", "X-Requested-With", "X-Stainless-Timeout", "X-Api-Key", "X-OpenAI-Agents-SDK", "X-Operation-ID", "X-Bifrost-View-As", SetupTokenHeader}
 
 // corsAllowHeaders joins the default headers with the configured extras, skipping duplicates.
 func corsAllowHeaders(configured []string) string {
@@ -564,9 +561,6 @@ func (c *CorsMiddleware) applyHeaders(ctx *fasthttp.RequestCtx, cfg *corsMiddlew
 				// "*" never covers Authorization (Fetch standard), so it stays listed explicitly.
 				allowHeaders = cfg.allowHeaders + ", *"
 			}
-		} else if len(requested) > 0 {
-			// Mcp-Param-* names come from each tool's x-mcp-header annotations, so they are echoed from the preflight.
-			allowHeaders = appendMCPParamHeaders(allowHeaders, requested)
 		}
 		ctx.Response.Header.Set("Access-Control-Allow-Origin", origin)
 		ctx.Response.Header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD")
@@ -1746,8 +1740,6 @@ type AuthMiddleware struct {
 	allowedOrigins    atomic.Pointer[[]string] // client_config.allowed_origins; read while auth is disabled
 	authConfig        atomic.Pointer[configstore.AuthConfig]
 	wsTicketStore     *WSTicketStore
-	tempTokensService *temptoken.Service // optional; when nil, temp-token fallback is disabled
-	tempTokensEnabled atomic.Bool
 	// bootstrapToken gates creation of the very first admin account. It is sourced
 	// from operator config (config.json setup_token or the BIFROST_SETUP_TOKEN env
 	// var) — never generated in-memory — so every node in a multi-node deployment
@@ -1761,12 +1753,10 @@ type AuthMiddleware struct {
 	setupToken     atomic.Pointer[string] // the configured setup token, kept for the life of the process
 }
 
-// InitAuthMiddleware initializes the auth middleware. The tempTokens service
-// is optional and still gated by client config — when nil or disabled, the
-// temp-token fallback path is skipped. configuredSetupToken is the operator-
+// InitAuthMiddleware initializes the auth middleware. configuredSetupToken is the operator-
 // provisioned bootstrap token resolved from config.json/env (see
 // lib.resolveSetupToken); pass "" when the operator hasn't configured one.
-func InitAuthMiddleware(store configstore.ConfigStore, wsTicketStore *WSTicketStore, tempTokensService *temptoken.Service, configuredSetupToken string) (*AuthMiddleware, error) {
+func InitAuthMiddleware(store configstore.ConfigStore, wsTicketStore *WSTicketStore, configuredSetupToken string) (*AuthMiddleware, error) {
 	if store == nil {
 		return nil, fmt.Errorf("store is not present")
 	}
@@ -1775,10 +1765,9 @@ func InitAuthMiddleware(store configstore.ConfigStore, wsTicketStore *WSTicketSt
 		return nil, fmt.Errorf("failed to get auth config from store: %v", err)
 	}
 	am := &AuthMiddleware{
-		store:             store,
-		authConfig:        atomic.Pointer[configstore.AuthConfig]{},
-		wsTicketStore:     wsTicketStore,
-		tempTokensService: tempTokensService,
+		store:         store,
+		authConfig:    atomic.Pointer[configstore.AuthConfig]{},
+		wsTicketStore: wsTicketStore,
 	}
 
 	am.authConfig.Store(authConfig)
@@ -1812,11 +1801,9 @@ func InitAuthMiddleware(store configstore.ConfigStore, wsTicketStore *WSTicketSt
 	if err == nil && clientConfig != nil {
 		am.whitelistedRoutes.Store(&clientConfig.WhitelistedRoutes)
 		am.allowedOrigins.Store(&clientConfig.AllowedOrigins)
-		am.tempTokensEnabled.Store(clientConfig.MCPEnableTempTokenAuth)
 	} else {
 		emptyRoutes := []string{}
 		am.whitelistedRoutes.Store(&emptyRoutes)
-		am.tempTokensEnabled.Store(false)
 	}
 
 	return am, nil
@@ -1998,72 +1985,7 @@ func refuseCrossOriginOnOpenAPI(ctx *fasthttp.RequestCtx, allowedOrigins []strin
 	return true
 }
 
-// UpdateTempTokenAuthEnabled updates whether scoped temp-token fallback auth is accepted.
-func (m *AuthMiddleware) UpdateTempTokenAuthEnabled(enabled bool) {
-	m.tempTokensEnabled.Store(enabled)
-}
-
-// 401 codes for the temp-token fallback. Only sent to a caller that presented a
-// token, so other routes leak nothing about this instance's config.
-const (
-	TempTokenAuthDisabledCode = "temp_token_auth_disabled"
-	TempTokenRejectedCode     = "temp_token_rejected"
-)
-
-// tryTempTokenOrUnauthorized is the last-resort auth path: a request that
-// failed every conventional credential check (no Authorization header, no
-// valid cookie) is given one more chance to present an X-Bifrost-Temp-Token
-// header that authorizes the specific (method, path) being requested. On
-// success the validated scope and resource_id are attached to ctx for
-// handler-side defense-in-depth checks, and the next handler runs. On
-// failure (no header, expired, route-mismatch, etc.) a 401 is written, carrying
-// one of the codes above when a token was presented.
-//
-// Temp-token validation is intentionally *not* attempted when an
-// Authorization header or session cookie is present — those paths have
-// their own success/failure semantics and silently rescuing a bad password
-// with a temp token would be surprising.
-func (m *AuthMiddleware) tryTempTokenOrUnauthorized(ctx *fasthttp.RequestCtx, next fasthttp.RequestHandler) {
-	token := ""
-	if m.tempTokensService != nil {
-		token = string(ctx.Request.Header.Peek("X-Bifrost-Temp-Token"))
-	}
-	if token == "" {
-		SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-		return
-	}
-	if !m.tempTokensEnabled.Load() {
-		sendUnauthorizedWithCode(ctx, TempTokenAuthDisabledCode, "temp token auth is disabled on this instance")
-		return
-	}
-	// Scope authorization must use the same raw path as router dispatch.
-	// A normalized path can name an allowed flow while the router selects
-	// a protected management handler through an encoded path parameter.
-	validated, err := m.tempTokensService.Validate(ctx, token, string(ctx.Method()), string(ctx.Request.URI().PathOriginal()))
-	if err == nil && validated != nil {
-		ctx.SetUserValue(schemas.BifrostContextKeyTempTokenScope, validated.Scope)
-		ctx.SetUserValue(schemas.BifrostContextKeyTempTokenResourceID, validated.ResourceID)
-		next(ctx)
-		return
-	}
-	// Expired, unknown and out-of-scope are one answer to the caller.
-	sendUnauthorizedWithCode(ctx, TempTokenRejectedCode, "Unauthorized")
-}
-
-// sendUnauthorizedWithCode writes a 401 carrying a machine-readable code.
-func sendUnauthorizedWithCode(ctx *fasthttp.RequestCtx, code, message string) {
-	status := fasthttp.StatusUnauthorized
-	SendBifrostError(ctx, &schemas.BifrostError{
-		IsBifrostError: false,
-		StatusCode:     &status,
-		Error: &schemas.ErrorField{
-			Code:    &code,
-			Message: message,
-		},
-	})
-}
-
-// InferenceMiddleware is for inference requests (including MCP routes). It always
+// InferenceMiddleware is for inference requests. It always
 // passes the request through — inference authentication is owned entirely by the
 // governance plugin, not by this dashboard-auth middleware.
 //
@@ -2088,9 +2010,6 @@ var apiSystemWhitelistedRoutes = []string{
 	// Idempotent: the handler clears the cookie and returns 200 whether or
 	// not a session token is present, so a repeat logout must not 401 here.
 	"/api/session/logout",
-	"/api/oauth/callback",
-	// Client ID Metadata Document
-	"/api/oauth/client-metadata.json",
 	"/health",
 	"/login",
 	"/favicon.ico",
@@ -2105,13 +2024,6 @@ var apiSystemWhitelistedRoutes = []string{
 
 // apiWhitelistedPrefixes are API path prefixes that never require a credential.
 var apiWhitelistedPrefixes = []string{
-	// "/api/oauth/callback" is also in apiSystemWhitelistedRoutes above as an
-	// exact match — that's the only OAuth route that must be public (it's
-	// hit by the browser after the upstream provider redirects back, with
-	// no cookie context). DO NOT add a broad "/api/oauth" prefix here:
-	// it would whitelist /api/oauth/per-user/* (auth-via-temp-token) and
-	// /api/oauth/config/* (admin-only) and bypass the temp-token fallback
-	// in tryTempTokenOrUnauthorized.
 	// Trailing slash is required: the dev routes live under "/api/dev/pprof".
 	// A bare "/api/dev" prefix also matches "/api/devices" (and any other
 	// "/api/dev*" route), which would silently bypass auth on those routes.
@@ -2120,11 +2032,6 @@ var apiWhitelistedPrefixes = []string{
 	// credentials securely. Management endpoints under /api/skills (without
 	// /serve/) remain authenticated.
 	"/api/skills/serve/",
-	// OAuth2 discovery endpoints (RFC 8414 AS metadata, RFC 9728 protected
-	// resource metadata, RFC 7517 JWKS) must be reachable without auth so
-	// clients can bootstrap the flow. Each handler still gates availability
-	// behind discoveryEnabled() and serves 404 when OAuth mode is off.
-	"/.well-known/",
 }
 
 // isAPIRouteWhitelisted reports whether url (the raw PathOriginal) is a public API route:
@@ -2439,10 +2346,7 @@ func (m *AuthMiddleware) middleware(shouldSkip func(*configstore.AuthConfig, str
 					next(ctx)
 					return
 				}
-				// Last-resort: a scoped temp token (e.g. for the MCP per-user
-				// OAuth auth page accessed by a non-admin browser) can rescue
-				// this request when it targets a route the token authorizes.
-				m.tryTempTokenOrUnauthorized(ctx, next)
+				SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
 				return
 			}
 			// Split the authorization header into the scheme and the token
@@ -2871,34 +2775,6 @@ func AuthBypassedMiddleware(allowedOrigins, whitelistedRoutes []string) schemas.
 			next(ctx)
 		}
 	}
-}
-
-// appendMCPParamHeaders appends the Mcp-Param-* names a preflight asks for to allowed, which is
-// returned unchanged when it asks for none.
-func appendMCPParamHeaders(allowed string, requested []byte) string {
-	isParam := func(name []byte) bool {
-		return len(name) > len("mcp-param-") && bytes.EqualFold(name[:len("mcp-param-")], []byte("mcp-param-"))
-	}
-	// Sized first so the list is built in one allocation: appending to a string copies it per name.
-	size := 0
-	for name := range bytes.SplitSeq(requested, []byte(",")) {
-		if name = bytes.TrimSpace(name); isParam(name) {
-			size += len(", ") + len(name)
-		}
-	}
-	if size == 0 {
-		return allowed
-	}
-	var out strings.Builder
-	out.Grow(len(allowed) + size)
-	out.WriteString(allowed)
-	for name := range bytes.SplitSeq(requested, []byte(",")) {
-		if name = bytes.TrimSpace(name); isParam(name) {
-			out.WriteString(", ")
-			out.Write(name)
-		}
-	}
-	return out.String()
 }
 
 // locationExternalKey is the request user value a handler sets when its Location

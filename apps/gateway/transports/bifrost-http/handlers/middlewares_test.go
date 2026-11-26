@@ -33,7 +33,6 @@ import (
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/encrypt"
-	"github.com/maximhq/bifrost/framework/temptoken"
 	"github.com/maximhq/bifrost/framework/tracing"
 	"github.com/maximhq/bifrost/transports/v2/bifrost-http/lib"
 	"github.com/stretchr/testify/assert"
@@ -5607,7 +5606,7 @@ func TestTracingMiddleware_RootSpanDropsQueryAndNormalizes(t *testing.T) {
 func TestAuthMiddleware_ConfiguredSetupToken_OutlivesFirstAdmin(t *testing.T) {
 	SetLogger(&mockLogger{})
 	const token = "test-setup-token"
-	am, err := InitAuthMiddleware(newRealOAuth2Store(t), nil, nil, token)
+	am, err := InitAuthMiddleware(newRealConfigStore(t), nil, token)
 	if err != nil {
 		t.Fatalf("InitAuthMiddleware: %v", err)
 	}
@@ -5636,7 +5635,7 @@ func TestAuthMiddleware_ConfiguredSetupToken_OutlivesFirstAdmin(t *testing.T) {
 		t.Error("an admin account must not make every token match the configured one")
 	}
 
-	none, err := InitAuthMiddleware(newRealOAuth2Store(t), nil, nil, "")
+	none, err := InitAuthMiddleware(newRealConfigStore(t), nil, "")
 	if err != nil {
 		t.Fatalf("InitAuthMiddleware: %v", err)
 	}

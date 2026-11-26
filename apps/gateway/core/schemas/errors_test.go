@@ -322,7 +322,6 @@ func TestEveryVocabularyValueIsReachable(t *testing.T) {
 		ErrorTypePolicyAccessDenied:           true,
 		ErrorTypePolicyBudgetExceeded:         true,
 		ErrorTypePolicyRateLimited:            true,
-		ErrorTypePolicyToolBlocked:            true,
 		ErrorTypeProviderCredentialsExhausted: true,
 	}
 	for _, v := range ErrorTypes {
@@ -382,7 +381,7 @@ func TestModelAddressedRequestTypesExcludeResourceAddressed(t *testing.T) {
 		BatchCreateRequest, BatchRetrieveRequest, BatchResultsRequest,
 		FileUploadRequest, FileRetrieveRequest, FileContentRequest,
 		VideoRetrieveRequest, VideoEditRequest, VideoRemixRequest,
-		ContainerRetrieveRequest, CachedContentRetrieveRequest, MCPToolExecutionRequest,
+		ContainerRetrieveRequest, CachedContentRetrieveRequest,
 	} {
 		if RequestTypeAddressesModel(rt) {
 			t.Errorf("request type %q addresses a resource other than the model; a 404 on it must not classify as %q", rt, ErrorTypeCallerModelUnknown)

@@ -8,9 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
-
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 const (
@@ -27,23 +24,17 @@ type KeyPoolFilter func(ctx *BifrostContext, provider ModelProvider, model strin
 // It contains the necessary components for setting up the system including account details,
 // plugins, logging, and initial pool size.
 type BifrostConfig struct {
-	Account                  Account
-	LLMPlugins               []LLMPlugin
-	MCPPlugins               []MCPPlugin
-	OAuth2Provider           OAuth2Provider
-	MCPHeadersProvider       MCPHeadersProvider // Backend for MCPAuthTypePerUserHeaders credential storage; nil disables per-user-headers auth (resolver errors at use)
-	Logger                   Logger
-	Tracer                   Tracer          // Tracer for distributed tracing (nil = NoOpTracer)
-	InitialPoolSize          int             // Initial pool size for sync pools in Bifrost. Higher values will reduce memory allocations but will increase memory usage.
-	DropExcessRequests       bool            // If true, in cases where the queue is full, requests will not wait for the queue to be empty and will be dropped instead.
-	MCPConfig                *MCPConfig      // MCP (Model Context Protocol) configuration for tool integration
-	KeySelector              KeySelector     // Custom key selector function
-	KeyPoolFilter            KeyPoolFilter   // Optional hook to filter available keys before selection; nil = all keys eligible
-	KVStore                  KVStore         // shared KV store for clustering/session stickiness; nil = disabled
-	SessionAffinity          SessionAffinity // Decides which key a session stays on; nil = Bifrost's own default, which needs KVStore to bind anything
-	ModelCatalog             ModelInfoProvider
-	MCPSharedDiscoveryStore  MCPDiscoveryStore
-	MCPPerUserDiscoveryStore MCPDiscoveryStore
+	Account            Account
+	LLMPlugins         []LLMPlugin
+	Logger             Logger
+	Tracer             Tracer          // Tracer for distributed tracing (nil = NoOpTracer)
+	InitialPoolSize    int             // Initial pool size for sync pools in Bifrost. Higher values will reduce memory allocations but will increase memory usage.
+	DropExcessRequests bool            // If true, in cases where the queue is full, requests will not wait for the queue to be empty and will be dropped instead.
+	KeySelector        KeySelector     // Custom key selector function
+	KeyPoolFilter      KeyPoolFilter   // Optional hook to filter available keys before selection; nil = all keys eligible
+	KVStore            KVStore         // shared KV store for clustering/session stickiness; nil = disabled
+	SessionAffinity    SessionAffinity // Decides which key a session stays on; nil = Bifrost's own default, which needs KVStore to bind anything
+	ModelCatalog       ModelInfoProvider
 
 	UsageEstimationTokenizers []string // Tokenizer families for cancelled-stream usage estimation; process-wide, see streamusage.Configure
 }
@@ -222,7 +213,6 @@ const (
 	OCRRequest                     RequestType = "ocr"
 	CountTokensRequest             RequestType = "count_tokens"
 	CompactionRequest              RequestType = "compaction"
-	MCPToolExecutionRequest        RequestType = "mcp_tool_execution"
 	PassthroughRequest             RequestType = "passthrough"
 	PassthroughStreamRequest       RequestType = "passthrough_stream"
 	UnknownRequest                 RequestType = "unknown"
@@ -241,37 +231,6 @@ const (
 	StructuredOutputForceTool       = "force-tool" // the retry must send the schema as the synthetic tool
 )
 
-// MCPAuthMode describes which identity dimension a per-user OAuth row is keyed by.
-// It is a derived view of context state at the point of token lookup, never
-// stored as a context key. Derived via BifrostContext.MCPAuthMode().
-type MCPAuthMode string
-
-const (
-	// MCPAuthModeUser: identity is a user id populated by an upstream auth
-	// middleware or plugin. Token rows keyed by user_id.
-	MCPAuthModeUser MCPAuthMode = "user"
-	// MCPAuthModeVK: identity is a virtual key. Token rows keyed by vk_id.
-	MCPAuthModeVK MCPAuthMode = "vk"
-	// MCPAuthModeSession: identity is a client-issued opaque session ID, asserted
-	// via the x-bf-mcp-session-id header. Token rows keyed by session_id.
-	// Used when there's no VK or user; the caller owns the session ID and must
-	// present it on every subsequent request to use the bound OAuth token.
-	MCPAuthModeSession MCPAuthMode = "session"
-	// MCPAuthModeAdmin: no identity dimension, the flow belongs to an MCP
-	// client's shared credential itself, not any caller. Used by
-	// InitiateUserOAuthFlow for redoing consent on an already-authorized
-	// shared client (see the MCP client reauthorize endpoint); the
-	// resulting token is still written with AuthMode "shared" (a
-	// TableMCPOauthToken-column distinction from the flow row's FlowMode
-	// "admin", see TableMCPOauthFlow's FlowMode field comment for why
-	// those two are named differently on purpose).
-	MCPAuthModeAdmin MCPAuthMode = "admin"
-	// MCPAuthModeNone: no identity dimension is present on the request (no
-	// user, no VK, no session header). Lets callers branch on the mode
-	// without mistaking an unauthenticated request for a session-mode caller.
-	MCPAuthModeNone MCPAuthMode = "none"
-)
-
 // BifrostContextKeyRequestType is a context key for the request type.
 const (
 	BifrostContextKeySessionToken      BifrostContextKey = "bifrost-session-token" // string (session token for authentication - set by auth middleware)
@@ -286,8 +245,6 @@ const (
 	// NOTE: []string is used for both keys, and by default all clients/tools are included (when nil).
 	// If "*" is present, all clients/tools are included, and [] means no clients/tools are included.
 	// Request context filtering takes priority over client config - context can override client exclusions.
-	MCPContextKeyIncludeClients BifrostContextKey = "mcp-include-clients" // Context key for whitelist client filtering
-	MCPContextKeyIncludeTools   BifrostContextKey = "mcp-include-tools"   // Context key for whitelist tool filtering (Note: toolName should be in "clientName-toolName" format for individual tools, or "clientName-*" for wildcard)
 
 	// BifrostContextKeyGovernanceDisableContentLogging is governance's content-logging decision for the
 	// request (bool): the resolved virtual key's own, or that of a project the request is scoped to,
@@ -337,8 +294,6 @@ const (
 	BifrostContextKeySendBackRawResponse                 BifrostContextKey = "bifrost-send-back-raw-response"                   // bool (per-request override — read by bifrost.go, never overwritten)
 	BifrostContextKeyIntegrationType                     BifrostContextKey = "bifrost-integration-type"                         // integration used in gateway (e.g. openai, anthropic, bedrock, etc.)
 	BifrostContextKeyIsResponsesToChatCompletionFallback BifrostContextKey = "bifrost-is-responses-to-chat-completion-fallback" // bool (set by bifrost - DO NOT SET THIS MANUALLY)
-	BifrostMCPAgentOriginalRequestID                     BifrostContextKey = "bifrost-mcp-agent-original-request-id"            // string (to store the original request ID for MCP agent mode)
-	BifrostContextKeyParentMCPRequestID                  BifrostContextKey = "bf-parent-mcp-request-id"                         // string (parent request ID for nested tool calls from executeCode)
 	BifrostContextKeyStructuredOutputToolName            BifrostContextKey = "bifrost-structured-output-tool-name"              // string (to store the name of the structured output tool (set by bifrost))
 	BifrostContextKeyStructuredOutputGrammarRetry        BifrostContextKey = "bifrost-structured-output-grammar-retry"          // string (StructuredOutputGrammarRejected set by a provider, StructuredOutputForceTool set by bifrost)
 	BifrostContextKeyUserAgent                           BifrostContextKey = "bifrost-user-agent"                               // string (set by bifrost)
@@ -368,9 +323,6 @@ const (
 	BifrostContextKeyDeferTraceCompletion                BifrostContextKey = "bifrost-defer-trace-completion"                   // bool (signals trace completion should be deferred for streaming - set by streaming handlers)
 	BifrostContextKeyTraceCompleter                      BifrostContextKey = "bifrost-trace-completer"                          // func([]PluginLogEntry) (callback to complete trace after streaming, receives transport plugin logs - set by tracing middleware)
 	BifrostContextKeyAccumulatorID                       BifrostContextKey = "bifrost-accumulator-id"                           // string (ID for streaming accumulator lookup - set by tracer for accumulator operations)
-	BifrostContextKeyMCPSessionID                        BifrostContextKey = "bifrost-mcp-session-id"                           // string (session-mode identity: any opaque value asserted by the caller via x-bf-mcp-session-id; binds the OAuth token row to subsequent /mcp calls when no VK or user is present)
-	BifrostContextKeyMCPCallbackBaseURL                  BifrostContextKey = "bifrost-mcp-callback-base-url"                    // string (base URL like "https://host" — set by HTTP middleware. OAuth resolver appends /api/oauth/callback; headers resolver appends the workspace submit path. Used for both per-user OAuth and per-user headers auth flows)
-	BifrostContextKeyIsMCPGateway                        BifrostContextKey = "bifrost-is-mcp-gateway"                           // bool (true when request is being handled via the MCP gateway path)
 	BifrostContextKeyHasEmittedMessageDelta              BifrostContextKey = "bifrost-has-emitted-message-delta"                // bool (tracks whether message_delta was already emitted during streaming - avoids duplicates)
 	BifrostContextKeyAnthropicStreamDeltaPromptUsage     BifrostContextKey = "bifrost-anthropic-stream-delta-prompt-usage"      // string ledger ID (one per upstream Anthropic stream, opened by the shared Anthropic streaming reader and recording, PER CHUNK, which prompt-side usage counters that chunk's raw `message_delta` reported -- payload-blind field-presence evidence only, never a value). The Anthropic egress converter reads it so a terminal frame reports no prompt counter the upstream did not report: `input_tokens: 0` synthesized there overwrites the message_start figure in every accumulating client. Per chunk because the reader hands chunks to the egress over a buffered channel, so a later event's reading is taken while earlier chunks are still queued; per stream because chunk numbering restarts on every attempt. It is applied only to a frame of the request that opened it: Value reads through to a parent, and a derived sub-request's chunk numbering restarts, so a chunk number alone would let a caller's reading strip counters the sub-request's own frame reported. Only the ID is held here: the readings themselves live in a top-level store inside that provider, per AGENTS.md's rule that stream-sized state never sits on the context. The store is unexported, so nothing outside the provider can read or forge an entry.
 	BifrostContextKeySkipDBUpdate                        BifrostContextKey = "bifrost-skip-db-update"                           // bool (set by bifrost - DO NOT SET THIS MANUALLY)
@@ -422,8 +374,6 @@ const (
 	BifrostContextKeySkipListModelsGovernanceFiltering   BifrostContextKey = "bifrost-skip-list-models-governance-filtering"    // bool (set by bifrost - DO NOT SET THIS MANUALLY))
 	BifrostContextKeySCIMClaims                          BifrostContextKey = "scim_claims"
 	BifrostContextKeyAuthCredential                      BifrostContextKey = "bifrost-auth-credential"            // schemas.Credential (what the request authenticated by, other than a virtual key presented in a header: set by the middleware that verified it, with the kind it names and the id it verified; read once when the request context settles who the request is)
-	BifrostContextKeyMCPInboundBearer                    BifrostContextKey = "bifrost-mcp-inbound-bearer"         // string (the caller's validated identity-provider token, used as the subject of delegated token exchange; set by the upstream auth layer - DO NOT SET THIS MANUALLY. SECURITY: live credential - never log its value)
-	BifrostContextKeyMCPInboundBearerOmitted             BifrostContextKey = "bifrost-mcp-inbound-bearer-omitted" // MCPInboundBearerOmittedReason (why a request that presented an identity-provider token carries no delegated-exchange subject; set by the upstream auth layer - DO NOT SET THIS MANUALLY)
 	BifrostContextKeyQueryScope                          BifrostContextKey = "bifrost-query-scope"                // configstore.QueryScope (func that mutates a query; set by upstream wrapper - DO NOT SET THIS MANUALLY)
 	BifrostContextKeyDimensionScope                      BifrostContextKey = "bifrost-dimension-scope"            // queryscope.DimensionScope (bounds the VALUES of a grouping dimension; set by upstream wrapper - DO NOT SET THIS MANUALLY)
 	BifrostContextKeyVisibilityFilterProvider            BifrostContextKey = "bifrost-visibility-filter-provider" // DEPRECATED: replaced by BifrostContextKeyQueryScope. Will be removed once all callers migrate.
@@ -435,10 +385,6 @@ const (
 	BifrostContextKeyValidateKeys                        BifrostContextKey = "bifrost-validate-keys"                      // bool (triggers additional key validation during provider add/update)
 	BifrostContextKeyProviderResponseHeaders             BifrostContextKey = "bifrost-provider-response-headers"          // map[string]string (set by provider handlers for response header forwarding)
 	BifrostContextKeyDroppedUnsupportedTools             BifrostContextKey = "bifrost-dropped-unsupported-tools"          // []string (set by provider request builders — tool type strings silently dropped because the target provider/model doesn't support them)
-	BifrostContextKeyMCPAddedTools                       BifrostContextKey = "bifrost-mcp-added-tools"                    // []string (set by bifrost - DO NOT SET THIS MANUALLY)) - list of tools added to the request by MCP, all the tool are in the format "clientName-toolName"
-	BifrostContextKeyMCPInstructionsInjected             BifrostContextKey = "bifrost-mcp-instructions-injected"          // bool (set by bifrost - DO NOT SET THIS MANUALLY) - guards the agent loop from stacking the instructions block on every turn
-	BifrostContextKeyMCPInstructionsText                 BifrostContextKey = "bifrost-mcp-instructions-text"              // *string (set by bifrost - DO NOT SET THIS MANUALLY) - the injected instructions block, so prompt-cache placement can skip it
-	BifrostContextKeyMCPAgentServedRoute                 BifrostContextKey = "bifrost-mcp-agent-served-route"             // *RoutingInfo (set by the MCP agent loop - DO NOT SET THIS MANUALLY) - route that served turn 1; marks a continuation turn
 	BifrostContextKeyLargePayloadMode                    BifrostContextKey = "bifrost-large-payload-mode"                 // bool (set by bifrost - DO NOT SET THIS MANUALLY)) indicates large payload streaming mode is active
 	BifrostContextKeyLargePayloadReader                  BifrostContextKey = "bifrost-large-payload-reader"               // io.Reader (set by bifrost - DO NOT SET THIS MANUALLY)) upstream reader for large payloads
 	BifrostContextKeyLargePayloadContentLength           BifrostContextKey = "bifrost-large-payload-content-length"       // int (set by bifrost - DO NOT SET THIS MANUALLY)) content length for large payloads
@@ -464,20 +410,8 @@ const (
 	BifrostContextKeySessionTTL                          BifrostContextKey = "bifrost-session-ttl"                        // time.Duration session TTL for the request (session stickiness)
 	BifrostContextKeyOpencodeSession                     BifrostContextKey = "bifrost-opencode-session"                   // string (resolved x-opencode-session value, namespaced per virtual key ID; set once per request by the egress transport for the OpenCode provider family - DO NOT SET MANUALLY)
 	BifrostContextKeySessionAffinity                     BifrostContextKey = "bifrost-session-affinity"                   // bool: whether the request lets its session decide where it goes (default true)
-	BifrostContextKeyMCPExtraHeaders                     BifrostContextKey = "bifrost-mcp-extra-headers"                  // map[string][]string (these headers are forwarded only to the MCP while tool execution if they are in the allowlist of the MCP client)
-	BifrostContextKeyMCPLogID                            BifrostContextKey = "bifrost-mcp-log-id"                         // string (unique UUID for each MCP tool log entry - set per goroutine by agent executor - DO NOT SET THIS MANUALLY)
-	BifrostContextKeyMCPUnattendedExecution              BifrostContextKey = "bifrost-mcp-unattended-execution"           // bool (set by the agent executor - DO NOT SET THIS MANUALLY) - true when a tool call runs without human approval, so Code Mode enforces tools_to_auto_execute on every nested call
 	BifrostContextKeyStreamTurnPending                   BifrostContextKey = "bifrost-stream-turn-pending"                // bool (set by bifrost - DO NOT SET THIS MANUALLY) - true while a provider-injected tool loop will start another upstream stream after the current one ends; the request's LLM span stays open until the client stream's last chunk
 	BifrostContextKeyInjectedToolsExecuted               BifrostContextKey = "bifrost-injected-tools-executed"            // bool (set by bifrost - DO NOT SET THIS MANUALLY) - the current attempt ran a provider-injected tool: it is not retried, and its response is assembled across turns
-	BifrostContextKeyMCPHealthCheckRequest               BifrostContextKey = "bifrost-mcp-health-check-request"           // bool (set by bifrost - DO NOT SET THIS MANUALLY) - true when the MCP connect/ping/list-tools request was generated by bifrost itself (periodic health checks, or the admin connection-verification probe) rather than originating from a caller
-	BifrostContextKeyMCPCallerCapabilities               BifrostContextKey = "bifrost-mcp-caller-capabilities"            // *mcp.ClientCapabilities (set by the MCP gateway - DO NOT SET THIS MANUALLY) - what the downstream MCP client declared on this request (2026-07-28 only)
-	BifrostContextKeyMCPToolListing                      BifrostContextKey = "bifrost-mcp-tool-listing"                   // string (set by bifrost - DO NOT SET THIS MANUALLY) - overrides which tools an MCP tool listing includes: "model" (code mode), "all" or "gateway" (the gateway's sync)
-	BifrostContextKeyMCPGatewayClient                    BifrostContextKey = "bifrost-mcp-gateway-client"                 // string (set by the MCP gateway - DO NOT SET THIS MANUALLY) - the one MCP client a /mcp/<slug> request serves
-	BifrostContextKeyMCPInputResumption                  BifrostContextKey = "bifrost-mcp-input-resumption"               // *mcp.MultiRoundTripParams (set by the MCP gateway - DO NOT SET THIS MANUALLY) - the caller's answers and requestState when it retries a tools/call that needed input
-	BifrostContextKeyMCPRoundTripID                      BifrostContextKey = "bifrost-mcp-round-trip-id"                  // string (set by the MCP gateway - DO NOT SET THIS MANUALLY) - the round-trip id a caller's retry carried in its requestState
-	BifrostContextKeyMCPRequestedToolName                BifrostContextKey = "bifrost-mcp-requested-tool-name"            // string (set by the MCP gateway - DO NOT SET THIS MANUALLY) - the server-given name a caller used when the gateway resolved it to a Bifrost tool name
-	BifrostContextKeyMCPToolUIResourceURI                BifrostContextKey = "bifrost-mcp-tool-ui-resource-uri"           // string (set by bifrost - DO NOT SET THIS MANUALLY) - the ui:// resource the MCP Apps tool being executed opens
-	BifrostContextKeyMCPToolAppOnly                      BifrostContextKey = "bifrost-mcp-tool-app-only"                  // bool (set by bifrost - DO NOT SET THIS MANUALLY) - the MCP tool being executed is visible only to MCP Apps
 	BifrostContextKeyCompatConvertTextToChat             BifrostContextKey = "bifrost-compat-convert-text-to-chat"        // bool (per-request override from x-bf-compat header)
 	BifrostContextKeyCompatConvertChatToResponses        BifrostContextKey = "bifrost-compat-convert-chat-to-responses"   // bool (per-request override from x-bf-compat header)
 	BifrostContextKeyCompatShouldDropParams              BifrostContextKey = "bifrost-compat-should-drop-params"          // bool (per-request override from x-bf-compat header)
@@ -499,8 +433,6 @@ const (
 	BifrostContextKeyConnectionClosed                    BifrostContextKey = "connection_closed"
 	BifrostContextKeyStreamBodyExhausted                 BifrostContextKey = "stream_body_exhausted"          // bool (set by bifrost - DO NOT SET THIS MANUALLY) - upstream body was read to EOF, so cleanup must not drain it again
 	BifrostContextKeyStreamParkedAfterFinish             BifrostContextKey = "stream_parked_after_finish"     // bool (set by bifrost - DO NOT SET THIS MANUALLY) - reader stopped on a heartbeat after finish_reason with the body still open, so cleanup must abandon the connection instead of draining it
-	BifrostContextKeyTempTokenScope                      BifrostContextKey = "bifrost-temp-token-scope"       // string (set by auth middleware when a temp token authorized the request - names the scope from the temptoken registry)
-	BifrostContextKeyTempTokenResourceID                 BifrostContextKey = "bifrost-temp-token-resource-id" // string (set by auth middleware alongside the scope - the resource_id the token is bound to, e.g. an OAuth flow ID for mcp_auth)
 	BifrostContextKeyUpstreamLatency                     BifrostContextKey = "bifrost-upstream-latency"       // *upstreamAccumulator nanoseconds (set by bifrost - DO NOT SET THIS MANUALLY) - cumulative time blocked on provider sockets across every attempt, plus the current attempt's start mark; subtract from total to get Bifrost overhead
 	BifrostContextKeyStreamOverhead                      BifrostContextKey = "bifrost-stream-overhead"        // *streamOverhead (set by bifrost - DO NOT SET THIS MANUALLY) - per-chunk stream conversion CPU and downstream backpressure, carved out of the overhead breakdown's "core" bucket
 )
@@ -1288,201 +1220,6 @@ func (br *BifrostRequest) SetRawRequestBody(rawRequestBody []byte) {
 	}
 }
 
-type MCPRequestType string
-
-const (
-	MCPRequestTypePing                  MCPRequestType = "ping"
-	MCPRequestTypeListTools             MCPRequestType = "list_tools"
-	MCPRequestTypeListResources         MCPRequestType = "list_resources"
-	MCPRequestTypeListResourceTemplates MCPRequestType = "list_resource_templates"
-	MCPRequestTypeListPrompts           MCPRequestType = "list_prompts"
-	MCPRequestTypeGetPrompt             MCPRequestType = "get_prompt"
-	MCPRequestTypeReadResource          MCPRequestType = "read_resource"
-	MCPRequestTypeComplete              MCPRequestType = "complete"
-
-	// [DEPRECATED] these will be replaced by MCPRequestTypeExecuteTool in the next major bump, but are kept for backward compatibility for now since some tools still rely on the old fields
-	MCPRequestTypeChatToolCall      MCPRequestType = "chat_tool_call"      // Chat API format
-	MCPRequestTypeResponsesToolCall MCPRequestType = "responses_tool_call" // Responses API format
-
-	// Will be used in from the next major bump
-	MCPRequestTypeExecuteTool MCPRequestType = "execute_tool"
-)
-
-// IsExecuteTool reports whether this is one of the execute-tool request variants
-// (Chat, Responses, or the future unified ExecuteTool). Used by MCPPlugin pre/post
-// hooks to skip non-tool envelope ops (Ping/ListTools) without sniffing pointer
-// fields on the request/response.
-//
-// NOTE: this helper exists because three execute-tool request types currently
-// coexist for backwards compat (ChatToolCall + ResponsesToolCall are deprecated).
-// Once callers fully migrate to MCPRequestTypeExecuteTool, this method will be
-// removed and consumers should switch to `t == MCPRequestTypeExecuteTool` directly.
-func (t MCPRequestType) IsExecuteTool() bool {
-	switch t {
-	case MCPRequestTypeChatToolCall,
-		MCPRequestTypeResponsesToolCall,
-		MCPRequestTypeExecuteTool:
-		return true
-	}
-	return false
-}
-
-// IsPromptOrResourceRead reports whether this is a prompts/get or resources/read, which plugins log
-// and govern per call like a tool execution.
-func (t MCPRequestType) IsPromptOrResourceRead() bool {
-	return t == MCPRequestTypeGetPrompt || t == MCPRequestTypeReadResource
-}
-
-// OTelMethodName returns the OTel semconv mcp.method.name for this request type
-// (tools/call, tools/list, ping). Unknown types fall back to the raw string.
-func (t MCPRequestType) OTelMethodName() string {
-	switch {
-	case t.IsExecuteTool():
-		return "tools/call"
-	case t == MCPRequestTypeListTools:
-		return "tools/list"
-	case t == MCPRequestTypeListResources:
-		return "resources/list"
-	case t == MCPRequestTypeListResourceTemplates:
-		return "resources/templates/list"
-	case t == MCPRequestTypeListPrompts:
-		return "prompts/list"
-	case t == MCPRequestTypeGetPrompt:
-		return "prompts/get"
-	case t == MCPRequestTypeReadResource:
-		return "resources/read"
-	case t == MCPRequestTypeComplete:
-		return "completion/complete"
-	case t == MCPRequestTypePing:
-		return "ping"
-	default:
-		return string(t)
-	}
-}
-
-// BifrostMCPRequest is the envelope for MCP requests that flow through the generic
-// PreMCPHook/PostMCPHook pipeline (Ping, ListTools, ExecuteTool variants). Connect
-// requests do NOT use this envelope — they are dispatched via the typed
-// MCPConnectionPlugin interface using *BifrostMCPConnectRequest directly.
-//
-// Exactly one of the embedded sub-request pointers is populated, matched by RequestType:
-//   - RequestType == MCPRequestTypePing       → BifrostMCPPingRequest
-//   - RequestType == MCPRequestTypeListTools  → BifrostMCPListToolsRequest
-//   - RequestType == MCPRequestTypeListResources / ListResourceTemplates / ListPrompts → the matching empty request
-//   - RequestType == MCPRequestTypeGetPrompt / ReadResource / Complete → the matching request
-//   - RequestType == MCPRequestTypeExecuteTool / MCPRequestTypeChatToolCall / MCPRequestTypeResponsesToolCall → BifrostMCPExecuteToolRequest
-type BifrostMCPRequest struct {
-	RequestType MCPRequestType
-	ClientName  string // MCP client this request targets (always set, regardless of request type)
-
-	*BifrostMCPPingRequest
-	*BifrostMCPListToolsRequest
-	*BifrostMCPListResourcesRequest
-	*BifrostMCPListResourceTemplatesRequest
-	*BifrostMCPListPromptsRequest
-	*BifrostMCPGetPromptRequest
-	*BifrostMCPReadResourceRequest
-	*BifrostMCPCompleteRequest
-
-	// [DEPRECATED] these will be replaced by BifrostMCPExecuteToolRequest in the next major bump, but are kept for backward compatibility for now since some tools still rely on the old fields
-	*ChatAssistantMessageToolCall
-	*ResponsesToolMessage
-
-	// Will be used in from the next major bump
-	*BifrostMCPExecuteToolRequest
-}
-
-// BifrostMCPConnectRequest carries the prepared inputs for an MCP connect operation.
-// Fields marked "mutable" may be modified by a plugin's PreMCPHook and the mutated values
-// will be used for the actual transport creation; "observe-only" fields are passed to plugins
-// for context but mutations are ignored (changing the transport type mid-flight would break
-// the rest of the connect codepath).
-type BifrostMCPConnectRequest struct {
-	ClientName       string            // observe-only — name of the client being connected
-	ConnectionType   MCPConnectionType // observe-only — transport type being established (http/stdio/sse/inprocess)
-	AuthType         MCPAuthType       // observe-only — authentication mode configured on the client
-	ConnectionString *string           // mutable — URL for http/sse, nil for stdio/inprocess
-	Headers          map[string]string // mutable — transport-level headers (http/sse only; stdio/inprocess ignore)
-	StdioCommand     *string           // mutable — command for stdio connections (nil otherwise)
-	StdioArgs        []string          // mutable — argv for stdio connections (nil otherwise)
-}
-
-// BifrostMCPPingRequest is intentionally empty: the wire ping rides over the existing
-// transport and has no per-call headers or parameters. Plugins observe via ClientName on
-// the parent BifrostMCPRequest and may short-circuit (synthetic healthy/unhealthy).
-type BifrostMCPPingRequest struct{}
-
-// BifrostMCPListToolsRequest is intentionally empty for the same reason as ping: list_tools
-// reuses the existing transport's headers. Plugins observe via ClientName and may short-circuit
-// (e.g. cached tool list).
-type BifrostMCPListToolsRequest struct{}
-
-// BifrostMCPListResourcesRequest, BifrostMCPListResourceTemplatesRequest and
-// BifrostMCPListPromptsRequest are empty for the same reason as list_tools.
-type BifrostMCPListResourcesRequest struct{}
-
-type BifrostMCPListResourceTemplatesRequest struct{}
-
-type BifrostMCPListPromptsRequest struct{}
-
-// BifrostMCPGetPromptRequest is a prompts/get forwarded to the client that owns the prompt.
-type BifrostMCPGetPromptRequest struct {
-	Name      string            // Prefixed with the client name
-	Arguments map[string]string // mutable
-}
-
-// BifrostMCPReadResourceRequest is a resources/read forwarded to the client that owns the URI.
-type BifrostMCPReadResourceRequest struct {
-	URI string
-}
-
-// BifrostMCPCompleteRequest is a completion/complete forwarded to the client that owns the reference.
-type BifrostMCPCompleteRequest struct {
-	Params mcp.CompleteParams // A prompt reference carries the prefixed prompt name
-}
-
-// Keeping the stub for now, will be used from the next major bump when we remove the old ChatToolCall and ResponsesToolMessage fields.
-// Note that the tool name and arguments are not standardized in this struct yet since they are still being pulled from the old fields for backward compatibility,
-// but they will be standardized in the future when we remove the old fields.
-type BifrostMCPExecuteToolRequest struct{}
-
-// GetToolName returns the tool name from the active MCP request variant.
-func (r *BifrostMCPRequest) GetToolName() string {
-	if r.ChatAssistantMessageToolCall != nil {
-		if r.ChatAssistantMessageToolCall.Function.Name != nil {
-			return *r.ChatAssistantMessageToolCall.Function.Name
-		}
-	}
-	if r.ResponsesToolMessage != nil {
-		if r.ResponsesToolMessage.Name != nil {
-			return *r.ResponsesToolMessage.Name
-		}
-	}
-	return ""
-}
-
-// ReadTarget returns the prompt name, without its client prefix, or the resource URI a read targets.
-func (r *BifrostMCPRequest) ReadTarget() string {
-	switch {
-	case r.BifrostMCPGetPromptRequest != nil:
-		return strings.TrimPrefix(r.BifrostMCPGetPromptRequest.Name, r.ClientName+"-")
-	case r.BifrostMCPReadResourceRequest != nil:
-		return r.BifrostMCPReadResourceRequest.URI
-	}
-	return ""
-}
-
-// GetToolArguments returns arguments from the active MCP request variant.
-func (r *BifrostMCPRequest) GetToolArguments() interface{} {
-	if r.ChatAssistantMessageToolCall != nil {
-		return r.ChatAssistantMessageToolCall.Function.Arguments
-	}
-	if r.ResponsesToolMessage != nil {
-		return r.ResponsesToolMessage.Arguments
-	}
-	return nil
-}
-
 //* Response Structs
 
 // BifrostResponse represents the complete result from any bifrost request.
@@ -1910,159 +1647,6 @@ func setCoreExtraFields(ef *BifrostResponseExtraFields, requestType RequestType,
 	}
 }
 
-// BifrostMCPResponse is the envelope for MCP responses that flow through the generic
-// PostMCPHook pipeline (Ping, ListTools, ExecuteTool variants). Connect responses do
-// NOT use this envelope — they are dispatched via the typed MCPConnectionPlugin
-// interface using *BifrostMCPConnectResponse directly.
-//
-// Exactly one of the embedded sub-response pointers is populated, matched by the
-// originating request's RequestType. ExtraFields (ClientName / ToolName / Latency)
-// applies to all envelope variants. For execute-tool requests in the back-compat
-// window, the direct ChatMessage / ResponsesMessage fields are populated instead of
-// any embedded sub-response.
-type BifrostMCPResponse struct {
-	*BifrostMCPPingResponse
-	*BifrostMCPListToolsResponse
-	*BifrostMCPListResourcesResponse
-	*BifrostMCPListResourceTemplatesResponse
-	*BifrostMCPListPromptsResponse
-	*BifrostMCPGetPromptResponse
-	*BifrostMCPReadResourceResponse
-	*BifrostMCPCompleteResponse
-
-	// [DEPRECATED] back-compat fields for execute-tool requests; will move into
-	// BifrostMCPExecuteToolResponse in the next major bump.
-	ChatMessage      *ChatMessage
-	ResponsesMessage *ResponsesMessage
-
-	// Empty stub today; will hold ChatMessage/ResponsesMessage in the next major bump.
-	*BifrostMCPExecuteToolResponse
-
-	ExtraFields BifrostMCPResponseExtraFields
-}
-
-// Latency for envelope MCP responses (ping, list_tools, execute_tool) is reported via
-// BifrostMCPResponse.ExtraFields.Latency (milliseconds). Connect carries its own
-// ExtraFields on BifrostMCPConnectResponse below — see typed Connect path.
-
-type BifrostMCPConnectResponse struct {
-	ConnectionInfo     *MCPClientConnectionInfo // Connection metadata after the handshake completes
-	ServerInfo         *MCPServerInfo           // Name + version from the initialize handshake
-	ProtocolVersion    string                   // Negotiated MCP protocol version
-	ServerCapabilities *MCPServerCapabilities   // Which MCP feature groups the server claims to support
-	// Instructions is the server's usage guidance from the initialize result. A sibling of
-	// ServerInfo on the wire, not nested inside it. Empty when the server sent none.
-	Instructions string
-	ExtraFields  BifrostMCPResponseExtraFields
-}
-
-// PopulateExtraFields backfills ClientName on the Connect response when it's not
-// already set. Mirrors BifrostMCPResponse.PopulateExtraFields. Connect has no tool
-// name, so only ClientName is populated.
-func (r *BifrostMCPConnectResponse) PopulateExtraFields(clientName string) {
-	if r == nil {
-		return
-	}
-	if r.ExtraFields.ClientName == "" {
-		r.ExtraFields.ClientName = clientName
-	}
-}
-
-// MCPServerInfo mirrors the ServerInfo portion of the MCP initialize handshake.
-type MCPServerInfo struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
-
-// MCPServerCapabilities mirrors the high-level capability flags from the MCP initialize handshake.
-// Only the booleans Bifrost cares about today; can grow as needed.
-type MCPServerCapabilities struct {
-	Tools     bool `json:"tools"`     // server supports tools/list + tools/call
-	Resources bool `json:"resources"` // server supports resources
-	Prompts   bool `json:"prompts"`   // server supports prompts
-	Logging   bool `json:"logging"`   // server supports logging
-}
-
-type BifrostMCPPingResponse struct{}
-
-type BifrostMCPListToolsResponse struct {
-	Tools        map[string]ChatTool // Discovered tools keyed by client-prefixed name
-	RawToolCount int                 // Count returned by the MCP server before Bifrost-side filtering
-	SkippedTools []SkippedMCPTool    // Tools Bifrost dropped during conversion + reason
-}
-
-type BifrostMCPListResourcesResponse struct {
-	Resources []mcp.Resource // As the server lists them
-}
-
-type BifrostMCPListResourceTemplatesResponse struct {
-	ResourceTemplates []mcp.ResourceTemplate // As the server lists them
-}
-
-type BifrostMCPListPromptsResponse struct {
-	Prompts []mcp.Prompt // Names prefixed with the client name
-}
-
-type BifrostMCPGetPromptResponse struct {
-	Prompt *mcp.GetPromptResult
-}
-
-type BifrostMCPReadResourceResponse struct {
-	Resource *mcp.ReadResourceResult
-}
-
-type BifrostMCPCompleteResponse struct {
-	Completion *mcp.CompleteResult
-}
-
-// SkippedMCPTool describes a tool that the MCP server returned but Bifrost did not include
-// in the final tool map (e.g. invalid normalized name).
-type SkippedMCPTool struct {
-	OriginalName string `json:"original_name"`
-	Reason       string `json:"reason"`
-}
-
-// Keeping the stub for now, will be used from the next major bump when we move ChatMessage
-// and ResponsesMessage into this struct.
-type BifrostMCPExecuteToolResponse struct{}
-
-// PopulateExtraFields backfills ExtraFields.{MCPRequestType, ClientName, ToolName}
-// when they aren't already set on the response. Mirrors BifrostResponse.PopulateExtraFields
-// and is used by every MCP gate to ensure short-circuit responses carry the same
-// attribution as real wire-call responses.
-func (r *BifrostMCPResponse) PopulateExtraFields(mcpRequestType MCPRequestType, clientName, toolName string) {
-	if r == nil {
-		return
-	}
-	if r.ExtraFields.MCPRequestType == "" {
-		r.ExtraFields.MCPRequestType = mcpRequestType
-	}
-	if r.ExtraFields.ClientName == "" {
-		r.ExtraFields.ClientName = clientName
-	}
-	if r.ExtraFields.ToolName == "" {
-		r.ExtraFields.ToolName = toolName
-	}
-}
-
-// PopulateMCPExtraFields backfills ExtraFields.{MCPRequestType, MCPClientName, MCPToolName}
-// when they aren't already set: the error counterpart of BifrostMCPResponse.PopulateExtraFields,
-// used by the MCP gate so a PostMCPHook can tell which call failed.
-func (e *BifrostError) PopulateMCPExtraFields(mcpRequestType MCPRequestType, clientName, toolName string) {
-	if e == nil {
-		return
-	}
-	if e.ExtraFields.MCPRequestType == "" {
-		e.ExtraFields.MCPRequestType = mcpRequestType
-	}
-	if e.ExtraFields.MCPClientName == "" {
-		e.ExtraFields.MCPClientName = clientName
-	}
-	if e.ExtraFields.MCPToolName == "" {
-		e.ExtraFields.MCPToolName = toolName
-	}
-}
-
 // PricingSurface names the product surface whose price list applies to a request.
 type PricingSurface string
 
@@ -2167,13 +1751,6 @@ type ResolvedKeyAlias struct {
 	ModelID     string       `json:"model_id"`               // wire model identifier actually sent to the provider
 	ModelName   *string      `json:"model_name,omitempty"`   // canonical name (used for pricing/logs)
 	ModelFamily *ModelFamily `json:"model_family,omitempty"` // resolved family for routing
-}
-
-type BifrostMCPResponseExtraFields struct {
-	MCPRequestType MCPRequestType `json:"mcp_request_type"` // request type this response corresponds to — lets PostMCPHook discriminate ping/list_tools from tool execute on success too
-	ClientName     string         `json:"client_name"`
-	ToolName       string         `json:"tool_name"` // empty for all but MCPRequestTypeExecuteTool requests for backwards compat, will be a pointer from next major bump.
-	Latency        int64          `json:"latency"`   // in milliseconds
 }
 
 // BifrostCacheMetadata represents cache execution metadata.
@@ -2510,23 +2087,16 @@ type BifrostErrorExtraFields struct {
 	// matched (i.e. RoutingInfo.ResolvedKeyAlias != nil), otherwise
 	// RoutingInfo.Model. Still populated for backward compatibility; new
 	// consumers should read from RoutingInfo.
-	ResolvedModelUsed string         `json:"resolved_model_used,omitempty"`
-	RequestType       RequestType    `json:"request_type,omitempty"`
-	MCPRequestType    MCPRequestType `json:"mcp_request_type,omitempty"`
-	// MCPClientName and MCPToolName are stamped by the MCP plugin gate on every
-	// error it hands PostMCPHook, as the request named them (the tool with its
-	// client prefix), so a hook can tell which call failed. In-process only.
-	MCPClientName             string                `json:"-"`
-	MCPToolName               string                `json:"-"`
-	RawRequest                interface{}           `json:"raw_request,omitempty"`
-	RawResponse               interface{}           `json:"raw_response,omitempty"`
-	ConvertedRequestType      RequestType           `json:"converted_request_type,omitempty"`
-	DroppedCompatPluginParams []string              `json:"dropped_compat_plugin_params,omitempty"`
-	Latency                   int64                 `json:"latency,omitempty"`        // in milliseconds
-	RetryAfter                int64                 `json:"retry_after_ms,omitempty"` // provider's retry hint in milliseconds, clamped to 1s..5m; zero when it gave none
-	KeyStatuses               []KeyStatus           `json:"key_statuses,omitempty"`
-	FallbackAttempts          []FallbackAttempt     `json:"fallback_attempts,omitempty"` // fallbacks that failed or were skipped, set when the primary's error is returned after the chain ran out
-	MCPAuthRequired           *MCPAuthRequiredError `json:"mcp_auth_required,omitempty"` // Set when a per-user MCP tool requires the caller to complete an inline auth flow (OAuth or headers)
+	ResolvedModelUsed         string            `json:"resolved_model_used,omitempty"`
+	RequestType               RequestType       `json:"request_type,omitempty"`
+	RawRequest                interface{}       `json:"raw_request,omitempty"`
+	RawResponse               interface{}       `json:"raw_response,omitempty"`
+	ConvertedRequestType      RequestType       `json:"converted_request_type,omitempty"`
+	DroppedCompatPluginParams []string          `json:"dropped_compat_plugin_params,omitempty"`
+	Latency                   int64             `json:"latency,omitempty"`        // in milliseconds
+	RetryAfter                int64             `json:"retry_after_ms,omitempty"` // provider's retry hint in milliseconds, clamped to 1s..5m; zero when it gave none
+	KeyStatuses               []KeyStatus       `json:"key_statuses,omitempty"`
+	FallbackAttempts          []FallbackAttempt `json:"fallback_attempts,omitempty"` // fallbacks that failed or were skipped, set when the primary's error is returned after the chain ran out
 	// BilledUsage carries provider-reported token usage that was consumed even
 	// though the request ultimately failed or was cancelled (e.g. a stream
 	// aborted mid-response, or a 5xx returned after input tokens were

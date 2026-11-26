@@ -31,9 +31,6 @@ func savedConfig() configstore.ProviderConfig {
 		CustomProviderConfig: &schemas.CustomProviderConfig{BaseProviderType: schemas.Anthropic},
 		OpenAIConfig:         &schemas.OpenAIConfig{DisableStore: true},
 		PromptCache:          &schemas.PromptCacheConfig{AutoInject: true, TTL: schemas.Ptr("1h")},
-		InjectedTools: []schemas.InjectedTool{
-			{Name: "web_search", MCPClientName: "tavily", ToolName: "search"},
-		},
 		Passthrough: &schemas.PassthroughPolicy{AllowedRoutes: []schemas.PassthroughRouteRule{{Methods: []string{"POST"}, Path: "/v1/chat/completions"}}},
 	}
 }

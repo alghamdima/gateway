@@ -243,54 +243,6 @@ func (s *RDBLogStore) GetDimensionModelUsage(ctx context.Context, filters Search
 	return entries, nil
 }
 
-// mcpDimensionColumn names the MCP tool log column that holds a dimension's id.
-// MCP tool logs carry scalar ownership columns only.
-func mcpDimensionColumn(dimension RankingDimension) (string, bool) {
-	switch dimension {
-	case RankingDimensionUser:
-		return "user_id", true
-	case RankingDimensionTeam:
-		return "team_id", true
-	case RankingDimensionCustomer:
-		return "customer_id", true
-	case RankingDimensionBusinessUnit:
-		return "business_unit_id", true
-	}
-	return "", false
-}
-
-// GetMCPToolCountsByDimension returns how many distinct tools each entity
-// called inside the filter window, in one grouped read over the tool calls
-// GetMCPTopTools counts. It replaces one GetMCPTopTools call per entity. An
-// entity the caller's dimension ceiling hides is left out.
-func (s *RDBLogStore) GetMCPToolCountsByDimension(ctx context.Context, filters MCPToolLogSearchFilters, dimension RankingDimension) (map[string]int, error) {
-	col, ok := mcpDimensionColumn(dimension)
-	if !ok {
-		return nil, fmt.Errorf("dimension %s has no MCP tool count reader", dimension)
-	}
-	q := s.ScopedDB(ctx).Model(&MCPToolLog{})
-	q = s.applyMCPFilters(q, filters)
-	q = q.Where("status IN ?", []string{"success", "error"})
-	q = q.Where(fmt.Sprintf("%s IS NOT NULL AND %s != ''", col, col))
-	// Grouping by the owner column names the owners, so the caller's dimension
-	// ceiling applies here as it does to the LLM usage reads.
-	q = applyDimensionCeiling(ctx, q, dimensionReadSource{}, col)
-	var rows []struct {
-		ID        string `gorm:"column:id"`
-		ToolCount int64  `gorm:"column:tool_count"`
-	}
-	if err := q.Select(col + " AS id, COUNT(DISTINCT tool_name) AS tool_count").
-		Group(col).
-		Find(&rows).Error; err != nil {
-		return nil, fmt.Errorf("failed to get mcp tool counts for %s: %w", dimension, err)
-	}
-	counts := make(map[string]int, len(rows))
-	for _, r := range rows {
-		counts[r.ID] = int(r.ToolCount)
-	}
-	return counts, nil
-}
-
 // prevWindowStart returns the start of the equally long window before
 // [start, end], the window GetDimensionRankings compares against.
 func prevWindowStart(start, end time.Time) time.Time {

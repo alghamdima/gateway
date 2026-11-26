@@ -33,13 +33,9 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	err = db.AutoMigrate(
 		&TableKey{},
 		&TableProvider{},
-		&TableMCPClient{},
 		&TablePlugin{},
 		&TableVirtualKey{},
 		&SessionsTable{},
-		&TableOauthConfig{},
-		&TableOauthToken{},
-		&TableMCPOauthFlow{},
 		&TableVectorStoreConfig{},
 	)
 	require.NoError(t, err)
@@ -525,58 +521,6 @@ func TestTableProvider_NoProxyConfig_NoEncryption(t *testing.T) {
 // TableMCPClient encryption tests
 // ============================================================================
 
-func TestTableMCPClient_EncryptDecrypt(t *testing.T) {
-	db := setupTestDB(t)
-
-	connStr := schemas.NewSecretVar("https://mcp-server.example.com/sse")
-	client := &TableMCPClient{
-		ClientID:         "mcp-1",
-		Name:             "test-mcp",
-		ConnectionType:   "sse",
-		ConnectionString: connStr,
-		Headers: map[string]schemas.SecretVar{
-			"Authorization": *schemas.NewSecretVar("Bearer secret-token"),
-		},
-	}
-
-	require.NoError(t, db.Create(client).Error)
-
-	raw := rawRow(t, db, "config_mcp_clients", client.ID)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	// Connection string should be encrypted
-	rawConnStr, ok := raw["connection_string"].(string)
-	assert.True(t, ok)
-	assert.NotContains(t, rawConnStr, "mcp-server.example.com")
-	// Headers JSON should be encrypted
-	rawHeaders, ok := raw["headers_json"].(string)
-	assert.True(t, ok)
-	assert.NotContains(t, rawHeaders, "secret-token")
-
-	var found TableMCPClient
-	require.NoError(t, db.First(&found, client.ID).Error)
-	assert.Equal(t, "https://mcp-server.example.com/sse", found.ConnectionString.GetValue())
-	require.Contains(t, found.Headers, "Authorization")
-	assert.Equal(t, "Bearer secret-token", found.Headers["Authorization"].Val)
-}
-
-func TestTableMCPClient_SecretVarConnectionString_NotEncrypted(t *testing.T) {
-	db := setupTestDB(t)
-
-	connStr := schemas.NewSecretVar("env.MCP_SERVER_URL")
-	client := &TableMCPClient{
-		ClientID:         "mcp-env",
-		Name:             "env-mcp",
-		ConnectionType:   "sse",
-		ConnectionString: connStr,
-	}
-
-	require.NoError(t, db.Create(client).Error)
-
-	var found TableMCPClient
-	require.NoError(t, db.First(&found, client.ID).Error)
-	assert.True(t, found.ConnectionString.IsFromSecret())
-}
-
 // ============================================================================
 // TablePlugin encryption tests
 // ============================================================================
@@ -712,166 +656,9 @@ func TestSessionsTable_HashComputedBeforeEncryption(t *testing.T) {
 // TableOauthConfig encryption tests
 // ============================================================================
 
-func TestTableOauthConfig_EncryptDecrypt(t *testing.T) {
-	db := setupTestDB(t)
-
-	config := &TableOauthConfig{
-		ID:           "oauth-cfg-1",
-		ClientID:     schemas.NewSecretVar("client-id-public"),
-		ClientSecret: schemas.NewSecretVar("super-secret-client-secret"),
-		RedirectURI:  "https://example.com/callback",
-	}
-
-	require.NoError(t, db.Create(config).Error)
-
-	raw := rawRow(t, db, "oauth_configs", "oauth-cfg-1")
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.NotEqual(t, "super-secret-client-secret", raw["client_secret"])
-
-	var found TableOauthConfig
-	require.NoError(t, db.First(&found, "id = ?", "oauth-cfg-1").Error)
-	assert.Equal(t, "super-secret-client-secret", found.ClientSecret.GetValue())
-	// Non-sensitive fields should be unchanged
-	assert.Equal(t, "client-id-public", found.ClientID.GetValue())
-	assert.Equal(t, "https://example.com/callback", found.RedirectURI)
-}
-
-func TestTableOauthConfig_EmptySecret_NoError(t *testing.T) {
-	db := setupTestDB(t)
-
-	config := &TableOauthConfig{
-		ID:          "oauth-cfg-empty",
-		RedirectURI: "https://example.com/callback",
-	}
-
-	require.NoError(t, db.Create(config).Error)
-
-	var found TableOauthConfig
-	require.NoError(t, db.First(&found, "id = ?", "oauth-cfg-empty").Error)
-	assert.Equal(t, "", found.ClientSecret.GetValue())
-}
-
-// TestTableOauthConfig_SecretRef_StampsStatus covers a client_secret held as an
-// env/vault reference. There is nothing to cipher, but the row must still leave
-// plain_text: the startup backfill selects on that column, so a row left behind
-// is re-selected and re-written on every boot.
-func TestTableOauthConfig_SecretRef_StampsStatus(t *testing.T) {
-	for _, ref := range []string{"vault.oauth_configs/cfg/client_secret", "env.OAUTH_CLIENT_SECRET"} {
-		t.Run(ref, func(t *testing.T) {
-			db := setupTestDB(t)
-
-			config := &TableOauthConfig{
-				ID:           "oauth-cfg-ref",
-				ClientSecret: schemas.NewSecretVar(ref),
-				RedirectURI:  "https://example.com/callback",
-			}
-			require.NoError(t, db.Create(config).Error)
-
-			raw := rawRow(t, db, "oauth_configs", "oauth-cfg-ref")
-			assert.Equal(t, "encrypted", raw["encryption_status"])
-			assert.Equal(t, ref, raw["client_secret"], "the reference must be stored verbatim, not ciphered")
-
-			var found TableOauthConfig
-			require.NoError(t, db.First(&found, "id = ?", "oauth-cfg-ref").Error)
-			assert.Equal(t, ref, found.ClientSecret.GetRawRef())
-		})
-	}
-}
-
-// TestTableMCPOauthFlow_EncryptDecrypt covers the CodeVerifier encrypt/decrypt
-// round trip that TestTableOauthConfig_EncryptDecrypt used to exercise before
-// PKCE fields moved off TableOauthConfig onto TableMCPOauthFlow (see that
-// migration).
-func TestTableMCPOauthFlow_EncryptDecrypt(t *testing.T) {
-	db := setupTestDB(t)
-
-	flow := &TableMCPOauthFlow{
-		ID:            "flow-1",
-		MCPClientID:   "mcp-1",
-		OauthConfigID: "oauth-cfg-1",
-		State:         "csrf-state-token",
-		CodeVerifier:  "pkce-code-verifier-secret",
-		FlowMode:      "admin",
-		ExpiresAt:     time.Now().Add(15 * time.Minute),
-	}
-
-	require.NoError(t, db.Create(flow).Error)
-
-	raw := rawRow(t, db, "mcp_oauth_flows", "flow-1")
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.NotEqual(t, "pkce-code-verifier-secret", raw["code_verifier"])
-
-	var found TableMCPOauthFlow
-	require.NoError(t, db.First(&found, "id = ?", "flow-1").Error)
-	assert.Equal(t, "pkce-code-verifier-secret", found.CodeVerifier)
-	// Non-sensitive fields should be unchanged
-	assert.Equal(t, "csrf-state-token", found.State)
-}
-
-func TestTableMCPOauthFlow_EmptyCodeVerifier_NoError(t *testing.T) {
-	db := setupTestDB(t)
-
-	flow := &TableMCPOauthFlow{
-		ID:            "flow-empty",
-		MCPClientID:   "mcp-1",
-		OauthConfigID: "oauth-cfg-1",
-		State:         "csrf-state-empty",
-		FlowMode:      "admin",
-		ExpiresAt:     time.Now().Add(15 * time.Minute),
-	}
-
-	require.NoError(t, db.Create(flow).Error)
-
-	var found TableMCPOauthFlow
-	require.NoError(t, db.First(&found, "id = ?", "flow-empty").Error)
-	assert.Equal(t, "", found.CodeVerifier)
-}
-
 // ============================================================================
 // TableOauthToken encryption tests
 // ============================================================================
-
-func TestTableOauthToken_EncryptDecrypt(t *testing.T) {
-	db := setupTestDB(t)
-
-	token := &TableOauthToken{
-		ID:           "oauth-tok-1",
-		AccessToken:  "access-token-secret-value",
-		RefreshToken: "refresh-token-secret-value",
-		TokenType:    "Bearer",
-		ExpiresAt:    bifrost.Ptr(time.Now().Add(time.Hour)),
-	}
-
-	require.NoError(t, db.Create(token).Error)
-
-	raw := rawRow(t, db, "oauth_tokens", "oauth-tok-1")
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.NotEqual(t, "access-token-secret-value", raw["access_token"])
-	assert.NotEqual(t, "refresh-token-secret-value", raw["refresh_token"])
-
-	var found TableOauthToken
-	require.NoError(t, db.First(&found, "id = ?", "oauth-tok-1").Error)
-	assert.Equal(t, "access-token-secret-value", found.AccessToken)
-	assert.Equal(t, "refresh-token-secret-value", found.RefreshToken)
-}
-
-func TestTableOauthToken_EmptyRefreshToken(t *testing.T) {
-	db := setupTestDB(t)
-
-	token := &TableOauthToken{
-		ID:          "oauth-tok-norefresh",
-		AccessToken: "access-only-token",
-		TokenType:   "Bearer",
-		ExpiresAt:   bifrost.Ptr(time.Now().Add(time.Hour)),
-	}
-
-	require.NoError(t, db.Create(token).Error)
-
-	var found TableOauthToken
-	require.NoError(t, db.First(&found, "id = ?", "oauth-tok-norefresh").Error)
-	assert.Equal(t, "access-only-token", found.AccessToken)
-	assert.Equal(t, "", found.RefreshToken)
-}
 
 // ============================================================================
 // TableVectorStoreConfig encryption tests
@@ -1315,52 +1102,6 @@ func TestTableKey_BedrockEndpointsCleared_RoundTrip(t *testing.T) {
 // MCP — edge cases for connection string / headers combinations
 // ============================================================================
 
-func TestTableMCPClient_DirectConnStr_EmptyHeaders(t *testing.T) {
-	db := setupTestDB(t)
-
-	// Direct connection string (not env var), no headers
-	connStr := schemas.NewSecretVar("https://mcp-direct.example.com/sse")
-	client := &TableMCPClient{
-		ClientID:         "mcp-direct-nohdr",
-		Name:             "direct-no-headers",
-		ConnectionType:   "sse",
-		ConnectionString: connStr,
-		// No headers — serializes to "{}" which should NOT be encrypted
-	}
-
-	require.NoError(t, db.Create(client).Error)
-
-	raw := rawRow(t, db, "config_mcp_clients", client.ID)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-
-	var found TableMCPClient
-	require.NoError(t, db.First(&found, client.ID).Error)
-	assert.Equal(t, "https://mcp-direct.example.com/sse", found.ConnectionString.GetValue())
-}
-
-func TestTableMCPClient_HeadersOnly_NoConnStr(t *testing.T) {
-	db := setupTestDB(t)
-
-	client := &TableMCPClient{
-		ClientID:       "mcp-hdr-only",
-		Name:           "headers-only",
-		ConnectionType: "sse",
-		Headers: map[string]schemas.SecretVar{
-			"X-Api-Key": *schemas.NewSecretVar("secret-api-key"),
-		},
-	}
-
-	require.NoError(t, db.Create(client).Error)
-
-	raw := rawRow(t, db, "config_mcp_clients", client.ID)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-
-	var found TableMCPClient
-	require.NoError(t, db.First(&found, client.ID).Error)
-	require.Contains(t, found.Headers, "X-Api-Key")
-	assert.Equal(t, "secret-api-key", found.Headers["X-Api-Key"].Val)
-}
-
 // ============================================================================
 // Round-trip update tests for remaining tables
 // ============================================================================
@@ -1390,52 +1131,6 @@ func TestTableVirtualKey_UpdatePreservesDecryption(t *testing.T) {
 	raw := rawRow(t, db, "governance_virtual_keys", "vk-update")
 	assert.Equal(t, "encrypted", raw["encryption_status"])
 	assert.Equal(t, encrypt.HashSHA256("updated-vk-value"), raw["value_hash"])
-}
-
-func TestTableOauthConfig_UpdatePreservesDecryption(t *testing.T) {
-	db := setupTestDB(t)
-
-	config := &TableOauthConfig{
-		ID:           "oauth-cfg-update",
-		ClientSecret: schemas.NewSecretVar("original-secret"),
-		RedirectURI:  "https://example.com/callback",
-	}
-	require.NoError(t, db.Create(config).Error)
-
-	var found TableOauthConfig
-	require.NoError(t, db.First(&found, "id = ?", "oauth-cfg-update").Error)
-	assert.Equal(t, "original-secret", found.ClientSecret.GetValue())
-
-	found.ClientSecret = schemas.NewSecretVar("rotated-secret")
-	require.NoError(t, db.Save(&found).Error)
-
-	var found2 TableOauthConfig
-	require.NoError(t, db.First(&found2, "id = ?", "oauth-cfg-update").Error)
-	assert.Equal(t, "rotated-secret", found2.ClientSecret.GetValue())
-}
-
-func TestTableOauthToken_UpdatePreservesDecryption(t *testing.T) {
-	db := setupTestDB(t)
-
-	token := &TableOauthToken{
-		ID:           "oauth-tok-update",
-		AccessToken:  "original-access",
-		RefreshToken: "original-refresh",
-		TokenType:    "Bearer",
-		ExpiresAt:    bifrost.Ptr(time.Now().Add(time.Hour)),
-	}
-	require.NoError(t, db.Create(token).Error)
-
-	var found TableOauthToken
-	require.NoError(t, db.First(&found, "id = ?", "oauth-tok-update").Error)
-
-	found.AccessToken = "refreshed-access"
-	require.NoError(t, db.Save(&found).Error)
-
-	var found2 TableOauthToken
-	require.NoError(t, db.First(&found2, "id = ?", "oauth-tok-update").Error)
-	assert.Equal(t, "refreshed-access", found2.AccessToken)
-	assert.Equal(t, "original-refresh", found2.RefreshToken)
 }
 
 func TestTableProvider_UpdatePreservesDecryption(t *testing.T) {
@@ -1509,37 +1204,6 @@ func TestTableVectorStoreConfig_UpdatePreservesDecryption(t *testing.T) {
 	assert.Contains(t, *found2.Config, "secret-v2")
 }
 
-func TestTableMCPClient_UpdatePreservesDecryption(t *testing.T) {
-	db := setupTestDB(t)
-
-	connStr := schemas.NewSecretVar("https://mcp-v1.example.com/sse")
-	client := &TableMCPClient{
-		ClientID:         "mcp-update",
-		Name:             "update-mcp",
-		ConnectionType:   "sse",
-		ConnectionString: connStr,
-		Headers: map[string]schemas.SecretVar{
-			"Authorization": *schemas.NewSecretVar("Bearer token-v1"),
-		},
-	}
-	require.NoError(t, db.Create(client).Error)
-
-	var found TableMCPClient
-	require.NoError(t, db.First(&found, client.ID).Error)
-	assert.Equal(t, "https://mcp-v1.example.com/sse", found.ConnectionString.GetValue())
-
-	found.ConnectionString = schemas.NewSecretVar("https://mcp-v2.example.com/sse")
-	found.Headers = map[string]schemas.SecretVar{
-		"Authorization": *schemas.NewSecretVar("Bearer token-v2"),
-	}
-	require.NoError(t, db.Save(&found).Error)
-
-	var found2 TableMCPClient
-	require.NoError(t, db.First(&found2, client.ID).Error)
-	assert.Equal(t, "https://mcp-v2.example.com/sse", found2.ConnectionString.GetValue())
-	assert.Equal(t, "Bearer token-v2", found2.Headers["Authorization"].Val)
-}
-
 // ============================================================================
 // Multi-row Find — verify all rows get decrypted
 // ============================================================================
@@ -1592,30 +1256,6 @@ func TestSessionsTable_FindMultipleDecryptsAll(t *testing.T) {
 	assert.True(t, tokens["token-1"])
 	assert.True(t, tokens["token-2"])
 	assert.True(t, tokens["token-3"])
-}
-
-func TestTableOauthToken_FindMultipleDecryptsAll(t *testing.T) {
-	db := setupTestDB(t)
-
-	for _, id := range []string{"multi-tok-1", "multi-tok-2"} {
-		token := &TableOauthToken{
-			ID:           id,
-			AccessToken:  "access-" + id,
-			RefreshToken: "refresh-" + id,
-			TokenType:    "Bearer",
-			ExpiresAt:    bifrost.Ptr(time.Now().Add(time.Hour)),
-		}
-		require.NoError(t, db.Create(token).Error)
-	}
-
-	var tokens []TableOauthToken
-	require.NoError(t, db.Find(&tokens).Error)
-	assert.Len(t, tokens, 2)
-
-	for _, tok := range tokens {
-		assert.Contains(t, tok.AccessToken, "access-multi-tok-")
-		assert.Contains(t, tok.RefreshToken, "refresh-multi-tok-")
-	}
 }
 
 // ============================================================================
@@ -1769,35 +1409,6 @@ func TestTableKey_EncryptionDisabled_StoresPlaintext(t *testing.T) {
 	assert.Equal(t, "https://azure.example.com", found.AzureKeyConfig.Endpoint.GetValue())
 }
 
-func TestTableMCPClient_EncryptionDisabled_StoresPlaintext(t *testing.T) {
-	disableEncryption(t)
-	db := setupTestDB(t)
-
-	client := &TableMCPClient{
-		ClientID:         "mcp-dis-1",
-		Name:             "disabled-mcp",
-		ConnectionType:   "sse",
-		ConnectionString: schemas.NewSecretVar("https://mcp.example.com"),
-		Headers: map[string]schemas.SecretVar{
-			"Authorization": *schemas.NewSecretVar("Bearer secret-token"),
-		},
-	}
-
-	require.NoError(t, db.Create(client).Error)
-
-	// Raw DB should have plaintext
-	raw := rawRow(t, db, "config_mcp_clients", client.ID)
-	assert.Equal(t, "plain_text", raw["encryption_status"])
-	assert.Equal(t, "https://mcp.example.com", raw["connection_string"])
-	assert.Contains(t, raw["headers_json"], "Bearer secret-token")
-
-	// GORM read should return same plaintext
-	var found TableMCPClient
-	require.NoError(t, db.First(&found, client.ID).Error)
-	assert.Equal(t, "https://mcp.example.com", found.ConnectionString.GetValue())
-	assert.Equal(t, "Bearer secret-token", found.Headers["Authorization"].Val)
-}
-
 func TestTableVirtualKey_EncryptionDisabled_StoresPlaintext(t *testing.T) {
 	disableEncryption(t)
 	db := setupTestDB(t)
@@ -1845,88 +1456,6 @@ func TestSessionsTable_EncryptionDisabled_StoresPlaintext(t *testing.T) {
 	var found SessionsTable
 	require.NoError(t, db.First(&found, session.ID).Error)
 	assert.Equal(t, "session-plaintext-token", found.Token)
-}
-
-func TestTableOauthConfig_EncryptionDisabled_StoresPlaintext(t *testing.T) {
-	disableEncryption(t)
-	db := setupTestDB(t)
-
-	cfg := &TableOauthConfig{
-		ID:           "cfg-dis-1",
-		ClientSecret: schemas.NewSecretVar("client-secret-plain"),
-		RedirectURI:  "https://example.com/cb",
-		Status:       "pending",
-	}
-
-	require.NoError(t, db.Create(cfg).Error)
-
-	// Raw DB should have plaintext
-	var raw map[string]any
-	db.Table("oauth_configs").Where("id = ?", "cfg-dis-1").Take(&raw)
-	assert.Equal(t, "plain_text", raw["encryption_status"])
-	assert.Equal(t, "client-secret-plain", raw["client_secret"])
-
-	// GORM read should return same plaintext
-	var found TableOauthConfig
-	require.NoError(t, db.Where("id = ?", "cfg-dis-1").First(&found).Error)
-	assert.Equal(t, "client-secret-plain", found.ClientSecret.GetValue())
-}
-
-func TestTableMCPOauthFlow_EncryptionDisabled_StoresPlaintext(t *testing.T) {
-	disableEncryption(t)
-	db := setupTestDB(t)
-
-	flow := &TableMCPOauthFlow{
-		ID:            "flow-dis-1",
-		MCPClientID:   "mcp-1",
-		OauthConfigID: "oauth-cfg-1",
-		State:         "csrf-state",
-		CodeVerifier:  "verifier-plain",
-		FlowMode:      "admin",
-		Status:        "pending",
-		ExpiresAt:     time.Now().Add(time.Hour),
-	}
-
-	require.NoError(t, db.Create(flow).Error)
-
-	// Raw DB should have plaintext
-	var raw map[string]any
-	db.Table("mcp_oauth_flows").Where("id = ?", "flow-dis-1").Take(&raw)
-	assert.Equal(t, "plain_text", raw["encryption_status"])
-	assert.Equal(t, "verifier-plain", raw["code_verifier"])
-
-	// GORM read should return same plaintext
-	var found TableMCPOauthFlow
-	require.NoError(t, db.Where("id = ?", "flow-dis-1").First(&found).Error)
-	assert.Equal(t, "verifier-plain", found.CodeVerifier)
-}
-
-func TestTableOauthToken_EncryptionDisabled_StoresPlaintext(t *testing.T) {
-	disableEncryption(t)
-	db := setupTestDB(t)
-
-	token := &TableOauthToken{
-		ID:           "tok-dis-1",
-		AccessToken:  "access-plain",
-		RefreshToken: "refresh-plain",
-		TokenType:    "Bearer",
-		ExpiresAt:    bifrost.Ptr(time.Now().Add(time.Hour)),
-	}
-
-	require.NoError(t, db.Create(token).Error)
-
-	// Raw DB should have plaintext
-	var raw map[string]any
-	db.Table("oauth_tokens").Where("id = ?", "tok-dis-1").Take(&raw)
-	assert.Equal(t, "plain_text", raw["encryption_status"])
-	assert.Equal(t, "access-plain", raw["access_token"])
-	assert.Equal(t, "refresh-plain", raw["refresh_token"])
-
-	// GORM read should return same plaintext
-	var found TableOauthToken
-	require.NoError(t, db.Where("id = ?", "tok-dis-1").First(&found).Error)
-	assert.Equal(t, "access-plain", found.AccessToken)
-	assert.Equal(t, "refresh-plain", found.RefreshToken)
 }
 
 func TestTableProvider_EncryptionDisabled_StoresPlaintext(t *testing.T) {
@@ -2066,10 +1595,7 @@ func trySetupPostgresDB(t *testing.T) *gorm.DB {
 	// TableOauthConfig must precede TableMCPClient (config_mcp_clients.oauth_config_id → oauth_configs).
 	err = db.AutoMigrate(
 		&TableProvider{},
-		&TableOauthConfig{},
-		&TableOauthToken{},
 		&TableKey{},
-		&TableMCPClient{},
 		&TablePlugin{},
 		&TableVirtualKey{},
 		&SessionsTable{},

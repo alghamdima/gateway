@@ -108,7 +108,7 @@ func trySetupClickHouseStore(t testing.TB) *ClickHouseLogStore {
 		t.Skipf("ClickHouse not available, skipping test: %v", err)
 	}
 	ch := store.(*ClickHouseLogStore)
-	for _, table := range []string{"logs", "mcp_tool_logs", "async_jobs"} {
+	for _, table := range []string{"logs", "async_jobs"} {
 		require.NoError(t, ch.db.Exec("TRUNCATE TABLE "+table).Error)
 	}
 	t.Cleanup(func() { _ = ch.Close(context.Background()) })
@@ -714,15 +714,6 @@ func TestClickHouseCreateIfNotExistsKeepsExistingRow(t *testing.T) {
 	assert.True(t, found.HasObject)
 	_, err = store.FindByID(ctx, "ch-keep-2")
 	require.NoError(t, err)
-
-	// MCP variant.
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{chTestMCPToolLog("ch-keep-mcp-1", ts)}))
-	require.NoError(t, store.UpdateMCPToolLog(ctx, "ch-keep-mcp-1", map[string]interface{}{"status": "success", "has_object": true}))
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{chTestMCPToolLog("ch-keep-mcp-1", ts)}))
-	foundMCP, err := store.FindMCPToolLog(ctx, "ch-keep-mcp-1")
-	require.NoError(t, err)
-	assert.Equal(t, "success", foundMCP.Status)
-	assert.True(t, foundMCP.HasObject)
 }
 
 func TestClickHouseBatchCreate(t *testing.T) {
@@ -956,25 +947,6 @@ func TestClickHouseDimensionFiltersMatchFanoutRankings(t *testing.T) {
 	}, now)
 }
 
-// The MCP tool log team, customer and business-unit filters go through the hasAny membership
-// SQL, so they are pinned on this backend too.
-func TestClickHouseMCPAttributionFilters(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	assertMCPAttributionFilters(t, store.RDBLogStore, store.BatchCreateMCPToolLogsIfNotExists)
-}
-
-// The MCP filter options fan out over the JSON-array columns through this backend's own ARRAY JOIN.
-func TestClickHouseMCPKeyPairs(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	assertMCPKeyPairs(t, store.RDBLogStore, store.BatchCreateMCPToolLogsIfNotExists)
-}
-
-// The MCP latency histogram reads its percentiles from ClickHouse's own quantile functions.
-func TestClickHouseMCPStatsAndHistograms(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	assertMCPFinishedCallAggregates(t, store.RDBLogStore, store.BatchCreateMCPToolLogsIfNotExists)
-}
-
 // The keyset cursor bound its timestamp as a time.Time, which the driver sends
 // at seconds precision. Ascending, every page re-read the rows earlier in the
 // cursor's second, and a second holding a full page never advanced; descending,
@@ -1163,19 +1135,16 @@ func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	done.Status = "success"
 	require.NoError(t, store.CreateIfNotExists(ctx, stuck))
 	require.NoError(t, store.CreateIfNotExists(ctx, done))
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{chTestMCPToolLog("ch-flush-mcp", old)}))
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
 	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
 	since := time.Now().UTC().Add(-30 * time.Minute)
 	require.NoError(t, store.Flush(ctx, since))
-	require.NoError(t, store.FlushMCPToolLogs(ctx, since))
 
 	_, err := store.FindByID(ctx, "ch-flush-stuck")
 	assert.ErrorIs(t, err, ErrNotFound, "stale processing row must be flushed")
 	_, err = store.FindByID(ctx, "ch-flush-done")
 	assert.NoError(t, err, "completed rows must survive the flush")
-	_, err = store.FindMCPToolLog(ctx, "ch-flush-mcp")
 	assert.ErrorIs(t, err, ErrNotFound, "stale processing MCP row must be flushed")
 
 	logsCmds := chNewMutationCommands(t, store.db, "logs", logsBefore)
@@ -1190,7 +1159,6 @@ func TestClickHouseFlushIsLightweightAndSkipsWhenEmpty(t *testing.T) {
 	logsBefore = chMutationIDs(t, store.db, "logs")
 	mcpBefore = chMutationIDs(t, store.db, "mcp_tool_logs")
 	require.NoError(t, store.Flush(ctx, since))
-	require.NoError(t, store.FlushMCPToolLogs(ctx, since))
 	assert.Empty(t, chNewMutationCommands(t, store.db, "logs", logsBefore), "empty flush must not issue a mutation")
 	assert.Empty(t, chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore), "empty flush must not issue a mutation")
 }
@@ -1205,23 +1173,18 @@ func TestClickHouseFlushSkipsSupersededProcessingRow(t *testing.T) {
 	old := time.Now().UTC().Add(-40 * time.Minute).Truncate(time.Millisecond)
 	require.NoError(t, store.CreateIfNotExists(ctx, chTestLog("ch-flush-superseded", old)))
 	require.NoError(t, store.Update(ctx, "ch-flush-superseded", map[string]interface{}{"status": "success"}))
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{chTestMCPToolLog("ch-flush-superseded-mcp", old)}))
-	require.NoError(t, store.UpdateMCPToolLog(ctx, "ch-flush-superseded-mcp", map[string]interface{}{"status": "success"}))
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
 	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
 	since := time.Now().UTC().Add(-30 * time.Minute)
 	require.NoError(t, store.Flush(ctx, since))
-	require.NoError(t, store.FlushMCPToolLogs(ctx, since))
 	assert.Empty(t, chNewMutationCommands(t, store.db, "logs", logsBefore), "superseded processing version must not trigger a flush mutation")
 	assert.Empty(t, chNewMutationCommands(t, store.db, "mcp_tool_logs", mcpBefore), "superseded processing version must not trigger a flush mutation")
 
 	found, err := store.FindByID(ctx, "ch-flush-superseded")
 	require.NoError(t, err)
 	assert.Equal(t, "success", found.Status)
-	mcp, err := store.FindMCPToolLog(ctx, "ch-flush-superseded-mcp")
 	require.NoError(t, err)
-	assert.Equal(t, "success", mcp.Status)
 }
 
 // TestClickHouseFinalAfterLightweightDelete proves the _row_exists mask left
@@ -1255,14 +1218,12 @@ func TestClickHouseFinalAfterLightweightDelete(t *testing.T) {
 		require.EqualValues(t, 2, chCountIDsNoFinal(t, store, "logs", []string{id}), "expected both versions of %s on disk before the delete", id)
 		require.Equal(t, int64(1), chCountRows(t, store.db, "logs", id), "FINAL collapses them to one logical row")
 	}
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, []*MCPToolLog{chTestMCPToolLog("ch-final-mcp", ts)}))
 	startMerges()
 
 	logsBefore := chMutationIDs(t, store.db, "logs")
 	mcpBefore := chMutationIDs(t, store.db, "mcp_tool_logs")
 	require.NoError(t, store.DeleteLog(ctx, "ch-final-1"))
 	require.NoError(t, store.DeleteLogs(ctx, []string{"ch-final-2", "ch-final-3"}))
-	require.NoError(t, store.DeleteMCPToolLogs(ctx, []string{"ch-final-mcp"}))
 
 	for _, id := range []string{"ch-final-1", "ch-final-2", "ch-final-3"} {
 		_, err := store.FindByID(ctx, id)
@@ -1270,8 +1231,6 @@ func TestClickHouseFinalAfterLightweightDelete(t *testing.T) {
 		assert.Equal(t, int64(0), chCountRows(t, store.db, "logs", id), "no version of %s may survive under FINAL", id)
 		assert.EqualValues(t, 0, chCountIDsNoFinal(t, store, "logs", []string{id}), "both physical versions of %s must be masked, not just the newest", id)
 	}
-	_, err := store.FindMCPToolLog(ctx, "ch-final-mcp")
-	assert.ErrorIs(t, err, ErrNotFound)
 
 	logsCmds := chNewMutationCommands(t, store.db, "logs", logsBefore)
 	require.Len(t, logsCmds, 2, "DeleteLog + DeleteLogs must issue one mutation each, got %v", logsCmds)
@@ -1295,7 +1254,7 @@ func chEngineFull(t *testing.T, db *gorm.DB, table string) string {
 func TestClickHouseTTLReconciledOnExistingTables(t *testing.T) {
 	store := trySetupClickHouseStore(t)
 	ctx := context.Background()
-	retained := []string{"logs", "mcp_tool_logs"}
+	retained := []string{"logs"}
 	// removeTTLs strips any TTL from the shared tables. REMOVE TTL errors on
 	// a table that has none (BAD_ARGUMENTS), so it is only issued when one is
 	// present. It runs before the initial-state check, because retention 0
@@ -1358,69 +1317,6 @@ func TestClickHouseTTLReconciledOnExistingTables(t *testing.T) {
 	for table, want := range before {
 		assert.Equal(t, want, chEngineFull(t, store.db, table), "%s: retention_days=0 must leave the table definition untouched", table)
 	}
-}
-
-func chTestMCPToolLog(id string, ts time.Time) *MCPToolLog {
-	return &MCPToolLog{
-		ID:        id,
-		Timestamp: ts,
-		ToolName:  "search_web",
-		Status:    "processing",
-		CreatedAt: ts,
-	}
-}
-
-func TestClickHouseMCPToolLogs(t *testing.T) {
-	store := trySetupClickHouseStore(t)
-	ctx := context.Background()
-	ts := time.Now().UTC().Truncate(time.Millisecond)
-
-	entries := []*MCPToolLog{
-		chTestMCPToolLog("ch-mcp-1", ts),
-		chTestMCPToolLog("ch-mcp-2", ts.Add(time.Millisecond)),
-	}
-	entries[0].RedactionMapping = `plain:{"input":{"EMAIL-1":"private@example.com"}}`
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, entries))
-	require.NoError(t, store.BatchCreateMCPToolLogsIfNotExists(ctx, nil)) // no-op
-
-	found, err := store.FindMCPToolLog(ctx, "ch-mcp-1")
-	require.NoError(t, err)
-	assert.Equal(t, "search_web", found.ToolName)
-	assert.Equal(t, entries[0].RedactionMapping, found.RedactionMapping)
-
-	// Map update.
-	latency := 42.0
-	require.NoError(t, store.UpdateMCPToolLog(ctx, "ch-mcp-1", map[string]interface{}{
-		"status":            "success",
-		"latency":           latency,
-		"redaction_mapping": `plain:{"output":{"EMAIL-2":"result@example.com"}}`,
-	}))
-	found, err = store.FindMCPToolLog(ctx, "ch-mcp-1")
-	require.NoError(t, err)
-	assert.Equal(t, "success", found.Status)
-	require.NotNil(t, found.Latency)
-	assert.Equal(t, 42.0, *found.Latency)
-	assert.Contains(t, found.RedactionMapping, "result@example.com")
-	assert.Equal(t, int64(1), chCountRows(t, store.db, "mcp_tool_logs", "ch-mcp-1"))
-
-	// Struct update preserves untouched fields and the dedup key.
-	require.NoError(t, store.UpdateMCPToolLog(ctx, "ch-mcp-2", &MCPToolLog{Status: "error", Timestamp: ts.Add(time.Hour)}))
-	found, err = store.FindMCPToolLog(ctx, "ch-mcp-2")
-	require.NoError(t, err)
-	assert.Equal(t, "error", found.Status)
-	assert.Equal(t, "search_web", found.ToolName)
-	assert.Equal(t, ts.Add(time.Millisecond).UnixMilli(), found.Timestamp.UnixMilli())
-	assert.Equal(t, int64(1), chCountRows(t, store.db, "mcp_tool_logs", "ch-mcp-2"))
-
-	assert.ErrorIs(t, store.UpdateMCPToolLog(ctx, "missing-id", map[string]interface{}{"status": "success"}), ErrNotFound)
-
-	hasLogs, err := store.HasMCPToolLogs(ctx)
-	require.NoError(t, err)
-	assert.True(t, hasLogs)
-
-	result, err := store.SearchMCPToolLogs(ctx, MCPToolLogSearchFilters{}, PaginationOptions{Limit: 10})
-	require.NoError(t, err)
-	assert.Len(t, result.Logs, 2)
 }
 
 // TestClickHouseHybridHasObjectSurvivesDuplicateCreate exercises the full

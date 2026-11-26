@@ -14,12 +14,12 @@ import (
 )
 
 // newProviderJobTestPlugin is newAccessTestPlugin over the MCP-stamping VK (id vk-mcp-stamp,
-// value mcpTestVKValue, every openai model), backed by a real SQLite config store that holds the
+// value accessTestVKValue, every openai model), backed by a real SQLite config store that holds the
 // provider job rows the ownership checks read.
 func newProviderJobTestPlugin(t *testing.T) (*GovernancePlugin, configstore.ConfigStore) {
 	t.Helper()
 	configStore := newProviderObjectConfigStore(t)
-	plugin := newAccessTestPlugin(t, buildVKForMCPStamping(nil), nil)
+	plugin := newAccessTestPlugin(t, buildAccessTestVK(), nil)
 	plugin.configStore = configStore
 	return plugin, configStore
 }
@@ -79,22 +79,22 @@ func TestPreLLMHookBindsBatchesToTheCreatingVirtualKey(t *testing.T) {
 
 	for _, requestType := range []schemas.RequestType{schemas.BatchRetrieveRequest, schemas.BatchCancelRequest, schemas.BatchResultsRequest, schemas.BatchDeleteRequest} {
 		t.Run(string(requestType), func(t *testing.T) {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), batchRequest(requestType, "batch-own"))
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), batchRequest(requestType, "batch-own"))
 			require.NoError(t, err)
 			assert.Nil(t, shortCircuit, "the creating key reaches its own batch")
 
-			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), batchRequest(requestType, "batch-other"))
+			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), batchRequest(requestType, "batch-other"))
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "another key's batch is refused")
 			require.NotNil(t, shortCircuit.Error.StatusCode)
 			assert.Equal(t, 404, *shortCircuit.Error.StatusCode, "refused as not found, not as forbidden")
 			assert.Contains(t, shortCircuit.Error.Error.Message, "batch-other")
 
-			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), batchRequest(requestType, "batch-unowned"))
+			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), batchRequest(requestType, "batch-unowned"))
 			require.NoError(t, err)
 			assert.Nil(t, shortCircuit, "a row with no recorded key binds to nobody")
 
-			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), batchRequest(requestType, "batch-unknown"))
+			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), batchRequest(requestType, "batch-unknown"))
 			require.NoError(t, err)
 			assert.Nil(t, shortCircuit, "a batch with no row cannot be bound and stays reachable")
 
@@ -135,7 +135,7 @@ func TestPostLLMHookFiltersBatchListToTheVirtualKey(t *testing.T) {
 	}
 
 	// The list request is evaluated first, which is what stamps the key on the context.
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.OpenAI}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -171,7 +171,7 @@ func TestPostLLMHookFailsBatchListWhenOwnershipLookupFails(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
 	plugin.configStore = failingJobLookupStore{store}
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.OpenAI}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -200,11 +200,11 @@ func TestPostLLMHookFailsBatchListWhenOwnershipLookupFails(t *testing.T) {
 // addresses no batch and is narrowed only to what is recorded, so with nothing recorded it goes
 // through as it always did.
 func TestPreLLMHookRefusesVirtualKeyBatchRequestsWithoutConfigStore(t *testing.T) {
-	plugin := newAccessTestPlugin(t, buildVKForMCPStamping(nil), nil)
+	plugin := newAccessTestPlugin(t, buildAccessTestVK(), nil)
 	plugin.configStore = nil
 
 	list := &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.OpenAI}}
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), list)
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), list)
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "a batch list has nothing to check against and goes through")
 
@@ -216,7 +216,7 @@ func TestPreLLMHookRefusesVirtualKeyBatchRequestsWithoutConfigStore(t *testing.T
 	}
 	for name, req := range requests {
 		t.Run(name, func(t *testing.T) {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), req)
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), req)
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "a virtual-key batch request must not proceed when ownership cannot be verified")
 			require.NotNil(t, shortCircuit.Error.StatusCode)
@@ -254,7 +254,7 @@ func TestPostLLMHookDropsRawResponsesWhenBatchListIsFiltered(t *testing.T) {
 		}}
 	}
 	run := func(resp *schemas.BifrostResponse) *schemas.BifrostBatchListResponse {
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.OpenAI}})
 		require.NoError(t, err)
 		require.Nil(t, shortCircuit)
@@ -340,18 +340,18 @@ func TestPreLLMHookBindsProviderObjectsToTheCreatingVirtualKey(t *testing.T) {
 		t.Run(string(requestType), func(t *testing.T) {
 			kind := providerObjectKindFor(requestType)
 
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests(kind + "-own")[requestType])
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests(kind + "-own")[requestType])
 			require.NoError(t, err)
 			assert.Nil(t, shortCircuit, "the creating key reaches its own object")
 
-			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests(kind + "-other")[requestType])
+			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests(kind + "-other")[requestType])
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "another key's object is refused")
 			require.NotNil(t, shortCircuit.Error.StatusCode)
 			assert.Equal(t, 404, *shortCircuit.Error.StatusCode, "refused as not found, not as forbidden")
 			assert.Contains(t, shortCircuit.Error.Error.Message, kind+"-other")
 
-			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests(kind + "-unknown")[requestType])
+			_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests(kind + "-unknown")[requestType])
 			require.NoError(t, err)
 			assert.Nil(t, shortCircuit, "an object with no row cannot be bound and stays reachable")
 
@@ -378,13 +378,13 @@ func TestProviderObjectOwnershipFollowsTheClientSetting(t *testing.T) {
 
 	for requestType := range providerObjectRequests("x") {
 		kind := providerObjectKindFor(requestType)
-		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests(kind + "-other")[requestType])
+		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests(kind + "-other")[requestType])
 		require.NoError(t, err)
 		assert.Nil(t, shortCircuit, "%s: another key's object is reachable while the setting is off", requestType)
 	}
 
 	listCtx := func() *schemas.BifrostContext {
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileListRequest, FileListRequest: &schemas.BifrostFileListRequest{Provider: schemas.OpenAI}})
 		require.NoError(t, err)
 		require.Nil(t, shortCircuit)
@@ -396,14 +396,14 @@ func TestProviderObjectOwnershipFollowsTheClientSetting(t *testing.T) {
 
 	// Creators are recorded while the setting is off: a plain create, and the automatic
 	// container whose marker the pre-hook leaves for the post-hook.
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileUploadRequest, FileUploadRequest: &schemas.BifrostFileUploadRequest{Provider: schemas.OpenAI}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
 	_, _, err = plugin.PostLLMHook(ctx, &schemas.BifrostResponse{FileUploadResponse: &schemas.BifrostFileUploadResponse{ID: "file-made-while-off",
 		ExtraFields: schemas.BifrostResponseExtraFields{RequestType: schemas.FileUploadRequest, Provider: schemas.OpenAI}}}, nil)
 	require.NoError(t, err)
-	ctx = presentCtx(mcpTestVKValue)
+	ctx = presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.ResponsesRequest, ResponsesRequest: &schemas.BifrostResponsesRequest{Provider: schemas.OpenAI, Model: "m", Params: &schemas.ResponsesParameters{
 		Tools: []schemas.ResponsesTool{{Type: schemas.ResponsesToolTypeCodeInterpreter, ResponsesToolCodeInterpreter: &schemas.ResponsesToolCodeInterpreter{Container: map[string]any{"type": "auto"}}}},
 	}}})
@@ -426,7 +426,7 @@ func TestProviderObjectOwnershipFollowsTheClientSetting(t *testing.T) {
 
 	// Turning the setting on binds the objects, including the ones recorded while it was off.
 	enforced = true
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("file-other")[schemas.FileRetrieveRequest])
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-other")[schemas.FileRetrieveRequest])
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit, "another key's object is refused once the setting is on")
 	assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
@@ -448,7 +448,7 @@ func TestPostLLMHookFiltersAListLargerThanOneStatementBinds(t *testing.T) {
 	}
 	data = append(data, schemas.FileObject{ID: "file-other"}, schemas.FileObject{ID: "file-own"})
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileListRequest, FileListRequest: &schemas.BifrostFileListRequest{Provider: schemas.OpenAI}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -471,7 +471,7 @@ func TestPreLLMHookBindsVideosUnderEitherIDForm(t *testing.T) {
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindVideo, "openai", "video_bare", other)
 
 	for _, id := range []string{"video_suffixed", "video_suffixed:openai", "video_bare", "video_bare:openai"} {
-		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests(id)[schemas.VideoDownloadRequest])
+		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests(id)[schemas.VideoDownloadRequest])
 		require.NoError(t, err)
 		require.NotNil(t, shortCircuit, "video %s belongs to another key", id)
 		assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
@@ -519,7 +519,7 @@ func TestPreLLMHookBindsBatchFilesThroughTheBatchRow(t *testing.T) {
 
 	for _, requestType := range []schemas.RequestType{schemas.FileRetrieveRequest, schemas.FileContentRequest, schemas.FileDeleteRequest, schemas.BatchCreateRequest} {
 		for _, fileID := range []string{"file-other-output", "file-other-error"} {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests(fileID)[requestType])
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests(fileID)[requestType])
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "%s on %s: another key's batch file is refused", requestType, fileID)
 			assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
@@ -527,14 +527,14 @@ func TestPreLLMHookBindsBatchFilesThroughTheBatchRow(t *testing.T) {
 		// The input file was there before the batch: a file uploaded through the gateway is bound
 		// by its own row, and one uploaded outside it stays shared. Running a batch on it must not
 		// make it the batch key's.
-		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("file-other-input")[requestType])
+		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-other-input")[requestType])
 		require.NoError(t, err)
 		assert.Nil(t, shortCircuit, "%s: an unowned input file is not claimed by the batch that ran on it", requestType)
-		_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("file-own-output")[requestType])
+		_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-own-output")[requestType])
 		require.NoError(t, err)
 		assert.Nil(t, shortCircuit, "%s: the creating key reaches its own batch output", requestType)
 	}
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("video_other")[schemas.VideoDownloadRequest])
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("video_other")[schemas.VideoDownloadRequest])
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit, "a video with only a job row is still bound")
 	assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
@@ -575,7 +575,7 @@ func TestPostLLMHookRecordsProviderObjectCreatorsAndForgetsDeleted(t *testing.T)
 
 	for kind, resp := range creates {
 		t.Run(kind, func(t *testing.T) {
-			ctx := presentCtx(mcpTestVKValue)
+			ctx := presentCtx(accessTestVKValue)
 			_, shortCircuit, err := plugin.PreLLMHook(ctx, createRequest(kind))
 			require.NoError(t, err)
 			require.Nil(t, shortCircuit)
@@ -590,7 +590,7 @@ func TestPostLLMHookRecordsProviderObjectCreatorsAndForgetsDeleted(t *testing.T)
 	}
 
 	// The recorded file is refused to another key and reachable to its creator.
-	otherKey := buildVKForMCPStamping(nil)
+	otherKey := buildAccessTestVK()
 	otherKey.ID = "vk-other"
 	otherKey.Value = *schemas.NewSecretVar("sk-bf-other")
 	otherPlugin := newAccessTestPlugin(t, otherKey, nil)
@@ -599,7 +599,7 @@ func TestPostLLMHookRecordsProviderObjectCreatorsAndForgetsDeleted(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit, "the recorded file is refused to another key")
 	assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("file-new")[schemas.FileContentRequest])
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-new")[schemas.FileContentRequest])
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit)
 
@@ -616,7 +616,7 @@ func TestPostLLMHookRecordsProviderObjectCreatorsAndForgetsDeleted(t *testing.T)
 	assert.Empty(t, rows, "an anonymous create binds to nobody")
 
 	// A successful delete forgets the object.
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, providerObjectRequests("file-new")[schemas.FileDeleteRequest])
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -739,7 +739,7 @@ func TestPostLLMHookFiltersProviderObjectListsToTheVirtualKey(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			ctx := presentCtx(mcpTestVKValue)
+			ctx := presentCtx(accessTestVKValue)
 			_, shortCircuit, err := plugin.PreLLMHook(ctx, tc.request)
 			require.NoError(t, err)
 			require.Nil(t, shortCircuit)
@@ -765,13 +765,13 @@ func TestPostLLMHookFiltersProviderObjectListsToTheVirtualKey(t *testing.T) {
 // a bound object is refused up front like a batch request is. Lists address nothing and are only
 // ever narrowed to what is recorded, so they go through unfiltered, as they did before.
 func TestPreLLMHookRefusesVirtualKeyProviderObjectRequestsWithoutConfigStore(t *testing.T) {
-	plugin := newAccessTestPlugin(t, buildVKForMCPStamping(nil), nil)
+	plugin := newAccessTestPlugin(t, buildAccessTestVK(), nil)
 	plugin.configStore = nil
 
 	requests := providerObjectRequests("object-any")
 	// A batch create only names its input file and stays open: nothing is recorded to check it
 	// against, and the batch's results are refused on their own.
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), requests[schemas.BatchCreateRequest])
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), requests[schemas.BatchCreateRequest])
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "a batch create is not refused for naming an input file")
 	delete(requests, schemas.BatchCreateRequest)
@@ -781,13 +781,13 @@ func TestPreLLMHookRefusesVirtualKeyProviderObjectRequestsWithoutConfigStore(t *
 		schemas.ContainerListRequest:     {RequestType: schemas.ContainerListRequest, ContainerListRequest: &schemas.BifrostContainerListRequest{Provider: schemas.OpenAI}},
 		schemas.CachedContentListRequest: {RequestType: schemas.CachedContentListRequest, CachedContentListRequest: &schemas.BifrostCachedContentListRequest{Provider: schemas.OpenAI}},
 	} {
-		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), list)
+		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), list)
 		require.NoError(t, err)
 		assert.Nil(t, shortCircuit, "a %s has nothing to check against and goes through", requestType)
 	}
 	for requestType, req := range requests {
 		t.Run(string(requestType), func(t *testing.T) {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), req)
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), req)
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "a virtual-key request must not proceed when ownership cannot be verified")
 			require.NotNil(t, shortCircuit.Error.StatusCode)
@@ -828,7 +828,7 @@ func (s *recordingObjectStore) UpsertProviderObject(ctx context.Context, object 
 // transcription request can run on a cached content. Each is checked like a direct reference.
 func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 	store := newProviderObjectConfigStore(t)
-	vk := buildVKForMCPStamping(nil)
+	vk := buildAccessTestVK()
 	vk.ProviderConfigs = append(vk.ProviderConfigs, buildProviderConfig("gemini", []string{"*"}))
 	plugin := newAccessTestPlugin(t, vk, nil)
 	plugin.configStore = store
@@ -859,7 +859,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 	}
 	refused := func(t *testing.T, req *schemas.BifrostRequest, named string) {
 		t.Helper()
-		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), req)
+		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), req)
 		require.NoError(t, err)
 		require.NotNil(t, shortCircuit, "another key's object is refused")
 		assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
@@ -874,16 +874,16 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 
 	t.Run("container create file_ids", func(t *testing.T) {
 		refused(t, container("file-own", "file-other"), "file-other")
-		allowed(t, presentCtx(mcpTestVKValue), container("file-own", "file-unknown"), "own and unrecorded files may be copied in")
-		allowed(t, presentCtx(mcpTestVKValue), container(), "a container with no files names nothing")
+		allowed(t, presentCtx(accessTestVKValue), container("file-own", "file-unknown"), "own and unrecorded files may be copied in")
+		allowed(t, presentCtx(accessTestVKValue), container(), "a container with no files names nothing")
 		allowed(t, emptyCtx(), container("file-other"), "a request that presented no key is unrestricted")
 	})
 	for _, requestType := range []schemas.RequestType{schemas.ChatCompletionRequest, schemas.ResponsesRequest, schemas.ImageGenerationRequest, schemas.ImageEditRequest, schemas.TranscriptionRequest} {
 		for _, key := range []string{"cached_content", "cachedContent"} {
 			t.Run(string(requestType)+" "+key, func(t *testing.T) {
 				refused(t, cached(requestType, key, "cachedContents/other"), "cachedContents/other")
-				allowed(t, presentCtx(mcpTestVKValue), cached(requestType, key, "cachedContents/own"), "the creating key runs on its own cache")
-				allowed(t, presentCtx(mcpTestVKValue), cached(requestType, key, "cachedContents/unknown"), "an unrecorded cache stays usable")
+				allowed(t, presentCtx(accessTestVKValue), cached(requestType, key, "cachedContents/own"), "the creating key runs on its own cache")
+				allowed(t, presentCtx(accessTestVKValue), cached(requestType, key, "cachedContents/unknown"), "an unrecorded cache stays usable")
 				allowed(t, emptyCtx(), cached(requestType, key, "cachedContents/other"), "a request that presented no key is unrestricted")
 			})
 		}
@@ -909,7 +909,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		for _, requestType := range []schemas.RequestType{schemas.ImageGenerationRequest, schemas.ImageEditRequest, schemas.ChatCompletionRequest} {
 			refused(t, both(requestType, "cachedContents/own", "cachedContents/other"), "cachedContents/other")
 			refused(t, both(requestType, "cachedContents/other", "cachedContents/own"), "cachedContents/other")
-			allowed(t, presentCtx(mcpTestVKValue), both(requestType, "cachedContents/own", "cachedContents/own"), "the same own cache under both spellings is fine")
+			allowed(t, presentCtx(accessTestVKValue), both(requestType, "cachedContents/own", "cachedContents/own"), "the same own cache under both spellings is fine")
 		}
 	})
 
@@ -921,15 +921,15 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 			return &schemas.BifrostRequest{RequestType: schemas.ContainerFileCreateRequest, ContainerFileCreateRequest: &schemas.BifrostContainerFileCreateRequest{Provider: schemas.OpenAI, ContainerID: "container-unbound", FileID: str(fileID)}}
 		}
 		refused(t, copyInto("file-other"), "file-other")
-		allowed(t, presentCtx(mcpTestVKValue), copyInto("file-own"), "the creating key copies its own file")
-		allowed(t, presentCtx(mcpTestVKValue), copyInto("file-unknown"), "an unrecorded file may be copied in")
+		allowed(t, presentCtx(accessTestVKValue), copyInto("file-own"), "the creating key copies its own file")
+		allowed(t, presentCtx(accessTestVKValue), copyInto("file-unknown"), "an unrecorded file may be copied in")
 	})
 	t.Run("video edit source", func(t *testing.T) {
 		edit := func(id string) *schemas.BifrostRequest {
 			return &schemas.BifrostRequest{RequestType: schemas.VideoEditRequest, VideoEditRequest: &schemas.BifrostVideoEditRequest{Provider: schemas.OpenAI, Model: "sora-2", Input: &schemas.VideoEditInput{Video: schemas.VideoInput{ID: id}, Prompt: "p"}}}
 		}
 		refused(t, edit("video_other"), "video_other")
-		allowed(t, presentCtx(mcpTestVKValue), edit("video_unknown"), "an unrecorded video may be edited")
+		allowed(t, presentCtx(accessTestVKValue), edit("video_unknown"), "an unrecorded video may be edited")
 		allowed(t, emptyCtx(), edit("video_other"), "a request that presented no key is unrestricted")
 	})
 	t.Run("chat message file_id", func(t *testing.T) {
@@ -939,8 +939,8 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		}
 		refused(t, chat(schemas.ChatContentBlock{Type: schemas.ChatContentBlockTypeFile, File: &schemas.ChatInputFile{FileID: str("file-other")}}), "file-other")
 		refused(t, chat(schemas.ChatContentBlock{Type: schemas.ChatContentBlockTypeImage, ImageURLStruct: &schemas.ChatInputImage{FileID: str("file-other")}}), "file-other")
-		allowed(t, presentCtx(mcpTestVKValue), chat(schemas.ChatContentBlock{Type: schemas.ChatContentBlockTypeFile, File: &schemas.ChatInputFile{FileID: str("file-own")}}), "the creating key reads its own file")
-		allowed(t, presentCtx(mcpTestVKValue), chat(schemas.ChatContentBlock{Type: schemas.ChatContentBlockTypeFile, File: &schemas.ChatInputFile{FileData: str("ZGF0YQ==")}}), "inline file data names no object")
+		allowed(t, presentCtx(accessTestVKValue), chat(schemas.ChatContentBlock{Type: schemas.ChatContentBlockTypeFile, File: &schemas.ChatInputFile{FileID: str("file-own")}}), "the creating key reads its own file")
+		allowed(t, presentCtx(accessTestVKValue), chat(schemas.ChatContentBlock{Type: schemas.ChatContentBlockTypeFile, File: &schemas.ChatInputFile{FileData: str("ZGF0YQ==")}}), "inline file data names no object")
 	})
 	t.Run("responses input file_id", func(t *testing.T) {
 		responses := func(fileID string) *schemas.BifrostRequest {
@@ -948,7 +948,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 				Content: &schemas.ResponsesMessageContent{ContentBlocks: []schemas.ResponsesMessageContentBlock{{Type: schemas.ResponsesInputMessageContentBlockTypeFile, FileID: str(fileID)}}}}}}}
 		}
 		refused(t, responses("file-other"), "file-other")
-		allowed(t, presentCtx(mcpTestVKValue), responses("file-own"), "the creating key reads its own file")
+		allowed(t, presentCtx(accessTestVKValue), responses("file-own"), "the creating key reads its own file")
 		allowed(t, emptyCtx(), responses("file-other"), "a request that presented no key is unrestricted")
 	})
 	// A Responses code_interpreter tool runs in a container: either an existing one named by id, or
@@ -963,9 +963,9 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		}
 		refused(t, withTool("container-other"), "container-other")
 		refused(t, withTool(map[string]interface{}{"type": "auto", "file_ids": []interface{}{"file-own", "file-other"}}), "file-other")
-		allowed(t, presentCtx(mcpTestVKValue), withTool("container-own"), "the creating key runs code in its own container")
-		allowed(t, presentCtx(mcpTestVKValue), withTool(map[string]interface{}{"type": "auto", "file_ids": []interface{}{"file-own"}}), "an automatic container seeded with own files")
-		allowed(t, presentCtx(mcpTestVKValue), withTool(map[string]interface{}{"type": "auto"}), "an empty automatic container names nothing")
+		allowed(t, presentCtx(accessTestVKValue), withTool("container-own"), "the creating key runs code in its own container")
+		allowed(t, presentCtx(accessTestVKValue), withTool(map[string]interface{}{"type": "auto", "file_ids": []interface{}{"file-own"}}), "an automatic container seeded with own files")
+		allowed(t, presentCtx(accessTestVKValue), withTool(map[string]interface{}{"type": "auto"}), "an empty automatic container names nothing")
 		allowed(t, emptyCtx(), withTool("container-other"), "a request that presented no key is unrestricted")
 	})
 	// Gemini names an uploaded file by its URI (https://generativelanguage.googleapis.com/v1beta/files/<id>),
@@ -998,8 +998,8 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		for name, build := range map[string]func(string) *schemas.BifrostRequest{"chat file": chatFile, "chat image": chatImage, "responses file": responsesFile, "responses image": responsesImage, "cached content create": cacheOn} {
 			t.Run(name, func(t *testing.T) {
 				refused(t, build(geminiFiles+"g-other"), "files/g-other")
-				allowed(t, presentCtx(mcpTestVKValue), build(geminiFiles+"g-own"), "the creating key uses its own file")
-				allowed(t, presentCtx(mcpTestVKValue), build("https://example.com/files/g-other"), "a URL on another host is not a Gemini file")
+				allowed(t, presentCtx(accessTestVKValue), build(geminiFiles+"g-own"), "the creating key uses its own file")
+				allowed(t, presentCtx(accessTestVKValue), build("https://example.com/files/g-other"), "a URL on another host is not a Gemini file")
 				allowed(t, emptyCtx(), build(geminiFiles+"g-other"), "a request that presented no key is unrestricted")
 			})
 		}
@@ -1033,7 +1033,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		refused(t, pass(schemas.OpenAI, "POST", "/v1/fine_tuning/jobs", `{"model":"gpt-4o-mini","training_file":"file-other"}`), "file-other")
 		refused(t, pass(schemas.OpenAI, "POST", "/v1/fine_tuning/jobs", `{"model":"gpt-4o-mini","training_file":"file-own","validation_file":"file-other"}`), "file-other")
 		refused(t, pass(schemas.Gemini, "POST", "/v1beta/models/gemini-2.5-flash:batchGenerateContent", `{"batch":{"displayName":"b","inputConfig":{"fileName":"files/g-other"}}}`), "files/g-other")
-		allowed(t, presentCtx(mcpTestVKValue), pass(schemas.OpenAI, "POST", "/v1/batches", `{"input_file_id":"file-own","endpoint":"/v1/chat/completions","completion_window":"24h"}`), "the creating key batches its own file")
+		allowed(t, presentCtx(accessTestVKValue), pass(schemas.OpenAI, "POST", "/v1/batches", `{"input_file_id":"file-own","endpoint":"/v1/chat/completions","completion_window":"24h"}`), "the creating key batches its own file")
 		// The Go SDK hands a path over as written, and the HTTP client resolves dot segments and
 		// repeated slashes before sending, so the path is checked as it will be sent.
 		refused(t, pass(schemas.OpenAI, "GET", "/v1/files/x/../file-other/content", ""), "file-other")
@@ -1044,10 +1044,10 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		refused(t, pass(schemas.OpenAI, "POST", "/v1/responses", `{"input":[{"content":[{"type":"input_file","file\u005fid":"file-other"}]}]}`), "file-other")
 		refused(t, pass(schemas.OpenAI, "POST", "/v1/responses", `{"input":"x","tools":[{"type":"code\u005finterpreter","container":"container-other"}]}`), "container-other")
 		refused(t, pass(schemas.Gemini, "POST", "/v1beta/models/gemini-2.5-flash:generateContent", `{"contents":[{"parts":[{"fileData":{"file\u0055ri":"`+geminiFiles+`g-other"}}]}]}`), "files/g-other")
-		allowed(t, presentCtx(mcpTestVKValue), pass(schemas.OpenAI, "POST", "/v1/responses", inputFile("file-own")), "the creating key reads its own file")
-		allowed(t, presentCtx(mcpTestVKValue), pass(schemas.OpenAI, "GET", "/v1/files/file-own/content", ""), "the creating key downloads its own file")
-		allowed(t, presentCtx(mcpTestVKValue), pass(schemas.OpenAI, "POST", "/v1/chat/completions", `{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}`), "a body naming no object")
-		allowed(t, presentCtx(mcpTestVKValue), pass(schemas.OpenAI, "POST", "/v1/responses", `not json`), "a body that is not JSON names nothing")
+		allowed(t, presentCtx(accessTestVKValue), pass(schemas.OpenAI, "POST", "/v1/responses", inputFile("file-own")), "the creating key reads its own file")
+		allowed(t, presentCtx(accessTestVKValue), pass(schemas.OpenAI, "GET", "/v1/files/file-own/content", ""), "the creating key downloads its own file")
+		allowed(t, presentCtx(accessTestVKValue), pass(schemas.OpenAI, "POST", "/v1/chat/completions", `{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}`), "a body naming no object")
+		allowed(t, presentCtx(accessTestVKValue), pass(schemas.OpenAI, "POST", "/v1/responses", `not json`), "a body that is not JSON names nothing")
 		allowed(t, emptyCtx(), pass(schemas.OpenAI, "GET", "/v1/files/file-other/content", ""), "a request that presented no key is unrestricted")
 
 		// A video is recorded with its :provider suffix; a passthrough path names it bare.
@@ -1057,7 +1057,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		// A passthrough list returns the provider's raw page, which cannot be narrowed to the key's
 		// objects, so a virtual key is sent to the gateway's own list route instead.
 		for _, path := range []string{"/v1/files", "/v1/batches", "/v1/containers", "/v1/containers/container-own/files", "/v1/videos"} {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), pass(schemas.OpenAI, "GET", path, ""))
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), pass(schemas.OpenAI, "GET", path, ""))
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "a passthrough list of %s is refused for a virtual key", path)
 			assert.Equal(t, 403, *shortCircuit.Error.StatusCode)
@@ -1077,7 +1077,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		refused(t, inline(schemas.Gemini, map[string]any{"model": "m", "contents": []any{map[string]any{"parts": []any{map[string]any{"fileData": map[string]any{"fileUri": geminiFiles + "g-other"}}}}}}), "files/g-other")
 		refused(t, inline(schemas.OpenAI, map[string]any{"model": "m", "cached_content": "cachedContents/other"}), "cachedContents/other")
 		refused(t, inline(schemas.OpenAI, map[string]any{"model": "m", "input": []any{map[string]any{"content": []any{map[string]any{"type": "input_file", "file_id": "file-other"}}}}}), "file-other")
-		allowed(t, presentCtx(mcpTestVKValue), inline(schemas.OpenAI, map[string]any{"model": "m", "input": []any{map[string]any{"content": []any{map[string]any{"type": "input_file", "file_id": "file-own"}}}}}), "own files in inline items")
+		allowed(t, presentCtx(accessTestVKValue), inline(schemas.OpenAI, map[string]any{"model": "m", "input": []any{map[string]any{"content": []any{map[string]any{"type": "input_file", "file_id": "file-own"}}}}}), "own files in inline items")
 	})
 	t.Run("container file addressed by its own id", func(t *testing.T) {
 		for name, req := range map[string]*schemas.BifrostRequest{
@@ -1087,7 +1087,7 @@ func TestPreLLMHookBindsObjectsReferencedInsideRequests(t *testing.T) {
 		} {
 			t.Run(name, func(t *testing.T) { refused(t, req, "cfile-other") })
 		}
-		allowed(t, presentCtx(mcpTestVKValue), &schemas.BifrostRequest{RequestType: schemas.ContainerFileRetrieveRequest, ContainerFileRetrieveRequest: &schemas.BifrostContainerFileRetrieveRequest{Provider: schemas.OpenAI, ContainerID: "container-unbound", FileID: "cfile-unknown"}}, "an unrecorded container file stays reachable")
+		allowed(t, presentCtx(accessTestVKValue), &schemas.BifrostRequest{RequestType: schemas.ContainerFileRetrieveRequest, ContainerFileRetrieveRequest: &schemas.BifrostContainerFileRetrieveRequest{Provider: schemas.OpenAI, ContainerID: "container-unbound", FileID: "cfile-unknown"}}, "an unrecorded container file stays reachable")
 	})
 }
 
@@ -1098,7 +1098,7 @@ func TestPostLLMHookRecordsAndFiltersContainerFiles(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindContainerFile, "openai", "cfile-other", "vk-someone-else")
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.ContainerFileCreateRequest, ContainerFileCreateRequest: &schemas.BifrostContainerFileCreateRequest{Provider: schemas.OpenAI, ContainerID: "container-unbound", File: []byte("x")}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1110,7 +1110,7 @@ func TestPostLLMHookRecordsAndFiltersContainerFiles(t *testing.T) {
 	require.Len(t, rows, 1, "the container file create was recorded")
 	assert.Equal(t, "vk-mcp-stamp", rows[0].VirtualKeyID)
 
-	ctx = presentCtx(mcpTestVKValue)
+	ctx = presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.ContainerFileListRequest, ContainerFileListRequest: &schemas.BifrostContainerFileListRequest{Provider: schemas.OpenAI, ContainerID: "container-unbound"}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1134,7 +1134,7 @@ func TestPostLLMHookRecordsAutomaticContainers(t *testing.T) {
 	plugin, store := newProviderJobTestPlugin(t)
 	run := func(t *testing.T, container interface{}, outputContainer string) {
 		t.Helper()
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		req := &schemas.BifrostRequest{RequestType: schemas.ResponsesRequest, ResponsesRequest: &schemas.BifrostResponsesRequest{Provider: schemas.OpenAI, Model: "m", Params: &schemas.ResponsesParameters{
 			Tools: []schemas.ResponsesTool{{Type: schemas.ResponsesToolTypeCodeInterpreter, ResponsesToolCodeInterpreter: &schemas.ResponsesToolCodeInterpreter{Container: container}}},
 		}}}
@@ -1165,7 +1165,7 @@ func TestPostLLMHookRecordsAutomaticContainers(t *testing.T) {
 
 	// One request can ask for an automatic container and name an existing one in another tool; the
 	// response then lists both, and only the automatic one is the key's.
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	req := &schemas.BifrostRequest{RequestType: schemas.ResponsesRequest, ResponsesRequest: &schemas.BifrostResponsesRequest{Provider: schemas.OpenAI, Model: "m", Params: &schemas.ResponsesParameters{
 		Tools: []schemas.ResponsesTool{
 			{Type: schemas.ResponsesToolTypeCodeInterpreter, ResponsesToolCodeInterpreter: &schemas.ResponsesToolCodeInterpreter{Container: map[string]interface{}{"type": "auto"}}},
@@ -1193,7 +1193,7 @@ func TestPostLLMHookRecordsAutomaticContainers(t *testing.T) {
 // so a second key cannot reach the object by switching the provider it asks through.
 func TestPreLLMHookBindsObjectsAcrossProviderAliases(t *testing.T) {
 	store := newProviderObjectConfigStore(t)
-	vk := buildVKForMCPStamping(nil)
+	vk := buildAccessTestVK()
 	vk.ProviderConfigs = []configstoreTables.TableVirtualKeyProviderConfig{
 		buildProviderConfig("openai", []string{"*"}),
 		buildProviderConfig("my-openai", []string{"*"}),
@@ -1215,22 +1215,22 @@ func TestPreLLMHookBindsObjectsAcrossProviderAliases(t *testing.T) {
 	}}
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-other", "vk-someone-else")
 
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), &schemas.BifrostRequest{RequestType: schemas.FileRetrieveRequest, FileRetrieveRequest: &schemas.BifrostFileRetrieveRequest{Provider: "my-openai", FileID: "file-other"}})
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), &schemas.BifrostRequest{RequestType: schemas.FileRetrieveRequest, FileRetrieveRequest: &schemas.BifrostFileRetrieveRequest{Provider: "my-openai", FileID: "file-other"}})
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit, "another key's OpenAI file is refused through an OpenAI-based custom provider")
 	assert.Equal(t, 404, *shortCircuit.Error.StatusCode)
 
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), &schemas.BifrostRequest{RequestType: schemas.FileRetrieveRequest, FileRetrieveRequest: &schemas.BifrostFileRetrieveRequest{Provider: schemas.Anthropic, FileID: "file-other"}})
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), &schemas.BifrostRequest{RequestType: schemas.FileRetrieveRequest, FileRetrieveRequest: &schemas.BifrostFileRetrieveRequest{Provider: schemas.Anthropic, FileID: "file-other"}})
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "a provider on a different upstream shares no objects with OpenAI")
 
 	// Speaking OpenAI's API is not being OpenAI: a custom provider on another service's base URL
 	// is a different upstream, and an id that happens to match there is not the OpenAI file.
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), &schemas.BifrostRequest{RequestType: schemas.FileRetrieveRequest, FileRetrieveRequest: &schemas.BifrostFileRetrieveRequest{Provider: "other-service", FileID: "file-other"}})
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), &schemas.BifrostRequest{RequestType: schemas.FileRetrieveRequest, FileRetrieveRequest: &schemas.BifrostFileRetrieveRequest{Provider: "other-service", FileID: "file-other"}})
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "an OpenAI-compatible provider on another base URL shares no objects with OpenAI")
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileListRequest, FileListRequest: &schemas.BifrostFileListRequest{Provider: "my-openai"}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1281,7 +1281,7 @@ func TestPostLLMHookRecordsBatchFilesFromRetrieve(t *testing.T) {
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindBatch, "openai", "batch-own", "vk-mcp-stamp")
 	retrieve := func(t *testing.T, batchID, output, errFile string) {
 		t.Helper()
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchRetrieveRequest, BatchRetrieveRequest: &schemas.BifrostBatchRetrieveRequest{Provider: schemas.OpenAI, BatchID: batchID}})
 		require.NoError(t, err)
 		require.Nil(t, shortCircuit)
@@ -1310,7 +1310,7 @@ func TestPostLLMHookRecordsBatchFilesFromRetrieve(t *testing.T) {
 	assert.Equal(t, "vk-mcp-stamp", owner(t, "file-own-output"), "the output file follows the batch's creator")
 	assert.Equal(t, "vk-mcp-stamp", owner(t, "file-own-error"), "the error file follows the batch's creator")
 
-	otherKey := buildVKForMCPStamping(nil)
+	otherKey := buildAccessTestVK()
 	otherKey.ID = "vk-other"
 	otherKey.Value = *schemas.NewSecretVar("sk-bf-other")
 	otherPlugin := newAccessTestPlugin(t, otherKey, nil)
@@ -1332,12 +1332,12 @@ func TestProviderObjectOwnersReadBatchRowsOnlyForUnrecordedFiles(t *testing.T) {
 	plugin.configStore = store
 	seedProviderObject(t, real, configstoreTables.ProviderObjectKindFile, "openai", "file-own", "vk-mcp-stamp")
 
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("file-own")[schemas.FileRetrieveRequest])
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-own")[schemas.FileRetrieveRequest])
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
 	assert.Empty(t, store.fileLookups, "a file with an ownership row needs no batch-row lookup")
 
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), providerObjectRequests("file-unknown")[schemas.FileRetrieveRequest])
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), providerObjectRequests("file-unknown")[schemas.FileRetrieveRequest])
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
 	require.Len(t, store.fileLookups, 1, "an unrecorded file is looked up in the batch rows once")
@@ -1358,7 +1358,7 @@ func TestHiddenProviderObjectsReadsAPageOverTheBindParameterLimit(t *testing.T) 
 	}
 	ids = append(ids, "file-other", "file-own")
 
-	hidden, err := plugin.hiddenProviderObjects(presentCtx(mcpTestVKValue), configstoreTables.ProviderObjectKindFile, "openai", "vk-mcp-stamp", ids)
+	hidden, err := plugin.hiddenProviderObjects(presentCtx(accessTestVKValue), configstoreTables.ProviderObjectKindFile, "openai", "vk-mcp-stamp", ids)
 	require.NoError(t, err)
 	require.NotNil(t, hidden)
 	assert.True(t, hidden("file-other"), "another key's file is hidden")
@@ -1374,7 +1374,7 @@ func TestPostLLMHookRetriesAFailedCreatorWriteOnce(t *testing.T) {
 	plugin.configStore = store
 	upload := func(t *testing.T, fileID string) {
 		t.Helper()
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileUploadRequest, FileUploadRequest: &schemas.BifrostFileUploadRequest{Provider: schemas.OpenAI}})
 		require.NoError(t, err)
 		require.Nil(t, shortCircuit)
@@ -1413,7 +1413,7 @@ func BenchmarkPreLLMHookProviderObjectChecks(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer store.Close(context.Background())
-	plugin := newAccessTestPlugin(b, buildVKForMCPStamping(nil), nil)
+	plugin := newAccessTestPlugin(b, buildAccessTestVK(), nil)
 	plugin.configStore = store
 	enforced := false
 	plugin.objectOwnershipEnforcedFn = func() bool { return enforced }
@@ -1443,7 +1443,7 @@ func BenchmarkPreLLMHookProviderObjectChecks(b *testing.B) {
 				enforced = mode == "on"
 				b.ReportAllocs()
 				for i := 0; i < b.N; i++ {
-					if _, _, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), build()); err != nil {
+					if _, _, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), build()); err != nil {
 						b.Fatal(err)
 					}
 				}
@@ -1457,7 +1457,7 @@ func BenchmarkPreLLMHookProviderObjectChecks(b *testing.B) {
 func newResourceNameTestPlugin(t *testing.T) (*GovernancePlugin, configstore.ConfigStore) {
 	t.Helper()
 	configStore := newProviderObjectConfigStore(t)
-	vk := buildVKForMCPStamping(nil)
+	vk := buildAccessTestVK()
 	vk.ProviderConfigs = append(vk.ProviderConfigs, buildProviderConfig("gemini", []string{"*"}), buildProviderConfig("vertex", []string{"*"}))
 	plugin := newAccessTestPlugin(t, vk, nil)
 	plugin.configStore = configStore
@@ -1535,7 +1535,7 @@ func TestPreLLMHookBindsResourceNamesUnderEveryForm(t *testing.T) {
 	}
 	for _, tc := range refused {
 		t.Run(tc.name, func(t *testing.T) {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), tc.req)
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), tc.req)
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "another key's object is refused in every form")
 			require.NotNil(t, shortCircuit.Error.StatusCode)
@@ -1545,13 +1545,13 @@ func TestPreLLMHookBindsResourceNamesUnderEveryForm(t *testing.T) {
 	}
 
 	for _, id := range []string{"g-own", "batches/g-own"} {
-		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Gemini, id))
+		_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Gemini, id))
 		require.NoError(t, err)
 		assert.Nil(t, shortCircuit, "the creating key reaches its batch as %q", id)
 	}
 
 	// A job number is matched whole: 5151 is not reached as 151.
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "151"))
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "151"))
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "a job number that is only a suffix of another is not that job")
 }
@@ -1570,7 +1570,7 @@ func TestPostLLMHookRecordsFullResourceNamesOnceAndForgetsOnlyTheDeletersRows(t 
 	bareRow := configstoreTables.ProviderObjectID(batch, "vertex", "4242")
 	otherRow := configstoreTables.ProviderObjectID(batch, "vertex", otherProjectBatch)
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchCreateRequest, BatchCreateRequest: &schemas.BifrostBatchCreateRequest{Provider: schemas.Vertex}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1588,7 +1588,7 @@ func TestPostLLMHookRecordsFullResourceNamesOnceAndForgetsOnlyTheDeletersRows(t 
 	// delete. The delete is admitted by the full name, which is one project's; the provider then
 	// echoes the job number.
 	seedProviderObject(t, store, batch, "vertex", otherProjectBatch, "vk-someone-else")
-	ctx = presentCtx(mcpTestVKValue)
+	ctx = presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, resourceRequest(schemas.BatchDeleteRequest, schemas.Vertex, vertexBatch))
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1625,7 +1625,7 @@ func TestPreLLMHookResolvesShortResourceNamesThroughFullNameRows(t *testing.T) {
 		{"batch by job number", resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "4242"), "4242"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), tc.req)
+			_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), tc.req)
 			require.NoError(t, err)
 			require.NotNil(t, shortCircuit, "another key's object is refused through its full-name row")
 			require.NotNil(t, shortCircuit.Error.StatusCode)
@@ -1633,10 +1633,10 @@ func TestPreLLMHookResolvesShortResourceNamesThroughFullNameRows(t *testing.T) {
 			assert.Contains(t, shortCircuit.Error.Error.Message, "'"+tc.id+"'")
 		})
 	}
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.CachedContentRetrieveRequest, schemas.Vertex, "7777"))
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.CachedContentRetrieveRequest, schemas.Vertex, "7777"))
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "the creating key reaches its own cached content by the bare id")
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.CachedContentRetrieveRequest, schemas.Vertex, "797"))
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.CachedContentRetrieveRequest, schemas.Vertex, "797"))
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "a bare id that is only a suffix of another is not that object")
 }
@@ -1653,7 +1653,7 @@ func TestPreLLMHookRefusesAmbiguousShortResourceNames(t *testing.T) {
 	seedProviderObject(t, store, batch, "vertex", own, "vk-mcp-stamp")
 	seedProviderObject(t, store, batch, "vertex", theirs, "vk-someone-else")
 
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "4242"))
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "4242"))
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit, "a job number recorded under two keys is refused")
 	require.NotNil(t, shortCircuit.Error.StatusCode)
@@ -1661,15 +1661,15 @@ func TestPreLLMHookRefusesAmbiguousShortResourceNames(t *testing.T) {
 	assert.Contains(t, shortCircuit.Error.Error.Message, "'4242'")
 	assert.Contains(t, shortCircuit.Error.Error.Message, "full resource name")
 
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, own))
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, own))
 	require.NoError(t, err)
 	assert.Nil(t, shortCircuit, "the full name is one project's and reaches the key's own job")
-	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, theirs))
+	_, shortCircuit, err = plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, theirs))
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit)
 	assert.Equal(t, 404, *shortCircuit.Error.StatusCode, "the other project's full name is another key's")
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err = plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.Vertex}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1694,7 +1694,7 @@ func TestPreLLMHookRefusesABareIDWhoseSourcesDisagree(t *testing.T) {
 	other := "vk-someone-else"
 	seedProviderJob(t, store, "vertex", "4242", &other)
 
-	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "4242"))
+	_, shortCircuit, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), resourceRequest(schemas.BatchRetrieveRequest, schemas.Vertex, "4242"))
 	require.NoError(t, err)
 	require.NotNil(t, shortCircuit, "a bare id whose full-name row and exact job row name different keys is refused")
 	require.NotNil(t, shortCircuit.Error.StatusCode)
@@ -1714,7 +1714,7 @@ func TestPostLLMHookKeepsBindingsWhenABareDeleteIsAmbiguous(t *testing.T) {
 		seedProviderObject(t, store, batch, "vertex", id, "vk-mcp-stamp")
 	}
 	deleteBare := func(id string) {
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, resourceRequest(schemas.BatchDeleteRequest, schemas.Vertex, id))
 		require.NoError(t, err)
 		require.Nil(t, shortCircuit, "the key's own jobs may be deleted")
@@ -1745,7 +1745,7 @@ func TestPostLLMHookKeepsBindingsWhenABareDeleteIsAmbiguous(t *testing.T) {
 // reaches the same upstream, so a binding recorded through another alias does not linger.
 func TestPostLLMHookForgetsDeletedObjectsUnderEveryAlias(t *testing.T) {
 	store := newProviderObjectConfigStore(t)
-	vk := buildVKForMCPStamping(nil)
+	vk := buildAccessTestVK()
 	vk.ProviderConfigs = append(vk.ProviderConfigs, buildProviderConfig("my-openai", []string{"*"}))
 	plugin := newAccessTestPlugin(t, vk, nil)
 	plugin.configStore = store
@@ -1755,7 +1755,7 @@ func TestPostLLMHookForgetsDeletedObjectsUnderEveryAlias(t *testing.T) {
 	}}
 	seedProviderObject(t, store, configstoreTables.ProviderObjectKindFile, "openai", "file-aliased", "vk-mcp-stamp")
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.FileDeleteRequest, FileDeleteRequest: &schemas.BifrostFileDeleteRequest{Provider: "my-openai", FileID: "file-aliased"}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1795,7 +1795,7 @@ func TestProviderObjectOwnersScanSuffixesOnceForUnresolvedShortIDs(t *testing.T)
 	seedProviderObject(t, real, batch, "vertex", "4242", "vk-mcp-stamp")
 	seedProviderObject(t, real, batch, "vertex", "5151", "vk-mcp-stamp")
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, &schemas.BifrostRequest{RequestType: schemas.BatchListRequest, BatchListRequest: &schemas.BifrostBatchListRequest{Provider: schemas.Vertex}})
 	require.NoError(t, err)
 	require.Nil(t, shortCircuit)
@@ -1822,7 +1822,7 @@ func BenchmarkPreLLMHookResourceNameLookup(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer store.Close(context.Background())
-	vk := buildVKForMCPStamping(nil)
+	vk := buildAccessTestVK()
 	vk.ProviderConfigs = append(vk.ProviderConfigs, buildProviderConfig("gemini", []string{"*"}), buildProviderConfig("vertex", []string{"*"}))
 	plugin := newAccessTestPlugin(b, vk, nil)
 	plugin.configStore = store
@@ -1839,7 +1839,7 @@ func BenchmarkPreLLMHookResourceNameLookup(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				req := &schemas.BifrostRequest{RequestType: schemas.BatchRetrieveRequest, BatchRetrieveRequest: &schemas.BifrostBatchRetrieveRequest{Provider: tc.provider, BatchID: tc.id}}
-				if _, _, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), req); err != nil {
+				if _, _, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), req); err != nil {
 					b.Fatal(err)
 				}
 			}

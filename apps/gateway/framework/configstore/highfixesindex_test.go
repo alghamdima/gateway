@@ -152,8 +152,6 @@ func TestHighFixSetBasedIndexMigrations(t *testing.T) {
 	for _, ndb := range indexMigrationDBs(t) {
 		t.Run(ndb.name, func(t *testing.T) {
 			db := ndb.db
-			require.NoError(t, db.Exec(`CREATE TABLE governance_virtual_key_mcp_configs (
-				id INTEGER PRIMARY KEY, virtual_key_id VARCHAR(255) NOT NULL, mcp_client_id INTEGER NOT NULL)`).Error)
 			require.NoError(t, db.Exec(`CREATE TABLE governance_virtual_key_provider_configs (
 				id INTEGER PRIMARY KEY, virtual_key_id VARCHAR(255) NOT NULL, provider VARCHAR(50) NOT NULL)`).Error)
 			require.NoError(t, db.Exec(`CREATE TABLE governance_virtual_key_provider_config_keys (
@@ -162,11 +160,6 @@ func TestHighFixSetBasedIndexMigrations(t *testing.T) {
 			require.NoError(t, db.Exec(`CREATE TABLE governance_virtual_keys (
 				id VARCHAR(255) PRIMARY KEY, created_at TIMESTAMP NOT NULL)`).Error)
 
-			runIndexMigrationTwice(t, db, "add_vk_mcp_configs_mcp_client_id_index",
-				func(ctx context.Context, db *gorm.DB) error {
-					return migrationAddVKMCPConfigsMCPClientIDIndex(ctx, db, testMigrationLogger)
-				},
-				"governance_virtual_key_mcp_configs", "idx_vk_mcp_configs_mcp_client_id")
 			runIndexMigrationTwice(t, db, "add_vk_provider_config_provider_and_key_indexes",
 				func(ctx context.Context, db *gorm.DB) error {
 					return migrationAddVKProviderConfigProviderAndKeyIndexes(ctx, db, testMigrationLogger)
@@ -238,16 +231,12 @@ func TestHighFixTagsBuildIndexes(t *testing.T) {
 	mg := db.Migrator()
 	require.NoError(t, mg.CreateTable(&tables.TableVirtualKey{}))
 	require.NoError(t, mg.CreateTable(&tables.SessionsTable{}))
-	require.NoError(t, mg.CreateTable(&tables.TableVirtualKeyMCPConfig{}))
 	require.NoError(t, mg.CreateTable(&tables.TableVirtualKeyProviderConfig{}))
 	require.NoError(t, mg.CreateTable(&tables.TableVirtualKeyProviderConfigKey{}))
 	require.NoError(t, mg.CreateTable(&tables.TableProviderJob{}))
 
 	require.True(t, indexIsUnique(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
 	require.True(t, indexIsUnique(t, db, "sessions", "idx_session_token_hash"))
-
-	require.Equal(t, []string{"mcp_client_id"}, indexColumns(t, db, "idx_vk_mcp_configs_mcp_client_id"))
-	require.Equal(t, []string{"virtual_key_id", "mcp_client_id"}, indexColumns(t, db, "idx_vk_mcpclient"))
 	require.True(t, indexIsUnique(t, db, "governance_virtual_key_mcp_configs", "idx_vk_mcpclient"))
 
 	require.Equal(t, []string{"provider"}, indexColumns(t, db, "idx_vk_provider_configs_provider"))

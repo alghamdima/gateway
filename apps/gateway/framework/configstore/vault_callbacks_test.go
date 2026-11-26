@@ -2,9 +2,7 @@ package configstore
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	bifrost "github.com/maximhq/bifrost/core"
@@ -38,52 +36,6 @@ func stubVaultHooks(t *testing.T) (stored map[string]string, removed *[]string) 
 		schemas.VaultRemoveHook = prevRemove
 	})
 	return stored, &rem
-}
-
-func TestVaultCallbacks_AutoStoreAndRemove(t *testing.T) {
-	stored, removed := stubVaultHooks(t)
-
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	RegisterVaultCallbacks(db)
-	require.NoError(t, db.AutoMigrate(&tables.TableMCPClient{}))
-
-	client := &tables.TableMCPClient{
-		ClientID:       "client-1",
-		Name:           "test-client",
-		ConnectionType: "http",
-		AuthType:       "headers",
-		Headers: map[string]schemas.SecretVar{
-			"Authorization": {Val: "secret-token"},
-		},
-	}
-	require.NoError(t, db.Create(client).Error)
-
-	// The global store callback should have pushed the plaintext header to vault
-	// before BeforeSave serialized Headers into HeadersJSON.
-	headerPath := "bifrost/config_mcp_clients/client-1/headers/Authorization"
-	require.Equal(t, "secret-token", stored[headerPath], "header secret not stored to vault")
-
-	// HeadersJSON persisted in the row should hold the vault ref, not plaintext.
-	var row tables.TableMCPClient
-	require.NoError(t, db.First(&row, "client_id = ?", "client-1").Error)
-	var headers map[string]string
-	require.NoError(t, json.Unmarshal([]byte(row.HeadersJSON), &headers))
-	require.Equal(t, "vault."+headerPath, headers["Authorization"], "HeadersJSON should store vault ref")
-
-	// Deleting the row should trigger the global remove callback. Load first so
-	// the model has its Headers populated for the reflection walk.
-	var toDelete tables.TableMCPClient
-	require.NoError(t, db.First(&toDelete, "client_id = ?", "client-1").Error)
-	require.NoError(t, db.Delete(&toDelete).Error)
-
-	found := false
-	for _, p := range *removed {
-		if p == headerPath {
-			found = true
-		}
-	}
-	require.True(t, found, "expected vault remove for %q, got %v", headerPath, *removed)
 }
 
 // TestVaultCallbacks_SelfManagedStoresPlaintext verifies that TableKey, whose
@@ -173,29 +125,4 @@ func TestVaultCallbacks_SelfManagedRemovesVaultSecrets(t *testing.T) {
 		}
 	}
 	require.True(t, found, "expected vault remove for %q, got %v", valuePath, *removed)
-}
-
-func TestVaultCallbacks_NoOpWhenDisabled(t *testing.T) {
-	// No hooks installed -> VaultStoreEnabled() is false -> callbacks no-op.
-	prevStore := schemas.VaultStoreHook
-	schemas.VaultStoreHook = nil
-	t.Cleanup(func() { schemas.VaultStoreHook = prevStore })
-
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	require.NoError(t, err)
-	RegisterVaultCallbacks(db)
-	require.NoError(t, db.AutoMigrate(&tables.TableMCPClient{}))
-
-	client := &tables.TableMCPClient{
-		ClientID:       "client-2",
-		Name:           "plain-client",
-		ConnectionType: "http",
-		AuthType:       "headers",
-		Headers:        map[string]schemas.SecretVar{"Authorization": {Val: "plain-secret"}},
-	}
-	require.NoError(t, db.Create(client).Error)
-
-	var row tables.TableMCPClient
-	require.NoError(t, db.First(&row, "client_id = ?", "client-2").Error)
-	require.False(t, strings.Contains(row.HeadersJSON, "vault."), "no vault ref expected when disabled: %s", row.HeadersJSON)
 }

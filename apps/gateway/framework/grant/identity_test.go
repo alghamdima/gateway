@@ -97,7 +97,7 @@ func TestNewCredential(t *testing.T) {
 // share a value, and none may be empty: an empty kind would read as nothing presented.
 func TestCredentialKindsAreDistinct(t *testing.T) {
 	kinds := []CredentialKind{
-		CredentialVirtualKey, CredentialSessionToken, CredentialIdentityToken, CredentialMCPToken, CredentialAPIKey,
+		CredentialVirtualKey, CredentialSessionToken, CredentialIdentityToken, CredentialAPIKey,
 	}
 	seen := make(map[CredentialKind]bool, len(kinds))
 	for _, k := range kinds {

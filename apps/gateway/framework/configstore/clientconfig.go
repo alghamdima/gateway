@@ -7,10 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash"
-	"maps"
-	"math"
 	"net/url"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -31,7 +28,6 @@ const (
 	EnvKeyTypeVertexConfig  EnvKeyType = "vertex_config"
 	EnvKeyTypeBedrockConfig EnvKeyType = "bedrock_config"
 	EnvKeyTypeConnection    EnvKeyType = "connection_string"
-	EnvKeyTypeMCPHeader     EnvKeyType = "mcp_header"
 )
 
 // MaxVKRotationCooldown is the hard ceiling on the virtual key rotation grace
@@ -41,16 +37,11 @@ const (
 // MaxAuthCodeTTL, and matching the maximum published in config.schema.json.
 const MaxVKRotationCooldown = 30 * 24 * time.Hour
 
-// MaxMCPOpenAPISpecMB is the ceiling on mcp_openapi_max_spec_mb: parsing holds several times the
-// spec's size in memory, so the setting may raise the limit but not without bound. Enforced at
-// PUT /api/config and the config.json load path, matching the maximum in config.schema.json.
-const MaxMCPOpenAPISpecMB = 256
-
 // EnvKeyInfo stores information about a key sourced from environment
 type EnvKeyInfo struct {
 	SecretVar  string                // The environment variable name (without env. prefix)
-	Provider   schemas.ModelProvider // The provider this key belongs to (empty for core/mcp configs)
-	KeyType    EnvKeyType            // Type of key (e.g., "api_key", "azure_config", "vertex_config", "bedrock_config", "connection_string", "mcp_header")
+	Provider   schemas.ModelProvider // The provider this key belongs to (empty for core configs)
+	KeyType    EnvKeyType            // Type of key (e.g., "api_key", "azure_config", "vertex_config", "bedrock_config", "connection_string")
 	ConfigPath string                // Path in config where this env var is used
 	KeyID      string                // The key ID this env var belongs to (empty for non-key configs like bedrock_config, connection_string)
 }
@@ -119,21 +110,6 @@ type ClientConfig struct {
 	AllowedHeaders                          []string                              `json:"allowed_headers,omitempty"`                     // Additional allowed headers for CORS and WebSocket
 	MaxRequestBodySizeMB                    int                                   `json:"max_request_body_size_mb"`                      // The maximum request body size in MB
 	Compat                                  CompatConfig                          `json:"compat"`                                        // Compat plugin configuration
-	MCPAgentDepth                           int                                   `json:"mcp_agent_depth"`                               // The maximum depth for MCP agent mode tool execution
-	MCPMaxInstructionsPerClient             int                                   `json:"mcp_max_instructions_per_client"`               // Byte bound on one server's forwarded instructions; 0 is the default
-	MCPMaxInstructionsTotal                 int                                   `json:"mcp_max_instructions_total"`                    // Byte bound on the whole forwarded aggregate; 0 is the default
-	MCPOpenAPIMaxSpecMB                     int                                   `json:"mcp_openapi_max_spec_mb"`                       // Size limit on an openapi MCP client's spec in MiB; 0 is the default (32)
-	BifrostURL                              *schemas.SecretVar                    `json:"bifrost_url,omitempty"`                         // The gateway's public base URL; /v1/mcp tool calls address it. Supports env var syntax ("env.MY_VAR")
-	BifrostMCPAllowWrites                   *bool                                 `json:"bifrost_mcp_allow_writes,omitempty"`            // Whether /v1/mcp serves non-GET /api tools; nil is true
-	MCPCodeModeLimits                       *schemas.MCPCodeModeLimits            `json:"mcp_code_mode_limits,omitempty"`                // Per-execution code mode limits; nil or zero fields use the defaults
-	MCPOAuthPrivateAllowlist                []string                              `json:"mcp_oauth_private_allowlist,omitempty"`         // Private hosts, IPs and CIDRs the MCP OAuth chain may reach for clients registered with admin auth
-	MCPToolExecutionTimeout                 int                                   `json:"mcp_tool_execution_timeout"`                    // The timeout for individual tool execution in seconds
-	MCPCodeModeBindingLevel                 string                                `json:"mcp_code_mode_binding_level"`                   // Code mode binding level: "server" or "tool"
-	MCPToolSyncInterval                     int                                   `json:"mcp_tool_sync_interval"`                        // Global tool sync interval in minutes (default: 10, 0 = built-in default)
-	MCPMaxProtocolVersion                   string                                `json:"mcp_max_protocol_version,omitempty"`            // Global cap on the MCP protocol version offered to upstreams ("" or "auto" = newest)
-	MCPServerMaxProtocolVersion             string                                `json:"mcp_server_max_protocol_version,omitempty"`     // Cap on the MCP protocol version Bifrost's /mcp serves ("" or "auto" = newest)
-	MCPDisableAutoToolInject                bool                                  `json:"mcp_disable_auto_tool_inject"`                  // When true, MCP tools are not injected into requests by default
-	MCPEnableTempTokenAuth                  bool                                  `json:"mcp_enable_temp_token_auth"`                    // When true, scoped temp tokens can authorize MCP per-user OAuth and per-user-headers auth pages. User-mode flows never mint regardless.
 	HeaderFilterConfig                      *tables.GlobalHeaderFilterConfig      `json:"header_filter_config,omitempty"`                // Global header filtering configuration for x-bf-eh-* headers
 	AsyncJobResultTTL                       int                                   `json:"async_job_result_ttl"`                          // Default TTL for async job results in seconds (default: 3600 = 1 hour)
 	RequiredHeaders                         []string                              `json:"required_headers,omitempty"`                    // Headers that must be present on every request (case-insensitive)
@@ -148,20 +124,9 @@ type ClientConfig struct {
 	HiddenRequestTypes                      []string                              `json:"hidden_request_types,omitempty"`                // Request types excluded from dashboard and log API reads; logs are still written
 	UsageEstimationTokenizers               []string                              `json:"usage_estimation_tokenizers,omitempty"`         // Embedded tokenizer families ("anthropic", "deepseek", "llama2", "llama3", "all") used to estimate a cancelled stream's usage; empty uses only o200k_base/cl100k_base
 	RoutingChainMaxDepth                    int                                   `json:"routing_chain_max_depth"`                       // Maximum depth for routing rule chain evaluation (default: 10)
-	MCPExternalClientURL                    *schemas.SecretVar                    `json:"mcp_external_client_url,omitempty"`             // Public base URL used as redirect_uri when Bifrost acts as an OAuth client to upstream MCP servers. Supports env var syntax ("env.MY_VAR")
-	MCPClientMetadataURL                    *schemas.SecretVar                    `json:"mcp_client_metadata_url,omitempty"`             // Full URL where Bifrost's Client ID Metadata Document is hosted; empty serves it under mcp_external_client_url
 	SkillsExternalClientURL                 *schemas.SecretVar                    `json:"skills_external_client_url,omitempty"`          // Public base URL for Skills Repository marketplaces; empty disables marketplace serving
-	MCPServerAuthMode                       tables.MCPServerAuthMode              `json:"mcp_server_auth_mode,omitempty"`                // How /mcp authenticates inbound clients: headers (default), both, or oauth.
-	OAuth2ServerConfig                      *tables.OAuth2ServerConfig            `json:"oauth2_server_config,omitempty"`                // OAuth2 AS-specific settings (IssuerURL, token TTLs). Only relevant when MCPServerAuthMode is both or oauth.
 	ConfigHash                              string                                `json:"-"`                                             // Config hash for reconciliation (not serialized)
 	DumpErrorsInConsoleLogs                 bool                                  `json:"dump_errors_in_console_logs"`                   // Dump error details in console logs
-}
-
-// IsMCPOAuthDiscoveryEnabled reports whether the well-known OAuth discovery
-// endpoints and JWKS endpoint should be live. True when MCPServerAuthMode is
-// both or oauth.
-func (c *ClientConfig) IsMCPOAuthDiscoveryEnabled() bool {
-	return c.MCPServerAuthMode == tables.MCPServerAuthModeBoth || c.MCPServerAuthMode == tables.MCPServerAuthModeOAuth
 }
 
 // UnmarshalJSON defaults all bool fields to true when absent from JSON.
@@ -293,52 +258,6 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 		hash.Write([]byte("routingChainMaxDepth:" + strconv.Itoa(c.RoutingChainMaxDepth)))
 	}
 
-	if c.MCPAgentDepth > 0 {
-		hash.Write([]byte("mcpAgentDepth:" + strconv.Itoa(c.MCPAgentDepth)))
-	} else {
-		hash.Write([]byte("mcpAgentDepth:0"))
-	}
-	// No else: 0 is the default, so writing ":0" would change every existing config's hash.
-	if c.MCPMaxInstructionsPerClient > 0 {
-		hash.Write([]byte("mcpMaxInstructionsPerClient:" + strconv.Itoa(c.MCPMaxInstructionsPerClient)))
-	}
-	if c.MCPMaxInstructionsTotal > 0 {
-		hash.Write([]byte("mcpMaxInstructionsTotal:" + strconv.Itoa(c.MCPMaxInstructionsTotal)))
-	}
-	if c.MCPOpenAPIMaxSpecMB > 0 {
-		hash.Write([]byte("mcpOpenAPIMaxSpecMB:" + strconv.Itoa(c.MCPOpenAPIMaxSpecMB)))
-	}
-
-	if c.MCPToolExecutionTimeout > 0 {
-		hash.Write([]byte("mcpToolExecutionTimeout:" + strconv.Itoa(c.MCPToolExecutionTimeout)))
-	} else {
-		hash.Write([]byte("mcpToolExecutionTimeout:0"))
-	}
-
-	if c.MCPCodeModeBindingLevel != "" {
-		hash.Write([]byte("mcpCodeModeBindingLevel:" + c.MCPCodeModeBindingLevel))
-	} else {
-		hash.Write([]byte("mcpCodeModeBindingLevel:server"))
-	}
-
-	if c.MCPToolSyncInterval > 0 {
-		hash.Write([]byte("mcpToolSyncInterval:" + strconv.Itoa(c.MCPToolSyncInterval)))
-	} else {
-		hash.Write([]byte("mcpToolSyncInterval:0"))
-	}
-
-	// Only hash non-default value to avoid legacy config hash churn on upgrade.
-	if c.MCPDisableAutoToolInject {
-		hash.Write([]byte("mcpDisableAutoToolInject:true"))
-	}
-
-	// Only hash non-default value to avoid legacy config hash churn on upgrade.
-
-	// Only hash non-default value to avoid legacy config hash churn on upgrade.
-	if c.MCPEnableTempTokenAuth {
-		hash.Write([]byte("mcpEnableTempTokenAuth:true"))
-	}
-
 	// Only hash non-default value to avoid legacy config hash churn on upgrade.
 	if c.AllowPerRequestContentStorageOverride {
 		hash.Write([]byte("allowPerRequestContentStorageOverride:true"))
@@ -372,27 +291,6 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 	// Only hash non-default value to avoid legacy config hash churn on upgrade.
 	if c.DumpErrorsInConsoleLogs {
 		hash.Write([]byte("dumpErrorsInConsoleLogs:true"))
-	}
-
-	// Only hash when present to avoid legacy config hash churn on upgrade.
-	if c.MCPCodeModeLimits != nil {
-		data, err := sonic.Marshal(c.MCPCodeModeLimits)
-		if err != nil {
-			return "", err
-		}
-		hash.Write([]byte("mcpCodeModeLimits:"))
-		hash.Write(data)
-	}
-
-	// Only hash when present to avoid legacy config hash churn on upgrade. An explicit
-	// empty list is present: it revokes every host, so it must read as a file change.
-	if c.MCPOAuthPrivateAllowlist != nil {
-		data, err := sortedStringsJSON(c.MCPOAuthPrivateAllowlist)
-		if err != nil {
-			return "", err
-		}
-		hash.Write([]byte("mcpOAuthPrivateAllowlist:"))
-		hash.Write(data)
 	}
 
 	// Hash integer fields
@@ -545,20 +443,6 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 		}
 	}
 
-	if c.MCPExternalClientURL.IsSet() {
-		if c.MCPExternalClientURL.IsFromSecret() {
-			hash.Write([]byte("externalClientURL:ref:" + c.MCPExternalClientURL.GetRawRef()))
-		} else {
-			hash.Write([]byte("externalClientURL:val:" + c.MCPExternalClientURL.GetValue()))
-		}
-	}
-	if c.MCPClientMetadataURL.IsSet() {
-		if c.MCPClientMetadataURL.IsFromSecret() {
-			hash.Write([]byte("clientMetadataURL:ref:" + c.MCPClientMetadataURL.GetRawRef()))
-		} else {
-			hash.Write([]byte("clientMetadataURL:val:" + c.MCPClientMetadataURL.GetValue()))
-		}
-	}
 	if c.SkillsExternalClientURL != nil {
 		if c.SkillsExternalClientURL.IsFromSecret() {
 			hash.Write([]byte("skillsExternalClientURL:ref:" + c.SkillsExternalClientURL.GetRawRef()))
@@ -567,130 +451,7 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 		}
 	}
 
-	// Length-prefixed, so where each value ends is unambiguous: a URL whose path
-	// ends in the next field's text must not hash like a shorter URL with that
-	// field set. Each is written only when set, so configs without them keep their hash.
-	if c.BifrostURL != nil {
-		if c.BifrostURL.IsFromSecret() {
-			writeLengthPrefixed(hash, "bifrostURL:ref:", c.BifrostURL.GetRawRef())
-		} else if v := c.BifrostURL.GetValue(); v != "" {
-			writeLengthPrefixed(hash, "bifrostURL:val:", v)
-		}
-	}
-	if c.BifrostMCPAllowWrites != nil {
-		writeLengthPrefixed(hash, "bifrostMCPAllowWrites:", strconv.FormatBool(*c.BifrostMCPAllowWrites))
-	}
-
-	// Only hash non-default values to avoid legacy config hash churn on upgrade —
-	// existing configs carry an empty auth mode and a nil OAuth2 server config.
-	if c.MCPServerAuthMode != "" {
-		hash.Write([]byte("mcpServerAuthMode:" + string(c.MCPServerAuthMode)))
-	}
-	// Hash OAuth2ServerConfig field-by-field (not via Marshal) for a stable,
-	// deterministic byte stream that does not depend on serializer field order.
-	if c.OAuth2ServerConfig != nil {
-		oc := c.OAuth2ServerConfig
-		if oc.IssuerURL.IsSet() {
-			if oc.IssuerURL.IsFromEnv() {
-				hash.Write([]byte("oauth2IssuerURL:env:" + oc.IssuerURL.GetRawRef()))
-			} else {
-				hash.Write([]byte("oauth2IssuerURL:val:" + oc.IssuerURL.GetValue()))
-			}
-		}
-		hash.Write([]byte("oauth2AuthCodeTTL:" + strconv.Itoa(oc.AuthCodeTTL)))
-		hash.Write([]byte("oauth2AccessTokenTTL:" + strconv.Itoa(oc.AccessTokenTTL)))
-		// Unset policy fields contribute nothing so rows stored before they were
-		// hashed keep their hash; once set, a file edit must win over the DB row.
-		for _, uri := range oc.AllowedRedirectURIs {
-			hash.Write([]byte("oauth2AllowedRedirectURI:" + uri))
-		}
-		if oc.DisableVKIdentity {
-			hash.Write([]byte("oauth2DisableVKIdentity:true"))
-		}
-		// Client gateways are only hashed when set, so configs without them keep
-		// their existing hash.
-		if cc := oc.ClaudeCodeGateway(); cc != nil {
-			// The NUL starts the block where no redirect URI can reach: URIs are written
-			// unframed (kept for existing hashes) and cannot hold control characters.
-			hash.Write([]byte("\x00gateways.claude_code.enabled:" + strconv.FormatBool(cc.Enabled)))
-			if cc.ManagedSettings != nil {
-				// MarshalSorted sorts map keys at every level, so the bytes are stable.
-				settings, err := providerUtils.MarshalSorted(cc.ManagedSettings)
-				if err != nil {
-					return "", fmt.Errorf("failed to marshal gateways.claude_code.managed_settings: %w", err)
-				}
-				hash.Write([]byte("gateways.claude_code.managed_settings:"))
-				hash.Write(settings)
-			}
-			if t := cc.Telemetry; t != nil {
-				hash.Write([]byte("gateways.claude_code.telemetry.enabled:" + strconv.FormatBool(t.Enabled)))
-				// Length-prefixed, so where one value ends is unambiguous: concatenated, a value
-				// containing the next field's text hashed like two shorter values.
-				for _, d := range t.Destinations {
-					writeLengthPrefixed(hash, "gateways.claude_code.telemetry.endpoint:", secretVarHashForm(d.Endpoint))
-					names := slices.Sorted(maps.Keys(d.Headers))
-					for _, name := range names {
-						writeLengthPrefixed(hash, "gateways.claude_code.telemetry.header.name:", name)
-						writeLengthPrefixed(hash, "gateways.claude_code.telemetry.header.value:", secretVarHashForm(d.Headers[name]))
-					}
-				}
-				for _, key := range t.DropAttributes {
-					writeLengthPrefixed(hash, "gateways.claude_code.telemetry.drop:", key)
-				}
-			}
-		}
-	}
-
 	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-// GenerateClientConfigHashWithToolManager extends GenerateClientConfigHash to also cover
-// the mcp.tool_manager_config file section. When tm is nil it returns the same value as
-// GenerateClientConfigHash, so it is safe to call unconditionally.
-func (c *ClientConfig) GenerateClientConfigHashWithToolManager(tm *schemas.MCPToolManagerConfig) (string, error) {
-	base, err := c.GenerateClientConfigHash()
-	if err != nil || tm == nil {
-		return base, err
-	}
-	h := sha256.New()
-	h.Write([]byte(base))
-	h.Write([]byte("toolMgrAgentDepth:" + strconv.Itoa(tm.MaxAgentDepth)))
-	h.Write([]byte("toolMgrTimeout:" + strconv.FormatInt(int64(math.Ceil(tm.ToolExecutionTimeout.D().Seconds())), 10)))
-	h.Write([]byte("toolMgrCodeMode:" + string(tm.CodeModeBindingLevel)))
-	if tm.DisableAutoToolInject {
-		h.Write([]byte("toolMgrDisableAutoInject:true"))
-	} else {
-		h.Write([]byte("toolMgrDisableAutoInject:false"))
-	}
-	// Only hash a non-default value, so a config written before this field existed keeps
-	// producing the same hash on upgrade.
-	if tm.CodeModeLimits != nil {
-		data, err := sonic.Marshal(tm.CodeModeLimits)
-		if err != nil {
-			return "", err
-		}
-		h.Write([]byte("toolMgrCodeModeLimits:"))
-		h.Write(data)
-	}
-	// Same presence rule as mcpOAuthPrivateAllowlist in GenerateClientConfigHash.
-	if tm.OAuthPrivateAllowlist != nil {
-		data, err := sortedStringsJSON(tm.OAuthPrivateAllowlist)
-		if err != nil {
-			return "", err
-		}
-		h.Write([]byte("toolMgrOAuthPrivateAllowlist:"))
-		h.Write(data)
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// sortedStringsJSON marshals a sorted copy of values, so a list's hash does
-// not depend on the order its entries were written in.
-func sortedStringsJSON(values []string) ([]byte, error) {
-	sorted := make([]string, len(values))
-	copy(sorted, values)
-	sort.Strings(sorted)
-	return sonic.Marshal(sorted)
 }
 
 // Redacted returns a copy of ClientConfig with any env-backed SecretVar fields masked.
@@ -699,16 +460,6 @@ func (c *ClientConfig) Redacted() ClientConfig {
 	if c.SkillsExternalClientURL != nil && c.SkillsExternalClientURL.IsFromSecret() {
 		out.SkillsExternalClientURL = c.SkillsExternalClientURL.Redacted()
 	}
-	if c.MCPExternalClientURL != nil && c.MCPExternalClientURL.IsFromSecret() {
-		out.MCPExternalClientURL = c.MCPExternalClientURL.Redacted()
-	}
-	if c.MCPClientMetadataURL != nil && c.MCPClientMetadataURL.IsFromSecret() {
-		out.MCPClientMetadataURL = c.MCPClientMetadataURL.Redacted()
-	}
-	if c.BifrostURL != nil && c.BifrostURL.IsFromSecret() {
-		out.BifrostURL = c.BifrostURL.Redacted()
-	}
-	out.OAuth2ServerConfig = c.OAuth2ServerConfig.Redacted()
 	return out
 }
 
@@ -726,7 +477,6 @@ type ProviderConfig struct {
 	CustomProviderConfig     *schemas.CustomProviderConfig     `json:"custom_provider_config,omitempty"`      // Custom provider configuration
 	OpenAIConfig             *schemas.OpenAIConfig             `json:"openai_config,omitempty"`               // OpenAI-specific configuration
 	PromptCache              *schemas.PromptCacheConfig        `json:"prompt_cache,omitempty"`                // Prompt-cache breakpoint injection
-	InjectedTools            []schemas.InjectedTool            `json:"injected_tools,omitempty"`              // MCP tools injected and auto-executed server side
 	Passthrough              *schemas.PassthroughPolicy        `json:"passthrough,omitempty"`                 // Routes the HTTP relays may forward
 	ConfigHash               string                            `json:"config_hash,omitempty"`                 // Hash of config.json version, used for change detection
 	Status                   string                            `json:"status,omitempty"`                      // Model discovery status for keyless providers
@@ -750,7 +500,6 @@ func (p *ProviderConfig) Redacted() *ProviderConfig {
 		CustomProviderConfig:     p.CustomProviderConfig,
 		OpenAIConfig:             p.OpenAIConfig,
 		PromptCache:              p.PromptCache,
-		InjectedTools:            p.InjectedTools,
 		Passthrough:              p.Passthrough,
 		ConfigHash:               p.ConfigHash,
 		Status:                   p.Status,
@@ -1169,15 +918,6 @@ func (p *ProviderConfig) generateConfigHash(providerName string, customProviderC
 		hash.Write(data)
 	}
 
-	// Hash InjectedTools
-	if len(p.InjectedTools) > 0 {
-		data, err := sonic.Marshal(p.InjectedTools)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
 	// Hash Passthrough
 	if p.Passthrough != nil {
 		data, err := sonic.Marshal(p.Passthrough)
@@ -1574,9 +1314,8 @@ type VirtualKeyHashInput struct {
 	TeamID      *string
 	CustomerID  *string
 	RateLimitID *string
-	// ProviderConfigs and MCPConfigs are hashed separately as they contain nested data
+	// ProviderConfigs are hashed separately as they contain nested data
 	ProviderConfigs []VirtualKeyProviderConfigHashInput
-	MCPConfigs      []VirtualKeyMCPConfigHashInput
 }
 
 // VirtualKeyProviderConfigHashInput represents provider config fields for hashing
@@ -1588,12 +1327,6 @@ type VirtualKeyProviderConfigHashInput struct {
 	AllowAllKeys      bool
 	RateLimitID       *string
 	KeyIDs            []string // Only key IDs, not full key objects
-}
-
-// VirtualKeyMCPConfigHashInput represents MCP config fields for hashing
-type VirtualKeyMCPConfigHashInput struct {
-	MCPClientID    uint
-	ToolsToExecute []string
 }
 
 // GenerateVirtualKeyHash generates a SHA256 hash for a virtual key.
@@ -1730,33 +1463,6 @@ func GenerateVirtualKeyHash(vk tables.TableVirtualKey) (string, error) {
 			}
 		}
 		data, err := sonic.Marshal(providerConfigsForHash)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-	// Hash MCPConfigs
-	if len(vk.MCPConfigs) > 0 {
-		// Copy and sort MCP configs for deterministic hashing
-		sortedMCPConfigs := make([]tables.TableVirtualKeyMCPConfig, len(vk.MCPConfigs))
-		copy(sortedMCPConfigs, vk.MCPConfigs)
-		sort.Slice(sortedMCPConfigs, func(i, j int) bool {
-			return sortedMCPConfigs[i].MCPClientID < sortedMCPConfigs[j].MCPClientID
-		})
-
-		mcpConfigsForHash := make([]VirtualKeyMCPConfigHashInput, len(sortedMCPConfigs))
-		for i, mc := range sortedMCPConfigs {
-			// Sort tools for deterministic hashing
-			sortedTools := make([]string, len(mc.ToolsToExecute))
-			copy(sortedTools, mc.ToolsToExecute)
-			sort.Strings(sortedTools)
-
-			mcpConfigsForHash[i] = VirtualKeyMCPConfigHashInput{
-				MCPClientID:    mc.MCPClientID,
-				ToolsToExecute: sortedTools,
-			}
-		}
-		data, err := sonic.Marshal(mcpConfigsForHash)
 		if err != nil {
 			return "", err
 		}
@@ -2261,275 +1967,6 @@ func GeneratePricingOverrideHash(p tables.TablePricingOverride) (string, error) 
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-// GenerateMCPClientHash generates a SHA256 hash for an MCP client.
-// This is used to detect changes to MCP clients between config.json and database.
-// Skips: ID (autoIncrement), ClientID (system-assigned), CreatedAt, UpdatedAt (dynamic fields)
-func GenerateMCPClientHash(m tables.TableMCPClient) (string, error) {
-	hash := sha256.New()
-
-	// Hash Name
-	hash.Write([]byte(m.Name))
-
-	// Hash ConnectionType
-	hash.Write([]byte(m.ConnectionType))
-
-	// Hash ConnectionString
-	if m.ConnectionString != nil {
-		if m.ConnectionString.IsFromSecret() {
-			hash.Write([]byte(m.ConnectionString.GetRawRef()))
-		} else {
-			hash.Write([]byte(m.ConnectionString.Val))
-		}
-	}
-
-	// Hash StdioConfig
-	if m.StdioConfig != nil {
-		data, err := sonic.Marshal(m.StdioConfig)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
-	// Hash TLSConfig
-	if m.TLSConfig != nil {
-		data, err := sonic.Marshal(m.TLSConfig)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
-	// Hash ToolsToExecute (sorted for deterministic hashing)
-	if len(m.ToolsToExecute) > 0 {
-		sortedTools := make([]string, len(m.ToolsToExecute))
-		copy(sortedTools, m.ToolsToExecute)
-		sort.Strings(sortedTools)
-		data, err := sonic.Marshal(sortedTools)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
-	// Hash Headers (sorted for deterministic hashing)
-	if len(m.Headers) > 0 {
-		keys := make([]string, 0, len(m.Headers))
-		for k := range m.Headers {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			val := m.Headers[k]
-			if val.IsFromSecret() {
-				hash.Write([]byte(k + ":ref:" + val.GetRawRef()))
-			} else {
-				hash.Write([]byte(k + ":val:" + val.Val))
-			}
-		}
-	}
-
-	// Hash AuthType so switching a client's auth scheme in config.json
-	// drifts the hash and triggers reconciliation. Normalize the empty
-	// value to the column default so a row hashed before save matches the
-	// same row hashed after load.
-	authType := m.AuthType
-	if authType == "" {
-		authType = string(schemas.MCPAuthTypeHeaders)
-	}
-	hash.Write([]byte("auth_type:" + authType))
-
-	// Hash a declared endpoint_slug (normalised) so editing it drifts the hash. Empty contributes
-	// nothing, so entries that omit it keep matching hashes stored before the field was hashed.
-	if m.EndpointSlug != "" {
-		hash.Write([]byte("endpoint_slug:" + Slugify(m.EndpointSlug)))
-	}
-
-	// Hash NeedsSessionStickiness so toggling it in config.json drifts the
-	// hash and triggers reconciliation — without this, editing only this
-	// field would leave the row's migration-backfilled (or nil-defaulted)
-	// value in place indefinitely, since nothing else about the row changed.
-	//
-	// nil contributes nothing — identical to how this field hashed before it
-	// existed in the formula at all. That's deliberate: a config.json entry
-	// that still omits the field must keep coincidentally matching a stale
-	// (pre-migration) stored hash, so the migration's true-backfill for
-	// existing shared clients isn't clobbered by a forced file-wins resync
-	// on the next restart just because config.json never mentions the field.
-	// true and false each get their own distinct marker: only an *explicit*
-	// value in config.json represents a real opinion worth detecting as a
-	// change. Collapsing false into nil's zero-contribution (as this used to
-	// do) meant an admin's explicit `needs_session_stickiness: false` edit
-	// could coincidentally hash-match a stale stored hash and silently never
-	// take effect.
-	if m.NeedsSessionStickiness != nil {
-		if *m.NeedsSessionStickiness {
-			hash.Write([]byte("needs_session_stickiness:true"))
-		} else {
-			hash.Write([]byte("needs_session_stickiness:false"))
-		}
-	}
-
-	// Only a set value contributes, so existing hashes are unchanged.
-	if m.MaxProtocolVersion != "" {
-		hash.Write([]byte("max_protocol_version:" + m.MaxProtocolVersion))
-	}
-	// Only true contributes, so a file edit of this flag syncs while clients without code mode keep their hash.
-	if m.IsCodeModeClient {
-		hash.Write([]byte("is_code_mode_client:true"))
-	}
-	// Inherit contributes nothing, so existing hashes are unchanged.
-	if m.ServerTypeOnSlug != schemas.MCPServerTypeOnSlugInherit {
-		hash.Write([]byte("server_type_on_slug:" + m.ServerTypeOnSlug.String()))
-	}
-	// nil (expose all) contributes nothing; [] and listed entries do.
-	for _, list := range []struct {
-		name  string
-		value schemas.WhiteList
-	}{{"prompts_to_expose", m.PromptsToExpose}, {"resources_to_expose", m.ResourcesToExpose}} {
-		if list.value != nil {
-			// JSON keeps entry boundaries: ["a,b"] and ["a","b"] hash apart.
-			data, err := sonic.Marshal([]string(list.value))
-			if err != nil {
-				return "", err
-			}
-			hash.Write([]byte(list.name + ":"))
-			hash.Write(data)
-		}
-	}
-
-	// Hash PerUserHeaderKeys (sorted for deterministic hashing) so edits to
-	// the declared header-name schema in config.json drift the hash.
-	if len(m.PerUserHeaderKeys) > 0 {
-		sortedKeys := make([]string, len(m.PerUserHeaderKeys))
-		copy(sortedKeys, m.PerUserHeaderKeys)
-		sort.Strings(sortedKeys)
-		data, err := sonic.Marshal(sortedKeys)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
-	// Hash PendingOAuthConfig so edits to the inline `oauth_config` block
-	// in config.json drift the hash and trigger reconciliation. Rows built
-	// from config.json carry only the runtime struct (the JSON column is
-	// populated later, by BeforeSave), so fall back to marshaling it with
-	// encoding/json — the same encoder BeforeSave uses to write the column
-	// — keeping both forms byte-identical.
-	if m.PendingOAuthConfigJSON != nil && *m.PendingOAuthConfigJSON != "" {
-		hash.Write([]byte(*m.PendingOAuthConfigJSON))
-	} else if m.PendingOAuthConfig != nil {
-		data, err := json.Marshal(m.PendingOAuthConfig)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
-	// Hash the token_exchange scoping block so edits to it in config.json
-	// drift the hash and trigger reconciliation. Same JSON-column-first
-	// fallback shape as PendingOAuthConfig above, for the same reason.
-	if m.TokenExchangeJSON != nil && *m.TokenExchangeJSON != "" {
-		hash.Write([]byte(*m.TokenExchangeJSON))
-	} else if m.TokenExchange != nil {
-		data, err := json.Marshal(m.TokenExchange)
-		if err != nil {
-			return "", err
-		}
-		hash.Write(data)
-	}
-
-	// Hash openapi_config so a changed spec, upstream, credential set or option
-	// in config.json drifts the hash and triggers reconciliation. The spec is
-	// hashed by content (or by its file reference when the content was not
-	// inlined), credentials by ref or value like Headers above; server-computed
-	// metadata (sizes, counts) is derived from these and contributes nothing.
-	// spec_url is hashed whenever it is set, inline spec or not: relative
-	// servers (and Swagger 2.0 documents without a host) resolve against it, so
-	// it can pick the upstream even when it does not supply the document. An
-	// empty base_url means the same as none. Every field is length-framed, so
-	// no value can run into the field written after it.
-	if m.OpenAPIConfig != nil {
-		oc := m.OpenAPIConfig
-		writeField := func(label, value string) {
-			fmt.Fprintf(hash, "openapi:%d:%s=%d:%s;", len(label), label, len(value), value)
-		}
-		switch {
-		case oc.Spec != "":
-			specSum := sha256.Sum256([]byte(oc.Spec))
-			writeField("spec_sha256", hex.EncodeToString(specSum[:]))
-		case oc.SpecFile != nil && *oc.SpecFile != "":
-			writeField("spec_file", *oc.SpecFile)
-		}
-		if oc.SpecURL != nil && *oc.SpecURL != "" {
-			writeField("spec_url", *oc.SpecURL)
-		}
-		if oc.BaseURL != nil && *oc.BaseURL != "" {
-			writeField("base_url", *oc.BaseURL)
-		}
-		if len(oc.SecurityCredentials) > 0 {
-			names := make([]string, 0, len(oc.SecurityCredentials))
-			for name := range oc.SecurityCredentials {
-				names = append(names, name)
-			}
-			sort.Strings(names)
-			for _, name := range names {
-				cred := oc.SecurityCredentials[name]
-				for _, part := range []struct {
-					label string
-					v     *schemas.SecretVar
-				}{{"value", cred.Value}, {"username", cred.Username}, {"password", cred.Password}} {
-					if part.v == nil {
-						continue
-					}
-					if part.v.IsFromSecret() {
-						writeField("cred_ref:"+name+":"+part.label, part.v.GetRawRef())
-					} else {
-						writeField("cred_val:"+name+":"+part.label, part.v.Val)
-					}
-				}
-			}
-		}
-		if oc.IncludeDeprecated {
-			writeField("include_deprecated", "true")
-		}
-		if oc.MaxResponseBytes != 0 {
-			writeField("max_response_bytes", fmt.Sprintf("%d", oc.MaxResponseBytes))
-		}
-	}
-
-	// Hash PerUserDiscovery so flipping it in config.json drifts the hash. Only
-	// true contributes: false is the default every row and every file entry
-	// written before the field existed already has, and a stored hash from
-	// that time must keep matching a file that still omits the field.
-	if m.PerUserDiscovery != nil && *m.PerUserDiscovery {
-		hash.Write([]byte("per_user_discovery:true"))
-	}
-
-	// will enable it in the future with a migration
-	// hash.Write([]byte("disabled:" + strconv.FormatBool(m.Disabled)))
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-// MCPClientHashMatchesLegacyCodeMode reports whether storedHash is this client's hash under the formula of
-// builds that did not hash is_code_mode_client. GenerateMCPClientHash now does when it is true, so the
-// first restart after the upgrade sees a mismatch for every such client even when config.json is untouched;
-// reconciliation calls this before treating that mismatch as a file edit, so UI and API edits survive.
-// storedCodeMode must be true too: without code mode both formulas agree, so a stored client without it
-// that now declares it is a file edit, not an old hash.
-func MCPClientHashMatchesLegacyCodeMode(m tables.TableMCPClient, storedHash string, storedCodeMode bool) (bool, error) {
-	if storedHash == "" || !m.IsCodeModeClient || !storedCodeMode {
-		return false, nil
-	}
-	m.IsCodeModeClient = false
-	legacy, err := GenerateMCPClientHash(m)
-	if err != nil {
-		return false, err
-	}
-	return legacy == storedHash, nil
-}
-
 // GeneratePluginHash generates a SHA256 hash for a plugin.
 // This is used to detect changes to plugins between config.json and database.
 // Skips: ID (autoIncrement), CreatedAt, UpdatedAt, IsCustom (dynamic fields)
@@ -2592,73 +2029,34 @@ func GeneratePluginHash(p tables.TablePlugin) (string, error) {
 
 // frameworkConfigHashPayload holds the config.json-sourced fields used for hashing.
 //
-// LiveModelsSyncInterval and OpenAPIURL carry omitempty deliberately: a nil pointer must
-// marshal to exactly the bytes this struct produced before the field existed,
-// so hashes already persisted in framework_configs stay valid and no upgraded
-// deployment sees a spurious "file changed" override on first boot.
+// LiveModelsSyncInterval carries omitempty deliberately: a nil pointer must marshal to
+// exactly the bytes this struct produced before the field existed.
 type frameworkConfigHashPayload struct {
 	PricingURL             *string `json:"pricing_url"`
 	ModelParametersURL     *string `json:"model_parameters_url"`
 	PricingSyncInterval    *int64  `json:"pricing_sync_interval"`
 	LiveModelsSyncInterval *int64  `json:"live_models_sync_interval,omitempty"`
-	OpenAPIURL             *string `json:"openapi_url,omitempty"`
-}
-
-type frameworkConfigHashPayloadWithMCP struct {
-	PricingURL             *string `json:"pricing_url"`
-	ModelParametersURL     *string `json:"model_parameters_url"`
-	PricingSyncInterval    *int64  `json:"pricing_sync_interval"`
-	MCPLibraryURL          *string `json:"mcp_library_url"`
-	MCPLibrarySyncInterval *int64  `json:"mcp_library_sync_interval"`
-	LiveModelsSyncInterval *int64  `json:"live_models_sync_interval,omitempty"`
-	OpenAPIURL             *string `json:"openapi_url,omitempty"`
 }
 
 // FrameworkConfigHashOptions adds optional framework config fields to the
-// config.json change-detection hash while preserving the legacy pricing-only
-// hash when omitted.
+// config.json change-detection hash while preserving the pricing-only hash
+// when omitted.
 type FrameworkConfigHashOptions struct {
-	MCPLibraryURL          *string
-	MCPLibrarySyncInterval *int64
 	LiveModelsSyncInterval *int64
-	OpenAPIURL             *string
 }
 
 // GenerateFrameworkConfigHash generates a SHA256 hash for a framework config.
 // This is used to detect changes to framework config between config.json and database.
 func GenerateFrameworkConfigHash(pricingURL *string, modelParametersURL *string, pricingSyncInterval *int64, opts ...FrameworkConfigHashOptions) (string, error) {
-	var data []byte
-	var err error
-	if len(opts) > 0 {
-		if opts[0].MCPLibraryURL == nil && opts[0].MCPLibrarySyncInterval == nil {
-			// Only live-models config was supplied. Staying on the pricing-only
-			// payload keeps the digest identical to a pre-MCP deployment's when
-			// the live interval is also nil.
-			data, err = sonic.Marshal(frameworkConfigHashPayload{
-				PricingURL:             pricingURL,
-				ModelParametersURL:     modelParametersURL,
-				PricingSyncInterval:    pricingSyncInterval,
-				LiveModelsSyncInterval: opts[0].LiveModelsSyncInterval,
-				OpenAPIURL:             opts[0].OpenAPIURL,
-			})
-		} else {
-			data, err = sonic.Marshal(frameworkConfigHashPayloadWithMCP{
-				PricingURL:             pricingURL,
-				ModelParametersURL:     modelParametersURL,
-				PricingSyncInterval:    pricingSyncInterval,
-				MCPLibraryURL:          opts[0].MCPLibraryURL,
-				MCPLibrarySyncInterval: opts[0].MCPLibrarySyncInterval,
-				LiveModelsSyncInterval: opts[0].LiveModelsSyncInterval,
-				OpenAPIURL:             opts[0].OpenAPIURL,
-			})
-		}
-	} else {
-		data, err = sonic.Marshal(frameworkConfigHashPayload{
-			PricingURL:          pricingURL,
-			ModelParametersURL:  modelParametersURL,
-			PricingSyncInterval: pricingSyncInterval,
-		})
+	payload := frameworkConfigHashPayload{
+		PricingURL:          pricingURL,
+		ModelParametersURL:  modelParametersURL,
+		PricingSyncInterval: pricingSyncInterval,
 	}
+	if len(opts) > 0 {
+		payload.LiveModelsSyncInterval = opts[0].LiveModelsSyncInterval
+	}
+	data, err := sonic.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
@@ -2692,41 +2090,8 @@ type GovernanceConfig struct {
 	ComplexityAnalyzerConfig *ComplexityAnalyzerConfig     `json:"complexity_analyzer_config,omitempty"`
 }
 
-// MaxOpenAPIURLLength bounds the framework config's openapi_url, matching config.schema.json.
-const MaxOpenAPIURLLength = 2048
-
-// ValidateOpenAPIURL accepts an empty setting (the build's default spec), an
-// absolute http(s) URL, or a relative path that stays inside the app directory. An
-// absolute path is refused: the setting is writable over the API, and a spec file
-// belongs beside config.json.
-func ValidateOpenAPIURL(value string) error {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil
-	}
-	if len(value) > MaxOpenAPIURLLength {
-		return fmt.Errorf("must be at most %d characters", MaxOpenAPIURLLength)
-	}
-	if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
-		parsed, err := url.Parse(value)
-		if err != nil || parsed.Hostname() == "" {
-			return fmt.Errorf("must be an absolute http(s) URL or a path relative to the app directory")
-		}
-		return nil
-	}
-	if strings.Contains(value, "://") {
-		return fmt.Errorf("must be an http(s) URL or a path relative to the app directory")
-	}
-	clean := filepath.Clean(filepath.FromSlash(value))
-	if filepath.IsAbs(clean) || strings.HasPrefix(value, "/") || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("must be a path relative to the app directory that stays inside it")
-	}
-	return nil
-}
-
-// MaxPublicURLLength is the longest public URL a setting accepts: bifrost_url
-// and the MCP and Skills external client URLs are stored in varchar(512)
-// columns, so a longer value would be accepted and then fail to save.
+// MaxPublicURLLength is the longest public URL a setting accepts: the Skills
+// external client URL is stored in a varchar(512) column, so a longer value would be accepted and then fail to save.
 const MaxPublicURLLength = 512
 
 // ValidatePublicBaseURL accepts an empty setting or a public HTTP base URL without private URL components.
@@ -2748,21 +2113,3 @@ func ValidatePublicBaseURL(value string) error {
 	return nil
 }
 
-// writeLengthPrefixed writes prefix, then value preceded by its byte length, so
-// a value can never run on into the field written after it.
-func writeLengthPrefixed(h hash.Hash, prefix, value string) {
-	h.Write([]byte(prefix + strconv.Itoa(len(value)) + ":" + value))
-}
-
-// secretVarHashForm is the form of a SecretVar that goes into the config hash:
-// the reference for an env or vault value (so a changed environment does not
-// look like a changed config), the plain value otherwise.
-func secretVarHashForm(v *schemas.SecretVar) string {
-	if v == nil {
-		return ""
-	}
-	if v.IsFromSecret() {
-		return "ref:" + v.GetRawRef()
-	}
-	return "val:" + v.GetValue()
-}

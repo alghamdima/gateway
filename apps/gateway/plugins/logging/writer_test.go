@@ -65,7 +65,7 @@ func TestProcessBatchConnectionErrorDoesNotFanOutPerRow(t *testing.T) {
 		LogStore: newTestStore(t),
 		fail:     func(int) error { return fmt.Errorf("write logs: %w", connRefused) },
 	}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -114,7 +114,7 @@ func TestProcessBatchSQLiteBusyRetriesWholeBatch(t *testing.T) {
 					return nil
 				},
 			}
-			plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+			plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 			if err != nil {
 				t.Fatalf("Init() error = %v", err)
 			}
@@ -164,7 +164,7 @@ func TestProcessBatchUnknownErrorStillFallsBackPerRow(t *testing.T) {
 			return nil
 		},
 	}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -214,7 +214,7 @@ func TestProcessBatchStatementTimeoutSplitsBatch(t *testing.T) {
 			return nil
 		},
 	}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -261,7 +261,7 @@ func TestProcessBatchStatementTimeoutSingleRowDropped(t *testing.T) {
 		LogStore: newTestStore(t),
 		fail:     func(int) error { return sqlStateErr("57014") },
 	}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -294,7 +294,7 @@ func TestProcessBatchCancelledContextHandsBatchBack(t *testing.T) {
 		LogStore: newTestStore(t),
 		fail:     func(int) error { return connRefused },
 	}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -362,7 +362,7 @@ func TestCleanupInterruptsBlockedFlushAndDrainsIt(t *testing.T) {
 	plugin, err := Init(context.Background(), &Config{Writer: &logstore.WriterConfig{
 		MaxBatchSize:  N,
 		BatchInterval: "10ms",
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -464,7 +464,7 @@ func TestBatchWriterPausesWhileMigrationLockHeld(t *testing.T) {
 		MaxBatchSize:       batch,
 		BatchInterval:      "10ms",
 		WriteQueueCapacity: capacity,
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -514,7 +514,7 @@ func TestBatchWriterForcedFlushAfterMaxPause(t *testing.T) {
 	plugin, err := Init(context.Background(), &Config{Writer: &logstore.WriterConfig{
 		MaxBatchSize:  N,
 		BatchInterval: "10ms",
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -542,7 +542,7 @@ func TestCleanupDuringMigrationPauseStillDrains(t *testing.T) {
 		MaxBatchSize:       batch,
 		BatchInterval:      "10ms",
 		WriteQueueCapacity: queued,
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -584,7 +584,7 @@ func TestBatchWriterGateFalseWritesAsUsual(t *testing.T) {
 			plugin, err := Init(context.Background(), &Config{Writer: &logstore.WriterConfig{
 				MaxBatchSize:  N,
 				BatchInterval: "10ms",
-			}}, testLogger{}, mk(inner), nil, nil, nil)
+			}}, testLogger{}, mk(inner), nil, nil)
 			if err != nil {
 				t.Fatalf("Init() error = %v", err)
 			}
@@ -617,7 +617,7 @@ func TestBatchWriterKeepsWritingAfterPauseCapUntilLockClears(t *testing.T) {
 	plugin, err := Init(context.Background(), &Config{Writer: &logstore.WriterConfig{
 		MaxBatchSize:  batch,
 		BatchInterval: "10ms",
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -691,7 +691,7 @@ func newUsageGatedPlugin(t *testing.T) (*LoggerPlugin, *usageGatedStore) {
 	plugin, err := Init(context.Background(), &Config{Writer: &logstore.WriterConfig{
 		MaxBatchSize:  2,
 		BatchInterval: "10ms",
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -878,7 +878,7 @@ func TestBatchWriterGateUnderSteadyLoadPostgres(t *testing.T) {
 	plugin, err := Init(ctx, &Config{Writer: &logstore.WriterConfig{
 		MaxBatchSize:  50,
 		BatchInterval: "500ms",
-	}}, testLogger{}, store, nil, nil, nil)
+	}}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1030,7 +1030,7 @@ func evictionRequestCtx(id string) *schemas.BifrostContext {
 // IfNotExists insert would no-op, leaving the row stuck in "processing".
 func TestPersistEvictedPartialSkipsEntryAlreadyTaken(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1057,7 +1057,7 @@ func TestPersistEvictedPartialSkipsEntryAlreadyTaken(t *testing.T) {
 // entry, every request must end as a single success row with its input.
 func TestConcurrentEvictionAndCompletionKeepsEveryLog(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1174,7 +1174,7 @@ func TestEvictionGivesUpAfterRepeatedQueueFailures(t *testing.T) {
 // global, visible policy on the partial row.
 func TestEvictionKeepsVirtualKeyHiddenPolicy(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1247,7 +1247,7 @@ func (c *chunkCountingTracer) GetSpanHandleByID(_ string, _ *string) schemas.Spa
 // (without probing the DB) so the final reconcile carries the resumed output.
 func TestResumedStreamChunksAccumulateAfterEviction(t *testing.T) {
 	spy := &fallbackSpyStore{LogStore: newTestStore(t)}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, spy, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, spy, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1297,7 +1297,7 @@ func TestEvictedPartialProbeIsBounded(t *testing.T) {
 	evictedPartialProbeTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { evictedPartialProbeTimeout = prev })
 
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, &blockingPresenceStore{LogStore: newTestStore(t)}, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, &blockingPresenceStore{LogStore: newTestStore(t)}, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1320,7 +1320,7 @@ func TestEvictedPartialProbeIsBounded(t *testing.T) {
 // speech/transcription/image/video request loses its input for good.
 func TestEvictionPersistsMediaInputs(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1379,7 +1379,7 @@ func seedProcessingRow(t *testing.T, store logstore.LogStore, id string, origTim
 // Timestamp kept) before it is dropped from memory.
 func TestCleanupStalePendingPersistsPartialRow(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1444,7 +1444,7 @@ func TestCleanupStalePendingPersistsPartialRow(t *testing.T) {
 // output onto the persisted partial row via UPDATE, preserving the input.
 func TestPostLLMHookReconcilesEvictedPartialRowSuccess(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1500,7 +1500,7 @@ func TestPostLLMHookReconcilesEvictedPartialRowSuccess(t *testing.T) {
 // persisted partial row to status=error with error details.
 func TestPostLLMHookReconcilesEvictedPartialRowError(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1565,7 +1565,7 @@ func (s *fallbackSpyStore) IsLogEntryPresent(ctx context.Context, id string) (bo
 // hammering that caused the original warning storm), while a terminal call does.
 func TestPostLLMHookNoDBProbeOnNonFinalChunk(t *testing.T) {
 	spy := &fallbackSpyStore{LogStore: newTestStore(t)}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, spy, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, spy, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1629,7 +1629,7 @@ func (s *slowStore) BatchUpdate(ctx context.Context, entries []*logstore.Log) er
 func TestBulkEvictReconcileIntegritySQLite(t *testing.T) {
 	base := newTestStore(t)
 	slow := &slowStore{LogStore: base, delay: 3 * time.Millisecond}
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, slow, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, slow, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1750,7 +1750,7 @@ func TestProcessBatchAppliesInsertsBeforeUpdates(t *testing.T) {
 // context must not replace what the partial row recorded.
 func TestReconcileLeavesPartialMetadataIntact(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1788,7 +1788,7 @@ func TestReconcileLeavesPartialMetadataIntact(t *testing.T) {
 // update must not regenerate the row's summary from the output alone.
 func TestReconcileKeepsInputContentSummary(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1827,7 +1827,7 @@ func TestReconcileKeepsInputContentSummary(t *testing.T) {
 func TestEvictionHonoursGlobalContentPolicy(t *testing.T) {
 	store := newTestStore(t)
 	disabled := true
-	plugin, err := Init(context.Background(), &Config{DisableContentLogging: &disabled}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{DisableContentLogging: &disabled}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1858,7 +1858,7 @@ func TestEvictionHonoursGlobalContentPolicy(t *testing.T) {
 // global policy allows content.
 func TestEvictionDropsProvisionalInput(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1887,7 +1887,7 @@ func TestEvictionDropsProvisionalInput(t *testing.T) {
 // output-only update entry.
 func TestReconcileCallbackReceivesFullRow(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1928,7 +1928,7 @@ func TestReconcileCallbackReceivesFullRow(t *testing.T) {
 // that still reconciles through the DB probe while the row exists.
 func TestEvictedPartialMarkerExpires(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -1964,7 +1964,7 @@ func TestEvictedPartialMarkerExpires(t *testing.T) {
 // Inject re-enqueues as an insert that would no-op against the partial row.
 func TestPersistCompletedEntryBypassesInject(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -2013,7 +2013,7 @@ func TestEnqueueLogUpdateDropsWhenQueueFull(t *testing.T) {
 // reconcile deliberately writes none, so eviction is its only source.
 func TestEvictionPersistsRequestMetadata(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -2065,7 +2065,7 @@ func (s *staleReadStore) FindByID(ctx context.Context, id string) (*logstore.Log
 // response even when the re-read row's offloaded content lags behind the update.
 func TestReconcileCallbackCarriesWrittenOutput(t *testing.T) {
 	base := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, &staleReadStore{LogStore: base}, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, &staleReadStore{LogStore: base}, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -2108,7 +2108,7 @@ func TestReconcileCallbackCarriesWrittenOutput(t *testing.T) {
 func TestReconcileAppliesFinalVisibility(t *testing.T) {
 	store := newTestStore(t)
 	disabled := true
-	plugin, err := Init(context.Background(), &Config{DisableContentLogging: &disabled}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{DisableContentLogging: &disabled}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}

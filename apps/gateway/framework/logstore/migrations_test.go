@@ -19,58 +19,6 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// TestMigrationAddMCPRedactionMappingColumn verifies the MCP mapping column is additive, idempotent, and preserves existing rows.
-func TestMigrationAddMCPRedactionMappingColumn(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("INSERT INTO mcp_tool_logs (id) VALUES (?)", "mcp-existing").Error)
-
-	ctx := context.Background()
-	require.NoError(t, migrationAddMCPRedactionMappingColumn(ctx, db, testLogger{}))
-	require.True(t, db.Migrator().HasColumn(&MCPToolLog{}, "RedactionMapping"))
-	require.NoError(t, migrationAddMCPRedactionMappingColumn(ctx, db, testLogger{}))
-
-	var count int64
-	require.NoError(t, db.Table("mcp_tool_logs").Where("id = ?", "mcp-existing").Count(&count).Error)
-	assert.Equal(t, int64(1), count)
-}
-
-// TestMigrationAddMCPPluginLogsColumn verifies the MCP plugin-log column is additive, idempotent, and preserves existing rows.
-func TestMigrationAddMCPPluginLogsColumn(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("INSERT INTO mcp_tool_logs (id) VALUES (?)", "mcp-existing").Error)
-
-	ctx := context.Background()
-	require.NoError(t, migrationAddMCPPluginLogsColumn(ctx, db, testLogger{}))
-	require.True(t, db.Migrator().HasColumn(&MCPToolLog{}, "PluginLogs"))
-	require.NoError(t, migrationAddMCPPluginLogsColumn(ctx, db, testLogger{}))
-
-	var count int64
-	require.NoError(t, db.Table("mcp_tool_logs").Where("id = ?", "mcp-existing").Count(&count).Error)
-	assert.Equal(t, int64(1), count)
-}
-
-// TestMigrationAddMethodColumnToMCPToolLogs verifies the read-method column is additive, idempotent,
-// and leaves existing rows (tool calls) null.
-func TestMigrationAddMethodColumnToMCPToolLogs(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("INSERT INTO mcp_tool_logs (id) VALUES (?)", "mcp-existing").Error)
-
-	ctx := context.Background()
-	for range 2 {
-		require.NoError(t, migrationAddMethodColumnToMCPToolLogs(ctx, db, testLogger{}))
-	}
-	require.True(t, db.Migrator().HasColumn(&MCPToolLog{}, "method"))
-	var method *string
-	require.NoError(t, db.Table("mcp_tool_logs").Select("method").Where("id = ?", "mcp-existing").Scan(&method).Error)
-	assert.Nil(t, method)
-}
-
 // TestMigrationAddSessionIDColumn verifies that the session lookup
 // column is additive, indexed, and preserves pre-existing request logs.
 func TestMigrationAddSessionIDColumn(t *testing.T) {
@@ -542,9 +490,7 @@ func TestCorrelationColumnsMigration(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec("CREATE TABLE logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
 	require.NoError(t, db.Exec("INSERT INTO logs (id) VALUES (?)", "log-existing").Error)
-	require.NoError(t, db.Exec("INSERT INTO mcp_tool_logs (id) VALUES (?)", "mcp-existing").Error)
 
 	ctx := context.Background()
 	require.NoError(t, migrationAddCorrelationColumns(ctx, db, testLogger{}))
@@ -554,19 +500,15 @@ func TestCorrelationColumnsMigration(t *testing.T) {
 		index string
 	}{
 		{&Log{}, "AgentCorrelationID", "idx_logs_agent_correlation_id"},
-		{&MCPToolLog{}, "SessionID", "idx_mcp_logs_session_id"},
-		{&MCPToolLog{}, "AgentCorrelationID", "idx_mcp_logs_agent_correlation_id"},
 	} {
 		require.True(t, db.Migrator().HasColumn(column.model, column.field), "missing %s", column.field)
 		require.True(t, db.Migrator().HasIndex(column.model, column.index), "missing %s", column.index)
 	}
 	require.NoError(t, migrationAddCorrelationColumns(ctx, db, testLogger{}))
 
-	var logCount, mcpCount int64
+	var logCount int64
 	require.NoError(t, db.Table("logs").Where("id = ?", "log-existing").Count(&logCount).Error)
-	require.NoError(t, db.Table("mcp_tool_logs").Where("id = ?", "mcp-existing").Count(&mcpCount).Error)
 	assert.Equal(t, int64(1), logCount)
-	assert.Equal(t, int64(1), mcpCount)
 }
 
 // TestCorrelationColumnsMigrationRollbackGuardsRecordedValues: the rollback drops the columns while
@@ -576,7 +518,6 @@ func TestCorrelationColumnsMigrationRollbackGuardsRecordedValues(t *testing.T) {
 		db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 		require.NoError(t, err)
 		require.NoError(t, db.Exec("CREATE TABLE logs (id TEXT PRIMARY KEY, session_id TEXT)").Error)
-		require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
 		require.NoError(t, migrationAddCorrelationColumns(context.Background(), db, testLogger{}))
 		return db
 	}
@@ -586,14 +527,10 @@ func TestCorrelationColumnsMigrationRollbackGuardsRecordedValues(t *testing.T) {
 		require.NoError(t, db.Table("logs").Create(map[string]interface{}{"id": "log-1", "session_id": "session-1"}).Error)
 		require.NoError(t, correlationColumnsMigration(context.Background(), testLogger{}).Rollback(db))
 		assert.False(t, db.Migrator().HasColumn("logs", "agent_correlation_id"))
-		assert.False(t, db.Migrator().HasColumn("mcp_tool_logs", "agent_correlation_id"))
-		assert.False(t, db.Migrator().HasColumn("mcp_tool_logs", "session_id"))
 		assert.True(t, db.Migrator().HasColumn("logs", "session_id"))
 	})
 	for _, tt := range []struct{ table, column string }{
 		{"logs", "agent_correlation_id"},
-		{"mcp_tool_logs", "session_id"},
-		{"mcp_tool_logs", "agent_correlation_id"},
 	} {
 		t.Run(tt.table+"."+tt.column, func(t *testing.T) {
 			db := open(t)
@@ -610,7 +547,7 @@ func TestCorrelationColumnsMigrationRollbackGuardsRecordedValues(t *testing.T) {
 // project column migrations add only the columns (addColumnIfNotExists never creates a field's
 // index), so an upgraded deployment scans logs by project_id unindexed unless a builder carries
 // them. logs gets the (project_id, timestamp) composite from ensureOwnerTimestampIndexes;
-// mcp_tool_logs keeps its single-column entry in ensurePerformanceIndexes. A fresh database gets
+// A fresh database gets
 // them from the model's index tags at table creation.
 func TestPerformanceIndexesCoverProjectIDs(t *testing.T) {
 	tables := map[string]string{}
@@ -621,7 +558,6 @@ func TestPerformanceIndexesCoverProjectIDs(t *testing.T) {
 		tables[idx.name] = idx.table
 	}
 	assert.Equal(t, "logs", tables["idx_logs_project_ts"])
-	assert.Equal(t, "mcp_tool_logs", tables["idx_mcp_logs_project_id"])
 }
 
 // TestPerformanceIndexesHaveNoDuplicateColumns keeps the background builder from building the
@@ -650,47 +586,6 @@ func TestPerformanceIndexesCoverCorrelationIDs(t *testing.T) {
 		tables[idx.name] = idx.table
 	}
 	assert.Equal(t, "logs", tables["idx_logs_agent_correlation_id"])
-	assert.Equal(t, "mcp_tool_logs", tables["idx_mcp_logs_session_id"])
-	assert.Equal(t, "mcp_tool_logs", tables["idx_mcp_logs_agent_correlation_id"])
-}
-
-// TestMigrationAddMCPGovernanceSnapshots verifies the attribution columns are
-// additive, idempotent, and leave rows written before them intact — those rows
-// keep their bare ids, which is the accepted cost of not rewriting history.
-func TestMigrationAddMCPGovernanceSnapshots(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "migrations.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	require.NoError(t, err)
-	require.NoError(t, db.Exec("CREATE TABLE mcp_tool_logs (id TEXT PRIMARY KEY)").Error)
-	require.NoError(t, db.Exec("INSERT INTO mcp_tool_logs (id) VALUES (?)", "mcp-existing").Error)
-
-	ctx := context.Background()
-	require.NoError(t, migrationAddMCPGovernanceSnapshots(ctx, db, testLogger{}))
-	for _, field := range []string{
-		"UserName", "TeamName", "CustomerName", "BusinessUnitName",
-		"TeamIDs", "TeamNames", "CustomerIDs", "CustomerNames",
-		"BusinessUnitIDs", "BusinessUnitNames", "BudgetIDs", "RateLimitIDs",
-	} {
-		require.True(t, db.Migrator().HasColumn(&MCPToolLog{}, field), "missing column for %s", field)
-	}
-	require.NoError(t, migrationAddMCPGovernanceSnapshots(ctx, db, testLogger{}))
-
-	var count int64
-	require.NoError(t, db.Table("mcp_tool_logs").Where("id = ?", "mcp-existing").Count(&count).Error)
-	assert.Equal(t, int64(1), count)
-}
-
-// TestMCPGovernanceSnapshotsMigrationIsRegistered keeps the migration reachable:
-// an unregistered step leaves the columns missing on every real deployment while
-// every unit test that calls it directly still passes.
-func TestMCPGovernanceSnapshotsMigrationIsRegistered(t *testing.T) {
-	for _, step := range logstoreMigrationSteps {
-		for _, id := range step.IDs {
-			if id == "mcp_tool_logs_add_governance_snapshots" {
-				return
-			}
-		}
-	}
-	t.Fatal("mcp_tool_logs_add_governance_snapshots is not registered in logstoreMigrationSteps")
 }
 
 // sqlRecorder captures every statement gorm executes, so a test can assert on
@@ -924,7 +819,6 @@ func TestIndexBuildersIgnoreSameNamedIndexInOtherSchema(t *testing.T) {
 		{"logs", "idx_logs_business_unit_ids_gin"},
 		{"logs", "idx_logs_customer_ids_gin"},
 		{"logs", "idx_logs_histogram_cover"},
-		{"mcp_tool_logs", "idx_mcp_logs_histogram_cover"},
 	}
 	for _, idx := range performanceIndexes {
 		indexes = append(indexes, index{idx.table, idx.name})
@@ -1203,8 +1097,6 @@ func TestClientIPColumnMigration_NonRollbackable(t *testing.T) {
 	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "client-ip.db")}, testLogger{})
 	require.NoError(t, err)
 	db := store.db
-	require.NoError(t, db.Create(&MCPToolLog{ID: "mcp-1", ToolName: "echo", Status: "success", Timestamp: time.Now().UTC(), CreatedAt: time.Now().UTC()}).Error)
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Update("client_ip", "203.0.113.7").Error)
 
 	err = clientIPColumnMigration(ctx, testLogger{}).Rollback(db)
 	require.Error(t, err, "rollback must refuse while client_ip holds a value")
@@ -1213,7 +1105,6 @@ func TestClientIPColumnMigration_NonRollbackable(t *testing.T) {
 		assert.True(t, db.Migrator().HasColumn(model, "client_ip"), "%T.client_ip survives a refused rollback", model)
 	}
 	var stored string
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Pluck("client_ip", &stored).Error)
 	assert.Equal(t, "203.0.113.7", stored)
 }
 
@@ -1248,8 +1139,6 @@ func TestUserEmailColumnMigration_NonRollbackable(t *testing.T) {
 	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "user-email.db")}, testLogger{})
 	require.NoError(t, err)
 	db := store.db
-	require.NoError(t, db.Create(&MCPToolLog{ID: "mcp-1", ToolName: "echo", Status: "success", Timestamp: time.Now().UTC(), CreatedAt: time.Now().UTC()}).Error)
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Update("user_email", "ada@example.com").Error)
 
 	err = userEmailColumnMigration(ctx, testLogger{}).Rollback(db)
 	require.Error(t, err, "rollback must refuse while user_email holds a value")
@@ -1258,29 +1147,7 @@ func TestUserEmailColumnMigration_NonRollbackable(t *testing.T) {
 		assert.True(t, db.Migrator().HasColumn(model, "user_email"), "%T.user_email survives a refused rollback", model)
 	}
 	var stored string
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Pluck("user_email", &stored).Error)
 	assert.Equal(t, "ada@example.com", stored)
-}
-
-func TestRoundTripIDColumnMigration_NonRollbackable(t *testing.T) {
-	ctx := context.Background()
-	store, err := newSqliteLogStore(ctx, &SQLiteConfig{Path: filepath.Join(t.TempDir(), "round-trip-id.db")}, testLogger{})
-	require.NoError(t, err)
-	db := store.db
-	require.NoError(t, db.Create(&MCPToolLog{ID: "mcp-1", ToolName: "echo", Status: "input_required", Timestamp: time.Now().UTC(), CreatedAt: time.Now().UTC()}).Error)
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Update("round_trip_id", "0123456789abcdef").Error)
-
-	err = roundTripIDColumnMigration(ctx, testLogger{}).Rollback(db)
-	require.Error(t, err, "rollback must refuse while round_trip_id holds a value")
-	assert.Contains(t, err.Error(), "non-rollbackable")
-	assert.True(t, db.Migrator().HasColumn(&MCPToolLog{}, "round_trip_id"), "round_trip_id survives a refused rollback")
-	var stored string
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Pluck("round_trip_id", &stored).Error)
-	assert.Equal(t, "0123456789abcdef", stored)
-
-	require.NoError(t, db.Model(&MCPToolLog{}).Where("id = ?", "mcp-1").Update("round_trip_id", nil).Error)
-	require.NoError(t, roundTripIDColumnMigration(ctx, testLogger{}).Rollback(db), "an empty column rolls back")
-	assert.False(t, db.Migrator().HasColumn(&MCPToolLog{}, "round_trip_id"))
 }
 
 // TestModelRoutingColumnsMigration_NonRollbackable pins that rolling

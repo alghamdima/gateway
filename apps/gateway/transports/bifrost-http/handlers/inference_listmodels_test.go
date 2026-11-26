@@ -131,7 +131,7 @@ func newElevenlabsScribeHandler(tb testing.TB, keys []schemas.Key, virtualKeys [
 	}
 	catalog.SetKeyConfigForProvider(schemas.OpenAI, config.Providers[schemas.OpenAI].Keys)
 	plugin, err := governance.Init(tb.Context(), nil, log, nil,
-		&configstore.GovernanceConfig{VirtualKeys: virtualKeys}, catalog, nil, scribeInMemoryStore{config})
+		&configstore.GovernanceConfig{VirtualKeys: virtualKeys}, catalog, scribeInMemoryStore{config})
 	require.NoError(tb, err)
 	client, err := bifrost.Init(tb.Context(), schemas.BifrostConfig{
 		Account: lib.NewBaseAccount(config), Logger: log, ModelCatalog: catalog,
@@ -280,7 +280,7 @@ func scribeCatalogAccess(catalog *modelcatalog.ModelCatalog, vk configtables.Tab
 	permit := grant.NewPermit(grant.PermitVirtualKey, vk.ID, vk.Name, true, false, []schemas.ProviderPermit{{
 		Provider: config.Provider, AllowedModels: config.AllowedModels,
 		BlacklistedModels: config.BlacklistedModels, KeyIDs: config.KeyIDs(),
-	}}, nil)
+	}})
 	return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", func(provider, model string, allowed []string) bool {
 		return catalog.IsModelAllowedForProvider(schemas.ModelProvider(provider), model, nil, schemas.WhiteList(allowed))
 	})
@@ -469,7 +469,7 @@ func TestApplyListModelsProviderFilterDelegatesToTheModelsManager(t *testing.T) 
 		// A provider granted no model at all is still asked: the fan-out decides who can
 		// serve the request, and the response is filtered per model afterwards.
 		{Provider: "anthropic"},
-	}, nil)
+	})
 	manager := &mockModelsManager{access: grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)}
 	h := &CompletionHandler{modelsManager: manager}
 

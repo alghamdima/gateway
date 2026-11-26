@@ -47,7 +47,7 @@ func TestMergeLoadBalancerMetadata(t *testing.T) {
 func TestPostLLMHookMergesLoadBalancerMetadata(t *testing.T) {
 	prefix := schemas.LoadBalancerMetadataPrefix
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -118,7 +118,7 @@ func TestPostLLMHookMergesLoadBalancerMetadata(t *testing.T) {
 func TestPostLLMHookNoPendingMergesLoadBalancerMetadata(t *testing.T) {
 	prefix := schemas.LoadBalancerMetadataPrefix
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -209,7 +209,7 @@ func TestCaptureLoggingHeadersDropsLoadBalancerKeys(t *testing.T) {
 func TestPostLLMHookDropsCallerLoadBalancerMetadataWithoutAnAttempt(t *testing.T) {
 	prefix := schemas.LoadBalancerMetadataPrefix
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	if err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
@@ -305,7 +305,7 @@ func TestPostLLMHookSnapshotsVirtualKeyMetadata(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newTestStore(t)
-			plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+			plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 			if err != nil {
 				t.Fatalf("Init() error = %v", err)
 			}

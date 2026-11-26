@@ -205,39 +205,6 @@ type LogStore interface {
 	GetDistinctApps(ctx context.Context, limit int, query string) ([]string, error)
 	GetDistinctMetadataKeys(ctx context.Context, limit int, query string) (map[string][]string, error)
 
-	// MCP Tool Log histogram methods
-	GetMCPHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*MCPHistogramResult, error)
-	// GetMCPLatencyHistogram returns time-bucketed latency percentiles of finished MCP tool calls.
-	GetMCPLatencyHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*LatencyHistogramResult, error)
-	GetMCPCostHistogram(ctx context.Context, filters MCPToolLogSearchFilters, bucketSizeSeconds int64) (*MCPCostHistogramResult, error)
-	GetMCPTopTools(ctx context.Context, filters MCPToolLogSearchFilters, limit int) (*MCPTopToolsResult, error)
-	// GetMCPToolCountsByDimension returns how many distinct tools each user,
-	// team, customer or business unit called, in one read.
-	GetMCPToolCountsByDimension(ctx context.Context, filters MCPToolLogSearchFilters, dimension RankingDimension) (map[string]int, error)
-
-	// MCP Tool Log methods
-	CreateMCPToolLog(ctx context.Context, entry *MCPToolLog) error
-	BatchCreateMCPToolLogsIfNotExists(ctx context.Context, entries []*MCPToolLog) error
-	FindMCPToolLog(ctx context.Context, id string) (*MCPToolLog, error)
-	UpdateMCPToolLog(ctx context.Context, id string, entry any) error
-	SearchMCPToolLogs(ctx context.Context, filters MCPToolLogSearchFilters, pagination PaginationOptions) (*MCPToolLogSearchResult, error)
-	GetMCPToolLogStats(ctx context.Context, filters MCPToolLogSearchFilters) (*MCPToolLogStats, error)
-	HasMCPToolLogs(ctx context.Context) (bool, error)
-	DeleteMCPToolLogs(ctx context.Context, ids []string) error
-	// DeleteMCPToolLogsBatch deletes up to batchSize MCP tool logs older than
-	// cutoff, oldest first, for the retention cleaner (see LogsCleaner).
-	DeleteMCPToolLogsBatch(ctx context.Context, cutoff time.Time, batchSize int) (deletedCount int64, err error)
-	FlushMCPToolLogs(ctx context.Context, since time.Time) error
-	GetAvailableToolNames(ctx context.Context, limit int, query string) ([]string, error)
-	GetAvailableServerLabels(ctx context.Context, limit int, query string) ([]string, error)
-	// GetAvailableMCPUserAgents returns distinct raw User-Agent strings from MCP tool logs for the "App" filter.
-	GetAvailableMCPUserAgents(ctx context.Context, limit int, query string) ([]string, error)
-	// GetAvailableMCPApps returns distinct backend-detected app labels from MCP tool logs.
-	GetAvailableMCPApps(ctx context.Context, limit int, query string) ([]string, error)
-	GetAvailableMCPVirtualKeys(ctx context.Context, limit int, query string) ([]MCPToolLog, error)
-	// GetDistinctMCPKeyPairs returns one MCP tool log dimension's id/name pairs for the filter sidebar.
-	GetDistinctMCPKeyPairs(ctx context.Context, idCol, nameCol string, limit int, query string) ([]KeyPairResult, error)
-
 	// Async Job methods
 	CreateAsyncJob(ctx context.Context, job *AsyncJob) error
 	FindAsyncJobByID(ctx context.Context, id string) (*AsyncJob, error)

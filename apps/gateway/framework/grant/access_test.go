@@ -73,18 +73,14 @@ func TestAccess_NilReceiverPermitsNothing(t *testing.T) {
 	assert.False(t, access.IsProviderAllowed("openai"))
 	assert.False(t, access.IsModelAllowed("openai", "gpt-4o"))
 	assert.False(t, access.AllowsEveryModel("openai"))
-	assert.False(t, access.IsMCPToolAllowed("client-tool"))
 	assert.False(t, access.IsScoped())
 	assert.Nil(t, access.Bases())
 	assert.Nil(t, access.Scoping())
 	assert.Equal(t, "", access.Mode())
 	assert.Empty(t, access.GrantedProvidersForModel("gpt-4o"))
 	assert.Empty(t, access.ProvidersForModel("gpt-4o"))
-	assert.Empty(t, access.MCPToolIncludeList())
-	assert.Equal(t, []string{}, access.NarrowMCPToolIncludeList([]string{"client-tool"}))
 	assert.Nil(t, access.PermitsForModel("openai", "gpt-4o"))
 	assert.Nil(t, access.DeniedPermitsForModel("openai", "gpt-4o"))
-	assert.Nil(t, access.DeniedPermitsForMCPTool("client-tool"))
 
 	keyIDs, restricted := access.KeysForModel("openai", "gpt-4o")
 	assert.Nil(t, keyIDs)
@@ -319,7 +315,6 @@ func TestAccess_UnknownModeFailsClosed(t *testing.T) {
 	assert.False(t, access.IsProviderAllowed("openai"))
 	assert.False(t, access.IsModelAllowed("openai", "gpt-4o"))
 	assert.Empty(t, access.GrantedProvidersForModel("gpt-4o"))
-	assert.Empty(t, access.MCPToolIncludeList())
 	assert.Nil(t, access.PermitsForModel("openai", "gpt-4o"))
 }
 
@@ -597,31 +592,6 @@ func TestAccess_KeysForComposes(t *testing.T) {
 		keyIDs, restricted = NewAccess(held(open), "", nil, "", nil).KeysForModel("openai", "gpt-4o")
 		assert.False(t, restricted, "one of them allows every key, so the pool is every key")
 		assert.Nil(t, keyIDs)
-	})
-}
-
-// A client wildcard is allowed only when some tool of the client survives composition.
-func TestAccess_MCPWildcardFollowsTheEffectiveTools(t *testing.T) {
-	caller := permitWithTools(PermitAccessProfile, "ap1", "Member", "github", "read_file")
-	project := permitWithTools(PermitProject, "p1", "Project", "github", "list_issues")
-
-	t.Run("intersect with no tool in common", func(t *testing.T) {
-		access := NewAccess(held(caller), "", project, Intersect, nil)
-		assert.Empty(t, access.MCPToolIncludeList())
-		assert.False(t, access.IsMCPToolAllowed("github-*"))
-		assertPermitsAre(t, access.DeniedPermitsForMCPTool("github-*"), project)
-	})
-
-	t.Run("intersect with a tool in common", func(t *testing.T) {
-		wider := permitWithTools(PermitProject, "p2", "Project", "github", "read_file", "list_issues")
-		access := NewAccess(held(caller), "", wider, Intersect, nil)
-		assert.True(t, access.IsMCPToolAllowed("github-*"))
-		assert.Empty(t, access.DeniedPermitsForMCPTool("github-*"))
-	})
-
-	t.Run("union keeps both sides' tools", func(t *testing.T) {
-		access := NewAccess(held(caller), "", project, Union, nil)
-		assert.True(t, access.IsMCPToolAllowed("github-*"))
 	})
 }
 
@@ -972,124 +942,6 @@ func TestAccess_GrantedProvidersForIgnoresTheMatcher(t *testing.T) {
 	assert.False(t, access.IsModelAllowed("openai", "not-a-real-model"), "the exact check does resolve it")
 }
 
-func TestAccess_IsMCPToolAllowed(t *testing.T) {
-	base := permitWithTools(PermitVirtualKey, "vk1", "Caller Key", "github", "read_file", "list_issues")
-	scoping := permitWithTools("other", "o1", "Other", "github", "read_file")
-
-	t.Run("base permit only", func(t *testing.T) {
-		access := NewAccess(held(base), "", nil, "", nil)
-		assert.True(t, access.IsMCPToolAllowed("github-read_file"))
-		assert.True(t, access.IsMCPToolAllowed("github-list_issues"))
-		assert.False(t, access.IsMCPToolAllowed("github-delete_repo"))
-		assert.False(t, access.IsMCPToolAllowed("slack-post_message"))
-		assert.True(t, access.IsMCPToolAllowed("github-*"), "the client is granted some tool")
-		assert.False(t, access.IsMCPToolAllowed(""))
-	})
-
-	t.Run("intersect", func(t *testing.T) {
-		access := NewAccess(held(base), "", scoping, Intersect, nil)
-		assert.True(t, access.IsMCPToolAllowed("github-read_file"))
-		assert.False(t, access.IsMCPToolAllowed("github-list_issues"))
-	})
-
-	t.Run("union", func(t *testing.T) {
-		wider := permitWithTools("other", "o2", "Other", "slack", "post_message")
-		access := NewAccess(held(base), "", wider, Union, nil)
-		assert.True(t, access.IsMCPToolAllowed("github-list_issues"))
-		assert.True(t, access.IsMCPToolAllowed("slack-post_message"))
-		assert.False(t, access.IsMCPToolAllowed("slack-delete_channel"))
-	})
-
-	t.Run("a client with no tools granted is not permitted", func(t *testing.T) {
-		empty := permitWithTools(PermitVirtualKey, "vk2", "Caller Key", "github")
-		access := NewAccess(held(empty), "", nil, "", nil)
-		assert.False(t, access.IsMCPToolAllowed("github-read_file"))
-		assert.False(t, access.IsMCPToolAllowed("github-*"))
-	})
-
-	t.Run("an unrestricted client permits every tool", func(t *testing.T) {
-		all := permitWithTools(PermitVirtualKey, "vk3", "Caller Key", "github", "*")
-		access := NewAccess(held(all), "", nil, "", nil)
-		assert.True(t, access.IsMCPToolAllowed("github-anything"))
-		assert.True(t, access.IsMCPToolAllowed("github-*"))
-	})
-
-	t.Run("within a permit, the first MCP permit for a client is the answer", func(t *testing.T) {
-		single := newPermit(permitSpec{
-			Type: PermitVirtualKey, ID: "vk4", Name: "Caller Key",
-			MCPPermits: []schemas.MCPPermit{
-				{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}},
-				{Client: "github-id", ClientName: "github", Tools: []string{"*"}},
-			},
-		})
-		assert.False(t, NewAccess(held(single), "", nil, "", nil).IsMCPToolAllowed("github-delete_repo"))
-	})
-}
-
-func TestAccess_MCPIncludeList(t *testing.T) {
-	base := permitWithTools(PermitVirtualKey, "vk1", "Caller Key", "github", "read_file", "list_issues")
-
-	t.Run("base permit only", func(t *testing.T) {
-		access := NewAccess(held(base), "", nil, "", nil)
-		assert.Equal(t, []string{"github-read_file", "github-list_issues"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("an unrestricted client becomes a wildcard entry", func(t *testing.T) {
-		all := permitWithTools(PermitVirtualKey, "vk2", "Caller Key", "github", "*")
-		access := NewAccess(held(all), "", nil, "", nil)
-		assert.Equal(t, []string{"github-*"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("a client with no tools granted contributes nothing", func(t *testing.T) {
-		empty := permitWithTools(PermitVirtualKey, "vk3", "Caller Key", "github")
-		access := NewAccess(held(empty), "", nil, "", nil)
-		assert.Empty(t, access.MCPToolIncludeList())
-	})
-
-	t.Run("union merges both sides", func(t *testing.T) {
-		scoping := permitWithTools("other", "o1", "Other", "slack", "post_message")
-		access := NewAccess(held(base), "", scoping, Union, nil)
-		assert.Equal(t, []string{"github-read_file", "github-list_issues", "slack-post_message"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("intersect keeps what both sides permit", func(t *testing.T) {
-		scoping := permitWithTools("other", "o1", "Other", "github", "read_file")
-		access := NewAccess(held(base), "", scoping, Intersect, nil)
-		assert.Equal(t, []string{"github-read_file"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("intersect narrows a wildcard down to the other side's tools", func(t *testing.T) {
-		wildcardBase := permitWithTools(PermitVirtualKey, "vk4", "Caller Key", "github", "*")
-		scoping := permitWithTools("other", "o1", "Other", "github", "read_file")
-		access := NewAccess(held(wildcardBase), "", scoping, Intersect, nil)
-		assert.Equal(t, []string{"github-read_file"}, access.MCPToolIncludeList(),
-			"passing the wildcard through would read as every tool of the client")
-	})
-
-	// The mirror of the case above, and the reason narrowing consults the scoping permit rather
-	// than its entry list: an unrestricted client expands to a bare "github-*", so asking whether
-	// that list contains "github-read_file" answers no for every tool the scope in fact permits.
-	t.Run("intersect keeps specific tools against an unrestricted scope", func(t *testing.T) {
-		scoping := permitWithTools("other", "o1", "Other", "github", "*")
-		access := NewAccess(held(base), "", scoping, Intersect, nil)
-		assert.Equal(t, []string{"github-read_file", "github-list_issues"}, access.MCPToolIncludeList(),
-			"intersecting a specific list with every tool is the specific list")
-	})
-
-	t.Run("intersect keeps a wildcard only when both sides are unrestricted", func(t *testing.T) {
-		wildcardBase := permitWithTools(PermitVirtualKey, "vk5", "Caller Key", "github", "*")
-		wildcardScoping := permitWithTools("other", "o1", "Other", "github", "*")
-		access := NewAccess(held(wildcardBase), "", wildcardScoping, Intersect, nil)
-		assert.Equal(t, []string{"github-*"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("intersect drops clients the other side does not hold", func(t *testing.T) {
-		scoping := permitWithTools("other", "o1", "Other", "slack", "post_message")
-		access := NewAccess(held(base), "", scoping, Intersect, nil)
-		assert.Empty(t, access.MCPToolIncludeList())
-	})
-}
-
 func TestAccess_DeniedBy(t *testing.T) {
 	base := permitWithModels(PermitVirtualKey, "vk1", "Caller Key", "openai", "gpt-4o")
 	scoping := permitWithModels("other", "o1", "Other Name", "openai", "o3")
@@ -1168,24 +1020,6 @@ func TestAccess_DeniedBy(t *testing.T) {
 		assert.Same(t, scoping, denied[0])
 	})
 
-	t.Run("tool denials are attributed too", func(t *testing.T) {
-		baseTools := permitWithTools(PermitVirtualKey, "vk1", "Caller Key", "github", "read_file")
-		scopingTools := permitWithTools("other", "o1", "Other Name", "github", "list_issues")
-
-		access := NewAccess(held(baseTools), "", scopingTools, Intersect, nil)
-
-		denied := access.DeniedPermitsForMCPTool("github-read_file")
-		require.Len(t, denied, 1)
-		assert.Equal(t, "Other Name", denied[0].Name())
-
-		denied = access.DeniedPermitsForMCPTool("github-list_issues")
-		require.Len(t, denied, 1)
-		assert.Equal(t, "Caller Key", denied[0].Name())
-
-		denied = access.DeniedPermitsForMCPTool("github-*")
-		require.Len(t, denied, 1, "each side grants some tool but none in common")
-		assert.Equal(t, "Other Name", denied[0].Name())
-	})
 }
 
 func TestAccess_Accessors(t *testing.T) {
@@ -1247,7 +1081,6 @@ func twoProfilesAndAProject() (first, second, project *Permit) {
 				Provider: "bedrock", AllowedModels: []string{"*"}, BlacklistedModels: []string{"claude-opus-4"}, KeyIDs: []string{"key-first-bedrock"},
 			},
 		},
-		MCPPermits: []schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: []string{"read_file"}}},
 	})
 	second = newPermit(permitSpec{
 		Type: PermitAccessProfile, ID: "ap2", Name: "Second Profile",
@@ -1262,10 +1095,6 @@ func twoProfilesAndAProject() (first, second, project *Permit) {
 				Provider: "anthropic", AllowedModels: []string{"claude-sonnet-4"}, KeyIDs: []string{"key-second-anthropic"},
 			},
 		},
-		MCPPermits: []schemas.MCPPermit{
-			{Client: "slack-id", ClientName: "slack", Tools: []string{"post_message"}},
-			{Client: "github-id", ClientName: "github", Tools: []string{"list_issues"}},
-		},
 	})
 	project = newPermit(permitSpec{
 		Type: PermitProject, ID: "p1", Name: "Some Project",
@@ -1277,7 +1106,6 @@ func twoProfilesAndAProject() (first, second, project *Permit) {
 				Provider: "gemini", AllowedModels: []string{"*"}, KeyIDs: []string{"key-project"}, Weight: ptr(0.2),
 			},
 		},
-		MCPPermits: []schemas.MCPPermit{{Client: "jira-id", ClientName: "jira", Tools: []string{"*"}}},
 	})
 	return first, second, project
 }
@@ -1298,10 +1126,6 @@ func TestAccess_SeveralBasesAreReadAsOne(t *testing.T) {
 	// blacklist the model, so through it the caller may reach it.
 	assert.True(t, access.IsModelAllowed("bedrock", "claude-opus-4"))
 
-	assert.True(t, access.IsMCPToolAllowed("github-read_file"), "the first grants it")
-	assert.True(t, access.IsMCPToolAllowed("github-list_issues"), "only the second grants it")
-	assert.True(t, access.IsMCPToolAllowed("slack-post_message"))
-	assert.False(t, access.IsMCPToolAllowed("jira-create_issue"))
 }
 
 // The attribution rule: every one of the caller's permits that permits the pair is named, in their
@@ -1565,33 +1389,6 @@ func TestAccess_GrantedProvidersForMergesBases(t *testing.T) {
 	})
 }
 
-func TestAccess_MCPIncludeListMergesBases(t *testing.T) {
-	first, second, project := twoProfilesAndAProject()
-
-	t.Run("entries merge in base order", func(t *testing.T) {
-		access := NewAccess(held(first, second), "", nil, "", nil)
-		assert.Equal(t, []string{"github-read_file", "slack-post_message", "github-list_issues"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("then compose with the scope", func(t *testing.T) {
-		unionAccess := NewAccess(held(first, second), "", project, Union, nil)
-		assert.Equal(t, []string{"github-read_file", "slack-post_message", "github-list_issues", "jira-*"}, unionAccess.MCPToolIncludeList())
-
-		intersectAccess := NewAccess(held(first, second), "", project, Intersect, nil)
-		assert.Empty(t, intersectAccess.MCPToolIncludeList(), "the project holds none of the caller's clients")
-	})
-
-	t.Run("a tool no base grants names every base", func(t *testing.T) {
-		access := NewAccess(held(first, second), "", nil, "", nil)
-		denied := access.DeniedPermitsForMCPTool("jira-create_issue")
-		require.Len(t, denied, 2)
-		assert.Same(t, first, denied[0])
-		assert.Same(t, second, denied[1])
-
-		assert.Nil(t, access.DeniedPermitsForMCPTool("github-list_issues"), "granted by the second")
-	})
-}
-
 func TestAccess_DeniedByNamesEveryRefusingSide(t *testing.T) {
 	first, second, project := twoProfilesAndAProject()
 
@@ -1624,57 +1421,6 @@ func TestAccess_DeniedByNamesEveryRefusingSide(t *testing.T) {
 		require.Len(t, denied, 2, "no base permits, and the scope's refusal changes nothing")
 		assert.Same(t, first, denied[0])
 		assert.Same(t, second, denied[1])
-	})
-}
-
-func TestAccess_NarrowMCPIncludeList(t *testing.T) {
-	specific := permitWithTools(PermitVirtualKey, "vk1", "Caller Key", "sentry", "find_projects", "search_issues")
-	everyTool := permitWithTools(PermitVirtualKey, "vk2", "Caller Key", "sentry", "*")
-
-	t.Run("a specific entry is kept when permitted and dropped when not", func(t *testing.T) {
-		access := NewAccess(held(specific), "", nil, "", nil)
-		assert.Equal(t, []string{"sentry-find_projects"}, access.NarrowMCPToolIncludeList([]string{"sentry-find_projects", "sentry-delete_project"}))
-	})
-
-	t.Run("a specific entry narrows within a client granted every tool", func(t *testing.T) {
-		access := NewAccess(held(everyTool), "", nil, "", nil)
-		assert.Equal(t, []string{"sentry-search_issues"}, access.NarrowMCPToolIncludeList([]string{"sentry-search_issues"}))
-	})
-
-	t.Run("a wildcard is kept only when the client is granted every tool", func(t *testing.T) {
-		assert.Equal(t, []string{"sentry-*"}, NewAccess(held(everyTool), "", nil, "", nil).NarrowMCPToolIncludeList([]string{"sentry-*"}))
-		assert.Equal(t, []string{"sentry-find_projects", "sentry-search_issues"},
-			NewAccess(held(specific), "", nil, "", nil).NarrowMCPToolIncludeList([]string{"sentry-*"}),
-			"passing the wildcard through would read as every tool of the client")
-	})
-
-	t.Run("a wildcard for a client not granted at all yields nothing", func(t *testing.T) {
-		access := NewAccess(held(specific), "", nil, "", nil)
-		assert.Equal(t, []string{}, access.NarrowMCPToolIncludeList([]string{"github-*"}))
-	})
-
-	t.Run("empties are dropped and repeats collapse across a wildcard and a specific entry", func(t *testing.T) {
-		access := NewAccess(held(specific), "", nil, "", nil)
-		assert.Equal(t, []string{"sentry-find_projects", "sentry-search_issues"},
-			access.NarrowMCPToolIncludeList([]string{"", "sentry-*", "sentry-find_projects"}))
-	})
-
-	t.Run("an empty request permits nothing, and so does no request", func(t *testing.T) {
-		access := NewAccess(held(everyTool), "", nil, "", nil)
-		assert.Equal(t, []string{}, access.NarrowMCPToolIncludeList([]string{""}))
-		assert.Equal(t, []string{}, access.NarrowMCPToolIncludeList(nil))
-	})
-
-	t.Run("no access permits nothing", func(t *testing.T) {
-		var access *Access
-		assert.Equal(t, []string{}, access.NarrowMCPToolIncludeList([]string{"sentry-*"}))
-	})
-
-	t.Run("narrowing answers for the composed access", func(t *testing.T) {
-		scoping := permitWithTools("other", "o1", "Other", "sentry", "find_projects")
-		access := NewAccess(held(everyTool), "", scoping, Intersect, nil)
-		assert.Equal(t, []string{"sentry-find_projects"}, access.NarrowMCPToolIncludeList([]string{"sentry-*", "sentry-search_issues"}),
-			"the wildcard narrows to what both sides permit, and a tool the scope withholds is dropped")
 	})
 }
 
@@ -2187,48 +1933,6 @@ func TestAccessLevels_CandidateKeysKeepTheCapUnderAScope(t *testing.T) {
 	}
 }
 
-func TestAccessLevels_MCPTools(t *testing.T) {
-	caller := permitWithTools(PermitAccessProfile, "ap1", "Member", "github", "read_file", "list_issues", "create_issue")
-
-	t.Run("a specific level narrows a specific list", func(t *testing.T) {
-		teamX := atLevel(permitWithTools(PermitTeamAccessProfile, "t1", "Team X", "github", "read_file"), 1)
-		teamY := atLevel(permitWithTools(PermitTeamAccessProfile, "t2", "Team Y", "github", "list_issues"), 1)
-		access := NewAccess(held(caller, teamX, teamY), Intersect, nil, "", nil)
-		assert.Equal(t, []string{"github-read_file", "github-list_issues"}, access.MCPToolIncludeList())
-		assert.True(t, access.IsMCPToolAllowed("github-read_file"))
-		assert.False(t, access.IsMCPToolAllowed("github-create_issue"))
-		assert.Equal(t, []string{"github-read_file"}, access.NarrowMCPToolIncludeList([]string{"github-read_file", "github-create_issue"}))
-		assertPermitsAre(t, access.DeniedPermitsForMCPTool("github-create_issue"), teamX, teamY)
-	})
-
-	t.Run("an unrestricted level keeps the specific list", func(t *testing.T) {
-		team := atLevel(permitWithTools(PermitTeamAccessProfile, "t1", "Team", "github", "*"), 1)
-		access := NewAccess(held(caller, team), Intersect, nil, "", nil)
-		assert.Equal(t, []string{"github-read_file", "github-list_issues", "github-create_issue"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("a wildcard caller is narrowed to the level's tools", func(t *testing.T) {
-		wildcard := permitWithTools(PermitAccessProfile, "ap2", "Member", "github", "*")
-		team := atLevel(permitWithTools(PermitTeamAccessProfile, "t1", "Team", "github", "read_file"), 1)
-		access := NewAccess(held(wildcard, team), Intersect, nil, "", nil)
-		assert.Equal(t, []string{"github-read_file"}, access.MCPToolIncludeList())
-	})
-
-	t.Run("a client the level does not hold is dropped", func(t *testing.T) {
-		team := atLevel(permitWithTools(PermitTeamAccessProfile, "t1", "Team", "slack", "post_message"), 1)
-		access := NewAccess(held(caller, team), Intersect, nil, "", nil)
-		assert.Empty(t, access.MCPToolIncludeList())
-	})
-
-	t.Run("a level with no tool in common refuses the client wildcard", func(t *testing.T) {
-		member := permitWithTools(PermitAccessProfile, "ap3", "Member", "github", "read_file")
-		team := atLevel(permitWithTools(PermitTeamAccessProfile, "t1", "Team", "github", "list_issues"), 1)
-		access := NewAccess(held(member, team), Intersect, nil, "", nil)
-		assert.False(t, access.IsMCPToolAllowed("github-*"))
-		assertPermitsAre(t, access.DeniedPermitsForMCPTool("github-*"), team)
-	})
-}
-
 func TestAccessLevels_ComposeWithAScope(t *testing.T) {
 	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
 	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a"), 1)
@@ -2287,13 +1991,12 @@ type matrixPermit struct {
 // build turns a matrix permit into a real one. A refusing permit holds the provider but grants
 // something else.
 func (m matrixPermit) build(kind PermitType, level int, id string) *Permit {
-	model, tool := "other-model", "other_tool"
+	model := "other-model"
 	if m.allows {
-		model, tool = "gpt-4o", "read_file"
+		model = "gpt-4o"
 	}
 	return NewPermit(kind, id, id, true, false,
 		[]schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{model}, KeyIDs: m.keys}},
-		[]schemas.MCPPermit{{Client: "github-id", ClientName: "github", Tools: []string{tool}}},
 		WithLevel(level))
 }
 
@@ -2532,8 +2235,6 @@ func TestAccessLevelsMatrix(t *testing.T) {
 
 			// Every capped dimension answers to the same rule.
 			assert.Equal(t, want, access.IsModelAllowed("openai", "gpt-4o"), "model")
-			assert.Equal(t, want, access.IsMCPToolAllowed("github-read_file"), "tool")
-			assert.Equal(t, want, slices.Contains(access.MCPToolIncludeList(), "github-read_file"), "tool include list")
 
 			// The granting level is the lowest one present.
 			granting := []string{}

@@ -21,11 +21,9 @@ func initDatasheetOverrideCatalog(t *testing.T, cs configstore.ConfigStore, dir 
 	t.Helper()
 	pricingURL := "file://" + filepath.Join(dir, "pricing.json")
 	paramsURL := "file://" + filepath.Join(dir, "params.json")
-	disabled := int64(0)
 	mc, err := Init(context.Background(), &Config{
 		PricingURL:             &pricingURL,
 		ModelParametersURL:     &paramsURL,
-		MCPLibrarySyncInterval: &disabled,
 	}, cs, bifrost.NewNoOpLogger())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = mc.Cleanup() })

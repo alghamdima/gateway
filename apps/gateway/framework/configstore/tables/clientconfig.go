@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/maximhq/bifrost/core/schemas"
 	"gorm.io/gorm"
 )
 
@@ -68,16 +67,6 @@ type TableClientConfig struct {
 	ExtraFieldsPlacement                    ExtraFieldsPlacement           `gorm:"column:extra_fields_placement;type:varchar(20);not null;default:'body'" json:"extra_fields_placement"`
 	EntityAccessProfileMode                 EntityAccessProfileMode        `gorm:"column:entity_access_profile_mode;type:varchar(20);not null;default:'union'" json:"entity_access_profile_mode"`
 	MaxRequestBodySizeMB                    int                            `gorm:"default:100" json:"max_request_body_size_mb"`
-	MCPAgentDepth                           int                            `gorm:"default:10" json:"mcp_agent_depth"`
-	MCPToolExecutionTimeout                 int                            `gorm:"default:30" json:"mcp_tool_execution_timeout"`                       // Timeout for individual tool execution in seconds (default: 30)
-	MCPCodeModeBindingLevel                 string                         `gorm:"default:server" json:"mcp_code_mode_binding_level"`                  // How tools are exposed in VFS: "server" or "tool"
-	MCPToolSyncInterval                     int                            `gorm:"default:10" json:"mcp_tool_sync_interval"`                           // Global tool sync interval in minutes (default: 10, 0 = built-in default)
-	MCPMaxProtocolVersion                   string                         `gorm:"type:varchar(20);default:''" json:"mcp_max_protocol_version"`        // Global cap on the MCP protocol version ("" or "auto" = newest)
-	MCPServerMaxProtocolVersion             string                         `gorm:"type:varchar(20);default:''" json:"mcp_server_max_protocol_version"` // Cap on the MCP protocol version Bifrost's /mcp serves ("" or "auto" = newest)
-	MCPDisableAutoToolInject                bool                           `gorm:"default:false" json:"mcp_disable_auto_tool_inject"`                  // When true, MCP tools are not injected into requests by default
-	MCPMaxInstructionsPerClient             int                            `gorm:"default:0" json:"mcp_max_instructions_per_client"`                   // Byte bound on one server's forwarded instructions; 0 is the default
-	MCPMaxInstructionsTotal                 int                            `gorm:"default:0" json:"mcp_max_instructions_total"`                        // Byte bound on the whole aggregate; 0 is the default
-	MCPEnableTempTokenAuth                  bool                           `gorm:"default:false" json:"mcp_enable_temp_token_auth"`                    // When true, scoped temp tokens can authorize MCP per-user OAuth and per-user-headers auth pages. User-mode flows never mint regardless.
 	AsyncJobResultTTL                       int                            `gorm:"default:3600" json:"async_job_result_ttl"`                           // Default TTL for async job results in seconds (default: 3600 = 1 hour)
 	RequiredHeadersJSON                     string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
 	LoggingHeadersJSON                      string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
@@ -89,8 +78,6 @@ type TableClientConfig struct {
 	HiddenRequestTypesJSON                  string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string of request types hidden from log reads
 	UsageEstimationTokenizersJSON           string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string of tokenizer families used to estimate a cancelled stream's usage
 	RoutingChainMaxDepth                    int                            `gorm:"default:10" json:"routing_chain_max_depth"`                          // Maximum depth for routing rule chain evaluation (default: 10)
-	MCPExternalClientURL                    string                         `gorm:"type:varchar(512)" json:"mcp_external_client_url,omitempty"`         // Public base URL used as redirect_uri when Bifrost acts as an OAuth client to upstream MCP servers
-	MCPClientMetadataURL                    string                         `gorm:"type:varchar(512)" json:"mcp_client_metadata_url,omitempty"`         // Where Bifrost's Client ID Metadata Document is hosted, when not under mcp_external_client_url
 	SkillsExternalClientURL                 string                         `gorm:"type:varchar(512)" json:"skills_external_client_url,omitempty"`      // Public base URL for Skills Repository marketplaces; empty disables marketplace serving
 	WhitelistedRoutesJSON                   string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
 	AllowPerRequestContentStorageOverride   bool                           `gorm:"default:false" json:"allow_per_request_content_storage_override"`    // Allow per-request override for content storage (e.g. long-term vs ephemeral)
@@ -107,29 +94,6 @@ type TableClientConfig struct {
 	CompatForceReasoningOnlyModelsToResponses bool `gorm:"column:compat_force_reasoning_only_models_to_responses;default:false" json:"-"`
 	CompatConvertDecisionToResponses          bool `gorm:"column:compat_convert_decision_to_responses;default:false" json:"-"`
 
-	// MCPOpenAPIMaxSpecMB limits an openapi MCP client's spec, in MiB; 0 is the built-in 32.
-	// The explicit column name avoids GORM deriving "mcp_open_api_..." from the field name.
-	MCPOpenAPIMaxSpecMB int `gorm:"column:mcp_openapi_max_spec_mb;default:0" json:"mcp_openapi_max_spec_mb"`
-
-	// BifrostURL is the gateway's public base URL; empty leaves self URLs to the request.
-	BifrostURL string `gorm:"column:bifrost_url;type:varchar(512)" json:"bifrost_url,omitempty"`
-	// BifrostMCPAllowWrites gates /v1/mcp's non-GET /api tools; NULL is true. A pointer, so GORM
-	// stores false instead of substituting a column default for the zero value.
-	BifrostMCPAllowWrites *bool `gorm:"column:bifrost_mcp_allow_writes" json:"bifrost_mcp_allow_writes,omitempty"`
-
-	// MCPServerAuthMode controls how /mcp authenticates inbound clients.
-	// Stored as a plain varchar column so it can be read without JSON parsing.
-	MCPServerAuthMode MCPServerAuthMode `gorm:"column:mcp_server_auth_mode;type:varchar(20);not null;default:'headers'" json:"mcp_server_auth_mode"`
-	// OAuth2ServerConfigJSON holds the OAuth2 AS-specific settings (IssuerURL,
-	// AuthCodeTTL, AccessTokenTTL) as a JSON blob. Only relevant when
-	// MCPServerAuthMode is both or oauth. Deserialized into OAuth2ServerConfig
-	// by AfterFind. The explicit column name avoids GORM deriving the leading
-	// acronym as "o_auth2_..." from the field name.
-	OAuth2ServerConfigJSON string `gorm:"column:oauth2_server_config_json;type:text" json:"-"`
-	// MCPCodeModeLimitsJSON holds the per-execution code mode limits as a JSON blob,
-	// deserialized into MCPCodeModeLimits by AfterFind.
-	MCPCodeModeLimitsJSON        string `gorm:"column:mcp_code_mode_limits_json;type:text" json:"-"`
-	MCPOAuthPrivateAllowlistJSON string `gorm:"column:mcp_oauth_private_allowlist_json;type:text" json:"-"` // JSON serialized []string
 
 	// Config hash is used to detect the changes synced from config.json file
 	// Every time we sync the config.json file, we will update the config hash
@@ -148,14 +112,9 @@ type TableClientConfig struct {
 	WhitelistedRoutes  []string                  `gorm:"-" json:"whitelisted_routes,omitempty"`
 	HeaderFilterConfig *GlobalHeaderFilterConfig `gorm:"-" json:"header_filter_config,omitempty"`
 	Metadata           map[string]any            `gorm:"-" json:"metadata,omitempty"`
-	OAuth2ServerConfig *OAuth2ServerConfig       `gorm:"-" json:"oauth2_server_config,omitempty"`
 
 	// UsageEstimationTokenizers is persisted as UsageEstimationTokenizersJSON.
 	UsageEstimationTokenizers []string `gorm:"-" json:"usage_estimation_tokenizers,omitempty"`
-
-	MCPCodeModeLimits *schemas.MCPCodeModeLimits `gorm:"-" json:"mcp_code_mode_limits,omitempty"` // Virtual: per-execution code mode limits
-
-	MCPOAuthPrivateAllowlist []string `gorm:"-" json:"mcp_oauth_private_allowlist,omitempty"` // Virtual: private targets the MCP OAuth chain may reach
 }
 
 // TableName sets the table name for each model
@@ -264,36 +223,6 @@ func (cc *TableClientConfig) BeforeSave(tx *gorm.DB) error {
 		cc.MetadataJSON = string(data)
 	}
 
-	if cc.OAuth2ServerConfig != nil {
-		data, err := cc.OAuth2ServerConfig.StorageJSON()
-		if err != nil {
-			return err
-		}
-		cc.OAuth2ServerConfigJSON = data
-	} else {
-		cc.OAuth2ServerConfigJSON = ""
-	}
-
-	if cc.MCPCodeModeLimits != nil {
-		data, err := json.Marshal(cc.MCPCodeModeLimits)
-		if err != nil {
-			return err
-		}
-		cc.MCPCodeModeLimitsJSON = string(data)
-	} else {
-		cc.MCPCodeModeLimitsJSON = ""
-	}
-
-	if len(cc.MCPOAuthPrivateAllowlist) > 0 {
-		data, err := json.Marshal(cc.MCPOAuthPrivateAllowlist)
-		if err != nil {
-			return err
-		}
-		cc.MCPOAuthPrivateAllowlistJSON = string(data)
-	} else {
-		cc.MCPOAuthPrivateAllowlistJSON = ""
-	}
-
 	return nil
 }
 
@@ -363,34 +292,6 @@ func (cc *TableClientConfig) AfterFind(tx *gorm.DB) error {
 		cc.Metadata = metadata
 	} else {
 		cc.Metadata = nil
-	}
-
-	if cc.OAuth2ServerConfigJSON != "" {
-		var authCfg OAuth2ServerConfig
-		if err := json.Unmarshal([]byte(cc.OAuth2ServerConfigJSON), &authCfg); err != nil {
-			return err
-		}
-		cc.OAuth2ServerConfig = &authCfg
-	} else {
-		cc.OAuth2ServerConfig = nil
-	}
-
-	if cc.MCPCodeModeLimitsJSON != "" {
-		var limits schemas.MCPCodeModeLimits
-		if err := json.Unmarshal([]byte(cc.MCPCodeModeLimitsJSON), &limits); err != nil {
-			return err
-		}
-		cc.MCPCodeModeLimits = &limits
-	} else {
-		cc.MCPCodeModeLimits = nil
-	}
-
-	if cc.MCPOAuthPrivateAllowlistJSON != "" {
-		if err := json.Unmarshal([]byte(cc.MCPOAuthPrivateAllowlistJSON), &cc.MCPOAuthPrivateAllowlist); err != nil {
-			return err
-		}
-	} else {
-		cc.MCPOAuthPrivateAllowlist = nil
 	}
 
 	return nil

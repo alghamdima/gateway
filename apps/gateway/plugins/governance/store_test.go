@@ -2644,7 +2644,7 @@ func TestResolveAccessStampsVirtualKeyMetadata(t *testing.T) {
 		{name: "metadata is stamped", metadata: map[string]string{"cost_center": "cc-42", "owner": "a@example.com"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vk := buildVKForMCPStamping(nil)
+			vk := buildAccessTestVK()
 			vk.Metadata = tc.metadata
 
 			logger := NewMockLogger()
@@ -2652,12 +2652,12 @@ func TestResolveAccessStampsVirtualKeyMetadata(t *testing.T) {
 				VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 			}, nil, &mockInMemoryStore{})
 			require.NoError(t, err)
-			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil, nil)
+			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
 			ctx := emptyCtx()
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, mcpTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
 			require.Equal(t, vk.ID, ctx.Value(schemas.BifrostContextKeyGovernanceVirtualKeyID), "the key resolved")
@@ -2672,7 +2672,7 @@ func TestResolveAccessStampsVirtualKeyMetadata(t *testing.T) {
 			assert.Equal(t, tc.metadata, got)
 
 			got["cost_center"] = "tampered"
-			stored, ok := local.GetVirtualKey(ctx, mcpTestVKValue)
+			stored, ok := local.GetVirtualKey(ctx, accessTestVKValue)
 			require.True(t, ok)
 			assert.Equal(t, "cc-42", stored.Metadata["cost_center"], "the stamped map must be a copy, not the stored key's map")
 		})
@@ -2755,7 +2755,7 @@ func TestResolveAccessStampsVirtualKeyMetadataIntoDimensions(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			vk := buildVKForMCPStamping(nil)
+			vk := buildAccessTestVK()
 			vk.Metadata = tc.metadata
 			if tc.disableContent {
 				vk.DisableContentLogging = boolPtr(true)
@@ -2766,7 +2766,7 @@ func TestResolveAccessStampsVirtualKeyMetadataIntoDimensions(t *testing.T) {
 				VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 			}, nil, &mockInMemoryStore{})
 			require.NoError(t, err)
-			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil, nil)
+			plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, nil, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -2776,7 +2776,7 @@ func TestResolveAccessStampsVirtualKeyMetadataIntoDimensions(t *testing.T) {
 			ctx.SetValue(schemas.BifrostContextKeyTracer, recorder)
 			ctx.SetValue(schemas.BifrostContextKeyTraceID, "trace-1")
 			ctx.SetValue(schemas.BifrostContextKeyDimensions, headerDims)
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, mcpTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
 

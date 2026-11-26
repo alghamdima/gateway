@@ -45,8 +45,8 @@ func (stubConfigManager) ReloadHeaderFilterConfig(context.Context, *configtables
 // the value and it snapped back on the next fetch.
 func TestUpdateConfig_PersistsVKRotationCooldown(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 
 	save := func(t *testing.T, cooldownJSON string) {
@@ -92,8 +92,8 @@ func TestUpdateConfig_PersistsVKRotationCooldown(t *testing.T) {
 // caller unaware of the field never lifts the upgrade pin, and an unsupported value is rejected.
 func TestUpdateConfig_MCPMaxProtocolVersion(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
 	save := func(t *testing.T, body string) int {
 		t.Helper()
@@ -174,8 +174,8 @@ func (r *tokenizerRecorder) ReloadClientConfigFromConfigStore(context.Context) e
 // Omitting the field keeps the stored list, and a rejected request applies nothing.
 func TestUpdateConfig_UsageEstimationTokenizers(t *testing.T) {
 	SetLogger(&mockLogger{})
-	store := newRealOAuth2Store(t)
-	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	store := newRealConfigStore(t)
+	cfg := newTestConfig(store, false)
 	recorder := &tokenizerRecorder{}
 	h := &ConfigHandler{store: cfg, configManager: recorder}
 	recorder.stored = func() []string {

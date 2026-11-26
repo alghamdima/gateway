@@ -33,9 +33,6 @@ const (
 const (
 	startTimeKey         schemas.BifrostContextKey = "bf-prom-start-time"
 	activeRequestTypeKey schemas.BifrostContextKey = "bf-prom-active-req-type"
-	mcpStartTimeKey      schemas.BifrostContextKey = "bf-prom-mcp-start-time"
-	mcpClientNameKey     schemas.BifrostContextKey = "bf-prom-mcp-client-name"
-	mcpToolNameKey       schemas.BifrostContextKey = "bf-prom-mcp-tool-name"
 
 	// Overhead is measured across the transport hooks rather than the LLM hooks,
 	// so the window matches the OTEL root span. Holds an *overheadSlot.
@@ -215,12 +212,10 @@ type PrometheusPlugin struct {
 	KeyRotationEventsTotal         *prometheus.CounterVec
 	ActiveRequests                 *prometheus.GaugeVec
 	ProviderKeyUp                  *prometheus.GaugeVec
-	MCPToolDuration                *prometheus.HistogramVec
 	customLabels                   []string
 
 	defaultHTTPLabels    []string
 	defaultBifrostLabels []string
-	defaultMCPLabels     []string
 
 	// Push gateway fields
 	pushConfig *PushGatewayConfig
@@ -312,12 +307,9 @@ var (
 	}
 )
 
-// Compile-time checks that PrometheusPlugin implements the hook interfaces it
-// registers metrics for (MCP hooks are auto-discovered by rebuildInterfaceCaches).
-var (
-	_ schemas.LLMPlugin = (*PrometheusPlugin)(nil)
-	_ schemas.MCPPlugin = (*PrometheusPlugin)(nil)
-)
+// Compile-time check that PrometheusPlugin implements the hook interface it
+// registers metrics for.
+var _ schemas.LLMPlugin = (*PrometheusPlugin)(nil)
 
 // Init creates a new PrometheusPlugin with initialized metrics.
 // userLabelNames are the unbounded dimensions, added when user_labels_enabled is
@@ -342,34 +334,10 @@ var userLabelNames = func() []string {
 // ones are opt-in via user_labels_enabled.
 var defaultBifrostLabelNames = schemas.MetricSafeEnrichmentDimNames()
 
-// defaultMCPLabelNames is the label set for bifrost_mcp_* metrics: the MCP semconv
-// dimensions available in the hook plus the governance identity. No network_transport
-// (core stamps it on the span, not context) and no provider/model.
 // perMetricLabelNames are the labels that individual bifrost_* metrics add on top of
 // the default set. A custom label repeating one of these makes Prometheus reject the
 // descriptor, so Init drops them like any other reserved name.
 var perMetricLabelNames = []string{"is_success", "status_code", "error_type", "cache_type"}
-
-var defaultMCPLabelNames = []string{
-	"mcp_client",
-	"mcp_tool_name",
-	"mcp_method",
-	"error_type",
-	"virtual_key_id",
-	"virtual_key_name",
-	"team_id",
-	"team_name",
-	"customer_id",
-	"customer_name",
-	"business_unit_id",
-	"business_unit_name",
-	"project_id",
-	"project_name",
-}
-
-// mcpOperationDurationBuckets: the OTel MCP semconv boundaries, matching plugins/otel
-// so both exporters report the same quantiles for the same operation.
-var mcpOperationDurationBuckets = []float64{0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60, 120, 300}
 
 // Values of the phase label on bifrost_routing_embedding_* counters: "request"
 // is a per-request classification embed (recorded through the routing metadata response
@@ -426,7 +394,7 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 	var filteredCustomLabels []string
 	if len(config.CustomLabels) > 0 {
 		for _, label := range config.CustomLabels {
-			if !containsLabel(defaultBifrostLabels, label) && !containsLabel(defaultHTTPLabels, label) && !containsLabel(defaultMCPLabelNames, label) && !containsLabel(perMetricLabelNames, label) {
+			if !containsLabel(defaultBifrostLabels, label) && !containsLabel(defaultHTTPLabels, label) && !containsLabel(perMetricLabelNames, label) {
 				filteredCustomLabels = append(filteredCustomLabels, label)
 			} else {
 				logger.Info("custom label %s is already a default label, it will be ignored", label)
@@ -728,18 +696,6 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 		[]string{"provider", "key_id", "key_name"},
 	)
 
-	// Mirrors the OTel semconv metric mcp.client.operation.duration. _count gives
-	// tool-call volume and error_type the error rate, so no separate MCP counters.
-	defaultMCPLabels := append([]string(nil), defaultMCPLabelNames...)
-	bifrostMCPToolDuration := factory.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "bifrost_mcp_client_operation_duration_seconds",
-			Help:    "Duration of an MCP tool call as observed by Bifrost (the MCP client).",
-			Buckets: mcpOperationDurationBuckets,
-		},
-		append(defaultMCPLabels, filteredCustomLabels...),
-	)
-
 	plugin := &PrometheusPlugin{
 		logger:                         logger,
 		pricingManager:                 pricingManager,
@@ -776,11 +732,9 @@ func Init(config *Config, pricingManager *modelcatalog.ModelCatalog, logger sche
 		KeyRotationEventsTotal:         bifrostKeyRotationEventsTotal,
 		ActiveRequests:                 bifrostActiveRequests,
 		ProviderKeyUp:                  bifrostProviderKeyUp,
-		MCPToolDuration:                bifrostMCPToolDuration,
 		customLabels:                   filteredCustomLabels,
 		defaultHTTPLabels:              defaultHTTPLabels,
 		defaultBifrostLabels:           defaultBifrostLabels,
-		defaultMCPLabels:               defaultMCPLabels,
 	}
 
 	// Default /metrics scraping to on when the config omits the field — preserves
@@ -1119,107 +1073,6 @@ func (p *PrometheusPlugin) applyCustomLabels(ctx *schemas.BifrostContext, labelV
 			}
 		}
 	}
-}
-
-// PreMCPHook stashes the tool-call start time so PostMCPHook has a wall-time
-// fallback on the error path (where the response — and its latency — is absent).
-func (p *PrometheusPlugin) PreMCPHook(ctx *schemas.BifrostContext, req *schemas.BifrostMCPRequest) (*schemas.BifrostMCPRequest, *schemas.MCPPluginShortCircuit, error) {
-	if ctx != nil && req != nil && (req.RequestType.IsExecuteTool() || req.RequestType.IsPromptOrResourceRead()) {
-		ctx.SetValue(mcpStartTimeKey, time.Now())
-		// Stash identity so the error path (resp == nil) still has tool/client
-		// for codemode filtering and metric labels.
-		ctx.SetValue(mcpClientNameKey, req.ClientName)
-		ctx.SetValue(mcpToolNameKey, mcpMetricName(req))
-	}
-	return req, nil, nil
-}
-
-// PostMCPHook records the MCP tool-call duration. Only execute-tool calls are
-// recorded (codemode tools skipped); ping/list_tools are lifecycle, not tool calls.
-// The gate stamps MCPRequestType on both the success response and the error.
-func (p *PrometheusPlugin) PostMCPHook(ctx *schemas.BifrostContext, resp *schemas.BifrostMCPResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostMCPResponse, *schemas.BifrostError, error) {
-	if ctx == nil {
-		return resp, bifrostErr, nil
-	}
-	mcpReqType := schemas.MCPRequestType("")
-	toolName, clientName := "", ""
-	if resp != nil {
-		mcpReqType = resp.ExtraFields.MCPRequestType
-		toolName = resp.ExtraFields.ToolName
-		clientName = resp.ExtraFields.ClientName
-	} else if bifrostErr != nil {
-		mcpReqType = bifrostErr.ExtraFields.MCPRequestType
-		// No response on the error path — recover identity stashed in PreMCPHook.
-		clientName = bifrost.GetStringFromContext(ctx, mcpClientNameKey)
-		toolName = bifrost.GetStringFromContext(ctx, mcpToolNameKey)
-	}
-	if mcpReqType.IsPromptOrResourceRead() {
-		// Core may move a read to another server after the pre-hooks; the response names the one that answered.
-		if clientName == "" {
-			clientName = bifrost.GetStringFromContext(ctx, mcpClientNameKey)
-		}
-		toolName = bifrost.GetStringFromContext(ctx, mcpToolNameKey)
-	} else if !mcpReqType.IsExecuteTool() || bifrost.IsCodemodeTool(toolName) {
-		return resp, bifrostErr, nil
-	}
-
-	// Prefer the wire tool-call latency; fall back to wall-time on the error path.
-	var durationSeconds float64
-	if resp != nil && resp.ExtraFields.Latency > 0 {
-		durationSeconds = float64(resp.ExtraFields.Latency) / 1000.0
-	} else if start, ok := ctx.Value(mcpStartTimeKey).(time.Time); ok {
-		durationSeconds = time.Since(start).Seconds()
-	}
-
-	errorType := ""
-	if bifrostErr != nil {
-		errorType = mcpErrorType(bifrostErr)
-	}
-
-	labelValues := map[string]string{
-		"mcp_client":         clientName,
-		"mcp_tool_name":      toolName,
-		"mcp_method":         mcpReqType.OTelMethodName(),
-		"error_type":         errorType,
-		"virtual_key_id":     bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceVirtualKeyID),
-		"virtual_key_name":   bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceVirtualKeyName),
-		"team_id":            bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceTeamID),
-		"team_name":          bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceTeamName),
-		"customer_id":        bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerID),
-		"customer_name":      bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerName),
-		"business_unit_id":   bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceBusinessUnitID),
-		"business_unit_name": bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceBusinessUnitName),
-		"project_id":         bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectID),
-		"project_name":       bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectName),
-	}
-	p.applyCustomLabels(ctx, labelValues)
-
-	promLabelValues := getPrometheusLabelValues(append(p.defaultMCPLabels, p.customLabels...), labelValues)
-	p.MCPToolDuration.WithLabelValues(promLabelValues...).Observe(durationSeconds)
-
-	return resp, bifrostErr, nil
-}
-
-// mcpMetricName is the mcp_tool_name label: the tool, or the prompt a prompts/get reads. A resource
-// read has none, since URIs are unbounded.
-func mcpMetricName(req *schemas.BifrostMCPRequest) string {
-	switch req.RequestType {
-	case schemas.MCPRequestTypeGetPrompt:
-		return req.ReadTarget()
-	case schemas.MCPRequestTypeReadResource:
-		return ""
-	}
-	return req.GetToolName()
-}
-
-// mcpErrorType classifies an MCP tool-call failure into a low-cardinality error_type.
-// Coarse by design: timeout/tool_error granularity (which the OTel/Datadog span path
-// derives from error.type) would require core's error sentinels here.
-func mcpErrorType(bifrostErr *schemas.BifrostError) string {
-	if bifrostErr != nil && bifrostErr.ExtraFields.MCPAuthRequired != nil {
-		return "auth_required"
-	}
-	return "_OTHER"
 }
 
 // extractProviderCacheTokens returns provider-side prompt-cache token counts from a

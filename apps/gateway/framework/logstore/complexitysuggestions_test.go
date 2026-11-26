@@ -35,7 +35,7 @@ func forEachComplexitySuggestionStore(t *testing.T, test func(t *testing.T, stor
 			t.Skip("Postgres not available")
 		}
 		dropAllManagedMatViews(db)
-		for _, table := range append([]string{"mcp_tool_logs", "async_jobs", "logs"}, complexitySuggestionTables...) {
+		for _, table := range append([]string{"async_jobs", "logs"}, complexitySuggestionTables...) {
 			require.NoError(t, db.Exec("DROP TABLE IF EXISTS "+table+" CASCADE").Error)
 		}
 		require.NoError(t, db.Exec("CREATE TABLE IF NOT EXISTS migrations (id VARCHAR(255) PRIMARY KEY)").Error)

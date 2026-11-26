@@ -762,7 +762,7 @@ func newCustomProviderTestPlugin(t *testing.T, vk *configstoreTables.TableVirtua
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 	}, nil, inMemory)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, inMemory)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, inMemory)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 	return plugin
@@ -1034,7 +1034,7 @@ func TestPreLLMHookRefusesServerToolModelsWithTheirOwnLimits(t *testing.T) {
 		RateLimits:   []configstoreTables.TableRateLimit{*limited},
 	}, nil, nil)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -1104,7 +1104,7 @@ func TestPreLLMHookChecksInteractionsAgentAgainstAllowlist(t *testing.T) {
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 	}, nil, nil)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -1166,7 +1166,7 @@ func TestPreLLMHookRefusesMixedPassthroughModelsWithTheirOwnLimits(t *testing.T)
 			VirtualKeys: []configstoreTables.TableVirtualKey{*vk}, ModelConfigs: modelConfigs, RateLimits: rateLimits,
 		}, nil, nil)
 		require.NoError(t, err)
-		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil, nil)
+		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, store, nil, nil, nil)
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 		return plugin
@@ -1315,7 +1315,7 @@ func TestBudgetResolver_evaluateAccessWithoutAKey(t *testing.T) {
 		Provider:      "openai",
 		AllowedModels: []string{"gpt-4o"},
 		KeyIDs:        []string{"key-a"},
-	}}, nil)
+	}})
 
 	t.Run("a granted provider and model is allowed", func(t *testing.T) {
 		ctx := keylessAccessCtx(granted)
@@ -1521,7 +1521,7 @@ func TestChatRequestNeverCopiesTheProviderMap(t *testing.T) {
 	store := &providerLookupCountingStore{mockInMemoryStore: mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{
 		schemas.OpenAI: {}, schemas.Anthropic: {}, schemas.Gemini: {},
 	}}}
-	vk := buildVirtualKeyWithProviders("vk-chat", mcpTestVKValue, "chat-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-chat", accessTestVKValue, "chat-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		buildProviderConfig("openai", []string{"gpt-4o"}),
 	})
 	logger := NewMockLogger()
@@ -1529,11 +1529,11 @@ func TestChatRequestNeverCopiesTheProviderMap(t *testing.T) {
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest, ChatRequest: &schemas.BifrostChatRequest{Provider: schemas.OpenAI, Model: "gpt-4o"}}
 	require.NoError(t, plugin.PreRequestHook(ctx, req))
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
@@ -1561,7 +1561,7 @@ func TestAllowedModelsMatchKeyAliasesThroughTheHookChain(t *testing.T) {
 			{ID: "k2", Models: schemas.WhiteList{"embedding-*"}},
 		}},
 	}}}
-	vk := buildVirtualKeyWithProviders("vk-alias", mcpTestVKValue, "alias-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-alias", accessTestVKValue, "alias-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		withAllKeys(buildProviderConfig("openai", []string{"gpt-4o"})),
 	})
 	logger := NewMockLogger()
@@ -1569,7 +1569,7 @@ func TestAllowedModelsMatchKeyAliasesThroughTheHookChain(t *testing.T) {
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -1596,7 +1596,7 @@ func TestAllowedModelsMatchKeyAliasesThroughTheHookChain(t *testing.T) {
 		{"gpt-4o", skipKeySelection, false},
 	} {
 		t.Run(fmt.Sprintf("%s/cred%d", tc.model, tc.cred), func(t *testing.T) {
-			ctx := presentCtx(mcpTestVKValue)
+			ctx := presentCtx(accessTestVKValue)
 			switch tc.cred {
 			case directKey:
 				ctx.SetValue(schemas.BifrostContextKeyDirectKey, schemas.Key{ID: "direct"})
@@ -1639,7 +1639,7 @@ func TestModelLimitOnAliasTargetGovernsTheAliasThroughTheHookChain(t *testing.T)
 				"cheap-gpt": {ModelID: "gpt-4o-mini"},
 			}}}},
 		}}
-		vk := buildVirtualKeyWithProviders("vk-alias-limit", mcpTestVKValue, "alias-limit-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+		vk := buildVirtualKeyWithProviders("vk-alias-limit", accessTestVKValue, "alias-limit-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 			withAllKeys(buildProviderConfig("openai", []string{"gpt-4o", "gpt-4o-mini"})),
 		})
 		logger := NewMockLogger()
@@ -1649,7 +1649,7 @@ func TestModelLimitOnAliasTargetGovernsTheAliasThroughTheHookChain(t *testing.T)
 			RateLimits:   []configstoreTables.TableRateLimit{*modelRL},
 		}, nil, store)
 		require.NoError(t, err)
-		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 		return plugin, local
@@ -1668,7 +1668,7 @@ func TestModelLimitOnAliasTargetGovernsTheAliasThroughTheHookChain(t *testing.T)
 			{"gpt-4o", true},     // the limited model itself
 			{"cheap-gpt", false}, // an alias of a model with no limit
 		} {
-			ctx := presentCtx(mcpTestVKValue)
+			ctx := presentCtx(accessTestVKValue)
 			req := chat(tc.model)
 			require.NoError(t, plugin.PreRequestHook(ctx, req))
 			_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
@@ -1686,7 +1686,7 @@ func TestModelLimitOnAliasTargetGovernsTheAliasThroughTheHookChain(t *testing.T)
 
 	t.Run("a successful alias request is charged against the target's limit", func(t *testing.T) {
 		plugin, local := newPlugin(t, buildRateLimitWithUsage("rl-gpt-4o", 1_000_000, 0, 100, 0))
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		req := chat("best-gpt")
 		require.NoError(t, plugin.PreRequestHook(ctx, req))
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
@@ -1716,7 +1716,7 @@ func TestAliasRequestIsChargedOnlyAgainstTheTargetThatRan(t *testing.T) {
 			{ID: "k2", Models: schemas.WhiteList{"*"}, Aliases: schemas.KeyAliases{"best-gpt": {ModelID: "gpt-4o-mini"}}},
 		}},
 	}}
-	vk := buildVirtualKeyWithProviders("vk-alias-charge", mcpTestVKValue, "alias-charge-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-alias-charge", accessTestVKValue, "alias-charge-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		withAllKeys(buildProviderConfig("openai", []string{"gpt-4o", "gpt-4o-mini"})),
 	})
 	rlLarge := buildRateLimitWithUsage("rl-gpt-4o", 1_000_000, 0, 100, 0)
@@ -1732,14 +1732,14 @@ func TestAliasRequestIsChargedOnlyAgainstTheTargetThatRan(t *testing.T) {
 			RateLimits: []configstoreTables.TableRateLimit{*rlLarge, *rlMini},
 		}, nil, store)
 		require.NoError(t, err)
-		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 		return plugin, local
 	}
 	run := func(t *testing.T, selectedKey string) map[string]int64 {
 		plugin, local := newPlugin(t)
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest, ChatRequest: &schemas.BifrostChatRequest{Provider: schemas.OpenAI, Model: "best-gpt"}}
 		require.NoError(t, plugin.PreRequestHook(ctx, req))
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
@@ -1774,7 +1774,7 @@ func TestAliasRequestIsChargedOnlyAgainstTheTargetThatRan(t *testing.T) {
 	// the key of the attempt that failed, so only that key's target is charged.
 	t.Run("a terminal error with billed usage is charged against the failed attempt's target", func(t *testing.T) {
 		plugin, local := newPlugin(t)
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest, ChatRequest: &schemas.BifrostChatRequest{Provider: schemas.OpenAI, Model: "best-gpt"}}
 		require.NoError(t, plugin.PreRequestHook(ctx, req))
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
@@ -1809,10 +1809,10 @@ func TestAliasRequestIsChargedOnlyAgainstTheTargetThatRan(t *testing.T) {
 func TestLiteralAccessKeepsTheLevelsThatCapTheAccess(t *testing.T) {
 	caller := grant.NewPermit(grant.PermitVirtualKey, "vk1", "Key", true, false, []schemas.ProviderPermit{{
 		Provider: "openai", AllowedModels: []string{"gpt-4o", "gpt-4o-mini"}, KeyIDs: []string{"*"},
-	}}, nil)
+	}})
 	team := grant.NewPermit(grant.PermitTeamAccessProfile, "t1", "Team", true, false, []schemas.ProviderPermit{{
 		Provider: "openai", AllowedModels: []string{"gpt-4o-mini"}, KeyIDs: []string{"*"},
-	}}, nil, grant.WithLevel(1))
+	}}, grant.WithLevel(1))
 	store := &mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{schemas.OpenAI: {}}}
 	access := grant.NewAccess([]schemas.Permit{caller, team}, grant.Intersect, nil, "", nil)
 	require.False(t, access.IsModelAllowed("openai", "gpt-4o"), "the team level caps gpt-4o")
@@ -1833,17 +1833,17 @@ func BenchmarkLimitsForKeyThatRan(b *testing.B) {
 			{ID: "k2", Models: schemas.WhiteList{"*"}, Aliases: schemas.KeyAliases{"best-gpt": {ModelID: "gpt-4o-mini"}, "top-gpt": {ModelID: "gpt-4o"}}},
 		}},
 	}}
-	vk := buildVirtualKeyWithProviders("vk-alias-bench", mcpTestVKValue, "alias-bench-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-alias-bench", accessTestVKValue, "alias-bench-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		withAllKeys(buildProviderConfig("openai", []string{"gpt-4o", "gpt-4o-mini"})),
 	})
 	logger := NewMockLogger()
 	local, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{VirtualKeys: []configstoreTables.TableVirtualKey{*vk}}, nil, store)
 	require.NoError(b, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(b, err)
 	b.Cleanup(func() { _ = plugin.Cleanup() })
 	for _, bc := range []struct{ name, model, ran string }{{"no_alias", "gpt-4o", ""}, {"keys_agree", "top-gpt", "gpt-4o"}, {"keys_disagree", "best-gpt", "gpt-4o"}} {
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest, ChatRequest: &schemas.BifrostChatRequest{Provider: schemas.OpenAI, Model: bc.model}}
 		require.NoError(b, plugin.PreRequestHook(ctx, req))
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
@@ -1901,7 +1901,7 @@ func TestAliasRulesFollowTheKeysThatCanServeTheRequest(t *testing.T) {
 	logger := NewMockLogger()
 	local, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{VirtualKeys: tables}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -1991,7 +1991,7 @@ func TestAliasTargetLimitsFollowTheVirtualKeysKeys(t *testing.T) {
 		RateLimits:   []configstoreTables.TableRateLimit{*exhausted},
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -2032,7 +2032,7 @@ func TestBlacklistHoldsAliasTargetsThroughTheHookChain(t *testing.T) {
 	}}}
 	blocking := withAllKeys(buildProviderConfig("anthropic", []string{"regex:^claude-.*"}))
 	blocking.BlacklistedModels = schemas.BlackList{"claude-opus-4-6"}
-	vk := buildVirtualKeyWithProviders("vk-blocking", mcpTestVKValue, "blocking-vk", []configstoreTables.TableVirtualKeyProviderConfig{blocking})
+	vk := buildVirtualKeyWithProviders("vk-blocking", accessTestVKValue, "blocking-vk", []configstoreTables.TableVirtualKeyProviderConfig{blocking})
 	plain := buildVirtualKeyWithProviders("vk-plain", plainVKValue, "plain-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		withAllKeys(buildProviderConfig("anthropic", []string{"regex:^claude-.*"})),
 	})
@@ -2041,7 +2041,7 @@ func TestBlacklistHoldsAliasTargetsThroughTheHookChain(t *testing.T) {
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk, *plain},
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -2063,7 +2063,7 @@ func TestBlacklistHoldsAliasTargetsThroughTheHookChain(t *testing.T) {
 		{"good-model", false},        // an alias of a model the key does not block
 		{"claude-sonnet-4-6", false}, // an ordinary allowed model
 	} {
-		blocked, _ := run(mcpTestVKValue, tc.model)
+		blocked, _ := run(accessTestVKValue, tc.model)
 		assert.Equal(t, tc.blocked, blocked, tc.model)
 	}
 
@@ -2087,7 +2087,7 @@ func TestLiteralRequestsKeepProviderLimitsWhenAnAliasTargetIsBlacklisted(t *test
 	exhausted := buildRateLimitWithUsage("rl-openai-exhausted", 1_000_000, 0, 1, 1)
 	pc := buildProviderConfigWithRateLimit("openai", []string{"gpt-4o"}, exhausted)
 	pc.BlacklistedModels = schemas.BlackList{"gpt-4o-mini"}
-	vk := buildVirtualKeyWithProviders("vk-literal", mcpTestVKValue, "literal-vk", []configstoreTables.TableVirtualKeyProviderConfig{pc})
+	vk := buildVirtualKeyWithProviders("vk-literal", accessTestVKValue, "literal-vk", []configstoreTables.TableVirtualKeyProviderConfig{pc})
 	logger := NewMockLogger()
 	local, err := NewLocalGovernanceStore(context.Background(), logger, nil, &configstore.GovernanceConfig{
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
@@ -2099,7 +2099,7 @@ func TestLiteralRequestsKeepProviderLimitsWhenAnAliasTargetIsBlacklisted(t *test
 		name    string
 		catalog *modelcatalog.ModelCatalog
 	}{{"with catalog", modelcatalog.NewTestCatalog(nil)}, {"without catalog", nil}} {
-		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, catalog.catalog, nil, store)
+		plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, catalog.catalog, store)
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 		for _, cred := range []struct {
@@ -2114,7 +2114,7 @@ func TestLiteralRequestsKeepProviderLimitsWhenAnAliasTargetIsBlacklisted(t *test
 			}},
 		} {
 			t.Run(catalog.name+"/"+cred.name, func(t *testing.T) {
-				ctx := presentCtx(mcpTestVKValue)
+				ctx := presentCtx(accessTestVKValue)
 				cred.set(ctx)
 				req := &schemas.BifrostRequest{RequestType: schemas.ChatCompletionRequest, ChatRequest: &schemas.BifrostChatRequest{Provider: schemas.OpenAI, Model: "gpt-4o"}}
 				require.NoError(t, plugin.PreRequestHook(ctx, req))
@@ -2133,7 +2133,7 @@ func TestLiteralRequestsKeepProviderLimitsWhenAnAliasTargetIsBlacklisted(t *test
 // model as written (a literal batch item, a direct key, skip key selection): one rebuild of the
 // access without alias targets. Requests that go through key selection never reach it.
 func BenchmarkLiteralAccessFor(b *testing.B) {
-	vk := buildVirtualKeyWithProviders("vk-bench", mcpTestVKValue, "bench-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-bench", accessTestVKValue, "bench-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		buildProviderConfig("openai", []string{"gpt-4o"}),
 	})
 	local, err := NewLocalGovernanceStore(context.Background(), NewMockLogger(), nil, &configstore.GovernanceConfig{
@@ -2142,12 +2142,12 @@ func BenchmarkLiteralAccessFor(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, NewMockLogger(), local, nil, modelcatalog.NewTestCatalog(nil), nil, &mockInMemoryStore{})
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, NewMockLogger(), local, nil, modelcatalog.NewTestCatalog(nil), &mockInMemoryStore{})
 	if err != nil {
 		b.Fatal(err)
 	}
 	b.Cleanup(func() { _ = plugin.Cleanup() })
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	access, err := plugin.ResolveAccess(ctx)
 	if err != nil || access == nil {
 		b.Fatalf("no access: %v", err)
@@ -2165,7 +2165,7 @@ func TestBatchItemModelsAreCheckedByLiteralName(t *testing.T) {
 	store := &providerLookupCountingStore{mockInMemoryStore: mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{
 		schemas.Anthropic: {Keys: []schemas.Key{{ID: "k1", Models: schemas.WhiteList{"*"}, Aliases: schemas.KeyAliases{"claude-opus-4-6": {ModelID: "claude-sonnet-4-6"}}}}},
 	}}}
-	vk := buildVirtualKeyWithProviders("vk-batch", mcpTestVKValue, "batch-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-batch", accessTestVKValue, "batch-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		withAllKeys(buildProviderConfig("anthropic", []string{"claude-sonnet-4-6"})),
 	})
 	logger := NewMockLogger()
@@ -2173,7 +2173,7 @@ func TestBatchItemModelsAreCheckedByLiteralName(t *testing.T) {
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -2204,7 +2204,7 @@ func TestBatchItemModelsAreCheckedByLiteralName(t *testing.T) {
 		{"a non-string body model falls through to a string params alias, which is refused", rawItems("claude-sonnet-4-6", schemas.BatchRequestItem{CustomID: "i", Body: map[string]any{"model": 123}, Params: map[string]any{"model": "claude-opus-4-6"}}), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := presentCtx(mcpTestVKValue)
+			ctx := presentCtx(accessTestVKValue)
 			require.NoError(t, plugin.PreRequestHook(ctx, tc.req))
 			_, shortCircuit, err := plugin.PreLLMHook(ctx, tc.req)
 			require.NoError(t, err)
@@ -2224,7 +2224,7 @@ func TestBatchItemLiteralModelTakesNoAliasTargetLimits(t *testing.T) {
 	store := &providerLookupCountingStore{mockInMemoryStore: mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{
 		schemas.Anthropic: {Keys: []schemas.Key{{ID: "k1", Models: schemas.WhiteList{"*"}, Aliases: schemas.KeyAliases{"claude-opus-4-6": {ModelID: "claude-sonnet-4-6"}}}}},
 	}}}
-	vk := buildVirtualKeyWithProviders("vk-batch", mcpTestVKValue, "batch-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-batch", accessTestVKValue, "batch-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		withAllKeys(buildProviderConfig("anthropic", []string{"claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"})),
 	})
 	provider := "anthropic"
@@ -2236,7 +2236,7 @@ func TestBatchItemLiteralModelTakesNoAliasTargetLimits(t *testing.T) {
 		Budgets:      exhausted.Budgets,
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -2247,7 +2247,7 @@ func TestBatchItemLiteralModelTakesNoAliasTargetLimits(t *testing.T) {
 		}}
 	}
 	run := func(req *schemas.BifrostRequest) (*schemas.BifrostContext, *schemas.LLMPluginShortCircuit) {
-		ctx := presentCtx(mcpTestVKValue)
+		ctx := presentCtx(accessTestVKValue)
 		require.NoError(t, plugin.PreRequestHook(ctx, req))
 		_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
 		require.NoError(t, err)
@@ -2274,7 +2274,7 @@ func TestBatchItemLiteralCheckKeepsCustomProviderExemption(t *testing.T) {
 	store := &providerLookupCountingStore{mockInMemoryStore: mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{
 		"acme": {CustomProviderConfig: &schemas.CustomProviderConfig{BaseProviderType: schemas.Anthropic, AllowedRequests: &schemas.AllowedRequests{ChatCompletion: true}}},
 	}}}
-	vk := buildVirtualKeyWithProviders("vk-custom", mcpTestVKValue, "custom-vk", []configstoreTables.TableVirtualKeyProviderConfig{
+	vk := buildVirtualKeyWithProviders("vk-custom", accessTestVKValue, "custom-vk", []configstoreTables.TableVirtualKeyProviderConfig{
 		buildProviderConfig("acme", []string{"*"}),
 	})
 	logger := NewMockLogger()
@@ -2282,7 +2282,7 @@ func TestBatchItemLiteralCheckKeepsCustomProviderExemption(t *testing.T) {
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
 	}, nil, store)
 	require.NoError(t, err)
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
@@ -2291,7 +2291,7 @@ func TestBatchItemLiteralCheckKeepsCustomProviderExemption(t *testing.T) {
 		Provider: "acme", Model: &model,
 		Requests: []schemas.BatchRequestItem{{CustomID: "item-0", Params: map[string]any{"model": model}}},
 	}}
-	ctx := presentCtx(mcpTestVKValue)
+	ctx := presentCtx(accessTestVKValue)
 	require.NoError(t, plugin.PreRequestHook(ctx, req))
 	_, shortCircuit, err := plugin.PreLLMHook(ctx, req)
 	require.NoError(t, err)
@@ -2299,7 +2299,7 @@ func TestBatchItemLiteralCheckKeepsCustomProviderExemption(t *testing.T) {
 }
 
 func BenchmarkPreLLMHookBatchCreate(b *testing.B) {
-	plugin := newAccessTestPlugin(b, buildVKForMCPStamping(nil), nil)
+	plugin := newAccessTestPlugin(b, buildAccessTestVK(), nil)
 	model := "gpt-4o"
 	cases := []struct {
 		name  string
@@ -2319,7 +2319,7 @@ func BenchmarkPreLLMHookBatchCreate(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				if _, _, err := plugin.PreLLMHook(presentCtx(mcpTestVKValue), tc.build()); err != nil {
+				if _, _, err := plugin.PreLLMHook(presentCtx(accessTestVKValue), tc.build()); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -2354,7 +2354,7 @@ func BenchmarkPreLLMHookKeyAliases(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), nil, store)
+	plugin, err := InitFromStore(context.Background(), &Config{IsVkMandatory: boolPtr(false)}, logger, local, nil, modelcatalog.NewTestCatalog(nil), store)
 	if err != nil {
 		b.Fatal(err)
 	}

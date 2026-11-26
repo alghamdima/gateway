@@ -18,7 +18,7 @@ var NoDeadline time.Time
 // assert the type before indexing: SetValue/ClearValue/GetAndSetValue accept any,
 // and indexing a map with a non-comparable key (slice, map, func) would panic.
 var reservedKeys = map[BifrostContextKey]struct{}{
-	BifrostContextKeyStreamUsageProvisional:      {},
+	BifrostContextKeyStreamUsageProvisional:  {},
 	BifrostContextKeyVirtualKey:              {},
 	BifrostContextKeyAPIKeyName:              {},
 	BifrostContextKeyAPIKeyID:                {},
@@ -41,16 +41,6 @@ var reservedKeys = map[BifrostContextKey]struct{}{
 	BifrostContextKeyStreamGated:             {},
 	BifrostContextKeyStreamAttemptAbort:      {},
 	BifrostContextKeyStreamCommitWatch:       {},
-	BifrostContextKeyMCPHealthCheckRequest:   {},
-	BifrostContextKeyMCPCallerCapabilities:   {},
-	BifrostContextKeyMCPInputResumption:      {},
-	BifrostContextKeyMCPRoundTripID:          {},
-	BifrostContextKeyMCPRequestedToolName:    {},
-	BifrostContextKeyMCPToolUIResourceURI:    {},
-	BifrostContextKeyMCPToolAppOnly:          {},
-	BifrostContextKeyMCPGatewayClient:        {},
-	BifrostContextKeyMCPToolListing:          {},
-	BifrostContextKeyMCPUnattendedExecution:  {},
 	BifrostContextKeyInjectedToolsExecuted:   {},
 	BifrostContextKeyUpstreamLatency:         {},
 	BifrostContextKeyStreamOverhead:          {},
@@ -58,11 +48,8 @@ var reservedKeys = map[BifrostContextKey]struct{}{
 	BifrostContextKeyRequestedProvider:       {},
 	BifrostContextKeyRequestedModel:          {},
 	BifrostContextKeyProviderProxyConfig:     {},
-	BifrostContextKeyMCPInboundBearer:        {},
 	BifrostContextKeyOpencodeSession:         {},
 	BifrostContextKeyAuthCredential:          {},
-	BifrostContextKeyMCPAgentServedRoute:     {},
-	BifrostContextKeyMCPInstructionsText:     {},
 	BifrostContextKeyClientIP:                {},
 
 	BifrostContextKeyPassthroughModelListFilter: {},
@@ -465,63 +452,6 @@ func (bc *BifrostContext) Value(key any) any {
 	}
 
 	return bc.parent.Value(key)
-}
-
-// AuthMode derives the per-user OAuth lookup mode from current context state.
-// Priority: UserID > VirtualKey > session. Call this at token-lookup time, not
-// in middleware — the governance plugin can inject UserID (via VK→owner
-// resolution) after middleware runs, and the mode must reflect that.
-//
-// Returns MCPAuthModeNone when no identity column is populated (no user, no
-// VK, no session header), so callers that branch on the returned mode alone
-// cannot mistake an unauthenticated request for a session-mode caller.
-//
-// VK check uses BifrostContextKeyGovernanceVirtualKeyID (the resolved VK row
-// ID) rather than BifrostContextKeyVirtualKey (the raw header value) because
-// vk-mode token rows are keyed by the resolved VK ID.
-func (bc *BifrostContext) MCPAuthMode() MCPAuthMode {
-	if userID, ok := bc.Value(BifrostContextKeyUserID).(string); ok && userID != "" {
-		return MCPAuthModeUser
-	}
-	if vkID, ok := bc.Value(BifrostContextKeyGovernanceVirtualKeyID).(string); ok && vkID != "" {
-		return MCPAuthModeVK
-	}
-	if sid, ok := bc.Value(BifrostContextKeyMCPSessionID).(string); ok && sid != "" {
-		return MCPAuthModeSession
-	}
-	return MCPAuthModeNone
-}
-
-// MCPIdentity returns the identity string to key per-user MCP credential
-// state by, for the given mode. Mirrors the exact priority MCPAuthMode()
-// uses to derive mode in the first place — call MCPAuthMode() first, then
-// pass its result here to read back the single context value that produced
-// it (user ID for MCPAuthModeUser, the resolved VK row ID for MCPAuthModeVK,
-// the raw session ID for MCPAuthModeSession).
-//
-// Used by every resolver that keys persisted state by (mode, identity,
-// mcp_client) — currently per-user OAuth and per-user headers — and by the
-// OAuth2Provider implementation for the same per-identity lookups. Returns
-// "" when the value backing mode isn't populated (e.g. mode is
-// MCPAuthModeNone, or context state changed between the two calls);
-// callers that require an identity to proceed treat that as "no usable
-// identity" and fall through to their own error path.
-func (bc *BifrostContext) MCPIdentity(mode MCPAuthMode) string {
-	switch mode {
-	case MCPAuthModeUser:
-		if v, _ := bc.Value(BifrostContextKeyUserID).(string); v != "" {
-			return v
-		}
-	case MCPAuthModeVK:
-		if v, _ := bc.Value(BifrostContextKeyGovernanceVirtualKeyID).(string); v != "" {
-			return v
-		}
-	case MCPAuthModeSession:
-		if v, _ := bc.Value(BifrostContextKeyMCPSessionID).(string); v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 // SetValue sets a value in the internal userValues map.

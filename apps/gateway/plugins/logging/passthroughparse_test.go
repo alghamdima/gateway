@@ -43,7 +43,7 @@ type passthroughCall struct {
 func runPassthroughCall(t *testing.T, cfg *Config, requestID string, call passthroughCall, setup, afterPre func(*schemas.BifrostContext)) *logstore.Log {
 	t.Helper()
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), cfg, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), cfg, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	contentType := call.contentType
@@ -322,7 +322,7 @@ func TestPassthroughLogSummarizesMultipartUploads(t *testing.T) {
 // so every passthrough row carries the tag the logs API documents.
 func TestPassthroughErrorWithoutPendingEntryIsTagged(t *testing.T) {
 	store := newTestStore(t)
-	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil, nil)
+	plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
 	require.NoError(t, err)
 
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)

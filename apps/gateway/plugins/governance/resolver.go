@@ -25,7 +25,6 @@ const (
 	DecisionRequestLimited  Decision = "request_limited"
 	DecisionModelBlocked    Decision = "model_blocked"
 	DecisionProviderBlocked Decision = "provider_blocked"
-	DecisionMCPToolBlocked  Decision = "mcp_tool_blocked"
 	// DecisionModelLimitsUnattributable refuses a passthrough body naming models whose own limits
 	// one request cannot be charged against (a mixed task array).
 	DecisionModelLimitsUnattributable Decision = "model_limits_unattributable"
@@ -110,7 +109,7 @@ func (r *BudgetResolver) evaluateAccess(ctx *schemas.BifrostContext, evaluationR
 	// model gate has nothing left to check against, so it is skipped with it. A provider the
 	// caller does configure keeps its model allowlist.
 	providerUnconfigured := skipProviderCheck && !access.IsProviderAllowed(string(provider))
-	if !skipProviderCheck && evaluationRequest.RequestType != schemas.MCPToolExecutionRequest && requestType != schemas.ListModelsRequest && !access.IsProviderAllowed(string(provider)) {
+	if !skipProviderCheck && requestType != schemas.ListModelsRequest && !access.IsProviderAllowed(string(provider)) {
 		return &EvaluationResult{
 			Decision: DecisionProviderBlocked,
 			Reason:   denialReason(fmt.Sprintf("Provider '%s' is not allowed", provider), access.DeniedPermitsForModel(string(provider), "")),
