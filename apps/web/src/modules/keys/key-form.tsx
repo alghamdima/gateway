@@ -73,11 +73,17 @@ export const allowedExpiries = (
           KEY_EXPIRY_SECONDS[choice] <= KEY_EXPIRY_SECONDS[maxLifetime],
       );
 
-/** "Nov 27, 2026, 3:04 AM GMT+3", in the reader's own time zone. */
+/**
+ * "Nov 27, 2026, 3:04 AM GMT+3", in the reader's own time zone. Spelled out
+ * field by field: Intl refuses `dateStyle`/`timeStyle` with `timeZoneName`.
+ */
 export const formatExpiry = (date: Date, locale: string) =>
   new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
     timeZoneName: "short",
   }).format(date);
 

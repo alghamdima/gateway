@@ -109,11 +109,15 @@ const menuFor = (user: User) =>
     }),
   }));
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // before the page renders: an admin page reads the admin API, which refuses
+  // anyone else, and that refusal would show as a 500 instead of the redirect
+  await getStaffUser();
+
   return (
     <SidebarProvider>
       <Suspense fallback={<DashboardSidebarSkeleton />}>
@@ -128,6 +132,27 @@ export default function AdminLayout({
 }
 
 async function AuthenticatedAdminSidebar() {
+  const user = await getStaffUser();
+
+  return (
+    <DashboardSidebar
+      user={user}
+      menu={menuFor(user)}
+      header={
+        <TurboLink
+          href={pathsConfig.index}
+          className="flex items-center gap-3 p-2 transition-[padding] group-data-[collapsible=icon]:p-0.5"
+        >
+          <Icons.Logo className="text-primary h-8 transition-[width,height]" />
+          <Icons.LogoText className="text-foreground h-4 group-data-[collapsible=icon]:hidden" />
+        </TurboLink>
+      }
+    />
+  );
+}
+
+/** The signed-in staff member, or a redirect for anyone else. The session is read once per request. */
+async function getStaffUser() {
   const session = await getSession();
 
   if (!session?.user) {
@@ -145,19 +170,5 @@ async function AuthenticatedAdminSidebar() {
     return redirect(pathsConfig.dashboard.user.settings.security);
   }
 
-  return (
-    <DashboardSidebar
-      user={user}
-      menu={menuFor(user)}
-      header={
-        <TurboLink
-          href={pathsConfig.index}
-          className="flex items-center gap-3 p-2 transition-[padding] group-data-[collapsible=icon]:p-0.5"
-        >
-          <Icons.Logo className="text-primary h-8 transition-[width,height]" />
-          <Icons.LogoText className="text-foreground h-4 group-data-[collapsible=icon]:hidden" />
-        </TurboLink>
-      }
-    />
-  );
+  return user;
 }
