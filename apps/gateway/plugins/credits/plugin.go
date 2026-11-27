@@ -62,6 +62,7 @@ type ledger interface {
 	Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, fx fxRate, ttl time.Duration) (string, ReserveOutcome, error)
 	Settle(ctx context.Context, st Settlement) (SettleResult, error)
 	Extend(ctx context.Context, reservationID string, ttl time.Duration) (bool, error)
+	Shortfall(ctx context.Context, organizationID, virtualKeyID string) (Shortfall, error)
 }
 
 // reaper releases holds whose settlement never arrived.
@@ -240,50 +241,62 @@ func classify(requestType schemas.RequestType) requestClass {
 // PreLLMHook holds the maximum cost of this attempt, or refuses the request.
 func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
 	if p.refuseAll != "" {
-		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits are not configured on this gateway."), nil
+		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits are not configured on this gateway.", schemas.Refusal{
+			LimitSource: schemas.LimitSourceService,
+			Reason:      ReasonCreditsNotConfigured,
+			RemedyHint:  "A problem on our side that retrying will not fix. Contact support.",
+		}), nil
 	}
 	if req == nil {
-		return req, refuse(400, ErrorTypeUnsupportedRequest, "The request is empty."), nil
+		return req, refuse(400, ErrorTypeUnsupportedRequest, "The request is empty.", schemas.Refusal{
+			LimitSource: schemas.LimitSourceRequestType,
+			Reason:      ReasonRequestEmpty,
+			RemedyHint:  "Send a request body.",
+		}), nil
 	}
 	switch classify(req.RequestType) {
 	case classFree:
 		return req, nil, nil
 	case classUnsupported:
-		return req, refuse(403, ErrorTypeUnsupportedRequest, fmt.Sprintf("Requests of type %q are not available.", req.RequestType)), nil
+		return req, requestTypeRefusal(req.RequestType), nil
 	}
 
 	customerID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerID)
 	if customerID == "" {
-		return req, refuse(403, ErrorTypeNoOrganization, "This API key is not linked to an organization."), nil
+		return req, refuseNoOrganization(), nil
 	}
 	lookupCtx, cancelLookup := context.WithTimeout(context.Background(), ledgerTimeout)
 	organizationID, mapped, err := p.organizationFor(lookupCtx, customerID)
 	cancelLookup()
 	if err != nil {
 		p.logger.Error("credits: cannot resolve gateway customer %s: %v", customerID, err)
-		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits could not be checked. Try again shortly."), nil
+		return req, refuseLedgerUnavailable("Credits could not be checked. Try again shortly."), nil
 	}
 	if !mapped {
-		return req, refuse(403, ErrorTypeNoOrganization, "This API key is not linked to an organization."), nil
+		return req, refuseNoOrganization(), nil
 	}
 
 	rate := p.rate.Load()
 	if rate == nil {
-		return req, refuse(503, ErrorTypeLedgerUnavailable, "Prices could not be loaded. Try again shortly."), nil
+		return req, refuseLedgerUnavailable("Prices could not be loaded. Try again shortly."), nil
 	}
 	fx := *rate
 
 	if reason := unboundable(ctx, req); reason != "" {
-		return req, refuse(400, ErrorTypeUnsupportedRequest, string(reason)), nil
+		return req, refuseUnbounded(string(reason)), nil
 	}
 	amount, err := p.estimate(ctx, req, fx.effectiveE6)
 	var cannotBound unboundableError
 	if errors.As(err, &cannotBound) {
-		return req, refuse(400, ErrorTypeUnsupportedRequest, string(cannotBound.reason)), nil
+		return req, refuseUnbounded(string(cannotBound.reason)), nil
 	}
 	if err != nil {
 		p.logger.Warn("credits: cannot estimate %s for organization %s: %v", req.RequestType, organizationID, err)
-		return req, refuse(400, ErrorTypeUnpriced, "This model cannot be priced, so the request was not sent."), nil
+		return req, refuse(400, ErrorTypeUnpriced, "This model cannot be priced, so the request was not sent.", schemas.Refusal{
+			LimitSource: schemas.LimitSourceCredits,
+			Reason:      ReasonModelNotPriced,
+			RemedyHint:  "Choose a model listed with a price on /api/v1/models.",
+		}), nil
 	}
 	if amount == 0 {
 		// a model that costs nothing needs no hold, and settles nothing
@@ -296,13 +309,10 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 	reservationID, outcome, err := p.ledger.Reserve(ledgerCtx, organizationID, virtualKeyID, amount, fx, p.reservationTTL)
 	if err != nil {
 		p.logger.Error("credits: reserve failed for organization %s: %v", organizationID, err)
-		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits could not be checked. Try again shortly."), nil
+		return req, refuseLedgerUnavailable("Credits could not be checked. Try again shortly."), nil
 	}
-	switch outcome {
-	case InsufficientCredits:
-		return req, refuse(402, ErrorTypeInsufficientCredits, "Insufficient credits. Add credits to continue, or lower max_tokens."), nil
-	case KeyLimitReached:
-		return req, refuse(403, ErrorTypeKeyLimit, "This API key has reached its spending limit. Raise the limit, wait for it to reset, or lower max_tokens."), nil
+	if outcome != Reserved {
+		return req, p.refuseHold(organizationID, virtualKeyID, outcome, amount), nil
 	}
 
 	held := &hold{
@@ -462,16 +472,6 @@ func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostReque
 	usage := &schemas.BifrostLLMUsage{PromptTokens: inputTokens, CompletionTokens: outputTokens, TotalTokens: inputTokens + outputTokens}
 	scopes := modelcatalog.PricingLookupScopesFromContext(ctx, string(provider))
 	return ceilMicroSAR(p.pricer.CalculateCostForUsage(usage, provider, model, req.RequestType, scopes), rateE6)
-}
-
-func refuse(status int, errorType, message string) *schemas.LLMPluginShortCircuit {
-	allowFallbacks := false
-	return &schemas.LLMPluginShortCircuit{Error: &schemas.BifrostError{
-		Type:           &errorType,
-		StatusCode:     &status,
-		Error:          &schemas.ErrorField{Message: message},
-		AllowFallbacks: &allowFallbacks,
-	}}
 }
 
 // usageOf is the attempt's token usage: the response's, or what the provider billed for

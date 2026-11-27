@@ -63,10 +63,36 @@ const isWindow = (value: string | null): value is keyof typeof WINDOW_START =>
   value !== null && value in WINDOW_START;
 
 /**
+ * When a key's limit window resets: the next UTC midnight, the next ISO week
+ * (Monday) or the next calendar month, the windows the credits plugin counts
+ * in (apps/gateway/plugins/credits/refusals.go, windowEnd).
+ */
+export const windowEnd = (
+  reset: keyof typeof WINDOW_START,
+  now = new Date(),
+) => {
+  const day = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const DAY = 86_400_000;
+  if (reset === "daily") {
+    return new Date(day + DAY);
+  }
+  if (reset === "weekly") {
+    const sinceMonday = (now.getUTCDay() + 6) % 7;
+    return new Date(day + (7 - sinceMonday) * DAY);
+  }
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+};
+
+/**
  * GET /api/v1/key: OpenRouter's self-inspection shape. limit_remaining is
  * what the credits plugin would still let the key hold in its window
  * (docs/platform/adr/0013-key-limits-in-the-ledger.md): the limit, minus the
- * window's usage, minus open holds.
+ * window's usage, minus open holds. limit_resets_at is when the window starts
+ * again (null for a limit that never resets). Amounts are SAR.
  */
 export const describeKey = async (key: CallingKey) => {
   const reset = isWindow(key.limitReset) ? key.limitReset : null;
@@ -90,6 +116,7 @@ export const describeKey = async (key: CallingKey) => {
           ? null
           : toSar(Math.max(0, key.limitMicroSar - spentAgainstLimit)),
       limit_reset: reset,
+      limit_resets_at: reset ? windowEnd(reset).toISOString() : null,
       usage: toSar(usage),
       usage_daily: toSar(daily),
       usage_weekly: toSar(weekly),

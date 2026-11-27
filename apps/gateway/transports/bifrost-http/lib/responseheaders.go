@@ -149,7 +149,7 @@ var ExposedResponseHeaders = strings.Join([]string{
 	HeaderBifrostCacheThreshold, HeaderBifrostCacheProviderUsed, HeaderBifrostCacheModelUsed, HeaderBifrostCacheInputTokens,
 	HeaderBifrostLatency, HeaderBifrostPricingRequestType, HeaderBifrostConvertedRequestType,
 	HeaderBifrostDroppedCompatParams, HeaderBifrostDroppedUnsupportedTools, HeaderBifrostPassthroughPath,
-	HeaderBifrostErrorType, HeaderBifrostRetryAfterMs,
+	HeaderBifrostErrorType, HeaderBifrostRetryAfterMs, HeaderRetryAfter,
 }, ", ")
 
 // extraFieldsKey is the top-level JSON key every Bifrost response and error carries its metadata under.
@@ -292,6 +292,21 @@ func ApplyBifrostErrorResponseHeaders(ctx *fasthttp.RequestCtx, bifrostCtx *sche
 		ctx.Response.Header.Set(HeaderBifrostRetryAfterMs, strconv.FormatInt(extra.RetryAfter, 10))
 	}
 }
+
+// ApplyRefusalHeaders writes Retry-After on a refusal the product made itself when retrying the same
+// request can succeed (a rate limit, a temporary outage of the ledger), and never otherwise
+// (core/schemas/refusal.go, docs/platform/api-errors.md).
+func ApplyRefusalHeaders(ctx *fasthttp.RequestCtx, bifrostErr *schemas.BifrostError) {
+	if bifrostErr == nil || bifrostErr.Error == nil || bifrostErr.Error.Refusal == nil {
+		return
+	}
+	if seconds := bifrostErr.Error.Refusal.RetryAfterSeconds(); seconds > 0 {
+		ctx.Response.Header.Set(HeaderRetryAfter, strconv.FormatInt(seconds, 10))
+	}
+}
+
+// HeaderRetryAfter is the standard header saying how many seconds to wait before retrying.
+const HeaderRetryAfter = "Retry-After"
 
 // ApplyBifrostResponseHeaders writes both the upstream provider response
 // headers (forwarded verbatim) and the bifrost-level `x-bifrost-*` routing

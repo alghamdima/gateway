@@ -166,6 +166,7 @@ func (g *GenericRouter) sendError(ctx *fasthttp.RequestCtx, bifrostCtx *schemas.
 	}
 	// Routed identity after provider headers so a chained upstream's x-bifrost-* can't overwrite it.
 	lib.ApplyBifrostErrorResponseHeaders(ctx, bifrostCtx, bifrostErr.ExtraFields)
+	lib.ApplyRefusalHeaders(ctx, bifrostErr)
 
 	ctx.SetStatusCode(bifrostErr.EffectiveHTTPStatus())
 	ctx.SetContentType("application/json")

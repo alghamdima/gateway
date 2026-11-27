@@ -53,6 +53,8 @@ Only part of the upstream repository was copied: `core`, `framework`, `plugins`,
 | `core/changelog.md`, `framework/changelog.md`, `transports/changelog.md` | Entries about the features outside the product are removed. |
 | `transports/Dockerfile.local` | No Node stage and no UI copied into the Go stage. |
 | `framework/modelcatalog/datasheet/types.go`, `framework/modelcatalog/datasheet/overrides.go`, `framework/modelcatalog/pricing.go` | A pricing override keeps its name in the in-memory lookup, and `Store.PricingOverrideName` / `ModelCatalog.PricingOverrideName` return the name of the override that prices a (model, request type) under the request's scopes, by the same resolution as the cost. The credits plugin records it on each usage entry (`metadata.price_override`), so a charge names the version of the control plane's price table it used (`docs/platform/adr/0018-model-price-table.md`). |
+| `core/schemas/bifrost.go`, `core/providers/anthropic/errors.go`, `core/providers/anthropic/types.go`, `transports/bifrost-http/lib/responseheaders.go`, `transports/bifrost-http/handlers/utils.go`, `transports/bifrost-http/integrations/utils.go` | The product's error contract (`docs/platform/api-errors.md`, SPEC API-08). `ErrorField` has a `Refusal` (not serialized itself); when set, the error object is written with `code` as the HTTP status number and a `metadata` object (`limit_source`, `reason`, `remedy_hint`, context). Anthropic's error envelope carries the same `metadata`. Both error writers call `lib.ApplyRefusalHeaders`, which writes `Retry-After` when the refusal says retrying can succeed; it is listed in the CORS exposed headers. Errors without a refusal are written as before. |
+| `plugins/governance/main.go`, `plugins/governance/resolver.go`, `plugins/governance/store.go` | Every governance refusal carries a `Refusal` (`defaultRefusal` per decision; provider and model allowlists are reported as `data_policy`, since in this product only the data policy sets them). A disabled or expired credential is 401 (`key_disabled`, `key_expired`) instead of 403; a scope that may not be used stays 403. `EvaluationResult` has a `Refusal`. A rate limit breach returns a `RateLimitError` (same message) carrying the limit, the usage and the window's reset, so the 429 has `Retry-After` and `resets_at`. Tests changed accordingly: `hookrefusal_test.go`, `permits_test.go`. |
 
 ## Added
 
@@ -60,6 +62,8 @@ Only part of the upstream repository was copied: `core`, `framework`, `plugins`,
 - `scripts/` (build, test and rename helpers), `compose/` (the shipped configuration)
 - `plugins/credits/`: the prepaid credits plugin
 - `framework/modelcatalog/datasheet/overridename_test.go`: tests for `PricingOverrideName`
+- `core/schemas/refusal.go`, `core/schemas/refusal_test.go`: the `Refusal` type, its limit sources and `NewRefusalError`
+- `plugins/governance/refusalcontract_test.go`; tests appended to `core/providers/anthropic/errors_test.go` and `transports/bifrost-http/lib/responseheaders_test.go`
 
 ## Renaming
 

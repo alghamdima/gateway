@@ -731,13 +731,11 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 			message = "authentication is required. Provide a virtual key (x-bf-vk), API key, or user token."
 		}
 		p.cfgMutex.RUnlock()
-		return nil, &schemas.BifrostError{
-			Type:       new("virtual_key_required"),
-			StatusCode: new(401),
-			Error: &schemas.ErrorField{
-				Message: message,
-			},
-		}
+		return nil, schemas.NewRefusalError(401, "virtual_key_required", message, schemas.Refusal{
+			LimitSource: schemas.LimitSourceKey,
+			Reason:      "key_missing",
+			RemedyHint:  "Send your API key as Authorization: Bearer <key>.",
+		})
 	}
 	p.cfgMutex.RUnlock()
 
@@ -820,36 +818,102 @@ func unusablePermit(access schemas.Access) *EvaluationResult {
 	permits := make([]schemas.Permit, 0, len(access.Bases())+1)
 	permits = append(permits, access.Bases()...)
 	permits = append(permits, access.Scoping())
-	for _, permit := range permits {
+	bases := len(access.Bases())
+	for i, permit := range permits {
 		if permit == nil {
 			continue
 		}
+		// A credential the caller presented that may not be used is a failed authentication, 401,
+		// as for one that does not exist (SPEC API-08); a scope it named is a permission, 403.
+		credential := i < bases
 		if !permit.IsActive() {
 			return &EvaluationResult{
 				Decision: DecisionAccessBlocked,
 				Reason:   fmt.Sprintf("%s is inactive", grant.PermitType(permit.Type()).PrettyString()),
+				Refusal:  unusablePermitRefusal(credential, "key_disabled", "scope_inactive", "This API key is disabled. Enable it again in the dashboard, or use another key."),
 			}
 		}
 		if permit.IsExpired() {
 			return &EvaluationResult{
 				Decision: DecisionAccessBlocked,
 				Reason:   fmt.Sprintf("%s has expired", grant.PermitType(permit.Type()).PrettyString()),
+				Refusal:  unusablePermitRefusal(credential, "key_expired", "scope_expired", "This API key has expired, and its expiry cannot be changed. Create a new key in the dashboard."),
 			}
 		}
 	}
 	return nil
 }
 
-// refusal builds the error a governance decision refuses a request with.
+// unusablePermitRefusal is what a caller is told about a permit that may not be used: a credential
+// is answered 401 with the given reason, a scope 403.
+func unusablePermitRefusal(credential bool, credentialReason, scopeReason, credentialHint string) *schemas.Refusal {
+	if credential {
+		return &schemas.Refusal{StatusCode: 401, LimitSource: schemas.LimitSourceKey, Reason: credentialReason, RemedyHint: credentialHint}
+	}
+	return &schemas.Refusal{LimitSource: schemas.LimitSourceKey, Reason: scopeReason, RemedyHint: "The scope this request named can no longer be used."}
+}
+
+// refusal builds the error a governance decision refuses a request with, in the product's error
+// contract (SPEC API-08, docs/platform/api-errors.md): the decision's own refusal when it set one,
+// else the decision's default, and its status when it names one.
 func refusal(result *EvaluationResult, statusCode int, errorType schemas.ErrorType) *schemas.BifrostError {
-	return &schemas.BifrostError{
-		// Type stays the raw decision: it is the client-visible error contract.
-		Type:       new(string(result.Decision)),
-		StatusCode: new(statusCode),
-		Error: &schemas.ErrorField{
-			Message: result.Reason,
-		},
-		ExtraFields: schemas.BifrostErrorExtraFields{ErrorType: errorType},
+	if statusCode >= 500 && result.Refusal == nil {
+		// a wiring fault, not a limit the caller ran into: nothing for them to act on
+		return &schemas.BifrostError{
+			Type:        new(string(result.Decision)),
+			StatusCode:  new(statusCode),
+			Error:       &schemas.ErrorField{Message: result.Reason},
+			ExtraFields: schemas.BifrostErrorExtraFields{ErrorType: errorType},
+		}
+	}
+	details := defaultRefusal(result.Decision)
+	if result.Refusal != nil {
+		if result.Refusal.StatusCode != 0 {
+			statusCode = result.Refusal.StatusCode
+		}
+		if result.Refusal.LimitSource != "" {
+			details = *result.Refusal
+		} else {
+			// only the context was set (a rate limit's reset): keep the decision's source and reason
+			details.RetryAfter = result.Refusal.RetryAfter
+			details.Details = result.Refusal.Details
+		}
+	}
+	// Type stays the raw decision: it is the client-visible error contract.
+	bifrostErr := schemas.NewRefusalError(statusCode, string(result.Decision), result.Reason, details)
+	bifrostErr.ExtraFields = schemas.BifrostErrorExtraFields{ErrorType: errorType}
+	return bifrostErr
+}
+
+// defaultRefusal is the limit source, reason and hint of each decision. In this product a virtual
+// key's provider and model allowlists are set only by the organization's data policy
+// (docs/platform/adr/0015-data-policy.md), so a request they refuse is refused by the data policy.
+func defaultRefusal(decision Decision) schemas.Refusal {
+	switch decision {
+	case DecisionAccessNotFound:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceKey, Reason: "key_invalid",
+			RemedyHint: "The API key does not exist or was deleted. Check the key, or create a new one in the dashboard."}
+	case DecisionProviderBlocked:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceDataPolicy, Reason: "provider_not_allowed",
+			RemedyHint: "Your organization's data policy allows no endpoint of this provider. Choose another model, or change the data policy in the dashboard."}
+	case DecisionModelBlocked:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceDataPolicy, Reason: "model_not_allowed",
+			RemedyHint: "Your organization's data policy does not allow this model. Choose another model, or change the data policy in the dashboard."}
+	case DecisionRateLimited:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceRateLimit, Reason: "rate_limited",
+			RemedyHint: "Your organization sent more than its rate limit allows. Retry after the number of seconds in Retry-After."}
+	case DecisionTokenLimited:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceRateLimit, Reason: "token_limit_reached",
+			RemedyHint: "Your organization used more tokens than its rate limit allows. Retry after the number of seconds in Retry-After."}
+	case DecisionRequestLimited:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceRateLimit, Reason: "request_limit_reached",
+			RemedyHint: "Your organization sent more requests than its rate limit allows. Retry after the number of seconds in Retry-After."}
+	case DecisionBudgetExceeded:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceBudget, Reason: "budget_exceeded",
+			RemedyHint: "A budget on this key or organization is spent. Wait for it to reset, or ask for it to be raised."}
+	default:
+		return schemas.Refusal{LimitSource: schemas.LimitSourceKey, Reason: "access_blocked",
+			RemedyHint: "This request is not allowed for this API key."}
 	}
 }
 

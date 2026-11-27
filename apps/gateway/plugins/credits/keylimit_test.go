@@ -174,3 +174,37 @@ func TestReserve_TheGatewayRoleCannotReadKeyHashes(t *testing.T) {
 		t.Fatalf("gateway_ledger read a key hash: %q", hash)
 	}
 }
+
+// Shortfall explains a refused hold with what the ledger holds, read as the gateway_ledger role.
+func TestShortfall_ReadsTheBalanceAndTheKeysWindow(t *testing.T) {
+	db := newTestDB(t)
+	store := NewStore(db.ledger)
+	ctx := context.Background()
+	org := db.organization(t, 10*usd)
+	db.apiKey(t, org, "vk_short", ptr(5*usd), ptr("weekly"))
+	db.apiKey(t, org, "vk_open", nil, nil)
+
+	held, outcome, err := store.Reserve(ctx, org, "vk_short", 3*usd, testFX, time.Minute)
+	if err != nil || outcome != Reserved {
+		t.Fatalf("hold: %d %v", outcome, err)
+	}
+	must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: held, OrganizationID: org, Cost: usd, FX: testFX, IdempotencyKey: "usage:" + held}))
+	if _, outcome, _ := store.Reserve(ctx, org, "vk_short", 2*usd, testFX, time.Minute); outcome != Reserved {
+		t.Fatalf("second hold: %d", outcome)
+	}
+
+	got, err := store.Shortfall(ctx, org, "vk_short")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// balance 10 - 1 charged, 2 held; the key spent 1 this week and holds 2
+	if !got.HasAccount || got.Balance != 9*usd || got.Held != 2*usd || got.KeyLimit == nil || *got.KeyLimit != 5*usd || got.KeySpent != 3*usd || got.KeyReset != "weekly" {
+		t.Fatalf("shortfall %+v", got)
+	}
+	if open, err := store.Shortfall(ctx, org, "vk_open"); err != nil || open.KeyLimit != nil || open.KeySpent != 0 {
+		t.Fatalf("a key without a limit: %+v %v", open, err)
+	}
+	if none, err := store.Shortfall(ctx, "org_that_does_not_exist", ""); err != nil || none.HasAccount {
+		t.Fatalf("no account: %+v %v", none, err)
+	}
+}

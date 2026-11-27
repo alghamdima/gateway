@@ -55,7 +55,7 @@ describe.skipIf(!adminUrl || !binary)(
     let ledger: typeof import("../../credits/ledger");
     let removeOrganizationFromGateway: (typeof import("@workspace/gateway-client/server"))["removeOrganizationFromGateway"];
 
-    const chat = (key: string) =>
+    const chat = (key: string, maxTokens?: number) =>
       fetch(`${gatewayUrl}/v1/chat/completions`, {
         method: "POST",
         headers: {
@@ -65,8 +65,38 @@ describe.skipIf(!adminUrl || !binary)(
         body: JSON.stringify({
           model: "openai/gpt-4o-mini",
           messages: [{ role: "user", content: "hi" }],
+          ...(maxTokens ? { max_tokens: maxTokens } : {}),
         }),
       });
+
+    /**
+     * The product's error contract (SPEC API-08, docs/platform/api-errors.md),
+     * read as OpenAI SDKs and OpenRouter clients read it: error.message and
+     * error.type, error.code the HTTP status as a number, error.metadata.
+     */
+    interface RefusalBody {
+      error: {
+        code: number;
+        message: string;
+        type?: string;
+        metadata?: Record<string, unknown>;
+      };
+    }
+
+    const refusalOf = async (response: Response, status: number) => {
+      const text = await response.text();
+      // the body is shown when the status is not the one expected
+      expect({ status: response.status, body: text }).toMatchObject({ status });
+      const body = JSON.parse(text) as RefusalBody;
+      expect(body.error.code).toBe(status);
+      expect(typeof body.error.message).toBe("string");
+      expect(body.error.message.length).toBeGreaterThan(0);
+      expect(typeof body.error.metadata?.remedy_hint).toBe("string");
+      // nothing secret: no upstream key, no gateway admin password
+      expect(text).not.toContain("sk-mock-upstream");
+      expect(text).not.toContain(ADMIN_PASSWORD);
+      return { body, text, metadata: body.error.metadata ?? {} };
+    };
 
     /** Settlement happens after the response: wait until nothing is held. */
     const settled = async (organizationId: string) => {
@@ -234,10 +264,15 @@ describe.skipIf(!adminUrl || !binary)(
       const balance = await settled("org_e2e");
       expect(balance.balance).toBe(SAR - EXPECTED_CHARGE);
 
-      // disabled: refused before the provider is called, nothing charged
+      // disabled: 401 (SPEC API-08), refused before the provider is called, nothing charged
       await keys.updateKey("org_e2e", apiKey.id, { disabled: true });
       const callsBefore = providerCalls;
-      expect((await chat(key)).status).toBe(403);
+      const disabled = await refusalOf(await chat(key), 401);
+      expect(disabled.metadata).toMatchObject({
+        limit_source: "key",
+        reason: "key_disabled",
+      });
+      expect(disabled.text).not.toContain(key);
       expect(providerCalls).toBe(callsBefore);
       expect((await settled("org_e2e")).balance).toBe(SAR - EXPECTED_CHARGE);
 
@@ -257,11 +292,191 @@ describe.skipIf(!adminUrl || !binary)(
         name: "capped",
         limit: { limitMicroSar: 100, reset: "daily" },
       });
-      const refused = await chat(key);
-      expect(refused.status).toBe(403);
-      expect(JSON.stringify(await refused.json())).toContain(
-        "credits_key_limit",
+      // 402, as OpenRouter's, with the numbers in SAR (SPEC API-08)
+      const { body, metadata } = await refusalOf(await chat(key), 402);
+      expect(body.error.type).toBe("credits_key_limit");
+      expect(metadata).toMatchObject({
+        limit_source: "key_limit",
+        // one request's hold is bigger than the whole limit: retrying will not help
+        reason: "request_exceeds_key_limit",
+        limit: 0.0001,
+        spent: 0,
+        remaining: 0.0001,
+        limit_reset: "daily",
+        currency: "SAR",
+      });
+      expect(metadata.resets_at).toBe(
+        new Date(
+          new Date().setUTCHours(24, 0, 0, 0), // the next UTC midnight
+        )
+          .toISOString()
+          .replace(".000Z", "Z"),
       );
+      expect(Number(metadata.required)).toBeGreaterThan(0.0001);
+    }, 60_000);
+
+    it("a key that spent its limit gets 402 key_limit_reached with what it spent and what is left", async () => {
+      // room for one request (its hold), not two: the second is refused on what the first spent
+      const { key } = await keys.createKey({
+        organizationId: "org_e2e",
+        userId: "user_e2e",
+        name: "one request",
+        limit: { limitMicroSar: 3_000, reset: "monthly" },
+      });
+      // max_tokens 1000 holds about 2,270 micro-SAR: one fits in 3,000, a second after 1,687 spent does not
+      const ok = await chat(key, 1000);
+      expect(ok.status).toBe(200);
+      await ok.text();
+      await settled("org_e2e");
+      const { metadata } = await refusalOf(await chat(key, 1000), 402);
+      expect(metadata).toMatchObject({
+        limit_source: "key_limit",
+        reason: "key_limit_reached",
+        limit: 0.003,
+        spent: EXPECTED_CHARGE / SAR,
+        remaining: (3_000 - EXPECTED_CHARGE) / SAR,
+        limit_reset: "monthly",
+        currency: "SAR",
+      });
+    }, 60_000);
+
+    it("an organization with no credit gets 402 credits, insufficient_balance, and the provider is never called", async () => {
+      await sql`insert into organization (id, name, slug, created_at) values ('org_zero', 'Zero', 'zero', now())`;
+      const { key } = await keys.createKey({
+        organizationId: "org_zero",
+        userId: "user_e2e",
+        name: "broke",
+      });
+      const callsBefore = providerCalls;
+      const { body, metadata, text } = await refusalOf(await chat(key), 402);
+      expect(body.error.type).toBe("insufficient_credits");
+      expect(metadata).toMatchObject({
+        limit_source: "credits",
+        reason: "insufficient_balance",
+        balance: 0,
+        available: 0,
+        currency: "SAR",
+      });
+      expect(text).not.toContain("retry_after_seconds");
+      // another organization's data is never in the answer
+      expect(text).not.toContain("org_e2e");
+      expect(providerCalls).toBe(callsBefore);
+    }, 60_000);
+
+    it("a balance smaller than one request's hold gets 402 request_exceeds_balance, with no Retry-After", async () => {
+      await sql`insert into organization (id, name, slug, created_at) values ('org_small', 'Small', 'small', now())`;
+      await ledger.applyEntry({
+        organizationId: "org_small",
+        amount: 100,
+        kind: "adjustment",
+        idempotencyKey: "e2e-small",
+      });
+      const { key } = await keys.createKey({
+        organizationId: "org_small",
+        userId: "user_e2e",
+        name: "small",
+      });
+      const response = await chat(key);
+      expect(response.headers.get("retry-after")).toBeNull();
+      const { metadata } = await refusalOf(response, 402);
+      expect(metadata).toMatchObject({
+        limit_source: "credits",
+        reason: "request_exceeds_balance",
+        balance: 0.0001,
+      });
+    }, 60_000);
+
+    it("an expired key gets 401 key_expired; a missing or unknown key 401 too", async () => {
+      const { key } = await keys.createKey({
+        organizationId: "org_e2e",
+        userId: "user_e2e",
+        name: "short-lived",
+        expiresAt: new Date(Date.now() + 1500),
+      });
+      await new Promise((r) => setTimeout(r, 2000));
+      const expired = await refusalOf(await chat(key), 401);
+      expect(expired.metadata).toMatchObject({
+        limit_source: "key",
+        reason: "key_expired",
+      });
+
+      const unknown = await refusalOf(
+        await chat("sk-bf-00000000-0000-0000-0000-000000000000"),
+        401,
+      );
+      expect(unknown.metadata).toMatchObject({
+        limit_source: "key",
+        reason: "key_invalid",
+      });
+
+      const missing = await fetch(`${gatewayUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          messages: [{ role: "user", content: "hi" }],
+        }),
+      });
+      const absent = await refusalOf(missing, 401);
+      expect(absent.metadata).toMatchObject({
+        limit_source: "key",
+        reason: "key_missing",
+      });
+    }, 60_000);
+
+    it("the OpenAI-compatible and Anthropic routes carry the same refusal, each in its own shape", async () => {
+      const { key } = await keys.createKey({
+        organizationId: "org_zero",
+        userId: "user_e2e",
+        name: "routes",
+      });
+      const openai = await fetch(`${gatewayUrl}/openai/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          messages: [{ role: "user", content: "hi" }],
+        }),
+      });
+      const viaOpenAI = await refusalOf(openai, 402);
+      expect(viaOpenAI.metadata).toMatchObject({
+        limit_source: "credits",
+        reason: "insufficient_balance",
+      });
+
+      const anthropic = await fetch(`${gatewayUrl}/anthropic/v1/messages`, {
+        method: "POST",
+        headers: {
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini",
+          max_tokens: 100,
+          messages: [{ role: "user", content: "hi" }],
+        }),
+      });
+      const text = await anthropic.text();
+      expect({ status: anthropic.status, body: text }).toMatchObject({
+        status: 402,
+      });
+      // Anthropic's envelope: { type: "error", error: { type, message } }, plus our metadata
+      expect(JSON.parse(text)).toMatchObject({
+        type: "error",
+        error: {
+          type: "billing_error",
+          message: expect.any(String),
+          metadata: {
+            limit_source: "credits",
+            reason: "insufficient_balance",
+            remedy_hint: expect.any(String),
+          },
+        },
+      });
     }, 60_000);
 
     it("an organization over its rate limit gets 429, keeps no hold, and pays only for what ran", async () => {
@@ -287,19 +502,30 @@ describe.skipIf(!adminUrl || !binary)(
       });
 
       const statuses: number[] = [];
-      let refusal = "";
+      let refused: Response | undefined;
       for (let i = 0; i < 3; i++) {
         const response = await chat(key);
         statuses.push(response.status);
         if (response.status !== 200) {
-          refusal = JSON.stringify(await response.json());
+          refused = response;
         } else {
           await response.text();
         }
         await settled("org_rl");
       }
       expect(statuses).toEqual([200, 200, 429]);
-      expect(refusal).toContain("rate");
+      // Retry-After: the seconds until the minute window resets (SPEC API-08)
+      const retryAfter = Number(refused?.headers.get("retry-after"));
+      expect(retryAfter).toBeGreaterThanOrEqual(1);
+      expect(retryAfter).toBeLessThanOrEqual(60);
+      const { metadata } = await refusalOf(refused as Response, 429);
+      expect(metadata).toMatchObject({
+        limit_source: "rate_limit",
+        reason: "request_limit_reached",
+        limit_kind: "requests",
+        limit: 2,
+        retry_after_seconds: retryAfter,
+      });
 
       const balance = await settled("org_rl");
       expect(balance.held).toBe(0);

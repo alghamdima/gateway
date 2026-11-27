@@ -65,6 +65,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
   let v1Router: typeof import("../router").v1Router;
   let hashKey: typeof import("../../keys/keys").hashKey;
   let models: typeof import("../models");
+  let windowEnd: typeof import("../queries").windowEnd;
   let seq = 0;
 
   const createOrganization = async () => {
@@ -143,6 +144,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
     ({ v1Router } = await import("../router"));
     ({ hashKey } = await import("../../keys/keys"));
     models = await import("../models");
+    ({ windowEnd } = await import("../queries"));
   });
 
   afterAll(async () => {
@@ -154,27 +156,43 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
 
   describe("authentication errors", () => {
     it.each([
-      ["no credentials", {}, "No auth credentials found"],
+      ["no credentials", {}, "No auth credentials found", "key_missing"],
       [
         "a malformed header",
         { Authorization: "Token abc" },
         "Malformed Authorization header: expected 'Bearer <key>'",
+        "key_invalid",
       ],
       [
         "an empty bearer",
         { Authorization: "Bearer " },
         "Malformed Authorization header: expected 'Bearer <key>'",
+        "key_invalid",
       ],
       [
         "an unknown key",
         { Authorization: "Bearer sk-bf-nobody" },
         "Invalid API key",
+        "key_invalid",
       ],
-    ])("401 for %s, with its own message", async (_label, headers, message) => {
-      const response = await get("/key", headers);
-      expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({ error: { code: 401, message } });
-    });
+    ])(
+      "401 for %s, with its own message and the error contract's metadata",
+      async (_label, headers, message, reason) => {
+        const response = await get("/key", headers);
+        expect(response.status).toBe(401);
+        expect(await response.json()).toEqual({
+          error: {
+            code: 401,
+            message,
+            metadata: {
+              limit_source: "key",
+              reason,
+              remedy_hint: expect.any(String),
+            },
+          },
+        });
+      },
+    );
 
     it("401 for a disabled key and for an expired one", async () => {
       const org = await createOrganization();
@@ -190,12 +208,20 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         Authorization: `Bearer ${expired.value}`,
       });
       expect([a.status, b.status]).toEqual([401, 401]);
-      expect(
-        ((await a.json()) as { error: { message: string } }).error.message,
-      ).toBe("This API key is disabled");
-      expect(
-        ((await b.json()) as { error: { message: string } }).error.message,
-      ).toBe("This API key has expired");
+      expect(await a.json()).toMatchObject({
+        error: {
+          code: 401,
+          message: "This API key is disabled",
+          metadata: { limit_source: "key", reason: "key_disabled" },
+        },
+      });
+      expect(await b.json()).toMatchObject({
+        error: {
+          code: 401,
+          message: "This API key has expired",
+          metadata: { limit_source: "key", reason: "key_expired" },
+        },
+      });
     });
 
     it("accepts the key in x-api-key, as Anthropic SDK clients send it", async () => {
@@ -236,6 +262,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         label: "sk-bf-v1-tes…",
         limit: 10,
         limit_reset: "monthly",
+        limit_resets_at: windowEnd("monthly").toISOString(),
         limit_remaining: 7, // 10 - 2 this month - 1 held
         usage: 5,
         usage_monthly: 2,
@@ -258,8 +285,27 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         limit: null,
         limit_remaining: null,
         limit_reset: null,
+        limit_resets_at: null,
         usage: 0,
       });
+    });
+
+    it("says when each limit window starts again, in UTC, as the credits plugin counts", () => {
+      // a Friday afternoon
+      const now = new Date("2026-11-27T15:00:00Z");
+      expect(windowEnd("daily", now).toISOString()).toBe(
+        "2026-11-28T00:00:00.000Z",
+      );
+      expect(windowEnd("weekly", now).toISOString()).toBe(
+        "2026-11-30T00:00:00.000Z",
+      );
+      expect(windowEnd("monthly", now).toISOString()).toBe(
+        "2026-12-01T00:00:00.000Z",
+      );
+      // on a Monday the week ends a week later
+      expect(
+        windowEnd("weekly", new Date("2026-11-30T00:00:00Z")).toISOString(),
+      ).toBe("2026-12-07T00:00:00.000Z");
     });
   });
 
@@ -501,10 +547,17 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
       // no GATEWAY_URL in tests: the gateway is not configured
       const response = await get("/models");
       expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("5");
       expect(await response.json()).toEqual({
         error: {
           code: 503,
           message: "The model catalog is unavailable. Try again shortly.",
+          metadata: {
+            limit_source: "service",
+            reason: "catalog_unavailable",
+            remedy_hint: expect.any(String),
+            retry_after_seconds: 5,
+          },
         },
       });
     });

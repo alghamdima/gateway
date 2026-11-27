@@ -73,6 +73,8 @@ func TestPreLLMHookRefusesACredentialThatResolvesToNothing(t *testing.T) {
 	require.NotNil(t, bifrostErr.Type)
 	assert.Equal(t, string(DecisionAccessNotFound), *bifrostErr.Type)
 	assert.Contains(t, bifrostErr.Error.Message, "credential", "the caller is told the credential is the problem")
+	require.NotNil(t, bifrostErr.Error.Refusal)
+	assert.Equal(t, "key_invalid", bifrostErr.Error.Refusal.Reason)
 
 	assert.Nil(t, ctx.Grant().Access(),
 		"nothing was resolved for the request, and that must not be recorded as an access permitting everything")
@@ -89,11 +91,15 @@ func TestPreLLMHookRefusesAnInactiveGrant(t *testing.T) {
 	bifrostErr := refusalTestRefusalFor(t, plugin, newPreRequestCtx())
 
 	require.NotNil(t, bifrostErr.StatusCode)
-	assert.Equal(t, 403, *bifrostErr.StatusCode, "the credential is real, so this is a permission answer")
+	assert.Equal(t, 401, *bifrostErr.StatusCode, "a credential that may not be used fails authentication, as OpenRouter's (SPEC API-08)")
 	require.NotNil(t, bifrostErr.Type)
 	assert.Equal(t, string(DecisionAccessBlocked), *bifrostErr.Type)
 	assert.Contains(t, bifrostErr.Error.Message, "virtual key is inactive",
 		"the refusal names what is inactive, so a deployment granting access through something else does not report it as a key")
+	require.NotNil(t, bifrostErr.Error.Refusal)
+	assert.Equal(t, schemas.LimitSourceKey, bifrostErr.Error.Refusal.LimitSource)
+	assert.Equal(t, "key_disabled", bifrostErr.Error.Refusal.Reason)
+	assert.NotEmpty(t, bifrostErr.Error.Refusal.RemedyHint)
 }
 
 // Expiry is the other half of the same gate, and is reported distinctly from being switched off: a key
@@ -105,10 +111,12 @@ func TestPreLLMHookRefusesAnExpiredGrant(t *testing.T) {
 	bifrostErr := refusalTestRefusalFor(t, plugin, newPreRequestCtx())
 
 	require.NotNil(t, bifrostErr.StatusCode)
-	assert.Equal(t, 403, *bifrostErr.StatusCode)
+	assert.Equal(t, 401, *bifrostErr.StatusCode)
 	require.NotNil(t, bifrostErr.Type)
 	assert.Equal(t, string(DecisionAccessBlocked), *bifrostErr.Type)
 	assert.Contains(t, bifrostErr.Error.Message, "virtual key has expired")
+	require.NotNil(t, bifrostErr.Error.Refusal)
+	assert.Equal(t, "key_expired", bifrostErr.Error.Refusal.Reason)
 	assert.NotContains(t, bifrostErr.Error.Message, "inactive", "run out is not switched off")
 }
 

@@ -2374,6 +2374,9 @@ type AnthropicMessageErrorStruct struct {
 	Type    string                        `json:"type"`              // Error type
 	Message string                        `json:"message"`           // Error message
 	Details *AnthropicMessageErrorDetails `json:"details,omitempty"` // Machine-readable details some errors carry (e.g. thread error codes)
+	// Metadata is set when the gateway itself refused the request: the same object the
+	// OpenAI-shaped error carries (core/schemas/refusal.go, docs/platform/api-errors.md)
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 // AnthropicMessageErrorDetails is the optional machine-readable payload of an

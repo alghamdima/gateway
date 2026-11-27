@@ -360,9 +360,27 @@ describe.skipIf(!adminUrl || !binary)(
       const refused = await send(key, 6);
       expect(refused.statuses).toEqual([403]);
       expect(refused.served).toEqual({});
-      expect(JSON.stringify(await (await chat(key)).json())).toContain(
-        "provider_blocked",
-      );
+      // the error contract (SPEC API-08): 403, limit_source data_policy, naming the rule and
+      // nothing of another organization's
+      const text = await (await chat(key)).text();
+      const body = JSON.parse(text) as {
+        error: {
+          code: number;
+          message: string;
+          metadata: Record<string, unknown>;
+        };
+      };
+      expect(body.error).toMatchObject({
+        code: 403,
+        type: "provider_blocked",
+        message: expect.any(String),
+        metadata: {
+          limit_source: "data_policy",
+          reason: "provider_not_allowed",
+          remedy_hint: expect.any(String),
+        },
+      });
+      expect(text).not.toContain("org_open");
       // nothing was charged for the refused requests, and no hold is left
       const balance = await ledger.getBalance("org_strict");
       expect(balance.held).toBe(0);

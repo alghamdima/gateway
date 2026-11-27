@@ -1253,7 +1253,9 @@ func TestEvaluateRefusesAPermitThatMayNotBeUsed(t *testing.T) {
 		assert.Equal(t, DecisionAccessBlocked, result.Decision)
 		assert.Contains(t, result.Reason, "expired")
 		require.NotNil(t, bifrostErr.StatusCode)
-		assert.Equal(t, 403, *bifrostErr.StatusCode)
+		assert.Equal(t, 401, *bifrostErr.StatusCode, "an expired credential fails authentication (SPEC API-08)")
+		require.NotNil(t, bifrostErr.Error.Refusal)
+		assert.Equal(t, "key_expired", bifrostErr.Error.Refusal.Reason)
 	})
 
 	t.Run("an inactive permit, even with a future expiry", func(t *testing.T) {

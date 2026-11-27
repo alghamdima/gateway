@@ -238,6 +238,7 @@ func sendBifrostErrorWithContext(ctx *fasthttp.RequestCtx, bifrostCtx *schemas.B
 	// upstream-latency headers are omitted on native errors — the routing_info-*
 	// headers still carry which provider ran and whether a fallback fired.
 	lib.ApplyBifrostErrorResponseHeaders(ctx, bifrostCtx, bifrostErr.ExtraFields)
+	lib.ApplyRefusalHeaders(ctx, bifrostErr)
 
 	ctx.SetContentType("application/json")
 	if lib.ExtraFieldsInHeaders(ctx) {

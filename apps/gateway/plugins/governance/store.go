@@ -1887,6 +1887,8 @@ func (gs *LocalGovernanceStore) CheckRateLimit(ctx context.Context, entityWiseRa
 	for entity, rateLimits := range entityWiseRateLimits {
 		for _, rateLimit := range rateLimits {
 			var violations []string
+			// the breach that resets last: the request can go through only once every breach has reset
+			var exceeded rateLimitBreach
 			// Check if rate limit needs reset (in-memory check)
 			// Track which limits are expired so we can skip only those specific checks
 			tokenLimitExpired := false
@@ -1926,6 +1928,9 @@ func (gs *LocalGovernanceStore) CheckRateLimit(ctx context.Context, entityWiseRa
 				}
 				violations = append(violations, fmt.Sprintf("token limit exceeded (%d/%d, resets every %s)",
 					rateLimit.TokenCurrentUsage+tokensBaseline, *rateLimit.TokenMaxLimit, duration))
+				exceeded = exceeded.later(rateLimitBreach{kind: "tokens", limit: *rateLimit.TokenMaxLimit,
+					used: rateLimit.TokenCurrentUsage + tokensBaseline, window: duration,
+					resetsAt: windowResetAt(rateLimit.TokenResetDuration, rateLimit.TokenLastReset)})
 			}
 
 			// Request limits - check if total usage (local + remote baseline) exceeds limit
@@ -1937,6 +1942,9 @@ func (gs *LocalGovernanceStore) CheckRateLimit(ctx context.Context, entityWiseRa
 				}
 				violations = append(violations, fmt.Sprintf("request limit exceeded (%d/%d, resets every %s)",
 					rateLimit.RequestCurrentUsage+requestsBaseline, *rateLimit.RequestMaxLimit, duration))
+				exceeded = exceeded.later(rateLimitBreach{kind: "requests", limit: *rateLimit.RequestMaxLimit,
+					used: rateLimit.RequestCurrentUsage + requestsBaseline, window: duration,
+					resetsAt: windowResetAt(rateLimit.RequestResetDuration, rateLimit.RequestLastReset)})
 			}
 
 			if len(violations) > 0 {
@@ -1949,11 +1957,75 @@ func (gs *LocalGovernanceStore) CheckRateLimit(ctx context.Context, entityWiseRa
 						decision = DecisionRequestLimited // More specific violation type
 					}
 				}
-				return decision, fmt.Errorf("rate limit violated for %s: %s", entity, violations)
+				return decision, &RateLimitError{message: fmt.Sprintf("rate limit violated for %s: %v", entity, violations), breach: exceeded}
 			}
 		}
 	}
 	return DecisionAllow, nil
+}
+
+// rateLimitBreach is one rate limit a request is over: what is counted, the ceiling, what was used
+// and when its window resets (zero when the window is unknown).
+type rateLimitBreach struct {
+	kind     string // "requests" or "tokens"
+	limit    int64
+	used     int64
+	window   string
+	resetsAt time.Time
+}
+
+// later is whichever breach resets later; a breach with a known reset wins over one without.
+func (b rateLimitBreach) later(other rateLimitBreach) rateLimitBreach {
+	if b.kind == "" || other.resetsAt.After(b.resetsAt) {
+		return other
+	}
+	return b
+}
+
+// windowResetAt is when a rate limit's window resets, zero when its duration is unknown.
+func windowResetAt(resetDuration *string, lastReset time.Time) time.Time {
+	if resetDuration == nil || lastReset.IsZero() {
+		return time.Time{}
+	}
+	duration, err := configstoreTables.ParseDuration(*resetDuration)
+	if err != nil || duration <= 0 {
+		return time.Time{}
+	}
+	return lastReset.Add(duration)
+}
+
+// RateLimitError is a rate limit refusal. Its message is unchanged from before; it also says
+// which limit was exceeded and when it resets, so the refusal can carry Retry-After (API-08).
+type RateLimitError struct {
+	message string
+	breach  rateLimitBreach
+}
+
+func (e *RateLimitError) Error() string { return e.message }
+
+// RetryAfter is how long until the exceeded window resets, at least a second; a second when the
+// reset time is unknown, since a rate limit always resets.
+func (e *RateLimitError) RetryAfter(now time.Time) time.Duration {
+	wait := e.breach.resetsAt.Sub(now)
+	if e.breach.resetsAt.IsZero() || wait < time.Second {
+		return time.Second
+	}
+	return wait
+}
+
+// Details are the numbers a rate limit refusal reports: the caller's own counts only.
+func (e *RateLimitError) Details(now time.Time) map[string]any {
+	details := map[string]any{
+		"limit_kind": e.breach.kind,
+		"limit":      e.breach.limit,
+		"used":       e.breach.used,
+		"window":     e.breach.window,
+		"resets_at":  nil,
+	}
+	if !e.breach.resetsAt.IsZero() {
+		details["resets_at"] = e.breach.resetsAt.UTC().Format(time.RFC3339)
+	}
+	return details
 }
 
 // Generic check budget method

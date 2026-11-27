@@ -134,6 +134,55 @@ func (s *Store) Reserve(ctx context.Context, organizationID, virtualKeyID string
 	return got, Reserved, nil
 }
 
+// Shortfall is what the ledger holds for an organization and a key, read after a hold was refused,
+// so the refusal can say by how much (docs/platform/api-errors.md). It is read apart from the
+// refused hold, so other requests may have moved it since; it explains, it never decides.
+type Shortfall struct {
+	// HasAccount is false when the organization has no credit account yet.
+	HasAccount bool
+	// Balance and Held are the organization's account, in micro-SAR.
+	Balance int64
+	Held    int64
+	// KeyLimit is the key's spending limit in micro-SAR; nil when the key has none.
+	KeyLimit *int64
+	// KeyReset is the key's limit window: daily, weekly or monthly; empty when it never resets.
+	KeyReset string
+	// KeySpent is what the key spent in its current window plus what its open holds may spend.
+	KeySpent int64
+}
+
+const accountSQL = `SELECT balance, held FROM credit_account WHERE organization_id = $1`
+
+// Shortfall reads the balance and, when virtualKeyID names a key with a limit, the key's limit and spend.
+func (s *Store) Shortfall(ctx context.Context, organizationID, virtualKeyID string) (Shortfall, error) {
+	var out Shortfall
+	err := s.pool.QueryRow(ctx, accountSQL, organizationID).Scan(&out.Balance, &out.Held)
+	switch {
+	case err == nil:
+		out.HasAccount = true
+	case err != pgx.ErrNoRows:
+		return out, fmt.Errorf("credits: read account: %w", err)
+	}
+	if virtualKeyID == "" {
+		return out, nil
+	}
+	var reset *string
+	err = s.pool.QueryRow(ctx, keyLimitSQL, virtualKeyID).Scan(&out.KeyLimit, &reset)
+	if err != nil && err != pgx.ErrNoRows {
+		return out, fmt.Errorf("credits: read key limit: %w", err)
+	}
+	if out.KeyLimit == nil {
+		return out, nil
+	}
+	if reset != nil {
+		out.KeyReset = *reset
+	}
+	if err := s.pool.QueryRow(ctx, keySpendSQL, virtualKeyID, reset).Scan(&out.KeySpent); err != nil {
+		return out, fmt.Errorf("credits: key spend: %w", err)
+	}
+	return out, nil
+}
+
 // querier is a pool or a transaction.
 type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row

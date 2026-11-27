@@ -727,3 +727,22 @@ func TestExposedResponseHeadersListsEveryGatewayHeader(t *testing.T) {
 	}
 	assert.Contains(t, exposed, HeaderRequestID)
 }
+
+// Retry-After is written only on a refusal that retrying can fix (docs/platform/api-errors.md).
+func TestApplyRefusalHeaders(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  *schemas.BifrostError
+		want string
+	}{
+		"a rate limit resetting in 1.2 s": {schemas.NewRefusalError(429, "request_limited", "slow down", schemas.Refusal{LimitSource: schemas.LimitSourceRateLimit, RetryAfter: 1200 * time.Millisecond}), "2"},
+		"insufficient credits":            {schemas.NewRefusalError(402, "insufficient_credits", "add credits", schemas.Refusal{LimitSource: schemas.LimitSourceCredits}), ""},
+		"an upstream error":               {&schemas.BifrostError{Error: &schemas.ErrorField{Message: "upstream"}}, ""},
+		"no error":                        {nil, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := &fasthttp.RequestCtx{}
+			ApplyRefusalHeaders(ctx, tc.err)
+			assert.Equal(t, tc.want, string(ctx.Response.Header.Peek(HeaderRetryAfter)))
+		})
+	}
+}

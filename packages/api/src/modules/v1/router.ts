@@ -9,21 +9,68 @@ import { logger } from "@workspace/shared/logger";
 
 import { getGeneration } from "../activity/generations";
 import { accessForOrganization } from "../data-policy/policy";
-import { AUTH_MESSAGES, authenticateKey, readKey } from "./auth";
+import {
+  AUTH_MESSAGES,
+  authenticateKey,
+  KEY_REMEDY_HINTS,
+  readKey,
+} from "./auth";
 import { listPublicModels } from "./models";
 import { describeCredits, describeKey } from "./queries";
 
-import type { CallingKey } from "./auth";
+import type { CallingKey, KeyRefusal } from "./auth";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 /**
  * The OpenRouter-compatible endpoints the control plane answers
  * (docs/platform/PLAN.md, step 8.2). The model endpoints themselves are the
- * gateway's. Errors use OpenRouter's shape: { error: { code, message } }.
+ * gateway's. Errors use the product's error contract, OpenRouter's shape
+ * (SPEC API-08, docs/platform/api-errors.md): { error: { code, message,
+ * metadata? } }, with metadata on refusals the caller can act on.
  */
 
-const apiError = (status: ContentfulStatusCode, message: string) =>
-  Response.json({ error: { code: status, message } }, { status });
+interface RefusalMetadata {
+  limit_source: string;
+  reason: string;
+  remedy_hint: string;
+}
+
+const apiError = (
+  status: ContentfulStatusCode,
+  message: string,
+  metadata?: RefusalMetadata,
+  retryAfterSeconds?: number,
+) =>
+  Response.json(
+    {
+      error: metadata
+        ? {
+            code: status,
+            message,
+            metadata: retryAfterSeconds
+              ? { ...metadata, retry_after_seconds: retryAfterSeconds }
+              : metadata,
+          }
+        : { code: status, message },
+    },
+    {
+      status,
+      headers: retryAfterSeconds
+        ? { "Retry-After": String(retryAfterSeconds) }
+        : undefined,
+    },
+  );
+
+/** Seconds to wait when the gateway is briefly unreachable. */
+const CATALOG_RETRY_AFTER_SECONDS = 5;
+
+/** 401 for a key that is missing, malformed, unknown, disabled or expired. */
+const keyRefused = ({ message, reason }: KeyRefusal) =>
+  apiError(401, message, {
+    limit_source: "key",
+    reason,
+    remedy_hint: KEY_REMEDY_HINTS[reason],
+  });
 
 const enforceKey = createMiddleware<{ Variables: { key: CallingKey } }>(
   async (c, next) => {
@@ -32,11 +79,11 @@ const enforceKey = createMiddleware<{ Variables: { key: CallingKey } }>(
       apiKey: c.req.header("x-api-key"),
     });
     if ("message" in sent) {
-      return apiError(401, sent.message);
+      return keyRefused(sent);
     }
     const result = await authenticateKey(sent.key);
     if (!result.isAuthenticated) {
-      return apiError(401, result.message);
+      return keyRefused(result);
     }
     c.set("key", result.key);
     return next();
@@ -54,11 +101,11 @@ export const v1Router = new Hono<{ Variables: { key: CallingKey } }>()
     });
     // no credentials at all is the public catalog; anything else must be a valid key
     if ("message" in sent && sent.message !== AUTH_MESSAGES.missing) {
-      return apiError(401, sent.message);
+      return keyRefused(sent);
     }
     const caller = "key" in sent ? await authenticateKey(sent.key) : undefined;
     if (caller && !caller.isAuthenticated) {
-      return apiError(401, caller.message);
+      return keyRefused(caller);
     }
     try {
       return c.json(
@@ -79,6 +126,13 @@ export const v1Router = new Hono<{ Variables: { key: CallingKey } }>()
         return apiError(
           503,
           "The model catalog is unavailable. Try again shortly.",
+          {
+            limit_source: "service",
+            reason: "catalog_unavailable",
+            remedy_hint:
+              "A temporary problem on our side. Retry after the number of seconds in Retry-After.",
+          },
+          CATALOG_RETRY_AFTER_SECONDS,
         );
       }
       throw error;

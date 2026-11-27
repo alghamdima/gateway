@@ -190,6 +190,9 @@ func ToAnthropicChatCompletionError(bifrostErr *schemas.BifrostError) *Anthropic
 		Type:    anthropicErrorType(bifrostErr),
 		Message: bifrostErr.GetErrorString(),
 	}
+	if bifrostErr.Error != nil && bifrostErr.Error.Refusal != nil {
+		errorStruct.Metadata = bifrostErr.Error.Refusal.Metadata()
+	}
 
 	return &AnthropicMessageError{
 		Type:  "error", // always "error" for Anthropic

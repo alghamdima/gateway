@@ -295,3 +295,26 @@ func TestAnthropicMessageErrorDetailsMarshal(t *testing.T) {
 		t.Errorf("details must be omitted when nil so existing errors stay byte-identical, got %s", data)
 	}
 }
+
+// A refusal the gateway made itself keeps Anthropic's envelope and carries the same metadata as
+// the OpenAI-shaped error (docs/platform/api-errors.md).
+func TestToAnthropicChatCompletionErrorCarriesARefusalsMetadata(t *testing.T) {
+	refused := schemas.NewRefusalError(402, "credits_key_limit", "This API key has reached its spending limit.", schemas.Refusal{
+		LimitSource: schemas.LimitSourceKeyLimit,
+		Reason:      "key_limit_reached",
+		RemedyHint:  "Raise the limit.",
+		Details:     map[string]any{"limit": 10.0},
+	})
+	got := ToAnthropicChatCompletionError(refused)
+	if got.Type != "error" || got.Error.Type != "billing_error" || got.Error.Message != "This API key has reached its spending limit." {
+		t.Fatalf("envelope %+v", got)
+	}
+	if got.Error.Metadata["limit_source"] != "key_limit" || got.Error.Metadata["reason"] != "key_limit_reached" || got.Error.Metadata["limit"] != 10.0 {
+		t.Fatalf("metadata %v", got.Error.Metadata)
+	}
+	status := 400
+	plain := ToAnthropicChatCompletionError(&schemas.BifrostError{StatusCode: &status, Error: &schemas.ErrorField{Message: "bad"}})
+	if plain.Error.Metadata != nil {
+		t.Fatal("an upstream error has no refusal metadata")
+	}
+}

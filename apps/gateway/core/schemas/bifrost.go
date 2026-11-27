@@ -1989,6 +1989,9 @@ type ErrorField struct {
 	Error   error       `json:"-"`
 	Param   interface{} `json:"param,omitempty"`
 	EventID *string     `json:"event_id,omitempty"`
+	// Refusal is set when the product itself refused the request (refusal.go). It is written as
+	// "code", the HTTP status as a number in place of Code, and "metadata".
+	Refusal *Refusal `json:"-"`
 }
 
 // MarshalJSON implements custom JSON marshaling for ErrorField.
@@ -2005,6 +2008,15 @@ func (e *ErrorField) MarshalJSON() ([]byte, error) {
 	if e.Error != nil {
 		errStr := e.Error.Error()
 		aux.Error = &errStr
+	}
+	if e.Refusal != nil {
+		// the shallower code field shadows the alias's string one
+		return json.Marshal(&struct {
+			Code     int            `json:"code"`
+			Metadata map[string]any `json:"metadata"`
+			Error    *string        `json:"error,omitempty"`
+			*Alias
+		}{Code: e.Refusal.StatusCode, Metadata: e.Refusal.Metadata(), Error: aux.Error, Alias: aux.Alias})
 	}
 
 	return json.Marshal(aux)

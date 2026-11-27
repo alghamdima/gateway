@@ -2,8 +2,10 @@
 package governance
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -58,6 +60,10 @@ type EvaluationRequest struct {
 type EvaluationResult struct {
 	Decision Decision `json:"decision"`
 	Reason   string   `json:"reason"`
+	// Refusal, when set, is what a refused caller is told beside Reason (SPEC API-08,
+	// docs/platform/api-errors.md); a non-zero StatusCode on it replaces the decision's status.
+	// Unset, decide fills in the decision's own.
+	Refusal *schemas.Refusal `json:"-"`
 }
 
 // BudgetResolver provides decision logic for the new hierarchical governance system
@@ -224,10 +230,17 @@ func (r *BudgetResolver) evaluateLimits(ctx *schemas.BifrostContext, evaluationR
 	// would otherwise have been affordable, and reporting the cheaper refusal first keeps the
 	// message stable for a caller that is both throttled and out of money.
 	if decision, err := r.store.CheckRateLimits(ctx, rateLimits, nil, nil); err != nil || isRateLimitViolation(decision) {
-		return &EvaluationResult{
+		result := &EvaluationResult{
 			Decision: decision,
 			Reason:   fmt.Sprintf("Rate limit exceeded: %s", reasonFromErr(err, decision)),
 		}
+		// when the window resets, so the caller knows when retrying will work (Retry-After)
+		var exceeded *RateLimitError
+		if errors.As(err, &exceeded) {
+			now := time.Now()
+			result.Refusal = &schemas.Refusal{RetryAfter: exceeded.RetryAfter(now), Details: exceeded.Details(now)}
+		}
+		return result
 	}
 
 	if decision, err := r.store.CheckBudgets(ctx, budgets, nil); err != nil || isBudgetViolation(decision) {

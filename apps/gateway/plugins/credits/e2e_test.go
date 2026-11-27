@@ -246,6 +246,12 @@ func bootGateway(t *testing.T, binary string, provider *mockProvider, creditsCon
 
 func (g *e2eGateway) post(t *testing.T, path, key string, body map[string]any) (int, string) {
 	t.Helper()
+	status, out, _ := g.postWithHeaders(t, path, key, body)
+	return status, out
+}
+
+func (g *e2eGateway) postWithHeaders(t *testing.T, path, key string, body map[string]any) (int, string, http.Header) {
+	t.Helper()
 	raw, _ := json.Marshal(body)
 	req, _ := http.NewRequest(http.MethodPost, g.url+path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
@@ -256,7 +262,35 @@ func (g *e2eGateway) post(t *testing.T, path, key string, body map[string]any) (
 	}
 	defer resp.Body.Close()
 	out, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(out)
+	return resp.StatusCode, string(out), resp.Header
+}
+
+// e2eRefusal is a refusal as a client reads it (SPEC API-08, docs/platform/api-errors.md): the
+// HTTP status as error.code, a message and type, and the metadata.
+type e2eRefusal struct {
+	Error struct {
+		Code     int            `json:"code"`
+		Message  string         `json:"message"`
+		Type     string         `json:"type"`
+		Metadata map[string]any `json:"metadata"`
+	} `json:"error"`
+}
+
+// checkRefusal reads a refusal body and checks the contract every refusal keeps.
+func checkRefusal(t *testing.T, status int, body string, wantSource, wantReason string) e2eRefusal {
+	t.Helper()
+	var refusal e2eRefusal
+	if err := json.Unmarshal([]byte(body), &refusal); err != nil {
+		t.Fatalf("not JSON: %s", body)
+	}
+	if refusal.Error.Code != status || refusal.Error.Message == "" || refusal.Error.Type == "" {
+		t.Fatalf("error object %+v: want code %d, a message and a type", refusal.Error, status)
+	}
+	m := refusal.Error.Metadata
+	if m["limit_source"] != wantSource || m["reason"] != wantReason || m["remedy_hint"] == "" || m["remedy_hint"] == nil {
+		t.Fatalf("metadata %v: want %s %s with a remedy hint", m, wantSource, wantReason)
+	}
+	return refusal
 }
 
 // hasProviderKey asks the gateway whether it holds a provider key with this id.
@@ -442,6 +476,7 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 			if status != 400 || !strings.Contains(out, ErrorTypeUnsupportedRequest) {
 				t.Errorf("%s: status %d: %s", name, status, out)
 			}
+			checkRefusal(t, status, out, "credits", ReasonCostCannotBeBounded)
 		}
 		if provider.chats.Load() != before {
 			t.Fatal("the provider was called for a request that was refused")
@@ -450,9 +485,17 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 
 	t.Run("a balance that cannot cover the request gets 402 and the provider is never called", func(t *testing.T) {
 		before := provider.chats.Load()
-		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+broke, chatBody(false))
+		status, body, headers := gw.postWithHeaders(t, "/v1/chat/completions", "sk-bf-e2e-"+broke, chatBody(false))
 		if status != 402 || !strings.Contains(body, ErrorTypeInsufficientCredits) {
 			t.Fatalf("status %d: %s", status, body)
+		}
+		// 10 micro-SAR against a hold of thousands: retrying will not help, so no Retry-After
+		refusal := checkRefusal(t, status, body, "credits", ReasonRequestExceedsBalance)
+		if m := refusal.Error.Metadata; m["balance"] != 0.00001 || m["currency"] != "SAR" || m["required"] == nil {
+			t.Fatalf("amounts %v", m)
+		}
+		if headers.Get("Retry-After") != "" {
+			t.Fatal("Retry-After on a refusal retrying cannot fix")
 		}
 		if provider.chats.Load() != before {
 			t.Fatal("the provider was called for a request that was refused")
@@ -468,6 +511,7 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		if status != 403 || !strings.Contains(body, ErrorTypeNoOrganization) {
 			t.Fatalf("status %d: %s", status, body)
 		}
+		checkRefusal(t, status, body, "key", ReasonKeyHasNoOrganization)
 		if provider.chats.Load() != before {
 			t.Fatal("the provider was called for a request that was refused")
 		}
@@ -480,6 +524,18 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		status, body := gw.post(t, "/v1/images/generations", "sk-bf-e2e-"+funded, map[string]any{"model": "openai/gpt-image-1", "prompt": "a cat"})
 		if status != 403 {
 			t.Fatalf("status %d: %s", status, body)
+		}
+		// a model the key may use reaches the plugin, which refuses the switched-off type in the
+		// error contract (SPEC API-08), with no Retry-After: switching it on is not a matter of time
+		status, body, headers := gw.postWithHeaders(t, "/v1/images/generations", "sk-bf-e2e-"+funded, map[string]any{"model": "openai/gpt-4o-mini", "prompt": "a cat"})
+		if status != 403 || !strings.Contains(body, ErrorTypeUnsupportedRequest) {
+			t.Fatalf("status %d: %s", status, body)
+		}
+		if refusal := checkRefusal(t, status, body, "request_type", ReasonRequestTypeNotEnabled); refusal.Error.Metadata["request_type"] != "image_generation" {
+			t.Fatalf("metadata %v", refusal.Error.Metadata)
+		}
+		if headers.Get("Retry-After") != "" {
+			t.Fatal("Retry-After on a switched-off request type")
 		}
 		if provider.others.Load() != before {
 			t.Fatal("the provider was called for a request that was refused")
@@ -610,17 +666,28 @@ func TestEndToEnd_AMisconfiguredPluginRefusesInsteadOfServingForFree(t *testing.
 	provider := newMockProvider(t)
 	org := db.organization(t, usd)
 
-	for name, config := range map[string]map[string]any{
-		"no database url":             {},
-		"a config of the wrong shape": {"database_url": 5},
-		"a database that is down":     {"database_url": "postgres://nobody:nothing@127.0.0.1:1/none"},
+	for name, c := range map[string]struct {
+		config     map[string]any
+		wantReason string
+		retryAfter string // a database that is down comes back; a broken config does not
+	}{
+		"no database url":             {map[string]any{}, ReasonCreditsNotConfigured, ""},
+		"a config of the wrong shape": {map[string]any{"database_url": 5}, ReasonCreditsNotConfigured, ""},
+		"a database that is down":     {map[string]any{"database_url": "postgres://nobody:nothing@127.0.0.1:1/none"}, ReasonLedgerUnavailable, "5"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			gw := startGatewayWithCredits(t, binary, provider, config, []string{org})
+			gw := startGatewayWithCredits(t, binary, provider, c.config, []string{org})
 			before := provider.chats.Load()
-			status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+org, chatBody(false))
+			status, body, headers := gw.postWithHeaders(t, "/v1/chat/completions", "sk-bf-e2e-"+org, chatBody(false))
 			if status != 503 || !strings.Contains(body, ErrorTypeLedgerUnavailable) {
 				t.Fatalf("status %d: %s", status, body)
+			}
+			checkRefusal(t, status, body, "service", c.wantReason)
+			if got := headers.Get("Retry-After"); got != c.retryAfter {
+				t.Fatalf("Retry-After %q, want %q", got, c.retryAfter)
+			}
+			if strings.Contains(body, "nothing@") {
+				t.Fatal("the refusal leaks the database url")
 			}
 			if provider.chats.Load() != before {
 				t.Fatal("the provider was called although the request could not be accounted for")

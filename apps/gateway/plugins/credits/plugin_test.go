@@ -77,6 +77,18 @@ func (f *fakeLedger) Extend(context.Context, string, time.Duration) (bool, error
 	return true, nil
 }
 
+// Shortfall reports the fake's balance, and the key as at its limit when keyLimited is set.
+func (f *fakeLedger) Shortfall(context.Context, string, string) (Shortfall, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := Shortfall{HasAccount: true, Balance: f.balance}
+	if f.keyLimited {
+		limit := int64(10 * usd)
+		out.KeyLimit, out.KeySpent, out.KeyReset = &limit, limit, "daily"
+	}
+	return out, nil
+}
+
 func (f *fakeLedger) settlements() []Settlement {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -275,25 +287,27 @@ func TestPreLLMHook_Refuses(t *testing.T) {
 		wantStatus int
 		wantType   string
 		wantCalls  int64
+		wantSource string
+		wantReason string
 	}{
 		{"a balance that does not cover the hold", &fakeLedger{balance: 100}, testPricer(), testOrg,
-			chatRequest(schemas.ChatCompletionRequest, nil), 402, ErrorTypeInsufficientCredits, 1},
+			chatRequest(schemas.ChatCompletionRequest, nil), 402, ErrorTypeInsufficientCredits, 1, "credits", ReasonRequestExceedsBalance},
 		{"a key over its spending limit", &fakeLedger{balance: 10 * usd, keyLimited: true}, testPricer(), testOrg,
-			chatRequest(schemas.ChatCompletionRequest, nil), 403, ErrorTypeKeyLimit, 1},
+			chatRequest(schemas.ChatCompletionRequest, nil), 402, ErrorTypeKeyLimit, 1, "key_limit", ReasonKeyLimitReached},
 		{"a key that belongs to no organization", &fakeLedger{balance: 10 * usd}, testPricer(), "",
-			chatRequest(schemas.ChatCompletionRequest, nil), 403, ErrorTypeNoOrganization, 0},
+			chatRequest(schemas.ChatCompletionRequest, nil), 403, ErrorTypeNoOrganization, 0, "key", ReasonKeyHasNoOrganization},
 		{"a model with no price", &fakeLedger{balance: 10 * usd}, &fakePricer{unknown: true}, testOrg,
-			chatRequest(schemas.ChatCompletionRequest, nil), 400, ErrorTypeUnpriced, 0},
+			chatRequest(schemas.ChatCompletionRequest, nil), 400, ErrorTypeUnpriced, 0, "credits", ReasonModelNotPriced},
 		{"a model with no maximum output and no limit on the request", &fakeLedger{balance: 10 * usd}, &fakePricer{inputRate: 1e-6, outputRate: 2e-6}, testOrg,
-			chatRequest(schemas.ChatCompletionRequest, nil), 400, ErrorTypeUnpriced, 0},
+			chatRequest(schemas.ChatCompletionRequest, nil), 400, ErrorTypeUnpriced, 0, "credits", ReasonModelNotPriced},
 		{"a ledger that cannot be reached", &fakeLedger{balance: 10 * usd, reserveErr: errors.New("connection refused")}, testPricer(), testOrg,
-			chatRequest(schemas.ChatCompletionRequest, nil), 503, ErrorTypeLedgerUnavailable, 1},
+			chatRequest(schemas.ChatCompletionRequest, nil), 503, ErrorTypeLedgerUnavailable, 1, "service", ReasonLedgerUnavailable},
 		{"a request type it cannot bound: image generation", &fakeLedger{balance: 10 * usd}, testPricer(), testOrg,
-			&schemas.BifrostRequest{RequestType: schemas.ImageGenerationRequest}, 403, ErrorTypeUnsupportedRequest, 0},
+			&schemas.BifrostRequest{RequestType: schemas.ImageGenerationRequest}, 403, ErrorTypeUnsupportedRequest, 0, "request_type", ReasonRequestTypeNotEnabled},
 		{"a request type it cannot bound: speech", &fakeLedger{balance: 10 * usd}, testPricer(), testOrg,
-			&schemas.BifrostRequest{RequestType: schemas.SpeechRequest}, 403, ErrorTypeUnsupportedRequest, 0},
+			&schemas.BifrostRequest{RequestType: schemas.SpeechRequest}, 403, ErrorTypeUnsupportedRequest, 0, "request_type", ReasonRequestTypeNotEnabled},
 		{"a request type it has never heard of", &fakeLedger{balance: 10 * usd}, testPricer(), testOrg,
-			&schemas.BifrostRequest{RequestType: schemas.RequestType("something_new")}, 403, ErrorTypeUnsupportedRequest, 0},
+			&schemas.BifrostRequest{RequestType: schemas.RequestType("something_new")}, 403, ErrorTypeUnsupportedRequest, 0, "request_type", ReasonRequestTypeNotEnabled},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -305,6 +319,10 @@ func TestPreLLMHook_Refuses(t *testing.T) {
 			status, errorType := refusalOf(t, sc)
 			if status != c.wantStatus || errorType != c.wantType {
 				t.Fatalf("refused with %d %s, want %d %s", status, errorType, c.wantStatus, c.wantType)
+			}
+			refusal := sc.Error.Error.Refusal
+			if refusal == nil || refusal.StatusCode != c.wantStatus || refusal.LimitSource != c.wantSource || refusal.Reason != c.wantReason || refusal.RemedyHint == "" {
+				t.Fatalf("refusal metadata %+v, want %d %s %s with a remedy hint", refusal, c.wantStatus, c.wantSource, c.wantReason)
 			}
 			if got := c.ledger.reserveCall.Load(); got != c.wantCalls {
 				t.Errorf("ledger was asked %d times, want %d", got, c.wantCalls)
