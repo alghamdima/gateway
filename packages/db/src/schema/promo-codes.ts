@@ -89,6 +89,14 @@ export const promoCode = pgTable(
     endsAt: timestamp(),
     /** Top-up kinds only: the least credit the top-up must buy. */
     minTopupMicroSar: microSar(),
+    /**
+     * When the credit the code grants expires (BILL-17, ADR 0019): its own
+     * date, separate from the purchase rule. Null: the purchase rule
+     * (pricing_settings.credit_expiry_days from the moment it is granted). No
+     * earlier than the code's end, so a use never grants credit that expires
+     * before the code does. Not for a fee discount, which grants no credit.
+     */
+    creditExpiresAt: timestamp(),
     /** False: only the organizations in promo_code_organization. */
     allOrganizations: boolean().notNull().default(true),
     isPaused: boolean().notNull().default(false),
@@ -127,6 +135,10 @@ export const promoCode = pgTable(
     check(
       "promo_code_dates",
       sql`${t.startsAt} is null or ${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`,
+    ),
+    check(
+      "promo_code_credit_expiry",
+      sql`${t.creditExpiresAt} is null or (${t.kind} <> 'fee_discount' and (${t.endsAt} is null or ${t.creditExpiresAt} >= ${t.endsAt}) and (${t.startsAt} is null or ${t.creditExpiresAt} > ${t.startsAt}))`,
     ),
     check(
       "promo_code_note_length",

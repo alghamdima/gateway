@@ -1,9 +1,5 @@
 import { eq } from "@workspace/db";
-import {
-  creditLedgerEntry,
-  organization,
-  TOPUP_FEE_SOURCES,
-} from "@workspace/db/schema";
+import { organization, TOPUP_FEE_SOURCES } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
@@ -23,6 +19,7 @@ import {
   quoteTopUpPromo,
 } from "../promo-codes/redeem";
 import { applyEntry } from "./ledger";
+import { applyProviderRefund } from "./refund";
 
 import type { EffectiveTopupFee } from "../pricing/fee";
 import type { AppliedTopUpPromo, TopUpPromoQuote } from "../promo-codes/redeem";
@@ -253,7 +250,7 @@ export const applyTopUpEvent = async (event: TopUpEvent) => {
   if (event.type === "paid") {
     return applyPayment(event);
   }
-  return applyRefund(event);
+  return applyProviderRefund(event);
 };
 
 /** What the payment webhook route passes to the provider's handler. */
@@ -338,89 +335,6 @@ const recordedFeeRate = (event: Extract<TopUpEvent, { type: "paid" }>) => {
 
 const isTopupFeeSource = (value: string): value is TopupFeeSource =>
   TOPUP_FEE_SOURCES.some((source) => source === value);
-
-const applyRefund = async (
-  event: Extract<TopUpEvent, { type: "refunded" }>,
-) => {
-  const [payment] = await db
-    .select()
-    .from(creditLedgerEntry)
-    .where(
-      eq(
-        creditLedgerEntry.idempotencyKey,
-        topUpKey(event.provider, event.paymentId),
-      ),
-    );
-
-  if (!payment) {
-    // a refund of a plan payment, or of a top-up that was never credited
-    logger.info(
-      `Refund ${event.refundId} is not for a credited top-up: ignored`,
-    );
-    return { isApplied: false };
-  }
-
-  const removed = refundedCredit({
-    creditMicroSar: payment.amount,
-    collectedMicroSar: Number(payment.metadata?.collectedMicroSar),
-    refundedMicroSar: event.refundedMicroSar,
-  });
-  if (removed === 0) {
-    return { isApplied: false };
-  }
-  if (!(await organizationExists(payment.organizationId))) {
-    logger.error(
-      `Refund ${event.refundId} is for organization ${payment.organizationId}, which no longer exists: not applied`,
-    );
-    return { isApplied: false };
-  }
-
-  const result = await applyEntry({
-    organizationId: payment.organizationId,
-    amount: -removed,
-    kind: "refund",
-    idempotencyKey: `refund:${event.provider}:${event.refundId}`,
-    reference: event.refundId,
-    metadata: {
-      provider: event.provider,
-      mode: event.mode,
-      paymentId: event.paymentId,
-      refundedMicroSar: event.refundedMicroSar,
-    },
-  });
-  logger.info(
-    `↩️ Refund ${event.refundId}: ${result.isApplied ? "removed" : "already removed"} ${removed} micro-SAR from ${payment.organizationId}`,
-  );
-  return { isApplied: result.isApplied };
-};
-
-/**
- * The refunded share of the payment, taken from the credit it bought:
- * floor(credit × refunded / collected). A full refund removes exactly the
- * credit; the fee's share is never removed as credit.
- */
-export const refundedCredit = ({
-  creditMicroSar,
-  collectedMicroSar,
-  refundedMicroSar,
-}: {
-  creditMicroSar: number;
-  collectedMicroSar: number;
-  refundedMicroSar: number;
-}) => {
-  if (
-    !Number.isSafeInteger(collectedMicroSar) ||
-    collectedMicroSar <= 0 ||
-    !Number.isSafeInteger(refundedMicroSar) ||
-    refundedMicroSar <= 0
-  ) {
-    throw new Error("A refund needs a positive payment and refund amount");
-  }
-  const refunded = Math.min(refundedMicroSar, collectedMicroSar);
-  return Number(
-    (BigInt(creditMicroSar) * BigInt(refunded)) / BigInt(collectedMicroSar),
-  );
-};
 
 const organizationExists = async (organizationId: string) => {
   const [row] = await db

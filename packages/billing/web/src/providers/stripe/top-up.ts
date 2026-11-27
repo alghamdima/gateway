@@ -1,11 +1,22 @@
 import { logger } from "@workspace/shared/logger";
 import { MICRO_SAR_PER_HALALA } from "@workspace/shared/utils";
 
-import { BillingProvider, PaymentMode, TOP_UP_PURPOSE } from "../types";
+import {
+  BillingProvider,
+  CREDIT_REFUND_PURPOSE,
+  PaymentMode,
+  TOP_UP_PURPOSE,
+} from "../types";
 import { createOrRetrieveCustomer } from "./customer";
 import { stripe } from "./sdk";
 
-import type { TopUpCheckoutInput, TopUpEvent } from "../types";
+import type {
+  TopUpCheckoutInput,
+  TopUpCreditRefund,
+  TopUpEvent,
+  TopUpRefundInput,
+  TopUpRefundResult,
+} from "../types";
 import type { Stripe } from "stripe";
 
 /**
@@ -80,29 +91,118 @@ export const createTopUpCheckout = async ({
   return { url: session.url };
 };
 
+/**
+ * Stripe's errors that mean it said no for good: the refund request was wrong
+ * (the payment cannot be refunded, or not by that much) or the card refused.
+ * Anything else (a connection error, Stripe's own 5xx, a rate limit) is
+ * thrown, and the request is tried again with the same idempotency key.
+ */
+const REFUSED_ERRORS = new Set([
+  "StripeInvalidRequestError",
+  "StripeCardError",
+]);
+
+/**
+ * A self-serve refund of part of a top-up (BILL-10, ADR 0019): the credit
+ * only, in halalas, never the fee. The idempotency key makes a double click
+ * or a retry return the same refund; the metadata lets the refund's webhook
+ * remove exactly that credit, if it arrives before our own write.
+ */
+export const refundTopUp = async ({
+  mode,
+  paymentId,
+  creditRefund,
+  idempotencyKey,
+}: TopUpRefundInput): Promise<TopUpRefundResult> => {
+  try {
+    const refund = await stripe(mode).refunds.create(
+      {
+        payment_intent: paymentId,
+        amount: toHalalas(creditRefund.creditMicroSar),
+        reason: "requested_by_customer",
+        metadata: {
+          purpose: CREDIT_REFUND_PURPOSE,
+          creditRefundId: creditRefund.creditRefundId,
+          creditMicroSar: String(creditRefund.creditMicroSar),
+        },
+      },
+      { idempotencyKey },
+    );
+    switch (refund.status) {
+      case "succeeded":
+        return { outcome: "succeeded", refundId: refund.id };
+      case "failed":
+      case "canceled":
+        return {
+          outcome: "failed",
+          refundId: refund.id,
+          reason: refund.failure_reason ?? refund.status,
+        };
+      default:
+        // pending or requires_action: its webhook says how it ends
+        return { outcome: "pending", refundId: refund.id };
+    }
+  } catch (error) {
+    if (isRefusal(error)) {
+      return { outcome: "refused", reason: error.message };
+    }
+    throw error;
+  }
+};
+
+const isRefusal = (
+  error: unknown,
+): error is { type: string; message: string } =>
+  typeof error === "object" &&
+  error !== null &&
+  "type" in error &&
+  typeof error.type === "string" &&
+  REFUSED_ERRORS.has(error.type) &&
+  "message" in error &&
+  typeof error.message === "string";
+
 /** The mode an event belongs to: Stripe marks every event live or not. */
 export const modeOfEvent = (event: { livemode: boolean }) =>
   event.livemode ? PaymentMode.LIVE : PaymentMode.TEST;
 
 /**
- * The top-up fact a verified webhook event carries, or null when the event is
- * not about a top-up payment or a finished refund.
+ * The top-up facts a verified webhook event carries: none when the event is
+ * not about a top-up payment or a finished refund. A refund can arrive as
+ * refund.created, refund.updated and charge.refunded; each names the refund,
+ * and the ledger keys it by the refund's id, so it counts once whichever come.
+ * charge.refunded does not carry its refunds unless expanded, so they are
+ * listed from Stripe.
  */
-export const toTopUpEvent = (event: Stripe.Event): TopUpEvent | null => {
-  const source = { provider: BillingProvider.STRIPE, mode: modeOfEvent(event) };
+export const toTopUpEvents = async (
+  event: Stripe.Event,
+): Promise<TopUpEvent[]> => {
+  const mode = modeOfEvent(event);
+  const source = { provider: BillingProvider.STRIPE, mode };
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
       const paid = toPaid(event.data.object);
-      return paid && { ...source, ...paid };
+      return paid ? [{ ...source, ...paid }] : [];
     }
     case "refund.created":
-    case "refund.updated": {
+    case "refund.updated":
+    case "refund.failed": {
       const refunded = toRefunded(event.data.object);
-      return refunded && { ...source, ...refunded };
+      return refunded ? [{ ...source, ...refunded }] : [];
+    }
+    case "charge.refunded": {
+      const charge = event.data.object;
+      const refunds =
+        charge.refunds?.data ??
+        (await stripe(mode).refunds.list({ charge: charge.id, limit: 100 }))
+          .data;
+      return refunds.flatMap((refund) => {
+        const refunded = toRefunded(refund);
+        return refunded ? [{ ...source, ...refunded }] : [];
+      });
     }
     default:
-      return null;
+      return [];
   }
 };
 
@@ -177,11 +277,23 @@ const toPromo = (metadata: Stripe.Metadata | null) => {
   return { codeId, feeDiscountMicroSar, bonusMicroSar };
 };
 
+/**
+ * A refund that has ended: succeeded, or (for a self-serve refund, whose hold
+ * must be released) failed or cancelled. A refund still pending is not a fact yet.
+ */
 const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {
   const paymentId = idOf(refund.payment_intent);
+  const creditRefund = toCreditRefund(refund.metadata);
+  const status =
+    refund.status === "succeeded"
+      ? "succeeded"
+      : refund.status === "failed" || refund.status === "canceled"
+        ? "failed"
+        : null;
 
   if (
-    refund.status !== "succeeded" ||
+    !status ||
+    (status === "failed" && !creditRefund) ||
     !paymentId ||
     refund.currency !== CURRENCY
   ) {
@@ -193,7 +305,25 @@ const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {
     refundId: refund.id,
     paymentId,
     refundedMicroSar: refund.amount * MICRO_SAR_PER_HALALA,
+    status,
+    creditRefund,
   };
+};
+
+/** What a self-serve refund carried (refundTopUp), or null for one made elsewhere. */
+const toCreditRefund = (
+  metadata: Stripe.Metadata | null,
+): TopUpCreditRefund | null => {
+  if (metadata?.purpose !== CREDIT_REFUND_PURPOSE) {
+    return null;
+  }
+  const creditRefundId = metadata.creditRefundId;
+  const creditMicroSar = toWholeNumber(metadata.creditMicroSar);
+  if (!creditRefundId || creditMicroSar === null) {
+    logger.error("A credits refund carries incomplete metadata");
+    return null;
+  }
+  return { creditRefundId, creditMicroSar };
 };
 
 const toHalalas = (microSar: number) => {

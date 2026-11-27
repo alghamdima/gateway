@@ -82,8 +82,50 @@ export type TopUpEvent = TopUpEventSource &
         refundId: string;
         paymentId: string;
         refundedMicroSar: number;
+        /**
+         * succeeded: the money went back. failed: a refund this product asked
+         * for (creditRefund set) failed or was cancelled, so its hold is released.
+         */
+        status: "succeeded" | "failed";
+        /** Set when the refund is a self-serve refund (BILL-10), from its metadata; null for one made in the provider's dashboard. */
+        creditRefund: TopUpCreditRefund | null;
       }
   );
+
+/** Marks a refund as a self-serve credits refund (BILL-10). */
+export const CREDIT_REFUND_PURPOSE = "credits_refund";
+
+/**
+ * What a self-serve refund carries to the provider and back on its webhook
+ * (BILL-10, ADR 0019): our request's id and the credit it returns, which is
+ * what the ledger removes whichever of the two arrives first.
+ */
+export interface TopUpCreditRefund {
+  creditRefundId: string;
+  /** micro-SAR, whole halalas: the money refunded, never the fee. */
+  creditMicroSar: number;
+}
+
+export interface TopUpRefundInput {
+  /** The mode the payment was taken in: a refund goes back the way it came. */
+  mode: PaymentMode;
+  /** The provider's payment id, as the top-up entry records it. */
+  paymentId: string;
+  creditRefund: TopUpCreditRefund;
+  /** The same key sent again returns the same refund instead of a second one. */
+  idempotencyKey: string;
+}
+
+/**
+ * The provider's answer. refused: it said no for good (the payment cannot be
+ * refunded, the amount is wrong), so the request fails and its hold is
+ * released. A provider that could not be reached throws instead, and the
+ * request stays pending to be tried again with the same key.
+ */
+export type TopUpRefundResult =
+  | { outcome: "succeeded" | "pending"; refundId: string }
+  | { outcome: "failed"; refundId: string; reason: string }
+  | { outcome: "refused"; reason: string };
 
 /** Which provider and mode a verified event came from. */
 export interface TopUpEventSource {
@@ -142,6 +184,8 @@ export interface BillingProviderStrategy {
     checkout: (input: TopUpCheckoutInput) => Promise<{ url: string | null }>;
     /** Which secrets are set for each mode, computed from env on each call. */
     secrets: () => ProviderSecrets;
+    /** Returns part of a top-up's payment (BILL-10): the credit only, never the fee. */
+    refund: (input: TopUpRefundInput) => Promise<TopUpRefundResult>;
   };
 }
 

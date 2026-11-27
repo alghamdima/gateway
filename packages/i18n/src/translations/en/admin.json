@@ -241,6 +241,25 @@
         "value": "1 USD = {{rate}} SAR"
       }
     },
+    "creditTerms": {
+      "title": "Refunds and credit expiry",
+      "description": "How long after a top-up its unused credit can be refunded from the credits page, and when credit expires. Each purchase keeps the terms it was bought on: a change applies to purchases made after it.",
+      "hours": "hours",
+      "days": "days",
+      "refundWindow": {
+        "label": "Refund window",
+        "description": "0 switches self-serve refunds off at once, for every purchase. The fee is never refunded."
+      },
+      "expiry": {
+        "switch": "Credit expires",
+        "label": "Credit expires after",
+        "description": "Counted from each purchase. Promo credit expires on its code's own date when it has one. Turn the switch off for credit that never expires."
+      },
+      "error": {
+        "whole": "Enter a whole number.",
+        "range": "Enter a whole number from {{min}} to {{max}}."
+      }
+    },
     "changes": {
       "title": "Change history",
       "description": "Every change to these prices, newest first. It cannot be edited.",
@@ -261,8 +280,16 @@
         "topupPresetsMicroSar": "Quick picks",
         "usdToSarRateE6": "USD to SAR rate",
         "fxSpreadBps": "Bank spread",
-        "effectiveUsdToSarRateE6": "Rate new requests use"
-      }
+        "effectiveUsdToSarRateE6": "Rate new requests use",
+        "refundWindowHours": "Refund window",
+        "creditExpiryDays": "Credit expires after"
+      },
+      "creditTerms": "Refund window and credit expiry",
+      "never": "never",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days"
     }
   },
   "audit": {
@@ -565,6 +592,8 @@
       "onePerOrganization": "One use per organization",
       "startsAt": "Valid from",
       "endsAt": "Valid through",
+      "creditExpiresAt": "Credit lasts through",
+      "creditExpiresAtDescription": "Optional. Without a date, the credit expires like purchased credit.",
       "minTopup": "Minimum top-up (SAR)",
       "minTopupPlaceholder": "None",
       "organizations": "Organizations",
@@ -579,6 +608,7 @@
       "invalidAmount": "Enter an amount above 0, in riyals and halalas.",
       "invalidUses": "Enter a whole number above 0, or leave it empty.",
       "invalidDates": "The end must be after the start.",
+      "invalidCreditExpiry": "The credit must last at least until the code ends.",
       "invalidCode": "3 to 32 letters, digits, - or _.",
       "noOrganizations": "List at least one organization, or choose all organizations."
     },

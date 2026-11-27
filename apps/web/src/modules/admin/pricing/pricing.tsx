@@ -15,6 +15,7 @@ import { Skeleton } from "@workspace/ui-web/skeleton";
 import { admin } from "~/modules/admin/lib/api";
 import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import { ChangesList } from "~/modules/admin/pricing/changes-list";
+import { CreditTermsForm } from "~/modules/admin/pricing/credit-terms-form";
 import { SettingsForm } from "~/modules/admin/pricing/settings-form";
 
 export const Pricing = () => {
@@ -46,6 +47,26 @@ export const Pricing = () => {
             />
           ) : (
             <Skeleton className="h-32 w-full" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("admin:pricing.creditTerms.title")}</CardTitle>
+          <CardDescription>
+            {t("admin:pricing.creditTerms.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {pricing.data ? (
+            <CreditTermsForm
+              canEdit={canEdit}
+              refundWindowHours={pricing.data.creditTerms.refundWindowHours}
+              creditExpiryDays={pricing.data.creditTerms.creditExpiryDays}
+            />
+          ) : (
+            <Skeleton className="h-24 w-full" />
           )}
         </CardContent>
       </Card>

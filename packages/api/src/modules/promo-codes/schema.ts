@@ -64,6 +64,8 @@ export const savePromoCodeSchema = z
     onePerOrganization: z.boolean(),
     startsAt: z.coerce.date().nullable(),
     endsAt: z.coerce.date().nullable(),
+    /** When the credit it grants expires (BILL-17); null: the purchase rule. */
+    creditExpiresAt: z.coerce.date().nullable().default(null),
     minTopupMicroSar: halalas("The minimum top-up").nullable(),
     allOrganizations: z.boolean(),
     organizationIds: z
@@ -117,6 +119,24 @@ export const savePromoCodeSchema = z
       value.endsAt.getTime() <= value.startsAt.getTime()
     ) {
       issue("endsAt", "The end must be after the start");
+    }
+    if (value.creditExpiresAt) {
+      if (value.kind === "fee_discount") {
+        issue("creditExpiresAt", "A fee discount grants no credit to expire");
+      } else if (
+        value.endsAt &&
+        value.creditExpiresAt.getTime() < value.endsAt.getTime()
+      ) {
+        issue(
+          "creditExpiresAt",
+          "The credit must not expire before the code ends",
+        );
+      } else if (
+        value.startsAt &&
+        value.creditExpiresAt.getTime() <= value.startsAt.getTime()
+      ) {
+        issue("creditExpiresAt", "The credit must expire after the start");
+      }
     }
     if (!value.allOrganizations && value.organizationIds.length === 0) {
       issue("organizationIds", "Choose at least one organization");

@@ -14,6 +14,7 @@ export const {
 export { getBillingProvider, providers } from "./providers";
 export {
   BillingProvider,
+  CREDIT_REFUND_PURPOSE,
   PaymentMode,
   TOP_UP_PURPOSE,
 } from "./providers/types";
@@ -22,6 +23,9 @@ export type {
   ModeSecrets,
   ProviderSecrets,
   SecretState,
+  TopUpCreditRefund,
   TopUpEvent,
+  TopUpRefundInput,
+  TopUpRefundResult,
   WebhookCallbacks,
 } from "./providers/types";

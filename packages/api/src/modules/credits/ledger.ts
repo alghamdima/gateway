@@ -6,6 +6,8 @@ import {
 } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
+import { lotSourceOf, openLotIn } from "./lots";
+
 import type { CreditEntryKind, TopupFeeSource } from "@workspace/db/schema";
 
 /** All amounts are micro-SAR (1 SAR = 1,000,000; docs/platform/adr/0017-sar-ledger.md). */
@@ -26,6 +28,8 @@ export interface ApplyEntryInput {
   topupFeeSource?: TopupFeeSource;
   /** Promo entries, and top-ups paid with a code: the code (BILL-08). */
   promoCodeId?: string;
+  /** Refund and expiry entries: the credit lot they take from (ADR 0019). */
+  creditLotId?: string;
 }
 
 export interface ApplyEntryResult {
@@ -33,6 +37,8 @@ export interface ApplyEntryResult {
   isApplied: boolean;
   entryId: string;
   balance: number;
+  /** The credit lot this entry opened (a grant applied now), else null (ADR 0019). */
+  lotId: string | null;
 }
 
 export interface Balance {
@@ -97,8 +103,21 @@ export const applyEntryIn = async (
       isApplied: false,
       entryId: existing.id,
       balance: account?.balance ?? 0,
+      lotId: null,
     };
   }
+
+  // every grant is a lot with the terms in force now, in the same transaction (ADR 0019)
+  const source = lotSourceOf(input.kind, input.amount);
+  const lotId = source
+    ? await openLotIn(tx, {
+        entryId: inserted.id,
+        organizationId: input.organizationId,
+        source,
+        amount: input.amount,
+        promoCodeId: input.promoCodeId,
+      })
+    : null;
 
   const [account] = await tx
     .insert(creditAccount)
@@ -116,7 +135,12 @@ export const applyEntryIn = async (
     throw new Error("credit_account upsert returned no row");
   }
 
-  return { isApplied: true, entryId: inserted.id, balance: account.balance };
+  return {
+    isApplied: true,
+    entryId: inserted.id,
+    balance: account.balance,
+    lotId,
+  };
 };
 
 export const getBalance = async (organizationId: string): Promise<Balance> => {

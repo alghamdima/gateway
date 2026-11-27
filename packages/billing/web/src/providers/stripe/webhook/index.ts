@@ -5,7 +5,7 @@ import { HttpException } from "@workspace/shared/utils";
 import { checkoutStatusChangeHandler } from "../checkout";
 import { webhookSecretFor } from "../config";
 import { subscriptionStatusChangeHandler } from "../subscription";
-import { isTopUpSession, modeOfEvent, toTopUpEvent } from "../top-up";
+import { isTopUpSession, modeOfEvent, toTopUpEvents } from "../top-up";
 import { STRIPE_SIGNATURE_HEADER } from "./constants";
 import { constructEvent } from "./event";
 
@@ -56,8 +56,7 @@ export const webhookHandler = async (
   logger.info(`🔔  Webhook received: ${event.type}`);
   await callbacks?.onEvent?.(event);
 
-  const topUpEvent = toTopUpEvent(event);
-  if (topUpEvent) {
+  for (const topUpEvent of await toTopUpEvents(event)) {
     await callbacks?.onTopUpEvent?.(topUpEvent);
   }
 

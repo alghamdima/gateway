@@ -119,6 +119,13 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     needs: { pricing: ["update"] },
     audit: { action: "pricing.update", target: "pricing" },
   },
+  // the refund window and the credit expiry (ADMIN-23)
+  {
+    method: "PUT",
+    path: /^\/pricing\/credit-terms$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "pricing.credit-terms", target: "pricing" },
+  },
 
   // the model price table (ADMIN-09, ADR 0018): the same permission as the other prices
   {

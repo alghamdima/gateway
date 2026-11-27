@@ -20,6 +20,8 @@ export interface PromoCode {
   onePerOrganization: boolean;
   startsAt: string | null;
   endsAt: string | null;
+  /** When the credit it grants expires (BILL-17); null: as purchased credit. */
+  creditExpiresAt: string | null;
   minTopupMicroSar: number | null;
   allOrganizations: boolean;
   isPaused: boolean;

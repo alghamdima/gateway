@@ -32,8 +32,21 @@ export interface PricingSettings {
   updatedBy: string | null;
 }
 
+/**
+ * The self-serve refund window and the credit expiry (ADMIN-23). Each
+ * purchase stores what they gave it (credit_lot), so a change applies to
+ * purchases made after it; a window of 0 also switches refunds off at once.
+ */
+export interface CreditTerms {
+  /** 0: self-serve refunds are off. */
+  refundWindowHours: number;
+  /** Null: credit never expires. */
+  creditExpiryDays: number | null;
+}
+
 export interface Pricing {
   settings: PricingSettings;
+  creditTerms: CreditTerms;
 }
 
 const SETTINGS_ID = 1;
@@ -73,9 +86,75 @@ const withEffectiveRate = <
   ),
 });
 
-export const getPricing = async (): Promise<Pricing> => ({
-  settings: await getPricingSettings(),
-});
+export const getCreditTerms = async (): Promise<CreditTerms> => {
+  const [terms] = await db
+    .select({
+      refundWindowHours: pricingSettings.refundWindowHours,
+      creditExpiryDays: pricingSettings.creditExpiryDays,
+    })
+    .from(pricingSettings)
+    .where(eq(pricingSettings.id, SETTINGS_ID));
+  if (!terms) {
+    throw new Error("pricing_settings has no row: run the database migrations");
+  }
+  return terms;
+};
+
+export const getPricing = async (): Promise<Pricing> => {
+  const [settings, creditTerms] = await Promise.all([
+    getPricingSettings(),
+    getCreditTerms(),
+  ]);
+  return { settings, creditTerms };
+};
+
+/** A change of the credit terms, with the values before and after it for the audit log. */
+export interface CreditTermsChange {
+  creditTerms: CreditTerms;
+  before: CreditTerms;
+  after: CreditTerms;
+}
+
+/**
+ * Sets the refund window and the credit expiry (ADMIN-23), recorded in
+ * pricing_change (target "credit_terms") in the same transaction.
+ */
+export const updateCreditTerms = async ({
+  staffId,
+  ...values
+}: CreditTerms & { staffId: string }): Promise<CreditTermsChange> =>
+  db.transaction(async (tx) => {
+    const terms = {
+      refundWindowHours: pricingSettings.refundWindowHours,
+      creditExpiryDays: pricingSettings.creditExpiryDays,
+    };
+    // lock the row so two staff saving at once are recorded in order
+    const [before] = await tx
+      .select(terms)
+      .from(pricingSettings)
+      .where(eq(pricingSettings.id, SETTINGS_ID))
+      .for("update");
+    if (!before) {
+      throw new Error(
+        "pricing_settings has no row: run the database migrations",
+      );
+    }
+    const [after] = await tx
+      .update(pricingSettings)
+      .set({ ...values, updatedAt: new Date(), updatedBy: staffId })
+      .where(eq(pricingSettings.id, SETTINGS_ID))
+      .returning(terms);
+    if (!after) {
+      throw new Error("pricing_settings row disappeared during the update");
+    }
+    await tx.insert(pricingChange).values({
+      target: "credit_terms",
+      before,
+      after,
+      changedBy: staffId,
+    });
+    return { creditTerms: after, before, after };
+  });
 
 /**
  * The latest changes, newest first, with the name of the staff user who made

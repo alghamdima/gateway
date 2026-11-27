@@ -123,6 +123,10 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
       values (${id}, ${organizationId}, ${-Math.max(1, Math.round(providerCostUsd * rateE6))}, 'usage', ${id},
               ${sql.json({ provider_cost_usd: providerCostUsd })}, ${at},
               ${Math.round(providerCostUsd * 1_000_000)}, ${rateE6}, 0, ${rateE6})`;
+    // and moves the cached balance by it, as the gateway's settlement does (ADR 0019's check)
+    await sql`insert into credit_account (organization_id, balance)
+      values (${organizationId}, ${-Math.max(1, Math.round(providerCostUsd * rateE6))})
+      on conflict (organization_id) do update set balance = credit_account.balance + excluded.balance`;
   };
 
   /** A hold the reaper released after it expired, as when a settlement never arrives. */
@@ -202,6 +206,8 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
         cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
       values ('rec_wrong_usd', ${other}, -1688, 'usage', 'rec_wrong_usd', ${sql.json({ provider_cost_usd: 0.00045 })}, '2026-11-25T12:00:00Z',
               300, 3750000, 0, 3750000)`;
+    await sql`insert into credit_account (organization_id, balance) values (${other}, -1688)
+      on conflict (organization_id) do update set balance = credit_account.balance - 1688`;
     const mismatch = await reconciliation.reconcile(
       {
         from: new Date("2026-11-25T00:00:00Z"),
@@ -254,6 +260,7 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
         cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
       values ('late', ${org}, -1688, 'usage', ${`usage:${late}`}, ${sql.json({ provider_cost_usd: 0.00045 })}, '2026-11-20T12:06:00Z',
               450, 3750000, 0, 3750000)`;
+    await sql`update credit_account set balance = balance - 1688 where organization_id = ${org}`;
 
     const result = await reconciliation.reconcile(
       {
@@ -350,5 +357,26 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
     expect((await post(`Bearer ${CRON_SECRET}x`)).status).toBe(401);
     // GET too, for schedulers that only send GET; refused the same way
     expect((await internalRouter.request("/reconciliation")).status).toBe(401);
+  });
+
+  // last: it leaves books that do not balance behind
+  it("is a mismatch when an account's balance is not the sum of its ledger (ADR 0019)", async () => {
+    const org = await createOrganization();
+    await charged(org, 0.001, "2026-12-02T10:00:00Z");
+    await sql`update credit_account set balance = balance + 1 where organization_id = ${org}`;
+    const result = await reconciliation.reconcile(
+      {
+        from: new Date("2026-12-02T00:00:00Z"),
+        to: new Date("2026-12-03T00:00:00Z"),
+      },
+      gatewayReporting([
+        { customerId: `cust_${org}`, requests: 1, costUsd: 0.001 },
+      ]),
+    );
+    expect(result.findings.organizations).toEqual([]);
+    expect(result.findings.ledger.balances).toEqual([
+      { organizationId: org, balance: -3749, ledgerSum: -3750 },
+    ]);
+    expect(result.status).toBe("mismatch");
   });
 });

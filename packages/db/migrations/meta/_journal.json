@@ -267,6 +267,13 @@
       "when": 1795781727536,
       "tag": "0037_model_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795785422100,
+      "tag": "0038_refunds_and_credit_expiry",
+      "breakpoints": true
     }
   ]
 }

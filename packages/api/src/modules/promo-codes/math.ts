@@ -45,6 +45,8 @@ export interface PromoCodeTerms {
   onePerOrganization: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
+  /** When the credit it grants expires (BILL-17): a use after it would grant credit already expired. */
+  creditExpiresAt?: Date | null;
   minTopupMicroSar: number | null;
   allOrganizations: boolean;
   isPaused: boolean;
@@ -77,6 +79,9 @@ export const checkPromoCode = ({
     return "not_started";
   }
   if (code.endsAt && time >= code.endsAt.getTime()) {
+    return "expired";
+  }
+  if (code.creditExpiresAt && time >= code.creditExpiresAt.getTime()) {
     return "expired";
   }
   const isFreeCredit = code.kind === "free_credit";

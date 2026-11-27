@@ -8,6 +8,9 @@ import { db } from "@workspace/db/server";
 import { getGateway } from "@workspace/gateway-client/server";
 import { logger } from "@workspace/shared/logger";
 
+import { checkLedgerInvariants, hasLedgerFindings } from "./invariants";
+
+import type { LedgerInvariantFindings } from "./invariants";
 import type { GatewayClient } from "@workspace/gateway-client/server";
 
 /**
@@ -54,6 +57,8 @@ export interface ReconciliationFindings {
   unattributed: { customerId: string; costUsd: number }[];
   reapedHolds: ReapedHolds[];
   checkedOrganizations: number;
+  /** The ledger's own invariants: balance and held caches, grants and their lots (ADR 0019). */
+  ledger: LedgerInvariantFindings;
   error?: string;
 }
 
@@ -82,7 +87,8 @@ export const reconcile = async (
     status =
       findings.organizations.length > 0 ||
       findings.unattributed.length > 0 ||
-      findings.reapedHolds.length > 0
+      findings.reapedHolds.length > 0 ||
+      hasLedgerFindings(findings.ledger)
         ? "mismatch"
         : "ok";
   } catch (error) {
@@ -92,6 +98,7 @@ export const reconcile = async (
       unattributed: [],
       reapedHolds: [],
       checkedOrganizations: 0,
+      ledger: { balances: [], held: [], grantsWithoutLot: [], lots: [] },
       error: error instanceof Error ? error.message : String(error),
     };
     status = "error";
@@ -120,36 +127,40 @@ const compare = async (
     gte(creditLedgerEntry.createdAt, from),
     lt(creditLedgerEntry.createdAt, to),
   );
-  const [gatewayCosts, customers, ledgerCosts, reaped] = await Promise.all([
-    gateway.getCustomerCosts(from, to),
-    db
-      .select({
-        organizationId: gatewayCustomer.organizationId,
-        customerId: gatewayCustomer.customerId,
-      })
-      .from(gatewayCustomer),
-    db
-      .select({
-        organizationId: creditLedgerEntry.organizationId,
-        costMicroUsd: sql<string>`coalesce(sum(${creditLedgerEntry.costMicroUsd}), 0)`,
-        entries: sql<string>`count(*)`,
-      })
-      .from(creditLedgerEntry)
-      .where(and(eq(creditLedgerEntry.kind, "usage"), inWindow))
-      .groupBy(creditLedgerEntry.organizationId),
-    // a hold closed after its expiry was released by the reaper; with no usage
-    // entry for it, the attempt's charge never reached the ledger
-    db.execute<{ organization_id: string; holds: string; held: string }>(sql`
+  const [gatewayCosts, customers, ledgerCosts, reaped, ledger] =
+    await Promise.all([
+      gateway.getCustomerCosts(from, to),
+      db
+        .select({
+          organizationId: gatewayCustomer.organizationId,
+          customerId: gatewayCustomer.customerId,
+        })
+        .from(gatewayCustomer),
+      db
+        .select({
+          organizationId: creditLedgerEntry.organizationId,
+          costMicroUsd: sql<string>`coalesce(sum(${creditLedgerEntry.costMicroUsd}), 0)`,
+          entries: sql<string>`count(*)`,
+        })
+        .from(creditLedgerEntry)
+        .where(and(eq(creditLedgerEntry.kind, "usage"), inWindow))
+        .groupBy(creditLedgerEntry.organizationId),
+      // a hold closed after its expiry was released by the reaper; with no usage
+      // entry for it, the attempt's charge never reached the ledger
+      db.execute<{ organization_id: string; holds: string; held: string }>(sql`
       SELECT r.organization_id, count(*) AS holds, sum(r.amount) AS held
         FROM credit_reservation r
        WHERE r.settled_at >= ${from.toISOString()}::timestamp
          AND r.settled_at < ${to.toISOString()}::timestamp
          AND r.settled_at >= r.expires_at
+         -- a refund's hold (credit_reservation refund:<request>) charges nothing
+         AND r.id NOT LIKE 'refund:%'
          AND NOT EXISTS (
            SELECT 1 FROM credit_ledger_entry e WHERE e.idempotency_key = 'usage:' || r.id
          )
        GROUP BY r.organization_id`),
-  ]);
+      checkLedgerInvariants(),
+    ]);
 
   const organizationOf = new Map(
     customers.map((c) => [c.customerId, c.organizationId]),
@@ -211,6 +222,7 @@ const compare = async (
       heldMicroSar: Number(row.held),
     })),
     checkedOrganizations: organizationIds.size,
+    ledger,
   };
 };
 

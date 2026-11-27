@@ -8,6 +8,8 @@ import {
 } from "@workspace/auth";
 import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
+  MAX_CREDIT_EXPIRY_DAYS,
+  MAX_REFUND_WINDOW_HOURS,
   MAX_TOPUP_FEE_BPS,
   MAX_TOPUP_FEE_MIN_MICRO_SAR,
   MAX_TOPUP_FEE_NOTE_LENGTH,
@@ -355,7 +357,9 @@ export type AdjustOrganizationCreditsInput = z.infer<
 
 /** The admin form checks the same ceilings before sending. */
 export {
+  MAX_CREDIT_EXPIRY_DAYS,
   MAX_FX_SPREAD_BPS,
+  MAX_REFUND_WINDOW_HOURS,
   MAX_TOPUP_MICRO_SAR,
   MAX_TOPUP_PRESETS,
   MAX_USD_TO_SAR_RATE_E6,
@@ -435,6 +439,31 @@ export const updatePricingSettingsSchema = z
 export type UpdatePricingSettingsInput = z.infer<
   typeof updatePricingSettingsSchema
 >;
+
+/**
+ * The refund window and the credit expiry (ADMIN-23), with the database's
+ * bounds on pricing_settings: 0 hours switches self-serve refunds off, null
+ * days means credit never expires.
+ */
+export const updateCreditTermsSchema = z.object({
+  refundWindowHours: z
+    .number()
+    .int()
+    .min(0, { message: "The refund window cannot be negative" })
+    .max(MAX_REFUND_WINDOW_HOURS, {
+      message: `The refund window must be at most ${MAX_REFUND_WINDOW_HOURS} hours`,
+    }),
+  creditExpiryDays: z
+    .number()
+    .int()
+    .min(1, { message: "Credit must last at least one day, or never expire" })
+    .max(MAX_CREDIT_EXPIRY_DAYS, {
+      message: `Credit expiry must be at most ${MAX_CREDIT_EXPIRY_DAYS} days`,
+    })
+    .nullable(),
+});
+
+export type UpdateCreditTermsInput = z.infer<typeof updateCreditTermsSchema>;
 
 /**
  * One organization's top-up fee (ADMIN-24): a null field uses the default's

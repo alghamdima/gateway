@@ -48,6 +48,17 @@ export const MAX_USD_TO_SAR_RATE_E6 = 5_000_000;
  */
 export const MAX_FX_SPREAD_BPS = 1_000;
 
+/**
+ * The self-serve refund window and the credit expiry (ADMIN-23, BILL-10,
+ * BILL-17). 720 hours (30 days) and 3,650 days (10 years) are ceilings
+ * against a typo, not business rules. Each purchase stores the moments they
+ * give (credit_lot), so a change applies to purchases made after it.
+ */
+export const DEFAULT_REFUND_WINDOW_HOURS = 24;
+export const MAX_REFUND_WINDOW_HOURS = 720;
+export const DEFAULT_CREDIT_EXPIRY_DAYS = 365;
+export const MAX_CREDIT_EXPIRY_DAYS = 3_650;
+
 /** A single row (id = 1), created by the migration. */
 export const pricingSettings = pgTable(
   "pricing_settings",
@@ -87,6 +98,13 @@ export const pricingSettings = pgTable(
       .default(DEFAULT_USD_TO_SAR_RATE_E6),
     /** The bank's conversion commission in bps, added to the official rate (ADMIN-06). */
     fxSpreadBps: integer().notNull().default(0),
+    /**
+     * Hours after a purchase its unused credit may be refunded from the
+     * credits page (ADMIN-23); 0 switches self-serve refunds off.
+     */
+    refundWindowHours: integer().notNull().default(DEFAULT_REFUND_WINDOW_HOURS),
+    /** Days after a purchase its unused credit expires (ADMIN-23); null never expires. */
+    creditExpiryDays: integer().default(DEFAULT_CREDIT_EXPIRY_DAYS),
     updatedAt: timestamp().notNull().defaultNow(),
     updatedBy: text(),
   },
@@ -115,6 +133,14 @@ export const pricingSettings = pgTable(
     check(
       "pricing_settings_fx_spread_range",
       sql`${t.fxSpreadBps} between 0 and ${sql.raw(String(MAX_FX_SPREAD_BPS))}`,
+    ),
+    check(
+      "pricing_settings_refund_window_range",
+      sql`${t.refundWindowHours} between 0 and ${sql.raw(String(MAX_REFUND_WINDOW_HOURS))}`,
+    ),
+    check(
+      "pricing_settings_credit_expiry_range",
+      sql`${t.creditExpiryDays} is null or ${t.creditExpiryDays} between 1 and ${sql.raw(String(MAX_CREDIT_EXPIRY_DAYS))}`,
     ),
   ],
 );
@@ -179,7 +205,8 @@ export const organizationTopupFee = pgTable(
 export const pricingChange = pgTable("pricing_change", {
   id: bigserial({ mode: "number" }).primaryKey(),
   /**
-   * What changed: "settings", or "organization:<id>" for one organization's
+   * What changed: "settings", "credit_terms" (ADMIN-23: the refund window
+   * and the credit expiry), or "organization:<id>" for one organization's
    * top-up fee (ADMIN-24; the row outlives the organization). Rows from before the markup was removed may also
    * name "provider:<name>" (a per-provider markup); they stay as history.
    */

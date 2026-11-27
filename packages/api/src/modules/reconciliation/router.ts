@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
+import { runCreditExpiryJob } from "../credits/expiry";
 import { checkLowBalances } from "../credits/low-balance";
 import { applyPendingPolicies } from "../data-policy/policy";
 import {
@@ -63,6 +64,13 @@ const modelPrices = async (c: Context) => {
   });
 };
 
+const creditExpiry = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await runCreditExpiryJob());
+};
+
 const modelPriceSuggestions = async (c: Context) => {
   if (!isAuthorized(c.req.header("authorization"))) {
     return c.json({ error: "unauthorized" }, 401);
@@ -84,6 +92,8 @@ const modelPriceSuggestions = async (c: Context) => {
  *   that the gateway lacks, and mends drift (ADMIN-09, ADR 0018)
  * - /model-price-suggestions: daily, after the gateway's own 24 h price sync;
  *   proposes the datasheet's prices that differ from ours (ADR 0018)
+ * - /credit-expiry: hourly; expires what is left of credit lots past their
+ *   expiry date, idempotently (BILL-17, ADR 0019)
  */
 export const internalRouter = new Hono()
   .get("/reconciliation", reconcileYesterday)
@@ -95,4 +105,6 @@ export const internalRouter = new Hono()
   .get("/model-prices", modelPrices)
   .post("/model-prices", modelPrices)
   .get("/model-price-suggestions", modelPriceSuggestions)
-  .post("/model-price-suggestions", modelPriceSuggestions);
+  .post("/model-price-suggestions", modelPriceSuggestions)
+  .get("/credit-expiry", creditExpiry)
+  .post("/credit-expiry", creditExpiry);

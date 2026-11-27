@@ -1,10 +1,14 @@
 import { Hono } from "hono";
 
 import { validate } from "../../middleware";
-import { updatePricingSettingsSchema } from "../../schema";
+import {
+  updateCreditTermsSchema,
+  updatePricingSettingsSchema,
+} from "../../schema";
 import {
   getPricing,
   getPricingChanges,
+  updateCreditTerms,
   updatePricingSettings,
 } from "./pricing";
 
@@ -32,5 +36,18 @@ export const pricingRouter = new Hono<{
       // the audit log keeps the values before and after, as pricing_change does
       c.set("auditChange", { before, after });
       return c.json(settings);
+    },
+  )
+  // the refund window and the credit expiry (ADMIN-23)
+  .put(
+    "/credit-terms",
+    validate("json", updateCreditTermsSchema),
+    async (c) => {
+      const { creditTerms, before, after } = await updateCreditTerms({
+        ...c.req.valid("json"),
+        staffId: c.var.user.id,
+      });
+      c.set("auditChange", { before, after });
+      return c.json(creditTerms);
     },
   );

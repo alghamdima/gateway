@@ -43,6 +43,9 @@ const RATE_KEYS = [
   "usdToSarRateE6",
   "fxSpreadBps",
   "effectiveUsdToSarRateE6",
+  // the refund window and the credit expiry (ADMIN-23)
+  "refundWindowHours",
+  "creditExpiryDays",
 ] as const;
 
 const sar = (microSar: number) => formatMicroSar(microSar);
@@ -74,7 +77,7 @@ export const ChangesList = ({ changes }: ChangesListProps) => {
       return t("admin:pricing.changes.none");
     }
     const shown = RATE_KEYS.flatMap((key) => {
-      const value = showValue(key, values[key]);
+      const value = showTerm(key, values) ?? showValue(key, values[key]);
       return value === null
         ? []
         : [`${t(`admin:pricing.changes.fields.${key}`)}: ${value}`];
@@ -84,10 +87,32 @@ export const ChangesList = ({ changes }: ChangesListProps) => {
       : t("admin:pricing.changes.retired");
   };
 
+  /** The credit terms read in hours and days; no expiry reads "never". */
+  const showTerm = (
+    key: (typeof RATE_KEYS)[number],
+    values: Record<string, unknown>,
+  ) => {
+    if (!(key in values)) {
+      return null;
+    }
+    const value = values[key];
+    if (key === "refundWindowHours" && typeof value === "number") {
+      return t("admin:pricing.changes.hours", { count: value });
+    }
+    if (key === "creditExpiryDays") {
+      return typeof value === "number"
+        ? t("admin:pricing.changes.days", { count: value })
+        : t("admin:pricing.changes.never");
+    }
+    return null;
+  };
+
   const targetLabel = (target: string) =>
     target === "settings"
       ? t("admin:pricing.changes.settings")
-      : target.replace(/^provider:/, "");
+      : target === "credit_terms"
+        ? t("admin:pricing.changes.creditTerms")
+        : target.replace(/^provider:/, "");
 
   if (changes.length === 0) {
     return (
@@ -120,7 +145,9 @@ export const ChangesList = ({ changes }: ChangesListProps) => {
                 change.changedBy}
             </TableCell>
             <TableCell
-              className={cn(change.target !== "settings" && "font-mono")}
+              className={cn(
+                change.target.startsWith("provider:") && "font-mono",
+              )}
             >
               {targetLabel(change.target)}
             </TableCell>

@@ -101,7 +101,18 @@
     "subscriptionItemNotFound": "No subscription item was found for this subscription.",
     "subscriptionUpdate": "Unable to update the subscription in the billing provider.",
     "topUpAmount": "The amount is outside the top-up limits. Refresh the page and try again.",
-    "topUpsUnavailable": "Top-ups are temporarily unavailable. Please try again later."
+    "topUpsUnavailable": "Top-ups are temporarily unavailable. Please try again later.",
+    "refund": {
+      "notFound": "This purchase was not found.",
+      "notRefundable": "Only a top-up can be refunded.",
+      "refundsOff": "Self-serve refunds are switched off. Contact support.",
+      "windowClosed": "The refund window for this top-up has passed.",
+      "alreadyRefunded": "This top-up has already been refunded.",
+      "failed": "The payment provider could not refund this top-up. Contact support.",
+      "nothingLeft": "All of this top-up's credit has been spent: there is nothing left to refund.",
+      "creditInUse": "Requests in progress are holding part of this credit. Try again in a minute.",
+      "providerUnavailable": "The payment provider could not be reached. Try again in a minute: you will not be refunded twice."
+    }
   },
   "subscription": {
     "status": {

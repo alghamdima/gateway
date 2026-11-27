@@ -108,6 +108,7 @@ export const PromoCodeForm = ({
       onePerOrganization: z.boolean(),
       startsAt: z.string(),
       endsAt: z.string(),
+      creditExpiresAt: z.string(),
       minTopup: amount(false),
       allOrganizations: z.boolean(),
       organizationIds: z.string(),
@@ -144,6 +145,17 @@ export const PromoCodeForm = ({
         endOfDay(value.endsAt) <= startOfDay(value.startsAt)
       ) {
         issue("endsAt", t(key("invalidDates")));
+      }
+      // the credit lasts at least as long as the code (BILL-17), as the API checks
+      if (
+        value.kind !== "fee_discount" &&
+        value.creditExpiresAt &&
+        ((value.endsAt &&
+          endOfDay(value.creditExpiresAt) < endOfDay(value.endsAt)) ||
+          (value.startsAt &&
+            endOfDay(value.creditExpiresAt) <= startOfDay(value.startsAt)))
+      ) {
+        issue("creditExpiresAt", t(key("invalidCreditExpiry")));
       }
       if (
         !value.allOrganizations &&
@@ -206,7 +218,8 @@ export const PromoCodeForm = ({
       | "maxUses"
       | "minTopup"
       | "startsAt"
-      | "endsAt",
+      | "endsAt"
+      | "creditExpiresAt",
     label: string,
     options: { placeholder?: string; type?: string; description?: string } = {},
   ) => (
@@ -353,6 +366,11 @@ export const PromoCodeForm = ({
           })}
         {text("startsAt", t(key("startsAt")), { type: "date" })}
         {text("endsAt", t(key("endsAt")), { type: "date" })}
+        {kind !== "fee_discount" &&
+          text("creditExpiresAt", t(key("creditExpiresAt")), {
+            type: "date",
+            description: t(key("creditExpiresAtDescription")),
+          })}
       </div>
 
       <div className="flex flex-col gap-3">
@@ -487,6 +505,10 @@ const toFormValues = (
   endsAt: code?.endsAt
     ? toDateInput(new Date(new Date(code.endsAt).getTime() - 1))
     : "",
+  // stored, like the end, as the start of the day after the last day the credit lasts
+  creditExpiresAt: code?.creditExpiresAt
+    ? toDateInput(new Date(new Date(code.creditExpiresAt).getTime() - 1))
+    : "",
   minTopup: sar(code?.minTopupMicroSar ?? null),
   allOrganizations: code?.allOrganizations ?? true,
   organizationIds: code?.organizations.map((org) => org.id).join("\n") ?? "",
@@ -506,6 +528,7 @@ const toPayload = (values: {
   onePerOrganization: boolean;
   startsAt: string;
   endsAt: string;
+  creditExpiresAt: string;
   minTopup: string;
   allOrganizations: boolean;
   organizationIds: string;
@@ -534,6 +557,10 @@ const toPayload = (values: {
       ? startOfDay(values.startsAt).toISOString()
       : null,
     endsAt: values.endsAt ? endOfDay(values.endsAt).toISOString() : null,
+    creditExpiresAt:
+      !isDiscount && values.creditExpiresAt
+        ? endOfDay(values.creditExpiresAt).toISOString()
+        : null,
     minTopupMicroSar: isFree ? null : microSarOrNull(values.minTopup),
     allOrganizations: values.allOrganizations,
     organizationIds: values.allOrganizations

@@ -29,7 +29,7 @@ Option 1.
 
 - Top-up amounts: a fixed list of amounts first (for example $10, $25, $50, $100), each a one-time product in the provider. Custom amounts come later, because they need provider-specific "pay what you want" support.
 - The ledger entry is written only from the verified webhook, keyed by the provider's payment id as `idempotency_key`, so a redelivered webhook cannot credit twice. The checkout redirect never credits.
-- Refunds append a negative `refund` entry, keyed by the provider's refund id.
+- Refunds append a negative `refund` entry, keyed by the provider's refund id. Self-serve refunds, the credit a refund removes, and credit expiry: ADR 0019.
 - Auto top-up (charge a saved card when the balance drops below a threshold) is a later phase. It needs off-session payments, which differ per provider.
 - Any purchase fee (OpenRouter charges 5.5%, minimum $0.80) is added on the payment, not taken from credits, so the ledger only holds spendable money.
 

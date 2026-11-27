@@ -399,6 +399,14 @@ const mutations = {
         json: InferRequestType<typeof api.admin.pricing.settings.$put>["json"],
       ) => handle(api.admin.pricing.settings.$put)({ json }),
     }),
+    updateCreditTerms: mutationOptions({
+      mutationKey: [KEY, "pricing", "credit-terms", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin.pricing)["credit-terms"]["$put"]
+        >["json"],
+      ) => handle(api.admin.pricing["credit-terms"].$put)({ json }),
+    }),
   },
   payments: {
     updateSettings: mutationOptions({

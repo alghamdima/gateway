@@ -115,7 +115,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       effectiveUsdToSarRateE6: 3_750_000,
     });
     // there is no markup on requests (ADR 0010): nothing to set or show
-    expect(Object.keys(pricingNow)).toEqual(["settings"]);
+    expect(Object.keys(pricingNow)).toEqual(["settings", "creditTerms"]);
     expect(
       Object.keys(pricingNow.settings).filter((key) => /markup/i.test(key)),
     ).toEqual([]);
@@ -608,6 +608,87 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         staffId: "staff_audit",
       });
     });
+  });
+
+  describe("refund window and credit expiry (ADMIN-23)", () => {
+    const put = async (body: Record<string, unknown>) =>
+      (await adminApp()).request("/api/admin/pricing/credit-terms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    it("starts at a 24-hour refund window and credit that expires after 365 days", async () => {
+      expect((await pricing.getPricing()).creditTerms).toEqual({
+        refundWindowHours: 24,
+        creditExpiryDays: 365,
+      });
+    });
+
+    it("records the values before and after in pricing_change and the audit log", async () => {
+      audited.length = 0;
+      const response = await put({
+        refundWindowHours: 48,
+        creditExpiryDays: null,
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        refundWindowHours: 48,
+        creditExpiryDays: null,
+      });
+      const [last] = (await changes("credit_terms")).slice(-1);
+      expect(last).toMatchObject({
+        before: { refundWindowHours: 24, creditExpiryDays: 365 },
+        after: { refundWindowHours: 48, creditExpiryDays: null },
+        changed_by: "staff_markup",
+      });
+      expect(audited).toHaveLength(1);
+      expect(audited[0]).toMatchObject({
+        action: "pricing.credit-terms",
+        details: {
+          before: { refundWindowHours: 24, creditExpiryDays: 365 },
+          after: { refundWindowHours: 48, creditExpiryDays: null },
+        },
+      });
+      // 0 hours switches self-serve refunds off
+      expect(
+        (await put({ refundWindowHours: 0, creditExpiryDays: 365 })).status,
+      ).toBe(200);
+      await pricing.updateCreditTerms({
+        refundWindowHours: 24,
+        creditExpiryDays: 365,
+        staffId: "staff_markup",
+      });
+    });
+
+    it.each([
+      { refundWindowHours: 721, creditExpiryDays: 365 },
+      { refundWindowHours: -1, creditExpiryDays: 365 },
+      { refundWindowHours: 1.5, creditExpiryDays: 365 },
+      { refundWindowHours: 24, creditExpiryDays: 0 },
+      { refundWindowHours: 24, creditExpiryDays: 3651 },
+      { refundWindowHours: 24 },
+    ])("refuses %o and records nothing", async (body) => {
+      const count = (await changes("credit_terms")).length;
+      audited.length = 0;
+      expect((await put(body)).status).toBe(422);
+      expect(audited).toHaveLength(0);
+      expect(await changes("credit_terms")).toHaveLength(count);
+    });
+
+    it.each([
+      ["refund_window_hours", 721, "pricing_settings_refund_window_range"],
+      ["refund_window_hours", -1, "pricing_settings_refund_window_range"],
+      ["credit_expiry_days", 0, "pricing_settings_credit_expiry_range"],
+      ["credit_expiry_days", 3651, "pricing_settings_credit_expiry_range"],
+    ])(
+      "the database refuses %s = %d too",
+      async (column, value, constraint) => {
+        await expect(
+          sql`update pricing_settings set ${sql(column)} = ${value} where id = 1`,
+        ).rejects.toMatchObject({ constraint_name: constraint });
+      },
+    );
   });
 
   describe("no markup on requests (ADR 0010)", () => {

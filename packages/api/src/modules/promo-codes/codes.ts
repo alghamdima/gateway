@@ -98,6 +98,8 @@ export interface PromoCodeValues extends Record<string, unknown> {
   onePerOrganization: boolean;
   startsAt: string | null;
   endsAt: string | null;
+  /** When the credit it grants expires (BILL-17); null: the purchase rule. */
+  creditExpiresAt: string | null;
   minTopupMicroSar: number | null;
   allOrganizations: boolean;
   organizationIds: string[];
@@ -126,6 +128,7 @@ const toValues = (
   onePerOrganization: row.onePerOrganization,
   startsAt: row.startsAt?.toISOString() ?? null,
   endsAt: row.endsAt?.toISOString() ?? null,
+  creditExpiresAt: row.creditExpiresAt?.toISOString() ?? null,
   minTopupMicroSar: row.minTopupMicroSar,
   allOrganizations: row.allOrganizations,
   organizationIds: [...organizationIds].sort(),
@@ -146,6 +149,7 @@ const toColumns = (input: SavePromoCodeInput) => ({
   onePerOrganization: input.onePerOrganization,
   startsAt: input.startsAt,
   endsAt: input.endsAt,
+  creditExpiresAt: input.creditExpiresAt,
   minTopupMicroSar: input.minTopupMicroSar,
   allOrganizations: input.allOrganizations,
   note: input.note,

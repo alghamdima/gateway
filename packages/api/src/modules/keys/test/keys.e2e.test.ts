@@ -267,8 +267,13 @@ describe.skipIf(!adminUrl || !binary)(
     it("an organization over its rate limit gets 429, keeps no hold, and pays only for what ran", async () => {
       const rateLimit = await import("../../admin/organizations/rate-limit");
       await sql`insert into organization (id, name, slug, created_at) values ('org_rl', 'RL', 'rl', now())`;
-      await sql`insert into credit_account (organization_id, balance) values ('org_rl', ${SAR})`;
-      await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) values ('seed_rl', 'org_rl', ${SAR}, 'top_up', 'seed_rl')`;
+      // through the ledger, so the grant has its lot (ADR 0019) and reconciliation stays clean
+      await ledger.applyEntry({
+        organizationId: "org_rl",
+        amount: SAR,
+        kind: "top_up",
+        idempotencyKey: "seed_rl",
+      });
       const { key } = await keys.createKey({
         organizationId: "org_rl",
         userId: "user_e2e",

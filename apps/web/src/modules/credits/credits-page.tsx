@@ -28,6 +28,7 @@ import {
 
 import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
+import { CreditLots } from "~/modules/credits/credit-lots";
 import { LowBalanceAlert } from "~/modules/credits/low-balance-alert";
 import { TopUp } from "~/modules/credits/top-up";
 import { formatMicroSar } from "~/modules/keys/money";
@@ -145,6 +146,8 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
           )}
         </CardContent>
       </Card>
+
+      <CreditLots organizationId={organizationId} canRefund={canTopUp} />
 
       {canTopUp && <TopUp organizationId={organizationId} />}
 

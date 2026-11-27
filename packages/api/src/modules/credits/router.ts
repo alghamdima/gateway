@@ -8,7 +8,9 @@ import {
 } from "../../middleware";
 import { customerPromoCodeSchema } from "../promo-codes/schema";
 import { getBalance, getEntries } from "./ledger";
+import { getCreditLots } from "./lots";
 import { getLowBalanceSetting, setLowBalanceSetting } from "./low-balance";
+import { requestRefund } from "./refund";
 import {
   getTopUpOptions,
   MICRO_SAR_PER_HALALA,
@@ -61,6 +63,33 @@ export const creditsRouter = new Hono()
         await getEntries({
           organizationId: c.req.param("organizationId"),
           ...c.req.valid("query"),
+        }),
+      ),
+  )
+  // each credit lot's remainder, expiry and refund (BILL-10, BILL-17, ADR 0019)
+  .get(
+    "/:organizationId/lots",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["read"] },
+      })(c, next),
+    async (c) => c.json(await getCreditLots(c.req.param("organizationId"))),
+  )
+  // the self-serve refund: who may pay may refund (BILL-10)
+  .post(
+    "/:organizationId/lots/:lotId/refund",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["create"] },
+      })(c, next),
+    async (c) =>
+      c.json(
+        await requestRefund({
+          organizationId: c.req.param("organizationId"),
+          lotId: c.req.param("lotId"),
+          userId: c.var.user.id,
         }),
       ),
   )

@@ -626,10 +626,10 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       ]);
     });
 
-    it("removes the refunded share of the payment on a partial refund", async () => {
+    it("removes the money refunded as credit on a partial refund (ADR 0019)", async () => {
       const organizationId = await paidTopUp("pi_partial");
 
-      // $5.40 of $10.80 paid is half: half of the $10 credit
+      // SAR 5.40 of SAR 10.80 paid back removes SAR 5.40 of the SAR 10 credit
       await deliver(
         event(
           "refund.created",
@@ -640,7 +640,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           }),
         ),
       );
-      expect(await balance(organizationId)).toBe(5 * SAR);
+      expect(await balance(organizationId)).toBe(4_600_000);
     });
 
     it("ignores a refund of a payment that was not a top-up", async () => {
@@ -1013,17 +1013,44 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
     });
   });
 
-  describe("refundedCredit", () => {
+  describe("dashboardRefundCredit", () => {
     it.each([
-      { refunded: 10_800_000, expected: 10 * SAR, label: "full refund" },
-      { refunded: 5_400_000, expected: 5 * SAR, label: "half" },
-      { refunded: 1, expected: 0, label: "less than a credit micro-SAR" },
-      { refunded: 20 * SAR, expected: 10 * SAR, label: "more than collected" },
-    ])("$label", ({ refunded, expected }) => {
+      {
+        refunded: 10_800_000,
+        already: 0,
+        expected: 10 * SAR,
+        label: "full refund: the credit, not the fee",
+      },
+      {
+        refunded: 5_400_000,
+        already: 0,
+        expected: 5_400_000,
+        label: "part: the money refunded",
+      },
+      {
+        refunded: 800_000,
+        already: 10 * SAR,
+        expected: 0,
+        label: "the fee after the credit: nothing",
+      },
+      {
+        refunded: 3 * SAR,
+        already: 8 * SAR,
+        expected: 2 * SAR,
+        label: "up to what earlier refunds left",
+      },
+      {
+        refunded: 20 * SAR,
+        already: 0,
+        expected: 10 * SAR,
+        label: "more than collected",
+      },
+    ])("$label", async ({ refunded, already, expected }) => {
+      const { dashboardRefundCredit } = await import("../refund");
       expect(
-        topUp.refundedCredit({
-          creditMicroSar: 10 * SAR,
-          collectedMicroSar: 10_800_000,
+        dashboardRefundCredit({
+          grantedMicroSar: 10 * SAR,
+          alreadyRefundedMicroSar: already,
           refundedMicroSar: refunded,
         }),
       ).toBe(expected);

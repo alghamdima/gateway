@@ -345,7 +345,8 @@
       "usage": "Usage",
       "refund": "Refund",
       "adjustment": "Adjustment",
-      "promo": "Promotion"
+      "promo": "Promotion",
+      "expiry": "Expired"
     },
     "redeem": {
       "title": "Redeem a code",
@@ -354,6 +355,44 @@
       "placeholder": "Enter a code",
       "submit": "Redeem",
       "success": "{{credit}} of credit added with code {{code}}."
+    },
+    "lots": {
+      "title": "Your credit by purchase",
+      "description": "Each top-up, promotion or credit from us, what is left of it and when it expires. Requests spend the credit that expires first.",
+      "added": "Added",
+      "source": "From",
+      "remaining": "Left",
+      "expires": "Expires",
+      "never": "Never",
+      "sources": {
+        "top_up": "Top-up",
+        "promo": "Promotion",
+        "adjustment": "Credit from Lemru"
+      },
+      "expiring": {
+        "title": "{{amount}} of credit expires within {{days}} days",
+        "description": "The first of it expires on {{date}}. Credit that is left when it expires is removed from your balance."
+      },
+      "refund": {
+        "label": "Refund",
+        "until": "Refundable until {{date}}",
+        "policy": "A top-up's unused credit can be refunded within the refund window shown on its button. The payment processing fee and promotional credit are not refunded.",
+        "confirm": {
+          "title": "Refund this top-up?",
+          "description": "You get back {{amount}}: the unused part of the {{granted}} of credit this top-up bought. Credit already spent and the payment processing fee are not refunded. The money goes back to the card you paid with, usually within 5 to 10 days.",
+          "action": "Refund {{amount}}"
+        },
+        "done": {
+          "succeeded": "{{amount}} refunded. It is on its way back to your card.",
+          "pending": "Refund of {{amount}} requested. The credit stays held until the payment provider confirms it."
+        },
+        "states": {
+          "pending": "Refund in progress",
+          "succeeded": "Refunded",
+          "failed": "Refund failed: contact support",
+          "refunded": "Refunded by support"
+        }
+      }
     }
   },
   "dataPolicy": {

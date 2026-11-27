@@ -50,7 +50,16 @@ export const creditEntryKindEnum = pgEnum("credit_entry_kind", [
   "refund",
   "adjustment",
   "promo",
+  // what was left of a credit lot when it expired (BILL-17, ADR 0019)
+  "expiry",
 ]);
+
+/**
+ * The kinds that name the credit lot they take from (ADR 0019): a refund of
+ * a top-up, and the expiry of a lot. Compared as text in the checks, because
+ * migration 0038 adds "expiry" to the enum in the same transaction.
+ */
+export const LOT_DEBIT_KINDS = ["refund", "expiry"] as const;
 
 /**
  * Append-only: a trigger rejects UPDATE and DELETE for every role. There is
@@ -98,9 +107,27 @@ export const creditLedgerEntry = pgTable(
     promoCodeId: text().references(() => promoCode.id, {
       onDelete: "restrict",
     }),
+    /**
+     * Refund and expiry entries: the credit lot they take from (ADR 0019). A
+     * grant is tied to its lot the other way, by credit_lot.entry_id.
+     */
+    creditLotId: text().references((): AnyPgColumn => creditLot.id, {
+      onDelete: "restrict",
+    }),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [
+    index("credit_ledger_entry_creditLotId_idx")
+      .on(t.creditLotId)
+      .where(sql`${t.creditLotId} is not null`),
+    check(
+      "credit_ledger_entry_lot_kind",
+      sql`(${t.creditLotId} is null or ${t.kind}::text in (${sql.raw(LOT_DEBIT_KINDS.map((kind) => `'${kind}'`).join(", "))})) and (${t.kind}::text <> 'expiry' or (${t.creditLotId} is not null and ${t.amount} < 0))`,
+    ),
+    check(
+      "credit_ledger_entry_refund_is_debit",
+      sql`${t.kind}::text <> 'refund' or ${t.amount} < 0`,
+    ),
     index("credit_ledger_entry_organizationId_createdAt_idx").on(
       t.organizationId,
       t.createdAt,
@@ -161,6 +188,122 @@ export const creditAccount = pgTable(
   (t) => [check("credit_account_held_not_negative", sql`${t.held} >= 0`)],
 );
 
+/**
+ * Where a credit lot came from (ADR 0019): a top-up, a promo code's credit, or
+ * a positive staff adjustment.
+ */
+export const CREDIT_LOT_SOURCES = ["top_up", "promo", "adjustment"] as const;
+export type CreditLotSource = (typeof CREDIT_LOT_SOURCES)[number];
+
+/**
+ * One grant of credit and the terms it was granted on (BILL-17, BILL-10, ADR
+ * 0019): written in the same transaction as its ledger entry, with the expiry
+ * and refund window in force at that moment, so a later change of the
+ * settings does not touch it. What is left of a lot is not stored: it is
+ * worked out from the ledger (credits/lots.ts), so the gateway's settlement
+ * stays one statement that knows nothing of lots. Append-only, except that
+ * the expiry job sets expired_at once (trigger).
+ */
+export const creditLot = pgTable(
+  "credit_lot",
+  {
+    id: text().primaryKey().$defaultFn(generateId),
+    /** No foreign key, as for the ledger: the record outlives the organization. */
+    organizationId: text().notNull(),
+    /** The grant: a top_up, promo or positive adjustment entry. */
+    entryId: text()
+      .notNull()
+      .unique()
+      .references((): AnyPgColumn => creditLedgerEntry.id, {
+        onDelete: "restrict",
+      }),
+    source: text().$type<CreditLotSource>().notNull(),
+    grantedMicroSar: microSar().notNull(),
+    /** From this moment what is left may be expired; null never expires. */
+    expiresAt: timestamp(),
+    /** Top-ups only: the self-serve refund is offered until then; null offers none. */
+    refundableUntil: timestamp(),
+    /** Set once, by the expiry job, when it closed the lot (with an expiry entry if anything was left). */
+    expiredAt: timestamp(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index("credit_lot_organizationId_createdAt_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    // what the expiry job looks for every hour
+    index("credit_lot_due_expiresAt_idx")
+      .on(t.expiresAt)
+      .where(sql`${t.expiredAt} is null and ${t.expiresAt} is not null`),
+    check(
+      "credit_lot_source",
+      sql`${t.source} in (${sql.raw(CREDIT_LOT_SOURCES.map((source) => `'${source}'`).join(", "))})`,
+    ),
+    check("credit_lot_granted_positive", sql`${t.grantedMicroSar} > 0`),
+    check(
+      "credit_lot_refund_window",
+      sql`${t.refundableUntil} is null or (${t.source} = 'top_up' and ${t.refundableUntil} > ${t.createdAt})`,
+    ),
+    check(
+      "credit_lot_expiry",
+      sql`(${t.expiresAt} is null or ${t.expiresAt} > ${t.createdAt}) and (${t.expiredAt} is null or ${t.expiresAt} is not null)`,
+    ),
+  ],
+);
+
+export const CREDIT_REFUND_STATUSES = [
+  "pending",
+  "succeeded",
+  "failed",
+] as const;
+export type CreditRefundStatus = (typeof CREDIT_REFUND_STATUSES)[number];
+
+/**
+ * A self-serve refund of a top-up (BILL-10, ADR 0019): at most one per lot.
+ * The money is in the ledger (a refund entry naming the lot, keyed by the
+ * provider's refund id); this row is the request, so a double click or a
+ * retry finds it and the provider gets the same idempotency key. While
+ * pending, a hold (credit_reservation `refund:<id>`) keeps the credit from
+ * being spent.
+ */
+export const creditRefund = pgTable(
+  "credit_refund",
+  {
+    id: text().primaryKey().$defaultFn(generateId),
+    organizationId: text().notNull(),
+    creditLotId: text()
+      .notNull()
+      .unique()
+      .references(() => creditLot.id, { onDelete: "restrict" }),
+    /** The credit returned, in micro-SAR: whole halalas, never the fee. */
+    amountMicroSar: microSar().notNull(),
+    status: text().$type<CreditRefundStatus>().notNull().default("pending"),
+    provider: text().notNull(),
+    paymentId: text().notNull(),
+    providerRefundId: text().unique(),
+    /** Why the provider refused it, for staff. */
+    failure: text(),
+    requestedBy: text().notNull(),
+    createdAt: timestamp().notNull().defaultNow(),
+    updatedAt: timestamp()
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("credit_refund_organizationId_idx").on(t.organizationId),
+    check(
+      "credit_refund_amount_halalas",
+      sql`${t.amountMicroSar} > 0 and ${t.amountMicroSar} % 10000 = 0`,
+    ),
+    check(
+      "credit_refund_status",
+      sql`${t.status} in (${sql.raw(CREDIT_REFUND_STATUSES.map((status) => `'${status}'`).join(", "))}) and (${t.status} <> 'succeeded' or ${t.providerRefundId} is not null)`,
+    ),
+  ],
+);
+
 /** One row per in-flight request; released when settledAt is set. */
 export const creditReservation = pgTable(
   "credit_reservation",
@@ -209,6 +352,8 @@ export const insertCreditLedgerEntrySchema =
 export const selectCreditLedgerEntrySchema =
   createSelectSchema(creditLedgerEntry);
 export const selectCreditAccountSchema = createSelectSchema(creditAccount);
+export const selectCreditLotSchema = createSelectSchema(creditLot);
+export const selectCreditRefundSchema = createSelectSchema(creditRefund);
 
 export type InsertCreditLedgerEntry = z.infer<
   typeof insertCreditLedgerEntrySchema
@@ -217,6 +362,8 @@ export type SelectCreditLedgerEntry = z.infer<
   typeof selectCreditLedgerEntrySchema
 >;
 export type SelectCreditAccount = z.infer<typeof selectCreditAccountSchema>;
+export type SelectCreditLot = z.infer<typeof selectCreditLotSchema>;
+export type SelectCreditRefund = z.infer<typeof selectCreditRefundSchema>;
 export type CreditEntryKind = (typeof creditEntryKindEnum.enumValues)[number];
 
 /**

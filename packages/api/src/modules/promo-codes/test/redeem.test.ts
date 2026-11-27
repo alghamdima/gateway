@@ -102,6 +102,7 @@ const base = (overrides: Partial<SavePromoCodeInput>): SavePromoCodeInput => ({
   onePerOrganization: true,
   startsAt: null,
   endsAt: null,
+  creditExpiresAt: null,
   minTopupMicroSar: null,
   allOrganizations: true,
   organizationIds: [],
