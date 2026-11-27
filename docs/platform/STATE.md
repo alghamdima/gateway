@@ -4,6 +4,8 @@ Read this first. It says what the product is, where everything lives, what is do
 
 **What to build next is in `SPEC.md`**: every feature of the product, compared with OpenRouter, with its status, where it lives, when it is done and the build order; the owner's open decisions are its section 3. The long form of the history is in `PLAN.md` (steps and their status), `ARCHITECTURE.md` and `adr/` (one file per decision). When this file and the code disagree, the code is right: fix this file.
 
+**Staging runs on the owner's server** (`uat.lemru.tech`, not public yet): how it is set up, restarted and updated, and what its first browser check found (the API keys page returns 500), is in `DEPLOY.md`.
+
 ## The product
 
 Lemru: one API for many AI models, for the Saudi market. A customer signs up, creates an organization, adds prepaid credits, creates API keys and calls models in the OpenAI request format. What sets it apart is control over data: the customer chooses the regions their requests may be processed in, the longest a provider may keep them and whether training is allowed, and every request records where it was processed.
