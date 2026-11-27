@@ -9,7 +9,7 @@ Date: 2026-11-21
 
 Customers buy credits before use, as on OpenRouter (research brief 01). TurboStarter ships three relevant pieces:
 
-- One-time orders: the `order` table and `BillingModel.ONE_TIME` plans (`packages/billing/shared/src/config/index.ts`), with webhooks per provider (Stripe, Lemon Squeezy, Polar, Dodo Payments).
+- One-time orders: the `order` table and `BillingModel.ONE_TIME` plans (`packages/billing/shared/src/config/index.ts`), with a webhook per provider (Stripe; the template's other providers were removed on 2026-11-27).
 - Metered billing: `recordUsage` sends meter events (Stripe `billing.meterEvents.create`, `packages/billing/web/src/providers/stripe/usage.ts`) against a subscription. The provider bills at the end of the period.
 - Organizations as billing owners (`customer.referenceId` can be an organization id).
 

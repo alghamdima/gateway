@@ -111,7 +111,6 @@ Both databases run on one Postgres server at launch, as two databases.
 | Purchase fee (value set by staff, ADR 0010), top-up amounts      | ADR 0003         |
 | Markup on inference (value set by staff per provider, ADR 0010)  | ADR 0005         |
 | Charging for failed attempts that consumed tokens                | ADR 0002         |
-| Lemon Squeezy buy links                                          | Phase 5b         |
 
 ## ADR index
 

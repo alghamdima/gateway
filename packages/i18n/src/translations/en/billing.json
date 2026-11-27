@@ -80,7 +80,6 @@
     "checkoutRetrieve": "An error occurred while retrieving the checkout session.",
     "portal": "An error occurred while getting the portal URL.",
     "invalidProvider": "Invalid billing provider!",
-    "lemonSqueezy": "Lemon Squeezy API internal error!",
     "variantNotFound": "Variant not found!",
     "priceNotFound": "Price not found!",
     "customerNotFound": "Customer not found!",

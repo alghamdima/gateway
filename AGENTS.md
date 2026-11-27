@@ -89,7 +89,7 @@ packages/
   api/         @workspace/api       Hono modules: the product's features, admin, auth, billing, organization
   gateway-client/  @workspace/gateway-client   TypeScript client for the engine's management API
   auth/        @workspace/auth      Better Auth server + web client (src/client/web.ts), staff roles
-  billing/     @workspace/billing   Shared + web (Stripe; the template's other providers are still there)
+  billing/     @workspace/billing   Shared + web (Stripe; the Saudi gateway will be a provider module beside it)
   db/          @workspace/db        Drizzle schema, migrations, scripts
   email/       @workspace/email     React Email templates + providers
   i18n/        @workspace/i18n      Translations + server/client utils
