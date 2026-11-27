@@ -8,7 +8,6 @@ import {
 } from "@workspace/auth";
 import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
-  MAX_MARKUP_BPS,
   MAX_TOPUP_FEE_BPS,
   MAX_TOPUP_FEE_MIN_MICRO_SAR,
   MAX_TOPUP_MICRO_SAR,
@@ -353,8 +352,6 @@ export type AdjustOrganizationCreditsInput = z.infer<
   typeof adjustOrganizationCreditsSchema
 >;
 
-const markupBpsSchema = z.number().int().min(0).max(MAX_MARKUP_BPS);
-
 /** The admin form checks the same ceilings before sending. */
 export {
   MAX_FX_SPREAD_BPS,
@@ -374,11 +371,12 @@ const topupAmountMicroSarSchema = z
     message: "Must be a whole number of halalas",
   });
 
-/** The same rules as the database checks on pricing_settings (packages/db/src/schema/pricing.ts). */
+/**
+ * The same rules as the database checks on pricing_settings (packages/db/src/schema/pricing.ts).
+ * There is no markup on requests: the platform's revenue is the top-up fee (ADR 0010).
+ */
 export const updatePricingSettingsSchema = z
   .object({
-    /** Basis points added to provider cost when no provider rule matches: 100 = 1%. */
-    defaultMarkupBps: markupBpsSchema,
     /** Basis points added on a top-up payment. */
     topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
     /** The least fee a top-up pays, in micro-SAR (1 SAR = 1,000,000). */
@@ -433,20 +431,9 @@ export const updatePricingSettingsSchema = z
     });
   });
 
-/** The gateway's provider name, as in its config: openai, anthropic, ... */
-export const pricingProviderSchema = z
-  .string()
-  .trim()
-  .regex(/^[a-z0-9][a-z0-9_.-]{0,63}$/);
-
-export const setProviderMarkupSchema = z.object({
-  markupBps: markupBpsSchema,
-});
-
 export type UpdatePricingSettingsInput = z.infer<
   typeof updatePricingSettingsSchema
 >;
-export type SetProviderMarkupInput = z.infer<typeof setProviderMarkupSchema>;
 
 /** A payment provider the product implements (ADMIN-03). */
 export const paymentProviderSchema = z.enum(PAYMENT_PROVIDERS);

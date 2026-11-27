@@ -239,7 +239,7 @@ func TestReaper_RunsOnItsIntervalSurvivesErrorsAndStopsOnCleanup(t *testing.T) {
 func TestBackground_FiftyConcurrentRequestsAgainstTheRealLedger(t *testing.T) {
 	db := newTestDB(t)
 	store := NewStore(db.ledger)
-	plugin := withMarkups(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}), 0, nil)
+	plugin := atParityRate(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}))
 	plugin.reaper = store
 	plugin.start(8, 2, 10*time.Millisecond) // a small queue, so some settlements overflow to the caller
 	// each request holds a little over 2000 and costs 2000: 200000 covers all fifty at once
@@ -277,7 +277,7 @@ func TestBackground_FiftyConcurrentRequestsAgainstTheRealLedger(t *testing.T) {
 func TestBackground_TheReaperLoopReleasesAnAbandonedHold(t *testing.T) {
 	db := newTestDB(t)
 	store := NewStore(db.ledger)
-	plugin := withMarkups(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}), 0, nil)
+	plugin := atParityRate(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}))
 	plugin.reaper = store
 	org := db.organization(t, 5000)
 
@@ -300,7 +300,7 @@ func TestBackground_TheReaperLoopReleasesAnAbandonedHold(t *testing.T) {
 func TestConcurrent_FiftyRequestsOnABalanceForTenAdmitExactlyTen(t *testing.T) {
 	db := newTestDB(t)
 	store := NewStore(db.ledger)
-	plugin := withMarkups(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}), 0, nil)
+	plugin := atParityRate(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}))
 	plugin.start(8, 2, 0)
 
 	// what one request holds, measured rather than assumed

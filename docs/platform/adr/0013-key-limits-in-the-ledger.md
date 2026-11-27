@@ -4,6 +4,7 @@
 - Date: 2026-11-23
 - Amends: ADR 0004 (per-key caps as gateway budgets)
 - Builds on: ADR 0001 (ledger), ADR 0005 (markup in the ledger), ADR 0009 (credits plugin hooks)
+- Note (2026-11-27): the markup is removed (ADR 0010 amendment). The limit still counts what the ledger charges, now provider cost × the USD to SAR rate.
 
 ## Context
 

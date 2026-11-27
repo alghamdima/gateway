@@ -27,7 +27,7 @@ const COMPLETION_TOKENS = 500;
 // gpt-4o-mini in the local pricing file: 0.15 USD per million input, 0.60 per million output
 const EXPECTED_CHARGE = Math.round(
   PROMPT_TOKENS * 0.15 + COMPLETION_TOKENS * 0.6,
-); // micro-SAR at 0% markup: 450
+); // 450: the provider's cost in micro-USD, charged at the rate with no markup
 const USD = 1_000_000;
 
 const freePort = () =>
@@ -373,7 +373,7 @@ describe.skipIf(!adminUrl || !binary)(
       models.clearModelCache();
       const { data } = await models.listPublicModels();
       const mini = data.find((model) => model.id === "openai/gpt-4o-mini");
-      // the local pricing file, at the migrations' default 0% markup
+      // the local pricing file, as it is: no markup
       expect(mini?.pricing).toMatchObject({
         prompt: "0.00000015",
         completion: "0.0000006",

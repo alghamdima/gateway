@@ -20,7 +20,7 @@ func TestLatency_Report(t *testing.T) {
 	}
 	db := newTestDB(t)
 	store := NewStore(db.ledger)
-	plugin := withMarkups(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}), 0, nil)
+	plugin := atParityRate(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}))
 	plugin.reaper = store
 	plugin.start(defaultSettleQueueSize, defaultSettleWorkers, defaultReapInterval)
 	defer plugin.Cleanup()

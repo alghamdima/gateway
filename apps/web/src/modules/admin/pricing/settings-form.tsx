@@ -39,7 +39,6 @@ import {
 
 interface SettingsFormProps {
   readonly canEdit: boolean;
-  readonly defaultMarkupBps: number;
   readonly topupFeeBps: number;
   readonly topupFeeMinMicroSar: number;
   readonly topupMinMicroSar: number;
@@ -51,7 +50,6 @@ interface SettingsFormProps {
 
 export const SettingsForm = ({
   canEdit,
-  defaultMarkupBps,
   topupFeeBps,
   topupFeeMinMicroSar,
   topupMinMicroSar,
@@ -70,7 +68,6 @@ export const SettingsForm = ({
   // the same rules as the API and the database checks (ADMIN-05)
   const schema = z
     .object({
-      defaultMarkup: percentSchema(1000, t("admin:pricing.error.decimals")),
       topupFee: percentSchema(100, t("admin:pricing.error.decimals")),
       // riyals and halalas, at most SAR 400: the same two-decimal rule as a percentage
       topupFeeMin: percentSchema(400, t("admin:pricing.error.decimals")),
@@ -137,7 +134,6 @@ export const SettingsForm = ({
   const form = useForm({
     resolver: standardSchemaResolver(schema),
     values: {
-      defaultMarkup: bpsToPercent(defaultMarkupBps),
       topupFee: bpsToPercent(topupFeeBps),
       topupFeeMin: microSarToSar(topupFeeMinMicroSar),
       topupMin: microSarToSar(topupMinMicroSar),
@@ -167,7 +163,6 @@ export const SettingsForm = ({
 
   const onSubmit = async (data: z.infer<typeof schema>) => {
     await updateSettings.mutateAsync({
-      defaultMarkupBps: percentToBps(data.defaultMarkup),
       topupFeeBps: percentToBps(data.topupFee),
       topupFeeMinMicroSar: sarToMicroSar(data.topupFeeMin),
       topupMinMicroSar: sarToMicroSar(data.topupMin),
@@ -181,11 +176,6 @@ export const SettingsForm = ({
   };
 
   const fields = [
-    {
-      name: "defaultMarkup",
-      label: t("admin:pricing.settings.defaultMarkup.label"),
-      description: t("admin:pricing.settings.defaultMarkup.description"),
-    },
     {
       name: "topupFee",
       label: t("admin:pricing.settings.topupFee.label"),

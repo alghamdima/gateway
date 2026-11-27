@@ -32,8 +32,6 @@ const ROUTES = {
   readPricing: ["GET", "/pricing"],
   pricingChanges: ["GET", "/pricing/changes"],
   updatePricing: ["PUT", "/pricing/settings"],
-  setProviderMarkup: ["PUT", "/pricing/providers/openai"],
-  removeProviderMarkup: ["DELETE", "/pricing/providers/openai"],
   readPayments: ["GET", "/payments"],
   paymentChanges: ["GET", "/payments/changes"],
   updatePaymentSettings: ["PUT", "/payments/settings"],
@@ -81,8 +79,6 @@ const ALLOWED: Record<string, Route[]> = {
     ...READ_ONLY,
     "adjustCredits",
     "updatePricing",
-    "setProviderMarkup",
-    "removeProviderMarkup",
     "updatePaymentSettings",
     "updatePaymentProvider",
     "readAudit",
@@ -147,6 +143,19 @@ describe("admin route access", () => {
     }
   });
 
+  // there is no markup on requests (ADR 0010): the per-provider markup routes
+  // are gone, and a request to one is refused to every role, admin included
+  it.each([
+    ["PUT", "/pricing/providers/openai"],
+    ["DELETE", "/pricing/providers/openai"],
+    ["PUT", "/pricing/markup"],
+  ])("has no rule for %s %s and refuses it to every role", (method, path) => {
+    expect(findAccessRule(method, path)).toBeUndefined();
+    for (const role of [...Object.keys(ALLOWED), "admin,finance"]) {
+      expect(canAccessAdminRoute({ role }, method, path)).toBe(false);
+    }
+  });
+
   it.each(Object.values(ROUTES))("covers %s %s with a rule", (method, path) => {
     expect(findAccessRule(method, path)).toBeDefined();
   });
@@ -165,7 +174,6 @@ describe("admin audit", () => {
     ["/organizations/o1/members/m1", "o1"],
     ["/users/u1/accounts/a1", "u1"],
     ["/pricing/settings", "settings"],
-    ["/pricing/providers/openai", "openai"],
     ["/payments/settings", "settings"],
     ["/payments/providers/stripe", "stripe"],
     ["/providers/k1/terms", "k1"],

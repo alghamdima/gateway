@@ -255,10 +255,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
   });
 
   describe("GET /models", () => {
-    it("shows each servable model with our price for its provider, as decimal strings", async () => {
-      await sql`update pricing_settings set default_markup_bps = 100 where id = 1`;
-      await sql`insert into provider_markup (provider, markup_bps) values ('openai', 500)
-        on conflict (provider) do update set markup_bps = 500`;
+    it("shows each servable model at its provider's price, no markup, as decimal strings", async () => {
       models.clearModelCache();
 
       const { data } = await models.listPublicModels(
@@ -314,16 +311,17 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
           output_modalities: ["text"],
           tokenizer: null,
         },
+        // the provider's price as it is: 0.15 per million
         pricing: {
-          prompt: "0.0000001575", // 0.15 per million + 5%
-          completion: "0.00000063",
-          input_cache_read: "0.00000007875",
+          prompt: "0.00000015",
+          completion: "0.0000006",
+          input_cache_read: "0.000000075",
         },
-        // the same in SAR at the seeded rate, 3.75, exactly
+        // the same × the seeded rate, 3.75, exactly: what a request is charged per token
         pricing_sar: {
-          prompt: "0.000000590625",
-          completion: "0.0000023625",
-          input_cache_read: "0.0000002953125",
+          prompt: "0.0000005625",
+          completion: "0.00000225",
+          input_cache_read: "0.00000028125",
         },
         usd_to_sar_rate: "3.75",
         top_provider: {
@@ -331,10 +329,14 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
           max_completion_tokens: 16_384,
         },
       });
-      // anthropic has no provider rule: the 1% default
+      // every provider is shown at its own price: no markup for any of them
       expect(data[0]?.pricing).toEqual({
-        prompt: "0.00000303",
-        completion: "0.0000101",
+        prompt: "0.000003",
+        completion: "0.00001",
+      });
+      expect(data[0]?.pricing_sar).toEqual({
+        prompt: "0.00001125",
+        completion: "0.0000375",
       });
 
       // with the bank's 2.5% the SAR prices use the effective rate, 3.84375
@@ -351,9 +353,10 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
             },
           ]),
         );
+        // 0.15 per million × 3.84375
         expect(withSpread[0]).toMatchObject({
-          pricing: { prompt: "0.0000001575" },
-          pricing_sar: { prompt: "0.000000605390625" },
+          pricing: { prompt: "0.00000015" },
+          pricing_sar: { prompt: "0.0000005765625" },
           usd_to_sar_rate: "3.84375",
         });
       } finally {

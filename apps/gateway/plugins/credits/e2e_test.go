@@ -327,20 +327,19 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 	funded := db.organization(t, usd)
 	broke := db.organization(t, 10)
 	cutOff := db.organization(t, usd)
-	// as staff would set them: 1 percent by default, 5 percent for the provider under test
-	db.setPricing(t, 100, map[string]int64{"openai": 500})
 	gw := startGateway(t, binary, provider, ledgerURL(t, db), []string{funded, broke, cutOff})
 
 	// gpt-4o-mini in the local pricing file: 0.15 USD per million input tokens, 0.60 per million output
 	providerCost := e2ePromptTokens*0.15e-6 + e2eCompletionTokens*0.60e-6 // 0.00045 USD
-	// in SAR at the rate the migration seeds (3.75, the peg), plus 5 percent:
-	// 0.00045 x 3.75 x 1.05 = 0.001771875 SAR, rounded half up to 1,772 micro-SAR
-	charge, err := toMicroSAR(providerCost, pegRate, 500)
-	if err != nil || charge != 1772 {
-		t.Fatalf("expected charge: %d, %v", charge, err)
+	// in SAR at the rate the migration seeds (3.75, the peg), with no markup: 0.00045 x 3.75 =
+	// 1,687.5 micro-SAR on paper, but the float sum is a hair under 0.00045, so the exact
+	// conversion of the value actually held is 1,687.4999... and rounds to 1,687
+	const charge = int64(1687)
+	if got, err := toMicroSAR(providerCost, pegRate); err != nil || got != charge {
+		t.Fatalf("expected charge: %d, %v", got, err)
 	}
 
-	t.Run("a chat completion is charged once at cost plus the provider's markup, in SAR", func(t *testing.T) {
+	t.Run("a chat completion is charged once at the provider's cost times the rate, in SAR", func(t *testing.T) {
 		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false))
 		if status != 200 || !strings.Contains(body, "hello") {
 			t.Fatalf("status %d: %s", status, body)
@@ -351,10 +350,11 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		}
 		var cost float64
 		var model, reference string
-		var markup int64
-		err := db.admin.QueryRow(context.Background(), `SELECT (metadata->>'provider_cost_usd')::float8, metadata->>'model', reference, (metadata->>'markup_bps')::bigint FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&cost, &model, &reference, &markup)
-		if err != nil || cost < providerCost-1e-9 || cost > providerCost+1e-9 || !strings.Contains(model, "gpt-4o-mini") || reference == "" || markup != 500 {
-			t.Fatalf("entry: cost=%v model=%q reference=%q markup=%d err=%v", cost, model, reference, markup, err)
+		// there is no markup to record: the charge is the provider's cost at the rate
+		var hasMarkup bool
+		err := db.admin.QueryRow(context.Background(), `SELECT (metadata->>'provider_cost_usd')::float8, metadata->>'model', reference, metadata ? 'markup_bps' FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&cost, &model, &reference, &hasMarkup)
+		if err != nil || cost < providerCost-1e-9 || cost > providerCost+1e-9 || !strings.Contains(model, "gpt-4o-mini") || reference == "" || hasMarkup {
+			t.Fatalf("entry: cost=%v model=%q reference=%q markup recorded=%v err=%v", cost, model, reference, hasMarkup, err)
 		}
 		// the provider key that served it is on the entry: the gateway's own id for it
 		var providerKey string
@@ -489,28 +489,10 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		}
 	})
 
-	t.Run("a markup staff change applies without restarting the gateway", func(t *testing.T) {
-		if testing.Short() {
-			t.Skip("waits for the plugin's 30 second refresh")
-		}
-		db.setPricing(t, 100, map[string]int64{"openai": 2000})
-		time.Sleep(markupRefreshInterval + 2*time.Second)
-		before := db.consistent(t, funded)
-		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false))
-		if status != 200 {
-			t.Fatalf("status %d: %s", status, body)
-		}
-		raised, _ := toMicroSAR(providerCost, pegRate, 2000)
-		if s := settled(t, db, funded); s.Balance != before.Balance-raised {
-			t.Fatalf("charged %d, want %d at the new 20 percent markup", before.Balance-s.Balance, raised)
-		}
-	})
-
 	t.Run("a rate and spread staff change apply to the next request only, and past entries keep theirs", func(t *testing.T) {
 		if testing.Short() {
 			t.Skip("waits for the plugin's 30 second refresh")
 		}
-		markup := int64(2000) // the markup subtest before this one raised it
 		entries := func() map[string][2]int64 {
 			rows, err := db.admin.Query(context.Background(), `SELECT id, -amount, effective_usd_to_sar_rate_e6 FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded)
 			if err != nil {
@@ -535,18 +517,31 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		}
 		settled(t, db, funded)
 		past := entries()
-		atPeg, _ := toMicroSAR(providerCost, pegRate, markup)
+		atPeg, _ := toMicroSAR(providerCost, pegRate)
 
 		// staff set 4.00 and a 2 percent bank spread; the next request converts at 4.08
 		db.setRate(t, 4_000_000)
 		db.setSpread(t, 200)
 		const newRate = int64(4_080_000)
-		time.Sleep(markupRefreshInterval + 2*time.Second)
+		// a markup left over from the old schema, readable by the gateway, cannot reach the
+		// charge: the plugin no longer reads one
+		if _, err := db.admin.Exec(context.Background(), `
+ALTER TABLE pricing_settings ADD COLUMN default_markup_bps integer NOT NULL DEFAULT 2000;
+CREATE TABLE provider_markup (provider text PRIMARY KEY, markup_bps integer NOT NULL);
+INSERT INTO provider_markup VALUES ('openai', 2000);
+GRANT SELECT ON provider_markup TO gateway_ledger`); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(rateRefreshInterval + 2*time.Second)
 		before := db.consistent(t, funded)
 		if status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false)); status != 200 {
 			t.Fatalf("status %d: %s", status, body)
 		}
-		atNewRate, _ := toMicroSAR(providerCost, newRate, markup)
+		// 0.00045 x 4.08 = 0.001836 SAR exactly: the provider's cost at the new rate, no markup
+		const atNewRate = int64(1836)
+		if got, _ := toMicroSAR(providerCost, newRate); got != atNewRate {
+			t.Fatalf("expected charge at the new rate: %d", got)
+		}
 		var official, spread int64
 		if s := settled(t, db, funded); s.Balance != before.Balance-atNewRate || atNewRate <= atPeg {
 			t.Fatalf("charged %d, want %d at the new rate (it was %d at the peg)", before.Balance-s.Balance, atNewRate, atPeg)

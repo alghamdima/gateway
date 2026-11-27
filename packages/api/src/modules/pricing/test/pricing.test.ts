@@ -40,6 +40,39 @@ const LIMITS = {
   fxSpreadBps: 0,
 };
 
+/** The pricing router behind the real staff access check, as an admin. */
+const adminApp = async () => {
+  const { Hono } = await import("hono");
+  const { HttpException } = await import("@workspace/shared/utils");
+  const { enforceStaffAccess } = await import("../../admin/access-middleware");
+  const { pricingRouter } = await import("../router");
+  const staff: User = {
+    id: "staff_markup",
+    name: "Staff",
+    email: "markup@example.com",
+    emailVerified: true,
+    banned: false,
+    isAnonymous: false,
+    twoFactorEnabled: false,
+    role: "admin",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  return new Hono<{ Variables: { user: User } }>()
+    .use(async (c, next) => {
+      c.set("user", staff);
+      await next();
+    })
+    .use("/api/admin/*", enforceStaffAccess)
+    .route("/api/admin/pricing", pricingRouter)
+    .onError((error) =>
+      Response.json(
+        { message: error.message },
+        { status: error instanceof HttpException ? error.status : 500 },
+      ),
+    );
+};
+
 describe.skipIf(!adminUrl)("admin pricing", () => {
   let database: TestDatabase;
   let sql: postgres.Sql;
@@ -73,29 +106,38 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     await database.drop();
   });
 
-  it("starts at no markup, a 5.5% top-up fee (SAR 3 minimum), top-ups of SAR 20 to SAR 3,750 and the peg", async () => {
-    const { settings, providers } = await pricing.getPricing();
-    expect(settings).toMatchObject({
-      defaultMarkupBps: 0,
+  it("starts at a 5.5% top-up fee (SAR 3 minimum), top-ups of SAR 20 to SAR 3,750 and the peg", async () => {
+    const pricingNow = await pricing.getPricing();
+    expect(pricingNow.settings).toMatchObject({
       topupFeeBps: 550,
       topupFeeMinMicroSar: 3_000_000,
       ...LIMITS,
       effectiveUsdToSarRateE6: 3_750_000,
     });
-    expect(providers).toEqual([]);
+    // there is no markup on requests (ADR 0010): nothing to set or show
+    expect(Object.keys(pricingNow)).toEqual(["settings"]);
+    expect(
+      Object.keys(pricingNow.settings).filter((key) => /markup/i.test(key)),
+    ).toEqual([]);
+  });
+
+  it("has no markup in the database for anything to read", async () => {
+    const [row] = await sql<{ table: string | null; columns: number }[]>`
+      select to_regclass('public.provider_markup')::text as table,
+        (select count(*)::int from information_schema.columns
+          where table_name = 'pricing_settings' and column_name like '%markup%') as columns`;
+    expect(row).toEqual({ table: null, columns: 0 });
   });
 
   it("records who changed the settings, and from what to what", async () => {
     const before = await pricing.getPricingSettings();
     const { settings: after } = await pricing.updatePricingSettings({
-      defaultMarkupBps: 300,
       topupFeeBps: 500,
       topupFeeMinMicroSar: 1_000_000,
       ...LIMITS,
       staffId: "staff_1",
     });
     expect(after).toMatchObject({
-      defaultMarkupBps: 300,
       topupFeeBps: 500,
       updatedBy: "staff_1",
     });
@@ -103,7 +145,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     const [last] = (await changes("settings")).slice(-1);
     expect(last).toMatchObject({
       before: {
-        defaultMarkupBps: before.defaultMarkupBps,
         topupFeeBps: before.topupFeeBps,
         topupFeeMinMicroSar: before.topupFeeMinMicroSar,
         topupMinMicroSar: before.topupMinMicroSar,
@@ -111,7 +152,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         topupPresetsMicroSar: before.topupPresetsMicroSar,
       },
       after: {
-        defaultMarkupBps: 300,
         topupFeeBps: 500,
         topupFeeMinMicroSar: 1_000_000,
         ...LIMITS,
@@ -126,18 +166,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
 
     await expect(
       pricing.updatePricingSettings({
-        defaultMarkupBps: -1,
-        topupFeeBps: 0,
-        topupFeeMinMicroSar: 3_000_000,
-        ...LIMITS,
-        staffId: "staff_1",
-      }),
-    ).rejects.toMatchObject({
-      cause: { constraint_name: "pricing_settings_default_markup_range" },
-    });
-    await expect(
-      pricing.updatePricingSettings({
-        defaultMarkupBps: 0,
         topupFeeBps: 10_001,
         topupFeeMinMicroSar: 3_000_000,
         ...LIMITS,
@@ -148,7 +176,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     });
     await expect(
       pricing.updatePricingSettings({
-        defaultMarkupBps: 0,
         topupFeeBps: 0,
         topupFeeMinMicroSar: 400_000_001,
         ...LIMITS,
@@ -157,74 +184,15 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     ).rejects.toMatchObject({
       cause: { constraint_name: "pricing_settings_topup_fee_min_range" },
     });
-    await expect(
-      pricing.setProviderMarkup({
-        provider: "openai",
-        markupBps: 100_001,
-        staffId: "staff_1",
-      }),
-    ).rejects.toMatchObject({
-      cause: { constraint_name: "provider_markup_range" },
-    });
 
     expect(await pricing.getPricingSettings()).toEqual(current);
     expect(await changes()).toHaveLength(count);
-  });
-
-  it("sets, changes and removes a provider's markup, recording each step", async () => {
-    await pricing.setProviderMarkup({
-      provider: "anthropic",
-      markupBps: 1000,
-      staffId: "staff_1",
-    });
-    await pricing.setProviderMarkup({
-      provider: "anthropic",
-      markupBps: 750,
-      staffId: "staff_2",
-    });
-
-    const { providers } = await pricing.getPricing();
-    expect(providers).toHaveLength(1);
-    expect(providers[0]).toMatchObject({
-      provider: "anthropic",
-      markupBps: 750,
-      updatedBy: "staff_2",
-    });
-
-    expect(
-      await pricing.removeProviderMarkup({
-        provider: "anthropic",
-        staffId: "staff_3",
-      }),
-    ).toBe(true);
-    expect(
-      await pricing.removeProviderMarkup({
-        provider: "anthropic",
-        staffId: "staff_3",
-      }),
-    ).toBe(false);
-    expect((await pricing.getPricing()).providers).toEqual([]);
-
-    expect(
-      (await changes("provider:anthropic")).map(
-        ({ before, after, changed_by }) => ({ before, after, changed_by }),
-      ),
-    ).toEqual([
-      { before: null, after: { markupBps: 1000 }, changed_by: "staff_1" },
-      {
-        before: { markupBps: 1000 },
-        after: { markupBps: 750 },
-        changed_by: "staff_2",
-      },
-      { before: { markupBps: 750 }, after: null, changed_by: "staff_3" },
-    ]);
   });
 
   it("keeps the history in order when staff save at the same time", async () => {
     await Promise.all(
       Array.from({ length: 12 }, (_, i) =>
         pricing.updatePricingSettings({
-          defaultMarkupBps: 1000 + i,
           topupFeeBps: 100 + i,
           topupFeeMinMicroSar: 3_000_000,
           ...LIMITS,
@@ -240,7 +208,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     }
     const { settings } = await pricing.getPricing();
     expect(history.at(-1)?.after).toEqual({
-      defaultMarkupBps: settings.defaultMarkupBps,
       topupFeeBps: settings.topupFeeBps,
       topupFeeMinMicroSar: settings.topupFeeMinMicroSar,
       topupMinMicroSar: settings.topupMinMicroSar,
@@ -256,8 +223,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     await sql`insert into "user" (id, name, email, email_verified, created_at, updated_at)
       values ('staff_named', 'Sara Admin', 'sara@example.com', true, now(), now())`;
     await pricing.updatePricingSettings({
-      defaultMarkupBps: 42,
-      topupFeeBps: 550,
+      topupFeeBps: 542,
       topupFeeMinMicroSar: 3_000_000,
       ...LIMITS,
       staffId: "staff_named",
@@ -265,7 +231,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     const [latest, previous] = await pricing.getPricingChanges(2);
     expect(latest).toMatchObject({
       target: "settings",
-      after: { defaultMarkupBps: 42, topupFeeBps: 550 },
+      after: { topupFeeBps: 542 },
       changedBy: "staff_named",
       changedByName: "Sara Admin",
     });
@@ -281,16 +247,16 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     );
   });
 
-  it("lets the gateway read the prices and nothing more", async () => {
+  it("lets the gateway read the rate and nothing more", async () => {
     await sql.begin(async (tx) => {
       await tx`set local role gateway_ledger`;
-      const rows = await tx`select default_markup_bps from pricing_settings`;
+      // what the credits plugin reads (apps/gateway/plugins/credits/rates.go)
+      const rows =
+        await tx`select usd_to_sar_rate_e6, fx_spread_bps from pricing_settings where id = 1`;
       expect(rows).toHaveLength(1);
-      await tx`select provider, markup_bps from provider_markup`;
     });
     for (const statement of [
-      "update pricing_settings set default_markup_bps = 0",
-      "insert into provider_markup (provider, markup_bps) values ('x', 0)",
+      "update pricing_settings set fx_spread_bps = 0",
       "select * from pricing_change",
     ]) {
       await expect(
@@ -304,7 +270,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
 
   describe("top-up limits (ADMIN-05)", () => {
     const fees = {
-      defaultMarkupBps: 0,
       topupFeeBps: 550,
       topupFeeMinMicroSar: 3_000_000,
       usdToSarRateE6: 3_750_000,
@@ -466,7 +431,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
 
   describe("USD to SAR rate and bank spread (ADMIN-06)", () => {
     const others = {
-      defaultMarkupBps: 0,
       topupFeeBps: 550,
       topupFeeMinMicroSar: 3_000_000,
       topupMinMicroSar: 20 * SAR,
@@ -646,35 +610,64 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     });
   });
 
+  describe("no markup on requests (ADR 0010)", () => {
+    it.each([
+      ["PUT", "/api/admin/pricing/providers/openai"],
+      ["DELETE", "/api/admin/pricing/providers/openai"],
+    ])(
+      "refuses %s %s, even to an admin, and records nothing",
+      async (method, path) => {
+        const app = await adminApp();
+        const count = (await changes()).length;
+        audited.length = 0;
+        const response = await app.request(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markupBps: 2000 }),
+        });
+        expect([403, 404]).toContain(response.status);
+        expect(audited).toHaveLength(0);
+        expect(await changes()).toHaveLength(count);
+      },
+    );
+
+    it("ignores a markup an old form still sends with the settings", async () => {
+      const app = await adminApp();
+      const response = await app.request("/api/admin/pricing/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topupFeeBps: 550,
+          topupFeeMinMicroSar: 3_000_000,
+          ...LIMITS,
+          defaultMarkupBps: 2000,
+        }),
+      });
+      expect(response.status).toBe(200);
+      const saved = (await response.json()) as Record<string, unknown>;
+      expect(saved).not.toHaveProperty("defaultMarkupBps");
+      const [last] = (await changes("settings")).slice(-1);
+      expect(last?.after).not.toHaveProperty("defaultMarkupBps");
+      expect(last?.changed_by).toBe("staff_markup");
+    });
+
+    it("lists a change recorded while markups existed, as it was", async () => {
+      await sql`insert into pricing_change (target, before, after, changed_by)
+        values ('provider:openai', null, ${sql.json({ markupBps: 500 })}, 'staff_old')`;
+      const [latest] = await pricing.getPricingChanges(1);
+      expect(latest).toMatchObject({
+        target: "provider:openai",
+        before: null,
+        after: { markupBps: 500 },
+        changedBy: "staff_old",
+      });
+    });
+  });
+
   describe("input the admin API accepts", () => {
-    it.each([
-      ["a provider name in the gateway's format", "openai", true],
-      ["a provider with a dot or dash", "azure-openai.eu", true],
-      ["upper case", "OpenAI", false],
-      ["a path", "../openai", false],
-      ["empty", "", false],
-    ])("provider: %s", async (_, provider, isValid) => {
-      const { pricingProviderSchema } = await import("../../../schema");
-      expect(pricingProviderSchema.safeParse(provider).success).toBe(isValid);
-    });
-
-    it.each([
-      [0, true],
-      [100_000, true],
-      [-5, false],
-      [1.5, false],
-      [100_001, false],
-    ])("markup %s bps", async (markupBps, isValid) => {
-      const { setProviderMarkupSchema } = await import("../../../schema");
-      expect(setProviderMarkupSchema.safeParse({ markupBps }).success).toBe(
-        isValid,
-      );
-    });
-
     it.each([
       [
         {
-          defaultMarkupBps: 0,
           topupFeeBps: 10_000,
           topupFeeMinMicroSar: 0,
           ...LIMITS,
@@ -683,7 +676,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       ],
       [
         {
-          defaultMarkupBps: 0,
           topupFeeBps: 10_001,
           topupFeeMinMicroSar: 0,
           ...LIMITS,
@@ -692,7 +684,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       ],
       [
         {
-          defaultMarkupBps: 0,
           topupFeeBps: 550,
           topupFeeMinMicroSar: -1,
           ...LIMITS,
@@ -701,18 +692,14 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       ],
       [
         {
-          defaultMarkupBps: 0,
           topupFeeBps: 550,
           topupFeeMinMicroSar: 0.5,
           ...LIMITS,
         },
         false,
       ],
-      [{ defaultMarkupBps: 0, topupFeeBps: 550 }, false],
-      [
-        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroSar: 0 },
-        false,
-      ],
+      [{ topupFeeBps: 550 }, false],
+      [{ topupFeeBps: 550, topupFeeMinMicroSar: 0 }, false],
     ])("settings %j", async (input, isValid) => {
       const { updatePricingSettingsSchema } = await import("../../../schema");
       expect(updatePricingSettingsSchema.safeParse(input).success).toBe(
@@ -778,7 +765,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       const { updatePricingSettingsSchema } = await import("../../../schema");
       expect(
         updatePricingSettingsSchema.safeParse({
-          defaultMarkupBps: 0,
           topupFeeBps: 550,
           topupFeeMinMicroSar: 3_000_000,
           ...LIMITS,
@@ -792,7 +778,6 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       const issues = (change: Record<string, unknown>) =>
         updatePricingSettingsSchema
           .safeParse({
-            defaultMarkupBps: 0,
             topupFeeBps: 550,
             topupFeeMinMicroSar: 3_000_000,
             ...LIMITS,

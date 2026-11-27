@@ -137,21 +137,21 @@ func testPricer() *fakePricer {
 	return &fakePricer{inputRate: 1e-6, outputRate: 2e-6, maxOutput: 1000}
 }
 
-// testPlugin charges at cost: its markups are loaded and all zero.
+// testPlugin has its rate loaded, at parity.
 func testPlugin(l ledger, p pricer) *Plugin {
 	plugin := newPlugin(l, p, bifrost.NewNoOpLogger(), &Config{})
 	plugin.settleBackoff = time.Millisecond
-	return withMarkups(plugin, 0, nil)
+	return atParityRate(plugin)
 }
 
-// atParity is a USD to SAR rate of exactly 1. The tests of holds, markups and bounds use it,
+// atParity is a USD to SAR rate of exactly 1. The tests of holds and bounds use it,
 // so their amounts read as micro-USD; the tests of the conversion set the peg (pegRate).
 const (
 	atParity = int64(1_000_000)
 	pegRate  = int64(3_750_000)
 )
 
-// fxAt is the rate with a spread, as LoadMarkups would publish it.
+// fxAt is the rate with a spread, as LoadRate would publish it.
 func fxAt(rateE6, spreadBps int64) fxRate {
 	fx, err := newFXRate(rateE6, spreadBps)
 	if err != nil {
@@ -163,18 +163,16 @@ func fxAt(rateE6, spreadBps int64) fxRate {
 // testFX is what the store tests record on holds and charges: the peg with a 2.5% spread.
 var testFX = fxAt(pegRate, 250)
 
-// withMarkups publishes a markups snapshot at parity, as a successful load from the
-// database would.
-func withMarkups(p *Plugin, defaultBps int64, byProvider map[string]int64) *Plugin {
-	p.markups.Store(&markups{defaultBps: defaultBps, byProvider: byProvider, fx: fxAt(atParity, 0)})
-	return p
+// atParityRate publishes a rate of exactly 1, as a successful load from the database would.
+func atParityRate(p *Plugin) *Plugin {
+	return withRate(p, atParity, 0)
 }
 
-// withRate publishes the current snapshot again with another USD to SAR rate and spread, as
-// staff changing them in the admin would.
+// withRate publishes another USD to SAR rate and spread, as staff changing them in the admin
+// would.
 func withRate(p *Plugin, rateE6, spreadBps int64) *Plugin {
-	current := p.markups.Load()
-	p.markups.Store(&markups{defaultBps: current.defaultBps, byProvider: current.byProvider, fx: fxAt(rateE6, spreadBps)})
+	fx := fxAt(rateE6, spreadBps)
+	p.rate.Store(&fx)
 	return p
 }
 
@@ -259,19 +257,6 @@ func TestPreLLMHook_TheRequestsOwnLimitLowersTheHold(t *testing.T) {
 	}
 	if ledger.reserved[1] < 2000 || ledger.reserved[1] > 2100 {
 		t.Errorf("with max_tokens above the model's maximum: held %d, want a little over 2000", ledger.reserved[1])
-	}
-}
-
-func TestPreLLMHook_MarkupIsHeldToo(t *testing.T) {
-	ledger := &fakeLedger{balance: 10 * usd}
-	plain := testPlugin(ledger, testPricer())
-	marked := withMarkups(testPlugin(ledger, testPricer()), 1000, nil)
-	plain.PreLLMHook(testContext(testOrg), chatRequest(schemas.ChatCompletionRequest, nil))
-	marked.PreLLMHook(testContext(testOrg), chatRequest(schemas.ChatCompletionRequest, nil))
-
-	want := ledger.reserved[0] + ledger.reserved[0]/10
-	if got := ledger.reserved[1]; got < want || got > want+1 {
-		t.Fatalf("with 10 percent markup held %d, want %d", got, want)
 	}
 }
 
@@ -404,11 +389,11 @@ func TestInit_AMisconfiguredPluginLoadsAndRefuses(t *testing.T) {
 
 func TestPostLLMHook_ChargesTheRealCostAndReleasesTheHold(t *testing.T) {
 	ledger := &fakeLedger{balance: 10 * usd}
-	plugin := withMarkups(testPlugin(ledger, testPricer()), 500, nil)
+	plugin := testPlugin(ledger, testPricer())
 	ctx := testContext(testOrg)
 	plugin.PreLLMHook(ctx, chatRequest(schemas.ChatCompletionRequest, nil))
 
-	// 1000 input tokens and 500 output tokens: 0.001 + 0.001 = 0.002 USD, plus 5 percent
+	// 1000 input tokens and 500 output tokens: 0.001 + 0.001 = 0.002 USD, at parity
 	resp := chatResponse(schemas.ChatCompletionRequest, 1000, 500)
 	gotResp, gotErr, err := plugin.PostLLMHook(ctx, resp, nil)
 	if err != nil || gotResp != resp || gotErr != nil {
@@ -418,7 +403,7 @@ func TestPostLLMHook_ChargesTheRealCostAndReleasesTheHold(t *testing.T) {
 		t.Fatalf("settlements: %+v", ledger.settled)
 	}
 	st := ledger.settled[0]
-	if st.Cost != 2100 || st.OrganizationID != testOrg || st.ReservationID != "res_1" || st.Reference != "req_1" || st.IdempotencyKey != "usage:res_1" {
+	if st.Cost != 2000 || st.OrganizationID != testOrg || st.ReservationID != "res_1" || st.Reference != "req_1" || st.IdempotencyKey != "usage:res_1" {
 		t.Fatalf("settlement: %+v", st)
 	}
 	if st.Metadata["provider_cost_usd"] != 0.002 || st.Metadata["model"] != "gpt-4o-mini" || st.Metadata["failed"] != false {
@@ -426,6 +411,10 @@ func TestPostLLMHook_ChargesTheRealCostAndReleasesTheHold(t *testing.T) {
 	}
 	if st.Metadata["prompt_tokens"] != 1000 || st.Metadata["completion_tokens"] != 500 || st.Metadata["total_tokens"] != 1500 {
 		t.Fatalf("token counts: %+v", st.Metadata)
+	}
+	// there is no markup to record: the charge is the provider's cost at the rate
+	if _, ok := st.Metadata["markup_bps"]; ok {
+		t.Fatalf("the entry records a markup: %+v", st.Metadata)
 	}
 
 	// the pipeline calling the hook again for the same attempt settles nothing more
@@ -604,16 +593,14 @@ func TestHooks_AgainstTheRealLedger(t *testing.T) {
 	db := newTestDB(t)
 	store := NewStore(db.ledger)
 	plugin := newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{})
-	// the markup and the rate come from the database, as staff would set them; the rate is
-	// the peg the migration seeds
-	db.setPricing(t, 500, nil)
-	plugin.prices = store
-	if err := plugin.refreshMarkups(context.Background()); err != nil {
+	// the rate comes from the database, as staff would set it: the peg the migration seeds
+	plugin.rates = store
+	if err := plugin.refreshRate(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	org := db.organization(t, 18_750) // 0.01875 SAR
+	org := db.organization(t, 17_000) // 0.017 SAR
 
-	// held: a little over 2000 x 1.05 x 3.75 = 7875. Two fit in 18750, a third does not.
+	// held: a little over 2000 x 3.75 = 7500. Two fit in 17000, a third does not.
 	first, second, third := testContext(org), testContext(org), testContext(org)
 	if _, sc, _ := plugin.PreLLMHook(first, chatRequest(schemas.ChatCompletionRequest, nil)); sc != nil {
 		t.Fatalf("first refused: %+v", sc.Error)
@@ -625,18 +612,18 @@ func TestHooks_AgainstTheRealLedger(t *testing.T) {
 	if status, errorType := refusalOf(t, sc); status != 402 || errorType != ErrorTypeInsufficientCredits {
 		t.Fatalf("third: %d %s", status, errorType)
 	}
-	if s := db.consistent(t, org); s.Balance != 18_750 || s.Held < 15_750 || s.Held > 16_900 {
+	if s := db.consistent(t, org); s.Balance != 17_000 || s.Held < 15_000 || s.Held > 16_900 {
 		t.Fatalf("state while two requests are in flight: %+v", s)
 	}
 
-	// the first costs 0.002 USD x 1.05 x 3.75 = 7875 micro-SAR; the second fails with nothing billed
+	// the first costs 0.002 USD x 3.75 = 7500 micro-SAR; the second fails with nothing billed
 	plugin.PostLLMHook(first, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
 	status := 502
 	plugin.PostLLMHook(second, nil, &schemas.BifrostError{StatusCode: &status, Error: &schemas.ErrorField{Message: "bad gateway"},
 		ExtraFields: schemas.BifrostErrorExtraFields{RequestType: schemas.ChatCompletionRequest, Provider: schemas.OpenAI}})
 
 	s := db.consistent(t, org)
-	if s.Balance != 10_875 || s.Held != 0 || s.UsageEntries != 1 {
+	if s.Balance != 9_500 || s.Held != 0 || s.UsageEntries != 1 {
 		t.Fatalf("state after both settled: %+v", s)
 	}
 

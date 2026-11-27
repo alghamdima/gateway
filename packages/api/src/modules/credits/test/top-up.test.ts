@@ -146,7 +146,6 @@ const setLimits = async (
 ) => {
   const { updatePricingSettings } = await import("../../pricing/pricing");
   await updatePricingSettings({
-    defaultMarkupBps: 0,
     topupFeeBps: 550,
     topupFeeMinMicroSar: 3_000_000,
     topupMinMicroSar,

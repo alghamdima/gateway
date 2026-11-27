@@ -94,15 +94,9 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
   },
   {
     method: "PUT",
-    path: /^\/pricing\/(settings|providers\/[^/]+)$/,
+    path: /^\/pricing\/settings$/,
     needs: { pricing: ["update"] },
     audit: { action: "pricing.update", target: "pricing" },
-  },
-  {
-    method: "DELETE",
-    path: /^\/pricing\/providers\/[^/]+$/,
-    needs: { pricing: ["update"] },
-    audit: { action: "pricing.remove-provider", target: "pricing" },
   },
 
   // payment gateways (ADMIN-03): the secrets stay in env and never pass through here
@@ -226,7 +220,7 @@ export const canAccessAdminRoute = (
 
 /**
  * For the audit log: which record a path is about. /organizations/o1/credits
- * is organization o1; /pricing/providers/openai is the pricing of openai,
+ * is organization o1; /pricing/settings is the pricing settings,
  * /payments/providers/stripe the payment settings of stripe.
  */
 export const auditTarget = (path: string) => {

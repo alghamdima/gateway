@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Per-key spending limits are enforced on what the ledger charges, markup included
+// Per-key spending limits are enforced on what the ledger charges
 // (docs/platform/adr/0013-key-limits-in-the-ledger.md).
 
 // apiKey stores a key the way the control plane does, with an optional limit.

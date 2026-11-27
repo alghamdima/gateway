@@ -35,7 +35,7 @@ Option 2.
 - **Settlement is written off the request path.** `PostLLMHook` pushes the settlement onto a bounded in-memory queue (1024) and returns; four workers write it, retrying up to five times with backoff, which is safe because settling is idempotent. When the queue is full the caller writes its own settlement: a slower response is better than a lost charge. On shutdown the workers get 30 seconds to write what is queued, and a settlement that arrives after shutdown began is written by its caller.
 - **The queue is not durable.** A settlement that fails every attempt, or is still queued when the process is killed, is not written. Its hold stays until the reaper releases it, so the customer is not charged for that request. The error log names the reservation, organization, amount and request, and the daily reconciliation against the gateway's log (ADR 0002) is what finds it. A durable outbox was not built: it would add a second write to every request to cover a case that reconciliation already has to cover.
 - **The reaper runs in every gateway instance**, once a minute. The statement is idempotent, so several instances running it is harmless.
-- **Markup**: superseded by ADR 0010. The markup now comes from the control-plane database, per provider, set by staff in the admin console. The per-organization override in ADR 0005 is still deferred.
+- **Markup**: superseded by ADR 0010, then removed (ADR 0010 amendment, 2026-11-27): a request is charged its provider's cost at the USD to SAR rate, with no markup.
 
 ## Consequences
 

@@ -14,8 +14,8 @@ import type { GatewayClient } from "@workspace/gateway-client/server";
  * The daily check that the gateway and the ledger agree (step 10.1 in
  * docs/platform/PLAN.md). For one UTC day it compares, per organization, the
  * provider cost the gateway logged with the provider cost the ledger
- * recorded on each usage entry, cost_micro_usd: both in USD and before markup
- * (ADR 0005), so neither the USD to SAR rate nor its changes can make them
+ * recorded on each usage entry, cost_micro_usd: both in USD (ADR 0005), so
+ * neither the USD to SAR rate nor its changes can make them
  * differ (ADR 0017). It also lists charges lost because a
  * hold was reaped without a settlement. A request that starts before
  * midnight and settles after it is logged on one day and charged on the

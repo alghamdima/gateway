@@ -69,7 +69,7 @@ export const creditLedgerEntry = pgTable(
     /** The gateway virtual key that spent it (usage only): per-key limits and reports (ADR 0013). */
     virtualKeyId: text(),
     /**
-     * Usage only: the provider's cost in micro-USD, before markup, rounded
+     * Usage only: the provider's cost in micro-USD, rounded
      * half up. Reconciliation compares it with the gateway's log (ADR 0002).
      */
     costMicroUsd: bigint({ mode: "number" }),

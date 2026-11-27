@@ -15,7 +15,6 @@ import { Skeleton } from "@workspace/ui-web/skeleton";
 import { admin } from "~/modules/admin/lib/api";
 import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import { ChangesList } from "~/modules/admin/pricing/changes-list";
-import { ProviderMarkups } from "~/modules/admin/pricing/provider-markups";
 import { SettingsForm } from "~/modules/admin/pricing/settings-form";
 
 export const Pricing = () => {
@@ -37,7 +36,6 @@ export const Pricing = () => {
           {pricing.data ? (
             <SettingsForm
               canEdit={canEdit}
-              defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
               topupFeeBps={pricing.data.settings.topupFeeBps}
               topupFeeMinMicroSar={pricing.data.settings.topupFeeMinMicroSar}
               topupMinMicroSar={pricing.data.settings.topupMinMicroSar}
@@ -45,26 +43,6 @@ export const Pricing = () => {
               topupPresetsMicroSar={pricing.data.settings.topupPresetsMicroSar}
               usdToSarRateE6={pricing.data.settings.usdToSarRateE6}
               fxSpreadBps={pricing.data.settings.fxSpreadBps}
-            />
-          ) : (
-            <Skeleton className="h-32 w-full" />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("admin:pricing.providers.title")}</CardTitle>
-          <CardDescription>
-            {t("admin:pricing.providers.subtitle")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {pricing.data ? (
-            <ProviderMarkups
-              canEdit={canEdit}
-              providers={pricing.data.providers}
-              defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
             />
           ) : (
             <Skeleton className="h-32 w-full" />

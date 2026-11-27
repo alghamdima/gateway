@@ -38,9 +38,12 @@ export interface Generation {
   provider_name: string | null;
   tokens_prompt: number;
   tokens_completion: number;
-  /** SAR charged, markup included (the account's currency, ADR 0017). */
+  /**
+   * SAR charged (the account's currency, ADR 0017): the upstream cost at the
+   * effective USD to SAR rate, with no markup (ADR 0010).
+   */
   total_cost: number;
-  /** The providers' cost in USD before markup: what the charge was converted from. */
+  /** The providers' cost in USD: what the charge was converted from. */
   upstream_cost_usd: number;
   currency: typeof CURRENCY;
   /** Milliseconds; null once the gateway's log has expired. */
@@ -53,7 +56,7 @@ export interface Generation {
     status: "success" | "error";
     /** SAR charged for the attempt. */
     cost: number;
-    /** The provider's cost in USD before markup. */
+    /** The provider's cost in USD. */
     upstream_cost_usd: number;
     /** The effective USD to SAR rate the attempt was converted at. */
     usd_to_sar_rate: number;
@@ -198,7 +201,7 @@ export interface RecentRequest {
   completionTokens: number;
   /** micro-SAR charged. */
   cost: number;
-  /** The provider's cost in micro-USD before markup; null on entries older than SAR. */
+  /** The provider's cost in micro-USD; null on entries older than SAR. */
   costMicroUsd: number | null;
   failed: boolean;
 }

@@ -1,8 +1,8 @@
 // Package credits is the gateway plugin that enforces the prepaid balance: it holds the
 // maximum cost of each attempt before the provider is called and charges the real cost
 // afterwards (docs/platform/adr/0001-credits-ledger.md, 0009-credits-plugin-hooks.md). The
-// markup and the USD to SAR rate come from prices staff set in the admin console
-// (0010-admin-controlled-pricing.md); the ledger is in micro-SAR (0017-sar-ledger.md).
+// charge is the provider's cost at the USD to SAR rate staff set in the admin console, with no
+// markup (0010-admin-controlled-pricing.md); the ledger is in micro-SAR (0017-sar-ledger.md).
 //
 // It fails closed. A request it cannot attribute to an organization, cannot price, or
 // cannot record is refused, not served for free.
@@ -79,11 +79,12 @@ type pricer interface {
 
 // Plugin implements schemas.LLMPlugin.
 type Plugin struct {
-	ledger  ledger
-	pricer  pricer
-	logger  schemas.Logger
-	prices  pricingSource
-	markups atomic.Pointer[markups]
+	ledger ledger
+	pricer pricer
+	logger schemas.Logger
+	rates  rateSource
+	// rate is the USD to SAR rate new holds convert at; nil until the first load (rates.go)
+	rate atomic.Pointer[fxRate]
 	// organizations caches gateway customer id -> organization id (organizations.go)
 	organizations      sync.Map
 	reservationTTL     time.Duration
@@ -106,11 +107,10 @@ type hold struct {
 	requestType    schemas.RequestType
 	// amount is the hold in micro-SAR
 	amount int64
-	// markupBps and fx are fixed when the hold is taken, so the attempt is charged at the
-	// markup and rate its hold was sized for even if staff change them meanwhile
-	markupBps int64
-	fx        fxRate
-	settled   atomic.Bool
+	// fx is fixed when the hold is taken, so the attempt is charged at the rate its hold was
+	// sized for even if staff change it meanwhile
+	fx      fxRate
+	settled atomic.Bool
 	// when the hold's lifetime last started (unix nanoseconds): a stream that is still
 	// running pushes it forward (keepAlive)
 	renewedAt atomic.Int64
@@ -163,11 +163,11 @@ func build(ctx context.Context, config *Config, logger schemas.Logger, catalog *
 	plugin := newPlugin(store, catalog, logger, config)
 	plugin.pool = pool
 	plugin.reaper = store
-	plugin.prices = store
+	plugin.rates = store
 	// a failure is logged and retried by the refresh loop; until then requests are refused.
 	// Bounded, so a database that is down delays the gateway's boot by seconds at most.
-	bootCtx, cancelBoot := context.WithTimeout(ctx, markupBootTimeout)
-	_ = plugin.refreshMarkups(bootCtx)
+	bootCtx, cancelBoot := context.WithTimeout(ctx, rateBootTimeout)
+	_ = plugin.refreshRate(bootCtx)
 	cancelBoot()
 	plugin.start(defaultSettleQueueSize, defaultSettleWorkers, defaultReapInterval)
 	return plugin, nil
@@ -264,18 +264,16 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		return req, refuse(403, ErrorTypeNoOrganization, "This API key is not linked to an organization."), nil
 	}
 
-	prices := p.markups.Load()
-	if prices == nil {
+	rate := p.rate.Load()
+	if rate == nil {
 		return req, refuse(503, ErrorTypeLedgerUnavailable, "Prices could not be loaded. Try again shortly."), nil
 	}
-	provider, _, _ := req.GetRequestFields()
-	markupBps := prices.forProvider(provider)
-	fx := prices.fx
+	fx := *rate
 
 	if reason := unboundable(ctx, req); reason != "" {
 		return req, refuse(400, ErrorTypeUnsupportedRequest, string(reason)), nil
 	}
-	amount, err := p.estimate(ctx, req, markupBps, fx.effectiveE6)
+	amount, err := p.estimate(ctx, req, fx.effectiveE6)
 	var cannotBound unboundableError
 	if errors.As(err, &cannotBound) {
 		return req, refuse(400, ErrorTypeUnsupportedRequest, string(cannotBound.reason)), nil
@@ -309,7 +307,6 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		organizationID: organizationID,
 		requestType:    req.RequestType,
 		amount:         amount,
-		markupBps:      markupBps,
 		fx:             fx,
 	}
 	held.renewedAt.Store(time.Now().UnixNano())
@@ -344,9 +341,9 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		// text already received (core/streamusage)
 		costUSD = p.pricer.CalculateCostForUsage(bifrostErr.ExtraFields.BilledUsage, provider, model, requestType, scopes)
 	}
-	// converted at the hold's rate and markup, so one attempt is never split between two
-	// prices; rounded half up to the nearest micro-SAR (the hold was rounded up)
-	cost, err := toMicroSAR(costUSD, held.fx.effectiveE6, held.markupBps)
+	// the provider's cost converted at the hold's rate, with no markup, so one attempt is never
+	// split between two rates; rounded half up to the nearest micro-SAR (the hold was rounded up)
+	cost, err := toMicroSAR(costUSD, held.fx.effectiveE6)
 	costMicroUSD, usdErr := toMicroUSD(costUSD)
 	if err = errors.Join(err, usdErr); err != nil {
 		// never guess a charge: release the hold and leave the difference to reconciliation
@@ -366,7 +363,6 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		Reference:      requestID,
 		Metadata: map[string]any{
 			"provider_cost_usd": costUSD,
-			"markup_bps":        held.markupBps,
 			"held":              held.amount,
 			"provider":          string(provider),
 			"model":             model,
@@ -393,9 +389,8 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 }
 
 // estimate returns the most this attempt can cost, in micro-SAR at the effective rate rateE6,
-// markup included,
 // rounded up.
-func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, markupBps, rateE6 int64) (int64, error) {
+func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, rateE6 int64) (int64, error) {
 	provider, model, _ := req.GetRequestFields()
 	if model == "" {
 		return 0, errors.New("request names no model")
@@ -458,7 +453,7 @@ func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostReque
 
 	usage := &schemas.BifrostLLMUsage{PromptTokens: inputTokens, CompletionTokens: outputTokens, TotalTokens: inputTokens + outputTokens}
 	scopes := modelcatalog.PricingLookupScopesFromContext(ctx, string(provider))
-	return ceilMicroSAR(p.pricer.CalculateCostForUsage(usage, provider, model, req.RequestType, scopes), rateE6, markupBps)
+	return ceilMicroSAR(p.pricer.CalculateCostForUsage(usage, provider, model, req.RequestType, scopes), rateE6)
 }
 
 func refuse(status int, errorType, message string) *schemas.LLMPluginShortCircuit {

@@ -3,6 +3,7 @@
 - Status: Accepted
 - Date: 2026-11-27
 - Amends: ADR 0001 (unit of the ledger), ADR 0010 (pricing settings), ADR 0012 (checkout currency)
+- Amended by: ADR 0010's amendment of 2026-11-27. The markup is removed: the conversion below is `micro-SAR = cost USD × effective rate e6`, the plugin reads the rate and spread alone (`rates.go`, which replaces `markups.go`), and holds and entries carry no markup.
 - Features: ADMIN-06, BILL-15 (`SPEC.md`)
 
 ## Context

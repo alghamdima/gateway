@@ -65,7 +65,7 @@ func TestHooks_ChargeTheOrganizationBehindTheGatewayCustomer(t *testing.T) {
 		`UPDATE gateway_customer SET customer_id = '5b91db81-1730-436b-9a18-e1929af07faf' WHERE organization_id = $1`, org); err != nil {
 		t.Fatal(err)
 	}
-	plugin := withMarkups(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}), 0, nil)
+	plugin := atParityRate(newPlugin(store, testPricer(), bifrost.NewNoOpLogger(), &Config{}))
 
 	if _, _, err := store.OrganizationFor(context.Background(), org); err != nil {
 		t.Fatal(err)

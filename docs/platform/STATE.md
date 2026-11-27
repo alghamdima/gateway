@@ -20,7 +20,7 @@ apps/
   gateway/    The engine, in Go. Started from Bifrost v2.6.0; the code is ours now.
 packages/
   api/        Hono API. One folder per feature under src/modules.
-  db/         Drizzle schema (one file per feature) and migrations 0000-0033.
+  db/         Drizzle schema (one file per feature) and migrations 0000-0034.
   gateway-client/  TypeScript client for the gateway's management API.
   auth/ billing/ email/ i18n/ ui/ shared/ storage/ cms/ flags/ analytics/ monitoring/
 docs/platform/  PLAN.md, ARCHITECTURE.md, adr/, research/, this file.
@@ -43,16 +43,17 @@ The mobile app and the browser extension of the template were removed on 2026-11
 
 1. The customer's key is a gateway virtual key; the organization is a gateway customer.
 2. `plugins/credits` reserves the worst-case cost of the request before it reaches the provider, and settles the real cost after. The ledger is in our Postgres (`credit_*` tables); the gateway connects as the role `gateway_ledger`, which may only do what migration 0026 grants.
-3. Money is SAR (ADR 0017). Every amount is micro-SAR (1 SAR = 1,000,000). Provider costs are USD; the plugin converts each attempt once, at the effective rate: the official USD→SAR rate staff set (`pricing_settings.usd_to_sar_rate_e6`, default 3.75) plus the bank's spread (`fx_spread_bps`, default 0), rounded up to the millionth, read with the markups every 30 s. The hold rounds up; the charge rounds half up at the hold's rate. Each hold and usage entry stores the official rate, the spread and the effective rate, and each usage entry the provider's cost in `cost_micro_usd`, so a rate change touches new requests only and reconciliation compares USD with USD.
-4. The gateway's own budgets are not used for money: they count recorded spend only and lag by seconds.
-5. Top-ups are a Stripe checkout in SAR (halalas) and a signed webhook (ADR 0012), with the provider, its mode and the on/off switch chosen by staff (ADMIN-03). Stripe is not settled for Saudi Arabia: see "Waiting on the owner".
+3. Money is SAR (ADR 0017). Every amount is micro-SAR (1 SAR = 1,000,000). Provider costs are USD; the plugin converts each attempt once, at the effective rate: the official USD→SAR rate staff set (`pricing_settings.usd_to_sar_rate_e6`, default 3.75) plus the bank's spread (`fx_spread_bps`, default 0), rounded up to the millionth, read every 30 s (`plugins/credits/rates.go`). The hold rounds up; the charge rounds half up at the hold's rate. Each hold and usage entry stores the official rate, the spread and the effective rate, and each usage entry the provider's cost in `cost_micro_usd`, so a rate change touches new requests only and reconciliation compares USD with USD.
+4. No markup on requests (owner, 2026-11-27; ADR 0010 amended, BILL-14, CHARGE-03, migration `0034`): a request is charged its serving provider's cost in USD × the effective rate, and nothing else. The platform's revenue is the top-up fee (`pricing_settings.topup_fee_bps`, at least `topup_fee_min_micro_sar`), shown before payment and never refunded. `/api/v1/models` and `/models` show provider price × rate; an activity record's SAR charge equals its upstream USD cost × the rate it was converted at.
+5. The gateway's own budgets are not used for money: they count recorded spend only and lag by seconds.
+6. Top-ups are a Stripe checkout in SAR (halalas) and a signed webhook (ADR 0012), with the provider, its mode and the on/off switch chosen by staff (ADMIN-03). Stripe is not settled for Saudi Arabia: see "Waiting on the owner".
 
 ## What is done
 
 - Credits ledger with reserve and settle, key spending limits, low-balance handling, reconciliation against the gateway's log.
 - Keys, credits, activity and data-policy pages for the customer; public model catalog at `/models`.
 - Data policy (ADR 0015): provider terms per gateway key, a policy per organization pushed to the gateway as key allowlists, evidence per request as of the time it was made.
-- Admin: users, organizations (credits, rate limit, data policy), pricing (our fee per provider, the top-up fee, the top-up limits and quick picks, ADMIN-05, and the USD→SAR rate with the bank's spread, ADMIN-06, all in SAR), providers and their keys, the request log, the audit log, reconciliation. Staff roles admin, finance and support, all with two-factor sign-in.
+- Admin: users, organizations (credits, rate limit, data policy), pricing (the top-up fee, the top-up limits and quick picks, ADMIN-05, and the USD→SAR rate with the bank's spread, ADMIN-06, all in SAR), providers and their keys, the request log, the audit log, reconciliation. Staff roles admin, finance and support, all with two-factor sign-in.
 - Brand: the control plane says Lemru everywhere; CI fails if the template's name comes back outside an allowlist.
 - Money in SAR (ADMIN-06, BILL-15, ADR 0017, migration `0033`): ledger, holds, key limits, low-balance thresholds, top-ups and the money settings are micro-SAR; seeded SAR defaults are top-ups of SAR 20 to SAR 3,750, quick picks 40/100/200/400, fee minimum SAR 3, low-balance default SAR 20 (the owner adjusts them in the admin). Screens and emails format with `formatMicroSar` (`@workspace/shared/utils`); the model catalog shows SAR per 1M with USD beside it. The public API answers in SAR with `currency: "SAR"` (SPEC section 2). The admin form was not checked in a browser.
 - One frontend (ADR 0016): the gateway's own UI is deleted. `GET /` on the gateway is a 404.

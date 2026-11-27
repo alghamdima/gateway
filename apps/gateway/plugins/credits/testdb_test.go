@@ -145,24 +145,6 @@ func (db *testDB) organization(t *testing.T, balance int64) string {
 	return id
 }
 
-// setPricing sets the default markup and replaces the per-provider markups, as staff do
-// in the admin console.
-func (db *testDB) setPricing(t *testing.T, defaultBps int64, byProvider map[string]int64) {
-	t.Helper()
-	ctx := context.Background()
-	if _, err := db.admin.Exec(ctx, `UPDATE pricing_settings SET default_markup_bps = $1 WHERE id = 1`, defaultBps); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.admin.Exec(ctx, `DELETE FROM provider_markup`); err != nil {
-		t.Fatal(err)
-	}
-	for provider, bps := range byProvider {
-		if _, err := db.admin.Exec(ctx, `INSERT INTO provider_markup (provider, markup_bps) VALUES ($1, $2)`, provider, bps); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 // setRate sets the USD to SAR rate x 1,000,000, as staff do in the admin console.
 func (db *testDB) setRate(t *testing.T, rateE6 int64) {
 	t.Helper()

@@ -159,7 +159,7 @@ type Settlement struct {
 	OrganizationID string
 	// Cost is what the attempt is charged, in micro-SAR. Zero releases the hold and writes no entry.
 	Cost int64
-	// CostMicroUSD is the provider's cost before markup, in micro-USD, stored on the entry.
+	// CostMicroUSD is the provider's cost in micro-USD, stored on the entry.
 	CostMicroUSD int64
 	// FX is the rate Cost was converted at: the hold's.
 	FX fxRate
@@ -167,7 +167,7 @@ type Settlement struct {
 	IdempotencyKey string
 	// Reference is the request id, for support and reconciliation.
 	Reference string
-	// Metadata is stored with the entry: the exact provider cost, markup, model, provider.
+	// Metadata is stored with the entry: the exact provider cost, model, provider.
 	Metadata map[string]any
 }
 

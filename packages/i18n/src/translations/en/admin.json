@@ -163,7 +163,7 @@
   "pricing": {
     "header": {
       "title": "Pricing",
-      "description": "Set the markup on inference per provider, the fee added to top-ups, the top-up limits and the USD to SAR rate."
+      "description": "Set the fee added to top-ups, the top-up limits and the USD to SAR rate. Requests are charged at the provider's cost, converted at that rate."
     },
     "saved": "Prices saved. Gateways apply them within 30 seconds.",
     "error": {
@@ -175,12 +175,8 @@
       "rateDecimals": "Use at most six decimals."
     },
     "settings": {
-      "title": "Default markup, top-up fee, limits and exchange rate",
+      "title": "Top-up fee, limits and exchange rate",
       "description": "Rates are percentages. Changes reach the gateway within 30 seconds and apply to requests that start after that.",
-      "defaultMarkup": {
-        "label": "Default markup",
-        "description": "Added to the provider's cost for every provider without its own markup below. 0% charges at cost."
-      },
       "topupFee": {
         "label": "Top-up fee",
         "description": "Added to the payment when a customer buys credits, but never less than the minimum. It is never taken from their credits."
@@ -216,16 +212,6 @@
         "value": "1 USD = {{rate}} SAR"
       }
     },
-    "providers": {
-      "title": "Markup per provider",
-      "subtitle": "Overrides the default markup for one provider.",
-      "provider": "Provider",
-      "markup": "Markup",
-      "updatedAt": "Updated",
-      "empty": "No provider has its own markup: every provider uses the default.",
-      "removed": "Provider markup removed. It now uses the default.",
-      "description": "Use the gateway's provider name, such as openai or anthropic. Saving an existing provider replaces its markup. Providers not listed use the default markup of {{markup}}%."
-    },
     "changes": {
       "title": "Change history",
       "description": "Every change to these prices, newest first. It cannot be edited.",
@@ -235,10 +221,10 @@
       "what": "What",
       "before": "Before",
       "after": "After",
-      "settings": "Default markup, fee, limits and exchange rate",
+      "settings": "Fee, limits and exchange rate",
       "none": "None",
+      "retired": "A setting that no longer exists",
       "fields": {
-        "defaultMarkupBps": "Default markup",
         "topupFeeBps": "Top-up fee",
         "topupFeeMinMicroSar": "Minimum fee",
         "topupMinMicroSar": "Minimum top-up",
@@ -246,8 +232,7 @@
         "topupPresetsMicroSar": "Quick picks",
         "usdToSarRateE6": "USD to SAR rate",
         "fxSpreadBps": "Bank spread",
-        "effectiveUsdToSarRateE6": "Rate new requests use",
-        "markupBps": "Markup"
+        "effectiveUsdToSarRateE6": "Rate new requests use"
       }
     }
   },

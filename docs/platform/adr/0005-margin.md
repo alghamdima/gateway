@@ -1,6 +1,6 @@
 # ADR 0005: Margin is applied in the ledger plugin as a multiplier on provider cost
 
-Status: Accepted for the mechanism. The value is set by staff per provider in the admin console: see ADR 0010, which supersedes the storage described here.
+Status: Superseded (2026-11-27). There is no markup on requests: the platform's revenue is the top-up fee (ADR 0010, amendment). Before that, the value was set by staff per provider (ADR 0010).
 Date: 2026-11-21
 
 ## Context

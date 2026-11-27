@@ -1,6 +1,6 @@
 # ADR 0010: Markup per provider and the top-up fee are set by staff in the admin console
 
-Status: Accepted. Amended by ADR 0017: money settings are micro-SAR, and `pricing_settings` also holds the USD to SAR rate and the bank's spread, read by the plugin with the markups.
+Status: Accepted. Amended by ADR 0017: money settings are micro-SAR, and `pricing_settings` also holds the USD to SAR rate and the bank's spread. **Amended 2026-11-27 (owner): there is no markup on requests**; see "Amendment: no markup, the fee at top-up is the revenue" at the end. The sections on markups below are history.
 Date: 2026-11-23
 
 ## Context
@@ -43,3 +43,15 @@ Option 3.
 - The public model catalog (Phase 7) must show prices with the same per-provider markup.
 - Still deferred from ADR 0005: a markup per organization.
 - Where we differ from OpenRouter on price: the markup per provider is ours (OpenRouter sells at the provider's price); there is no crypto payment, so no separate crypto fee (OpenRouter: 5%); refunds within 24 hours and credit expiry after a year belong to Phase 6 and are not built.
+
+## Amendment: no markup, the fee at top-up is the revenue (2026-11-27)
+
+Owner decision, as OpenRouter does it: the platform earns the fee taken at top-up, and a request is charged at the serving provider's rate with no markup (`SPEC.md` §2, BILL-14, CHARGE-03).
+
+- **The charge.** `micro-SAR = provider cost USD × effective USD to SAR rate e6`, the effective rate being official × (1 + bank spread), rounded up to the millionth (ADR 0017). The hold rounds up, the charge rounds half up, and the charge uses the hold's rate (`apps/gateway/plugins/credits/money.go`).
+- **What the plugin reads.** Only the rate and the spread, from `pricing_settings`, every 30 seconds (`plugins/credits/rates.go`, which replaces `markups.go`). Holds and usage entries no longer record `markup_bps`.
+- **Storage.** Migration `0034` drops `pricing_settings.default_markup_bps` and the table `provider_markup` (with the gateway role's grant on it). `pricing_change` keeps its old rows, markup values included: it is append-only history, and the admin list shows a field that no longer exists as such.
+- **Admin.** The markup routes (`PUT`/`DELETE /api/admin/pricing/providers/:provider`), their access rules, Zod schemas, form and translations are removed; a request to one is refused to every role. The fee, the top-up limits and the rate stay.
+- **Customers.** `/api/v1/models` and `/models` show the provider's price (USD) and that price × the effective rate (SAR). An activity record's `total_cost` (SAR) equals its `upstream_cost_usd` × the rate it was converted at.
+- **Fee.** Unchanged: `topup_fee_bps` with `topup_fee_min_micro_sar`, shown before payment, added to the payment, never taken from credits and never refunded (ADR 0003).
+- Superseded: ADR 0005 (margin as a multiplier) and the per-organization markup it deferred; the markup parts of this ADR above; the markup in ADR 0017's formula.

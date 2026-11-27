@@ -29,8 +29,12 @@ interface ChangesListProps {
   readonly changes: PricingChange[];
 }
 
+/**
+ * The fields a change shows. Rows recorded before the markup was removed also
+ * carry markup fields (and a "provider:<name>" target); the history is
+ * append-only, so they stay, and are listed as a setting that no longer exists.
+ */
 const RATE_KEYS = [
-  "defaultMarkupBps",
   "topupFeeBps",
   "topupFeeMinMicroSar",
   "topupMinMicroSar",
@@ -39,7 +43,6 @@ const RATE_KEYS = [
   "usdToSarRateE6",
   "fxSpreadBps",
   "effectiveUsdToSarRateE6",
-  "markupBps",
 ] as const;
 
 const sar = (microSar: number) => formatMicroSar(microSar);
@@ -70,12 +73,15 @@ export const ChangesList = ({ changes }: ChangesListProps) => {
     if (!values) {
       return t("admin:pricing.changes.none");
     }
-    return RATE_KEYS.flatMap((key) => {
-      const shown = showValue(key, values[key]);
-      return shown === null
+    const shown = RATE_KEYS.flatMap((key) => {
+      const value = showValue(key, values[key]);
+      return value === null
         ? []
-        : [`${t(`admin:pricing.changes.fields.${key}`)}: ${shown}`];
-    }).join(", ");
+        : [`${t(`admin:pricing.changes.fields.${key}`)}: ${value}`];
+    });
+    return shown.length > 0
+      ? shown.join(", ")
+      : t("admin:pricing.changes.retired");
   };
 
   const targetLabel = (target: string) =>

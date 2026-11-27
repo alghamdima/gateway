@@ -399,26 +399,6 @@ const mutations = {
         json: InferRequestType<typeof api.admin.pricing.settings.$put>["json"],
       ) => handle(api.admin.pricing.settings.$put)({ json }),
     }),
-    setProvider: mutationOptions({
-      mutationKey: [KEY, "pricing", "providers", "set"],
-      mutationFn: ({
-        provider,
-        ...json
-      }: InferRequestType<
-        (typeof api.admin.pricing.providers)[":provider"]["$put"]
-      >["json"] & { provider: string }) =>
-        handle(api.admin.pricing.providers[":provider"].$put)({
-          param: { provider },
-          json,
-        }),
-    }),
-    removeProvider: mutationOptions({
-      mutationKey: [KEY, "pricing", "providers", "remove"],
-      mutationFn: ({ provider }: { provider: string }) =>
-        handle(api.admin.pricing.providers[":provider"].$delete)({
-          param: { provider },
-        }),
-    }),
   },
   payments: {
     updateSettings: mutationOptions({

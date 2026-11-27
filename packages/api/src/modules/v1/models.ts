@@ -2,7 +2,7 @@ import { getGateway } from "@workspace/gateway-client/server";
 import { formatRateE6 } from "@workspace/shared/utils";
 
 import { marketPrice, marketPriceSar } from "../pricing/price";
-import { getPricing } from "../pricing/pricing";
+import { getPricingSettings } from "../pricing/pricing";
 
 import type {
   GatewayClient,
@@ -12,10 +12,11 @@ import type {
 
 /**
  * GET /api/v1/models: the models the gateway can serve, in OpenRouter's
- * shape, with prices that include our markup for the model's provider
- * (ADR 0005, 0010), so the price shown is the price charged. `pricing` is USD
- * per token, as OpenRouter's; `pricing_sar` is the same in SAR at the current
- * effective USD to SAR rate (ADR 0017), which is what new requests convert at.
+ * shape, at the serving provider's price with no markup (ADR 0010: the
+ * platform's revenue is the top-up fee), so the price shown is the price
+ * charged. `pricing` is USD per token, as OpenRouter's; `pricing_sar` is the
+ * same in SAR at the current effective USD to SAR rate (ADR 0017), which is
+ * what new requests convert at.
  */
 
 export interface PublicPricing {
@@ -69,27 +70,18 @@ export const listPublicModels = async (
   if (allowedKeys?.size === 0) {
     return { data: [] };
   }
-  const [listed, { settings, providers }] = await Promise.all([
+  const [listed, settings] = await Promise.all([
     gateway.listModels(allowedKeys && [...allowedKeys]),
-    getPricing(),
+    getPricingSettings(),
   ]);
   const models = allowedKeys
     ? listed.filter((model) =>
         model.accessible_by_keys?.some((keyId) => allowedKeys.has(keyId)),
       )
     : listed;
-  const markupFor = new Map(
-    providers.map((row) => [row.provider, row.markupBps]),
-  );
   const publicModels = models
     .filter((model) => !model.is_deprecated && hasPrice(model))
-    .map((model) =>
-      toPublicModel(
-        model,
-        markupFor.get(model.provider) ?? settings.defaultMarkupBps,
-        settings.effectiveUsdToSarRateE6,
-      ),
-    )
+    .map((model) => toPublicModel(model, settings.effectiveUsdToSarRateE6))
     .sort((a, b) => a.id.localeCompare(b.id));
 
   if (access.allowAll) {
@@ -121,7 +113,6 @@ const cost = (model: GatewayModel, field: CostField) =>
 
 const toPublicModel = (
   model: GatewayModel,
-  markupBps: number,
   usdToSarRateE6: number,
 ): PublicModel => {
   const pricing = (toPrice: (value: number) => string): PublicPricing => {
@@ -150,10 +141,8 @@ const toPublicModel = (
       output_modalities: model.architecture?.output_modalities ?? [],
       tokenizer: model.architecture?.tokenizer ?? null,
     },
-    pricing: pricing((value) => marketPrice(value, markupBps)),
-    pricing_sar: pricing((value) =>
-      marketPriceSar(value, markupBps, usdToSarRateE6),
-    ),
+    pricing: pricing(marketPrice),
+    pricing_sar: pricing((value) => marketPriceSar(value, usdToSarRateE6)),
     usd_to_sar_rate: formatRateE6(usdToSarRateE6),
     top_provider: {
       context_length: contextLength,
