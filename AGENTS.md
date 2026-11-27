@@ -126,6 +126,23 @@ tooling/       oxfmt, oxlint, typescript, vitest, github, scripts
 
 Environment: create `.env.local` at repo root with `DATABASE_URL`, `PRODUCT_NAME`, `URL`, `DEFAULT_LOCALE`.
 
+## Before you push (lessons from 2026-11-27)
+
+- Run the API tests **with the gateway binary**, or the end-to-end tests are skipped and breaks hide (it happened: `keys.e2e` expected USD after the SAR ledger). Build it with `(cd apps/gateway/transports && go build -o <scratch>/gateway-e2e ./bifrost-http)` (Go 1.27.4 toolchain), then `GATEWAY_E2E_BINARY=<scratch>/gateway-e2e env -u SKIP_ENV_VALIDATION pnpm with-env pnpm -F @workspace/api exec vitest run`: expect 0 skipped.
+- Money changes also run the credits plugin tests with the binary and the race detector: `cd apps/gateway/plugins/credits && CREDITS_TEST_DATABASE_URL=... CREDITS_E2E_BINARY=<scratch>/gateway-e2e go test -count=1 -race ./...`, and `bash apps/gateway/scripts/test.sh <module>` for every Go module touched.
+- Database work follows the skills in `.agents/skills/` (`postgresql-table-design`, `drizzle-best-practices`, `supabase-postgres-best-practices`, `database-designer`) and the repo's conventions: micro-SAR `bigint`, named checks with "ceiling against a typo" constants, append-only ledger and change tables, a down script per migration, migrations generated with the repo command.
+- Money is in **SAR** (micro-SAR in the ledger, ADR 0017); provider costs are USD, converted once per attempt at the effective rate (official rate x bank spread, both admin settings), stored on every entry. Revenue is the top-up fee only; requests have no markup.
+- No business value is hard-coded (SPEC rule 6): anything staff may change lives in admin, in the database, audited with before and after.
+- Postgres stops when a cloud container restarts: `service postgresql start` before the database tests.
+
+## After a deploy (operations nobody may forget)
+
+- Admin, model prices: press **Import current prices** once, so day-one charges match.
+- Schedule the internal jobs: `/api/internal/model-prices` every minute (pushes approved prices to the gateway, repairs drift), `/api/internal/model-price-suggestions` daily, `/api/internal/credit-expiry` hourly, and the existing reconciliation job daily.
+- Stripe webhook: send `checkout.session.completed`, `charge.refunded`, `refund.updated` and `refund.failed`; set `STRIPE_*` (live) and, for test mode, `STRIPE_TEST_*` secrets; confirm the Stripe account accepts SAR.
+- Legal terms must state the 365-day credit expiry and the 24-hour refund rule before launch.
+- Open every admin screen once on the production build (pricing, payments, model prices, promo codes, an organization's fee card) and the customer credits page: none has been checked in a browser yet.
+
 ## Code conventions
 
 - TypeScript: functional, declarative; no classes
