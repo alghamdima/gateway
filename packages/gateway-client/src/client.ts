@@ -27,6 +27,12 @@ export interface CreateVirtualKeyInput {
 export interface UpdateVirtualKeyInput {
   name?: string;
   isActive?: boolean;
+  /**
+   * A new expiry, which the gateway requires to be in the future. Only the
+   * platform's maximum key lifetime shortens a key's expiry (ADMIN-12); a
+   * customer can never change it (KEYS-03).
+   */
+  expiresAt?: Date;
 }
 
 export interface CreatedVirtualKey {
@@ -518,6 +524,9 @@ export const createGatewayClient = ({
           ...(input.isActive === undefined
             ? {}
             : { is_active: input.isActive }),
+          ...(input.expiresAt === undefined
+            ? {}
+            : { expires_at: input.expiresAt.toISOString() }),
         },
       );
     },

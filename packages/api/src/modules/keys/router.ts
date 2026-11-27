@@ -12,8 +12,21 @@ import {
   enforceOrganizationPermission,
   validate,
 } from "../../middleware";
-import { createApiKeySchema, updateApiKeySchema } from "../../schema";
-import { createKey, deleteKey, listKeys, updateKey } from "./keys";
+import {
+  createApiKeySchema,
+  searchApiKeysSchema,
+  updateApiKeySchema,
+} from "../../schema";
+import { expiresAtFor } from "./expiry";
+import {
+  createKey,
+  deleteKey,
+  getKey,
+  listKeys,
+  searchKeys,
+  updateKey,
+} from "./keys";
+import { getKeySettings } from "./settings";
 
 import type { Permissions, User } from "@workspace/auth";
 
@@ -47,21 +60,67 @@ const gatewayUnavailable = (error: unknown): never => {
 const notFound = () =>
   new HttpException(HttpStatusCode.NOT_FOUND, { code: "error.notFound" });
 
-/** /api/keys/:organizationId. Owners and admins manage keys; members see them (ADR 0004). */
+/**
+ * /api/keys/:organizationId. Owners and admins manage keys; members see them
+ * (ADR 0004). No route returns a key's secret except the create, once.
+ */
 export const keysRouter = new Hono<{ Variables: { user: User } }>()
   .use(enforceAuth)
   .get("/:organizationId", can(["read"]), async (c) =>
     c.json(await listKeys(c.req.param("organizationId"))),
   )
+  // what the create form starts from and allows (ADMIN-12); registered before /:keyId
+  .get("/:organizationId/settings", can(["read"]), async (c) => {
+    const {
+      defaultLimitMicroSar,
+      defaultLimitReset,
+      defaultExpiry,
+      maxLifetime,
+      limitPresetsMicroSar,
+    } = await getKeySettings();
+    return c.json({
+      defaultLimitMicroSar,
+      defaultLimitReset,
+      defaultExpiry,
+      maxLifetime,
+      limitPresetsMicroSar,
+    });
+  })
+  // by name, prefix or a pasted key, in the body so a key never sits in a URL (KEYS-05)
+  .post(
+    "/:organizationId/search",
+    can(["read"]),
+    validate("json", searchApiKeysSchema),
+    async (c) =>
+      c.json(
+        await searchKeys(
+          c.req.param("organizationId"),
+          c.req.valid("json").query,
+        ),
+      ),
+  )
+  .get("/:organizationId/:keyId", can(["read"]), async (c) => {
+    const key = await getKey(
+      c.req.param("organizationId"),
+      c.req.param("keyId"),
+    );
+    if (!key) {
+      throw notFound();
+    }
+    return c.json(key);
+  })
   .post(
     "/:organizationId",
     can(["create"]),
     validate("json", createApiKeySchema),
     async (c) => {
+      const { name, expiry, limit } = c.req.valid("json");
       const created = await createKey({
         organizationId: c.req.param("organizationId"),
         userId: c.var.user.id,
-        ...c.req.valid("json"),
+        name,
+        limit,
+        expiresAt: expiresAtFor(expiry),
       }).catch(gatewayUnavailable);
       return c.json(created, 201);
     },
@@ -71,10 +130,12 @@ export const keysRouter = new Hono<{ Variables: { user: User } }>()
     can(["update"]),
     validate("json", updateApiKeySchema),
     async (c) => {
+      // the expiry is not among them: the schema refuses any attempt to change it (KEYS-03)
+      const { name, disabled, limit } = c.req.valid("json");
       const updated = await updateKey(
         c.req.param("organizationId"),
         c.req.param("keyId"),
-        c.req.valid("json"),
+        { name, disabled, limit },
       ).catch(gatewayUnavailable);
       if (!updated) {
         throw notFound();

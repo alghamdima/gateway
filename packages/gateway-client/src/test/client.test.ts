@@ -166,9 +166,17 @@ describe("gateway client", () => {
   it("updates only what it is given", async () => {
     await client().updateVirtualKey("vk_1", { isActive: false });
     await client().updateVirtualKey("vk_1", { name: "renamed" });
+    await client().updateVirtualKey("vk_1", {
+      expiresAt: new Date("2026-12-01T00:00:00.123Z"),
+    });
     expect(seen.map((s) => [s.method, s.path, s.body])).toEqual([
       ["PUT", "/api/governance/virtual-keys/vk_1", { is_active: false }],
       ["PUT", "/api/governance/virtual-keys/vk_1", { name: "renamed" }],
+      [
+        "PUT",
+        "/api/governance/virtual-keys/vk_1",
+        { expires_at: "2026-12-01T00:00:00.123Z" },
+      ],
     ]);
   });
 

@@ -281,6 +281,13 @@
       "when": 1795788481544,
       "tag": "0039_promo_clawback",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795793477012,
+      "tag": "0040_key_lifecycle",
+      "breakpoints": true
     }
   ]
 }

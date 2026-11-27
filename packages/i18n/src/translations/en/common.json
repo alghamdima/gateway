@@ -275,5 +275,6 @@
   "dataPolicy": "Data policy",
   "payments": "Payments",
   "promoCodes": "Promo codes",
-  "modelPrices": "Model prices"
+  "modelPrices": "Model prices",
+  "keySettings": "Key defaults"
 }

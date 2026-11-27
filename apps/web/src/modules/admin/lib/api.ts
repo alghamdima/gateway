@@ -226,6 +226,18 @@ const queries = {
         queryFn: () => handle(api.admin.pricing.changes.$get)(),
       }),
   },
+  keySettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "key-settings"],
+        queryFn: () => handle(api.admin["key-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "key-settings", "changes"],
+        queryFn: () => handle(api.admin["key-settings"].changes.$get)(),
+      }),
+  },
   payments: {
     get: () =>
       queryOptions({
@@ -406,6 +418,16 @@ const mutations = {
           (typeof api.admin.pricing)["credit-terms"]["$put"]
         >["json"],
       ) => handle(api.admin.pricing["credit-terms"].$put)({ json }),
+    }),
+  },
+  keySettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "key-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["key-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["key-settings"].$put)({ json }),
     }),
   },
   payments: {

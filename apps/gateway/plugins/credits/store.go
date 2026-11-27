@@ -66,20 +66,21 @@ const keyLimitSQL = `SELECT limit_micro_sar, limit_reset FROM api_key WHERE virt
 const keyLockSQL = `SELECT pg_advisory_xact_lock(hashtextextended('credits:key:' || $1, 0))`
 
 // keySpendSQL is what a key has spent in its current window (UTC calendar day, ISO week
-// or month; all time without a reset), plus what its open holds may still spend.
+// or month; all time without a reset), plus what its open holds may still spend. The window
+// is the control plane's key_limit_window_start (migration 0040), the one definition the
+// dashboard and GET /api/v1/key count with too.
 const keySpendSQL = `
 SELECT coalesce((
          SELECT -sum(amount) FROM credit_ledger_entry
           WHERE virtual_key_id = $1 AND kind = 'usage'
-            AND created_at >= CASE $2::text
-                  WHEN 'daily' THEN date_trunc('day', now() AT TIME ZONE 'UTC')
-                  WHEN 'weekly' THEN date_trunc('week', now() AT TIME ZONE 'UTC')
-                  WHEN 'monthly' THEN date_trunc('month', now() AT TIME ZONE 'UTC')
-                  ELSE '-infinity'::timestamp
-                END), 0)
+            AND created_at >= key_limit_window_start($2::text, now() AT TIME ZONE 'UTC')), 0)
      + coalesce((
          SELECT sum(amount) FROM credit_reservation
           WHERE virtual_key_id = $1 AND settled_at IS NULL), 0)`
+
+// keyWindowEndSQL is when a key's current limit window ends (key_limit_window_end, migration
+// 0040): null for a limit that never resets.
+const keyWindowEndSQL = `SELECT key_limit_window_end($1::text, now() AT TIME ZONE 'UTC')`
 
 // Reserve holds amount (micro-SAR) against the organization's balance and, when virtualKeyID
 // names a key with a spending limit, against that limit too. amount must be positive.
@@ -149,6 +150,8 @@ type Shortfall struct {
 	KeyReset string
 	// KeySpent is what the key spent in its current window plus what its open holds may spend.
 	KeySpent int64
+	// KeyResetsAt is when the key's window starts again (UTC); nil when it never resets.
+	KeyResetsAt *time.Time
 }
 
 const accountSQL = `SELECT balance, held FROM credit_account WHERE organization_id = $1`
@@ -179,6 +182,16 @@ func (s *Store) Shortfall(ctx context.Context, organizationID, virtualKeyID stri
 	}
 	if err := s.pool.QueryRow(ctx, keySpendSQL, virtualKeyID, reset).Scan(&out.KeySpent); err != nil {
 		return out, fmt.Errorf("credits: key spend: %w", err)
+	}
+	if reset != nil {
+		var end *time.Time
+		if err := s.pool.QueryRow(ctx, keyWindowEndSQL, reset).Scan(&end); err != nil {
+			return out, fmt.Errorf("credits: key window end: %w", err)
+		}
+		if end != nil {
+			utc := end.UTC()
+			out.KeyResetsAt = &utc
+		}
 	}
 	return out, nil
 }

@@ -21,5 +21,10 @@ export default async function Page({
     return notFound();
   }
 
-  return <KeysPage organizationId={activeOrganization.id} />;
+  return (
+    <KeysPage
+      organizationId={activeOrganization.id}
+      organizationSlug={organization}
+    />
+  );
 }

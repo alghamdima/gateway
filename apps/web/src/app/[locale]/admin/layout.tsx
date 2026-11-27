@@ -48,6 +48,11 @@ const menu = [
         icon: <Icons.Percent />,
       },
       {
+        title: "keySettings",
+        href: pathsConfig.admin.keySettings.index,
+        icon: <Icons.Key />,
+      },
+      {
         title: "modelPrices",
         href: pathsConfig.admin.modelPrices.index,
         icon: <Icons.ChartNoAxesGantt />,

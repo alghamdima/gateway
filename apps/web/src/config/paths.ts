@@ -25,6 +25,9 @@ const pathsConfig = {
     pricing: {
       index: `${ADMIN_PREFIX}/pricing`,
     },
+    keySettings: {
+      index: `${ADMIN_PREFIX}/key-settings`,
+    },
     modelPrices: {
       index: `${ADMIN_PREFIX}/model-prices`,
     },
@@ -90,6 +93,7 @@ const pathsConfig = {
       },
       members: `${DASHBOARD_PREFIX}/${slug}/members`,
       keys: `${DASHBOARD_PREFIX}/${slug}/keys`,
+      key: (id: string) => `${DASHBOARD_PREFIX}/${slug}/keys/${id}`,
       credits: `${DASHBOARD_PREFIX}/${slug}/credits`,
       activity: `${DASHBOARD_PREFIX}/${slug}/activity`,
       dataPolicy: `${DASHBOARD_PREFIX}/${slug}/data-policy`,

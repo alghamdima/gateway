@@ -77,9 +77,9 @@ func TestCreditsRefusal_SaysWhetherRetryingCanHelp(t *testing.T) {
 
 func TestKeyLimitRefusal_GivesTheNumbersAndTheReset(t *testing.T) {
 	limit := int64(10_000_000) // SAR 10
-	now := time.Date(2026, 11, 27, 15, 4, 5, 0, time.UTC)
+	resetsAt := time.Date(2026, 11, 28, 0, 0, 0, 0, time.UTC) // read from key_limit_window_end by Shortfall
 
-	sc := keyLimitRefusal(Shortfall{KeyLimit: &limit, KeySpent: 9_500_000, KeyReset: "daily"}, true, 1_000_000, now)
+	sc := keyLimitRefusal(Shortfall{KeyLimit: &limit, KeySpent: 9_500_000, KeyReset: "daily", KeyResetsAt: &resetsAt}, true, 1_000_000)
 	if *sc.Error.StatusCode != 402 || *sc.Error.Type != ErrorTypeKeyLimit {
 		t.Fatalf("refused with %d %s, want 402 %s", *sc.Error.StatusCode, *sc.Error.Type, ErrorTypeKeyLimit)
 	}
@@ -99,39 +99,17 @@ func TestKeyLimitRefusal_GivesTheNumbersAndTheReset(t *testing.T) {
 	}
 
 	t.Run("one request bigger than the whole limit says retrying will not help", func(t *testing.T) {
-		sc := keyLimitRefusal(Shortfall{KeyLimit: &limit}, true, limit+1, now)
+		sc := keyLimitRefusal(Shortfall{KeyLimit: &limit}, true, limit+1)
 		if reason := sc.Error.Error.Refusal.Reason; reason != ReasonRequestExceedsKeyLimit {
 			t.Fatalf("reason %s", reason)
 		}
 	})
 
 	t.Run("a limit with no reset has no reset time", func(t *testing.T) {
-		errorObject, _ := metadataOf(t, keyLimitRefusal(Shortfall{KeyLimit: &limit, KeySpent: limit}, true, 1, now))
+		errorObject, _ := metadataOf(t, keyLimitRefusal(Shortfall{KeyLimit: &limit, KeySpent: limit}, true, 1))
 		metadata, _ := errorObject["metadata"].(map[string]any)
 		if metadata["resets_at"] != nil || metadata["limit_reset"] != nil {
 			t.Fatalf("metadata %v", metadata)
 		}
 	})
-}
-
-func TestWindowEnd_MatchesTheLedgersWindows(t *testing.T) {
-	// a Friday afternoon
-	now := time.Date(2026, 11, 27, 15, 0, 0, 0, time.UTC)
-	for reset, want := range map[string]string{
-		"daily":   "2026-11-28T00:00:00Z",
-		"weekly":  "2026-11-30T00:00:00Z", // the next Monday, as date_trunc('week') counts
-		"monthly": "2026-12-01T00:00:00Z",
-	} {
-		got, ok := windowEnd(reset, now)
-		if !ok || got.Format(time.RFC3339) != want {
-			t.Errorf("%s: %v %v, want %s", reset, got, ok, want)
-		}
-	}
-	// on a Monday the window ends a week later, not today
-	if got, _ := windowEnd("weekly", time.Date(2026, 11, 30, 0, 0, 0, 0, time.UTC)); got.Format(time.RFC3339) != "2026-12-07T00:00:00Z" {
-		t.Errorf("weekly on a Monday: %v", got)
-	}
-	if _, ok := windowEnd("", now); ok {
-		t.Error("a limit that never resets has no window end")
-	}
 }

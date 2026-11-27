@@ -221,57 +221,152 @@
   "keys": {
     "title": "API keys",
     "description": "Keys call the models through the API and spend this organization's credits. Owners and admins manage them.",
+    "search": {
+      "placeholder": "Search by name or paste a key…",
+      "label": "Search keys",
+      "empty": "No key matches this search.",
+      "clear": "Clear search"
+    },
     "create": {
-      "cta": "Create key",
-      "title": "Create an API key"
+      "cta": "New key",
+      "title": "Create an API key",
+      "description": "A key's expiration is set now and cannot be changed later."
+    },
+    "error": {
+      "expiryBeyondMaxLifetime": "This expiration is longer than the platform allows. Choose a shorter one."
     },
     "edit": {
-      "title": "Edit key",
       "success": "Key updated."
     },
+    "disable": {
+      "cta": "Disable",
+      "title": "Disable key",
+      "description": "Are you sure you want to disable {{name}}? You can re-enable it later.",
+      "success": "Key disabled."
+    },
+    "enable": {
+      "cta": "Enable",
+      "success": "Key enabled."
+    },
     "delete": {
-      "title": "Delete {{name}}?",
-      "description": "Requests with this key stop working at once. This cannot be undone.",
+      "cta": "Delete",
+      "title": "Delete key",
+      "description": "Are you sure you want to delete {{name}}? This action cannot be undone.",
       "success": "Key deleted."
     },
     "secret": {
-      "title": "Copy your new key",
-      "description": "This is the only time it is shown. Store it somewhere safe; if you lose it, create a new one.",
+      "title": "Your new key",
+      "description": "Please copy it now and write it down somewhere safe. You will not be able to see it again.",
       "copy": "Copy key",
       "done": "I have copied it"
     },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "expired": "Expired"
+    },
     "form": {
-      "description": "A spending limit caps what this key can spend, on top of the organization's balance.",
       "name": {
         "label": "Name",
+        "description": "Choose a clear, descriptive name to identify this key.",
         "placeholder": "Production"
       },
+      "expiry": {
+        "label": "Expiration",
+        "preview": "Key will expire on: {{date}}",
+        "previewNever": "This key will not expire.",
+        "readOnly": "Expiration cannot be modified. Create a new API key for a new expiration time.",
+        "never": "No expiration",
+        "neverValue": "Never",
+        "1h": "1 hour",
+        "1d": "1 day",
+        "7d": "7 days",
+        "30d": "30 days",
+        "90d": "90 days",
+        "180d": "180 days",
+        "1y": "1 year",
+        "maximum": "The platform allows keys to live at most {{lifetime}}."
+      },
       "limit": {
-        "label": "Spending limit",
-        "placeholder": "No limit",
-        "description": "Leave the limit empty for no cap. Limits reset at midnight UTC, on Mondays, or on the first of the month.",
-        "invalid": "Enter an amount above 0, up to 1,000,000."
+        "label": "Credit limit",
+        "choice": "Credit limit",
+        "custom": "Custom amount",
+        "none": "No limit",
+        "amount": "Amount in SAR",
+        "invalid": "Enter an amount above 0, up to 4,000,000.",
+        "helper": "Requests are rejected once this key has used {{amount}} in total, until you raise its credit limit.",
+        "helperReset": "Requests are rejected once this key has used {{amount}} in a {{window}}, until it resets or you raise its credit limit.",
+        "helperNone": "No limit: this key can spend the organization's whole balance.",
+        "description": "Once the credits consumed by this key reach this amount, the key stops working. Leave blank for no limit."
       },
       "reset": {
-        "label": "Resets",
-        "never": "Never",
+        "label": "Reset limit every…",
+        "description": "When the credit limit resets: daily at midnight UTC, weekly on Monday, or monthly on the 1st.",
+        "never": "N/A",
         "daily": "Daily",
         "weekly": "Weekly",
-        "monthly": "Monthly"
+        "monthly": "Monthly",
+        "window": {
+          "daily": "day (UTC)",
+          "weekly": "week (from Monday, UTC)",
+          "monthly": "month (from the 1st, UTC)"
+        },
+        "badge": {
+          "never": "Total",
+          "daily": "Daily",
+          "weekly": "Weekly",
+          "monthly": "Monthly"
+        }
       }
     },
     "list": {
-      "empty": "No keys yet.",
-      "name": "Name",
+      "empty": "No API keys yet. Create your first key to start calling models.",
       "key": "Key",
-      "limit": "Limit",
+      "lastUsed": "Last used",
+      "expires": "Expires {{date}}",
+      "neverExpires": "Never expires",
+      "total": "Total",
+      "limit": "Key limit",
       "status": "Status",
-      "created": "Created",
       "noLimit": "No limit",
-      "active": "Active",
-      "disabled": "Disabled",
-      "enable": "Enable",
-      "disable": "Disable"
+      "never": "Never",
+      "actions": "Actions for {{name}}",
+      "open": "Open",
+      "count_one": "{{count}} key",
+      "count_other": "{{count}} keys"
+    },
+    "page": {
+      "back": "API keys",
+      "notFound": "This key does not exist, or it was deleted.",
+      "activity": "Activity",
+      "created": "Created {{date}}",
+      "details": "Details",
+      "spend": "Spend in the last 30 days",
+      "noSpend": "No spend in this window.",
+      "usage": "Usage",
+      "usageDescription": "Charged requests, in SAR. Weeks start on Monday and every period is in UTC.",
+      "total": "Total",
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "metadata": "Metadata",
+      "createdAt": "Created",
+      "lastUsed": "Last used",
+      "lastUsedNever": "Never",
+      "budget": "Budget",
+      "budgetLabel": "Key limit",
+      "budgetUsed": "{{used}} / {{limit}}",
+      "budgetRemaining": "{{remaining}} remaining",
+      "budgetResets": "Resets {{date}}",
+      "budgetNone": "No limit on this key.",
+      "danger": "Danger zone",
+      "disableTitle": "Disable key",
+      "disableDescription": "Prevent this key from being used. You can re-enable it later.",
+      "enableTitle": "Enable key",
+      "enableDescription": "Let this key be used again.",
+      "deleteTitle": "Delete key",
+      "deleteDescription": "Permanently delete this key. This action cannot be undone.",
+      "expiredNote": "This key has expired. Create a new key to keep calling models."
     }
   },
   "credits": {

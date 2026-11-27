@@ -20,6 +20,10 @@ ADR 0004 mapped a key's spending limit (OpenRouter's `limit` and `limit_reset`) 
 6. **Where the limit is read.** `api_key.limit_micro_usd` and `limit_reset`, by `virtual_key_id`, on every hold. The `gateway_ledger` role gets SELECT on those three columns only, not on the key's name or hash. A virtual key the control plane did not create has no row and only the balance applies.
 7. **Refusal.** `403` with type `credits_key_limit`, as OpenRouter answers a key over its limit with 403.
 
+## Amendment (2026-11-27): one definition of the windows
+
+The windows were written twice, as `date_trunc` in the plugin's SQL and in TypeScript for `GET /api/v1/key`, with `windowEnd` again in Go and TypeScript. They are now the SQL functions `key_limit_window_start(reset, at)` and `key_limit_window_end(reset, at)` (migration `0040`, `IMMUTABLE`): the plugin counts a key's spend from the first and says `resets_at` from the second; the dashboard and `GET /api/v1/key` count usage and show the reset with the same two (`packages/api/src/modules/keys/usage.ts`). Their boundaries are tested in Go, and through the gateway binary a key at its limit gets 402 `key_limit` until its window has turned, then works again.
+
 ## Consequences
 
 - The limit and the charge are the same number, whatever the markup or a change to it.

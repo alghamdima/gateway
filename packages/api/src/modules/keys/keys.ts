@@ -1,13 +1,21 @@
 import { createHash } from "node:crypto";
 
-import { and, desc, eq } from "@workspace/db";
+import { and, desc, eq, ilike, or, sql } from "@workspace/db";
 import { apiKey, gatewayCustomer } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { getGateway } from "@workspace/gateway-client/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
-import { generateId } from "@workspace/shared/utils";
+import { generateId, HttpException } from "@workspace/shared/utils";
 
 import { accessForOrganization } from "../data-policy/policy";
+import { expiresAtFor, isWithinMaxLifetime } from "./expiry";
+import { getKeySettings } from "./settings";
+import {
+  getKeySpendByDay,
+  getKeyUsage,
+  getOrganizationKeyUsage,
+} from "./usage";
 
 import type {
   GatewayClient,
@@ -28,7 +36,7 @@ export interface KeyLimit {
 }
 
 /** What may be shown about a key: never its hash or virtual key id. */
-const publicColumns = {
+export const publicColumns = {
   id: apiKey.id,
   name: apiKey.name,
   prefix: apiKey.prefix,
@@ -38,6 +46,22 @@ const publicColumns = {
   disabledAt: apiKey.disabledAt,
   createdBy: apiKey.createdBy,
   createdAt: apiKey.createdAt,
+};
+
+/**
+ * Enabled, disabled, or expired (KEYS-04). An expired key cannot be enabled
+ * again in any way that helps: its expiry is fixed (KEYS-03), so expired wins.
+ */
+export type KeyStatus = "enabled" | "disabled" | "expired";
+
+export const keyStatus = (
+  key: { disabledAt: Date | null; expiresAt: Date | null },
+  now = new Date(),
+): KeyStatus => {
+  if (key.expiresAt && key.expiresAt.getTime() <= now.getTime()) {
+    return "expired";
+  }
+  return key.disabledAt ? "disabled" : "enabled";
 };
 
 export const hashKey = (value: string) =>
@@ -95,19 +119,52 @@ export interface CreateKeyInput {
   organizationId: string;
   userId: string;
   name: string;
+  /** Omitted: the platform's default limit (ADMIN-12). null: no limit. */
   limit?: KeyLimit | null;
+  /**
+   * Omitted: the platform's default expiry (ADMIN-12). null: no expiration.
+   * The API turns the customer's choice into this moment (expiresAtFor); it
+   * must be within the platform's maximum lifetime.
+   */
   expiresAt?: Date | null;
 }
+
+/** A key may not outlive the platform's maximum lifetime, nor skip expiring while one is set. */
+const expiryBeyondMaximum = () =>
+  new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY, {
+    code: "organization:keys.error.expiryBeyondMaxLifetime",
+  });
 
 /**
  * Creates the virtual key first, then records it. If recording fails, the
  * virtual key is deleted, so no key the control plane does not know about
- * stays alive.
+ * stays alive. The expiry given to the gateway is the expiry recorded here:
+ * the gateway enforces it, and nothing changes it later but the platform's
+ * maximum lifetime (lifetime.ts), which updates both.
  */
 export const createKey = async (
   { organizationId, userId, name, limit, expiresAt }: CreateKeyInput,
   gateway: GatewayClient = getGateway(),
 ) => {
+  const settings = await getKeySettings();
+  const now = new Date();
+  const expiry =
+    expiresAt === undefined
+      ? expiresAtFor(settings.defaultExpiry, now)
+      : expiresAt;
+  if (!isWithinMaxLifetime(expiry, settings.maxLifetimeSeconds, now)) {
+    throw expiryBeyondMaximum();
+  }
+  const keyLimit =
+    limit === undefined
+      ? settings.defaultLimitMicroSar === null
+        ? null
+        : {
+            limitMicroSar: settings.defaultLimitMicroSar,
+            reset: settings.defaultLimitReset,
+          }
+      : limit;
+
   const customerId = await ensureGatewayCustomer(organizationId, gateway);
   // the gateway's key names are unique across every customer, so it gets our
   // id; the name the customer chose lives only here
@@ -115,7 +172,7 @@ export const createKey = async (
   const virtualKey = await gateway.createVirtualKey({
     name: id,
     customerId,
-    expiresAt,
+    expiresAt: expiry,
     // the organization's data policy, from the key's first request (ADR 0015)
     access: await accessForOrganization(organizationId, gateway),
   });
@@ -131,9 +188,10 @@ export const createKey = async (
         virtualKeyId: virtualKey.id,
         prefix: keyPrefix(virtualKey.value),
         valueHash: hashKey(virtualKey.value),
-        limitMicroSar: limit?.limitMicroSar ?? null,
-        limitReset: limit?.reset ?? null,
-        expiresAt: expiresAt ?? null,
+        limitMicroSar: keyLimit?.limitMicroSar ?? null,
+        limitReset: keyLimit?.reset ?? null,
+        expiresAt: expiry,
+        createdAt: now,
       })
       .returning(publicColumns);
     if (!row) {
@@ -155,12 +213,75 @@ export const createKey = async (
   }
 };
 
-export const listKeys = async (organizationId: string) =>
-  db
-    .select(publicColumns)
+/**
+ * The organization's keys, newest first, each with its status and usage
+ * (KEYS-06): spend all time, what counts against its limit now, last used.
+ */
+export const listKeys = async (organizationId: string) => {
+  const [rows, usage] = await Promise.all([
+    db
+      .select(publicColumns)
+      .from(apiKey)
+      .where(eq(apiKey.organizationId, organizationId))
+      .orderBy(desc(apiKey.createdAt)),
+    getOrganizationKeyUsage(organizationId),
+  ]);
+  const now = new Date();
+  return rows.map((row) => ({
+    ...row,
+    status: keyStatus(row, now),
+    usage: usage.get(row.id) ?? {
+      total: 0,
+      spentAgainstLimit: 0,
+      lastUsedAt: null,
+    },
+  }));
+};
+
+/**
+ * Finds keys by name, by the start of their shown prefix, or by a whole key
+ * someone pasted (KEYS-05). A pasted key is hashed and compared with the
+ * stored hash: the key itself is never stored, logged or sent back, and only
+ * the organization's own keys can match.
+ */
+export const searchKeys = async (organizationId: string, query: string) => {
+  const term = query.trim();
+  const escaped = term.replace(/[\\%_]/g, (char) => `\\${char}`);
+  const matches = await db
+    .select({ id: apiKey.id })
     .from(apiKey)
-    .where(eq(apiKey.organizationId, organizationId))
-    .orderBy(desc(apiKey.createdAt));
+    .where(
+      and(
+        eq(apiKey.organizationId, organizationId),
+        or(
+          eq(apiKey.valueHash, hashKey(term)),
+          ilike(apiKey.name, `%${escaped}%`),
+          sql`starts_with(${apiKey.prefix}, ${term})`,
+        ),
+      ),
+    );
+  const ids = new Set(matches.map((match) => match.id));
+  return (await listKeys(organizationId)).filter((key) => ids.has(key.id));
+};
+
+/** One key with everything its page shows (KEYS-11); undefined when the organization has no such key. */
+export const getKey = async (organizationId: string, keyId: string) => {
+  const [row] = await db
+    .select({ ...publicColumns, virtualKeyId: apiKey.virtualKeyId })
+    .from(apiKey)
+    .where(
+      and(eq(apiKey.id, keyId), eq(apiKey.organizationId, organizationId)),
+    );
+  if (!row) {
+    return undefined;
+  }
+  const { virtualKeyId, ...key } = row;
+  const [usage, spendByDay] = await Promise.all([
+    getKeyUsage(virtualKeyId, key.limitReset),
+    getKeySpendByDay(virtualKeyId),
+  ]);
+  return { ...key, status: keyStatus(key), usage, spendByDay };
+};
 
 const findKey = async (organizationId: string, keyId: string) => {
   const [row] = await db

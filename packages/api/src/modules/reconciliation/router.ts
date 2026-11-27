@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import { runCreditExpiryJob } from "../credits/expiry";
 import { checkLowBalances } from "../credits/low-balance";
 import { applyPendingPolicies } from "../data-policy/policy";
+import { runKeyLifetimeJob } from "../keys/lifetime";
 import {
   runModelPricesJob,
   runModelPriceSuggestionsJob,
@@ -78,6 +79,13 @@ const modelPriceSuggestions = async (c: Context) => {
   return c.json(await runModelPriceSuggestionsJob());
 };
 
+const keyLifetime = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await runKeyLifetimeJob());
+};
+
 /**
  * /api/internal: jobs a scheduler calls with `Authorization: Bearer
  * <CRON_SECRET>`. Without CRON_SECRET set, every call is refused. GET is
@@ -94,6 +102,9 @@ const modelPriceSuggestions = async (c: Context) => {
  *   proposes the datasheet's prices that differ from ours (ADR 0018)
  * - /credit-expiry: hourly; expires what is left of credit lots past their
  *   expiry date, idempotently (BILL-17, ADR 0019)
+ * - /key-lifetime: hourly; cuts keys that would outlive the maximum key
+ *   lifetime, in the gateway and the database, finishing what a failure left
+ *   when staff shortened it (ADMIN-12), idempotently
  */
 export const internalRouter = new Hono()
   .get("/reconciliation", reconcileYesterday)
@@ -107,4 +118,6 @@ export const internalRouter = new Hono()
   .get("/model-price-suggestions", modelPriceSuggestions)
   .post("/model-price-suggestions", modelPriceSuggestions)
   .get("/credit-expiry", creditExpiry)
-  .post("/credit-expiry", creditExpiry);
+  .post("/credit-expiry", creditExpiry)
+  .get("/key-lifetime", keyLifetime)
+  .post("/key-lifetime", keyLifetime);

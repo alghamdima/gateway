@@ -44,6 +44,8 @@ const menu = ({
       {
         title: "apiKeys",
         href: pathsConfig.dashboard.organization(slug).keys,
+        // a key's own page is under it
+        exact: false,
         icon: <Icons.Key />,
       },
       {

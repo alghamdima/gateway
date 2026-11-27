@@ -4,6 +4,11 @@ import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 
+import {
+  KEY_EXPIRIES,
+  KEY_EXPIRY_CHOICES,
+  KEY_EXPIRY_SECONDS,
+} from "@workspace/api/schema";
 import { useTranslation } from "@workspace/i18n";
 import { Button } from "@workspace/ui-web/button";
 import {
@@ -32,103 +37,122 @@ import {
 } from "@workspace/ui-web/select";
 import { Spinner } from "@workspace/ui-web/spinner";
 
-import { MICRO_SAR, sarToMicroSar } from "~/modules/keys/money";
+import {
+  LimitFields,
+  limitValuesSchema,
+  toKeyLimit,
+  toLimitValues,
+} from "~/modules/keys/limit-fields";
+import { useNow } from "~/modules/keys/use-now";
 
-export const RESETS = ["never", "daily", "weekly", "monthly"] as const;
-export type Reset = (typeof RESETS)[number];
+import type { KeyExpiryChoice } from "@workspace/api/schema";
+import type { KeyCreationSettings } from "~/modules/keys/lib/api";
+import type { KeyLimitInput } from "~/modules/keys/limit-fields";
 
-export interface KeyFormValues {
+export interface CreateKeyResult {
   name: string;
-  /** Empty: no limit. */
-  limitSar: string;
-  reset: Reset;
+  expiry: KeyExpiryChoice;
+  limit: KeyLimitInput | null;
 }
 
-export interface KeyFormResult {
-  name: string;
-  limit: {
-    limitMicroSar: number;
-    reset: Exclude<Reset, "never"> | null;
-  } | null;
-}
-
-interface KeyFormModalProps {
+interface CreateKeyModalProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly title: string;
-  readonly submitLabel: string;
-  readonly initial?: Partial<KeyFormValues>;
-  readonly onSubmit: (result: KeyFormResult) => Promise<unknown>;
+  readonly settings: KeyCreationSettings | undefined;
+  readonly onSubmit: (result: CreateKeyResult) => Promise<unknown>;
 }
 
-/** Name, and an optional spending cap with its reset: for creating and for editing a key. */
-export const KeyFormModal = ({
+/** The lifetimes the platform's maximum allows; "never" only without one (ADMIN-12). */
+export const allowedExpiries = (
+  maxLifetime: KeyCreationSettings["maxLifetime"],
+): KeyExpiryChoice[] =>
+  maxLifetime === null
+    ? [...KEY_EXPIRY_CHOICES]
+    : KEY_EXPIRIES.filter(
+        (choice) =>
+          KEY_EXPIRY_SECONDS[choice] <= KEY_EXPIRY_SECONDS[maxLifetime],
+      );
+
+/** "Nov 27, 2026, 3:04 AM GMT+3", in the reader's own time zone. */
+export const formatExpiry = (date: Date, locale: string) =>
+  new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZoneName: "short",
+  }).format(date);
+
+/**
+ * Name, expiration (required, fixed once the key exists: KEYS-03) and credit
+ * limit with its reset, starting from the platform's defaults (ADMIN-12).
+ */
+export const CreateKeyModal = ({
   open,
   onOpenChange,
-  title,
-  submitLabel,
-  initial,
+  settings,
   onSubmit,
-}: KeyFormModalProps) => {
-  const { t } = useTranslation(["common", "organization"]);
+}: CreateKeyModalProps) => {
+  const { t, i18n } = useTranslation(["common", "organization"]);
+  const expiries = allowedExpiries(settings?.maxLifetime ?? null);
 
   const schema = z.object({
     name: z.string().trim().min(1).max(100),
-    limitSar: z
-      .string()
-      .trim()
-      .refine(
-        (value) =>
-          value === "" ||
-          (Number.isFinite(Number(value)) &&
-            Number(value) > 0 &&
-            Number(value) <= 1_000_000),
-        { message: t("organization:keys.form.limit.invalid") },
-      ),
-    reset: z.enum(RESETS),
+    expiry: z.enum(KEY_EXPIRY_CHOICES),
+    limit: limitValuesSchema(t("organization:keys.form.limit.invalid")),
   });
 
   const form = useForm({
     resolver: standardSchemaResolver(schema),
     values: {
-      name: initial?.name ?? "",
-      limitSar: initial?.limitSar ?? "",
-      reset: initial?.reset ?? "monthly",
+      name: "",
+      expiry: settings?.defaultExpiry ?? "90d",
+      limit: toLimitValues(
+        settings?.defaultLimitMicroSar ?? null,
+        settings?.defaultLimitReset ?? null,
+        settings?.limitPresetsMicroSar ?? [],
+      ),
     },
   });
-  const limitSar = useWatch({ control: form.control, name: "limitSar" });
-  const hasLimit = limitSar.trim() !== "";
+  const expiry = useWatch({ control: form.control, name: "expiry" });
+
+  // the preview moves with the clock while the form is open
+  const now = useNow(15_000);
+  const preview =
+    expiry === "never"
+      ? t("organization:keys.form.expiry.previewNever")
+      : t("organization:keys.form.expiry.preview", {
+          date: formatExpiry(
+            new Date(now + KEY_EXPIRY_SECONDS[expiry] * 1000),
+            i18n.language,
+          ),
+        });
 
   const submit = async (values: z.infer<typeof schema>) => {
     await onSubmit({
       name: values.name,
-      limit:
-        values.limitSar === ""
-          ? null
-          : {
-              limitMicroSar: sarToMicroSar(Number(values.limitSar)),
-              reset: values.reset === "never" ? null : values.reset,
-            },
+      expiry: values.expiry,
+      limit: toKeyLimit(values.limit),
     });
+    form.reset();
   };
 
-  const resets = RESETS.map((value) => ({
+  const expiryItems = expiries.map((value) => ({
     value,
-    label: t(`organization:keys.form.reset.${value}`),
+    label: t(`organization:keys.form.expiry.${value}`),
   }));
+  const isDisabled = form.formState.isSubmitting || !settings;
 
   return (
     <Modal open={open} drawer={{ onOpenChange }} dialog={{ onOpenChange }}>
       <ModalContent>
         <ModalHeader>
-          <ModalTitle>{title}</ModalTitle>
+          <ModalTitle>{t("organization:keys.create.title")}</ModalTitle>
           <ModalDescription>
-            {t("organization:keys.form.description")}
+            {t("organization:keys.create.description")}
           </ModalDescription>
         </ModalHeader>
         <ModalBody>
           <form
-            id="key-form"
+            id="key-create-form"
             noValidate
             onSubmit={form.handleSubmit(submit)}
             className="space-y-6"
@@ -147,7 +171,7 @@ export const KeyFormModal = ({
                     placeholder={t("organization:keys.form.name.placeholder")}
                     {...field}
                     aria-invalid={fieldState.invalid}
-                    disabled={form.formState.isSubmitting}
+                    disabled={isDisabled}
                   />
                   {fieldState.invalid && (
                     <FieldError errors={[fieldState.error]} />
@@ -155,66 +179,63 @@ export const KeyFormModal = ({
                 </Field>
               )}
             />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Controller
-                name="limitSar"
-                control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="key-limit">
-                      {t("organization:keys.form.limit.label")}
-                    </FieldLabel>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">SAR</span>
-                      <Input
-                        id="key-limit"
-                        inputMode="decimal"
-                        placeholder={t(
-                          "organization:keys.form.limit.placeholder",
-                        )}
-                        {...field}
-                        aria-invalid={fieldState.invalid}
-                        disabled={form.formState.isSubmitting}
-                      />
-                    </div>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
-              />
-              <Controller
-                name="reset"
-                control={form.control}
-                render={({ field }) => (
-                  <Field>
-                    <FieldLabel htmlFor="key-reset">
-                      {t("organization:keys.form.reset.label")}
-                    </FieldLabel>
-                    <Select
-                      items={resets}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={!hasLimit || form.formState.isSubmitting}
-                    >
-                      <SelectTrigger id="key-reset" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {resets.map((reset) => (
-                          <SelectItem key={reset.value} value={reset.value}>
-                            {reset.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              />
-            </div>
-            <FieldDescription>
-              {t("organization:keys.form.limit.description")}
-            </FieldDescription>
+            <Controller
+              name="expiry"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="key-expiry">
+                    {t("organization:keys.form.expiry.label")}
+                  </FieldLabel>
+                  <Select
+                    items={expiryItems}
+                    value={field.value}
+                    onValueChange={(value) => {
+                      const choice = expiries.find((item) => item === value);
+                      if (choice) field.onChange(choice);
+                    }}
+                    disabled={isDisabled}
+                  >
+                    <SelectTrigger id="key-expiry" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {expiryItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription aria-live="polite">
+                    {preview}
+                  </FieldDescription>
+                  {settings?.maxLifetime && (
+                    <FieldDescription>
+                      {t("organization:keys.form.expiry.maximum", {
+                        lifetime: t(
+                          `organization:keys.form.expiry.${settings.maxLifetime}`,
+                        ),
+                      })}
+                    </FieldDescription>
+                  )}
+                </Field>
+              )}
+            />
+            <Controller
+              name="limit"
+              control={form.control}
+              render={({ field }) => (
+                <LimitFields
+                  idPrefix="key-create"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={form.formState.errors.limit?.limitSar?.message}
+                  presets={settings?.limitPresetsMicroSar ?? []}
+                  disabled={isDisabled}
+                />
+              )}
+            />
           </form>
         </ModalBody>
         <ModalFooter>
@@ -225,30 +246,15 @@ export const KeyFormModal = ({
               </Button>
             }
           />
-          <Button
-            type="submit"
-            form="key-form"
-            disabled={form.formState.isSubmitting}
-          >
-            {form.formState.isSubmitting ? <Spinner /> : submitLabel}
+          <Button type="submit" form="key-create-form" disabled={isDisabled}>
+            {form.formState.isSubmitting ? (
+              <Spinner />
+            ) : (
+              t("organization:keys.create.cta")
+            )}
           </Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
   );
 };
-
-/** The form's values for a key as the API returns it. */
-export const toFormValues = (key: {
-  name: string;
-  limitMicroSar: number | null;
-  limitReset: string | null;
-}): KeyFormValues => ({
-  name: key.name,
-  limitSar:
-    key.limitMicroSar === null ? "" : String(key.limitMicroSar / MICRO_SAR),
-  reset:
-    key.limitMicroSar === null
-      ? "monthly"
-      : (RESETS.find((reset) => reset === key.limitReset) ?? "never"),
-});

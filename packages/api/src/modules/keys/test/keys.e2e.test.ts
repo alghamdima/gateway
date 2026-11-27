@@ -110,6 +110,46 @@ describe.skipIf(!adminUrl || !binary)(
       throw new Error("a hold was never settled");
     };
 
+    const adminAuthorization = `Basic ${Buffer.from(`${ADMIN_USER}:${ADMIN_PASSWORD}`).toString("base64")}`;
+
+    /** The virtual key as the gateway holds it; undefined when it is gone. */
+    const gatewayKey = async (virtualKeyId: string) => {
+      const response = await fetch(
+        `${gatewayUrl}/api/governance/virtual-keys/${encodeURIComponent(virtualKeyId)}`,
+        { headers: { Authorization: adminAuthorization } },
+      );
+      if (response.status === 404) {
+        return undefined;
+      }
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as {
+        virtual_key: { expires_at?: string | null; is_active?: boolean };
+      };
+      return body.virtual_key;
+    };
+
+    const stored = async (keyId: string) => {
+      const [row] = await sql<
+        { virtual_key_id: string; expires_at: Date | null; created_at: Date }[]
+      >`select virtual_key_id, expires_at, created_at from api_key where id = ${keyId}`;
+      if (!row) {
+        throw new Error(`no api_key ${keyId}`);
+      }
+      return row;
+    };
+
+    /** The gateway's expiry and ours, as milliseconds; null for none. */
+    const expiries = async (keyId: string) => {
+      const row = await stored(keyId);
+      const virtualKey = await gatewayKey(row.virtual_key_id);
+      return {
+        ours: row.expires_at?.getTime() ?? null,
+        gateway: virtualKey?.expires_at
+          ? new Date(virtualKey.expires_at).getTime()
+          : null,
+      };
+    };
+
     beforeAll(async () => {
       const { createTestDatabase } = await import("@workspace/db/testing");
       database = await createTestDatabase(adminUrl ?? "");
@@ -631,6 +671,182 @@ describe.skipIf(!adminUrl || !binary)(
       expect(result.status).toBe("ok");
     }, 60_000);
 
+    it("a key at its limit gets 402 key_limit until its window starts again: daily, weekly and monthly", async () => {
+      const usage = await import("../usage");
+      await sql`insert into organization (id, name, slug, created_at) values ('org_windows', 'Windows', 'windows', now())`;
+      await ledger.applyEntry({
+        organizationId: "org_windows",
+        amount: SAR,
+        kind: "top_up",
+        idempotencyKey: "seed_windows",
+      });
+      const now = new Date();
+      const midnight = Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+      );
+      // when each window starts again, worked out here, apart from the database's functions
+      const nextReset = {
+        daily: new Date(midnight + 86_400_000),
+        weekly: new Date(
+          midnight + (7 - ((now.getUTCDay() + 6) % 7)) * 86_400_000,
+        ),
+        monthly: new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+        ),
+      } as const;
+
+      for (const reset of ["daily", "weekly", "monthly"] as const) {
+        const { key, apiKey } = await keys.createKey({
+          organizationId: "org_windows",
+          userId: "user_e2e",
+          name: `limit ${reset}`,
+          limit: { limitMicroSar: 3_000, reset },
+        });
+        const { virtual_key_id: vk } = await stored(apiKey.id);
+        const first = await chat(key, 1000);
+        expect(first.status).toBe(200);
+        await first.text();
+        await settled("org_windows");
+
+        // at its limit for this window
+        const { metadata } = await refusalOf(await chat(key, 1000), 402);
+        expect(metadata).toMatchObject({
+          limit_source: "key_limit",
+          reason: "key_limit_reached",
+          limit_reset: reset,
+          spent: EXPECTED_CHARGE / SAR,
+          resets_at: nextReset[reset].toISOString().replace(".000Z", "Z"),
+        });
+        // the key's page counts the same window and the same reset
+        const before = await usage.getKeyUsage(vk, reset);
+        expect(before.spentAgainstLimit).toBe(EXPECTED_CHARGE);
+        expect(before.resetsAt?.toISOString()).toBe(
+          nextReset[reset].toISOString(),
+        );
+
+        // the window turns: the charge now lies one second before the current window started
+        await sql`alter table credit_ledger_entry disable trigger credit_ledger_entry_append_only_trigger`;
+        await sql`update credit_ledger_entry set created_at = key_limit_window_start(${reset}, now() at time zone 'UTC') - interval '1 second'
+                  where virtual_key_id = ${vk} and kind = 'usage'`;
+        await sql`alter table credit_ledger_entry enable trigger credit_ledger_entry_append_only_trigger`;
+
+        const after = await chat(key, 1000);
+        expect({ reset, status: after.status }).toEqual({ reset, status: 200 });
+        await after.text();
+        await settled("org_windows");
+        const counted = await usage.getKeyUsage(vk, reset);
+        expect(counted.spentAgainstLimit).toBe(EXPECTED_CHARGE);
+        expect(counted.total).toBe(2 * EXPECTED_CHARGE);
+      }
+    }, 60_000);
+
+    it("the expiry the gateway enforces is the one recorded, and a shorter maximum lifetime moves both", async () => {
+      const settings = await import("../settings");
+      const lifetime = await import("../lifetime");
+      await sql`insert into organization (id, name, slug, created_at) values ('org_life', 'Life', 'life', now())`;
+      await ledger.applyEntry({
+        organizationId: "org_life",
+        amount: SAR,
+        kind: "top_up",
+        idempotencyKey: "seed_life",
+      });
+
+      // the create form's choices, as the API turns them into a moment
+      const { expiresAtFor } = await import("../expiry");
+      const year = await keys.createKey({
+        organizationId: "org_life",
+        userId: "user_e2e",
+        name: "a year",
+        expiresAt: expiresAtFor("1y"),
+      });
+      const hour = await keys.createKey({
+        organizationId: "org_life",
+        userId: "user_e2e",
+        name: "an hour",
+        expiresAt: expiresAtFor("1h"),
+      });
+      const never = await keys.createKey({
+        organizationId: "org_life",
+        userId: "user_e2e",
+        name: "never",
+        expiresAt: null,
+      });
+      for (const { apiKey } of [year, hour]) {
+        const both = await expiries(apiKey.id);
+        expect(both.ours).not.toBeNull();
+        expect(both.gateway).toBe(both.ours);
+      }
+      expect(await expiries(never.apiKey.id)).toEqual({
+        ours: null,
+        gateway: null,
+      });
+
+      // made two days ago, as far as the maximum is concerned: a one-day maximum has passed for it
+      await sql`update api_key set created_at = created_at - interval '2 days' where id = ${never.apiKey.id}`;
+      const change = await settings.updateKeySettings({
+        staffId: "staff_e2e",
+        defaultLimitMicroSar: null,
+        defaultLimitReset: null,
+        defaultExpiry: "1d",
+        maxLifetime: "1d",
+        limitPresetsMicroSar: [50 * SAR],
+      });
+      const result = await lifetime.applyMaxLifetime({
+        maxLifetimeSeconds: change.settings.maxLifetimeSeconds,
+      });
+      expect(result.failed).toBe(0);
+
+      // cut to created_at + 1 day, the same moment in the gateway
+      const yearRow = await stored(year.apiKey.id);
+      const cut = await expiries(year.apiKey.id);
+      expect(cut.ours).toBe(yearRow.created_at.getTime() + 86_400_000);
+      expect(cut.gateway).toBe(cut.ours);
+      // an hour is within a day: untouched
+      expect((await expiries(hour.apiKey.id)).ours).toBe(
+        hour.apiKey.expiresAt?.getTime(),
+      );
+      // past its cut-off: expires within seconds, in both places, and the gateway refuses it
+      const past = await expiries(never.apiKey.id);
+      expect(past.gateway).toBe(past.ours);
+      expect(past.ours ?? 0).toBeLessThanOrEqual(Date.now() + 5_000);
+      const stillOn = await chat(never.key);
+      expect(stillOn.status).toBe(200);
+      await stillOn.text();
+      await settled("org_life");
+      await new Promise((r) =>
+        setTimeout(r, (past.ours ?? 0) - Date.now() + 500),
+      );
+      const expired = await refusalOf(await chat(never.key), 401);
+      expect(expired.metadata).toMatchObject({
+        limit_source: "key",
+        reason: "key_expired",
+      });
+      // the year key, cut to a day, still works
+      const working = await chat(year.key);
+      expect(working.status).toBe(200);
+      await working.text();
+      await settled("org_life");
+
+      // no expiry change through the API at all: the gateway's stays as it was
+      const { updateApiKeySchema } = await import("../../../schema");
+      expect(
+        updateApiKeySchema.safeParse({ expiresAt: new Date().toISOString() })
+          .success,
+      ).toBe(false);
+
+      // back to no maximum, for the tests after this one
+      await settings.updateKeySettings({
+        staffId: "staff_e2e",
+        defaultLimitMicroSar: null,
+        defaultLimitReset: null,
+        defaultExpiry: "90d",
+        maxLifetime: null,
+        limitPresetsMicroSar: [50 * SAR],
+      });
+    }, 60_000);
+
     it("a deleted key and the keys of a deleted organization stop working", async () => {
       const { key, apiKey } = await keys.createKey({
         organizationId: "org_e2e",
@@ -639,8 +855,11 @@ describe.skipIf(!adminUrl || !binary)(
       });
       expect((await chat(key)).status).toBe(200);
       await settled("org_e2e");
+      const { virtual_key_id: deletedVk } = await stored(apiKey.id);
       await keys.deleteKey("org_e2e", apiKey.id);
       expect((await chat(key)).status).toBe(401);
+      // gone from the gateway, not only refused
+      expect(await gatewayKey(deletedVk)).toBeUndefined();
 
       const { key: survivor } = await keys.createKey({
         organizationId: "org_e2e",

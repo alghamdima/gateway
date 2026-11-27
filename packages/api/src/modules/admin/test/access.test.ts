@@ -9,8 +9,8 @@ import {
 } from "../access";
 
 // Every route the admin routers define, as [method, path after /api/admin].
-// Keep in step with modules/admin/**/router.ts, modules/pricing/router.ts and
-// modules/payments/router.ts.
+// Keep in step with modules/admin/**/router.ts, modules/pricing/router.ts,
+// modules/payments/router.ts and modules/keys/admin-router.ts.
 const ROUTES = {
   summary: ["GET", "/summary"],
   listUsers: ["GET", "/users"],
@@ -36,6 +36,9 @@ const ROUTES = {
   readPricing: ["GET", "/pricing"],
   pricingChanges: ["GET", "/pricing/changes"],
   updatePricing: ["PUT", "/pricing/settings"],
+  readKeySettings: ["GET", "/key-settings"],
+  keySettingsChanges: ["GET", "/key-settings/changes"],
+  updateKeySettings: ["PUT", "/key-settings"],
   readPayments: ["GET", "/payments"],
   paymentChanges: ["GET", "/payments/changes"],
   updatePaymentSettings: ["PUT", "/payments/settings"],
@@ -79,6 +82,8 @@ const READ_ONLY: Route[] = [
   "listCustomers",
   "readPricing",
   "pricingChanges",
+  "readKeySettings",
+  "keySettingsChanges",
   "readPayments",
   "paymentChanges",
   "listPromoCodes",
@@ -96,6 +101,7 @@ const ALLOWED: Record<string, Route[]> = {
     ...READ_ONLY,
     "adjustCredits",
     "updatePricing",
+    "updateKeySettings",
     "setTopupFee",
     "clearTopupFee",
     "updatePaymentSettings",
@@ -199,6 +205,7 @@ describe("admin audit", () => {
     ["/users/u1/accounts/a1", "u1"],
     ["/pricing/settings", "settings"],
     ["/payments/settings", "settings"],
+    ["/key-settings", "key-settings"],
     ["/payments/providers/stripe", "stripe"],
     ["/providers/k1/terms", "k1"],
     ["/providers/accounts/openai", "openai"],

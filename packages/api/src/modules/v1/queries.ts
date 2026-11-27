@@ -1,11 +1,13 @@
-import { and, eq, gte, isNull, sql } from "@workspace/db";
-import { creditLedgerEntry, creditReservation } from "@workspace/db/schema";
+import { and, eq, sql } from "@workspace/db";
+import { API_KEY_LIMIT_RESETS, creditLedgerEntry } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { CURRENCY } from "@workspace/shared/utils";
 
 import { getBalance, MICRO_SAR } from "../credits/ledger";
+import { getKeyUsage } from "../keys/usage";
 
 import type { CallingKey } from "./auth";
+import type { ApiKeyLimitReset } from "@workspace/db/schema";
 
 /**
  * The public API speaks amounts as JSON numbers, as OpenRouter's, but in the
@@ -16,95 +18,17 @@ import type { CallingKey } from "./auth";
  */
 export const toSar = (microSar: number) => microSar / MICRO_SAR;
 
-const WINDOW_START = {
-  daily: sql`date_trunc('day', now() AT TIME ZONE 'UTC')`,
-  weekly: sql`date_trunc('week', now() AT TIME ZONE 'UTC')`,
-  monthly: sql`date_trunc('month', now() AT TIME ZONE 'UTC')`,
-} as const;
-
-/** What a key spent since `since` (all time without it), in micro-SAR, from its usage entries. */
-const keyUsage = async (
-  virtualKeyId: string,
-  since?: keyof typeof WINDOW_START,
-) => {
-  const [row] = await db
-    .select({
-      total: sql<string>`coalesce(-sum(${creditLedgerEntry.amount}), 0)`,
-    })
-    .from(creditLedgerEntry)
-    .where(
-      and(
-        eq(creditLedgerEntry.virtualKeyId, virtualKeyId),
-        eq(creditLedgerEntry.kind, "usage"),
-        since
-          ? gte(creditLedgerEntry.createdAt, WINDOW_START[since])
-          : undefined,
-      ),
-    );
-  return Number(row?.total ?? 0);
-};
-
-const keyHeld = async (virtualKeyId: string) => {
-  const [row] = await db
-    .select({
-      total: sql<string>`coalesce(sum(${creditReservation.amount}), 0)`,
-    })
-    .from(creditReservation)
-    .where(
-      and(
-        eq(creditReservation.virtualKeyId, virtualKeyId),
-        isNull(creditReservation.settledAt),
-      ),
-    );
-  return Number(row?.total ?? 0);
-};
-
-const isWindow = (value: string | null): value is keyof typeof WINDOW_START =>
-  value !== null && value in WINDOW_START;
-
-/**
- * When a key's limit window resets: the next UTC midnight, the next ISO week
- * (Monday) or the next calendar month, the windows the credits plugin counts
- * in (apps/gateway/plugins/credits/refusals.go, windowEnd).
- */
-export const windowEnd = (
-  reset: keyof typeof WINDOW_START,
-  now = new Date(),
-) => {
-  const day = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-  const DAY = 86_400_000;
-  if (reset === "daily") {
-    return new Date(day + DAY);
-  }
-  if (reset === "weekly") {
-    const sinceMonday = (now.getUTCDay() + 6) % 7;
-    return new Date(day + (7 - sinceMonday) * DAY);
-  }
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-};
-
 /**
  * GET /api/v1/key: OpenRouter's self-inspection shape. limit_remaining is
  * what the credits plugin would still let the key hold in its window
  * (docs/platform/adr/0013-key-limits-in-the-ledger.md): the limit, minus the
  * window's usage, minus open holds. limit_resets_at is when the window starts
- * again (null for a limit that never resets). Amounts are SAR.
+ * again (null for a limit that never resets). The figures are the key page's
+ * (keys/usage.ts), with the windows the plugin enforces. Amounts are SAR.
  */
 export const describeKey = async (key: CallingKey) => {
-  const reset = isWindow(key.limitReset) ? key.limitReset : null;
-  const [usage, daily, weekly, monthly, held] = await Promise.all([
-    keyUsage(key.virtualKeyId),
-    keyUsage(key.virtualKeyId, "daily"),
-    keyUsage(key.virtualKeyId, "weekly"),
-    keyUsage(key.virtualKeyId, "monthly"),
-    keyHeld(key.virtualKeyId),
-  ]);
-  const windowUsage = { daily, weekly, monthly }[reset ?? "daily"];
-  const spentAgainstLimit = (reset ? windowUsage : usage) + held;
+  const reset = isReset(key.limitReset) ? key.limitReset : null;
+  const usage = await getKeyUsage(key.virtualKeyId, reset);
 
   return {
     data: {
@@ -114,13 +38,13 @@ export const describeKey = async (key: CallingKey) => {
       limit_remaining:
         key.limitMicroSar === null
           ? null
-          : toSar(Math.max(0, key.limitMicroSar - spentAgainstLimit)),
+          : toSar(Math.max(0, key.limitMicroSar - usage.spentAgainstLimit)),
       limit_reset: reset,
-      limit_resets_at: reset ? windowEnd(reset).toISOString() : null,
-      usage: toSar(usage),
-      usage_daily: toSar(daily),
-      usage_weekly: toSar(weekly),
-      usage_monthly: toSar(monthly),
+      limit_resets_at: usage.resetsAt?.toISOString() ?? null,
+      usage: toSar(usage.total),
+      usage_daily: toSar(usage.daily),
+      usage_weekly: toSar(usage.weekly),
+      usage_monthly: toSar(usage.monthly),
       currency: CURRENCY,
       is_management_key: false,
       disabled: false,
@@ -129,6 +53,9 @@ export const describeKey = async (key: CallingKey) => {
     },
   };
 };
+
+const isReset = (value: string | null): value is ApiKeyLimitReset =>
+  API_KEY_LIMIT_RESETS.some((reset) => reset === value);
 
 /**
  * GET /api/v1/credits: OpenRouter's two running totals, for the key's

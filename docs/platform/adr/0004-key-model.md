@@ -38,6 +38,12 @@ The gateway's governance API does not accept a customer id: it generates one (a 
 - Deleting an organization deletes its row (foreign key), so its keys can no longer be charged even if removing them from the gateway failed: they are refused.
 - Disabling a key in the gateway returns 403 `policy_access_denied` to its holder, not 401; a deleted or unknown key returns 401.
 
+## Amendment (2026-11-27): expiry, maximum lifetime, last used (KEYS-03, KEYS-11, ADMIN-12)
+
+- **Expiry is required and fixed.** A key is created with a lifetime (1 hour to 1 year, or no expiration), turned into a moment at creation. That moment is sent to the gateway's virtual key and stored in `api_key.expires_at`: one value in two places, and the gateway enforces it (401 `key_expired`). The customer can never change it; a request that tries is refused.
+- **Maximum key lifetime** (staff, `key_settings`, migration `0040`). A new key may not outlive it, and "no expiration" is refused while one is set. When staff shorten it, every existing key that would outlive it is cut to `created_at + maximum`, in the gateway first and then in `api_key`, the same moment in both (`packages/api/src/modules/keys/lifetime.ts`). The gateway stores expiry per virtual key and only accepts a future one, so a key already past its cut-off gets an expiry 5 seconds ahead. The cut is idempotent, only ever shortens, locks the key's row while the gateway is told, and is retried hourly (`/api/internal/key-lifetime`). OpenRouter refuses such keys; computing the cut at check time instead would mean the gateway reading our settings on every request. Raising the maximum later extends no key.
+- **No `last_used_at` column.** Last used is the time of the key's latest `usage` ledger entry, read at display time through the partial index on `(virtual_key_id, created_at)` that ADR 0013 added. A column would be an update of `api_key` on every request: a hot, update-heavy row on the gateway's request path, and `gateway_ledger` would need write access to `api_key`. A request that was refused or charged nothing does not count as a use.
+
 ## Consequences
 
 - The control plane is the only writer of customers and virtual keys. The Bifrost admin UI is not exposed to customers (ADR 0007), so there is one source of truth.

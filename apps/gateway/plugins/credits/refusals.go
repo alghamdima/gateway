@@ -83,7 +83,7 @@ func (p *Plugin) refuseHold(organizationID, virtualKeyID string, outcome Reserve
 		p.logger.Warn("credits: cannot read why a hold for organization %s was refused: %v", organizationID, err)
 	}
 	if outcome == KeyLimitReached {
-		return keyLimitRefusal(shortfall, known, amount, time.Now())
+		return keyLimitRefusal(shortfall, known, amount)
 	}
 	return creditsRefusal(shortfall, known, amount)
 }
@@ -122,7 +122,7 @@ func creditsRefusal(s Shortfall, known bool, amount int64) *schemas.LLMPluginSho
 	return refuse(402, ErrorTypeInsufficientCredits, message, refusal)
 }
 
-func keyLimitRefusal(s Shortfall, known bool, amount int64, now time.Time) *schemas.LLMPluginShortCircuit {
+func keyLimitRefusal(s Shortfall, known bool, amount int64) *schemas.LLMPluginShortCircuit {
 	refusal := schemas.Refusal{
 		LimitSource: schemas.LimitSourceKeyLimit,
 		Reason:      ReasonKeyLimitReached,
@@ -140,9 +140,9 @@ func keyLimitRefusal(s Shortfall, known bool, amount int64, now time.Time) *sche
 			"resets_at":   nil,
 			"currency":    currency,
 		}
-		if resetsAt, ok := windowEnd(s.KeyReset, now); ok {
+		if s.KeyReset != "" && s.KeyResetsAt != nil {
 			details["limit_reset"] = s.KeyReset
-			details["resets_at"] = resetsAt.Format(time.RFC3339)
+			details["resets_at"] = s.KeyResetsAt.UTC().Format(time.RFC3339)
 		}
 		refusal.Details = details
 		if amount > limit {
@@ -152,25 +152,6 @@ func keyLimitRefusal(s Shortfall, known bool, amount int64, now time.Time) *sche
 		}
 	}
 	return refuse(402, ErrorTypeKeyLimit, message, refusal)
-}
-
-// windowEnd is when a key's limit window resets: the next UTC midnight, the next ISO week (Monday)
-// or the next calendar month, the same windows the ledger counts in (keySpendSQL). False for a
-// limit that never resets.
-func windowEnd(reset string, now time.Time) (time.Time, bool) {
-	now = now.UTC()
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	switch reset {
-	case "daily":
-		return day.AddDate(0, 0, 1), true
-	case "weekly":
-		// days since Monday: Go's Sunday is 0
-		sinceMonday := (int(day.Weekday()) + 6) % 7
-		return day.AddDate(0, 0, 7-sinceMonday), true
-	case "monthly":
-		return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC).AddDate(0, 1, 0), true
-	}
-	return time.Time{}, false
 }
 
 // sar turns micro-SAR into SAR, as the public API writes amounts (packages/api/src/modules/v1/queries.ts).

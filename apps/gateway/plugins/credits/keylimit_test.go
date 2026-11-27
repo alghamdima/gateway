@@ -201,10 +201,54 @@ func TestShortfall_ReadsTheBalanceAndTheKeysWindow(t *testing.T) {
 	if !got.HasAccount || got.Balance != 9*usd || got.Held != 2*usd || got.KeyLimit == nil || *got.KeyLimit != 5*usd || got.KeySpent != 3*usd || got.KeyReset != "weekly" {
 		t.Fatalf("shortfall %+v", got)
 	}
+	// the reset is the next Monday at 00:00 UTC, read from the database's key_limit_window_end
+	var monday time.Time
+	if err := db.admin.QueryRow(ctx, `SELECT date_trunc('week', now() AT TIME ZONE 'UTC') + interval '1 week'`).Scan(&monday); err != nil {
+		t.Fatal(err)
+	}
+	if got.KeyResetsAt == nil || !got.KeyResetsAt.Equal(monday) || got.KeyResetsAt.Weekday() != time.Monday {
+		t.Fatalf("resets at %v, want %v", got.KeyResetsAt, monday)
+	}
 	if open, err := store.Shortfall(ctx, org, "vk_open"); err != nil || open.KeyLimit != nil || open.KeySpent != 0 {
 		t.Fatalf("a key without a limit: %+v %v", open, err)
 	}
 	if none, err := store.Shortfall(ctx, "org_that_does_not_exist", ""); err != nil || none.HasAccount {
 		t.Fatalf("no account: %+v %v", none, err)
+	}
+}
+
+// The windows are defined once, in the database (migration 0040), for the plugin and the control
+// plane alike: these are their boundaries, in UTC, called as the gateway_ledger role.
+func TestKeyLimitWindowFunctions_UTCBoundaries(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	for _, tc := range []struct {
+		reset, at, start, end string
+	}{
+		{"daily", "2026-11-27 23:59:59.999999", "2026-11-27T00:00:00Z", "2026-11-28T00:00:00Z"},
+		{"daily", "2026-11-28 00:00:00", "2026-11-28T00:00:00Z", "2026-11-29T00:00:00Z"},
+		// Sunday night is still last week; Monday 00:00 starts the next one
+		{"weekly", "2026-11-29 23:59:59", "2026-11-23T00:00:00Z", "2026-11-30T00:00:00Z"},
+		{"weekly", "2026-11-30 00:00:00", "2026-11-30T00:00:00Z", "2026-12-07T00:00:00Z"},
+		{"monthly", "2026-12-31 23:59:59", "2026-12-01T00:00:00Z", "2027-01-01T00:00:00Z"},
+		{"monthly", "2027-01-01 00:00:00", "2027-01-01T00:00:00Z", "2027-02-01T00:00:00Z"},
+		{"monthly", "2028-02-29 12:00:00", "2028-02-01T00:00:00Z", "2028-03-01T00:00:00Z"},
+	} {
+		var start, end time.Time
+		if err := db.ledger.QueryRow(ctx, `SELECT key_limit_window_start($1, $2::timestamp), key_limit_window_end($1, $2::timestamp)`, tc.reset, tc.at).Scan(&start, &end); err != nil {
+			t.Fatal(err)
+		}
+		if start.Format(time.RFC3339) != tc.start || end.Format(time.RFC3339) != tc.end {
+			t.Errorf("%s at %s: [%s, %s), want [%s, %s)", tc.reset, tc.at, start.Format(time.RFC3339), end.Format(time.RFC3339), tc.start, tc.end)
+		}
+	}
+	// a limit that never resets counts all time and never ends
+	var infinite bool
+	var end *time.Time
+	if err := db.ledger.QueryRow(ctx, `SELECT key_limit_window_start(NULL, now()::timestamp) = '-infinity', key_limit_window_end(NULL, now()::timestamp)`).Scan(&infinite, &end); err != nil {
+		t.Fatal(err)
+	}
+	if !infinite || end != nil {
+		t.Fatalf("no reset: start -infinity %v, end %v", infinite, end)
 	}
 }

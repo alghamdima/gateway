@@ -769,5 +769,57 @@
       "effective_price": "Charged differently",
       "not_in_catalog": "Not in the catalog"
     }
+  },
+  "keySettings": {
+    "header": {
+      "title": "Key defaults",
+      "description": "What a new API key starts from, and how long any key may live."
+    },
+    "saved": "Key defaults saved.",
+    "savedShortened": "Key defaults saved. {{count}} existing keys now expire at the new maximum.",
+    "form": {
+      "title": "Defaults for new keys",
+      "description": "The create form starts from these values; the customer can change them, within the maximum lifetime.",
+      "defaultLimit": {
+        "label": "Default credit limit",
+        "description": "In riyals. Leave empty for no limit by default.",
+        "invalid": "Enter an amount above 0, up to 4,000,000, with at most two decimals."
+      },
+      "defaultReset": {
+        "label": "Default reset",
+        "description": "Needs a default limit. Daily at midnight UTC, weekly on Monday, monthly on the 1st."
+      },
+      "defaultExpiry": {
+        "label": "Default expiration",
+        "description": "Preselected in the create form. It must be within the maximum lifetime."
+      },
+      "maxLifetime": {
+        "label": "Maximum key lifetime",
+        "description": "No key may live longer, counted from its creation. A shorter maximum also cuts existing keys: each expires at its creation plus the maximum, or within seconds if that has passed. Raising it later extends no key.",
+        "none": "No maximum"
+      },
+      "presets": {
+        "label": "Limit quick picks",
+        "description": "Amounts offered in the create form, in riyals, separated by commas: 1 to {{count}}.",
+        "invalid": "Enter 1 to {{count}} amounts above zero, in riyals and halalas, separated by commas."
+      },
+      "defaultBeyondMax": "The default expiration must be within the maximum lifetime."
+    },
+    "changes": {
+      "title": "History",
+      "description": "Every change of the key defaults, with who made it and the values before and after.",
+      "empty": "No changes yet.",
+      "when": "When",
+      "who": "Who",
+      "before": "Before",
+      "after": "After",
+      "fields": {
+        "defaultLimitMicroSar": "Default limit",
+        "defaultLimitReset": "Default reset",
+        "defaultExpiry": "Default expiration",
+        "maxLifetime": "Maximum lifetime",
+        "limitPresetsMicroSar": "Quick picks"
+      }
+    }
   }
 }

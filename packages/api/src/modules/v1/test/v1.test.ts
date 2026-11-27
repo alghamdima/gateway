@@ -65,7 +65,6 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
   let v1Router: typeof import("../router").v1Router;
   let hashKey: typeof import("../../keys/keys").hashKey;
   let models: typeof import("../models");
-  let windowEnd: typeof import("../queries").windowEnd;
   let seq = 0;
 
   const createOrganization = async () => {
@@ -86,9 +85,13 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
     const n = ++seq;
     const value = `sk-bf-v1-test-key-${n}-${"x".repeat(24)}`;
     const virtualKeyId = `vk_v1_${n}`;
-    await sql`insert into api_key (id, organization_id, created_by, name, virtual_key_id, prefix, value_hash, limit_micro_sar, limit_reset, disabled_at, expires_at)
+    // a key expires after it was created (api_key_expires_after_created): an expired one is an hour old
+    const createdAt = options.expiresAt
+      ? new Date(options.expiresAt.getTime() - 3_600_000)
+      : new Date();
+    await sql`insert into api_key (id, organization_id, created_by, name, virtual_key_id, prefix, value_hash, limit_micro_sar, limit_reset, disabled_at, expires_at, created_at)
       values (${`key_${n}`}, ${organizationId}, 'user_1', ${`key ${n}`}, ${virtualKeyId}, 'sk-bf-v1-tes', ${hashKey(value)},
-              ${options.limit ?? null}, ${options.reset ?? null}, ${options.disabled ? new Date() : null}, ${options.expiresAt ?? null})`;
+              ${options.limit ?? null}, ${options.reset ?? null}, ${options.disabled ? new Date() : null}, ${options.expiresAt ?? null}, ${createdAt})`;
     return { value, virtualKeyId };
   };
 
@@ -144,7 +147,6 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
     ({ v1Router } = await import("../router"));
     ({ hashKey } = await import("../../keys/keys"));
     models = await import("../models");
-    ({ windowEnd } = await import("../queries"));
   });
 
   afterAll(async () => {
@@ -262,7 +264,14 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         label: "sk-bf-v1-tes…",
         limit: 10,
         limit_reset: "monthly",
-        limit_resets_at: windowEnd("monthly").toISOString(),
+        // the first of next month, 00:00 UTC
+        limit_resets_at: new Date(
+          Date.UTC(
+            new Date().getUTCFullYear(),
+            new Date().getUTCMonth() + 1,
+            1,
+          ),
+        ).toISOString(),
         limit_remaining: 7, // 10 - 2 this month - 1 held
         usage: 5,
         usage_monthly: 2,
@@ -290,22 +299,21 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
       });
     });
 
-    it("says when each limit window starts again, in UTC, as the credits plugin counts", () => {
-      // a Friday afternoon
-      const now = new Date("2026-11-27T15:00:00Z");
-      expect(windowEnd("daily", now).toISOString()).toBe(
-        "2026-11-28T00:00:00.000Z",
-      );
-      expect(windowEnd("weekly", now).toISOString()).toBe(
-        "2026-11-30T00:00:00.000Z",
-      );
-      expect(windowEnd("monthly", now).toISOString()).toBe(
-        "2026-12-01T00:00:00.000Z",
-      );
-      // on a Monday the week ends a week later
-      expect(
-        windowEnd("weekly", new Date("2026-11-30T00:00:00Z")).toISOString(),
-      ).toBe("2026-12-07T00:00:00.000Z");
+    it("says when each limit window starts again, in UTC, with the functions the credits plugin counts by", async () => {
+      // a Friday afternoon; the windows are the database's (migration 0040)
+      const [ends] = await sql<
+        { daily: string; weekly: string; monthly: string; monday: string }[]
+      >`select key_limit_window_end('daily', '2026-11-27 15:00')::text as daily,
+               key_limit_window_end('weekly', '2026-11-27 15:00')::text as weekly,
+               key_limit_window_end('monthly', '2026-11-27 15:00')::text as monthly,
+               key_limit_window_end('weekly', '2026-11-30 00:00')::text as monday`;
+      expect(ends).toEqual({
+        daily: "2026-11-28 00:00:00",
+        weekly: "2026-11-30 00:00:00",
+        monthly: "2026-12-01 00:00:00",
+        // on a Monday the week ends a week later
+        monday: "2026-12-07 00:00:00",
+      });
     });
   });
 

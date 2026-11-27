@@ -127,6 +127,19 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "pricing.credit-terms", target: "pricing" },
   },
 
+  // the key defaults and the maximum key lifetime (ADMIN-12): values staff set for customers, as prices
+  {
+    method: "GET",
+    path: /^\/key-settings(\/changes)?$/,
+    needs: { pricing: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: /^\/key-settings$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "keys.defaults", target: "key-settings" },
+  },
+
   // the model price table (ADMIN-09, ADR 0018): the same permission as the other prices
   {
     method: "GET",
@@ -333,7 +346,11 @@ export const auditTarget = (path: string) => {
       ? segments[2]
       : (segments[1] ?? "model-prices");
   }
-  if (segments[0] === "pricing" || segments[0] === "payments") {
+  if (
+    segments[0] === "pricing" ||
+    segments[0] === "payments" ||
+    segments[0] === "key-settings"
+  ) {
     return segments.at(-1);
   }
   // /providers/accounts/openai/keys/k1 is about provider openai
