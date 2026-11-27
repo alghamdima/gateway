@@ -48,12 +48,15 @@ interface RefundTarget {
   id: string;
   amountMicroSar: number;
   grantedMicroSar: number;
+  /** The unused promo bonus the refund takes back with it (ADR 0019). */
+  bonusClawbackMicroSar: number;
 }
 
 /**
  * The organization's credit, purchase by purchase (BILL-17, BILL-10): what is
  * left of each, when it expires, a notice before credit expires, and the
- * refund of a top-up within its window (the unused part only, never the fee).
+ * refund of a top-up within its window (the unused part only, never the fee;
+ * the unused part of its promo bonus is removed with it, and the dialog says how much).
  */
 export const CreditLots = ({ organizationId, canRefund }: CreditLotsProps) => {
   const { t, i18n } = useTranslation(["common", "organization"]);
@@ -181,6 +184,8 @@ export const CreditLots = ({ organizationId, canRefund }: CreditLotsProps) => {
                             id: lot.id,
                             amountMicroSar: lot.refund.amountMicroSar,
                             grantedMicroSar: lot.grantedMicroSar,
+                            bonusClawbackMicroSar:
+                              lot.refund.bonusClawbackMicroSar,
                           })
                         }
                       >
@@ -223,6 +228,13 @@ export const CreditLots = ({ organizationId, canRefund }: CreditLotsProps) => {
                   granted: money(target.grantedMicroSar),
                 })}
             </DialogDescription>
+            {target && target.bonusClawbackMicroSar > 0 && (
+              <DialogDescription>
+                {t("organization:credits.lots.refund.confirm.bonus", {
+                  bonus: money(target.bonusClawbackMicroSar),
+                })}
+              </DialogDescription>
+            )}
           </DialogHeader>
           <DialogFooter>
             <DialogClose

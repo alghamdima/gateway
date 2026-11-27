@@ -218,6 +218,23 @@ const dashboardRefund = (paymentId: string, halalas: number): FakeRefund => ({
   metadata: {},
 });
 
+/** The reconciliation's own check finds nothing for the organization. */
+const expectNoFindings = async (organizationId: string) => {
+  const { checkLedgerInvariants } =
+    await import("../../reconciliation/invariants");
+  const findings = await checkLedgerInvariants();
+  for (const list of [
+    findings.balances,
+    findings.held,
+    findings.grantsWithoutLot,
+    findings.lots,
+  ]) {
+    expect(list.filter((row) => row.organizationId === organizationId)).toEqual(
+      [],
+    );
+  }
+};
+
 describe.skipIf(!adminUrl)("credit lots, refunds and expiry", () => {
   let database: TestDatabase;
   let sql: postgres.Sql;
@@ -356,6 +373,38 @@ describe.skipIf(!adminUrl)("credit lots, refunds and expiry", () => {
       staffId: "staff_terms",
     });
 
+  /** A top-up bonus code (10%, at most SAR 10); returns its id. */
+  const bonusCode = async () => {
+    const [row] = await sql<{ id: string }[]>`
+      insert into promo_code (id, code, kind, bonus_bps, bonus_cap_micro_sar, created_by, updated_by)
+      values (${randomUUID()}, ${`BONUS${++seq}`}, 'topup_bonus', 1000, 10000000, 'staff', 'staff') returning id`;
+    if (!row) {
+      throw new Error("no promo code");
+    }
+    return row.id;
+  };
+  /** The bonus lot of a top-up paid with a code. */
+  const bonusLotOf = async (paymentId: string) => {
+    const [row] = await sql<{ id: string }[]>`
+      select l.id from credit_lot l join credit_ledger_entry e on e.id = l.entry_id
+       where e.idempotency_key = ${`promo:stripe:${paymentId}`}`;
+    if (!row) {
+      throw new Error("no bonus lot");
+    }
+    return row.id;
+  };
+  const clawbacksOf = async (organizationId: string) =>
+    sql<
+      {
+        amount: string;
+        credit_lot_id: string | null;
+        promo_code_id: string | null;
+        idempotency_key: string;
+        reference: string | null;
+      }[]
+    >`
+      select amount, credit_lot_id, promo_code_id, idempotency_key, reference from credit_ledger_entry
+       where organization_id = ${organizationId} and kind = 'promo_clawback' order by created_at, id`;
   const refundAs = async (
     role: string,
     organizationId: string,
@@ -549,13 +598,11 @@ describe.skipIf(!adminUrl)("credit lots, refunds and expiry", () => {
       await expectBooksBalance(organizationId);
     });
 
-    it("never refunds a promo bonus: it is a lot of its own, spent first", async () => {
+    it("never pays out a promo bonus: it is a lot of its own, spent first, and only its unused part is taken back", async () => {
       const organizationId = await createOrganization();
-      const [code] = await sql<{ id: string }[]>`
-        insert into promo_code (id, code, kind, bonus_bps, bonus_cap_micro_sar, created_by, updated_by)
-        values (${randomUUID()}, ${`BONUS${seq}`}, 'topup_bonus', 1000, 10000000, 'staff', 'staff') returning id`;
+      const code = await bonusCode();
       const { lotId } = await buy(organizationId, 100 * SAR, {
-        bonusCode: { id: code?.id ?? "", bonusMicroSar: 10 * SAR },
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
       });
       await spend(organizationId, 4 * SAR); // from the bonus first
 
@@ -565,7 +612,14 @@ describe.skipIf(!adminUrl)("credit lots, refunds and expiry", () => {
         userId: "user_admin",
       });
       expect(result.amountMicroSar).toBe(100 * SAR);
-      expect((await account(organizationId)).balance).toBe(6 * SAR); // the rest of the bonus
+      expect(stripeFake.creates[0]?.params).toMatchObject({ amount: 10_000 }); // the credit only
+      // the SAR 4 of bonus already spent stays spent; the SAR 6 left goes with the refund
+      expect(
+        (await entriesOf(organizationId, "promo_clawback")).map((row) =>
+          Number(row.amount),
+        ),
+      ).toEqual([-6 * SAR]);
+      expect(await account(organizationId)).toEqual({ balance: 0, held: 0 });
       await expectBooksBalance(organizationId);
     });
 
@@ -885,6 +939,327 @@ describe.skipIf(!adminUrl)("credit lots, refunds and expiry", () => {
         refund.requestRefund({ organizationId, lotId, userId: "u" }),
       ).rejects.toMatchObject({
         code: "billing:error.refund.alreadyRefunded",
+      });
+    });
+  });
+
+  describe("promo bonus taken back on refund", () => {
+    it("removes the whole unused bonus with a full refund, naming the bonus lot, its code and the refund", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { lotId, paymentId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      const bonusLotId = await bonusLotOf(paymentId);
+
+      // the confirm dialog's data: the refund and the bonus that goes with it
+      const view = await lots.getCreditLots(organizationId);
+      expect(view.lots.find((lot) => lot.id === lotId)?.refund).toMatchObject({
+        state: "available",
+        amountMicroSar: 100 * SAR,
+        bonusClawbackMicroSar: 10 * SAR,
+      });
+      expect(
+        view.lots.find((lot) => lot.id === bonusLotId)?.refund,
+      ).toMatchObject({ state: "none", bonusClawbackMicroSar: 0 });
+
+      await refund.requestRefund({ organizationId, lotId, userId: "u" });
+      const [made] = [...stripeFake.byKey.values()];
+      expect(await clawbacksOf(organizationId)).toEqual([
+        {
+          amount: String(-10 * SAR),
+          credit_lot_id: bonusLotId,
+          promo_code_id: code,
+          idempotency_key: `promo_clawback:stripe:${made?.id}`,
+          reference: made?.id,
+        },
+      ]);
+      // the bonus is never paid out: Stripe refunds the credit only
+      expect(stripeFake.creates[0]?.params).toMatchObject({ amount: 10_000 });
+      expect(await account(organizationId)).toEqual({ balance: 0, held: 0 });
+      expect((await remainingOf(organizationId)).get(bonusLotId)).toBe(0);
+      await expectBooksBalance(organizationId);
+      await expectNoFindings(organizationId);
+    });
+
+    it("does not take back bonus already spent", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { lotId, paymentId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      await spend(organizationId, 15 * SAR); // the whole bonus, then SAR 5 of the top-up
+      const view = await lots.getCreditLots(organizationId);
+      expect(view.lots.find((lot) => lot.id === lotId)?.refund).toMatchObject({
+        amountMicroSar: 95 * SAR,
+        bonusClawbackMicroSar: 0,
+      });
+
+      await refund.requestRefund({ organizationId, lotId, userId: "u" });
+      expect(await clawbacksOf(organizationId)).toEqual([]);
+      expect(
+        (await remainingOf(organizationId)).get(await bonusLotOf(paymentId)),
+      ).toBe(0);
+      expect(await account(organizationId)).toEqual({ balance: 0, held: 0 });
+      await expectBooksBalance(organizationId);
+    });
+
+    it("takes back a proportional share on partial refunds, rounded down to the halala, and never more than is left", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { paymentId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      const bonusLotId = await bonusLotOf(paymentId);
+
+      // 30% of the credit: 30% of the bonus
+      await deliver(event("refund.created", dashboardRefund(paymentId, 3000)));
+      // 53.33% so far: SAR 5.333 of the bonus, rounded down to SAR 5.33, less the SAR 3 taken
+      await deliver(event("refund.created", dashboardRefund(paymentId, 2333)));
+      // the rest of the credit and the fee: the rest of the bonus
+      await deliver(
+        event("refund.created", dashboardRefund(paymentId, 4667 + 550)),
+      );
+      expect(
+        (await clawbacksOf(organizationId)).map((row) => [
+          Number(row.amount),
+          row.credit_lot_id,
+        ]),
+      ).toEqual([
+        [-3 * SAR, bonusLotId],
+        [-2_330_000, bonusLotId],
+        [-4_670_000, bonusLotId],
+      ]);
+      expect(await account(organizationId)).toEqual({ balance: 0, held: 0 });
+      await expectBooksBalance(organizationId);
+
+      // with SAR 8 of the bonus spent, half the credit refunded takes back the SAR 2 left, not SAR 5
+      const other = await createOrganization();
+      const second = await buy(other, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      await spend(other, 8 * SAR);
+      await deliver(
+        event("refund.created", dashboardRefund(second.paymentId, 5000)),
+      );
+      await deliver(
+        event("refund.created", dashboardRefund(second.paymentId, 5000)),
+      );
+      expect(
+        (await clawbacksOf(other)).map((row) => Number(row.amount)),
+      ).toEqual([-2 * SAR]);
+      expect((await account(other)).balance).toBe(0);
+      await expectBooksBalance(other);
+      await expectNoFindings(other);
+    });
+
+    it("leaves free credit and a top-up without a bonus alone", async () => {
+      const organizationId = await createOrganization();
+      const [free] = await sql<{ id: string; code: string }[]>`
+        insert into promo_code (id, code, kind, credit_micro_sar, created_by, updated_by)
+        values (${randomUUID()}, ${`FREE${++seq}`}, 'free_credit', 25000000, 'staff', 'staff') returning id, code`;
+      const { redeemFreeCredit } = await import("../../promo-codes/redeem");
+      await redeemFreeCredit({
+        organizationId,
+        code: free?.code ?? "",
+        userId: "u",
+      });
+      const plain = await buy(organizationId, 40 * SAR);
+      const code = await bonusCode();
+      const withBonus = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+
+      await refund.requestRefund({
+        organizationId,
+        lotId: plain.lotId,
+        userId: "u",
+      });
+      expect(await clawbacksOf(organizationId)).toEqual([]);
+      await refund.requestRefund({
+        organizationId,
+        lotId: withBonus.lotId,
+        userId: "u",
+      });
+      expect(
+        (await clawbacksOf(organizationId)).map((row) => row.credit_lot_id),
+      ).toEqual([await bonusLotOf(withBonus.paymentId)]);
+      // the free credit is all still there
+      expect(await account(organizationId)).toEqual({
+        balance: 25 * SAR,
+        held: 0,
+      });
+      const [freeLot] = await sql<{ id: string }[]>`
+        select l.id from credit_lot l join credit_ledger_entry e on e.id = l.entry_id
+         where e.organization_id = ${organizationId} and e.promo_code_id = ${free?.id ?? ""}`;
+      expect((await remainingOf(organizationId)).get(freeLot?.id ?? "")).toBe(
+        25 * SAR,
+      );
+      await expectBooksBalance(organizationId);
+    });
+
+    it("takes back once under retries, double clicks and every webhook Stripe sends", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { lotId, paymentId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      stripeFake.next = "unreachable";
+      await expect(
+        refund.requestRefund({ organizationId, lotId, userId: "u" }),
+      ).rejects.toMatchObject({
+        code: "billing:error.refund.providerUnavailable",
+      });
+      // the bonus that goes with it is held too, so it cannot be spent meanwhile
+      expect(await account(organizationId)).toEqual({
+        balance: 110 * SAR,
+        held: 110 * SAR,
+      });
+      expect(await spend(organizationId, 1 * SAR)).toBe(false);
+
+      stripeFake.next = "succeeded";
+      stripeFake.beforeReturn = async (made) => {
+        await deliver(event("refund.created", made));
+      };
+      await Promise.allSettled([
+        refund.requestRefund({ organizationId, lotId, userId: "u" }),
+        refund.requestRefund({ organizationId, lotId, userId: "u" }),
+      ]);
+      const made = [...stripeFake.byKey.values()][0];
+      stripeFake.charges.set("ch_claw", made ? [made] : []);
+      await deliver(event("refund.updated", made));
+      await deliver(
+        event("charge.refunded", {
+          id: "ch_claw",
+          object: "charge",
+          payment_intent: paymentId,
+        }),
+      );
+      await deliver(event("refund.created", made));
+
+      expect(await clawbacksOf(organizationId)).toHaveLength(1);
+      expect(await entriesOf(organizationId, "refund")).toHaveLength(1);
+      expect(await account(organizationId)).toEqual({ balance: 0, held: 0 });
+      await expectBooksBalance(organizationId);
+
+      // a dashboard refund delivered as every event Stripe sends, twice
+      const other = await createOrganization();
+      const second = await buy(other, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      const dash = dashboardRefund(second.paymentId, 5000);
+      stripeFake.charges.set("ch_claw_dash", [dash]);
+      for (let round = 0; round < 2; round++) {
+        await deliver(event("refund.created", dash));
+        await deliver(event("refund.updated", dash));
+        await deliver(
+          event("charge.refunded", {
+            id: "ch_claw_dash",
+            object: "charge",
+            payment_intent: second.paymentId,
+            refunds: null,
+          }),
+        );
+      }
+      expect(
+        (await clawbacksOf(other)).map((row) => Number(row.amount)),
+      ).toEqual([-5 * SAR]);
+      await expectBooksBalance(other);
+    });
+
+    it("holds the bonus with a pending refund and takes it back when the webhook says it succeeded", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { lotId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      stripeFake.next = "pending";
+      await refund.requestRefund({ organizationId, lotId, userId: "u" });
+      expect(await account(organizationId)).toEqual({
+        balance: 110 * SAR,
+        held: 110 * SAR,
+      });
+      expect(await clawbacksOf(organizationId)).toEqual([]);
+      const made = [...stripeFake.byKey.values()][0];
+      await deliver(event("refund.updated", { ...made, status: "succeeded" }));
+      expect(await clawbacksOf(organizationId)).toHaveLength(1);
+      expect(await account(organizationId)).toEqual({ balance: 0, held: 0 });
+      await expectBooksBalance(organizationId);
+    });
+
+    it("refuses when requests in flight hold the bonus that would be taken back", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { lotId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      await sql.unsafe(RESERVE_SQL, [randomUUID(), organizationId, 5 * SAR]);
+      await expect(
+        refund.requestRefund({ organizationId, lotId, userId: "u" }),
+      ).rejects.toMatchObject({ code: "billing:error.refund.creditInUse" });
+      expect(stripeFake.creates).toHaveLength(0);
+    });
+
+    it("keeps the promo report equal to the ledger", async () => {
+      const code = await bonusCode();
+      const first = await createOrganization();
+      const second = await createOrganization();
+      const a = await buy(first, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      const b = await buy(second, 50 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 5 * SAR },
+      });
+      await spend(second, 1 * SAR);
+      await refund.requestRefund({
+        organizationId: first,
+        lotId: a.lotId,
+        userId: "u",
+      });
+      await deliver(
+        event("refund.created", dashboardRefund(b.paymentId, 2000)),
+      );
+
+      const codes = await import("../../promo-codes/codes");
+      const report = await codes.getPromoCodeReport(code);
+      const [ledger] = await sql<{ granted: string; clawed: string }[]>`
+        select coalesce(sum(amount) filter (where kind = 'promo'), 0) as granted,
+               coalesce(-sum(amount) filter (where kind = 'promo_clawback'), 0) as clawed
+          from credit_ledger_entry where promo_code_id = ${code}`;
+      expect(report.creditGrantedMicroSar).toBe(Number(ledger?.granted));
+      expect(report.creditClawedBackMicroSar).toBe(Number(ledger?.clawed));
+      // SAR 10 from the first; 40% of SAR 5 from the second (SAR 4 of it left)
+      expect(report.creditClawedBackMicroSar).toBe(10 * SAR + 2 * SAR);
+      expect(
+        report.redemptions.reduce(
+          (sum, row) => sum + row.clawedBackMicroSar,
+          0,
+        ),
+      ).toBe(report.creditClawedBackMicroSar);
+    });
+
+    it("refuses a clawback that names no lot or no code, or adds credit", async () => {
+      const organizationId = await createOrganization();
+      const code = await bonusCode();
+      const { paymentId } = await buy(organizationId, 100 * SAR, {
+        bonusCode: { id: code, bonusMicroSar: 10 * SAR },
+      });
+      const bonusLotId = await bonusLotOf(paymentId);
+      const insert = (
+        amount: number,
+        lot: string | null,
+        promo: string | null,
+      ) =>
+        sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, credit_lot_id, promo_code_id)
+            values (${randomUUID()}, ${organizationId}, ${amount}, 'promo_clawback', ${randomUUID()}, ${lot}, ${promo})`;
+      await expect(insert(-1, null, code)).rejects.toMatchObject({
+        constraint_name: "credit_ledger_entry_lot_kind",
+      });
+      await expect(insert(1, bonusLotId, code)).rejects.toMatchObject({
+        constraint_name: "credit_ledger_entry_lot_kind",
+      });
+      await expect(insert(-1, bonusLotId, null)).rejects.toMatchObject({
+        constraint_name: "credit_ledger_entry_promo_code",
       });
     });
   });

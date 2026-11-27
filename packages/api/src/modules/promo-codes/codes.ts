@@ -1,6 +1,7 @@
 import { and, desc, eq, ilike, inArray, sql } from "@workspace/db";
 import {
   creditLedgerEntry,
+  creditLot,
   organization,
   promoCode,
   promoCodeChange,
@@ -364,6 +365,12 @@ export interface PromoCodeReport {
   organizations: number;
   /** Bonus and free credit: the sum of the code's promo ledger entries. */
   creditGrantedMicroSar: number;
+  /**
+   * Bonus taken back when its top-up was refunded: minus the sum of the
+   * code's promo_clawback entries (ADR 0019). Granted less this is what the
+   * code left with organizations.
+   */
+  creditClawedBackMicroSar: number;
   /** Taken off top-up fees: the sum the code's top-up entries record. */
   feeWaivedMicroSar: number;
   redemptions: {
@@ -374,21 +381,24 @@ export interface PromoCodeReport {
     topupCreditMicroSar: number | null;
     feeDiscountMicroSar: number;
     creditMicroSar: number;
+    /** What refunds of its top-up took back of this use's bonus. */
+    clawedBackMicroSar: number;
     createdAt: Date;
   }[];
 }
 
 /**
  * The report on one code. The money is read from the ledger, the source of
- * truth: credit granted is the sum of its promo entries, fee waived the sum
- * of the discounts its top-up entries record. Uses and organizations are
- * counted from the redemptions.
+ * truth: credit granted is the sum of its promo entries, clawed back minus
+ * the sum of its promo_clawback entries, fee waived the sum of the discounts
+ * its top-up entries record (a refund never returns the fee, so a refund
+ * leaves it as it was). Uses and organizations are counted from the redemptions.
  */
 export const getPromoCodeReport = async (
   id: string,
 ): Promise<PromoCodeReport> => {
   await getPromoCode(id);
-  const [counts, granted, waived, redemptions] = await Promise.all([
+  const [counts, granted, clawedBack, waived, redemptions] = await Promise.all([
     db
       .select({
         uses: sql<string>`count(*)`,
@@ -405,6 +415,17 @@ export const getPromoCodeReport = async (
         and(
           eq(creditLedgerEntry.promoCodeId, id),
           eq(creditLedgerEntry.kind, "promo"),
+        ),
+      ),
+    db
+      .select({
+        total: sql<string>`coalesce(-sum(${creditLedgerEntry.amount}), 0)`,
+      })
+      .from(creditLedgerEntry)
+      .where(
+        and(
+          eq(creditLedgerEntry.promoCodeId, id),
+          eq(creditLedgerEntry.kind, "promo_clawback"),
         ),
       ),
     db
@@ -427,6 +448,12 @@ export const getPromoCodeReport = async (
         topupCreditMicroSar: promoCodeRedemption.topupCreditMicroSar,
         feeDiscountMicroSar: promoCodeRedemption.feeDiscountMicroSar,
         creditMicroSar: promoCodeRedemption.creditMicroSar,
+        // the clawbacks name the lot of this use's bonus entry
+        clawedBackMicroSar: sql<number>`coalesce((
+          SELECT -sum(c.amount) FROM ${creditLedgerEntry} c
+            JOIN ${creditLot} l ON l.id = c.credit_lot_id
+           WHERE l.entry_id = ${promoCodeRedemption.ledgerEntryId}
+             AND c.kind = 'promo_clawback'), 0)`.mapWith(Number),
         createdAt: promoCodeRedemption.createdAt,
       })
       .from(promoCodeRedemption)
@@ -442,6 +469,7 @@ export const getPromoCodeReport = async (
     uses: Number(counts[0]?.uses ?? 0),
     organizations: Number(counts[0]?.organizations ?? 0),
     creditGrantedMicroSar: Number(granted[0]?.total ?? 0),
+    creditClawedBackMicroSar: Number(clawedBack[0]?.total ?? 0),
     feeWaivedMicroSar: Number(waived[0]?.total ?? 0),
     redemptions,
   };

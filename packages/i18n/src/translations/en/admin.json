@@ -627,10 +627,11 @@
     },
     "report": {
       "title": "Report",
-      "description": "Credit granted and fee waived are read from the credits ledger.",
+      "description": "Credit granted, clawed back and fee waived are read from the credits ledger. When a top-up is refunded, the unused part of its bonus is taken back: granted less clawed back is what the code left with organizations.",
       "uses": "Uses",
       "organizations": "Organizations",
       "creditGranted": "Credit granted",
+      "creditClawedBack": "Clawed back on refunds",
       "feeWaived": "Fee waived",
       "redemptions": "Latest uses",
       "empty": "Not used yet.",
@@ -638,7 +639,8 @@
       "organization": "Organization",
       "topUp": "Top-up",
       "discount": "Fee discount",
-      "credit": "Credit"
+      "credit": "Credit",
+      "clawedBack": "Clawed back"
     },
     "changes": {
       "title": "Changes",

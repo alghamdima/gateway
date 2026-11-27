@@ -9,6 +9,8 @@ import {
 import { db } from "@workspace/db/server";
 import { MICRO_SAR_PER_HALALA } from "@workspace/shared/utils";
 
+import { bonusClawbackDue, bonusesOfPurchases } from "./clawback";
+
 import type { LedgerTransaction } from "./ledger";
 import type {
   CreditEntryKind,
@@ -26,8 +28,8 @@ import type {
  * that knows nothing of lots. The rule, in ledger order (created_at, then id):
  *
  * - a grant opens its lot; it first pays any debt (spending that no lot covered);
- * - a refund or expiry entry takes from the lot it names, up to what is left
- *   of it; any rest is spent like usage;
+ * - a refund, expiry or promo clawback entry takes from the lot it names, up
+ *   to what is left of it; any rest is spent like usage;
  * - usage, a negative adjustment and a refund that names no lot are spent from
  *   the open lots, the one that expires first first (never-expiring last); on
  *   the same expiry, promo credit before adjustments before purchased credit,
@@ -300,6 +302,12 @@ export interface CreditLotView {
     state: LotRefundState;
     /** What the refund returns (or returned): the unused credit in whole halalas. */
     amountMicroSar: number;
+    /**
+     * What the refund would take back of the promo bonus that came with this
+     * top-up: its unused part, in proportion to the credit refunded, in whole
+     * halalas (clawback.ts). 0 when it came with none or the refund is not available.
+     */
+    bonusClawbackMicroSar: number;
     refundableUntil: string | null;
   };
 }
@@ -363,6 +371,11 @@ export const getCreditLots = async (
     )
     .sort((a, b) => compareLots(a.lot, b.lot));
 
+  const bonuses = await bonusesOfPurchases(
+    db,
+    open.filter(({ lot }) => lot.source === "top_up").map(({ lot }) => lot.id),
+  );
+
   const views = open.map(({ lot, remainingMicroSar }): CreditLotView => {
     const request = refundOf.get(lot.id);
     const amountMicroSar =
@@ -374,6 +387,19 @@ export const getCreditLots = async (
         : isRefundable({ lot, amountMicroSar, areRefundsEnabled, now })
           ? "available"
           : "none";
+    const bonus = bonuses.get(lot.id);
+    // an available refund has no refund of this purchase before it, so nothing taken back yet
+    const bonusClawbackMicroSar =
+      bonus && state === "available"
+        ? bonusClawbackDue({
+            purchaseGrantedMicroSar: bonus.purchaseGrantedMicroSar,
+            bonusGrantedMicroSar: bonus.bonusGrantedMicroSar,
+            refundedCreditMicroSar: amountMicroSar,
+            alreadyClawedBackMicroSar: 0,
+            bonusRemainingMicroSar:
+              attribution.remaining.get(bonus.bonusLotId) ?? 0,
+          })
+        : 0;
     return {
       id: lot.id,
       source: lot.source,
@@ -384,6 +410,7 @@ export const getCreditLots = async (
       refund: {
         state,
         amountMicroSar,
+        bonusClawbackMicroSar,
         refundableUntil: lot.refundableUntil?.toISOString() ?? null,
       },
     };

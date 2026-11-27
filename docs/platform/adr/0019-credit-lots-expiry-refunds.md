@@ -4,7 +4,8 @@
 - Date: 2026-11-27
 - Features: ADMIN-23, BILL-10, BILL-17 (`SPEC.md`); owner decisions of 2026-11-27 (section 2: refund within 24 hours without the fee, credit may expire 365 days after purchase, both admin settings; BILL-08 decisions: promo credit expires on its own date)
 - Builds on: ADR 0001 (ledger), ADR 0003 and 0012 (top-ups, refund webhook; amended here), ADR 0009 (where settlement runs), ADR 0017 (micro-SAR)
-- Migration: `0038_refunds_and_credit_expiry` (down script in `migrations/down/`)
+- Migration: `0038_refunds_and_credit_expiry`; amended by `0039_promo_clawback` (down scripts in `migrations/down/`)
+- Amended: 2026-11-27, owner decision: a refund takes back the unused promo bonus (section "Refunds take back the unused promo bonus")
 
 ## Context
 
@@ -33,7 +34,7 @@ A lot is immutable (trigger); the expiry job's one mark, `expired_at`, may be se
 What is left of a lot is **not stored**. It is worked out from the ledger (`attributeLots` in `credits/lots.ts`), so the gateway's settlement stays exactly as it is. Replay the organization's entries in ledger order, `(created_at, id)`:
 
 1. A grant opens its lot with its granted amount. If there is **debt** (spending no lot covered), the new lot pays it first.
-2. A `refund` or `expiry` entry names its lot (`credit_ledger_entry.credit_lot_id`) and takes from it, up to what is left of it. Any rest is spent as in 3.
+2. A `refund`, `expiry` or `promo_clawback` entry names its lot (`credit_ledger_entry.credit_lot_id`) and takes from it, up to what is left of it. Any rest is spent as in 3.
 3. Usage, a negative adjustment, and a refund that names no lot (from before 0038) are spent from the open lots in this order: the earliest `expires_at` first, never-expiring last; on the same expiry, `promo` before `adjustment` before `top_up` (free credit before bought credit); then the older lot; then the lower id. What no lot covers is debt.
 
 Consecutive usage entries all draw the same way, so Postgres sums them per gap between other entries (a window `count(*) FILTER (WHERE kind <> 'usage')`); the replay reads the grants, refunds, adjustments and expiries plus one sum per gap.
@@ -54,17 +55,29 @@ Running it twice at once: the second waits on the account lock, then finds the l
 
 ### Self-serve refund (BILL-10)
 
-`POST /api/credits/:organizationId/lots/:lotId/refund`, permission `billing: ["create"]` (owners and admins, as for a top-up). It returns the unused part of **that** top-up's lot, down to the halala: never the fee (it is not in the lot), never a promo bonus (a lot of its own, spent first on the same expiry), never credit already spent. The confirm dialog says so and shows the amount.
+`POST /api/credits/:organizationId/lots/:lotId/refund`, permission `billing: ["create"]` (owners and admins, as for a top-up). It returns the unused part of **that** top-up's lot, down to the halala: never the fee (it is not in the lot), never a promo bonus (a lot of its own, spent first on the same expiry), never credit already spent. The unused part of the bonus that came with the top-up is removed with it (below). The confirm dialog says so and shows both amounts.
 
-1. Transaction: lock the account; refuse if the lot is not this organization's top-up, a refund of it exists (self-serve or from Stripe's dashboard), refunds are off, the window has passed, nothing whole is left, or `balance − held` cannot cover it. Write `credit_refund` (one per lot, unique) and hold the amount as a request's hold does: a `credit_reservation` with id `refund:<request>`, 15 minutes, which the gateway's reaper frees if we never finish.
+1. Transaction: lock the account; refuse if the lot is not this organization's top-up, a refund of it exists (self-serve or from Stripe's dashboard), refunds are off, the window has passed, nothing whole is left, or `balance − held` cannot cover it. Write `credit_refund` (one per lot, unique) and hold the amount, plus the bonus it will take back, as a request's hold does: a `credit_reservation` with id `refund:<request>`, 15 minutes, which the gateway's reaper frees if we never finish.
 2. Outside any transaction: `BillingProviderStrategy.topUp.refund` (Stripe: `refunds.create` on the payment intent, amount in halalas, `idempotencyKey: credit-refund:<request>`, metadata `purpose=credits_refund`, request id, credit).
-3. Succeeded: in one transaction free the hold (reservation row, then account: the gateway's order), write a `refund` entry for the credit naming the lot, keyed `refund:stripe:<refund id>`, mark the request. Pending: keep the hold for 14 days until the webhook. Refused or failed: free the hold, mark the request failed (final). Stripe unreachable: the request stays pending; a retry (or a double click) sends the same key and gets the same refund.
+3. Succeeded: in one transaction free the hold (reservation row, then account: the gateway's order), write a `refund` entry for the credit naming the lot, keyed `refund:stripe:<refund id>`, take back the bonus (below), mark the request. Pending: keep the hold for 14 days until the webhook. Refused or failed: free the hold, mark the request failed (final). Stripe unreachable: the request stays pending; a retry (or a double click) sends the same key and gets the same refund.
 
 Every refund webhook (`refund.created`, `refund.updated`, `refund.failed`, `charge.refunded`, whose refunds are listed from Stripe when not expanded) is applied per refund id. A self-serve refund's webhook carries the request id and the credit in its metadata and completes the request exactly as step 3 does, under the same key, so whichever arrives first writes the entry and the other changes nothing.
 
 ### Refunds made in Stripe's dashboard
 
 Staff may refund any part of a payment. The ledger removes **the money refunded as credit**, matched by the payment id (the top-up's lot), up to the purchase's credit less what earlier refunds of it removed: `min(refunded, granted − already refunded)`. The fee is the last part of a payment to be refunded and removes nothing. Each refund is counted once, by its id, under the account's lock, so two refunds of one payment are counted one after the other. This replaces ADR 0012's proportional share (`floor(credit × refunded / total)`): money that leaves is credit that leaves, until the credit is gone. A staff refund may exceed what is unused; the excess is spent from the other lots or becomes a negative balance, as before.
+
+### Refunds take back the unused promo bonus (amendment, owner 2026-11-27)
+
+A top-up paid with a bonus code has two lots: its credit (`top_up`) and its bonus (`promo`, the entry keyed `promo:<provider>:<payment>`, BILL-08). When the top-up is refunded, self-serve or in Stripe's dashboard, the unused part of the bonus is removed in the **same transaction as the refund entry**, under the account's lock (`credits/clawback.ts`):
+
+- **Its own kind, `promo_clawback`.** It names the bonus lot (`credit_lot_id`) and the code (`promo_code_id`), and is negative (checks `credit_ledger_entry_lot_kind` and `credit_ledger_entry_promo_code`, migration 0039). Not `refund`: a `refund` entry is money paid back to the customer, keyed by the provider's refund and matched by payment (dashboard refunds sum the `refund` entries of the top-up's lot to know how much credit is left to remove; the credits page marks a lot with a `refund` entry as refunded). A clawback pays nothing out, so mixing the two would count bonus as money refunded. For the attribution rule it is one more entry that names its lot (rule 2): it takes from the bonus lot, up to what is left of it.
+- **Keyed by the refund:** `promo_clawback:<provider>:<refund id>`. One refund takes back once: it is written only when that refund's entry is written now (not when its key was already applied), and the key is checked first. A self-serve refund's request and its webhooks, and every event of a dashboard refund, land on the same refund id.
+- **How much.** `due = floor_halala(bonus granted × credit refunded of the purchase so far (this refund included, at most its credit) / credit granted) − taken back by earlier refunds of it`, then `min(due, floor_halala(what is left of the bonus))`, never below 0. A full refund takes back the whole unused bonus; a partial refund its share. Rounded down to the halala, in the customer's favour, so the clawback is always whole halalas and a share under a halala takes nothing; the next refund of the same purchase catches up, so the shares of a fully refunded purchase add up to the bonus (when unspent). The product is computed in bigint.
+- **Only the unused part.** Bonus already spent is never taken back: the customer keeps what they used. When the bonus expires with its top-up (the code has no credit date of its own), promo is spent first on the same expiry, so spending reaches the bonus before the top-up; with an earlier code date it is spent first anyway, with a later one after. Because the cap is what the lot still holds, the remainders stay ≥ 0 and still add up to the balance (the invariants below are unchanged), and the clawback can never push the balance below 0.
+- **Holds.** A self-serve refund holds the bonus it will take back together with the credit (`refund:<request>` reservation), so requests in flight cannot spend it while the provider works, and refuses as `creditInUse` when they hold it. The amount is worked out again when the refund is written: spending can only lower it. A dashboard refund has no hold, as before.
+- **Unaffected:** free credit (no top-up behind it), a top-up without a bonus, and a second top-up with a one-use code that was credited without a bonus.
+- **Shown:** the credits page gives each refundable top-up `bonusClawbackMicroSar`, and the confirm dialog states it; the history labels it "Promotion taken back"; the promo report (BILL-08) shows credit clawed back, in total and per use, from the ledger, so granted − clawed back is what the code left with organizations. Fee waived is unchanged: the fee is never refunded.
 
 ### Invariants checked by reconciliation
 
@@ -74,6 +87,5 @@ Staff may refund any part of a payment. The ledger removes **the money refunded 
 
 - The gateway is untouched: settlement is one statement as before; it never reads lots.
 - Working out remainders reads all of an organization's ledger once (summed per gap). It runs when the credits page loads, for a refund, for the job (only for organizations with a due lot) and for reconciliation. For an organization with millions of entries a checkpoint (remainders as of an entry) is the next step; not needed at today's volume.
-- A refunded top-up keeps its promo bonus (the bonus is its own lot and is not refunded). Taking the unused bonus back on refund is an owner decision, not built.
 - Email notices before expiry are not built: the credits page shows a notice 30 and 7 days before credit expires.
 - SPEC BILL-17 said "off until the terms say so": the migration seeds 365 days as the owner decided; until the published terms say credit expires, staff should set "never" in the admin.

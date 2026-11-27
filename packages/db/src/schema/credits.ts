@@ -52,14 +52,21 @@ export const creditEntryKindEnum = pgEnum("credit_entry_kind", [
   "promo",
   // what was left of a credit lot when it expired (BILL-17, ADR 0019)
   "expiry",
+  // the unused part of a top-up's promo bonus, taken back when the top-up is refunded (ADR 0019)
+  "promo_clawback",
 ]);
 
 /**
  * The kinds that name the credit lot they take from (ADR 0019): a refund of
- * a top-up, and the expiry of a lot. Compared as text in the checks, because
- * migration 0038 adds "expiry" to the enum in the same transaction.
+ * a top-up, the expiry of a lot, and the clawback of a refunded top-up's
+ * promo bonus. Compared as text in the checks, because migrations 0038 and
+ * 0039 add "expiry" and "promo_clawback" to the enum in the same transaction.
  */
-export const LOT_DEBIT_KINDS = ["refund", "expiry"] as const;
+export const LOT_DEBIT_KINDS = ["refund", "expiry", "promo_clawback"] as const;
+/** Lot debits that must name their lot and remove credit (a refund may predate lots). */
+const NAMED_LOT_DEBIT_KINDS = ["expiry", "promo_clawback"] as const;
+const textList = (values: readonly string[]) =>
+  sql.raw(values.map((value) => `'${value}'`).join(", "));
 
 /**
  * Append-only: a trigger rejects UPDATE and DELETE for every role. There is
@@ -102,13 +109,14 @@ export const creditLedgerEntry = pgTable(
     topupFeeSource: text().$type<TopupFeeSource>(),
     /**
      * The promo code behind the entry (BILL-08): every promo entry (bonus or
-     * free credit) names one; a top-up names the code it was paid with.
+     * free credit) and every promo clawback names one; a top-up names the
+     * code it was paid with.
      */
     promoCodeId: text().references(() => promoCode.id, {
       onDelete: "restrict",
     }),
     /**
-     * Refund and expiry entries: the credit lot they take from (ADR 0019). A
+     * Refund, expiry and promo clawback entries: the credit lot they take from (ADR 0019). A
      * grant is tied to its lot the other way, by credit_lot.entry_id.
      */
     creditLotId: text().references((): AnyPgColumn => creditLot.id, {
@@ -122,7 +130,7 @@ export const creditLedgerEntry = pgTable(
       .where(sql`${t.creditLotId} is not null`),
     check(
       "credit_ledger_entry_lot_kind",
-      sql`(${t.creditLotId} is null or ${t.kind}::text in (${sql.raw(LOT_DEBIT_KINDS.map((kind) => `'${kind}'`).join(", "))})) and (${t.kind}::text <> 'expiry' or (${t.creditLotId} is not null and ${t.amount} < 0))`,
+      sql`(${t.creditLotId} is null or ${t.kind}::text in (${textList(LOT_DEBIT_KINDS)})) and (${t.kind}::text not in (${textList(NAMED_LOT_DEBIT_KINDS)}) or (${t.creditLotId} is not null and ${t.amount} < 0))`,
     ),
     check(
       "credit_ledger_entry_refund_is_debit",
@@ -155,7 +163,7 @@ export const creditLedgerEntry = pgTable(
     ),
     check(
       "credit_ledger_entry_promo_code",
-      sql`(${t.kind} <> 'promo' or ${t.promoCodeId} is not null) and (${t.promoCodeId} is null or ${t.kind} in ('promo', 'top_up'))`,
+      sql`(${t.kind}::text not in ('promo', 'promo_clawback') or ${t.promoCodeId} is not null) and (${t.promoCodeId} is null or ${t.kind}::text in ('promo', 'top_up', 'promo_clawback'))`,
     ),
     index("credit_ledger_entry_promoCodeId_idx")
       .on(t.promoCodeId)

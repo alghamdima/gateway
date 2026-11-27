@@ -109,6 +109,10 @@ export const PromoCodeDetail = ({ id }: PromoCodeDetailProps) => {
           value: format.money(report.data.creditGrantedMicroSar),
         },
         {
+          label: t("admin:promoCodes.report.creditClawedBack"),
+          value: format.money(report.data.creditClawedBackMicroSar),
+        },
+        {
           label: t("admin:promoCodes.report.feeWaived"),
           value: format.money(report.data.feeWaivedMicroSar),
         },
@@ -255,6 +259,9 @@ export const PromoCodeDetail = ({ id }: PromoCodeDetailProps) => {
                       <TableHead className="text-right">
                         {t("admin:promoCodes.report.credit")}
                       </TableHead>
+                      <TableHead className="text-right">
+                        {t("admin:promoCodes.report.clawedBack")}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -283,6 +290,9 @@ export const PromoCodeDetail = ({ id }: PromoCodeDetailProps) => {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {format.money(row.creditMicroSar)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {format.money(row.clawedBackMicroSar)}
                         </TableCell>
                       </TableRow>
                     ))}

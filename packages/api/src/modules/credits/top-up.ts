@@ -300,7 +300,8 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
   const result = event.promo
     ? await creditTopUpWithPromo({
         promo: event.promo,
-        paymentKey: `${event.provider}:${event.paymentId}`,
+        provider: event.provider,
+        paymentId: event.paymentId,
         topUp,
       })
     : await applyEntry(topUp);

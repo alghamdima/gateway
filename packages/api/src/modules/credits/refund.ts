@@ -13,6 +13,7 @@ import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
+import { clawBackBonusIn, estimateBonusClawbackIn } from "./clawback";
 import { applyEntryIn } from "./ledger";
 import { floorToHalala, getLotRemainders } from "./lots";
 
@@ -29,7 +30,9 @@ import type {
  * Self-serve: an organization admin refunds a top-up from the credits page
  * while its window is open. It returns the unused part of that purchase's
  * credit (its lot's remainder, down to the halala), never the fee and never a
- * promo bonus (a separate lot). The request is written and the credit held
+ * promo bonus (a separate lot). The unused part of the bonus that came with
+ * the top-up is taken back in the same transaction as the refund entry
+ * (clawback.ts), in proportion to the credit refunded. The request is written and the credit held
  * first; the provider is called outside any transaction, with an idempotency
  * key per request; the refund entry is written when the provider says it
  * succeeded, by whichever of our call and its webhook gets there first, under
@@ -39,7 +42,8 @@ import type {
  * ledger removes the money refunded as credit, up to the purchase's credit
  * less what earlier refunds of it removed, matched by the payment id: the fee
  * is the last part of a payment to be refunded, and a refund of it removes
- * nothing. Each refund counts once, keyed by its id.
+ * nothing. Each refund counts once, keyed by its id, and takes back its share
+ * of the purchase's unused bonus with it.
  */
 
 /** How long a request's hold lasts before the reaper frees it, if we stop half way. */
@@ -213,9 +217,19 @@ const prepareRefund = async (
   }
   if (existing) {
     // a retry: the same amount and key; the hold again if the reaper freed it and the credit is there
-    await holdCredit(tx, existing.id, organizationId, existing.amountMicroSar, {
-      ifAvailable: true,
-    });
+    const clawback = await estimateBonusClawbackIn(
+      tx,
+      organizationId,
+      lot.id,
+      existing.amountMicroSar,
+    );
+    await holdCredit(
+      tx,
+      existing.id,
+      organizationId,
+      existing.amountMicroSar + clawback,
+      { ifAvailable: true },
+    );
     return {
       requestId: existing.id,
       amountMicroSar: existing.amountMicroSar,
@@ -255,7 +269,14 @@ const prepareRefund = async (
   if (amountMicroSar <= 0) {
     throw refundRefusal("nothingLeft");
   }
-  if (amountMicroSar > account.balance - account.held) {
+  // the unused bonus that goes with it is held too, so requests cannot spend it meanwhile
+  const clawbackMicroSar = await estimateBonusClawbackIn(
+    tx,
+    organizationId,
+    lot.id,
+    amountMicroSar,
+  );
+  if (amountMicroSar + clawbackMicroSar > account.balance - account.held) {
     // part of it is held by requests in flight; they settle within minutes
     throw refundRefusal("creditInUse");
   }
@@ -274,9 +295,13 @@ const prepareRefund = async (
   if (!request) {
     throw new Error("credit_refund insert returned no row");
   }
-  await holdCredit(tx, request.id, organizationId, amountMicroSar, {
-    ifAvailable: false,
-  });
+  await holdCredit(
+    tx,
+    request.id,
+    organizationId,
+    amountMicroSar + clawbackMicroSar,
+    { ifAvailable: false },
+  );
   return { requestId: request.id, amountMicroSar, payment };
 };
 
@@ -316,7 +341,7 @@ const paymentOfEntry = async (
 };
 
 /**
- * Holds the credit being refunded the way a request's hold does
+ * Holds the credit being refunded, and the bonus it takes back, the way a request's hold does
  * (credit_reservation, id `refund:<request>`), so it cannot be spent while the
  * provider works, and the gateway's reaper frees it if we never finish. The
  * rate columns, which a refund does not use, carry the rate in force.
@@ -442,7 +467,8 @@ interface SelfServeRefundEvent extends PaymentOf {
 
 /**
  * Writes a self-serve refund that succeeded, once: frees its hold, removes
- * exactly the credit it carried from its lot, and marks the request. Called by
+ * exactly the credit it carried from its lot, takes back the unused part of
+ * the top-up's bonus, and marks the request. Called by
  * the request itself and by the refund's webhook, whichever comes first.
  */
 const completeSelfServeRefund = async (event: SelfServeRefundEvent) =>
@@ -479,6 +505,16 @@ const completeSelfServeRefund = async (event: SelfServeRefundEvent) =>
         selfServe: true,
       },
     });
+    const clawedBack = applied.isApplied
+      ? await clawBackBonusIn(tx, {
+          organizationId: request.organizationId,
+          purchaseLotId: request.creditLotId,
+          provider: event.provider,
+          mode: event.mode,
+          paymentId: event.paymentId,
+          refundId: event.refundId,
+        })
+      : 0;
     await tx
       .update(creditRefund)
       .set({
@@ -488,7 +524,7 @@ const completeSelfServeRefund = async (event: SelfServeRefundEvent) =>
       })
       .where(eq(creditRefund.id, request.id));
     logger.info(
-      `↩️ Refund ${event.refundId}: ${applied.isApplied ? "removed" : "already removed"} ${request.amountMicroSar} micro-SAR from ${request.organizationId}${released ? " and freed its hold" : ""}`,
+      `↩️ Refund ${event.refundId}: ${applied.isApplied ? "removed" : "already removed"} ${request.amountMicroSar} micro-SAR from ${request.organizationId}${clawedBack ? ` and ${clawedBack} of its bonus` : ""}${released ? ", freed its hold" : ""}`,
     );
     return true;
   });
@@ -633,6 +669,14 @@ export const applyProviderRefund = async (
         refundedMicroSar: event.refundedMicroSar,
         selfServe: false,
       },
+    });
+    await clawBackBonusIn(tx, {
+      organizationId: topUp.organizationId,
+      purchaseLotId: topUp.lotId,
+      provider: event.provider,
+      mode: event.mode,
+      paymentId: event.paymentId,
+      refundId: event.refundId,
     });
     logger.info(
       `↩️ Refund ${event.refundId}: removed ${removed} micro-SAR from ${topUp.organizationId}`,

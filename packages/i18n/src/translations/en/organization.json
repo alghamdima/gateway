@@ -346,7 +346,8 @@
       "refund": "Refund",
       "adjustment": "Adjustment",
       "promo": "Promotion",
-      "expiry": "Expired"
+      "expiry": "Expired",
+      "promo_clawback": "Promotion taken back"
     },
     "redeem": {
       "title": "Redeem a code",
@@ -376,10 +377,11 @@
       "refund": {
         "label": "Refund",
         "until": "Refundable until {{date}}",
-        "policy": "A top-up's unused credit can be refunded within the refund window shown on its button. The payment processing fee and promotional credit are not refunded.",
+        "policy": "A top-up's unused credit can be refunded within the refund window shown on its button. The payment processing fee and promotional credit are not refunded. If the top-up came with a promotional bonus, the unused part of the bonus is removed with the refund, in proportion to the credit refunded; bonus already spent is yours to keep.",
         "confirm": {
           "title": "Refund this top-up?",
           "description": "You get back {{amount}}: the unused part of the {{granted}} of credit this top-up bought. Credit already spent and the payment processing fee are not refunded. The money goes back to the card you paid with, usually within 5 to 10 days.",
+          "bonus": "This top-up came with a promotional bonus: {{bonus}} of it, the unused part in proportion to the credit refunded, is removed from your balance too. It is not paid out. Bonus already spent is not taken back.",
           "action": "Refund {{amount}}"
         },
         "done": {

@@ -154,6 +154,13 @@ export const promoRefusalError = (reason: PromoRefusal) =>
     code: `billing:promo.refused.${reason}`,
   });
 
+/**
+ * The key of a top-up's bonus entry and redemption: `promo:<provider>:<payment>`.
+ * A refund of that payment finds its bonus by it (credits/clawback.ts).
+ */
+export const topUpBonusKey = (provider: string, paymentId: string) =>
+  `promo:${provider}:${paymentId}`;
+
 /** What a paid top-up says about the code it carried, as the checkout computed it. */
 export interface PaidTopUpPromo {
   codeId: string;
@@ -163,8 +170,9 @@ export interface PaidTopUpPromo {
 
 export interface CreditTopUpWithPromoInput {
   promo: PaidTopUpPromo;
-  /** "<provider>:<payment id>": the redemption and the bonus entry are keyed by it. */
-  paymentKey: string;
+  /** Where the payment was taken: the redemption and the bonus entry are keyed by it. */
+  provider: string;
+  paymentId: string;
   /** The top-up entry as the webhook would write it without a code. */
   topUp: ApplyEntryInput;
 }
@@ -182,10 +190,13 @@ export interface CreditTopUpWithPromoInput {
  */
 export const creditTopUpWithPromo = async ({
   promo,
-  paymentKey,
+  provider,
+  paymentId,
   topUp,
 }: CreditTopUpWithPromoInput) =>
   db.transaction(async (tx) => {
+    const paymentKey = `${provider}:${paymentId}`;
+    const bonusKey = topUpBonusKey(provider, paymentId);
     // the code first, then the account (in applyEntryIn): the order every use takes
     const [code] = await tx
       .select()
@@ -236,7 +247,7 @@ export const creditTopUpWithPromo = async ({
             organizationId: topUp.organizationId,
             amount: promo.bonusMicroSar,
             kind: "promo",
-            idempotencyKey: `promo:${paymentKey}`,
+            idempotencyKey: bonusKey,
             reference: code.code,
             promoCodeId: code.id,
             metadata: { paymentId: paymentKey, kind: code.kind },
@@ -253,7 +264,7 @@ export const creditTopUpWithPromo = async ({
       creditMicroSar: promo.bonusMicroSar,
       ledgerEntryId: bonus?.entryId ?? null,
       topupEntryId: applied.entryId,
-      idempotencyKey: `promo:${paymentKey}`,
+      idempotencyKey: bonusKey,
     });
     await countUse(tx, code.id);
     return { ...applied, balance: bonus?.balance ?? applied.balance };
