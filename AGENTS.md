@@ -138,7 +138,7 @@ Environment: create `.env.local` at repo root with `DATABASE_URL`, `PRODUCT_NAME
 ## After a deploy (operations nobody may forget)
 
 - Admin, model prices: press **Import current prices** once, so day-one charges match.
-- Schedule the internal jobs: `/api/internal/model-prices` every minute (pushes approved prices to the gateway, repairs drift), `/api/internal/model-price-suggestions` daily, `/api/internal/credit-expiry` hourly, and the existing reconciliation job daily.
+- Schedule the internal jobs: `/api/internal/model-prices` every minute (pushes approved prices to the gateway, repairs drift), `/api/internal/model-price-suggestions` daily, `/api/internal/credit-expiry` hourly, `/api/internal/key-lifetime` hourly (finishes key expiry cuts after the maximum key lifetime is shortened), and the existing reconciliation job daily.
 - Stripe webhook: send `checkout.session.completed`, `charge.refunded`, `refund.updated` and `refund.failed`; set `STRIPE_*` (live) and, for test mode, `STRIPE_TEST_*` secrets; confirm the Stripe account accepts SAR.
 - Legal terms must state the 365-day credit expiry and the 24-hour refund rule before launch.
 - Open every admin screen once on the production build (pricing, payments, model prices, promo codes, an organization's fee card) and the customer credits page: none has been checked in a browser yet.
