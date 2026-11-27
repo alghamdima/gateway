@@ -4,7 +4,7 @@ Read this first. It says what the product is, where everything lives, what is do
 
 **What to build next is in `SPEC.md`**: every feature of the product, compared with OpenRouter, with its status, where it lives, when it is done and the build order; the owner's open decisions are its section 3. The long form of the history is in `PLAN.md` (steps and their status), `ARCHITECTURE.md` and `adr/` (one file per decision). When this file and the code disagree, the code is right: fix this file.
 
-**Staging runs on the owner's server** (`uat.lemru.tech`, not public yet): how it is set up, restarted and updated, and what its first browser check found (the API keys page returns 500), is in `DEPLOY.md`.
+**Staging runs on the owner's server** at https://uat.lemru.tech: how it is set up, restarted and updated, and what its browser check found and fixed, is in `DEPLOY.md`.
 
 ## The product
 

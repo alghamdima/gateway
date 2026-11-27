@@ -1,18 +1,21 @@
 # Staging deployment
 
-The staging server (Ubuntu 26.04, 4 vCPU, 15 GiB RAM, 193 GB disk) runs the whole product from this repository at `/home/gateway`, branch `feat/ai-gateway`. Set up on 2026-11-27. Domain: `uat.lemru.tech` (points at the server). HTTPS is not set up yet, and the web app is not open to the internet yet.
+The staging server (Ubuntu 26.04, 4 vCPU, 15 GiB RAM, 193 GB disk) runs the whole product from this repository at `/home/gateway`, branch `feat/ai-gateway`. Set up on 2026-11-27. Public address: **https://uat.lemru.tech** (HTTPS since 2026-11-27, owner's approval).
 
 ## What runs where
 
-| Piece         | How                                                                                           | Listens on                     |
-| ------------- | --------------------------------------------------------------------------------------------- | ------------------------------ |
-| Postgres 18   | Docker Compose service `db` (project `lemru`), volume `lemru_postgres_data`                   | `127.0.0.1:5432`               |
-| Mailpit       | Compose service `mailpit` (catches every email; open it through an SSH tunnel)                | `127.0.0.1:1025`, `:8025` (UI) |
-| Gateway       | Compose profile `gateway` (`transports/Dockerfile.local`, `apps/gateway/compose/config.json`) | `127.0.0.1:8080`               |
-| Web (Next.js) | Production build, systemd unit `lemru-web.service` (`next start -H localhost -p 3000`)        | `localhost:3000`               |
-| Internal jobs | systemd timers `lemru-job-*.timer` → `lemru-job@<name>.service` → `/usr/local/bin/lemru-job`  | –                              |
+| Piece           | How                                                                                              | Listens on                         |
+| --------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| Postgres 18     | Docker Compose service `db` (project `lemru`), volume `lemru_postgres_data`                      | `127.0.0.1:5432`                   |
+| Mailpit         | Compose service `mailpit` (catches every email; open it through an SSH tunnel)                   | `127.0.0.1:1025`, `:8025` (UI)     |
+| Gateway         | Compose profile `gateway` (`transports/Dockerfile.local`, `apps/gateway/compose/config.json`)    | `127.0.0.1:8080`                   |
+| Caddy 2.6 (apt) | Reverse proxy with automatic Let's Encrypt certificates, `/etc/caddy/Caddyfile`, `caddy.service` | `*:80` (redirects to 443), `*:443` |
+| Web (Next.js)   | Production build, systemd unit `lemru-web.service` (`next start -H localhost -p 3000`)           | `localhost:3000`                   |
+| Internal jobs   | systemd timers `lemru-job-*.timer` → `lemru-job@<name>.service` → `/usr/local/bin/lemru-job`     | –                                  |
 
-Only SSH (22) is open to the internet. `ufw` is inactive. Docker publishes its ports past `ufw` anyway, which is why every Compose port is bound to `127.0.0.1` (through `POSTGRES_PORT`, `MAILPIT_*_PORT` in `.env.local`). To see the site before HTTPS exists, open an SSH tunnel: `ssh -L 3000:localhost:3000 -L 8025:localhost:8025 root@<server>`, then browse `http://localhost:3000`.
+Open to the internet: SSH (22, from anywhere, as the owner chose), HTTP (80) and HTTPS (443), all through `ufw` (active, everything else refused). Only the web app is public: Caddy proxies `uat.lemru.tech` to `localhost:3000`. The gateway, Postgres and Mailpit stay private. Docker publishes its ports past `ufw`, which is why every Compose port is bound to `127.0.0.1` (through `POSTGRES_PORT`, `MAILPIT_*_PORT` in `.env.local`). To read the emails Mailpit caught: `ssh -L 8025:localhost:8025 root@uat.lemru.tech`, then browse `http://localhost:8025`.
+
+Keep `next start -H localhost`, never `-H 127.0.0.1`: Next turns any `127.x` host into `localhost` in the proxy's URL (`next/dist/server/web/next-url.js`) but not in its own origin (`router-utils/resolve-routes.js`, `initUrl`). The i18n proxy's rewrite then looks external, Next fetches it as a new request, the proxy runs again on `/en/...` and redirects back: every page answers 307 to itself.
 
 Toolchain on the host: Docker 29.10 with Compose v5.8, Node 24.22.3 (from nodejs.org, checksum verified, in `/usr/local`), and pnpm 12.4.1. Go is not installed: the gateway image builds Go inside `golang:1.27.4`.
 
@@ -33,6 +36,8 @@ pnpm with-env docker compose --profile gateway up -d --wait   # db, mailpit, gat
 systemctl restart lemru-web
 curl -s localhost:8080/health                                 # {"status":"ok",...}
 curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/      # 200
+curl -s -o /dev/null -w '%{http_code}\n' https://uat.lemru.tech/  # 200
+systemctl reload caddy                                        # after editing the Caddyfile
 systemctl list-timers 'lemru-*'
 ```
 
@@ -52,7 +57,7 @@ NODE_ENV=production pnpm with-env pnpm exec turbo run build --filter=web
 systemctl restart lemru-web
 ```
 
-Build the web app through turbo, not `pnpm --filter web build` alone. The CMS package generates `.content-collections`, which the web build imports. `NEXT_PUBLIC_*` values are baked in at build time, so rebuild after changing them (for example `URL` when HTTPS arrives).
+Build the web app through turbo, not `pnpm --filter web build` alone. The CMS package generates `.content-collections`, which the web build imports. `NEXT_PUBLIC_*` values are baked in at build time, so rebuild after changing them (`URL`, `NEXT_PUBLIC_URL` and `BETTER_AUTH_URL` are `https://uat.lemru.tech`).
 
 ## Internal jobs
 
@@ -81,15 +86,13 @@ Run one by hand with `lemru-job reconciliation`. Each job ran once by hand on 20
 
 Status 200 with real content and no console errors: `/admin`, users, a user, customers, organizations, an organization (credits, top-up fee card, rate limit, data policy, members), pricing, payments, model prices, promo codes, new promo code, providers, key defaults, requests, audit, reconciliation. On the customer side: org home, credits (shows "Top-ups are temporarily unavailable"), activity, data policy, members, settings, billing, and the user dashboard, settings and security pages.
 
-Broken:
+Found broken, fixed the same day and checked again over `https://uat.lemru.tech` (28 screens, all 200, no errors; the create-key dialog shows "Key will expire on: Feb 25, 2027, 9:45 PM UTC"):
 
-1. **API keys page returns 500** (`/dashboard/<org>/keys`; the key page and the create-key form also call it). `formatExpiry` in `apps/web/src/modules/keys/key-form.tsx:78` passes `dateStyle`/`timeStyle` together with `timeZoneName`, which `Intl.DateTimeFormat` rejects (`TypeError: Invalid option : option`, reproduced in Node 24).
-2. **`/admin` without a session returns 500** instead of sending the visitor to sign in (`You need to be logged in to access this feature!` thrown from the admin page).
-3. **The cookie banner covers the "Sign in" button** at 1366×900 until it is dismissed.
-4. **The web app loops on every page (307 to itself) unless the request's Host matches `next start -H`.** Next 16.4.6 builds its own origin from `-H`/`-p` (`next/dist/server/lib/router-utils/resolve-routes.js`, `initUrl`). The i18n proxy builds its rewrite from the Host header (`next-i18n-router`, `request.url`). When the two differ, Next fetches the rewrite as an external URL, the proxy runs again on `/en/...` and redirects back. Bound to `localhost`, it works for `localhost:3000`. **Behind a reverse proxy for `uat.lemru.tech` this breaks again** unless the proxy sends `Host: localhost:3000`, or the code is fixed (a relative rewrite, or `experimental.trustHostHeader`). Decide this before HTTPS.
+1. **API keys page returned 500** (`/dashboard/<org>/keys`, the key page and the create-key form). `formatExpiry` (`apps/web/src/modules/keys/key-form.tsx`) passed `dateStyle`/`timeStyle` with `timeZoneName`, which `Intl.DateTimeFormat` refuses (`Invalid option : option`). It now spells the fields out.
+2. **`/admin` without a session returned 500**: the redirect sat only in the Suspense'd sidebar, while the page read the admin API, which refused the visitor. The admin layout now checks the staff member before the page renders (`getStaffUser`), and `e2e/specs/admin.signed-out.spec.ts` covers it. Signed out, `/admin` and `/admin/users` now answer 307 to `/auth/login`.
+
+Not a bug: the cookie banner covers the "Sign in" button until the visitor answers it (the e2e suite answers it with `installConsentBannerHandler`).
 
 ## Still to do
 
-- HTTPS for `uat.lemru.tech` (reverse proxy with automatic certificates). It needs ports 80 and 443 open to the internet: owner's approval first. Then set `URL`, `NEXT_PUBLIC_URL` and `BETTER_AUTH_URL` to `https://uat.lemru.tech`, rebuild the web app, and handle point 4 above.
-- Firewall: turn on `ufw` with SSH (and later 80/443) only, once the owner says which addresses may use SSH.
 - Provider keys, then the price import; Stripe test keys; a real PostHog key or none; email through a real provider instead of Mailpit before outside testers sign up.
