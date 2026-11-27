@@ -116,6 +116,27 @@ const refund = (input: {
   status: input.status ?? "succeeded",
 });
 
+/** Sets the top-up limits as staff would in the admin pricing settings. */
+const setLimits = async (
+  topupMinMicroUsd: number,
+  topupMaxMicroUsd: number,
+  topupPresetsMicroUsd: number[],
+) => {
+  const { updatePricingSettings } = await import("../../pricing/pricing");
+  await updatePricingSettings({
+    defaultMarkupBps: 0,
+    topupFeeBps: 550,
+    topupFeeMinMicroUsd: 800_000,
+    topupMinMicroUsd,
+    topupMaxMicroUsd,
+    topupPresetsMicroUsd,
+    staffId: "staff_limits",
+  });
+};
+/** Back to the limits the migration seeds. */
+const seeded = () =>
+  setLimits(5 * USD, 1000 * USD, [10 * USD, 25 * USD, 50 * USD, 100 * USD]);
+
 describe.skipIf(!adminUrl)("credit top-ups", () => {
   let database: TestDatabase;
   let sql: postgres.Sql;
@@ -244,6 +265,73 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       expect(params).not.toHaveProperty("payment_method_types");
       // starting a checkout credits nothing
       expect(await entries(organizationId)).toHaveLength(0);
+    });
+
+    describe("limits per payment, set by staff (ADMIN-05)", () => {
+      it("gives the form the stored limits, quick picks and fee", async () => {
+        expect(await topUp.getTopUpOptions()).toEqual({
+          minMicroUsd: 5 * USD,
+          maxMicroUsd: 1000 * USD,
+          presetsMicroUsd: [10 * USD, 25 * USD, 50 * USD, 100 * USD],
+          feeBps: 550,
+          feeMinMicroUsd: 800_000,
+        });
+      });
+
+      it("refuses an amount under the stored minimum or over the stored maximum", async () => {
+        const organizationId = await createOrganization();
+        await expect(topUp.quoteTopUp(5 * USD - 10_000)).rejects.toMatchObject({
+          status: 400,
+          code: "billing:error.topUpAmount",
+        });
+        await expect(
+          topUp.quoteTopUp(1000 * USD + 10_000),
+        ).rejects.toMatchObject({
+          status: 400,
+          code: "billing:error.topUpAmount",
+        });
+        await expect(
+          topUp.startTopUp({
+            user: { id: "user_1", email: "owner@example.com" },
+            organizationId,
+            creditMicroUsd: 1500 * USD,
+            origin: "https://app.example.com",
+          }),
+        ).rejects.toMatchObject({ status: 400 });
+        expect(stripeCalls.sessions).toHaveLength(0);
+        // the limits themselves are allowed
+        expect((await topUp.quoteTopUp(5 * USD)).creditMicroUsd).toBe(5 * USD);
+        expect((await topUp.quoteTopUp(1000 * USD)).creditMicroUsd).toBe(
+          1000 * USD,
+        );
+      });
+
+      it("follows the limits as soon as staff change them", async () => {
+        const organizationId = await createOrganization();
+        try {
+          await setLimits(20 * USD, 2000 * USD, [20 * USD, 1500 * USD]);
+
+          expect(await topUp.getTopUpOptions()).toMatchObject({
+            minMicroUsd: 20 * USD,
+            maxMicroUsd: 2000 * USD,
+            presetsMicroUsd: [20 * USD, 1500 * USD],
+          });
+          const result = await topUp.startTopUp({
+            user: { id: "user_1", email: "owner@example.com" },
+            organizationId,
+            creditMicroUsd: 1500 * USD,
+            origin: "https://app.example.com",
+          });
+          expect(result).toMatchObject({ creditMicroUsd: 1500 * USD });
+          expect(stripeCalls.sessions).toHaveLength(1);
+          // $10 was allowed before the minimum went up to $20
+          await expect(topUp.quoteTopUp(10 * USD)).rejects.toMatchObject({
+            status: 400,
+          });
+        } finally {
+          await seeded();
+        }
+      });
     });
 
     it("refuses an organization that does not exist", async () => {

@@ -11,6 +11,8 @@ import {
   MAX_MARKUP_BPS,
   MAX_TOPUP_FEE_BPS,
   MAX_TOPUP_FEE_MIN_MICRO_USD,
+  MAX_TOPUP_MICRO_USD,
+  MAX_TOPUP_PRESETS,
   PROVIDER_AGREEMENTS,
   PROVIDER_REGIONS,
   selectCustomerSchema,
@@ -348,14 +350,60 @@ export type AdjustOrganizationCreditsInput = z.infer<
 
 const markupBpsSchema = z.number().int().min(0).max(MAX_MARKUP_BPS);
 
-export const updatePricingSettingsSchema = z.object({
-  /** Basis points added to provider cost when no provider rule matches: 100 = 1%. */
-  defaultMarkupBps: markupBpsSchema,
-  /** Basis points added on a top-up payment. */
-  topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
-  /** The least fee a top-up pays, in micro-USD (1 USD = 1,000,000). */
-  topupFeeMinMicroUsd: z.number().int().min(0).max(MAX_TOPUP_FEE_MIN_MICRO_USD),
-});
+/** The admin form checks the same ceilings before sending. */
+export { MAX_TOPUP_MICRO_USD, MAX_TOPUP_PRESETS };
+
+/** A top-up amount in micro-USD: whole cents, above zero, under the typo ceiling. */
+const topupAmountMicroUsdSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_TOPUP_MICRO_USD)
+  .refine((value) => value % 10_000 === 0, {
+    message: "Must be a whole number of cents",
+  });
+
+/** The same rules as the database checks on pricing_settings (packages/db/src/schema/pricing.ts). */
+export const updatePricingSettingsSchema = z
+  .object({
+    /** Basis points added to provider cost when no provider rule matches: 100 = 1%. */
+    defaultMarkupBps: markupBpsSchema,
+    /** Basis points added on a top-up payment. */
+    topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
+    /** The least fee a top-up pays, in micro-USD (1 USD = 1,000,000). */
+    topupFeeMinMicroUsd: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_TOPUP_FEE_MIN_MICRO_USD),
+    /** The least credit one top-up may buy, in micro-USD. */
+    topupMinMicroUsd: topupAmountMicroUsdSchema,
+    /** The most credit one top-up may buy, in micro-USD. */
+    topupMaxMicroUsd: topupAmountMicroUsdSchema,
+    /** The quick-pick amounts of the top-up form, in micro-USD. */
+    topupPresetsMicroUsd: z
+      .array(topupAmountMicroUsdSchema)
+      .min(1)
+      .max(MAX_TOPUP_PRESETS),
+  })
+  .superRefine((value, ctx) => {
+    if (value.topupMaxMicroUsd < value.topupMinMicroUsd) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["topupMaxMicroUsd"],
+        message: "The top-up maximum must be at least the minimum",
+      });
+    }
+    value.topupPresetsMicroUsd.forEach((preset, index) => {
+      if (preset < value.topupMinMicroUsd || preset > value.topupMaxMicroUsd) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["topupPresetsMicroUsd", index],
+          message: "Each quick-pick amount must be within the top-up limits",
+        });
+      }
+    });
+  });
 
 /** The gateway's provider name, as in its config: openai, anthropic, ... */
 export const pricingProviderSchema = z

@@ -40,6 +40,9 @@ export const Pricing = () => {
               defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
               topupFeeBps={pricing.data.settings.topupFeeBps}
               topupFeeMinMicroUsd={pricing.data.settings.topupFeeMinMicroUsd}
+              topupMinMicroUsd={pricing.data.settings.topupMinMicroUsd}
+              topupMaxMicroUsd={pricing.data.settings.topupMaxMicroUsd}
+              topupPresetsMicroUsd={pricing.data.settings.topupPresetsMicroUsd}
             />
           ) : (
             <Skeleton className="h-32 w-full" />

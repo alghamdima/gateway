@@ -19,9 +19,6 @@ import type { WebhookCallbacks } from "@workspace/billing-web/server";
  * arrives, never on the redirect back.
  */
 
-/** Limits per payment, in micro-USD (confirmed by the owner, ADR 0012). */
-export const TOP_UP_MIN_MICRO_USD = 5_000_000;
-export const TOP_UP_MAX_MICRO_USD = 1_000_000_000;
 export const MICRO_USD_PER_CENT = 10_000;
 
 const LINE_LABELS = { credits: "Credits", fee: "Payment processing fee" };
@@ -32,14 +29,48 @@ export interface TopUpQuote {
   totalMicroUsd: number;
 }
 
-/** The fee as it stands now: what the checkout started next would charge. */
+/** What the top-up form needs, all set by staff in the admin pricing settings (ADMIN-05). */
+export interface TopUpOptions {
+  /** The least and most credit one payment may buy, in micro-USD (SAR with ADMIN-06). */
+  minMicroUsd: number;
+  maxMicroUsd: number;
+  /** The quick-pick amounts, smallest first, in micro-USD. */
+  presetsMicroUsd: number[];
+  /** The fee rates, so the form can say how the fee is worked out. */
+  feeBps: number;
+  feeMinMicroUsd: number;
+}
+
+export const getTopUpOptions = async (): Promise<TopUpOptions> => {
+  const settings = await getPricingSettings();
+  return {
+    minMicroUsd: settings.topupMinMicroUsd,
+    maxMicroUsd: settings.topupMaxMicroUsd,
+    presetsMicroUsd: settings.topupPresetsMicroUsd,
+    feeBps: settings.topupFeeBps,
+    feeMinMicroUsd: settings.topupFeeMinMicroUsd,
+  };
+};
+
+/**
+ * The fee as it stands now: what the checkout started next would charge.
+ * Refuses an amount outside the limits staff set, read at the time of the
+ * request.
+ */
 export const quoteTopUp = async (
   creditMicroUsd: number,
 ): Promise<TopUpQuote> => {
-  const feeMicroUsd = computeTopupFee(
-    creditMicroUsd,
-    await getPricingSettings(),
-  );
+  const settings = await getPricingSettings();
+  if (
+    creditMicroUsd < settings.topupMinMicroUsd ||
+    creditMicroUsd > settings.topupMaxMicroUsd
+  ) {
+    throw new HttpException(HttpStatusCode.BAD_REQUEST, {
+      code: "billing:error.topUpAmount",
+      message: `A top-up must be between ${settings.topupMinMicroUsd} and ${settings.topupMaxMicroUsd} micro-USD`,
+    });
+  }
+  const feeMicroUsd = computeTopupFee(creditMicroUsd, settings);
   return {
     creditMicroUsd,
     feeMicroUsd,

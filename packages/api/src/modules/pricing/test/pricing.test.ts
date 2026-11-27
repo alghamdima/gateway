@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { User } from "@workspace/auth";
 import type { TestDatabase } from "@workspace/db/testing";
 import type postgres from "postgres";
 
@@ -7,6 +8,25 @@ import type postgres from "postgres";
 // the gateway role's grants are enforced by the database. Skips without
 // DATABASE_URL.
 const adminUrl = process.env.DATABASE_URL;
+
+// The router's middleware imports the auth server and the translations (JSX the
+// test runner does not compile); the request test needs only the English
+// validation messages.
+vi.mock("@workspace/auth/server", () => ({ auth: {} }));
+vi.mock("@workspace/i18n", async () => {
+  const z = await import("zod");
+  return { getValidationLocale: () => z.locales.en };
+});
+vi.mock("@workspace/i18n/server", () => ({ getLocaleFromRequest: () => "en" }));
+
+const USD = 1_000_000;
+
+/** The top-up limits the migration seeds: $5 to $1,000, quick picks 10/25/50/100. */
+const LIMITS = {
+  topupMinMicroUsd: 5 * USD,
+  topupMaxMicroUsd: 1000 * USD,
+  topupPresetsMicroUsd: [10 * USD, 25 * USD, 50 * USD, 100 * USD],
+};
 
 describe.skipIf(!adminUrl)("admin pricing", () => {
   let database: TestDatabase;
@@ -41,12 +61,13 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     await database.drop();
   });
 
-  it("starts at no markup and a 5.5% top-up fee", async () => {
+  it("starts at no markup, a 5.5% top-up fee and top-ups of $5 to $1,000", async () => {
     const { settings, providers } = await pricing.getPricing();
     expect(settings).toMatchObject({
       defaultMarkupBps: 0,
       topupFeeBps: 550,
       topupFeeMinMicroUsd: 800_000,
+      ...LIMITS,
     });
     expect(providers).toEqual([]);
   });
@@ -57,6 +78,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       defaultMarkupBps: 300,
       topupFeeBps: 500,
       topupFeeMinMicroUsd: 1_000_000,
+      ...LIMITS,
       staffId: "staff_1",
     });
     expect(after).toMatchObject({
@@ -71,11 +93,15 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         defaultMarkupBps: before.defaultMarkupBps,
         topupFeeBps: before.topupFeeBps,
         topupFeeMinMicroUsd: before.topupFeeMinMicroUsd,
+        topupMinMicroUsd: before.topupMinMicroUsd,
+        topupMaxMicroUsd: before.topupMaxMicroUsd,
+        topupPresetsMicroUsd: before.topupPresetsMicroUsd,
       },
       after: {
         defaultMarkupBps: 300,
         topupFeeBps: 500,
         topupFeeMinMicroUsd: 1_000_000,
+        ...LIMITS,
       },
       changed_by: "staff_1",
     });
@@ -90,6 +116,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         defaultMarkupBps: -1,
         topupFeeBps: 0,
         topupFeeMinMicroUsd: 800_000,
+        ...LIMITS,
         staffId: "staff_1",
       }),
     ).rejects.toMatchObject({
@@ -100,6 +127,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         defaultMarkupBps: 0,
         topupFeeBps: 10_001,
         topupFeeMinMicroUsd: 800_000,
+        ...LIMITS,
         staffId: "staff_1",
       }),
     ).rejects.toMatchObject({
@@ -110,6 +138,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         defaultMarkupBps: 0,
         topupFeeBps: 0,
         topupFeeMinMicroUsd: 100_000_001,
+        ...LIMITS,
         staffId: "staff_1",
       }),
     ).rejects.toMatchObject({
@@ -185,6 +214,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
           defaultMarkupBps: 1000 + i,
           topupFeeBps: 100 + i,
           topupFeeMinMicroUsd: 800_000,
+          ...LIMITS,
           staffId: `staff_${i}`,
         }),
       ),
@@ -200,6 +230,9 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       defaultMarkupBps: settings.defaultMarkupBps,
       topupFeeBps: settings.topupFeeBps,
       topupFeeMinMicroUsd: settings.topupFeeMinMicroUsd,
+      topupMinMicroUsd: settings.topupMinMicroUsd,
+      topupMaxMicroUsd: settings.topupMaxMicroUsd,
+      topupPresetsMicroUsd: settings.topupPresetsMicroUsd,
     });
   });
 
@@ -210,6 +243,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       defaultMarkupBps: 42,
       topupFeeBps: 550,
       topupFeeMinMicroUsd: 800_000,
+      ...LIMITS,
       staffId: "staff_named",
     });
     const [latest, previous] = await pricing.getPricingChanges(2);
@@ -252,6 +286,166 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     }
   });
 
+  describe("top-up limits (ADMIN-05)", () => {
+    const fees = {
+      defaultMarkupBps: 0,
+      topupFeeBps: 550,
+      topupFeeMinMicroUsd: 800_000,
+    };
+
+    it("records the limits and quick picks before and after, picks once and smallest first", async () => {
+      const before = await pricing.getPricingSettings();
+      const after = await pricing.updatePricingSettings({
+        ...fees,
+        topupMinMicroUsd: 20 * USD,
+        topupMaxMicroUsd: 5000 * USD,
+        topupPresetsMicroUsd: [500 * USD, 20 * USD, 100 * USD, 20 * USD],
+        staffId: "staff_limits",
+      });
+      expect(after).toMatchObject({
+        topupMinMicroUsd: 20 * USD,
+        topupMaxMicroUsd: 5000 * USD,
+        topupPresetsMicroUsd: [20 * USD, 100 * USD, 500 * USD],
+      });
+
+      const [last] = (await changes("settings")).slice(-1);
+      expect(last).toMatchObject({
+        before: {
+          topupMinMicroUsd: before.topupMinMicroUsd,
+          topupMaxMicroUsd: before.topupMaxMicroUsd,
+          topupPresetsMicroUsd: before.topupPresetsMicroUsd,
+        },
+        after: {
+          topupMinMicroUsd: 20 * USD,
+          topupMaxMicroUsd: 5000 * USD,
+          topupPresetsMicroUsd: [20 * USD, 100 * USD, 500 * USD],
+        },
+        changed_by: "staff_limits",
+      });
+
+      await pricing.updatePricingSettings({
+        ...fees,
+        ...LIMITS,
+        staffId: "staff_limits",
+      });
+    });
+
+    it.each([
+      ["a minimum of zero", { topupMinMicroUsd: 0 }, "limits"],
+      [
+        "a maximum under the minimum",
+        { topupMinMicroUsd: 100 * USD, topupMaxMicroUsd: 99 * USD },
+        "limits",
+      ],
+      [
+        "a maximum over the $1,000,000 ceiling",
+        { topupMaxMicroUsd: 1_000_000 * USD + 1 },
+        "limits",
+      ],
+      ["no quick picks", { topupPresetsMicroUsd: [] }, "presets"],
+      [
+        "nine quick picks",
+        {
+          topupPresetsMicroUsd: Array.from(
+            { length: 9 },
+            (_, i) => (10 + i) * USD,
+          ),
+        },
+        "presets",
+      ],
+      [
+        "a quick pick under the minimum",
+        { topupPresetsMicroUsd: [4 * USD, 10 * USD] },
+        "presets",
+      ],
+      [
+        "a quick pick over the maximum",
+        { topupPresetsMicroUsd: [10 * USD, 1001 * USD] },
+        "presets",
+      ],
+    ])(
+      "the database refuses %s and records nothing",
+      async (_, change, check) => {
+        const count = (await changes()).length;
+        const current = await pricing.getPricingSettings();
+
+        await expect(
+          pricing.updatePricingSettings({
+            ...fees,
+            ...LIMITS,
+            ...change,
+            staffId: "staff_1",
+          }),
+        ).rejects.toMatchObject({
+          cause: { constraint_name: `pricing_settings_topup_${check}_range` },
+        });
+
+        expect(await pricing.getPricingSettings()).toEqual(current);
+        expect(await changes()).toHaveLength(count);
+      },
+    );
+
+    it("answers the admin API with the rule a cross-field check broke", async () => {
+      const { Hono } = await import("hono");
+      const { HttpException } = await import("@workspace/shared/utils");
+      const { pricingRouter } = await import("../router");
+      const staff: User = {
+        id: "staff_http",
+        name: "Staff",
+        email: "staff@example.com",
+        emailVerified: true,
+        banned: false,
+        isAnonymous: false,
+        twoFactorEnabled: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      // enforceAdmin puts the signed-in staff user here in the real app
+      const app = new Hono<{ Variables: { user: User } }>()
+        .use(async (c, next) => {
+          c.set("user", staff);
+          await next();
+        })
+        .route("/", pricingRouter)
+        .onError((error) =>
+          Response.json(
+            { message: error.message },
+            { status: error instanceof HttpException ? error.status : 500 },
+          ),
+        );
+      const put = (body: Record<string, unknown>) =>
+        app.request("/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...fees, ...LIMITS, ...body }),
+        });
+
+      const maxBelowMin = await put({
+        topupMinMicroUsd: 50 * USD,
+        topupMaxMicroUsd: 40 * USD,
+        topupPresetsMicroUsd: [50 * USD],
+      });
+      expect(maxBelowMin.status).toBe(422);
+      expect(await maxBelowMin.json()).toEqual({
+        message: "The top-up maximum must be at least the minimum",
+      });
+
+      const presetOutside = await put({ topupPresetsMicroUsd: [2 * USD] });
+      expect(presetOutside.status).toBe(422);
+      expect(await presetOutside.json()).toEqual({
+        message: "Each quick-pick amount must be within the top-up limits",
+      });
+
+      const valid = await put({ topupMaxMicroUsd: 2000 * USD });
+      expect(valid.status).toBe(200);
+      expect(await valid.json()).toMatchObject({
+        topupMaxMicroUsd: 2000 * USD,
+        updatedBy: "staff_http",
+      });
+      await put({});
+    });
+  });
+
   describe("input the admin API accepts", () => {
     it.each([
       ["a provider name in the gateway's format", "openai", true],
@@ -279,27 +473,149 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
 
     it.each([
       [
-        { defaultMarkupBps: 0, topupFeeBps: 10_000, topupFeeMinMicroUsd: 0 },
+        {
+          defaultMarkupBps: 0,
+          topupFeeBps: 10_000,
+          topupFeeMinMicroUsd: 0,
+          ...LIMITS,
+        },
         true,
       ],
       [
-        { defaultMarkupBps: 0, topupFeeBps: 10_001, topupFeeMinMicroUsd: 0 },
+        {
+          defaultMarkupBps: 0,
+          topupFeeBps: 10_001,
+          topupFeeMinMicroUsd: 0,
+          ...LIMITS,
+        },
         false,
       ],
       [
-        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroUsd: -1 },
+        {
+          defaultMarkupBps: 0,
+          topupFeeBps: 550,
+          topupFeeMinMicroUsd: -1,
+          ...LIMITS,
+        },
         false,
       ],
       [
-        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroUsd: 0.5 },
+        {
+          defaultMarkupBps: 0,
+          topupFeeBps: 550,
+          topupFeeMinMicroUsd: 0.5,
+          ...LIMITS,
+        },
         false,
       ],
       [{ defaultMarkupBps: 0, topupFeeBps: 550 }, false],
+      [
+        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroUsd: 0 },
+        false,
+      ],
     ])("settings %j", async (input, isValid) => {
       const { updatePricingSettingsSchema } = await import("../../../schema");
       expect(updatePricingSettingsSchema.safeParse(input).success).toBe(
         isValid,
       );
+    });
+
+    it.each([
+      ["the seeded limits", {}, true],
+      [
+        "a maximum equal to the minimum",
+        { topupMaxMicroUsd: 5 * USD, topupPresetsMicroUsd: [5 * USD] },
+        true,
+      ],
+      [
+        "eight quick picks",
+        {
+          topupPresetsMicroUsd: Array.from(
+            { length: 8 },
+            (_, i) => (10 + i) * USD,
+          ),
+        },
+        true,
+      ],
+      [
+        "a maximum under the minimum",
+        { topupMaxMicroUsd: 4 * USD, topupPresetsMicroUsd: [4 * USD] },
+        false,
+      ],
+      ["a minimum of zero", { topupMinMicroUsd: 0 }, false],
+      [
+        "a maximum over the ceiling",
+        { topupMaxMicroUsd: 1_000_000 * USD + 10_000 },
+        false,
+      ],
+      [
+        "an amount that is not whole cents",
+        { topupMinMicroUsd: 5 * USD + 1 },
+        false,
+      ],
+      ["no quick picks", { topupPresetsMicroUsd: [] }, false],
+      [
+        "nine quick picks",
+        {
+          topupPresetsMicroUsd: Array.from(
+            { length: 9 },
+            (_, i) => (10 + i) * USD,
+          ),
+        },
+        false,
+      ],
+      [
+        "a quick pick under the minimum",
+        { topupPresetsMicroUsd: [1 * USD] },
+        false,
+      ],
+      [
+        "a quick pick over the maximum",
+        { topupPresetsMicroUsd: [2000 * USD] },
+        false,
+      ],
+    ])("top-up limits: %s", async (_, change, isValid) => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      expect(
+        updatePricingSettingsSchema.safeParse({
+          defaultMarkupBps: 0,
+          topupFeeBps: 550,
+          topupFeeMinMicroUsd: 800_000,
+          ...LIMITS,
+          ...change,
+        }).success,
+      ).toBe(isValid);
+    });
+
+    it("names the field and the rule when the limits do not fit together", async () => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      const issues = (change: Record<string, unknown>) =>
+        updatePricingSettingsSchema
+          .safeParse({
+            defaultMarkupBps: 0,
+            topupFeeBps: 550,
+            topupFeeMinMicroUsd: 800_000,
+            ...LIMITS,
+            ...change,
+          })
+          .error?.issues.map(({ path, message }) => ({ path, message }));
+
+      expect(
+        issues({
+          topupMinMicroUsd: 50 * USD,
+          topupMaxMicroUsd: 40 * USD,
+          topupPresetsMicroUsd: [45 * USD],
+        }),
+      ).toContainEqual({
+        path: ["topupMaxMicroUsd"],
+        message: "The top-up maximum must be at least the minimum",
+      });
+      expect(issues({ topupPresetsMicroUsd: [10 * USD, 1001 * USD] })).toEqual([
+        {
+          path: ["topupPresetsMicroUsd", 1],
+          message: "Each quick-pick amount must be within the top-up limits",
+        },
+      ]);
     });
   });
 });

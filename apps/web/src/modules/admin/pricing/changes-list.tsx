@@ -32,8 +32,27 @@ const RATE_KEYS = [
   "defaultMarkupBps",
   "topupFeeBps",
   "topupFeeMinMicroUsd",
+  "topupMinMicroUsd",
+  "topupMaxMicroUsd",
+  "topupPresetsMicroUsd",
   "markupBps",
 ] as const;
+
+const usd = (microUsd: number) => `$${microUsdToUsd(microUsd).toFixed(2)}`;
+
+/** One recorded value as staff read it: dollars for amounts, percent for rates. */
+const showValue = (key: (typeof RATE_KEYS)[number], value: unknown) => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is number => typeof item === "number")
+      .map(usd)
+      .join(" / ");
+  }
+  if (typeof value !== "number") {
+    return null;
+  }
+  return key.endsWith("MicroUsd") ? usd(value) : `${bpsToPercent(value)}%`;
+};
 
 export const ChangesList = ({ changes }: ChangesListProps) => {
   const { t, i18n } = useTranslation(["common", "admin"]);
@@ -42,16 +61,12 @@ export const ChangesList = ({ changes }: ChangesListProps) => {
     if (!values) {
       return t("admin:pricing.changes.none");
     }
-    return RATE_KEYS.filter((key) => typeof values[key] === "number")
-      .map((key) => {
-        const value = values[key] as number;
-        const shown =
-          key === "topupFeeMinMicroUsd"
-            ? `$${microUsdToUsd(value).toFixed(2)}`
-            : `${bpsToPercent(value)}%`;
-        return `${t(`admin:pricing.changes.fields.${key}`)}: ${shown}`;
-      })
-      .join(", ");
+    return RATE_KEYS.flatMap((key) => {
+      const shown = showValue(key, values[key]);
+      return shown === null
+        ? []
+        : [`${t(`admin:pricing.changes.fields.${key}`)}: ${shown}`];
+    }).join(", ");
   };
 
   const targetLabel = (target: string) =>

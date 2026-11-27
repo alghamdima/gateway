@@ -163,14 +163,17 @@
   "pricing": {
     "header": {
       "title": "Pricing",
-      "description": "Set the markup on inference per provider and the fee added to top-ups."
+      "description": "Set the markup on inference per provider, the fee added to top-ups and the top-up limits."
     },
     "saved": "Prices saved. Gateways apply them within 30 seconds.",
     "error": {
-      "decimals": "Use at most two decimals."
+      "decimals": "Use at most two decimals.",
+      "maxBelowMin": "The maximum must be at least the minimum.",
+      "presets": "Enter 1 to {{count}} amounts above zero, in dollars and cents, separated by commas.",
+      "presetOutOfRange": "Each quick pick must be between the minimum and the maximum."
     },
     "settings": {
-      "title": "Default markup and top-up fee",
+      "title": "Default markup, top-up fee and limits",
       "description": "Rates are percentages. Changes reach the gateway within 30 seconds and apply to requests that start after that.",
       "defaultMarkup": {
         "label": "Default markup",
@@ -183,6 +186,18 @@
       "topupFeeMin": {
         "label": "Minimum top-up fee",
         "description": "The least fee a top-up pays, in dollars: the fee is the larger of the percentage and this amount. OpenRouter charges 5.5% with a $0.80 minimum."
+      },
+      "topupMin": {
+        "label": "Minimum top-up",
+        "description": "The least credit a customer can buy in one payment, in dollars."
+      },
+      "topupMax": {
+        "label": "Maximum top-up",
+        "description": "The most credit a customer can buy in one payment, in dollars."
+      },
+      "topupPresets": {
+        "label": "Quick picks",
+        "description": "Amounts offered as buttons on the top-up form, in dollars, separated by commas: 1 to {{count}}, each within the limits."
       }
     },
     "providers": {
@@ -204,12 +219,15 @@
       "what": "What",
       "before": "Before",
       "after": "After",
-      "settings": "Default markup and fee",
+      "settings": "Default markup, fee and limits",
       "none": "None",
       "fields": {
         "defaultMarkupBps": "Default markup",
         "topupFeeBps": "Top-up fee",
         "topupFeeMinMicroUsd": "Minimum fee",
+        "topupMinMicroUsd": "Minimum top-up",
+        "topupMaxMicroUsd": "Maximum top-up",
+        "topupPresetsMicroUsd": "Quick picks",
         "markupBps": "Markup"
       }
     }

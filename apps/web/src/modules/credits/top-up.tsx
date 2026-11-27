@@ -24,26 +24,53 @@ import { Skeleton } from "@workspace/ui-web/skeleton";
 import { Spinner } from "@workspace/ui-web/spinner";
 
 import { api } from "~/lib/api/client";
-import { formatMicroUsd, usdToMicroUsd } from "~/modules/keys/money";
-
-/** The API enforces the same limits (docs/platform/adr/0012-top-up-checkout.md). */
-const MIN_USD = 5;
-const MAX_USD = 1_000;
-const QUICK_PICKS = [10, 25, 50, 100];
+import { formatMicroUsd, MICRO_USD, usdToMicroUsd } from "~/modules/keys/money";
 
 interface TopUpProps {
   readonly organizationId: string;
 }
 
 /**
- * Buy credits: the fee comes from the admin settings and is shown before
- * paying. The balance changes when the payment webhook arrives, not here.
+ * Buy credits: the limits, quick picks and fee come from the admin settings
+ * (ADMIN-04, ADMIN-05) and the fee is shown before paying. The API checks the
+ * same limits. The balance changes when the payment webhook arrives, not here.
  */
 export const TopUp = ({ organizationId }: TopUpProps) => {
-  const { t, i18n } = useTranslation(["common", "organization"]);
-  const [amountUsd, setAmountUsd] = useState("25");
+  const options = useQuery({
+    queryKey: ["credits", organizationId, "top-up", "options"],
+    queryFn: () =>
+      handle(api.credits[":organizationId"]["top-up"].options.$get)({
+        param: { organizationId },
+      }),
+  });
 
-  const amount = toCreditMicroUsd(amountUsd);
+  if (!options.data) {
+    return <Skeleton className="h-64 w-full" />;
+  }
+  return <TopUpForm organizationId={organizationId} options={options.data} />;
+};
+
+interface TopUpOptions {
+  minMicroUsd: number;
+  maxMicroUsd: number;
+  presetsMicroUsd: number[];
+}
+
+interface TopUpFormProps {
+  readonly organizationId: string;
+  readonly options: TopUpOptions;
+}
+
+const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
+  const { t, i18n } = useTranslation(["common", "organization"]);
+  const presetsUsd = options.presetsMicroUsd.map((preset) =>
+    String(preset / MICRO_USD),
+  );
+  const [amountUsd, setAmountUsd] = useState(
+    presetsUsd[Math.min(1, presetsUsd.length - 1)] ?? "",
+  );
+
+  const amount = toCreditMicroUsd(amountUsd, options);
   const money = (microUsd: number) => formatMicroUsd(microUsd, i18n.language);
 
   const quote = useQuery({
@@ -114,15 +141,17 @@ export const TopUp = ({ organizationId }: TopUpProps) => {
             </div>
           </Field>
           <div className="flex flex-wrap gap-2">
-            {QUICK_PICKS.map((pick) => (
+            {options.presetsMicroUsd.map((pick, index) => (
               <Button
                 key={pick}
                 type="button"
-                variant={amountUsd === String(pick) ? "default" : "outline"}
-                onClick={() => setAmountUsd(String(pick))}
+                variant={
+                  amountUsd === presetsUsd[index] ? "default" : "outline"
+                }
+                onClick={() => setAmountUsd(presetsUsd[index] ?? "")}
                 disabled={isRedirecting}
               >
-                {money(pick * 1_000_000)}
+                {money(pick)}
               </Button>
             ))}
           </div>
@@ -130,8 +159,8 @@ export const TopUp = ({ organizationId }: TopUpProps) => {
         {amount === null && (
           <FieldError>
             {t("organization:credits.topUp.invalid", {
-              min: money(MIN_USD * 1_000_000),
-              max: money(MAX_USD * 1_000_000),
+              min: money(options.minMicroUsd),
+              max: money(options.maxMicroUsd),
             })}
           </FieldError>
         )}
@@ -186,11 +215,14 @@ export const TopUp = ({ organizationId }: TopUpProps) => {
 };
 
 /** Whole cents within the limits, in micro-USD; null when the typed amount is not one. */
-const toCreditMicroUsd = (value: string) => {
+const toCreditMicroUsd = (
+  value: string,
+  { minMicroUsd, maxMicroUsd }: TopUpOptions,
+) => {
   const trimmed = value.trim();
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
     return null;
   }
-  const usd = Number(trimmed);
-  return usd >= MIN_USD && usd <= MAX_USD ? usdToMicroUsd(usd) : null;
+  const microUsd = usdToMicroUsd(Number(trimmed));
+  return microUsd >= minMicroUsd && microUsd <= maxMicroUsd ? microUsd : null;
 };

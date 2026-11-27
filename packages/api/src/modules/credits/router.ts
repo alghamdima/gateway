@@ -9,11 +9,10 @@ import {
 import { getBalance, getEntries } from "./ledger";
 import { getLowBalanceSetting, setLowBalanceSetting } from "./low-balance";
 import {
+  getTopUpOptions,
   MICRO_USD_PER_CENT,
   quoteTopUp,
   startTopUp,
-  TOP_UP_MAX_MICRO_USD,
-  TOP_UP_MIN_MICRO_USD,
 } from "./top-up";
 
 const getEntriesQuerySchema = z.object({
@@ -21,12 +20,15 @@ const getEntriesQuerySchema = z.object({
   before: z.string().optional(),
 });
 
-/** Credit to buy in micro-USD: whole cents, within the per-payment limits. */
+/**
+ * Credit to buy in micro-USD: whole cents. The limits per payment are admin
+ * settings, checked against the stored values when the request is handled
+ * (quoteTopUp).
+ */
 const topUpAmountSchema = z.coerce
   .number()
   .int()
-  .min(TOP_UP_MIN_MICRO_USD)
-  .max(TOP_UP_MAX_MICRO_USD)
+  .positive()
   .refine((value) => value % MICRO_USD_PER_CENT === 0, {
     message: "Must be a whole number of cents",
   });
@@ -95,6 +97,15 @@ export const creditsRouter = new Hono()
           c.req.valid("json").thresholdMicroUsd,
         ),
       ),
+  )
+  .get(
+    "/:organizationId/top-up/options",
+    async (c, next) =>
+      enforceOrganizationPermission({
+        organizationId: c.req.param("organizationId"),
+        permissions: { billing: ["create"] },
+      })(c, next),
+    async (c) => c.json(await getTopUpOptions()),
   )
   .get(
     "/:organizationId/top-up/quote",

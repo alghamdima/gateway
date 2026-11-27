@@ -21,6 +21,16 @@ export const percentSchema = (max: number, decimalsMessage: string) =>
       message: decimalsMessage,
     });
 
+/** Dollars and cents above zero, at most `max`: a top-up amount typed by staff. */
+export const usdSchema = (max: number, decimalsMessage: string) =>
+  z
+    .number()
+    .positive()
+    .max(max)
+    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-9, {
+      message: decimalsMessage,
+    });
+
 /** Provider names as the gateway uses them (apps/gateway/core/schemas). */
 export const GATEWAY_PROVIDERS = [
   "openai",

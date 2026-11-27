@@ -24,6 +24,10 @@ export const MAX_MARKUP_BPS = 100_000;
 export const MAX_TOPUP_FEE_BPS = 10_000;
 /** 100 USD in micro-USD: a ceiling against a typo, not a business rule. */
 export const MAX_TOPUP_FEE_MIN_MICRO_USD = 100_000_000;
+/** 1,000,000 USD in micro-USD: a ceiling against a typo, not a business rule. */
+export const MAX_TOPUP_MICRO_USD = 1_000_000_000_000;
+/** How many quick-pick amounts the top-up form shows at most. */
+export const MAX_TOPUP_PRESETS = 8;
 
 /** A single row (id = 1), created by the migration. */
 export const pricingSettings = pgTable(
@@ -39,6 +43,22 @@ export const pricingSettings = pgTable(
      * percentage and this amount, as OpenRouter's 5.5% with a $0.80 minimum.
      */
     topupFeeMinMicroUsd: bigint({ mode: "number" }).notNull().default(800_000),
+    /*
+     * The limits of one top-up payment and the quick-pick amounts the form
+     * offers (ADMIN-05). In micro-USD for now, like the fee minimum: the move
+     * to SAR is ADMIN-06, which converts every money setting together.
+     */
+    /** The least credit one top-up may buy. */
+    topupMinMicroUsd: bigint({ mode: "number" }).notNull().default(5_000_000),
+    /** The most credit one top-up may buy. */
+    topupMaxMicroUsd: bigint({ mode: "number" })
+      .notNull()
+      .default(1_000_000_000),
+    /** 1 to 8 amounts, each within the limits. */
+    topupPresetsMicroUsd: bigint({ mode: "number" })
+      .array()
+      .notNull()
+      .default(sql`'{10000000,25000000,50000000,100000000}'::bigint[]`),
     updatedAt: timestamp().notNull().defaultNow(),
     updatedBy: text(),
   },
@@ -55,6 +75,14 @@ export const pricingSettings = pgTable(
     check(
       "pricing_settings_topup_fee_min_range",
       sql`${t.topupFeeMinMicroUsd} between 0 and ${sql.raw(String(MAX_TOPUP_FEE_MIN_MICRO_USD))}`,
+    ),
+    check(
+      "pricing_settings_topup_limits_range",
+      sql`${t.topupMinMicroUsd} > 0 and ${t.topupMaxMicroUsd} >= ${t.topupMinMicroUsd} and ${t.topupMaxMicroUsd} <= ${sql.raw(String(MAX_TOPUP_MICRO_USD))}`,
+    ),
+    check(
+      "pricing_settings_topup_presets_range",
+      sql`cardinality(${t.topupPresetsMicroUsd}) between 1 and ${sql.raw(String(MAX_TOPUP_PRESETS))} and array_position(${t.topupPresetsMicroUsd}, null) is null and ${t.topupMinMicroUsd} <= all(${t.topupPresetsMicroUsd}) and ${t.topupMaxMicroUsd} >= all(${t.topupPresetsMicroUsd})`,
     ),
   ],
 );
