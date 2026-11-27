@@ -24,11 +24,13 @@ const ADMIN_USER = "control-plane";
 const ADMIN_PASSWORD = "e2e-gateway-admin-password";
 const PROMPT_TOKENS = 1000;
 const COMPLETION_TOKENS = 500;
-// gpt-4o-mini in the local pricing file: 0.15 USD per million input, 0.60 per million output
-const EXPECTED_CHARGE = Math.round(
-  PROMPT_TOKENS * 0.15 + COMPLETION_TOKENS * 0.6,
-); // 450: the provider's cost in micro-USD, charged at the rate with no markup
-const USD = 1_000_000;
+// gpt-4o-mini in the local pricing file: 0.15 USD per million input, 0.60 per million output, so the
+// provider's cost is 450 micro-USD. The ledger is in micro-SAR (ADR 0017): 450 x 3.75 (the seeded rate,
+// no bank spread, no markup) = 1687.5, and the gateway's float cost sits a hair under 0.00045 USD, so the
+// charge rounds to 1687 micro-SAR, the same figure the credits plugin's end-to-end test pins.
+const EXPECTED_CHARGE = 1687;
+/** The starting balance: 1 SAR in micro-SAR. */
+const SAR = 1_000_000;
 
 const freePort = () =>
   new Promise<number>((done) => {
@@ -215,7 +217,7 @@ describe.skipIf(!adminUrl || !binary)(
       await sql`insert into organization (id, name, slug, created_at) values ('org_e2e', 'E2E', 'e2e', now())`;
       await ledger.applyEntry({
         organizationId: "org_e2e",
-        amount: USD,
+        amount: SAR,
         kind: "adjustment",
         idempotencyKey: "e2e-credit",
       });
@@ -230,20 +232,20 @@ describe.skipIf(!adminUrl || !binary)(
       expect(response.status).toBe(200);
       expect(JSON.stringify(await response.json())).toContain("hello");
       const balance = await settled("org_e2e");
-      expect(balance.balance).toBe(USD - EXPECTED_CHARGE);
+      expect(balance.balance).toBe(SAR - EXPECTED_CHARGE);
 
       // disabled: refused before the provider is called, nothing charged
       await keys.updateKey("org_e2e", apiKey.id, { disabled: true });
       const callsBefore = providerCalls;
       expect((await chat(key)).status).toBe(403);
       expect(providerCalls).toBe(callsBefore);
-      expect((await settled("org_e2e")).balance).toBe(USD - EXPECTED_CHARGE);
+      expect((await settled("org_e2e")).balance).toBe(SAR - EXPECTED_CHARGE);
 
       // enabled again: works again
       await keys.updateKey("org_e2e", apiKey.id, { disabled: false });
       expect((await chat(key)).status).toBe(200);
       expect((await settled("org_e2e")).balance).toBe(
-        USD - 2 * EXPECTED_CHARGE,
+        SAR - 2 * EXPECTED_CHARGE,
       );
     }, 60_000);
 
@@ -265,8 +267,8 @@ describe.skipIf(!adminUrl || !binary)(
     it("an organization over its rate limit gets 429, keeps no hold, and pays only for what ran", async () => {
       const rateLimit = await import("../../admin/organizations/rate-limit");
       await sql`insert into organization (id, name, slug, created_at) values ('org_rl', 'RL', 'rl', now())`;
-      await sql`insert into credit_account (organization_id, balance) values ('org_rl', ${USD})`;
-      await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) values ('seed_rl', 'org_rl', ${USD}, 'top_up', 'seed_rl')`;
+      await sql`insert into credit_account (organization_id, balance) values ('org_rl', ${SAR})`;
+      await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) values ('seed_rl', 'org_rl', ${SAR}, 'top_up', 'seed_rl')`;
       const { key } = await keys.createKey({
         organizationId: "org_rl",
         userId: "user_e2e",
@@ -296,7 +298,7 @@ describe.skipIf(!adminUrl || !binary)(
 
       const balance = await settled("org_rl");
       expect(balance.held).toBe(0);
-      expect(balance.balance).toBe(USD - 2 * EXPECTED_CHARGE);
+      expect(balance.balance).toBe(SAR - 2 * EXPECTED_CHARGE);
       const [open] = await sql<
         { n: string }[]
       >`select count(*) as n from credit_reservation where organization_id = 'org_rl' and settled_at is null`;
@@ -361,14 +363,18 @@ describe.skipIf(!adminUrl || !binary)(
         provider_name: "openai",
         tokens_prompt: PROMPT_TOKENS,
         tokens_completion: COMPLETION_TOKENS,
-        total_cost: EXPECTED_CHARGE / USD,
+        total_cost: EXPECTED_CHARGE / SAR,
         finish_reason: "stop",
         streamed: false,
       });
       expect(record?.latency).toBeGreaterThan(0);
     }, 60_000);
 
-    it("lists the gateway's models with their catalog price on /api/v1/models", async () => {
+    it("lists the gateway's models at our price, seeded from its datasheet, on /api/v1/models", async () => {
+      // the one-time seed (ADMIN-09, ADR 0018): our table takes the price the gateway charges
+      const { importFromGateway } = await import("../../model-prices/import");
+      const { getGateway } = await import("@workspace/gateway-client/server");
+      await importFromGateway({ gateway: getGateway(), staffId: "staff_e2e" });
       const models = await import("../../v1/models");
       models.clearModelCache();
       const { data } = await models.listPublicModels();
