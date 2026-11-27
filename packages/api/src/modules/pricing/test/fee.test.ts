@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeTopupFee } from "../fee";
+import { computeTopupFee, resolveTopupFee } from "../fee";
 
 const USD = 1_000_000;
 const openRouter = { topupFeeBps: 550, topupFeeMinMicroSar: 0.8 * USD };
@@ -62,5 +62,88 @@ describe("top-up fee", () => {
     expect(() =>
       computeTopupFee(USD, { topupFeeBps: -1, topupFeeMinMicroSar: 0 }),
     ).toThrow(/non-negative/);
+  });
+});
+
+describe("which fee a top-up pays (ADMIN-24)", () => {
+  const SAR = 1_000_000;
+  const defaults = { topupFeeBps: 550, topupFeeMinMicroSar: 3 * SAR };
+  const now = new Date("2026-11-27T12:00:00.000Z");
+  const later = new Date("2026-12-27T12:00:00.000Z");
+
+  it("pays the default when the organization has no fee of its own", () => {
+    expect(resolveTopupFee(defaults, null, now)).toEqual({
+      ...defaults,
+      source: "default",
+    });
+  });
+
+  it("pays the organization's fee while it is valid", () => {
+    expect(
+      resolveTopupFee(
+        defaults,
+        { feeBps: 200, feeMinMicroSar: 1 * SAR, expiresAt: later },
+        now,
+      ),
+    ).toEqual({
+      topupFeeBps: 200,
+      topupFeeMinMicroSar: 1 * SAR,
+      source: "organization",
+    });
+  });
+
+  it("takes a field the organization leaves out from the default", () => {
+    expect(
+      resolveTopupFee(
+        defaults,
+        { feeBps: null, feeMinMicroSar: 0, expiresAt: null },
+        now,
+      ),
+    ).toEqual({
+      topupFeeBps: 550,
+      topupFeeMinMicroSar: 0,
+      source: "organization",
+    });
+    expect(
+      resolveTopupFee(
+        defaults,
+        { feeBps: 900, feeMinMicroSar: null, expiresAt: null },
+        now,
+      ),
+    ).toEqual({
+      topupFeeBps: 900,
+      topupFeeMinMicroSar: 3 * SAR,
+      source: "organization",
+    });
+  });
+
+  it("falls back to the default from the moment it expires", () => {
+    const override = { feeBps: 0, feeMinMicroSar: 0, expiresAt: later };
+    expect(
+      resolveTopupFee(defaults, override, new Date(later.getTime() - 1)).source,
+    ).toBe("organization");
+    expect(resolveTopupFee(defaults, override, later)).toEqual({
+      ...defaults,
+      source: "default",
+    });
+  });
+
+  it("treats a fee that sets nothing as the default", () => {
+    expect(
+      resolveTopupFee(
+        defaults,
+        { feeBps: null, feeMinMicroSar: null, expiresAt: null },
+        now,
+      ).source,
+    ).toBe("default");
+  });
+
+  it("charges with the resolved rate: a 0% fee with no minimum is free", () => {
+    const fee = resolveTopupFee(
+      defaults,
+      { feeBps: 0, feeMinMicroSar: 0, expiresAt: null },
+      now,
+    );
+    expect(computeTopupFee(100 * SAR, fee)).toBe(0);
   });
 });

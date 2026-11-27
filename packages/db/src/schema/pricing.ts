@@ -12,6 +12,7 @@ import {
 import { sql } from "drizzle-orm/sql";
 
 import { createSelectSchema } from "../lib/zod";
+import { organization } from "./auth";
 
 import type * as z from "zod";
 
@@ -118,11 +119,67 @@ export const pricingSettings = pgTable(
   ],
 );
 
+/**
+ * Where the fee a top-up paid came from (ADMIN-24): the pricing settings, or
+ * the organization's own fee below. BILL-08 adds promo codes here.
+ */
+export const TOPUP_FEE_SOURCES = ["default", "organization"] as const;
+export type TopupFeeSource = (typeof TOPUP_FEE_SOURCES)[number];
+
+/** The longest note staff may keep on an organization's fee. */
+export const MAX_TOPUP_FEE_NOTE_LENGTH = 500;
+
+/**
+ * A top-up fee for one organization, higher or lower than the default
+ * (ADMIN-24). A null field uses the default's value; no row, or a row past
+ * `expiresAt`, is the default. The top-up reads it at the time of the quote
+ * (packages/api/src/modules/pricing/organization-fee.ts), so an expired fee
+ * falls back without anyone acting. The bounds are the default's.
+ */
+export const organizationTopupFee = pgTable(
+  "organization_topup_fee",
+  {
+    organizationId: text()
+      .primaryKey()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** 100 bps = 1%; null uses pricing_settings.topup_fee_bps. */
+    feeBps: integer(),
+    /** micro-SAR; null uses pricing_settings.topup_fee_min_micro_sar. */
+    feeMinMicroSar: bigint({ mode: "number" }),
+    /** From this moment the default applies again; null never expires. */
+    expiresAt: timestamp(),
+    /** Why staff set it, for the next person who reads it. */
+    note: text().notNull().default(""),
+    updatedAt: timestamp().notNull().defaultNow(),
+    updatedBy: text().notNull(),
+  },
+  (t) => [
+    check(
+      "organization_topup_fee_bps_range",
+      sql`${t.feeBps} is null or ${t.feeBps} between 0 and ${sql.raw(String(MAX_TOPUP_FEE_BPS))}`,
+    ),
+    check(
+      "organization_topup_fee_min_range",
+      sql`${t.feeMinMicroSar} is null or ${t.feeMinMicroSar} between 0 and ${sql.raw(String(MAX_TOPUP_FEE_MIN_MICRO_SAR))}`,
+    ),
+    // a row that changes nothing is a cleared fee: it is deleted instead
+    check(
+      "organization_topup_fee_sets_something",
+      sql`${t.feeBps} is not null or ${t.feeMinMicroSar} is not null`,
+    ),
+    check(
+      "organization_topup_fee_note_length",
+      sql`char_length(${t.note}) <= ${sql.raw(String(MAX_TOPUP_FEE_NOTE_LENGTH))}`,
+    ),
+  ],
+);
+
 /** Append-only: a trigger rejects UPDATE and DELETE, as for the ledger. */
 export const pricingChange = pgTable("pricing_change", {
   id: bigserial({ mode: "number" }).primaryKey(),
   /**
-   * What changed: "settings". Rows from before the markup was removed may also
+   * What changed: "settings", or "organization:<id>" for one organization's
+   * top-up fee (ADMIN-24; the row outlives the organization). Rows from before the markup was removed may also
    * name "provider:<name>" (a per-provider markup); they stay as history.
    */
   target: text().notNull(),
@@ -134,6 +191,11 @@ export const pricingChange = pgTable("pricing_change", {
 
 export const selectPricingSettingsSchema = createSelectSchema(pricingSettings);
 export const selectPricingChangeSchema = createSelectSchema(pricingChange);
+export const selectOrganizationTopupFeeSchema =
+  createSelectSchema(organizationTopupFee);
 
 export type SelectPricingSettings = z.infer<typeof selectPricingSettingsSchema>;
 export type SelectPricingChange = z.infer<typeof selectPricingChangeSchema>;
+export type SelectOrganizationTopupFee = z.infer<
+  typeof selectOrganizationTopupFeeSchema
+>;

@@ -105,7 +105,7 @@ export const creditsRouter = new Hono()
         organizationId: c.req.param("organizationId"),
         permissions: { billing: ["create"] },
       })(c, next),
-    async (c) => c.json(await getTopUpOptions()),
+    async (c) => c.json(await getTopUpOptions(c.req.param("organizationId"))),
   )
   .get(
     "/:organizationId/top-up/quote",
@@ -115,7 +115,13 @@ export const creditsRouter = new Hono()
         permissions: { billing: ["create"] },
       })(c, next),
     validate("query", z.object({ amount: topUpAmountSchema })),
-    async (c) => c.json(await quoteTopUp(c.req.valid("query").amount)),
+    async (c) =>
+      c.json(
+        await quoteTopUp(
+          c.req.param("organizationId"),
+          c.req.valid("query").amount,
+        ),
+      ),
   )
   .post(
     "/:organizationId/top-up",

@@ -5,6 +5,8 @@
  * credits bought (ADR 0003).
  */
 
+import type { TopupFeeSource } from "@workspace/db/schema";
+
 export interface TopupFeeRates {
   /** 100 bps = 1%. */
   topupFeeBps: number;
@@ -44,4 +46,49 @@ export const computeTopupFee = (
   const halalas =
     percentHalalas > minimumHalalas ? percentHalalas : minimumHalalas;
   return Number(halalas * MICRO_SAR_PER_HALALA);
+};
+
+/** The fee rates a top-up uses, and where they came from, so the payment can record them. */
+export interface EffectiveTopupFee extends TopupFeeRates {
+  /** "default" or "organization" (ADMIN-24). */
+  source: TopupFeeSource;
+}
+
+/** An organization's own fee: a null field uses the default's value. */
+export interface OrganizationTopupFeeRates {
+  feeBps: number | null;
+  feeMinMicroSar: number | null;
+  /** From this moment the default applies again; null never expires. */
+  expiresAt: Date | null;
+}
+
+/**
+ * The one rule for which fee a top-up pays (ADMIN-24): the organization's own
+ * fee while it has not expired at `at`, each missing field taken from the
+ * default; otherwise the default. Resolved at the time of the quote, so an
+ * expired fee falls back without anyone acting.
+ */
+export const resolveTopupFee = (
+  defaults: TopupFeeRates,
+  override: OrganizationTopupFeeRates | null,
+  at: Date,
+): EffectiveTopupFee => {
+  const isActive =
+    override !== null &&
+    (override.feeBps !== null || override.feeMinMicroSar !== null) &&
+    (override.expiresAt === null ||
+      override.expiresAt.getTime() > at.getTime());
+  if (!isActive) {
+    return {
+      topupFeeBps: defaults.topupFeeBps,
+      topupFeeMinMicroSar: defaults.topupFeeMinMicroSar,
+      source: "default",
+    };
+  }
+  return {
+    topupFeeBps: override.feeBps ?? defaults.topupFeeBps,
+    topupFeeMinMicroSar:
+      override.feeMinMicroSar ?? defaults.topupFeeMinMicroSar,
+    source: "organization",
+  };
 };

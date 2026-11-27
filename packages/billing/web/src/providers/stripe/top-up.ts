@@ -25,6 +25,7 @@ export const createTopUpCheckout = async ({
   organizationId,
   creditMicroSar,
   feeMicroSar,
+  feeRate,
   labels,
   redirect,
 }: TopUpCheckoutInput) => {
@@ -42,6 +43,9 @@ export const createTopUpCheckout = async ({
     organizationId,
     creditMicroSar: String(creditMicroSar),
     feeMicroSar: String(feeMicroSar),
+    feeBps: String(feeRate.feeBps),
+    feeMinMicroSar: String(feeRate.feeMinMicroSar),
+    feeSource: feeRate.feeSource,
   };
   const line = (name: string, microSar: number) => ({
     quantity: 1,
@@ -136,8 +140,19 @@ const toPaid = (session: Stripe.Checkout.Session): TopUpFact | null => {
     organizationId,
     creditMicroSar,
     feeMicroSar,
+    feeRate: toFeeRate(session.metadata),
     collectedMicroSar: session.amount_total * MICRO_SAR_PER_HALALA,
   };
+};
+
+/** The fee rate the checkout carried, or null when a session started before it did. */
+const toFeeRate = (metadata: Stripe.Metadata | null) => {
+  const feeBps = toWholeNumber(metadata?.feeBps);
+  const feeMinMicroSar = toWholeNumber(metadata?.feeMinMicroSar);
+  const feeSource = metadata?.feeSource;
+  return feeBps === null || feeMinMicroSar === null || !feeSource
+    ? null
+    : { feeBps, feeMinMicroSar, feeSource };
 };
 
 const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {

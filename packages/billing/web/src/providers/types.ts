@@ -29,9 +29,22 @@ export interface TopUpCheckoutInput {
   creditMicroSar: number;
   /** micro-SAR, whole halalas; paid on top of the credits. */
   feeMicroSar: number;
+  /** The rate the fee was worked out with, carried to the webhook so the payment records it. */
+  feeRate: TopUpFeeRate;
   /** The line names the customer sees on the payment page and the receipt. */
   labels: { credits: string; fee: string };
   redirect: { success: string; cancel: string };
+}
+
+/**
+ * The fee rate a top-up was quoted at (ADMIN-24): 100 bps = 1%, the minimum in
+ * micro-SAR, and where the rate came from ("default", "organization"), which
+ * the API checks before it records it.
+ */
+export interface TopUpFeeRate {
+  feeBps: number;
+  feeMinMicroSar: number;
+  feeSource: string;
 }
 
 /** What a verified payment webhook says about a top-up. Amounts are micro-SAR. */
@@ -44,6 +57,8 @@ export type TopUpEvent = TopUpEventSource &
         organizationId: string;
         creditMicroSar: number;
         feeMicroSar: number;
+        /** Null for a payment started before the rate was carried (ADMIN-24). */
+        feeRate: TopUpFeeRate | null;
         /** What the provider actually collected. */
         collectedMicroSar: number;
       }

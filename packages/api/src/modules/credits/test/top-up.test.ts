@@ -19,6 +19,8 @@ const adminUrl = process.env.DATABASE_URL;
 const WEBHOOK_SECRET = "whsec_live_secret";
 const TEST_WEBHOOK_SECRET = "whsec_test_secret";
 const SAR = 1_000_000;
+/** An organization with no fee of its own: it pays the default (ADMIN-24). */
+const NO_OVERRIDE = "org_default_fee";
 
 /** Stripe's secrets as env would hold them; tests change them (ADMIN-03). */
 const stripeEnv = vi.hoisted((): Record<string, string | undefined> => ({}));
@@ -105,6 +107,8 @@ const session = (input: {
   feeMicroSar: number;
   amountTotalHalalas?: number;
   paymentStatus?: string;
+  /** What the checkout carries about the fee rate (ADMIN-24). */
+  feeRate?: Record<string, string>;
 }) => ({
   id: `cs_${input.paymentIntent}`,
   object: "checkout.session",
@@ -121,6 +125,7 @@ const session = (input: {
     organizationId: input.organizationId,
     creditMicroSar: String(input.creditMicroSar),
     feeMicroSar: String(input.feeMicroSar),
+    ...input.feeRate,
   },
 });
 
@@ -156,6 +161,22 @@ const setLimits = async (
     staffId: "staff_limits",
   });
 };
+/** Sets an organization's own top-up fee as staff would in the admin (ADMIN-24). */
+const setOwnFee = async (
+  organizationId: string,
+  values: { feeBps: number | null; feeMinMicroSar: number | null },
+) => {
+  const { setOrganizationTopupFee } =
+    await import("../../pricing/organization-fee");
+  await setOrganizationTopupFee({
+    organizationId,
+    staffId: "staff_fee",
+    expiresAt: null,
+    note: "",
+    ...values,
+  });
+};
+
 /** Back to the limits the migration seeds. */
 const seeded = () =>
   setLimits(20 * SAR, 3750 * SAR, [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR]);
@@ -256,12 +277,14 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
   describe("checkout", () => {
     it("quotes the fee from the admin settings: the minimum, then the percentage", async () => {
       // migration defaults: 5.5% with a SAR 3 minimum
-      expect(await topUp.quoteTopUp(40 * SAR)).toEqual({
+      expect(await topUp.quoteTopUp(NO_OVERRIDE, 40 * SAR)).toEqual({
         creditMicroSar: 40 * SAR,
         feeMicroSar: 3_000_000,
         totalMicroSar: 43_000_000,
       });
-      expect((await topUp.quoteTopUp(100 * SAR)).feeMicroSar).toBe(5_500_000);
+      expect((await topUp.quoteTopUp(NO_OVERRIDE, 100 * SAR)).feeMicroSar).toBe(
+        5_500_000,
+      );
     });
 
     it("asks Stripe for a payment in SAR halalas with a credits line, a fee line and the metadata the webhook reads", async () => {
@@ -326,7 +349,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
 
     describe("limits per payment, set by staff (ADMIN-05)", () => {
       it("gives the form the stored limits, quick picks and fee", async () => {
-        expect(await topUp.getTopUpOptions()).toEqual({
+        expect(await topUp.getTopUpOptions(NO_OVERRIDE)).toEqual({
           isAvailable: true,
           minMicroSar: 20 * SAR,
           maxMicroSar: 3750 * SAR,
@@ -338,14 +361,14 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
 
       it("refuses an amount under the stored minimum or over the stored maximum", async () => {
         const organizationId = await createOrganization();
-        await expect(topUp.quoteTopUp(20 * SAR - 10_000)).rejects.toMatchObject(
-          {
-            status: 400,
-            code: "billing:error.topUpAmount",
-          },
-        );
         await expect(
-          topUp.quoteTopUp(3750 * SAR + 10_000),
+          topUp.quoteTopUp(NO_OVERRIDE, 20 * SAR - 10_000),
+        ).rejects.toMatchObject({
+          status: 400,
+          code: "billing:error.topUpAmount",
+        });
+        await expect(
+          topUp.quoteTopUp(NO_OVERRIDE, 3750 * SAR + 10_000),
         ).rejects.toMatchObject({
           status: 400,
           code: "billing:error.topUpAmount",
@@ -360,12 +383,12 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         ).rejects.toMatchObject({ status: 400 });
         expect(stripeCalls.sessions).toHaveLength(0);
         // the limits themselves are allowed
-        expect((await topUp.quoteTopUp(20 * SAR)).creditMicroSar).toBe(
-          20 * SAR,
-        );
-        expect((await topUp.quoteTopUp(3750 * SAR)).creditMicroSar).toBe(
-          3750 * SAR,
-        );
+        expect(
+          (await topUp.quoteTopUp(NO_OVERRIDE, 20 * SAR)).creditMicroSar,
+        ).toBe(20 * SAR);
+        expect(
+          (await topUp.quoteTopUp(NO_OVERRIDE, 3750 * SAR)).creditMicroSar,
+        ).toBe(3750 * SAR);
       });
 
       it("follows the limits as soon as staff change them", async () => {
@@ -373,7 +396,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         try {
           await setLimits(50 * SAR, 5000 * SAR, [50 * SAR, 4500 * SAR]);
 
-          expect(await topUp.getTopUpOptions()).toMatchObject({
+          expect(await topUp.getTopUpOptions(NO_OVERRIDE)).toMatchObject({
             minMicroSar: 50 * SAR,
             maxMicroSar: 5000 * SAR,
             presetsMicroSar: [50 * SAR, 4500 * SAR],
@@ -387,7 +410,9 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           expect(result).toMatchObject({ creditMicroSar: 4500 * SAR });
           expect(stripeCalls.sessions).toHaveLength(1);
           // SAR 40 was allowed before the minimum went up to SAR 50
-          await expect(topUp.quoteTopUp(40 * SAR)).rejects.toMatchObject({
+          await expect(
+            topUp.quoteTopUp(NO_OVERRIDE, 40 * SAR),
+          ).rejects.toMatchObject({
             status: 400,
           });
         } finally {
@@ -622,6 +647,156 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
     });
   });
 
+  describe("fee per organization (ADMIN-24)", () => {
+    const recorded = async (organizationId: string) =>
+      sql<
+        {
+          topup_fee_bps: number | null;
+          topup_fee_min_micro_sar: string | null;
+          topup_fee_source: string | null;
+        }[]
+      >`select topup_fee_bps, topup_fee_min_micro_sar, topup_fee_source
+        from credit_ledger_entry where organization_id = ${organizationId}`;
+
+    it("quotes, shows and charges the organization's fee, and leaves other organizations on the default", async () => {
+      const organizationId = await createOrganization();
+      const other = await createOrganization();
+      // 2% with the default SAR 3 minimum
+      await setOwnFee(organizationId, { feeBps: 200, feeMinMicroSar: null });
+
+      expect(await topUp.getTopUpOptions(organizationId)).toMatchObject({
+        feeBps: 200,
+        feeMinMicroSar: 3_000_000,
+      });
+      expect(await topUp.getTopUpOptions(other)).toMatchObject({
+        feeBps: 550,
+        feeMinMicroSar: 3_000_000,
+      });
+      // 2% of SAR 400 is SAR 8; the default would be SAR 22
+      expect(await topUp.quoteTopUp(organizationId, 400 * SAR)).toEqual({
+        creditMicroSar: 400 * SAR,
+        feeMicroSar: 8 * SAR,
+        totalMicroSar: 408 * SAR,
+      });
+      expect((await topUp.quoteTopUp(other, 400 * SAR)).feeMicroSar).toBe(
+        22 * SAR,
+      );
+      // under the percentage, the default minimum still applies
+      expect(
+        (await topUp.quoteTopUp(organizationId, 40 * SAR)).feeMicroSar,
+      ).toBe(3 * SAR);
+
+      const result = await topUp.startTopUp({
+        user: { id: "user_1", email: "owner@example.com" },
+        organizationId,
+        creditMicroSar: 400 * SAR,
+        origin: "https://app.example.com",
+      });
+      expect(result).toEqual({
+        url: "https://checkout.stripe.test/1",
+        creditMicroSar: 400 * SAR,
+        feeMicroSar: 8 * SAR,
+        totalMicroSar: 408 * SAR,
+      });
+      expect(stripeCalls.sessions[0]?.metadata).toMatchObject({
+        feeMicroSar: String(8 * SAR),
+        feeBps: "200",
+        feeMinMicroSar: "3000000",
+        feeSource: "organization",
+      });
+    });
+
+    it("carries the default's rate and source when the organization has none", async () => {
+      const organizationId = await createOrganization();
+      await topUp.startTopUp({
+        user: { id: "user_1", email: "owner@example.com" },
+        organizationId,
+        creditMicroSar: 100 * SAR,
+        origin: "https://app.example.com",
+      });
+      expect(stripeCalls.sessions[0]?.metadata).toMatchObject({
+        feeBps: "550",
+        feeMinMicroSar: "3000000",
+        feeSource: "default",
+      });
+    });
+
+    it("records on the top-up the fee rate, minimum and source the payment was quoted at", async () => {
+      const organizationId = await createOrganization();
+      const paid = session({
+        organizationId,
+        paymentIntent: "pi_own_fee",
+        creditMicroSar: 400 * SAR,
+        feeMicroSar: 8 * SAR,
+        feeRate: {
+          feeBps: "200",
+          feeMinMicroSar: "3000000",
+          feeSource: "organization",
+        },
+      });
+      // the organization's fee changing after the checkout does not rewrite the payment
+      await setOwnFee(organizationId, { feeBps: 900, feeMinMicroSar: 0 });
+
+      expect(
+        (await deliver(event("checkout.session.completed", paid))).status,
+      ).toBe(200);
+      expect(await recorded(organizationId)).toEqual([
+        {
+          topup_fee_bps: 200,
+          topup_fee_min_micro_sar: "3000000",
+          topup_fee_source: "organization",
+        },
+      ]);
+    });
+
+    it("still credits a payment that carries no rate or an unknown source, without recording one", async () => {
+      const before = await createOrganization();
+      const unknown = await createOrganization();
+      // a checkout started before the rate was carried
+      const old = session({
+        organizationId: before,
+        paymentIntent: "pi_no_rate",
+        creditMicroSar: 40 * SAR,
+        feeMicroSar: 3 * SAR,
+      });
+      const odd = session({
+        organizationId: unknown,
+        paymentIntent: "pi_odd_source",
+        creditMicroSar: 40 * SAR,
+        feeMicroSar: 3 * SAR,
+        feeRate: {
+          feeBps: "550",
+          feeMinMicroSar: "3000000",
+          feeSource: "promo",
+        },
+      });
+
+      await deliver(event("checkout.session.completed", old));
+      await deliver(event("checkout.session.completed", odd));
+
+      for (const organizationId of [before, unknown]) {
+        expect(await balance(organizationId)).toBe(40 * SAR);
+        expect(await recorded(organizationId)).toEqual([
+          {
+            topup_fee_bps: null,
+            topup_fee_min_micro_sar: null,
+            topup_fee_source: null,
+          },
+        ]);
+      }
+    });
+
+    it("refuses a fee rate on anything but a top-up", async () => {
+      const organizationId = await createOrganization();
+      await expect(
+        sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, topup_fee_bps, topup_fee_min_micro_sar, topup_fee_source)
+          values ('e_fee', ${organizationId}, 1, 'adjustment', 'k_fee', 1, 1, 'default')`,
+      ).rejects.toMatchObject({
+        constraint_name: "credit_ledger_entry_topup_fee",
+      });
+    });
+  });
+
   describe("payment gateway chosen by staff (ADMIN-03)", () => {
     const start = (organizationId: string) =>
       topUp.startTopUp({
@@ -639,15 +814,17 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       const organizationId = await createOrganization();
       await setPayments({ topupsEnabled: false });
 
-      expect((await topUp.getTopUpOptions()).isAvailable).toBe(false);
-      await expect(topUp.quoteTopUp(40 * SAR)).rejects.toMatchObject(
-        unavailable,
+      expect((await topUp.getTopUpOptions(NO_OVERRIDE)).isAvailable).toBe(
+        false,
       );
+      await expect(
+        topUp.quoteTopUp(NO_OVERRIDE, 40 * SAR),
+      ).rejects.toMatchObject(unavailable);
       await expect(start(organizationId)).rejects.toMatchObject(unavailable);
       expect(stripeCalls.sessions).toHaveLength(0);
 
       await setPayments({ topupsEnabled: true });
-      expect((await topUp.getTopUpOptions()).isAvailable).toBe(true);
+      expect((await topUp.getTopUpOptions(NO_OVERRIDE)).isAvailable).toBe(true);
       expect(await start(organizationId)).toMatchObject({
         url: "https://checkout.stripe.test/1",
       });
@@ -677,7 +854,9 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       ],
     ])("refuses new top-ups when %s", async (_, values) => {
       setEnv(values);
-      expect((await topUp.getTopUpOptions()).isAvailable).toBe(false);
+      expect((await topUp.getTopUpOptions(NO_OVERRIDE)).isAvailable).toBe(
+        false,
+      );
       await expect(start(await createOrganization())).rejects.toMatchObject(
         unavailable,
       );

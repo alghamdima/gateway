@@ -55,6 +55,27 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     needs: { organizations: ["update"] },
     audit: { action: "organization.rate-limit", target: "organization" },
   },
+  // an organization's own top-up fee (ADMIN-24): the same permission as the default fee
+  {
+    method: "GET",
+    path: new RegExp(`^/organizations/${ID}/top-up-fee(/changes)?$`),
+    needs: { pricing: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: new RegExp(`^/organizations/${ID}/top-up-fee$`),
+    needs: { pricing: ["update"] },
+    audit: { action: "pricing.organization-fee", target: "organization" },
+  },
+  {
+    method: "DELETE",
+    path: new RegExp(`^/organizations/${ID}/top-up-fee$`),
+    needs: { pricing: ["update"] },
+    audit: {
+      action: "pricing.organization-fee-clear",
+      target: "organization",
+    },
+  },
   {
     method: "GET",
     path: /^\/organizations(\/.*)?$/,

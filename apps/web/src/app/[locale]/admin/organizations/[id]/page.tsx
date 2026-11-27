@@ -18,6 +18,7 @@ import { MembersDataTable } from "~/modules/admin/organizations/organization/mem
 import { OrdersDataTable } from "~/modules/admin/organizations/organization/orders/data-table/orders-data-table";
 import { OrganizationRateLimit } from "~/modules/admin/organizations/organization/rate-limit";
 import { SubscriptionsDataTable } from "~/modules/admin/organizations/organization/subscriptions/data-table/subscriptions-data-table";
+import { OrganizationTopupFee } from "~/modules/admin/organizations/organization/topup-fee";
 
 export const generateMetadata = async ({
   params,
@@ -68,6 +69,10 @@ export default async function OrganizationPage({
     {
       label: t("credits"),
       component: <OrganizationCredits organizationId={id} />,
+    },
+    {
+      label: t("topupFee"),
+      component: <OrganizationTopupFee organizationId={id} />,
     },
     {
       label: t("rateLimit"),

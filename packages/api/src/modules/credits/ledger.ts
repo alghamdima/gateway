@@ -6,7 +6,7 @@ import {
 } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
-import type { CreditEntryKind } from "@workspace/db/schema";
+import type { CreditEntryKind, TopupFeeSource } from "@workspace/db/schema";
 
 /** All amounts are micro-SAR (1 SAR = 1,000,000; docs/platform/adr/0017-sar-ledger.md). */
 export { MICRO_SAR } from "@workspace/shared/utils";
@@ -20,6 +20,10 @@ export interface ApplyEntryInput {
   idempotencyKey: string;
   reference?: string;
   metadata?: Record<string, unknown>;
+  /** Top-up only: the fee rate the payment was quoted at and its source (ADMIN-24). */
+  topupFeeBps?: number;
+  topupFeeMinMicroSar?: number;
+  topupFeeSource?: TopupFeeSource;
 }
 
 export interface ApplyEntryResult {

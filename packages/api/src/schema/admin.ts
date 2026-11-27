@@ -10,6 +10,7 @@ import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
   MAX_TOPUP_FEE_BPS,
   MAX_TOPUP_FEE_MIN_MICRO_SAR,
+  MAX_TOPUP_FEE_NOTE_LENGTH,
   MAX_TOPUP_MICRO_SAR,
   MAX_TOPUP_PRESETS,
   MAX_FX_SPREAD_BPS,
@@ -433,6 +434,48 @@ export const updatePricingSettingsSchema = z
 
 export type UpdatePricingSettingsInput = z.infer<
   typeof updatePricingSettingsSchema
+>;
+
+/**
+ * One organization's top-up fee (ADMIN-24): a null field uses the default's
+ * value, at least one must be set. The bounds are the default's.
+ */
+export const setOrganizationTopupFeeSchema = z
+  .object({
+    /** 100 bps = 1%; null uses the default percentage. */
+    feeBps: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_TOPUP_FEE_BPS, {
+        message: "The fee must be between 0% and 100%",
+      })
+      .nullable(),
+    /** micro-SAR; null uses the default minimum. */
+    feeMinMicroSar: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_TOPUP_FEE_MIN_MICRO_SAR, {
+        message: "The fee minimum must be at most SAR 400",
+      })
+      .nullable(),
+    /** From this moment the default applies again; null never expires. */
+    expiresAt: z.coerce
+      .date()
+      .refine((value) => value.getTime() > Date.now(), {
+        message: "The expiry must be in the future",
+      })
+      .nullable(),
+    note: z.string().trim().max(MAX_TOPUP_FEE_NOTE_LENGTH),
+  })
+  .refine((value) => value.feeBps !== null || value.feeMinMicroSar !== null, {
+    message: "Set a fee percentage or a minimum, or clear the fee instead",
+    path: ["feeBps"],
+  });
+
+export type SetOrganizationTopupFeeInput = z.infer<
+  typeof setOrganizationTopupFeeSchema
 >;
 
 /** A payment provider the product implements (ADMIN-03). */

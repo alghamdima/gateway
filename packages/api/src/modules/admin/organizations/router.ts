@@ -11,12 +11,19 @@ import {
   getOrganizationSubscriptionsInputSchema,
   getOrganizationsInputSchema,
   setOrganizationRateLimitSchema,
+  setOrganizationTopupFeeSchema,
 } from "../../../schema";
 import { adjustCredits } from "../../credits/adjust";
 import { getBalance } from "../../credits/ledger";
 import { getDataPolicy } from "../../data-policy/policy";
 import { getInvitations } from "../../organization/queries/invitations";
 import { getMembers } from "../../organization/queries/members";
+import {
+  clearOrganizationTopupFee,
+  getOrganizationTopupFee,
+  getOrganizationTopupFeeChanges,
+  setOrganizationTopupFee,
+} from "../../pricing/organization-fee";
 import {
   deleteOrganization,
   deleteOrganizationInvitation,
@@ -35,9 +42,12 @@ import {
   setOrganizationRateLimit,
 } from "./rate-limit";
 
+import type { AuditChange } from "../access-middleware";
 import type { User } from "@workspace/auth";
 
-export const organizationsRouter = new Hono<{ Variables: { user: User } }>()
+export const organizationsRouter = new Hono<{
+  Variables: { user: User; auditChange?: AuditChange };
+}>()
   .get("/", validate("query", getOrganizationsInputSchema), async (c) =>
     c.json(await getOrganizations(c.req.valid("query"))),
   )
@@ -98,6 +108,35 @@ export const organizationsRouter = new Hono<{ Variables: { user: User } }>()
         }),
       ),
   )
+  // the organization's own top-up fee (ADMIN-24): pricing permission, as the default fee
+  .get("/:id/top-up-fee", async (c) =>
+    c.json(await getOrganizationTopupFee(c.req.param("id"))),
+  )
+  .get("/:id/top-up-fee/changes", async (c) =>
+    c.json(await getOrganizationTopupFeeChanges(c.req.param("id"))),
+  )
+  .put(
+    "/:id/top-up-fee",
+    validate("json", setOrganizationTopupFeeSchema),
+    async (c) => {
+      const { override, before, after } = await setOrganizationTopupFee({
+        organizationId: c.req.param("id"),
+        staffId: c.var.user.id,
+        ...c.req.valid("json"),
+      });
+      // the audit log keeps the values before and after, as pricing_change does
+      c.set("auditChange", { before, after });
+      return c.json(override);
+    },
+  )
+  .delete("/:id/top-up-fee", async (c) => {
+    const { before, after } = await clearOrganizationTopupFee({
+      organizationId: c.req.param("id"),
+      staffId: c.var.user.id,
+    });
+    c.set("auditChange", { before, after });
+    return c.json({ isCleared: before !== null });
+  })
   .delete("/:id", async (c) =>
     c.json(await deleteOrganization({ id: c.req.param("id") })),
   )

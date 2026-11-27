@@ -15,7 +15,9 @@ import { generateId } from "@workspace/shared/utils";
 
 import { createInsertSchema, createSelectSchema } from "../lib/zod";
 import { organization } from "./auth";
+import { TOPUP_FEE_SOURCES } from "./pricing";
 
+import type { TopupFeeSource } from "./pricing";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type * as z from "zod";
 
@@ -79,6 +81,15 @@ export const creditLedgerEntry = pgTable(
     fxSpreadBps: integer(),
     /** Usage only: the rate × 1,000,000 the cost was converted at: official plus spread. */
     effectiveUsdToSarRateE6: integer("effective_usd_to_sar_rate_e6"),
+    /*
+     * Top-up only: the fee rate the payment was quoted at and where it came
+     * from (ADMIN-24), so a later change of the default or the organization's
+     * fee does not rewrite what this payment paid. Null on top-ups started
+     * before migration 0035. The fee amount is in metadata.feeMicroSar.
+     */
+    topupFeeBps: integer(),
+    topupFeeMinMicroSar: bigint({ mode: "number" }),
+    topupFeeSource: text().$type<TopupFeeSource>(),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [
@@ -106,6 +117,10 @@ export const creditLedgerEntry = pgTable(
     check(
       "credit_ledger_entry_usage_has_cost_and_rate",
       sql`${t.kind} <> 'usage' or (${t.costMicroUsd} is not null and ${t.usdToSarRateE6} is not null and ${t.fxSpreadBps} is not null and ${t.effectiveUsdToSarRateE6} is not null)`,
+    ),
+    check(
+      "credit_ledger_entry_topup_fee",
+      sql`(${t.topupFeeBps} is null and ${t.topupFeeMinMicroSar} is null and ${t.topupFeeSource} is null) or (${t.kind} = 'top_up' and ${t.topupFeeBps} >= 0 and ${t.topupFeeMinMicroSar} >= 0 and ${t.topupFeeSource} in (${sql.raw(TOPUP_FEE_SOURCES.map((source) => `'${source}'`).join(", "))}))`,
     ),
   ],
 );

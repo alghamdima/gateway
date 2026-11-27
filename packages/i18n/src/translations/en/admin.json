@@ -81,6 +81,35 @@
         "notApplied": "Not on every key yet",
         "nothingAllowed": "No endpoint satisfies this policy: every request of this organization is refused."
       },
+      "topupFee": {
+        "default": "Default fee",
+        "current": "This organization's fee",
+        "effective": "Charged now",
+        "rate": "{{percent}}%, at least {{minimum}}",
+        "none": "None: pays the default",
+        "fromDefault": "default",
+        "expires": "Until {{date}}",
+        "expired": "Expired on {{date}}: the default applies",
+        "noExpiry": "No expiry",
+        "source": {
+          "default": "Default",
+          "organization": "Organization"
+        },
+        "percent": "Fee (%)",
+        "minimum": "Minimum (SAR)",
+        "useDefault": "Default",
+        "validThrough": "Valid through",
+        "note": "Note",
+        "notePlaceholder": "Why this organization pays a different fee",
+        "clear": "Back to default",
+        "saved": "Top-up fee saved.",
+        "cleared": "The organization pays the default fee again.",
+        "invalidPercent": "Enter a percentage from 0 to 100 with at most two decimals, or leave it empty for the default.",
+        "invalidMinimum": "Enter an amount from 0 to 400 SAR with at most two decimals, or leave it empty for the default.",
+        "invalidDate": "Choose a date from today on, or leave it empty for no expiry.",
+        "nothingSet": "Set a fee or a minimum, or use Back to default.",
+        "description": "Higher or lower than the default, for this organization only. An empty field uses the default's value. From the day after the last valid day the default applies again by itself. Every change is kept with its value before and after."
+      },
       "rateLimit": {
         "requests": "Requests per minute",
         "tokens": "Tokens per minute",

@@ -1,5 +1,9 @@
 import { eq } from "@workspace/db";
-import { creditLedgerEntry, organization } from "@workspace/db/schema";
+import {
+  creditLedgerEntry,
+  organization,
+  TOPUP_FEE_SOURCES,
+} from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
@@ -11,11 +15,14 @@ import {
   resolveTopUpGateway,
 } from "../payments/gateway";
 import { computeTopupFee } from "../pricing/fee";
+import { getEffectiveTopupFee } from "../pricing/organization-fee";
 import { getPricingSettings } from "../pricing/pricing";
 import { applyEntry } from "./ledger";
 
+import type { EffectiveTopupFee } from "../pricing/fee";
 import type { TopUpEvent } from "@workspace/billing-web/server";
 import type { WebhookCallbacks } from "@workspace/billing-web/server";
+import type { TopupFeeSource } from "@workspace/db/schema";
 
 /**
  * Buying credits (docs/platform/adr/0012-top-up-checkout.md). The checkout is
@@ -46,14 +53,20 @@ export interface TopUpOptions {
   maxMicroSar: number;
   /** The quick-pick amounts, smallest first, in micro-SAR. */
   presetsMicroSar: number[];
-  /** The fee rates, so the form can say how the fee is worked out. */
+  /**
+   * The fee rates this organization pays now, so the form can say how the
+   * fee is worked out: its own fee while valid, else the default (ADMIN-24).
+   */
   feeBps: number;
   feeMinMicroSar: number;
 }
 
-export const getTopUpOptions = async (): Promise<TopUpOptions> => {
-  const [settings, isAvailable] = await Promise.all([
+export const getTopUpOptions = async (
+  organizationId: string,
+): Promise<TopUpOptions> => {
+  const [settings, fee, isAvailable] = await Promise.all([
     getPricingSettings(),
+    getEffectiveTopupFee(organizationId),
     isTopUpAvailable(),
   ]);
   return {
@@ -61,8 +74,8 @@ export const getTopUpOptions = async (): Promise<TopUpOptions> => {
     minMicroSar: settings.topupMinMicroSar,
     maxMicroSar: settings.topupMaxMicroSar,
     presetsMicroSar: settings.topupPresetsMicroSar,
-    feeBps: settings.topupFeeBps,
-    feeMinMicroSar: settings.topupFeeMinMicroSar,
+    feeBps: fee.topupFeeBps,
+    feeMinMicroSar: fee.topupFeeMinMicroSar,
   };
 };
 
@@ -72,14 +85,28 @@ export const getTopUpOptions = async (): Promise<TopUpOptions> => {
  * request, and refuses everything while top-ups are unavailable.
  */
 export const quoteTopUp = async (
+  organizationId: string,
   creditMicroSar: number,
 ): Promise<TopUpQuote> => {
   await resolveTopUpGateway();
-  return quote(creditMicroSar);
+  // the customer sees the amounts; the rate behind them is for the payment record
+  const priced = await quote(organizationId, creditMicroSar);
+  return {
+    creditMicroSar: priced.creditMicroSar,
+    feeMicroSar: priced.feeMicroSar,
+    totalMicroSar: priced.totalMicroSar,
+  };
 };
 
-const quote = async (creditMicroSar: number): Promise<TopUpQuote> => {
-  const settings = await getPricingSettings();
+/** The quote, and the fee rate it used, which only the payment record needs. */
+const quote = async (
+  organizationId: string,
+  creditMicroSar: number,
+): Promise<TopUpQuote & { fee: EffectiveTopupFee }> => {
+  const [settings, fee] = await Promise.all([
+    getPricingSettings(),
+    getEffectiveTopupFee(organizationId),
+  ]);
   if (
     creditMicroSar < settings.topupMinMicroSar ||
     creditMicroSar > settings.topupMaxMicroSar
@@ -89,11 +116,12 @@ const quote = async (creditMicroSar: number): Promise<TopUpQuote> => {
       message: `A top-up must be between ${formatMicroSar(settings.topupMinMicroSar)} and ${formatMicroSar(settings.topupMaxMicroSar)}`,
     });
   }
-  const feeMicroSar = computeTopupFee(creditMicroSar, settings);
+  const feeMicroSar = computeTopupFee(creditMicroSar, fee);
   return {
     creditMicroSar,
     feeMicroSar,
     totalMicroSar: creditMicroSar + feeMicroSar,
+    fee,
   };
 };
 
@@ -120,7 +148,7 @@ export const startTopUp = async ({
     throw new HttpException(HttpStatusCode.NOT_FOUND);
   }
 
-  const priced = await quote(creditMicroSar);
+  const { fee, ...priced } = await quote(organizationId, creditMicroSar);
   const page = new URL(`/dashboard/${org.slug}/credits`, origin);
   const back = (status: string) => {
     const url = new URL(page);
@@ -135,6 +163,11 @@ export const startTopUp = async ({
       organizationId,
       creditMicroSar: priced.creditMicroSar,
       feeMicroSar: priced.feeMicroSar,
+      feeRate: {
+        feeBps: fee.topupFeeBps,
+        feeMinMicroSar: fee.topupFeeMinMicroSar,
+        feeSource: fee.source,
+      },
       labels: LINE_LABELS,
       redirect: { success: back("success"), cancel: back("cancelled") },
     });
@@ -204,12 +237,39 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
       feeMicroSar: event.feeMicroSar,
       collectedMicroSar: event.collectedMicroSar,
     },
+    ...recordedFeeRate(event),
   });
   logger.info(
     `💳 Top-up ${event.paymentId}: ${result.isApplied ? "credited" : "already credited"} ${event.creditMicroSar} micro-SAR to ${event.organizationId}`,
   );
   return { isApplied: result.isApplied };
 };
+
+/**
+ * The fee rate the payment was quoted at, as ledger columns (ADMIN-24). A
+ * payment that does not carry a known rate is still credited, without it: the
+ * money was taken.
+ */
+const recordedFeeRate = (event: Extract<TopUpEvent, { type: "paid" }>) => {
+  const rate = event.feeRate;
+  if (!rate) {
+    return {};
+  }
+  if (!isTopupFeeSource(rate.feeSource)) {
+    logger.error(
+      `Top-up ${event.paymentId} names an unknown fee source "${rate.feeSource}": its fee rate is not recorded`,
+    );
+    return {};
+  }
+  return {
+    topupFeeBps: rate.feeBps,
+    topupFeeMinMicroSar: rate.feeMinMicroSar,
+    topupFeeSource: rate.feeSource,
+  };
+};
+
+const isTopupFeeSource = (value: string): value is TopupFeeSource =>
+  TOPUP_FEE_SOURCES.some((source) => source === value);
 
 const applyRefund = async (
   event: Extract<TopUpEvent, { type: "refunded" }>,
