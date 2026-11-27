@@ -48,6 +48,11 @@ const menu = [
         icon: <Icons.Percent />,
       },
       {
+        title: "payments",
+        href: pathsConfig.admin.payments.index,
+        icon: <Icons.CreditCard />,
+      },
+      {
         title: "providers",
         href: pathsConfig.admin.providers.index,
         icon: <Icons.Globe2 />,

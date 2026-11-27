@@ -21,6 +21,8 @@ export interface WebhookCallbacks {
 export const TOP_UP_PURPOSE = "credits_top_up";
 
 export interface TopUpCheckoutInput {
+  /** Which of the provider's secrets to use: staff choose it (ADMIN-03). */
+  mode: PaymentMode;
   user: BillingUser;
   organizationId: string;
   /** micro-USD, whole cents. */
@@ -33,23 +35,50 @@ export interface TopUpCheckoutInput {
 }
 
 /** What a verified payment webhook says about a top-up. Amounts are micro-USD. */
-export type TopUpEvent =
-  | {
-      type: "paid";
-      /** The provider's payment id: one payment is credited once. */
-      paymentId: string;
-      organizationId: string;
-      creditMicroUsd: number;
-      feeMicroUsd: number;
-      /** What the provider actually collected. */
-      collectedMicroUsd: number;
-    }
-  | {
-      type: "refunded";
-      refundId: string;
-      paymentId: string;
-      refundedMicroUsd: number;
-    };
+export type TopUpEvent = TopUpEventSource &
+  (
+    | {
+        type: "paid";
+        /** The provider's payment id: one payment is credited once. */
+        paymentId: string;
+        organizationId: string;
+        creditMicroUsd: number;
+        feeMicroUsd: number;
+        /** What the provider actually collected. */
+        collectedMicroUsd: number;
+      }
+    | {
+        type: "refunded";
+        refundId: string;
+        paymentId: string;
+        refundedMicroUsd: number;
+      }
+  );
+
+/** Which provider and mode a verified event came from. */
+export interface TopUpEventSource {
+  provider: BillingProvider;
+  mode: PaymentMode;
+}
+
+/**
+ * Whether one secret is set, by its env name. Never the value: this is what
+ * the admin shows (rule 6 of docs/platform/SPEC.md).
+ */
+export interface SecretState {
+  name: string;
+  /** wrongMode: set, but a key of the other mode (a test key named as live). */
+  status: "present" | "missing" | "wrongMode";
+}
+
+export interface ModeSecrets {
+  secretKey: SecretState;
+  webhookSecret: SecretState;
+  /** Both present and of this mode: checkouts and webhooks can work. */
+  isConfigured: boolean;
+}
+
+export type ProviderSecrets = Record<PaymentMode, ModeSecrets>;
 
 export interface BillingProviderStrategy {
   provider: BillingProvider;
@@ -81,6 +110,8 @@ export interface BillingProviderStrategy {
   /** Only providers that support credit top-ups. */
   topUp?: {
     checkout: (input: TopUpCheckoutInput) => Promise<{ url: string | null }>;
+    /** Which secrets are set for each mode, computed from env on each call. */
+    secrets: () => ProviderSecrets;
   };
 }
 
@@ -90,3 +121,11 @@ export const BillingProvider = {
 
 export type BillingProvider =
   (typeof BillingProvider)[keyof typeof BillingProvider];
+
+/** Test takes no real money; live does. Each mode has its own secrets. */
+export const PaymentMode = {
+  TEST: "test",
+  LIVE: "live",
+} as const;
+
+export type PaymentMode = (typeof PaymentMode)[keyof typeof PaymentMode];

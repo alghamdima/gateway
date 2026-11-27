@@ -105,6 +105,19 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "pricing.remove-provider", target: "pricing" },
   },
 
+  // payment gateways (ADMIN-03): the secrets stay in env and never pass through here
+  {
+    method: "GET",
+    path: /^\/payments(\/changes)?$/,
+    needs: { payments: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: /^\/payments\/(settings|providers\/[^/]+)$/,
+    needs: { payments: ["update"] },
+    audit: { action: "payments.update", target: "payments" },
+  },
+
   // the request log: what happened to each call, never its content
   { method: "GET", path: /^\/requests$/, needs: "any-staff" },
 
@@ -213,11 +226,12 @@ export const canAccessAdminRoute = (
 
 /**
  * For the audit log: which record a path is about. /organizations/o1/credits
- * is organization o1; /pricing/providers/openai is the pricing of openai.
+ * is organization o1; /pricing/providers/openai is the pricing of openai,
+ * /payments/providers/stripe the payment settings of stripe.
  */
 export const auditTarget = (path: string) => {
   const segments = path.split("/").filter(Boolean);
-  if (segments[0] === "pricing") {
+  if (segments[0] === "pricing" || segments[0] === "payments") {
     return segments.at(-1);
   }
   // /providers/accounts/openai/keys/k1 is about provider openai

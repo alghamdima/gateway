@@ -396,5 +396,80 @@
       "latency": "Latency",
       "tokens": "Tokens in / out"
     }
+  },
+  "payments": {
+    "header": {
+      "title": "Payments",
+      "description": "The payment gateways that take top-ups: which one is active, its mode, and whether customers can add credits."
+    },
+    "topups": {
+      "title": "Top-ups",
+      "description": "When off, customers cannot start a new top-up and see that top-ups are paused. Payments already started are still credited.",
+      "label": "Top-ups enabled",
+      "unavailable": "Customers cannot top up right now: {{reason}}",
+      "reason": {
+        "off": "top-ups are switched off.",
+        "disabled": "the active provider is disabled.",
+        "secrets": "the active provider has no {{mode}} secrets in env."
+      }
+    },
+    "providers": {
+      "title": "Payment providers",
+      "description": "Secrets stay in the server's environment: this page shows only whether each one is set, never its value. Changes apply within 30 seconds.",
+      "active": "Active",
+      "makeActive": "Make active",
+      "enabled": "Enabled",
+      "mode": "Mode",
+      "secretKey": "Secret key",
+      "webhookSecret": "Webhook signing secret",
+      "webhookUrl": "Webhook URL",
+      "webhookUrlDescription": "Add this endpoint in the provider's dashboard, in each mode you use, with the events listed in ADR 0012.",
+      "copy": "Copy",
+      "copied": "Webhook URL copied.",
+      "names": {
+        "stripe": "Stripe"
+      }
+    },
+    "mode": {
+      "test": "Test",
+      "live": "Live"
+    },
+    "secret": {
+      "present": "Set",
+      "missing": "Missing",
+      "wrongMode": "Wrong mode: a key of the other mode"
+    },
+    "live": {
+      "title": "Switch to live mode?",
+      "description": "In live mode every top-up charges a real card and adds credits customers can spend. Make sure the live secrets and the live webhook endpoint are set in the provider's dashboard.",
+      "confirm": "Switch to live"
+    },
+    "saved": "Payment settings saved. They apply within 30 seconds.",
+    "error": {
+      "providerDisabled": "This provider is disabled. Enable it before making it active.",
+      "providerNotConfigured": "This provider's secrets for its current mode are missing from the server's environment. Set them before making it active.",
+      "secretsMissing": "The secrets for this mode are missing from the server's environment, or are keys of the other mode. Set them before switching.",
+      "activeProviderDisabled": "This is the active provider. Make another provider active before disabling it."
+    },
+    "changes": {
+      "title": "Change history",
+      "description": "Every change to these settings, newest first. It cannot be edited.",
+      "empty": "No changes yet.",
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "before": "Before",
+      "after": "After",
+      "settings": "Top-ups and active provider",
+      "none": "None",
+      "on": "on",
+      "off": "off",
+      "fields": {
+        "topupsEnabled": "Top-ups",
+        "activeProvider": "Active provider",
+        "enabled": "Enabled",
+        "mode": "Mode"
+      }
+    }
   }
 }

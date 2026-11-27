@@ -16,45 +16,61 @@ import type postgres from "postgres";
 // redelivered webhook count once. Skips without DATABASE_URL.
 const adminUrl = process.env.DATABASE_URL;
 
-const WEBHOOK_SECRET = "whsec_test_secret";
+const WEBHOOK_SECRET = "whsec_live_secret";
+const TEST_WEBHOOK_SECRET = "whsec_test_secret";
 const USD = 1_000_000;
 
-/** Records what would be sent to Stripe instead of sending it. */
+/** Stripe's secrets as env would hold them; tests change them (ADMIN-03). */
+const stripeEnv = vi.hoisted((): Record<string, string | undefined> => ({}));
+const BOTH_MODES = {
+  STRIPE_SECRET_KEY: "sk_live_not_used",
+  STRIPE_WEBHOOK_SECRET: "whsec_live_secret",
+  STRIPE_TEST_SECRET_KEY: "sk_test_not_used",
+  STRIPE_TEST_WEBHOOK_SECRET: "whsec_test_secret",
+};
+const setEnv = (values: Partial<typeof BOTH_MODES>) => {
+  for (const name of Object.keys(BOTH_MODES)) {
+    stripeEnv[name] = undefined;
+  }
+  Object.assign(stripeEnv, values);
+};
+vi.mock(
+  "../../../../../billing/web/src/providers/stripe/env",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    env: stripeEnv,
+  }),
+);
+
+/** Records what would be sent to Stripe, and with which mode's client, instead of sending it. */
 const stripeCalls = vi.hoisted(() => ({
+  modes: [] as (string | undefined)[],
   sessions: [] as Record<string, unknown>[],
   customers: [] as Record<string, unknown>[],
 }));
 
-vi.mock(
-  "../../../../../billing/web/src/providers/stripe/sdk",
-  async (importOriginal) => {
-    const original =
-      // only the signature checker is used from the real client
-      await importOriginal<{ stripe: () => { webhooks: object } }>();
-    const real = original.stripe();
+vi.mock("../../../../../billing/web/src/providers/stripe/sdk", () => ({
+  stripe: (mode?: string) => {
+    stripeCalls.modes.push(mode);
     return {
-      stripe: () => ({
-        // signature checks are Stripe's own code, unchanged
-        webhooks: real.webhooks,
-        customers: {
+      customers: {
+        create: async (params: Record<string, unknown>) => {
+          stripeCalls.customers.push(params);
+          return { id: `cus_${stripeCalls.customers.length}` };
+        },
+        retrieve: async (id: string) => ({ id }),
+      },
+      checkout: {
+        sessions: {
           create: async (params: Record<string, unknown>) => {
-            stripeCalls.customers.push(params);
-            return { id: `cus_${stripeCalls.customers.length}` };
-          },
-          retrieve: async (id: string) => ({ id }),
-        },
-        checkout: {
-          sessions: {
-            create: async (params: Record<string, unknown>) => {
-              stripeCalls.sessions.push(params);
-              return { id: "cs_test_1", url: "https://checkout.stripe.test/1" };
-            },
+            stripeCalls.sessions.push(params);
+            return { id: "cs_test_1", url: "https://checkout.stripe.test/1" };
           },
         },
-      }),
+      },
     };
   },
-);
+}));
 
 /** The Stripe-Signature header Stripe sends: HMAC-SHA256 of "timestamp.payload". */
 const sign = (payload: string, secret = WEBHOOK_SECRET) => {
@@ -66,13 +82,19 @@ const sign = (payload: string, secret = WEBHOOK_SECRET) => {
 };
 
 let eventSeq = 0;
-const event = (type: string, object: Record<string, unknown>) =>
+/** An event as Stripe sends it; live mode unless the test says otherwise. */
+const event = (
+  type: string,
+  object: Record<string, unknown>,
+  livemode = true,
+) =>
   JSON.stringify({
     id: `evt_${++eventSeq}`,
     object: "event",
     type,
     api_version: "2026-11-18.endive",
     created: Math.floor(Date.now() / 1000),
+    livemode,
     data: { object },
   });
 
@@ -137,6 +159,29 @@ const setLimits = async (
 const seeded = () =>
   setLimits(5 * USD, 1000 * USD, [10 * USD, 25 * USD, 50 * USD, 100 * USD]);
 
+/** Changes the payment settings as staff would in the admin (ADMIN-03). */
+const setPayments = async (input: {
+  topupsEnabled?: boolean;
+  mode?: "test" | "live";
+}) => {
+  const payments = await import("../../payments/settings");
+  if (input.mode) {
+    await payments.updatePaymentProvider({
+      provider: "stripe",
+      enabled: true,
+      mode: input.mode,
+      staffId: "staff_payments",
+    });
+  }
+  if (input.topupsEnabled !== undefined) {
+    await payments.updatePaymentSettings({
+      topupsEnabled: input.topupsEnabled,
+      activeProvider: "stripe",
+      staffId: "staff_payments",
+    });
+  }
+};
+
 describe.skipIf(!adminUrl)("credit top-ups", () => {
   let database: TestDatabase;
   let sql: postgres.Sql;
@@ -180,8 +225,6 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
     const { createTestDatabase } = await import("@workspace/db/testing");
     database = await createTestDatabase(adminUrl ?? "");
     process.env.DATABASE_URL = database.url;
-    process.env.STRIPE_SECRET_KEY = "sk_test_not_used";
-    process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
 
     sql = (await import("postgres")).default(database.url, { max: 4 });
     ({ webhookHandler } = await import("@workspace/billing-web/server"));
@@ -195,9 +238,18 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
     await database.drop();
   });
 
-  beforeEach(() => {
+  /** Back to what the migration seeds: top-ups on, Stripe active and live. */
+  const resetPayments = async () => {
+    await sql`update payment_provider set enabled = true, mode = 'live'`;
+    await sql`update payment_settings set topups_enabled = true, active_provider = 'stripe'`;
+    (await import("../../payments/settings")).clearPaymentSettingsCache();
+  };
+  beforeEach(async () => {
+    stripeCalls.modes.length = 0;
     stripeCalls.sessions.length = 0;
     stripeCalls.customers.length = 0;
+    setEnv(BOTH_MODES);
+    await resetPayments();
   });
 
   describe("checkout", () => {
@@ -231,6 +283,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       const params = stripeCalls.sessions[0];
       const metadata = {
         purpose: "credits_top_up",
+        provider: "stripe",
+        mode: "live",
         organizationId,
         creditMicroUsd: "25000000",
         feeMicroUsd: "1380000",
@@ -263,6 +317,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         },
       ]);
       expect(params).not.toHaveProperty("payment_method_types");
+      // the live client: the mode migration 0032 seeds
+      expect(stripeCalls.modes).toEqual(["live", "live"]);
       // starting a checkout credits nothing
       expect(await entries(organizationId)).toHaveLength(0);
     });
@@ -270,6 +326,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
     describe("limits per payment, set by staff (ADMIN-05)", () => {
       it("gives the form the stored limits, quick picks and fee", async () => {
         expect(await topUp.getTopUpOptions()).toEqual({
+          isAvailable: true,
           minMicroUsd: 5 * USD,
           maxMicroUsd: 1000 * USD,
           presetsMicroUsd: [10 * USD, 25 * USD, 50 * USD, 100 * USD],
@@ -539,6 +596,198 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         { count: string }[]
       >`select count(*) from credit_ledger_entry where idempotency_key = 'refund:stripe:re_plan'`;
       expect(Number(row?.count)).toBe(0);
+    });
+  });
+
+  describe("payment gateway chosen by staff (ADMIN-03)", () => {
+    const start = (organizationId: string) =>
+      topUp.startTopUp({
+        user: { id: "user_1", email: "owner@example.com" },
+        organizationId,
+        creditMicroUsd: 10 * USD,
+        origin: "https://app.example.com",
+      });
+    const unavailable = {
+      status: 503,
+      code: "billing:error.topUpsUnavailable",
+    };
+
+    it("refuses new top-ups while they are switched off, and takes them again when on", async () => {
+      const organizationId = await createOrganization();
+      await setPayments({ topupsEnabled: false });
+
+      expect((await topUp.getTopUpOptions()).isAvailable).toBe(false);
+      await expect(topUp.quoteTopUp(10 * USD)).rejects.toMatchObject(
+        unavailable,
+      );
+      await expect(start(organizationId)).rejects.toMatchObject(unavailable);
+      expect(stripeCalls.sessions).toHaveLength(0);
+
+      await setPayments({ topupsEnabled: true });
+      expect((await topUp.getTopUpOptions()).isAvailable).toBe(true);
+      expect(await start(organizationId)).toMatchObject({
+        url: "https://checkout.stripe.test/1",
+      });
+      expect(stripeCalls.sessions).toHaveLength(1);
+    });
+
+    it("refuses new top-ups while the active provider is disabled", async () => {
+      // the admin API cannot do this (it refuses to disable the active
+      // provider); the check stands on its own anyway
+      await sql`update payment_provider set enabled = false`;
+      (await import("../../payments/settings")).clearPaymentSettingsCache();
+      await expect(start(await createOrganization())).rejects.toMatchObject(
+        unavailable,
+      );
+      expect(stripeCalls.sessions).toHaveLength(0);
+    });
+
+    it.each([
+      ["the live secrets are missing", {}],
+      [
+        "the live webhook secret is missing",
+        { ...BOTH_MODES, STRIPE_WEBHOOK_SECRET: undefined },
+      ],
+      [
+        "the live key is a test key",
+        { ...BOTH_MODES, STRIPE_SECRET_KEY: "sk_test_named_as_live" },
+      ],
+    ])("refuses new top-ups when %s", async (_, values) => {
+      setEnv(values);
+      expect((await topUp.getTopUpOptions()).isAvailable).toBe(false);
+      await expect(start(await createOrganization())).rejects.toMatchObject(
+        unavailable,
+      );
+      expect(stripeCalls.sessions).toHaveLength(0);
+    });
+
+    it("pays with the client of the mode staff chose, and marks the payment with it", async () => {
+      const organizationId = await createOrganization();
+      await setPayments({ mode: "test" });
+
+      await start(organizationId);
+
+      expect(stripeCalls.modes).toEqual(["test", "test"]);
+      expect(stripeCalls.sessions[0]?.metadata).toMatchObject({
+        provider: "stripe",
+        mode: "test",
+      });
+      // test and live are separate Stripe customers
+      const [customer] = await sql<
+        { provider: string }[]
+      >`select provider from customer where reference_id = ${organizationId}`;
+      expect(customer?.provider).toBe("stripe_test");
+    });
+
+    it("refuses new top-ups in test mode once its secrets are gone", async () => {
+      await setPayments({ mode: "test" });
+      setEnv({ ...BOTH_MODES, STRIPE_TEST_SECRET_KEY: undefined });
+      await expect(start(await createOrganization())).rejects.toMatchObject(
+        unavailable,
+      );
+    });
+
+    describe("webhook", () => {
+      const paid = (organizationId: string, paymentIntent: string) =>
+        session({
+          organizationId,
+          paymentIntent,
+          creditMicroUsd: 10 * USD,
+          feeMicroUsd: 800_000,
+        });
+
+      it("credits a live payment even while top-ups are off: the money was taken", async () => {
+        const organizationId = await createOrganization();
+        await setPayments({ topupsEnabled: false });
+
+        const response = await deliver(
+          event("checkout.session.completed", paid(organizationId, "pi_off")),
+        );
+        expect(response.status).toBe(200);
+        expect(await balance(organizationId)).toBe(10 * USD);
+        const [entry] = await sql<
+          { metadata: Record<string, unknown> }[]
+        >`select metadata from credit_ledger_entry where idempotency_key = 'top_up:stripe:pi_off'`;
+        expect(entry?.metadata).toMatchObject({
+          provider: "stripe",
+          mode: "live",
+        });
+      });
+
+      it("verifies a test event with the test secret and credits it while in test mode", async () => {
+        const organizationId = await createOrganization();
+        await setPayments({ mode: "test" });
+        const payload = event(
+          "checkout.session.completed",
+          paid(organizationId, "pi_test_mode"),
+          false,
+        );
+
+        // a test event signed with the live secret is refused
+        await expect(
+          deliver(payload, sign(payload, WEBHOOK_SECRET)),
+        ).rejects.toMatchObject({ status: 400 });
+        expect(await balance(organizationId)).toBe(0);
+
+        const response = await deliver(
+          payload,
+          sign(payload, TEST_WEBHOOK_SECRET),
+        );
+        expect(response.status).toBe(200);
+        expect(await balance(organizationId)).toBe(10 * USD);
+      });
+
+      it("refuses a live event signed with the test secret", async () => {
+        const organizationId = await createOrganization();
+        const payload = event(
+          "checkout.session.completed",
+          paid(organizationId, "pi_live_wrong_secret"),
+        );
+        await expect(
+          deliver(payload, sign(payload, TEST_WEBHOOK_SECRET)),
+        ).rejects.toMatchObject({ status: 400 });
+        expect(await balance(organizationId)).toBe(0);
+      });
+
+      it("refuses a test event when no test webhook secret is set", async () => {
+        setEnv({ ...BOTH_MODES, STRIPE_TEST_WEBHOOK_SECRET: undefined });
+        const organizationId = await createOrganization();
+        const payload = event(
+          "checkout.session.completed",
+          paid(organizationId, "pi_test_unset"),
+          false,
+        );
+        await expect(
+          deliver(payload, sign(payload, TEST_WEBHOOK_SECRET)),
+        ).rejects.toMatchObject({ status: 400 });
+        expect(await balance(organizationId)).toBe(0);
+      });
+
+      it("refuses an event that does not say its mode", async () => {
+        const payload = JSON.stringify({
+          id: "evt_no_mode",
+          object: "event",
+          type: "checkout.session.completed",
+          data: { object: {} },
+        });
+        await expect(deliver(payload)).rejects.toMatchObject({ status: 400 });
+      });
+
+      it("acknowledges a test payment without crediting it once the provider is live", async () => {
+        const organizationId = await createOrganization();
+        const payload = event(
+          "checkout.session.completed",
+          paid(organizationId, "pi_test_while_live"),
+          false,
+        );
+
+        const response = await deliver(
+          payload,
+          sign(payload, TEST_WEBHOOK_SECRET),
+        );
+        expect(response.status).toBe(200);
+        expect(await balance(organizationId)).toBe(0);
+      });
     });
   });
 

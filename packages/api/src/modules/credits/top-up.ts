@@ -1,4 +1,3 @@
-import { provider, topUp } from "@workspace/billing-web/server";
 import { eq } from "@workspace/db";
 import { creditLedgerEntry, organization } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
@@ -6,6 +5,11 @@ import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
+import {
+  acceptsTestPayments,
+  isTopUpAvailable,
+  resolveTopUpGateway,
+} from "../payments/gateway";
 import { computeTopupFee } from "../pricing/fee";
 import { getPricingSettings } from "../pricing/pricing";
 import { applyEntry } from "./ledger";
@@ -29,8 +33,14 @@ export interface TopUpQuote {
   totalMicroUsd: number;
 }
 
-/** What the top-up form needs, all set by staff in the admin pricing settings (ADMIN-05). */
+/**
+ * What the top-up form needs, all set by staff in the admin: the limits and
+ * fee in the pricing settings (ADMIN-04, ADMIN-05), whether top-ups are
+ * available in the payment settings (ADMIN-03).
+ */
 export interface TopUpOptions {
+  /** False when top-ups are off or no payment provider can take them now. */
+  isAvailable: boolean;
   /** The least and most credit one payment may buy, in micro-USD (SAR with ADMIN-06). */
   minMicroUsd: number;
   maxMicroUsd: number;
@@ -42,8 +52,12 @@ export interface TopUpOptions {
 }
 
 export const getTopUpOptions = async (): Promise<TopUpOptions> => {
-  const settings = await getPricingSettings();
+  const [settings, isAvailable] = await Promise.all([
+    getPricingSettings(),
+    isTopUpAvailable(),
+  ]);
   return {
+    isAvailable,
     minMicroUsd: settings.topupMinMicroUsd,
     maxMicroUsd: settings.topupMaxMicroUsd,
     presetsMicroUsd: settings.topupPresetsMicroUsd,
@@ -55,11 +69,16 @@ export const getTopUpOptions = async (): Promise<TopUpOptions> => {
 /**
  * The fee as it stands now: what the checkout started next would charge.
  * Refuses an amount outside the limits staff set, read at the time of the
- * request.
+ * request, and refuses everything while top-ups are unavailable.
  */
 export const quoteTopUp = async (
   creditMicroUsd: number,
 ): Promise<TopUpQuote> => {
+  await resolveTopUpGateway();
+  return quote(creditMicroUsd);
+};
+
+const quote = async (creditMicroUsd: number): Promise<TopUpQuote> => {
   const settings = await getPricingSettings();
   if (
     creditMicroUsd < settings.topupMinMicroUsd ||
@@ -90,11 +109,8 @@ export const startTopUp = async ({
   /** The site the customer is on; the payment page sends them back there. */
   origin: string;
 }) => {
-  if (!topUp) {
-    throw new HttpException(HttpStatusCode.NOT_IMPLEMENTED, {
-      code: "billing:error.checkout",
-    });
-  }
+  // the provider and mode staff chose, read now (ADMIN-03)
+  const gateway = await resolveTopUpGateway();
 
   const [org] = await db
     .select({ slug: organization.slug })
@@ -104,7 +120,7 @@ export const startTopUp = async ({
     throw new HttpException(HttpStatusCode.NOT_FOUND);
   }
 
-  const quote = await quoteTopUp(creditMicroUsd);
+  const priced = await quote(creditMicroUsd);
   const page = new URL(`/dashboard/${org.slug}/credits`, origin);
   const back = (status: string) => {
     const url = new URL(page);
@@ -113,15 +129,16 @@ export const startTopUp = async ({
   };
 
   try {
-    const { url } = await topUp.checkout({
+    const { url } = await gateway.checkout({
+      mode: gateway.mode,
       user,
       organizationId,
-      creditMicroUsd: quote.creditMicroUsd,
-      feeMicroUsd: quote.feeMicroUsd,
+      creditMicroUsd: priced.creditMicroUsd,
+      feeMicroUsd: priced.feeMicroUsd,
       labels: LINE_LABELS,
       redirect: { success: back("success"), cancel: back("cancelled") },
     });
-    return { url, ...quote };
+    return { url, ...priced };
   } catch (error) {
     logger.error(error);
     throw new HttpException(HttpStatusCode.BAD_GATEWAY, {
@@ -130,12 +147,14 @@ export const startTopUp = async ({
   }
 };
 
-const topUpKey = (paymentId: string) => `top_up:${provider}:${paymentId}`;
+const topUpKey = (provider: string, paymentId: string) =>
+  `top_up:${provider}:${paymentId}`;
 
 /**
  * Writes what a verified webhook says to the ledger. Every delivery of the
  * same payment or refund lands on the same idempotency key, so it counts once.
- * Throwing makes the provider deliver the event again.
+ * Throwing makes the provider deliver the event again. The top-up switches do
+ * not apply here: a payment already taken is always credited (ADMIN-03).
  */
 export const applyTopUpEvent = async (event: TopUpEvent) => {
   if (event.type === "paid") {
@@ -160,6 +179,12 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
     );
     return { isApplied: false };
   }
+  if (event.mode === "test" && !(await acceptsTestPayments(event.provider))) {
+    logger.warn(
+      `Top-up ${event.paymentId} was paid in ${event.provider}'s test mode, which is not the mode in use: not credited`,
+    );
+    return { isApplied: false };
+  }
   if (!(await organizationExists(event.organizationId))) {
     logger.error(
       `Top-up ${event.paymentId} is for organization ${event.organizationId}, which no longer exists: not credited`,
@@ -171,10 +196,11 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
     organizationId: event.organizationId,
     amount: event.creditMicroUsd,
     kind: "top_up",
-    idempotencyKey: topUpKey(event.paymentId),
+    idempotencyKey: topUpKey(event.provider, event.paymentId),
     reference: event.paymentId,
     metadata: {
-      provider,
+      provider: event.provider,
+      mode: event.mode,
       feeMicroUsd: event.feeMicroUsd,
       collectedMicroUsd: event.collectedMicroUsd,
     },
@@ -191,7 +217,12 @@ const applyRefund = async (
   const [payment] = await db
     .select()
     .from(creditLedgerEntry)
-    .where(eq(creditLedgerEntry.idempotencyKey, topUpKey(event.paymentId)));
+    .where(
+      eq(
+        creditLedgerEntry.idempotencyKey,
+        topUpKey(event.provider, event.paymentId),
+      ),
+    );
 
   if (!payment) {
     // a refund of a plan payment, or of a top-up that was never credited
@@ -220,10 +251,11 @@ const applyRefund = async (
     organizationId: payment.organizationId,
     amount: -removed,
     kind: "refund",
-    idempotencyKey: `refund:${provider}:${event.refundId}`,
+    idempotencyKey: `refund:${event.provider}:${event.refundId}`,
     reference: event.refundId,
     metadata: {
-      provider,
+      provider: event.provider,
+      mode: event.mode,
       paymentId: event.paymentId,
       refundedMicroUsd: event.refundedMicroUsd,
     },

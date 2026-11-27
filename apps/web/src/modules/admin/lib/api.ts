@@ -226,6 +226,18 @@ const queries = {
         queryFn: () => handle(api.admin.pricing.changes.$get)(),
       }),
   },
+  payments: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "payments"],
+        queryFn: () => handle(api.admin.payments.$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "payments", "changes"],
+        queryFn: () => handle(api.admin.payments.changes.$get)(),
+      }),
+  },
   requests: {
     list: (
       query: InferRequestType<typeof api.admin.requests.$get>["query"] = {},
@@ -405,6 +417,31 @@ const mutations = {
       mutationFn: ({ provider }: { provider: string }) =>
         handle(api.admin.pricing.providers[":provider"].$delete)({
           param: { provider },
+        }),
+    }),
+  },
+  payments: {
+    updateSettings: mutationOptions({
+      mutationKey: [KEY, "payments", "settings", "update"],
+      mutationFn: (
+        json: InferRequestType<typeof api.admin.payments.settings.$put>["json"],
+      ) => handle(api.admin.payments.settings.$put)({ json }),
+    }),
+    updateProvider: mutationOptions({
+      mutationKey: [KEY, "payments", "providers", "update"],
+      mutationFn: ({
+        provider,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.payments.providers)[":provider"]["$put"]
+      >["json"] & {
+        provider: InferRequestType<
+          (typeof api.admin.payments.providers)[":provider"]["$put"]
+        >["param"]["provider"];
+      }) =>
+        handle(api.admin.payments.providers[":provider"].$put)({
+          param: { provider },
+          json,
         }),
     }),
   },

@@ -271,5 +271,6 @@
   "activity": "Activity",
   "reconciliation": "Reconciliation",
   "providers": "Providers",
-  "dataPolicy": "Data policy"
+  "dataPolicy": "Data policy",
+  "payments": "Payments"
 }

@@ -1,5 +1,6 @@
 import { BillingProvider } from "../types";
 import { checkout } from "./checkout";
+import { secrets } from "./config";
 import { getBillingPortal } from "./customer";
 import { updateSubscription } from "./subscription";
 import { createTopUpCheckout } from "./top-up";
@@ -15,6 +16,6 @@ export const strategy = {
   updateSubscription,
   recordUsage,
   getUsage,
-  topUp: { checkout: createTopUpCheckout },
+  topUp: { checkout: createTopUpCheckout, secrets },
   provider: BillingProvider.STRIPE,
 } satisfies BillingProviderStrategy;

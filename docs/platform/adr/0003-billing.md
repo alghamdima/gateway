@@ -1,6 +1,8 @@
 # ADR 0003: Prepaid top-ups through one-time payments
 
 > Amended by ADR 0012: the customer types the amount (no product per amount), because the fee is a setting staff change (ADR 0010).
+>
+> Amended 2026-11-27 (ADMIN-03): the provider is no longer chosen in code. Staff pick the active provider, its mode (test or live) and whether top-ups are on in the admin (`payment_settings`, `payment_provider`, history in `payment_change`). Each provider keeps one pair of secrets per mode in env and verifies its own webhook; a payment already taken is credited whatever the switches say, and a test-mode payment only while the provider is in test mode.
 
 Status: Accepted for the model. The payment provider is the owner's decision and still open. The purchase fee is set by staff in the admin console (ADR 0010).
 Date: 2026-11-21

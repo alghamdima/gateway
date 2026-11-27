@@ -13,6 +13,8 @@ import {
   MAX_TOPUP_FEE_MIN_MICRO_USD,
   MAX_TOPUP_MICRO_USD,
   MAX_TOPUP_PRESETS,
+  PAYMENT_MODES,
+  PAYMENT_PROVIDERS,
   PROVIDER_AGREEMENTS,
   PROVIDER_REGIONS,
   selectCustomerSchema,
@@ -419,6 +421,28 @@ export type UpdatePricingSettingsInput = z.infer<
   typeof updatePricingSettingsSchema
 >;
 export type SetProviderMarkupInput = z.infer<typeof setProviderMarkupSchema>;
+
+/** A payment provider the product implements (ADMIN-03). */
+export const paymentProviderSchema = z.enum(PAYMENT_PROVIDERS);
+
+export const updatePaymentSettingsSchema = z.object({
+  /** Off refuses new checkouts; payments already started still credit. */
+  topupsEnabled: z.boolean(),
+  /** The provider new checkouts go to. */
+  activeProvider: paymentProviderSchema,
+});
+
+export const updatePaymentProviderSchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(PAYMENT_MODES),
+});
+
+export type UpdatePaymentSettingsInput = z.infer<
+  typeof updatePaymentSettingsSchema
+>;
+export type UpdatePaymentProviderInput = z.infer<
+  typeof updatePaymentProviderSchema
+>;
 
 /** The gateway's key_id for a provider key. */
 export const providerKeyIdSchema = z.string().min(1).max(255);

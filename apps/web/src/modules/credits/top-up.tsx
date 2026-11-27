@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { handle } from "@workspace/api/utils";
 import { useTranslation } from "@workspace/i18n";
+import { Alert, AlertDescription, AlertTitle } from "@workspace/ui-web/alert";
 import { Button } from "@workspace/ui-web/button";
 import {
   Card,
@@ -19,6 +20,7 @@ import {
   FieldError,
   FieldLabel,
 } from "@workspace/ui-web/field";
+import { Icons } from "@workspace/ui-web/icons";
 import { Input } from "@workspace/ui-web/input";
 import { Skeleton } from "@workspace/ui-web/skeleton";
 import { Spinner } from "@workspace/ui-web/spinner";
@@ -34,6 +36,8 @@ interface TopUpProps {
  * Buy credits: the limits, quick picks and fee come from the admin settings
  * (ADMIN-04, ADMIN-05) and the fee is shown before paying. The API checks the
  * same limits. The balance changes when the payment webhook arrives, not here.
+ * While staff have top-ups off, or no payment provider can take them
+ * (ADMIN-03), a notice replaces the form.
  */
 export const TopUp = ({ organizationId }: TopUpProps) => {
   const options = useQuery({
@@ -47,7 +51,32 @@ export const TopUp = ({ organizationId }: TopUpProps) => {
   if (!options.data) {
     return <Skeleton className="h-64 w-full" />;
   }
+  if (!options.data.isAvailable) {
+    return <TopUpUnavailable />;
+  }
   return <TopUpForm organizationId={organizationId} options={options.data} />;
+};
+
+const TopUpUnavailable = () => {
+  const { t } = useTranslation(["common", "organization"]);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("organization:credits.topUp.title")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Alert>
+          <Icons.Info />
+          <AlertTitle>
+            {t("organization:credits.topUp.unavailable.title")}
+          </AlertTitle>
+          <AlertDescription>
+            {t("organization:credits.topUp.unavailable.description")}
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  );
 };
 
 interface TopUpOptions {

@@ -1,6 +1,6 @@
 import { logger } from "@workspace/shared/logger";
 
-import { TOP_UP_PURPOSE } from "../types";
+import { BillingProvider, PaymentMode, TOP_UP_PURPOSE } from "../types";
 import { createOrRetrieveCustomer } from "./customer";
 import { stripe } from "./sdk";
 
@@ -14,6 +14,7 @@ const MICRO_USD_PER_CENT = 10_000;
  * Both lines are inline prices, because the fee is a setting staff change at any time.
  */
 export const createTopUpCheckout = async ({
+  mode,
   user,
   organizationId,
   creditMicroUsd,
@@ -24,10 +25,14 @@ export const createTopUpCheckout = async ({
   const { stripeCustomer } = await createOrRetrieveCustomer({
     referenceId: organizationId,
     email: user.email,
+    mode,
   });
 
+  // the mode is also on the event (livemode); kept here so the payment shows it
   const metadata = {
     purpose: TOP_UP_PURPOSE,
+    provider: BillingProvider.STRIPE,
+    mode,
     organizationId,
     creditMicroUsd: String(creditMicroUsd),
     feeMicroUsd: String(feeMicroUsd),
@@ -41,7 +46,7 @@ export const createTopUpCheckout = async ({
     },
   });
 
-  const session = await stripe().checkout.sessions.create({
+  const session = await stripe(mode).checkout.sessions.create({
     mode: "payment",
     customer: stripeCustomer.id,
     client_reference_id: organizationId,
@@ -59,27 +64,41 @@ export const createTopUpCheckout = async ({
   return { url: session.url };
 };
 
+/** The mode an event belongs to: Stripe marks every event live or not. */
+export const modeOfEvent = (event: { livemode: boolean }) =>
+  event.livemode ? PaymentMode.LIVE : PaymentMode.TEST;
+
 /**
  * The top-up fact a verified webhook event carries, or null when the event is
  * not about a top-up payment or a finished refund.
  */
 export const toTopUpEvent = (event: Stripe.Event): TopUpEvent | null => {
+  const source = { provider: BillingProvider.STRIPE, mode: modeOfEvent(event) };
   switch (event.type) {
     case "checkout.session.completed":
-    case "checkout.session.async_payment_succeeded":
-      return toPaid(event.data.object);
+    case "checkout.session.async_payment_succeeded": {
+      const paid = toPaid(event.data.object);
+      return paid && { ...source, ...paid };
+    }
     case "refund.created":
-    case "refund.updated":
-      return toRefunded(event.data.object);
+    case "refund.updated": {
+      const refunded = toRefunded(event.data.object);
+      return refunded && { ...source, ...refunded };
+    }
     default:
       return null;
   }
 };
 
+type WithoutSource<T> = T extends unknown
+  ? Omit<T, "provider" | "mode">
+  : never;
+type TopUpFact = WithoutSource<TopUpEvent>;
+
 export const isTopUpSession = (session: Stripe.Checkout.Session) =>
   session.metadata?.purpose === TOP_UP_PURPOSE;
 
-const toPaid = (session: Stripe.Checkout.Session): TopUpEvent | null => {
+const toPaid = (session: Stripe.Checkout.Session): TopUpFact | null => {
   // with delayed payment methods the session completes unpaid, and
   // async_payment_succeeded follows once the money arrives
   if (!isTopUpSession(session) || session.payment_status !== "paid") {
@@ -115,7 +134,7 @@ const toPaid = (session: Stripe.Checkout.Session): TopUpEvent | null => {
   };
 };
 
-const toRefunded = (refund: Stripe.Refund): TopUpEvent | null => {
+const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {
   const paymentId = idOf(refund.payment_intent);
 
   if (

@@ -100,7 +100,8 @@
     "usageRetrieve": "Could not retrieve usage from billing provider.",
     "subscriptionItemNotFound": "No subscription item was found for this subscription.",
     "subscriptionUpdate": "Unable to update the subscription in the billing provider.",
-    "topUpAmount": "The amount is outside the top-up limits. Refresh the page and try again."
+    "topUpAmount": "The amount is outside the top-up limits. Refresh the page and try again.",
+    "topUpsUnavailable": "Top-ups are temporarily unavailable. Please try again later."
   },
   "subscription": {
     "status": {

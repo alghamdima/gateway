@@ -15,6 +15,7 @@ export const staffAc = createAccessControl({
   customers: ["read"],
   credits: ["read", "adjust"],
   pricing: ["read", "update"],
+  payments: ["read", "update"],
   providers: ["read", "update"],
   audit: ["read"],
 });
@@ -38,11 +39,12 @@ const admin = staffAc.newRole({
   customers: ["read"],
   credits: ["read", "adjust"],
   pricing: ["read", "update"],
+  payments: ["read", "update"],
   providers: ["read", "update"],
   audit: ["read"],
 });
 
-/** Money: prices and credit adjustments. Can look at accounts, cannot act on them. */
+/** Money: prices, payment gateways and credit adjustments. Can look at accounts, cannot act on them. */
 const finance = staffAc.newRole({
   user: ["list", "get"],
   session: [],
@@ -50,6 +52,7 @@ const finance = staffAc.newRole({
   customers: ["read"],
   credits: ["read", "adjust"],
   pricing: ["read", "update"],
+  payments: ["read", "update"],
   providers: ["read"],
   audit: ["read"],
 });
@@ -62,6 +65,7 @@ const support = staffAc.newRole({
   customers: ["read"],
   credits: ["read"],
   pricing: ["read"],
+  payments: ["read"],
   providers: ["read"],
   audit: [],
 });
@@ -74,6 +78,7 @@ const user = staffAc.newRole({
   customers: [],
   credits: [],
   pricing: [],
+  payments: [],
   providers: [],
   audit: [],
 });

@@ -8,18 +8,45 @@ import { logger } from "@workspace/shared/logger";
 import { HttpException } from "@workspace/shared/utils";
 
 import { GetBillingPortalPayload } from "../../schema";
-import { BillingProvider, BillingUser } from "../types";
+import { BillingProvider, BillingUser, PaymentMode } from "../types";
 import { stripe } from "./sdk";
 
 import type { Stripe } from "stripe";
 
-const getStripeCustomerById = async (id: string) => {
-  return stripe().customers.retrieve(id);
+/**
+ * Test and live mode have separate customers, so each mode keeps its own row
+ * in `customer`. Live keeps the provider name rows already use.
+ */
+const customerProvider = (mode?: PaymentMode) =>
+  mode === PaymentMode.TEST
+    ? `${BillingProvider.STRIPE}_test`
+    : BillingProvider.STRIPE;
+
+const isMissingResource = (error: unknown) =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === "resource_missing";
+
+const getStripeCustomerById = async (id: string, mode?: PaymentMode) => {
+  try {
+    return await stripe(mode).customers.retrieve(id);
+  } catch (error) {
+    // an id from another Stripe account or mode: a new customer replaces it
+    if (isMissingResource(error)) {
+      return null;
+    }
+    throw error;
+  }
 };
 
-const createStripeCustomer = async (referenceId: string, email: string) => {
+const createStripeCustomer = async (
+  referenceId: string,
+  email: string,
+  mode?: PaymentMode,
+) => {
   const customerData = { metadata: { referenceId }, email };
-  const newCustomer = await stripe().customers.create(customerData);
+  const newCustomer = await stripe(mode).customers.create(customerData);
 
   return newCustomer;
 };
@@ -27,20 +54,24 @@ const createStripeCustomer = async (referenceId: string, email: string) => {
 export const createOrRetrieveCustomer = async ({
   referenceId,
   email,
+  mode,
 }: {
   referenceId: string;
   email: string;
+  /** Top-ups name the mode staff chose; the template's plan code does not. */
+  mode?: PaymentMode;
 }) => {
+  const provider = customerProvider(mode);
   const [existingCustomer] = await getCustomersByReferenceId(referenceId, {
-    provider: BillingProvider.STRIPE,
+    provider,
   });
 
   const stripeCustomer = existingCustomer?.externalId
-    ? await getStripeCustomerById(existingCustomer.externalId)
+    ? await getStripeCustomerById(existingCustomer.externalId, mode)
     : null;
 
   const stripeCustomerToProcess =
-    stripeCustomer ?? (await createStripeCustomer(referenceId, email));
+    stripeCustomer ?? (await createStripeCustomer(referenceId, email, mode));
 
   if (existingCustomer) {
     if (existingCustomer.externalId !== stripeCustomerToProcess.id) {
@@ -61,7 +92,7 @@ export const createOrRetrieveCustomer = async ({
   const [newCustomer] = await upsertCustomer({
     referenceId,
     externalId: stripeCustomerToProcess.id,
-    provider: BillingProvider.STRIPE,
+    provider,
   });
 
   return {

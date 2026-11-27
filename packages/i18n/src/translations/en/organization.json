@@ -310,6 +310,10 @@
           "title": "Payment cancelled",
           "description": "Nothing was charged."
         }
+      },
+      "unavailable": {
+        "title": "Top-ups are temporarily unavailable",
+        "description": "Adding credits is paused for now. Your balance and API keys keep working as usual. Please check back later."
       }
     },
     "title": "Credits",

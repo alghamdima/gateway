@@ -20,7 +20,7 @@ apps/
   gateway/    The engine, in Go. Started from Bifrost v2.6.0; the code is ours now.
 packages/
   api/        Hono API. One folder per feature under src/modules.
-  db/         Drizzle schema (one file per feature) and migrations 0000-0030.
+  db/         Drizzle schema (one file per feature) and migrations 0000-0032.
   gateway-client/  TypeScript client for the gateway's management API.
   auth/ billing/ email/ i18n/ ui/ shared/ storage/ cms/ flags/ analytics/ monitoring/
 docs/platform/  PLAN.md, ARCHITECTURE.md, adr/, research/, this file.
@@ -35,7 +35,7 @@ A feature has four homes and no others:
 | Screens                | `apps/web/src/modules/<feature>`, pages in `apps/web/src/app/[locale]` |
 | Work inside the engine | `apps/gateway/plugins/<feature>`                                       |
 
-Our features today: `keys`, `credits`, `activity`, `data-policy`, `pricing`, `reconciliation`, `v1` (the public API under `/api/v1`), and under `admin`: `organizations`, `providers`, `requests`, `audit`, `users`, `customers`. In the gateway: `plugins/credits`.
+Our features today: `keys`, `credits`, `activity`, `data-policy`, `pricing`, `payments`, `reconciliation`, `v1` (the public API under `/api/v1`), and under `admin`: `organizations`, `providers`, `requests`, `audit`, `users`, `customers`. In the gateway: `plugins/credits`.
 
 The mobile app and the browser extension of the template were removed on 2026-11-23 (commit `2089e54`). If a mobile app is built, `apps/mobile` comes back from git history and uses the same `packages/`.
 
@@ -44,7 +44,7 @@ The mobile app and the browser extension of the template were removed on 2026-11
 1. The customer's key is a gateway virtual key; the organization is a gateway customer.
 2. `plugins/credits` reserves the worst-case cost of the request before it reaches the provider, and settles the real cost after. The ledger is in our Postgres (`credit_*` tables); the gateway connects as the role `gateway_ledger`, which may only do what migration 0026 grants.
 3. The gateway's own budgets are not used for money: they count recorded spend only and lag by seconds.
-4. Top-ups are a Stripe checkout and a signed webhook (ADR 0012). Stripe is not settled for Saudi Arabia: see "Waiting on the owner".
+4. Top-ups are a Stripe checkout and a signed webhook (ADR 0012), with the provider, its mode and the on/off switch chosen by staff (ADMIN-03). Stripe is not settled for Saudi Arabia: see "Waiting on the owner".
 
 ## What is done
 
@@ -54,6 +54,7 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - Admin: users, organizations (credits, rate limit, data policy), pricing (our fee per provider, the top-up fee, and the top-up limits and quick picks: ADMIN-05, in micro-USD until ADMIN-06 moves money settings to SAR), providers and their keys, the request log, the audit log, reconciliation. Staff roles admin, finance and support, all with two-factor sign-in.
 - Brand: the control plane says Lemru everywhere; CI fails if the template's name comes back outside an allowlist.
 - One frontend (ADR 0016): the gateway's own UI is deleted. `GET /` on the gateway is a 404.
+- Payment gateway management (ADMIN-03): staff switch top-ups on or off, pick the active provider and its mode (test or live) at `/admin/payments` (`packages/api/src/modules/payments`, tables in `schema/payments.ts`, migration `0032` seeds today's behaviour: Stripe, live, top-ups on). Secrets stay in env, one pair per mode (`STRIPE_TEST_*` added); the page shows only set or missing. Checkouts use the chosen mode; the webhook verifies each event with its own mode's secret and always credits live payments; test payments credit only while in test mode. Not yet checked in a browser.
 - Payment providers: Stripe only. The template's other providers were removed (owner, 2026-11-27) with their code, env, dependencies and translations; a provider implements `BillingProviderStrategy` (`packages/billing/web/src/providers/types.ts`), which is where the Saudi gateway goes.
 - The gateway features outside the product are removed, each with its code, routes, schemas, migrations, tests and baseline rows, and listed in `apps/gateway/MODIFICATIONS.md` ("Features outside the product"): RSS feeds, outbound webhooks, Warp (the internal chat), the prompt repository, the Agent Gateway (A2A), relays, MCP (with its OAuth2 server, the Claude Code gateway sign-in and temporary tokens), and the providers that resell a personal subscription or another gateway (GitHub Copilot, Opencode Zen and Go, the ChatGPT/Codex sign-in passthrough, the Claude Code subscription passthrough that forwarded a caller's own Anthropic token upstream). Also gone (2026-11-26): the `jsonparser` plugin, `framework/queue`, `helm-charts/`, the settings of upstream's paid edition that no code reads (alerting, guardrails, audit logs, cluster, SCIM and others) and every trace of its observability connectors; and the dead code: every function the gateway binary cannot reach, found with `deadcode`, except code for the switched-off request types, test support, `plugins/mocker` (used by the semantic-cache tests) and the plugin SDK's guardrail and redaction helpers. The `Makefile` has `build` only.
 - Switched off, not removed: speech, transcription, images, video, realtime, rerank, batch and files keep their code and routes; `plugins/credits` refuses them with a 403 until each is switched on.

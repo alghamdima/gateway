@@ -9,7 +9,8 @@ import {
 } from "../access";
 
 // Every route the admin routers define, as [method, path after /api/admin].
-// Keep in step with modules/admin/**/router.ts and modules/pricing/router.ts.
+// Keep in step with modules/admin/**/router.ts, modules/pricing/router.ts and
+// modules/payments/router.ts.
 const ROUTES = {
   summary: ["GET", "/summary"],
   listUsers: ["GET", "/users"],
@@ -33,6 +34,10 @@ const ROUTES = {
   updatePricing: ["PUT", "/pricing/settings"],
   setProviderMarkup: ["PUT", "/pricing/providers/openai"],
   removeProviderMarkup: ["DELETE", "/pricing/providers/openai"],
+  readPayments: ["GET", "/payments"],
+  paymentChanges: ["GET", "/payments/changes"],
+  updatePaymentSettings: ["PUT", "/payments/settings"],
+  updatePaymentProvider: ["PUT", "/payments/providers/stripe"],
   readProviders: ["GET", "/providers"],
   setProviderTerms: ["PUT", "/providers/k1/terms"],
   removeProviderTerms: ["DELETE", "/providers/k1/terms"],
@@ -63,6 +68,8 @@ const READ_ONLY: Route[] = [
   "listCustomers",
   "readPricing",
   "pricingChanges",
+  "readPayments",
+  "paymentChanges",
   "readProviders",
   "readProviderAccounts",
   "readRequests",
@@ -76,6 +83,8 @@ const ALLOWED: Record<string, Route[]> = {
     "updatePricing",
     "setProviderMarkup",
     "removeProviderMarkup",
+    "updatePaymentSettings",
+    "updatePaymentProvider",
     "readAudit",
   ],
   support: READ_ONLY,
@@ -124,6 +133,8 @@ describe("admin route access", () => {
   it.each([
     ["GET", "/unknown"],
     ["POST", "/pricing"],
+    ["DELETE", "/payments/providers/stripe"],
+    ["PUT", "/payments"],
     ["GET", "/users/u1/accounts/extra/../.."],
     ["DELETE", "/customers"],
     ["HEAD", "/summary"],
@@ -155,6 +166,8 @@ describe("admin audit", () => {
     ["/users/u1/accounts/a1", "u1"],
     ["/pricing/settings", "settings"],
     ["/pricing/providers/openai", "openai"],
+    ["/payments/settings", "settings"],
+    ["/payments/providers/stripe", "stripe"],
     ["/providers/k1/terms", "k1"],
     ["/providers/accounts/openai", "openai"],
     ["/providers/accounts/openai/keys/k1", "openai"],

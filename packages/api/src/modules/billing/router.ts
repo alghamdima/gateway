@@ -13,6 +13,8 @@ import {
   getCustomersByReferenceId,
   getCustomersWithPurchasesByReferenceId,
 } from "@workspace/billing/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException } from "@workspace/shared/utils";
 
 import {
   enforceAuth,
@@ -122,6 +124,13 @@ export const billingRouter = new Hono()
         }),
       ),
   )
-  .post(`/webhook/${web.provider}`, (c) =>
-    web.webhookHandler(c.req.raw, topUpWebhookCallbacks),
-  );
+  // one URL per payment provider; each verifies its own signatures (ADMIN-03)
+  .post("/webhook/:provider", (c) => {
+    const strategy = web.getBillingProvider(c.req.param("provider"));
+    if (!strategy) {
+      throw new HttpException(HttpStatusCode.NOT_FOUND, {
+        code: "error.notFound",
+      });
+    }
+    return strategy.webhookHandler(c.req.raw, topUpWebhookCallbacks);
+  });
