@@ -6,7 +6,7 @@ import { db } from "@workspace/db/server";
  * The activity page (step 9.1): spend, requests and tokens over a window, by
  * day, by model and by key. Read from the ledger's usage entries, which are
  * kept for good and carry the key and token counts (ADR 0013, 0014), not from
- * the gateway's logs, which expire. Amounts are micro-USD.
+ * the gateway's logs, which expire. Amounts are micro-SAR.
  */
 
 export interface ActivityFigures {

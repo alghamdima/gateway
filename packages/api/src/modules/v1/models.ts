@@ -1,6 +1,7 @@
 import { getGateway } from "@workspace/gateway-client/server";
+import { formatRateE6 } from "@workspace/shared/utils";
 
-import { marketPrice } from "../pricing/price";
+import { marketPrice, marketPriceSar } from "../pricing/price";
 import { getPricing } from "../pricing/pricing";
 
 import type {
@@ -12,8 +13,17 @@ import type {
 /**
  * GET /api/v1/models: the models the gateway can serve, in OpenRouter's
  * shape, with prices that include our markup for the model's provider
- * (ADR 0005, 0010), so the price shown is the price charged.
+ * (ADR 0005, 0010), so the price shown is the price charged. `pricing` is USD
+ * per token, as OpenRouter's; `pricing_sar` is the same in SAR at the current
+ * effective USD to SAR rate (ADR 0017), which is what new requests convert at.
  */
+
+export interface PublicPricing {
+  prompt: string;
+  completion: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+}
 
 export interface PublicModel {
   id: string;
@@ -25,12 +35,11 @@ export interface PublicModel {
     output_modalities: string[];
     tokenizer: string | null;
   };
-  pricing: {
-    prompt: string;
-    completion: string;
-    input_cache_read?: string;
-    input_cache_write?: string;
-  };
+  pricing: PublicPricing;
+  /** The same prices in SAR per token, at `usd_to_sar_rate`. */
+  pricing_sar: PublicPricing;
+  /** The effective USD to SAR rate the SAR prices use, as a decimal string. */
+  usd_to_sar_rate: string;
   top_provider: {
     context_length: number | null;
     max_completion_tokens: number | null;
@@ -78,6 +87,7 @@ export const listPublicModels = async (
       toPublicModel(
         model,
         markupFor.get(model.provider) ?? settings.defaultMarkupBps,
+        settings.effectiveUsdToSarRateE6,
       ),
     )
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -109,13 +119,25 @@ type CostField =
 const cost = (model: GatewayModel, field: CostField) =>
   model.overridden_pricing?.[field] ?? model[field];
 
-const toPublicModel = (model: GatewayModel, markupBps: number): PublicModel => {
-  const price = (field: CostField) => {
-    const value = cost(model, field);
-    return value === undefined ? undefined : marketPrice(value, markupBps);
+const toPublicModel = (
+  model: GatewayModel,
+  markupBps: number,
+  usdToSarRateE6: number,
+): PublicModel => {
+  const pricing = (toPrice: (value: number) => string): PublicPricing => {
+    const price = (field: CostField) => {
+      const value = cost(model, field);
+      return value === undefined ? undefined : toPrice(value);
+    };
+    const cacheRead = price("cache_read_input_token_cost");
+    const cacheWrite = price("cache_creation_input_token_cost");
+    return {
+      prompt: price("input_cost_per_token") ?? "0",
+      completion: price("output_cost_per_token") ?? "0",
+      ...(cacheRead === undefined ? {} : { input_cache_read: cacheRead }),
+      ...(cacheWrite === undefined ? {} : { input_cache_write: cacheWrite }),
+    };
   };
-  const cacheRead = price("cache_read_input_token_cost");
-  const cacheWrite = price("cache_creation_input_token_cost");
   const contextLength = model.context_length ?? model.max_input_tokens ?? null;
 
   return {
@@ -128,12 +150,11 @@ const toPublicModel = (model: GatewayModel, markupBps: number): PublicModel => {
       output_modalities: model.architecture?.output_modalities ?? [],
       tokenizer: model.architecture?.tokenizer ?? null,
     },
-    pricing: {
-      prompt: price("input_cost_per_token") ?? "0",
-      completion: price("output_cost_per_token") ?? "0",
-      ...(cacheRead === undefined ? {} : { input_cache_read: cacheRead }),
-      ...(cacheWrite === undefined ? {} : { input_cache_write: cacheWrite }),
-    },
+    pricing: pricing((value) => marketPrice(value, markupBps)),
+    pricing_sar: pricing((value) =>
+      marketPriceSar(value, markupBps, usdToSarRateE6),
+    ),
+    usd_to_sar_rate: formatRateE6(usdToSarRateE6),
     top_provider: {
       context_length: contextLength,
       max_completion_tokens: model.max_output_tokens ?? null,

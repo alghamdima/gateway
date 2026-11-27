@@ -85,11 +85,15 @@ describe.skipIf(!adminUrl)("generation records", () => {
       completion?: number;
       virtualKeyId?: string;
       providerKeyId?: string;
+      /** The provider's USD cost; by default the amount at the peg. */
+      costMicroUsd?: number;
     },
   ) => {
     const id = `gen_${++seq}`;
-    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, virtual_key_id, metadata, created_at)
+    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, virtual_key_id,
+        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6, metadata, created_at)
       values (${id}, ${organizationId}, ${-entry.amount}, 'usage', ${id}, ${entry.reference}, ${entry.virtualKeyId ?? null},
+              ${entry.costMicroUsd ?? Math.round(entry.amount / 3.75)}, 3750000, 0, 3750000,
               ${sql.json({ model: "gpt-4o-mini", provider: entry.provider ?? "openai", failed: entry.failed ?? false, prompt_tokens: entry.prompt ?? 0, completion_tokens: entry.completion ?? 0, ...(entry.providerKeyId ? { provider_key_id: entry.providerKeyId } : {}) })},
               ${entry.at})`;
   };
@@ -111,12 +115,14 @@ describe.skipIf(!adminUrl)("generation records", () => {
     await database.drop();
   });
 
-  it("joins every attempt of a request with the gateway's timing", async () => {
+  it("joins every attempt of a request with the gateway's timing, in SAR with the USD cost", async () => {
     const org = await createOrganization();
-    // the first provider failed after billing some tokens; the fallback answered
+    // the first provider failed after billing some tokens; the fallback answered.
+    // Each is charged in micro-SAR at 3.75 and keeps its USD cost
     await attempt(org, {
       reference: "req_1",
-      amount: 120,
+      amount: 450,
+      costMicroUsd: 120,
       at: "2026-11-24T10:00:00Z",
       provider: "openai",
       failed: true,
@@ -125,7 +131,8 @@ describe.skipIf(!adminUrl)("generation records", () => {
     });
     await attempt(org, {
       reference: "req_1",
-      amount: 450,
+      amount: 1688,
+      costMicroUsd: 450,
       at: "2026-11-24T10:00:01Z",
       provider: "anthropic",
       prompt: 1000,
@@ -155,7 +162,9 @@ describe.skipIf(!adminUrl)("generation records", () => {
       provider_name: "anthropic",
       tokens_prompt: 1100,
       tokens_completion: 510,
-      total_cost: 0.00057,
+      total_cost: 0.002138,
+      upstream_cost_usd: 0.00057,
+      currency: "SAR",
       latency: 842,
       finish_reason: "stop",
       streamed: true,
@@ -164,14 +173,18 @@ describe.skipIf(!adminUrl)("generation records", () => {
           provider: "openai",
           model: "gpt-4o-mini",
           status: "error",
-          cost: 0.00012,
+          cost: 0.00045,
+          upstream_cost_usd: 0.00012,
+          usd_to_sar_rate: 3.75,
           created_at: "2026-11-24T10:00:00.000Z",
         },
         {
           provider: "anthropic",
           model: "gpt-4o-mini",
           status: "success",
-          cost: 0.00045,
+          cost: 0.001688,
+          upstream_cost_usd: 0.00045,
+          usd_to_sar_rate: 3.75,
           created_at: "2026-11-24T10:00:01.000Z",
         },
       ],

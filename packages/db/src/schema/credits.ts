@@ -2,6 +2,7 @@ import {
   bigint,
   check,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -15,15 +16,30 @@ import { generateId } from "@workspace/shared/utils";
 import { createInsertSchema, createSelectSchema } from "../lib/zod";
 import { organization } from "./auth";
 
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type * as z from "zod";
 
 /**
  * Prepaid credits (docs/platform/adr/0001-credits-ledger.md).
  *
- * Every amount is micro-USD (1 USD = 1,000,000) in a Postgres bigint. It is
- * read as a JS number, which is exact up to about 9 billion USD.
+ * Every amount is micro-SAR (1 SAR = 1,000,000) in a Postgres bigint: the
+ * customer's currency (docs/platform/adr/0017-sar-ledger.md). It is read as a
+ * JS number, which is exact up to about 9 billion SAR. Provider costs are USD:
+ * a usage entry and a hold store the official USD to SAR rate, the bank's
+ * spread and the effective rate they were converted at.
  */
-const microUsd = () => bigint({ mode: "number" });
+
+/**
+ * effective = ceil(official × (10,000 + spread) / 10,000), in bigint so the
+ * product cannot overflow: the same rule as effectiveUsdToSarRateE6.
+ */
+const effectiveRateRule = (
+  official: AnyPgColumn,
+  spread: AnyPgColumn,
+  effective: AnyPgColumn,
+) =>
+  sql`${effective}::bigint = (${official}::bigint * (10000 + ${spread}) + 9999) / 10000`;
+const microSar = () => bigint({ mode: "number" });
 
 export const creditEntryKindEnum = pgEnum("credit_entry_kind", [
   "top_up",
@@ -43,8 +59,8 @@ export const creditLedgerEntry = pgTable(
   {
     id: text().primaryKey().$defaultFn(generateId),
     organizationId: text().notNull(),
-    /** Signed: credits are positive, debits negative. */
-    amount: microUsd().notNull(),
+    /** Signed micro-SAR: credits are positive, debits negative. */
+    amount: microSar().notNull(),
     kind: creditEntryKindEnum().notNull(),
     /** Payment id, refund id or request attempt: the same event never counts twice. */
     idempotencyKey: text().notNull().unique(),
@@ -52,6 +68,17 @@ export const creditLedgerEntry = pgTable(
     metadata: jsonb().$type<Record<string, unknown>>(),
     /** The gateway virtual key that spent it (usage only): per-key limits and reports (ADR 0013). */
     virtualKeyId: text(),
+    /**
+     * Usage only: the provider's cost in micro-USD, before markup, rounded
+     * half up. Reconciliation compares it with the gateway's log (ADR 0002).
+     */
+    costMicroUsd: bigint({ mode: "number" }),
+    /** Usage only: the official USD to SAR rate × 1,000,000 at the hold. */
+    usdToSarRateE6: integer("usd_to_sar_rate_e6"),
+    /** Usage only: the bank's spread in bps at the hold. */
+    fxSpreadBps: integer(),
+    /** Usage only: the rate × 1,000,000 the cost was converted at: official plus spread. */
+    effectiveUsdToSarRateE6: integer("effective_usd_to_sar_rate_e6"),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [
@@ -63,6 +90,23 @@ export const creditLedgerEntry = pgTable(
       .on(t.virtualKeyId, t.createdAt)
       .where(sql`${t.kind} = 'usage' and ${t.virtualKeyId} is not null`),
     check("credit_ledger_entry_amount_not_zero", sql`${t.amount} <> 0`),
+    check(
+      "credit_ledger_entry_cost_micro_usd_not_negative",
+      sql`${t.costMicroUsd} is null or ${t.costMicroUsd} >= 0`,
+    ),
+    check(
+      "credit_ledger_entry_usd_to_sar_rate_positive",
+      sql`${t.usdToSarRateE6} is null or ${t.usdToSarRateE6} > 0`,
+    ),
+    check(
+      "credit_ledger_entry_effective_rate",
+      sql`${t.effectiveUsdToSarRateE6} is null or (${t.usdToSarRateE6} is not null and ${t.fxSpreadBps} between 0 and 10000 and ${effectiveRateRule(t.usdToSarRateE6, t.fxSpreadBps, t.effectiveUsdToSarRateE6)})`,
+    ),
+    // a charge always says what it cost in USD and the rates it was converted at
+    check(
+      "credit_ledger_entry_usage_has_cost_and_rate",
+      sql`${t.kind} <> 'usage' or (${t.costMicroUsd} is not null and ${t.usdToSarRateE6} is not null and ${t.fxSpreadBps} is not null and ${t.effectiveUsdToSarRateE6} is not null)`,
+    ),
   ],
 );
 
@@ -76,8 +120,8 @@ export const creditAccount = pgTable(
     organizationId: text()
       .primaryKey()
       .references(() => organization.id, { onDelete: "cascade" }),
-    balance: microUsd().notNull().default(0),
-    held: microUsd().notNull().default(0),
+    balance: microSar().notNull().default(0),
+    held: microSar().notNull().default(0),
     createdAt: timestamp().notNull().defaultNow(),
     updatedAt: timestamp()
       .notNull()
@@ -95,9 +139,18 @@ export const creditReservation = pgTable(
     organizationId: text()
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    amount: microUsd().notNull(),
+    amount: microSar().notNull(),
     /** The gateway virtual key the hold is for, when the request came with one (ADR 0013). */
     virtualKeyId: text(),
+    /**
+     * The official USD to SAR rate × 1,000,000 and the bank's spread in bps
+     * when the hold was taken, and the effective rate it was sized at; its
+     * settlement converts the real cost at the same rate, whatever staff set
+     * meanwhile.
+     */
+    usdToSarRateE6: integer("usd_to_sar_rate_e6").notNull(),
+    fxSpreadBps: integer().notNull(),
+    effectiveUsdToSarRateE6: integer("effective_usd_to_sar_rate_e6").notNull(),
     expiresAt: timestamp().notNull(),
     settledAt: timestamp(),
     createdAt: timestamp().notNull().defaultNow(),
@@ -110,6 +163,14 @@ export const creditReservation = pgTable(
       .on(t.virtualKeyId)
       .where(sql`${t.settledAt} is null and ${t.virtualKeyId} is not null`),
     check("credit_reservation_amount_positive", sql`${t.amount} > 0`),
+    check(
+      "credit_reservation_usd_to_sar_rate_positive",
+      sql`${t.usdToSarRateE6} > 0`,
+    ),
+    check(
+      "credit_reservation_effective_rate",
+      sql`${t.fxSpreadBps} between 0 and 10000 and ${effectiveRateRule(t.usdToSarRateE6, t.fxSpreadBps, t.effectiveUsdToSarRateE6)}`,
+    ),
   ],
 );
 
@@ -140,8 +201,8 @@ export const lowBalanceAlert = pgTable(
     organizationId: text()
       .primaryKey()
       .references(() => organization.id, { onDelete: "cascade" }),
-    /** micro-USD; null turns the alert off. */
-    thresholdMicroUsd: microUsd(),
+    /** micro-SAR; null turns the alert off. */
+    thresholdMicroSar: microSar(),
     notifiedAt: timestamp(),
     updatedAt: timestamp()
       .notNull()
@@ -151,7 +212,7 @@ export const lowBalanceAlert = pgTable(
   (t) => [
     check(
       "low_balance_alert_threshold_positive",
-      sql`${t.thresholdMicroUsd} is null or ${t.thresholdMicroUsd} > 0`,
+      sql`${t.thresholdMicroSar} is null or ${t.thresholdMicroSar} > 0`,
     ),
   ],
 );

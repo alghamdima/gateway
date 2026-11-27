@@ -41,7 +41,7 @@ import { authClient } from "~/lib/auth/client";
 import { useCopy } from "~/modules/common/hooks/use-copy";
 import { KeyFormModal, toFormValues } from "~/modules/keys/key-form";
 import { keys } from "~/modules/keys/lib/api";
-import { formatMicroUsd } from "~/modules/keys/money";
+import { formatMicroSar } from "~/modules/keys/money";
 import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
 
 import type { KeyFormResult } from "~/modules/keys/key-form";
@@ -54,7 +54,7 @@ interface ApiKeyRow {
   id: string;
   name: string;
   prefix: string;
-  limitMicroUsd: number | null;
+  limitMicroSar: number | null;
   limitReset: string | null;
   expiresAt: string | null;
   disabledAt: string | null;
@@ -109,9 +109,9 @@ export const KeysPage = ({ organizationId }: KeysPageProps) => {
   };
 
   const describeLimit = (row: ApiKeyRow) =>
-    row.limitMicroUsd === null
+    row.limitMicroSar === null
       ? t("organization:keys.list.noLimit")
-      : `${formatMicroUsd(row.limitMicroUsd, i18n.language)} · ${t(resetLabelKey(row.limitReset))}`;
+      : `${formatMicroSar(row.limitMicroSar, i18n.language)} · ${t(resetLabelKey(row.limitReset))}`;
 
   const rows: ApiKeyRow[] = list.data ?? [];
 

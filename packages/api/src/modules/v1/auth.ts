@@ -16,7 +16,7 @@ export interface CallingKey {
   virtualKeyId: string;
   name: string;
   prefix: string;
-  limitMicroUsd: number | null;
+  limitMicroSar: number | null;
   limitReset: string | null;
   expiresAt: Date | null;
   createdAt: Date;
@@ -61,7 +61,7 @@ export const authenticateKey = async (
       virtualKeyId: apiKey.virtualKeyId,
       name: apiKey.name,
       prefix: apiKey.prefix,
-      limitMicroUsd: apiKey.limitMicroUsd,
+      limitMicroSar: apiKey.limitMicroSar,
       limitReset: apiKey.limitReset,
       expiresAt: apiKey.expiresAt,
       disabledAt: apiKey.disabledAt,

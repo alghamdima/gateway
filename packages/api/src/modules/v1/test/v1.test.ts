@@ -10,7 +10,7 @@ import type postgres from "postgres";
 // Needs real Postgres: the answers are sums over the ledger. Skips without DATABASE_URL.
 const adminUrl = process.env.DATABASE_URL;
 
-const USD = 1_000_000;
+const SAR = 1_000_000;
 
 /** A gateway that only knows its model catalog. */
 const gatewayWith = (models: GatewayModel[]): GatewayClient => ({
@@ -76,7 +76,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
     const n = ++seq;
     const value = `sk-bf-v1-test-key-${n}-${"x".repeat(24)}`;
     const virtualKeyId = `vk_v1_${n}`;
-    await sql`insert into api_key (id, organization_id, created_by, name, virtual_key_id, prefix, value_hash, limit_micro_usd, limit_reset, disabled_at, expires_at)
+    await sql`insert into api_key (id, organization_id, created_by, name, virtual_key_id, prefix, value_hash, limit_micro_sar, limit_reset, disabled_at, expires_at)
       values (${`key_${n}`}, ${organizationId}, 'user_1', ${`key ${n}`}, ${virtualKeyId}, 'sk-bf-v1-tes', ${hashKey(value)},
               ${options.limit ?? null}, ${options.reset ?? null}, ${options.disabled ? new Date() : null}, ${options.expiresAt ?? null})`;
     return { value, virtualKeyId };
@@ -91,9 +91,33 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
   ) => {
     const id = `entry_v1_${++entrySeq}`;
     await sql.unsafe(
-      `insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, virtual_key_id, created_at)
-       values ($1, $2, $3, $4, $1, $5, ${options.createdAt ?? "now()"})`,
-      [id, organizationId, amount, kind, options.virtualKeyId ?? null],
+      `insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, virtual_key_id, created_at,
+         cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+       values ($1, $2, $3, $4, $1, $5, ${options.createdAt ?? "now()"}, $6, $7, $8, $9)`,
+      // a charge says its USD cost and rates, as the gateway writes it
+      kind === "usage"
+        ? [
+            id,
+            organizationId,
+            amount,
+            kind,
+            options.virtualKeyId ?? null,
+            Math.round(-amount / 3.75),
+            3_750_000,
+            0,
+            3_750_000,
+          ]
+        : [
+            id,
+            organizationId,
+            amount,
+            kind,
+            options.virtualKeyId ?? null,
+            null,
+            null,
+            null,
+            null,
+          ],
     );
     await sql`insert into credit_account (organization_id, balance) values (${organizationId}, ${amount})
       on conflict (organization_id) do update set balance = credit_account.balance + ${amount}`;
@@ -176,23 +200,23 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
     it("reports usage per window and what the limit still allows, counting open holds", async () => {
       const org = await createOrganization();
       const { value, virtualKeyId } = await createKey(org, {
-        limit: 10 * USD,
+        limit: 10 * SAR,
         reset: "monthly",
       });
       const other = await createKey(org);
 
-      await entry(org, "top_up", 100 * USD);
-      await entry(org, "usage", -2 * USD, { virtualKeyId });
+      await entry(org, "top_up", 100 * SAR);
+      await entry(org, "usage", -2 * SAR, { virtualKeyId });
       // last month: counts in usage, not in usage_monthly or against a monthly limit
-      await entry(org, "usage", -3 * USD, {
+      await entry(org, "usage", -3 * SAR, {
         virtualKeyId,
         createdAt:
           "date_trunc('month', now() AT TIME ZONE 'UTC') - interval '1 day'",
       });
       // another key of the same organization: not this key's usage
-      await entry(org, "usage", -7 * USD, { virtualKeyId: other.virtualKeyId });
-      await sql`insert into credit_reservation (id, organization_id, amount, expires_at, virtual_key_id)
-        values ('res_v1', ${org}, ${USD}, now() + interval '1 minute', ${virtualKeyId})`;
+      await entry(org, "usage", -7 * SAR, { virtualKeyId: other.virtualKeyId });
+      await sql`insert into credit_reservation (id, organization_id, amount, expires_at, virtual_key_id, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+        values ('res_v1', ${org}, ${SAR}, now() + interval '1 minute', ${virtualKeyId}, 3750000, 0, 3750000)`;
 
       const response = await get("/key", { Authorization: `Bearer ${value}` });
       expect(response.status).toBe(200);
@@ -206,6 +230,8 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         limit_remaining: 7, // 10 - 2 this month - 1 held
         usage: 5,
         usage_monthly: 2,
+        // amounts are the account's currency
+        currency: "SAR",
         is_management_key: false,
         disabled: false,
         expires_at: null,
@@ -293,6 +319,13 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
           completion: "0.00000063",
           input_cache_read: "0.00000007875",
         },
+        // the same in SAR at the seeded rate, 3.75, exactly
+        pricing_sar: {
+          prompt: "0.000000590625",
+          completion: "0.0000023625",
+          input_cache_read: "0.0000002953125",
+        },
+        usd_to_sar_rate: "3.75",
         top_provider: {
           context_length: 128_000,
           max_completion_tokens: 16_384,
@@ -303,6 +336,30 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         prompt: "0.00000303",
         completion: "0.0000101",
       });
+
+      // with the bank's 2.5% the SAR prices use the effective rate, 3.84375
+      await sql`update pricing_settings set fx_spread_bps = 250 where id = 1`;
+      models.clearModelCache();
+      try {
+        const { data: withSpread } = await models.listPublicModels(
+          gatewayWith([
+            {
+              name: "gpt-4o-mini",
+              provider: "openai",
+              input_cost_per_token: 0.00000015,
+              output_cost_per_token: 0.0000006,
+            },
+          ]),
+        );
+        expect(withSpread[0]).toMatchObject({
+          pricing: { prompt: "0.0000001575" },
+          pricing_sar: { prompt: "0.000000605390625" },
+          usd_to_sar_rate: "3.84375",
+        });
+      } finally {
+        await sql`update pricing_settings set fx_spread_bps = 0 where id = 1`;
+        models.clearModelCache();
+      }
     });
 
     describe("for an organization with a data policy", () => {
@@ -409,17 +466,17 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
     it("returns totals whose difference is the organization's balance", async () => {
       const org = await createOrganization();
       const { value } = await createKey(org);
-      await entry(org, "top_up", 25 * USD);
+      await entry(org, "top_up", 25 * SAR);
       await entry(org, "usage", -1_500_000);
-      await entry(org, "refund", -5 * USD);
-      await entry(org, "adjustment", 2 * USD);
+      await entry(org, "refund", -5 * SAR);
+      await entry(org, "adjustment", 2 * SAR);
 
       const response = await get("/credits", {
         Authorization: `Bearer ${value}`,
       });
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
-        data: { total_credits: 22, total_usage: 1.5 },
+        data: { total_credits: 22, total_usage: 1.5, currency: "SAR" },
       });
       // 22 - 1.5 = 20.5 = 25 - 1.5 - 5 + 2
     });
@@ -428,13 +485,13 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
       const mine = await createOrganization();
       const theirs = await createOrganization();
       const { value } = await createKey(mine);
-      await entry(theirs, "top_up", 99 * USD);
+      await entry(theirs, "top_up", 99 * SAR);
       expect(
         await (
           await get("/credits", { Authorization: `Bearer ${value}` })
         ).json(),
       ).toEqual({
-        data: { total_credits: 0, total_usage: 0 },
+        data: { total_credits: 0, total_usage: 0, currency: "SAR" },
       });
     });
   });

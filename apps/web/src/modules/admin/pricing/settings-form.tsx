@@ -2,11 +2,18 @@
 
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
 
-import { MAX_TOPUP_MICRO_USD, MAX_TOPUP_PRESETS } from "@workspace/api/schema";
+import {
+  MAX_FX_SPREAD_BPS,
+  MAX_TOPUP_MICRO_SAR,
+  MAX_TOPUP_PRESETS,
+  MAX_USD_TO_SAR_RATE_E6,
+  MIN_USD_TO_SAR_RATE_E6,
+} from "@workspace/api/schema";
 import { useTranslation } from "@workspace/i18n";
+import { effectiveUsdToSarRateE6, formatRateE6 } from "@workspace/shared/utils";
 import { Button } from "@workspace/ui-web/button";
 import {
   Field,
@@ -21,37 +28,43 @@ import { toast } from "@workspace/ui-web/toast";
 import { admin } from "~/modules/admin/lib/api";
 import {
   bpsToPercent,
-  microUsdToUsd,
+  microSarToSar,
   percentSchema,
   percentToBps,
-  usdSchema,
-  usdToMicroUsd,
+  rateE6ToRate,
+  rateToRateE6,
+  sarSchema,
+  sarToMicroSar,
 } from "~/modules/admin/pricing/rates";
 
 interface SettingsFormProps {
   readonly canEdit: boolean;
   readonly defaultMarkupBps: number;
   readonly topupFeeBps: number;
-  readonly topupFeeMinMicroUsd: number;
-  readonly topupMinMicroUsd: number;
-  readonly topupMaxMicroUsd: number;
-  readonly topupPresetsMicroUsd: number[];
+  readonly topupFeeMinMicroSar: number;
+  readonly topupMinMicroSar: number;
+  readonly topupMaxMicroSar: number;
+  readonly topupPresetsMicroSar: number[];
+  readonly usdToSarRateE6: number;
+  readonly fxSpreadBps: number;
 }
 
 export const SettingsForm = ({
   canEdit,
   defaultMarkupBps,
   topupFeeBps,
-  topupFeeMinMicroUsd,
-  topupMinMicroUsd,
-  topupMaxMicroUsd,
-  topupPresetsMicroUsd,
+  topupFeeMinMicroSar,
+  topupMinMicroSar,
+  topupMaxMicroSar,
+  topupPresetsMicroSar,
+  usdToSarRateE6,
+  fxSpreadBps,
 }: SettingsFormProps) => {
   const { t } = useTranslation(["common", "admin"]);
   const queryClient = useQueryClient();
 
-  const amount = usdSchema(
-    microUsdToUsd(MAX_TOPUP_MICRO_USD),
+  const amount = sarSchema(
+    microSarToSar(MAX_TOPUP_MICRO_SAR),
     t("admin:pricing.error.decimals"),
   );
   // the same rules as the API and the database checks (ADMIN-05)
@@ -59,11 +72,31 @@ export const SettingsForm = ({
     .object({
       defaultMarkup: percentSchema(1000, t("admin:pricing.error.decimals")),
       topupFee: percentSchema(100, t("admin:pricing.error.decimals")),
-      // dollars and cents, at most $100: the same two-decimal rule as a percentage
-      topupFeeMin: percentSchema(100, t("admin:pricing.error.decimals")),
+      // riyals and halalas, at most SAR 400: the same two-decimal rule as a percentage
+      topupFeeMin: percentSchema(400, t("admin:pricing.error.decimals")),
       topupMin: amount,
       topupMax: amount,
       topupPresets: z.string(),
+      // the official rate, 3 to 5 with at most six decimals (ADMIN-06)
+      usdToSarRate: z
+        .number()
+        .min(
+          rateE6ToRate(MIN_USD_TO_SAR_RATE_E6),
+          t("admin:pricing.error.rate"),
+        )
+        .max(
+          rateE6ToRate(MAX_USD_TO_SAR_RATE_E6),
+          t("admin:pricing.error.rate"),
+        )
+        .refine(
+          (value) =>
+            Math.abs(value * 1_000_000 - Math.round(value * 1_000_000)) < 1e-6,
+          { message: t("admin:pricing.error.rateDecimals") },
+        ),
+      fxSpread: percentSchema(
+        bpsToPercent(MAX_FX_SPREAD_BPS),
+        t("admin:pricing.error.decimals"),
+      ),
     })
     .superRefine((value, ctx) => {
       if (value.topupMax < value.topupMin) {
@@ -106,14 +139,23 @@ export const SettingsForm = ({
     values: {
       defaultMarkup: bpsToPercent(defaultMarkupBps),
       topupFee: bpsToPercent(topupFeeBps),
-      topupFeeMin: microUsdToUsd(topupFeeMinMicroUsd),
-      topupMin: microUsdToUsd(topupMinMicroUsd),
-      topupMax: microUsdToUsd(topupMaxMicroUsd),
-      topupPresets: topupPresetsMicroUsd
-        .map((preset) => microUsdToUsd(preset))
+      topupFeeMin: microSarToSar(topupFeeMinMicroSar),
+      topupMin: microSarToSar(topupMinMicroSar),
+      topupMax: microSarToSar(topupMaxMicroSar),
+      topupPresets: topupPresetsMicroSar
+        .map((preset) => microSarToSar(preset))
         .join(", "),
+      usdToSarRate: rateE6ToRate(usdToSarRateE6),
+      fxSpread: bpsToPercent(fxSpreadBps),
     },
   });
+
+  // what new requests will convert at, worked out as the gateway does
+  const [rate, spread] = useWatch({
+    control: form.control,
+    name: ["usdToSarRate", "fxSpread"],
+  });
+  const effectiveRate = toEffectiveRate(rate, spread);
 
   const updateSettings = useMutation({
     ...admin.mutations.pricing.updateSettings,
@@ -127,12 +169,14 @@ export const SettingsForm = ({
     await updateSettings.mutateAsync({
       defaultMarkupBps: percentToBps(data.defaultMarkup),
       topupFeeBps: percentToBps(data.topupFee),
-      topupFeeMinMicroUsd: usdToMicroUsd(data.topupFeeMin),
-      topupMinMicroUsd: usdToMicroUsd(data.topupMin),
-      topupMaxMicroUsd: usdToMicroUsd(data.topupMax),
-      topupPresetsMicroUsd: (parsePresets(data.topupPresets) ?? []).map(
-        (preset) => usdToMicroUsd(preset),
+      topupFeeMinMicroSar: sarToMicroSar(data.topupFeeMin),
+      topupMinMicroSar: sarToMicroSar(data.topupMin),
+      topupMaxMicroSar: sarToMicroSar(data.topupMax),
+      topupPresetsMicroSar: (parsePresets(data.topupPresets) ?? []).map(
+        (preset) => sarToMicroSar(preset),
       ),
+      usdToSarRateE6: rateToRateE6(data.usdToSarRate),
+      fxSpreadBps: percentToBps(data.fxSpread),
     });
   };
 
@@ -189,7 +233,7 @@ export const SettingsForm = ({
                 </FieldLabel>
                 <div className="flex items-center gap-2">
                   {name === "topupFeeMin" && (
-                    <span className="text-muted-foreground">$</span>
+                    <span className="text-muted-foreground">SAR</span>
                   )}
                   <Input
                     id={`admin-pricing-${name}`}
@@ -231,7 +275,7 @@ export const SettingsForm = ({
                   {label}
                 </FieldLabel>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">$</span>
+                  <span className="text-muted-foreground">SAR</span>
                   <Input
                     id={`admin-pricing-${name}`}
                     type="number"
@@ -265,7 +309,7 @@ export const SettingsForm = ({
                 {t("admin:pricing.settings.topupPresets.label")}
               </FieldLabel>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">$</span>
+                <span className="text-muted-foreground">SAR</span>
                 <Input
                   id="admin-pricing-topupPresets"
                   inputMode="decimal"
@@ -284,6 +328,98 @@ export const SettingsForm = ({
           )}
         />
       </div>
+      <div className="grid gap-6 @lg:grid-cols-3">
+        <Controller
+          name="usdToSarRate"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="admin-pricing-usdToSarRate">
+                {t("admin:pricing.settings.usdToSarRate.label")}
+              </FieldLabel>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">
+                  {t("admin:pricing.settings.usdToSarRate.unit")}
+                </span>
+                <Input
+                  id="admin-pricing-usdToSarRate"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.000001"
+                  min={rateE6ToRate(MIN_USD_TO_SAR_RATE_E6)}
+                  max={rateE6ToRate(MAX_USD_TO_SAR_RATE_E6)}
+                  value={Number.isNaN(field.value) ? "" : field.value}
+                  onChange={(event) =>
+                    field.onChange(event.target.valueAsNumber)
+                  }
+                  onBlur={field.onBlur}
+                  disabled={isDisabled}
+                  aria-invalid={fieldState.invalid}
+                  className="max-w-32"
+                />
+                <span className="text-muted-foreground">SAR</span>
+              </div>
+              <FieldDescription>
+                {t("admin:pricing.settings.usdToSarRate.description")}
+              </FieldDescription>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+        <Controller
+          name="fxSpread"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="admin-pricing-fxSpread">
+                {t("admin:pricing.settings.fxSpread.label")}
+              </FieldLabel>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="admin-pricing-fxSpread"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min={0}
+                  max={bpsToPercent(MAX_FX_SPREAD_BPS)}
+                  value={Number.isNaN(field.value) ? "" : field.value}
+                  onChange={(event) =>
+                    field.onChange(event.target.valueAsNumber)
+                  }
+                  onBlur={field.onBlur}
+                  disabled={isDisabled}
+                  aria-invalid={fieldState.invalid}
+                  className="max-w-32"
+                />
+                <span className="text-muted-foreground">%</span>
+              </div>
+              <FieldDescription>
+                {t("admin:pricing.settings.fxSpread.description")}
+              </FieldDescription>
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            </Field>
+          )}
+        />
+        <Field>
+          <FieldLabel>
+            {t("admin:pricing.settings.effectiveRate.label")}
+          </FieldLabel>
+          <p
+            className="text-lg font-medium tabular-nums"
+            aria-live="polite"
+            data-testid="effective-usd-to-sar-rate"
+          >
+            {effectiveRate === null
+              ? "—"
+              : t("admin:pricing.settings.effectiveRate.value", {
+                  rate: formatRateE6(effectiveRate),
+                })}
+          </p>
+          <FieldDescription>
+            {t("admin:pricing.settings.effectiveRate.description")}
+          </FieldDescription>
+        </Field>
+      </div>
       {canEdit && (
         <Button
           type="submit"
@@ -296,7 +432,27 @@ export const SettingsForm = ({
   );
 };
 
-/** "10, 25, 50" to dollar amounts; null when a part is not a number. */
+/**
+ * The official rate plus the spread, rounded up to the millionth as the
+ * gateway does; null while either field does not hold a valid value.
+ */
+const toEffectiveRate = (rate: number, spread: number) => {
+  const rateE6 = rateToRateE6(rate);
+  const spreadBps = percentToBps(spread);
+  if (
+    !Number.isFinite(rate) ||
+    !Number.isFinite(spread) ||
+    rateE6 < MIN_USD_TO_SAR_RATE_E6 ||
+    rateE6 > MAX_USD_TO_SAR_RATE_E6 ||
+    spreadBps < 0 ||
+    spreadBps > MAX_FX_SPREAD_BPS
+  ) {
+    return null;
+  }
+  return effectiveUsdToSarRateE6(rateE6, spreadBps);
+};
+
+/** "40, 100, 200" to riyal amounts; null when a part is not a number. */
 const parsePresets = (value: string) => {
   const parts = value
     .split(",")

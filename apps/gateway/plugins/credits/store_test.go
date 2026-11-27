@@ -16,7 +16,7 @@ func TestReserve_HoldsWhenTheBalanceCovers(t *testing.T) {
 	store := NewStore(db.ledger)
 	org := db.organization(t, 10*usd)
 
-	id, got, err := store.Reserve(context.Background(), org, "", 4*usd, time.Minute)
+	id, got, err := store.Reserve(context.Background(), org, "", 4*usd, testFX, time.Minute)
 	if err != nil || got != Reserved || id == "" {
 		t.Fatalf("Reserve = %q, %d, %v", id, got, err)
 	}
@@ -31,17 +31,17 @@ func TestReserve_RefusesWhatTheBalanceDoesNotCover(t *testing.T) {
 	ctx := context.Background()
 	org := db.organization(t, 10*usd)
 
-	if _, got, err := store.Reserve(ctx, org, "", 10*usd+1, time.Minute); err != nil || got == Reserved {
+	if _, got, err := store.Reserve(ctx, org, "", 10*usd+1, testFX, time.Minute); err != nil || got == Reserved {
 		t.Fatalf("more than the balance: outcome=%d err=%v", got, err)
 	}
-	if _, got, err := store.Reserve(ctx, org, "", 7*usd, time.Minute); err != nil || got != Reserved {
+	if _, got, err := store.Reserve(ctx, org, "", 7*usd, testFX, time.Minute); err != nil || got != Reserved {
 		t.Fatalf("first hold: outcome=%d err=%v", got, err)
 	}
 	// 3 USD left to hold: the spendable amount is balance minus what is already held
-	if _, got, err := store.Reserve(ctx, org, "", 3*usd+1, time.Minute); err != nil || got == Reserved {
+	if _, got, err := store.Reserve(ctx, org, "", 3*usd+1, testFX, time.Minute); err != nil || got == Reserved {
 		t.Fatalf("more than balance - held: outcome=%d err=%v", got, err)
 	}
-	if _, got, err := store.Reserve(ctx, org, "", 3*usd, time.Minute); err != nil || got != Reserved {
+	if _, got, err := store.Reserve(ctx, org, "", 3*usd, testFX, time.Minute); err != nil || got != Reserved {
 		t.Fatalf("exactly balance - held: outcome=%d err=%v", got, err)
 	}
 	if s := db.consistent(t, org); s.Held != 10*usd {
@@ -54,13 +54,13 @@ func TestReserve_RefusesAnOrganizationWithoutAnAccount(t *testing.T) {
 	store := NewStore(db.ledger)
 	ctx := context.Background()
 
-	if _, got, err := store.Reserve(ctx, db.organization(t, 0), "", 1, time.Minute); err != nil || got == Reserved {
+	if _, got, err := store.Reserve(ctx, db.organization(t, 0), "", 1, testFX, time.Minute); err != nil || got == Reserved {
 		t.Fatalf("no account: outcome=%d err=%v", got, err)
 	}
-	if _, got, err := store.Reserve(ctx, "org_that_does_not_exist", "", 1, time.Minute); err != nil || got == Reserved {
+	if _, got, err := store.Reserve(ctx, "org_that_does_not_exist", "", 1, testFX, time.Minute); err != nil || got == Reserved {
 		t.Fatalf("no organization: outcome=%d err=%v", got, err)
 	}
-	if _, _, err := store.Reserve(ctx, db.organization(t, usd), "", 0, time.Minute); err == nil {
+	if _, _, err := store.Reserve(ctx, db.organization(t, usd), "", 0, testFX, time.Minute); err == nil {
 		t.Fatal("a zero reservation must be an error")
 	}
 }
@@ -78,7 +78,7 @@ func TestReserve_ConcurrentRequestsNeverHoldMoreThanTheBalance(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, got, err := store.Reserve(context.Background(), org, "", usd, time.Minute)
+			_, got, err := store.Reserve(context.Background(), org, "", usd, testFX, time.Minute)
 			if err != nil {
 				t.Error(err)
 			}
@@ -106,9 +106,9 @@ func TestSettle_ChargesOnceAndReleasesTheHold(t *testing.T) {
 	id := must[string](t)(reserve(store, org, 4*usd))
 
 	st := Settlement{
-		ReservationID: id, OrganizationID: org, Cost: 1_250_000,
+		ReservationID: id, OrganizationID: org, Cost: 1_250_000, CostMicroUSD: 333_333, FX: testFX,
 		IdempotencyKey: "nonce:req_1:0:0", Reference: "req_1",
-		Metadata: map[string]any{"provider_cost_usd": 1.25, "model": "gpt-4o-mini"},
+		Metadata: map[string]any{"provider_cost_usd": 0.333333, "model": "gpt-4o-mini"},
 	}
 	first := must[SettleResult](t)(store.Settle(ctx, st))
 	if !first.Charged || !first.Released {
@@ -116,6 +116,20 @@ func TestSettle_ChargesOnceAndReleasesTheHold(t *testing.T) {
 	}
 	if s := db.consistent(t, org); s.Balance != 8_750_000 || s.Held != 0 || s.UsageEntries != 1 {
 		t.Fatalf("state after settle: %+v", s)
+	}
+	// the entry stores the USD cost and the rate as columns; the hold stored the rate too
+	var costMicroUSD int64
+	var entry, hold fxRate
+	if err := db.admin.QueryRow(ctx, `
+		SELECT e.cost_micro_usd, e.usd_to_sar_rate_e6, e.fx_spread_bps, e.effective_usd_to_sar_rate_e6,
+		       r.usd_to_sar_rate_e6, r.fx_spread_bps, r.effective_usd_to_sar_rate_e6
+		  FROM credit_ledger_entry e, credit_reservation r WHERE e.idempotency_key = $1 AND r.id = $2`, st.IdempotencyKey, id).Scan(
+		&costMicroUSD, &entry.officialE6, &entry.spreadBps, &entry.effectiveE6, &hold.officialE6, &hold.spreadBps, &hold.effectiveE6); err != nil || costMicroUSD != 333_333 || entry != testFX || hold != testFX {
+		t.Fatalf("entry: %d micro-USD at %+v, hold at %+v (%v)", costMicroUSD, entry, hold, err)
+	}
+	// the database holds the effective rate to official + spread, rounded up
+	if _, err := db.admin.Exec(ctx, `INSERT INTO credit_reservation (id, organization_id, amount, expires_at, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6) VALUES ('res_wrong_rate', $1, 1, now(), 3750000, 250, 3750000)`, org); err == nil {
+		t.Fatal("a hold whose effective rate is not official + spread was accepted")
 	}
 
 	// the same attempt delivered again: after a crash, a retry, or by another instance
@@ -149,7 +163,7 @@ func TestSettle_ConcurrentDeliveriesOfOneAttemptChargeOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			res, err := store.Settle(context.Background(), Settlement{ReservationID: id, OrganizationID: org, Cost: usd, IdempotencyKey: "nonce:req_c:0:0"})
+			res, err := store.Settle(context.Background(), Settlement{ReservationID: id, OrganizationID: org, Cost: usd, FX: testFX, IdempotencyKey: "nonce:req_c:0:0"})
 			if err != nil {
 				t.Error(err)
 			}
@@ -194,7 +208,7 @@ func TestSettle_CostAboveTheHoldCanTakeTheBalanceBelowZero(t *testing.T) {
 	id := must[string](t)(reserve(store, org, usd))
 
 	// the estimate was 1 USD, the attempt really cost 1.40
-	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 1_400_000, IdempotencyKey: "nonce:req_over:0:0"}))
+	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 1_400_000, FX: testFX, IdempotencyKey: "nonce:req_over:0:0"}))
 	if !res.Charged || !res.Released {
 		t.Fatalf("settle: %+v", res)
 	}
@@ -202,7 +216,7 @@ func TestSettle_CostAboveTheHoldCanTakeTheBalanceBelowZero(t *testing.T) {
 		t.Fatalf("state: %+v", s)
 	}
 	// and the next request is refused until a top-up
-	if _, got, err := store.Reserve(ctx, org, "", 1, time.Minute); err != nil || got == Reserved {
+	if _, got, err := store.Reserve(ctx, org, "", 1, testFX, time.Minute); err != nil || got == Reserved {
 		t.Fatalf("reserve on a negative balance: outcome=%d err=%v", got, err)
 	}
 }
@@ -216,6 +230,9 @@ func TestSettle_RejectsBadInput(t *testing.T) {
 
 	if _, err := store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: -1, IdempotencyKey: "k"}); err == nil {
 		t.Error("a negative cost must be an error")
+	}
+	if _, err := store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 1, IdempotencyKey: "k_no_rate"}); err == nil {
+		t.Fatal("a charge without its rate was accepted")
 	}
 	if _, err := store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 1}); err == nil {
 		t.Error("a missing idempotency key must be an error")
@@ -260,7 +277,7 @@ func TestReap_ReleasesExpiredHoldsOnly(t *testing.T) {
 	}
 
 	// the request behind a reaped hold finishes after all: it is charged, and its hold is not released twice
-	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: expired1, OrganizationID: org, Cost: 500_000, IdempotencyKey: "nonce:late:0:0"}))
+	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: expired1, OrganizationID: org, Cost: 500_000, FX: testFX, IdempotencyKey: "nonce:late:0:0"}))
 	if !res.Charged || res.Released {
 		t.Fatalf("late settle: %+v", res)
 	}
@@ -317,7 +334,7 @@ func TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance(t *testing.T)
 		go func() {
 			defer wg.Done()
 			ctx := context.Background()
-			id, got, err := store.Reserve(ctx, org, "", usd, time.Minute)
+			id, got, err := store.Reserve(ctx, org, "", usd, testFX, time.Minute)
 			if err != nil {
 				t.Error(err)
 				return
@@ -326,7 +343,7 @@ func TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance(t *testing.T)
 				refused.Add(1)
 				return
 			}
-			if _, err := store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 800_000, IdempotencyKey: fmt.Sprintf("nonce:traffic_%d:0:0", i)}); err != nil {
+			if _, err := store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 800_000, FX: testFX, IdempotencyKey: fmt.Sprintf("nonce:traffic_%d:0:0", i)}); err != nil {
 				t.Error(err)
 				return
 			}
@@ -352,7 +369,7 @@ func TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance(t *testing.T)
 }
 
 func reserve(store *Store, organizationID string, amount int64) (string, error) {
-	id, got, err := store.Reserve(context.Background(), organizationID, "", amount, time.Minute)
+	id, got, err := store.Reserve(context.Background(), organizationID, "", amount, testFX, time.Minute)
 	if err == nil && got != Reserved {
 		err = fmt.Errorf("reservation of %d refused", amount)
 	}
@@ -367,7 +384,7 @@ func TestGatewayRole_CannotMintCredit(t *testing.T) {
 
 	for name, statement := range map[string]string{
 		"a top-up entry":           `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) VALUES ('mint1', $1, 1000000, 'top_up', 'mint1')`,
-		"a positive usage entry":   `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) VALUES ('mint2', $1, 1000000, 'usage', 'mint2')`,
+		"a positive usage entry":   `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6) VALUES ('mint2', $1, 1000000, 'usage', 'mint2', 0, 3750000, 0, 3750000)`,
 		"a raised balance":         `UPDATE credit_account SET balance = balance + 1000000 WHERE organization_id = $1`,
 		"a changed account owner":  `UPDATE credit_account SET organization_id = organization_id WHERE organization_id = $1`,
 		"a hold's amount":          `UPDATE credit_reservation SET amount = 1 WHERE organization_id = $1`,
@@ -386,7 +403,7 @@ func TestGatewayRole_CannotMintCredit(t *testing.T) {
 	if ok := must[bool](t)(store.Extend(ctx, hold, time.Minute)); !ok {
 		t.Fatal("extend failed")
 	}
-	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: hold, OrganizationID: org, Cost: 400_000, IdempotencyKey: "nonce:role:0:0"}))
+	res := must[SettleResult](t)(store.Settle(ctx, Settlement{ReservationID: hold, OrganizationID: org, Cost: 400_000, FX: testFX, IdempotencyKey: "nonce:role:0:0"}))
 	if !res.Charged || !res.Released {
 		t.Fatalf("settle: %+v", res)
 	}

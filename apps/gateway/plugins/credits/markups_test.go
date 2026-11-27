@@ -108,7 +108,7 @@ func (f *fakeSource) count() int {
 
 func TestRefreshLoop_RetriesQuicklyUntilTheFirstLoad(t *testing.T) {
 	down := func() (*markups, error) { return nil, errors.New("connection refused") }
-	up := func() (*markups, error) { return &markups{defaultBps: 300}, nil }
+	up := func() (*markups, error) { return &markups{defaultBps: 300, fx: fxAt(atParity, 0)}, nil }
 	source := &fakeSource{loads: []func() (*markups, error){down, down, down, up}}
 	plugin := testPlugin(&fakeLedger{}, testPricer())
 	plugin.markups.Store(nil)
@@ -122,8 +122,8 @@ func TestRefreshLoop_RetriesQuicklyUntilTheFirstLoad(t *testing.T) {
 
 func TestRefreshLoop_KeepsTheLastGoodValuesAndPicksUpChanges(t *testing.T) {
 	down := func() (*markups, error) { return nil, errors.New("connection refused") }
-	first := func() (*markups, error) { return &markups{defaultBps: 300}, nil }
-	second := func() (*markups, error) { return &markups{defaultBps: 400}, nil }
+	first := func() (*markups, error) { return &markups{defaultBps: 300, fx: fxAt(atParity, 0)}, nil }
+	second := func() (*markups, error) { return &markups{defaultBps: 400, fx: fxAt(atParity, 0)}, nil }
 	source := &fakeSource{loads: []func() (*markups, error){down, down, first, down, second}}
 
 	plugin := testPlugin(&fakeLedger{}, testPricer())
@@ -156,7 +156,7 @@ func TestRefreshLoop_KeepsTheLastGoodValuesAndPicksUpChanges(t *testing.T) {
 }
 
 func TestRefreshLoop_DoesNotHammerTheDatabaseOnceLoaded(t *testing.T) {
-	source := &fakeSource{loads: []func() (*markups, error){func() (*markups, error) { return &markups{}, nil }}}
+	source := &fakeSource{loads: []func() (*markups, error){func() (*markups, error) { return &markups{fx: fxAt(atParity, 0)}, nil }}}
 	plugin := testPlugin(&fakeLedger{}, testPricer())
 	plugin.prices = source
 	ctx, cancel := context.WithCancel(context.Background())
@@ -174,9 +174,39 @@ func TestLoadMarkups_ReadsWhatStaffSet(t *testing.T) {
 	store := NewStore(db.ledger)
 
 	m, err := store.LoadMarkups(context.Background())
-	if err != nil || m.defaultBps != 0 || len(m.byProvider) != 0 {
-		t.Fatalf("fresh database: %+v, %v", m, err)
+	if err != nil || m.defaultBps != 0 || len(m.byProvider) != 0 || m.fx != fxAt(pegRate, 0) {
+		t.Fatalf("fresh database: %+v, %v; want no markups at the peg the migration seeds", m, err)
 	}
+
+	// the rate and spread staff set are read by their named columns, and the effective rate
+	// is worked out from them: 3.761 + 1.5% = 3.817415
+	db.setRate(t, 3_761_000)
+	db.setSpread(t, 150)
+	if m, err = store.LoadMarkups(context.Background()); err != nil || m.fx != (fxRate{officialE6: 3_761_000, spreadBps: 150, effectiveE6: 3_817_415}) {
+		t.Fatalf("after staff set 3.761 and 1.5%%: %+v, %v", m, err)
+	}
+	// a spread outside its typo ceiling is refused by the database
+	for _, typo := range []int64{1001, -1} {
+		if _, err := db.admin.Exec(context.Background(), `UPDATE pricing_settings SET fx_spread_bps = $1 WHERE id = 1`, typo); err == nil {
+			t.Fatalf("the database accepted a spread of %d bps", typo)
+		}
+	}
+	db.setSpread(t, 0)
+	// outside the sanity range the database refuses it: a typo cannot reach the plugin
+	for _, typo := range []int64{37_500_000, 375_000, 0} {
+		if _, err := db.admin.Exec(context.Background(), `UPDATE pricing_settings SET usd_to_sar_rate_e6 = $1 WHERE id = 1`, typo); err == nil {
+			t.Fatalf("the database accepted a rate of %d", typo)
+		}
+	}
+	// and a rate that got past the database anyway is refused, never turned into free requests
+	if _, err := db.admin.Exec(context.Background(), `ALTER TABLE pricing_settings DROP CONSTRAINT pricing_settings_usd_to_sar_rate_range`); err != nil {
+		t.Fatal(err)
+	}
+	db.setRate(t, 0)
+	if m, err := store.LoadMarkups(context.Background()); err == nil {
+		t.Fatalf("a zero rate was loaded: %+v", m)
+	}
+	db.setRate(t, pegRate)
 
 	db.setPricing(t, 250, map[string]int64{"openai": 0, "anthropic": 1200})
 	m, err = store.LoadMarkups(context.Background())

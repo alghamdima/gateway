@@ -2,12 +2,12 @@ import * as z from "zod";
 
 import { API_KEY_LIMIT_RESETS } from "@workspace/db/schema";
 
-/** 1,000,000 USD in micro-USD: a ceiling against typos. */
-const MAX_LIMIT_MICRO_USD = 1_000_000_000_000;
+/** 4,000,000 SAR in micro-SAR: a ceiling against typos. */
+const MAX_LIMIT_MICRO_SAR = 4_000_000_000_000;
 
 export const keyLimitSchema = z.object({
-  /** micro-USD (1 USD = 1,000,000). */
-  limitMicroUsd: z.number().int().positive().max(MAX_LIMIT_MICRO_USD),
+  /** micro-SAR (1 SAR = 1,000,000). */
+  limitMicroSar: z.number().int().positive().max(MAX_LIMIT_MICRO_SAR),
   /** null: the limit never resets. */
   reset: z.enum(API_KEY_LIMIT_RESETS).nullable(),
 });

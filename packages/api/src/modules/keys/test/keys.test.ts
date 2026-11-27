@@ -203,7 +203,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
         organizationId: org,
         userId: "user_1",
         name: "capped",
-        limit: { limitMicroUsd: 5_000_000, reset: "weekly" },
+        limit: { limitMicroSar: 5_000_000, reset: "weekly" },
         expiresAt,
       },
       gateway.client,
@@ -213,7 +213,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
     expect(sent).toMatchObject({ expiresAt });
     expect(sent).not.toHaveProperty("limit");
     expect(apiKey).toMatchObject({
-      limitMicroUsd: 5_000_000,
+      limitMicroSar: 5_000_000,
       limitReset: "weekly",
     });
   });
@@ -277,12 +277,12 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
     const updated = await keys.updateKey(
       org,
       apiKey.id,
-      { limit: { limitMicroUsd: 2_000_000, reset: "daily" } },
+      { limit: { limitMicroSar: 2_000_000, reset: "daily" } },
       gateway.client,
     );
     expect(gateway.state.updates).toEqual([]);
     expect(updated).toMatchObject({
-      limitMicroUsd: 2_000_000,
+      limitMicroSar: 2_000_000,
       limitReset: "daily",
     });
   });
@@ -363,7 +363,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
         organizationId: org,
         userId: "u",
         name: "a",
-        limit: { limitMicroUsd: 1_000_000, reset: null },
+        limit: { limitMicroSar: 1_000_000, reset: null },
       },
       gateway.client,
     );
@@ -378,7 +378,7 @@ describe.skipIf(!adminUrl)("organization API keys", () => {
     ]);
     expect(updated).toMatchObject({
       name: "renamed",
-      limitMicroUsd: null,
+      limitMicroSar: null,
       limitReset: null,
     });
     expect(updated?.disabledAt).toBeInstanceOf(Date);

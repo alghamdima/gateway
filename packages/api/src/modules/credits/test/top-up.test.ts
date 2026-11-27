@@ -18,7 +18,7 @@ const adminUrl = process.env.DATABASE_URL;
 
 const WEBHOOK_SECRET = "whsec_live_secret";
 const TEST_WEBHOOK_SECRET = "whsec_test_secret";
-const USD = 1_000_000;
+const SAR = 1_000_000;
 
 /** Stripe's secrets as env would hold them; tests change them (ADMIN-03). */
 const stripeEnv = vi.hoisted((): Record<string, string | undefined> => ({}));
@@ -101,63 +101,65 @@ const event = (
 const session = (input: {
   organizationId: string;
   paymentIntent: string;
-  creditMicroUsd: number;
-  feeMicroUsd: number;
-  amountTotalCents?: number;
+  creditMicroSar: number;
+  feeMicroSar: number;
+  amountTotalHalalas?: number;
   paymentStatus?: string;
 }) => ({
   id: `cs_${input.paymentIntent}`,
   object: "checkout.session",
   mode: "payment",
   customer: "cus_1",
-  currency: "usd",
+  currency: "sar",
   payment_intent: input.paymentIntent,
   payment_status: input.paymentStatus ?? "paid",
   amount_total:
-    input.amountTotalCents ??
-    (input.creditMicroUsd + input.feeMicroUsd) / 10_000,
+    input.amountTotalHalalas ??
+    (input.creditMicroSar + input.feeMicroSar) / 10_000,
   metadata: {
     purpose: "credits_top_up",
     organizationId: input.organizationId,
-    creditMicroUsd: String(input.creditMicroUsd),
-    feeMicroUsd: String(input.feeMicroUsd),
+    creditMicroSar: String(input.creditMicroSar),
+    feeMicroSar: String(input.feeMicroSar),
   },
 });
 
 const refund = (input: {
   id: string;
   paymentIntent: string;
-  amountCents: number;
+  amountHalalas: number;
   status?: string;
 }) => ({
   id: input.id,
   object: "refund",
-  amount: input.amountCents,
-  currency: "usd",
+  amount: input.amountHalalas,
+  currency: "sar",
   payment_intent: input.paymentIntent,
   status: input.status ?? "succeeded",
 });
 
 /** Sets the top-up limits as staff would in the admin pricing settings. */
 const setLimits = async (
-  topupMinMicroUsd: number,
-  topupMaxMicroUsd: number,
-  topupPresetsMicroUsd: number[],
+  topupMinMicroSar: number,
+  topupMaxMicroSar: number,
+  topupPresetsMicroSar: number[],
 ) => {
   const { updatePricingSettings } = await import("../../pricing/pricing");
   await updatePricingSettings({
     defaultMarkupBps: 0,
     topupFeeBps: 550,
-    topupFeeMinMicroUsd: 800_000,
-    topupMinMicroUsd,
-    topupMaxMicroUsd,
-    topupPresetsMicroUsd,
+    topupFeeMinMicroSar: 3_000_000,
+    topupMinMicroSar,
+    topupMaxMicroSar,
+    topupPresetsMicroSar,
+    usdToSarRateE6: 3_750_000,
+    fxSpreadBps: 0,
     staffId: "staff_limits",
   });
 };
 /** Back to the limits the migration seeds. */
 const seeded = () =>
-  setLimits(5 * USD, 1000 * USD, [10 * USD, 25 * USD, 50 * USD, 100 * USD]);
+  setLimits(20 * SAR, 3750 * SAR, [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR]);
 
 /** Changes the payment settings as staff would in the admin (ADMIN-03). */
 const setPayments = async (input: {
@@ -254,30 +256,30 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
 
   describe("checkout", () => {
     it("quotes the fee from the admin settings: the minimum, then the percentage", async () => {
-      // migration defaults: 5.5% with a $0.80 minimum
-      expect(await topUp.quoteTopUp(10 * USD)).toEqual({
-        creditMicroUsd: 10 * USD,
-        feeMicroUsd: 800_000,
-        totalMicroUsd: 10_800_000,
+      // migration defaults: 5.5% with a SAR 3 minimum
+      expect(await topUp.quoteTopUp(40 * SAR)).toEqual({
+        creditMicroSar: 40 * SAR,
+        feeMicroSar: 3_000_000,
+        totalMicroSar: 43_000_000,
       });
-      expect((await topUp.quoteTopUp(100 * USD)).feeMicroUsd).toBe(5_500_000);
+      expect((await topUp.quoteTopUp(100 * SAR)).feeMicroSar).toBe(5_500_000);
     });
 
-    it("asks Stripe for a payment with a credits line, a fee line and the metadata the webhook reads", async () => {
+    it("asks Stripe for a payment in SAR halalas with a credits line, a fee line and the metadata the webhook reads", async () => {
       const organizationId = await createOrganization();
 
       const result = await topUp.startTopUp({
         user: { id: "user_1", email: "owner@example.com" },
         organizationId,
-        creditMicroUsd: 25 * USD,
+        creditMicroSar: 125 * SAR,
         origin: "https://app.example.com",
       });
 
       expect(result).toMatchObject({
         url: "https://checkout.stripe.test/1",
-        creditMicroUsd: 25 * USD,
-        feeMicroUsd: 1_380_000, // 5.5% of $25 = $1.375, half up to $1.38
-        totalMicroUsd: 26_380_000,
+        creditMicroSar: 125 * SAR,
+        feeMicroSar: 6_880_000, // 5.5% of SAR 125 = SAR 6.875, half up to SAR 6.88
+        totalMicroSar: 131_880_000,
       });
       expect(stripeCalls.sessions).toHaveLength(1);
       const params = stripeCalls.sessions[0];
@@ -286,8 +288,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         provider: "stripe",
         mode: "live",
         organizationId,
-        creditMicroUsd: "25000000",
-        feeMicroUsd: "1380000",
+        creditMicroSar: "125000000",
+        feeMicroSar: "6880000",
       };
       expect(params).toMatchObject({
         mode: "payment",
@@ -302,16 +304,16 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         {
           quantity: 1,
           price_data: {
-            currency: "usd",
-            unit_amount: 2500,
+            currency: "sar",
+            unit_amount: 12500, // halalas: Stripe's minor unit for SAR
             product_data: { name: "Credits" },
           },
         },
         {
           quantity: 1,
           price_data: {
-            currency: "usd",
-            unit_amount: 138,
+            currency: "sar",
+            unit_amount: 688,
             product_data: { name: "Payment processing fee" },
           },
         },
@@ -327,22 +329,24 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       it("gives the form the stored limits, quick picks and fee", async () => {
         expect(await topUp.getTopUpOptions()).toEqual({
           isAvailable: true,
-          minMicroUsd: 5 * USD,
-          maxMicroUsd: 1000 * USD,
-          presetsMicroUsd: [10 * USD, 25 * USD, 50 * USD, 100 * USD],
+          minMicroSar: 20 * SAR,
+          maxMicroSar: 3750 * SAR,
+          presetsMicroSar: [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR],
           feeBps: 550,
-          feeMinMicroUsd: 800_000,
+          feeMinMicroSar: 3_000_000,
         });
       });
 
       it("refuses an amount under the stored minimum or over the stored maximum", async () => {
         const organizationId = await createOrganization();
-        await expect(topUp.quoteTopUp(5 * USD - 10_000)).rejects.toMatchObject({
-          status: 400,
-          code: "billing:error.topUpAmount",
-        });
+        await expect(topUp.quoteTopUp(20 * SAR - 10_000)).rejects.toMatchObject(
+          {
+            status: 400,
+            code: "billing:error.topUpAmount",
+          },
+        );
         await expect(
-          topUp.quoteTopUp(1000 * USD + 10_000),
+          topUp.quoteTopUp(3750 * SAR + 10_000),
         ).rejects.toMatchObject({
           status: 400,
           code: "billing:error.topUpAmount",
@@ -351,38 +355,40 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           topUp.startTopUp({
             user: { id: "user_1", email: "owner@example.com" },
             organizationId,
-            creditMicroUsd: 1500 * USD,
+            creditMicroSar: 4000 * SAR,
             origin: "https://app.example.com",
           }),
         ).rejects.toMatchObject({ status: 400 });
         expect(stripeCalls.sessions).toHaveLength(0);
         // the limits themselves are allowed
-        expect((await topUp.quoteTopUp(5 * USD)).creditMicroUsd).toBe(5 * USD);
-        expect((await topUp.quoteTopUp(1000 * USD)).creditMicroUsd).toBe(
-          1000 * USD,
+        expect((await topUp.quoteTopUp(20 * SAR)).creditMicroSar).toBe(
+          20 * SAR,
+        );
+        expect((await topUp.quoteTopUp(3750 * SAR)).creditMicroSar).toBe(
+          3750 * SAR,
         );
       });
 
       it("follows the limits as soon as staff change them", async () => {
         const organizationId = await createOrganization();
         try {
-          await setLimits(20 * USD, 2000 * USD, [20 * USD, 1500 * USD]);
+          await setLimits(50 * SAR, 5000 * SAR, [50 * SAR, 4500 * SAR]);
 
           expect(await topUp.getTopUpOptions()).toMatchObject({
-            minMicroUsd: 20 * USD,
-            maxMicroUsd: 2000 * USD,
-            presetsMicroUsd: [20 * USD, 1500 * USD],
+            minMicroSar: 50 * SAR,
+            maxMicroSar: 5000 * SAR,
+            presetsMicroSar: [50 * SAR, 4500 * SAR],
           });
           const result = await topUp.startTopUp({
             user: { id: "user_1", email: "owner@example.com" },
             organizationId,
-            creditMicroUsd: 1500 * USD,
+            creditMicroSar: 4500 * SAR,
             origin: "https://app.example.com",
           });
-          expect(result).toMatchObject({ creditMicroUsd: 1500 * USD });
+          expect(result).toMatchObject({ creditMicroSar: 4500 * SAR });
           expect(stripeCalls.sessions).toHaveLength(1);
-          // $10 was allowed before the minimum went up to $20
-          await expect(topUp.quoteTopUp(10 * USD)).rejects.toMatchObject({
+          // SAR 40 was allowed before the minimum went up to SAR 50
+          await expect(topUp.quoteTopUp(40 * SAR)).rejects.toMatchObject({
             status: 400,
           });
         } finally {
@@ -396,7 +402,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         topUp.startTopUp({
           user: { id: "user_1", email: "owner@example.com" },
           organizationId: "org_missing",
-          creditMicroUsd: 10 * USD,
+          creditMicroSar: 40 * SAR,
           origin: "https://app.example.com",
         }),
       ).rejects.toMatchObject({ status: 404 });
@@ -410,8 +416,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       const paid = session({
         organizationId,
         paymentIntent: "pi_once",
-        creditMicroUsd: 10 * USD,
-        feeMicroUsd: 800_000,
+        creditMicroSar: 10 * SAR,
+        feeMicroSar: 800_000,
       });
 
       const first = await deliver(event("checkout.session.completed", paid));
@@ -427,11 +433,11 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       expect(await entries(organizationId)).toEqual([
         {
           kind: "top_up",
-          amount: String(10 * USD),
+          amount: String(10 * SAR),
           idempotency_key: "top_up:stripe:pi_once",
         },
       ]);
-      expect(await balance(organizationId)).toBe(10 * USD);
+      expect(await balance(organizationId)).toBe(10 * SAR);
     });
 
     it("credits a delayed payment only when the money arrives", async () => {
@@ -439,8 +445,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       const input = {
         organizationId,
         paymentIntent: "pi_delayed",
-        creditMicroUsd: 50 * USD,
-        feeMicroUsd: 2_750_000,
+        creditMicroSar: 50 * SAR,
+        feeMicroSar: 2_750_000,
       };
 
       await deliver(
@@ -454,7 +460,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       await deliver(
         event("checkout.session.async_payment_succeeded", session(input)),
       );
-      expect(await balance(organizationId)).toBe(50 * USD);
+      expect(await balance(organizationId)).toBe(50 * SAR);
     });
 
     it("rejects an event whose signature does not match and writes nothing", async () => {
@@ -464,8 +470,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         session({
           organizationId,
           paymentIntent: "pi_forged",
-          creditMicroUsd: 1_000 * USD,
-          feeMicroUsd: 0,
+          creditMicroSar: 1_000 * SAR,
+          feeMicroSar: 0,
         }),
       );
 
@@ -483,11 +489,29 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           session({
             organizationId,
             paymentIntent: "pi_mismatch",
-            creditMicroUsd: 10 * USD,
-            feeMicroUsd: 800_000,
-            amountTotalCents: 500,
+            creditMicroSar: 10 * SAR,
+            feeMicroSar: 800_000,
+            amountTotalHalalas: 500,
           }),
         ),
+      );
+
+      expect(response.status).toBe(200);
+      expect(await entries(organizationId)).toHaveLength(0);
+    });
+
+    it("credits nothing for a payment that was not in SAR", async () => {
+      const organizationId = await createOrganization();
+      const response = await deliver(
+        event("checkout.session.completed", {
+          ...session({
+            organizationId,
+            paymentIntent: "pi_usd",
+            creditMicroSar: 40 * SAR,
+            feeMicroSar: 3_000_000,
+          }),
+          currency: "usd",
+        }),
       );
 
       expect(response.status).toBe(200);
@@ -501,8 +525,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           session({
             organizationId: "org_deleted",
             paymentIntent: "pi_deleted",
-            creditMicroUsd: 10 * USD,
-            feeMicroUsd: 800_000,
+            creditMicroSar: 10 * SAR,
+            feeMicroSar: 800_000,
           }),
         ),
       );
@@ -524,8 +548,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           session({
             organizationId,
             paymentIntent,
-            creditMicroUsd: 10 * USD,
-            feeMicroUsd: 800_000,
+            creditMicroSar: 10 * SAR,
+            feeMicroSar: 800_000,
           }),
         ),
       );
@@ -537,13 +561,13 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       const full = {
         id: "re_full",
         paymentIntent: "pi_full",
-        amountCents: 1080,
+        amountHalalas: 1080,
       };
 
       await deliver(
         event("refund.created", refund({ ...full, status: "pending" })),
       );
-      expect(await balance(organizationId)).toBe(10 * USD);
+      expect(await balance(organizationId)).toBe(10 * SAR);
 
       await deliver(event("refund.updated", refund(full)));
       await deliver(event("refund.updated", refund(full)));
@@ -556,7 +580,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       expect(refunds).toEqual([
         {
           kind: "refund",
-          amount: String(-10 * USD),
+          amount: String(-10 * SAR),
           idempotency_key: "refund:stripe:re_full",
         },
       ]);
@@ -572,11 +596,11 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           refund({
             id: "re_half",
             paymentIntent: "pi_partial",
-            amountCents: 540,
+            amountHalalas: 540,
           }),
         ),
       );
-      expect(await balance(organizationId)).toBe(5 * USD);
+      expect(await balance(organizationId)).toBe(5 * SAR);
     });
 
     it("ignores a refund of a payment that was not a top-up", async () => {
@@ -586,7 +610,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           refund({
             id: "re_plan",
             paymentIntent: "pi_plan",
-            amountCents: 1900,
+            amountHalalas: 1900,
           }),
         ),
       );
@@ -604,7 +628,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       topUp.startTopUp({
         user: { id: "user_1", email: "owner@example.com" },
         organizationId,
-        creditMicroUsd: 10 * USD,
+        creditMicroSar: 40 * SAR,
         origin: "https://app.example.com",
       });
     const unavailable = {
@@ -617,7 +641,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       await setPayments({ topupsEnabled: false });
 
       expect((await topUp.getTopUpOptions()).isAvailable).toBe(false);
-      await expect(topUp.quoteTopUp(10 * USD)).rejects.toMatchObject(
+      await expect(topUp.quoteTopUp(40 * SAR)).rejects.toMatchObject(
         unavailable,
       );
       await expect(start(organizationId)).rejects.toMatchObject(unavailable);
@@ -692,8 +716,8 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         session({
           organizationId,
           paymentIntent,
-          creditMicroUsd: 10 * USD,
-          feeMicroUsd: 800_000,
+          creditMicroSar: 10 * SAR,
+          feeMicroSar: 800_000,
         });
 
       it("credits a live payment even while top-ups are off: the money was taken", async () => {
@@ -704,7 +728,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           event("checkout.session.completed", paid(organizationId, "pi_off")),
         );
         expect(response.status).toBe(200);
-        expect(await balance(organizationId)).toBe(10 * USD);
+        expect(await balance(organizationId)).toBe(10 * SAR);
         const [entry] = await sql<
           { metadata: Record<string, unknown> }[]
         >`select metadata from credit_ledger_entry where idempotency_key = 'top_up:stripe:pi_off'`;
@@ -734,7 +758,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
           sign(payload, TEST_WEBHOOK_SECRET),
         );
         expect(response.status).toBe(200);
-        expect(await balance(organizationId)).toBe(10 * USD);
+        expect(await balance(organizationId)).toBe(10 * SAR);
       });
 
       it("refuses a live event signed with the test secret", async () => {
@@ -793,16 +817,16 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
 
   describe("refundedCredit", () => {
     it.each([
-      { refunded: 10_800_000, expected: 10 * USD, label: "full refund" },
-      { refunded: 5_400_000, expected: 5 * USD, label: "half" },
-      { refunded: 1, expected: 0, label: "less than a credit micro-USD" },
-      { refunded: 20 * USD, expected: 10 * USD, label: "more than collected" },
+      { refunded: 10_800_000, expected: 10 * SAR, label: "full refund" },
+      { refunded: 5_400_000, expected: 5 * SAR, label: "half" },
+      { refunded: 1, expected: 0, label: "less than a credit micro-SAR" },
+      { refunded: 20 * SAR, expected: 10 * SAR, label: "more than collected" },
     ])("$label", ({ refunded, expected }) => {
       expect(
         topUp.refundedCredit({
-          creditMicroUsd: 10 * USD,
-          collectedMicroUsd: 10_800_000,
-          refundedMicroUsd: refunded,
+          creditMicroSar: 10 * SAR,
+          collectedMicroSar: 10_800_000,
+          refundedMicroSar: refunded,
         }),
       ).toBe(expected);
     });

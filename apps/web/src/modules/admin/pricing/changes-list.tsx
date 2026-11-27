@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@workspace/i18n";
+import { formatMicroSar, formatRateE6 } from "@workspace/shared/utils";
 import { cn } from "@workspace/ui";
 import {
   Table,
@@ -11,7 +12,7 @@ import {
   TableRow,
 } from "@workspace/ui-web/table";
 
-import { bpsToPercent, microUsdToUsd } from "~/modules/admin/pricing/rates";
+import { bpsToPercent } from "~/modules/admin/pricing/rates";
 
 interface PricingChange {
   id: number;
@@ -31,27 +32,35 @@ interface ChangesListProps {
 const RATE_KEYS = [
   "defaultMarkupBps",
   "topupFeeBps",
-  "topupFeeMinMicroUsd",
-  "topupMinMicroUsd",
-  "topupMaxMicroUsd",
-  "topupPresetsMicroUsd",
+  "topupFeeMinMicroSar",
+  "topupMinMicroSar",
+  "topupMaxMicroSar",
+  "topupPresetsMicroSar",
+  "usdToSarRateE6",
+  "fxSpreadBps",
+  "effectiveUsdToSarRateE6",
   "markupBps",
 ] as const;
 
-const usd = (microUsd: number) => `$${microUsdToUsd(microUsd).toFixed(2)}`;
+const sar = (microSar: number) => formatMicroSar(microSar);
 
-/** One recorded value as staff read it: dollars for amounts, percent for rates. */
+/** One recorded value as staff read it: riyals for amounts, decimals for exchange rates, percent for the rest. */
 const showValue = (key: (typeof RATE_KEYS)[number], value: unknown) => {
   if (Array.isArray(value)) {
     return value
       .filter((item): item is number => typeof item === "number")
-      .map(usd)
+      .map(sar)
       .join(" / ");
   }
   if (typeof value !== "number") {
     return null;
   }
-  return key.endsWith("MicroUsd") ? usd(value) : `${bpsToPercent(value)}%`;
+  if (key.endsWith("MicroSar")) {
+    return sar(value);
+  }
+  return key.endsWith("RateE6")
+    ? formatRateE6(value)
+    : `${bpsToPercent(value)}%`;
 };
 
 export const ChangesList = ({ changes }: ChangesListProps) => {

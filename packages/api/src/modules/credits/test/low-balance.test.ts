@@ -15,7 +15,7 @@ import type postgres from "postgres";
 // Skips without DATABASE_URL.
 const adminUrl = process.env.DATABASE_URL;
 
-const USD = 1_000_000;
+const SAR = 1_000_000;
 
 /** Emails are recorded, not sent. */
 const sent = vi.hoisted(
@@ -62,7 +62,9 @@ describe.skipIf(!adminUrl)("low-balance emails", () => {
     kind = amount > 0 ? "top_up" : "usage",
   ) => {
     const id = `low_${++seq}`;
-    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) values (${id}, ${organizationId}, ${amount}, ${kind}, ${id})`;
+    const isUsage = kind === "usage";
+    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+      values (${id}, ${organizationId}, ${amount}, ${kind}, ${id}, ${isUsage ? Math.round(-amount / 3.75) : null}, ${isUsage ? 3_750_000 : null}, ${isUsage ? 0 : null}, ${isUsage ? 3_750_000 : null})`;
     await sql`insert into credit_account (organization_id, balance) values (${organizationId}, ${amount})
       on conflict (organization_id) do update set balance = credit_account.balance + ${amount}`;
   };
@@ -96,11 +98,11 @@ describe.skipIf(!adminUrl)("low-balance emails", () => {
 
   it("emails the owners and admins once per dip, and again after a top-up and a new dip", async () => {
     const org = await createOrganization();
-    await entry(org, 10 * USD);
+    await entry(org, 40 * SAR);
     await check();
     expect(sentTo(org)).toEqual([]);
 
-    await entry(org, -6 * USD); // $4 left, under the $5 default
+    await entry(org, -24 * SAR); // SAR 16 left, under the SAR 20 default
     await check();
     expect(sentTo(org)).toEqual([
       `admin@${org}.example`,
@@ -111,8 +113,8 @@ describe.skipIf(!adminUrl)("low-balance emails", () => {
       template: "low-balance",
       variables: {
         url: `https://app.example.com/dashboard/${org}/credits`,
-        available: "$4.00",
-        threshold: "$5.00",
+        available: expect.stringMatching(/^SAR\s16\.00$/),
+        threshold: expect.stringMatching(/^SAR\s20\.00$/),
       },
     });
 
@@ -120,18 +122,18 @@ describe.skipIf(!adminUrl)("low-balance emails", () => {
     await check();
     expect(sentTo(org)).toEqual([]); // still low: not again
 
-    await entry(org, 20 * USD); // back above
+    await entry(org, 80 * SAR); // back above
     await check();
     expect(sentTo(org)).toEqual([]);
-    await entry(org, -22 * USD); // $2 left: a new dip
+    await entry(org, -82 * SAR); // SAR 14 left: a new dip
     await check();
     expect(sentTo(org)).toHaveLength(2);
   });
 
   it("counts requests in flight against what is available", async () => {
     const org = await createOrganization();
-    await entry(org, 6 * USD);
-    await sql`update credit_account set held = ${2 * USD} where organization_id = ${org}`;
+    await entry(org, 24 * SAR);
+    await sql`update credit_account set held = ${8 * SAR} where organization_id = ${org}`;
     await check();
     expect(sentTo(org)).toHaveLength(2);
   });
@@ -140,8 +142,8 @@ describe.skipIf(!adminUrl)("low-balance emails", () => {
     const fresh = await createOrganization();
     await sql`insert into credit_account (organization_id, balance) values (${fresh}, 0)`;
     const off = await createOrganization();
-    await entry(off, 10 * USD);
-    await entry(off, -9 * USD);
+    await entry(off, 40 * SAR);
+    await entry(off, -36 * SAR);
     await lowBalance.setLowBalanceSetting(off, null);
 
     await check();
@@ -151,24 +153,24 @@ describe.skipIf(!adminUrl)("low-balance emails", () => {
 
   it("uses the organization's own threshold, and a new threshold starts a new watch", async () => {
     const org = await createOrganization();
-    await entry(org, 30 * USD);
-    await lowBalance.setLowBalanceSetting(org, 50 * USD);
+    await entry(org, 30 * SAR);
+    await lowBalance.setLowBalanceSetting(org, 50 * SAR);
     expect(await lowBalance.getLowBalanceSetting(org)).toEqual({
-      thresholdMicroUsd: 50 * USD,
+      thresholdMicroSar: 50 * SAR,
     });
 
     await check();
     expect(sentTo(org)).toHaveLength(2);
     sent.length = 0;
-    await lowBalance.setLowBalanceSetting(org, 40 * USD);
+    await lowBalance.setLowBalanceSetting(org, 40 * SAR);
     await check();
     expect(sentTo(org)).toHaveLength(2);
   });
 
-  it("has the $5 default for an organization that never chose", async () => {
+  it("has the SAR 20 default for an organization that never chose", async () => {
     const org = await createOrganization();
     expect(await lowBalance.getLowBalanceSetting(org)).toEqual({
-      thresholdMicroUsd: 5 * USD,
+      thresholdMicroSar: 20 * SAR,
     });
   });
 });

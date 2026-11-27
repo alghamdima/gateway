@@ -1,6 +1,6 @@
 # ADR 0012: Top-up checkout and the payment webhook
 
-- Status: Accepted (amount limits confirmed by the owner on 2026-11-23)
+- Status: Accepted (amount limits confirmed by the owner on 2026-11-23). Amended by ADR 0017: the checkout is in SAR (halalas), metadata `creditMicroSar` and `feeMicroSar`, and the limits are staff settings in SAR (ADMIN-05).
 - Date: 2026-11-23
 - Builds on: ADR 0001 (ledger), ADR 0003 (prepaid top-ups), ADR 0010 (fee set by staff)
 

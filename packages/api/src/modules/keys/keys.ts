@@ -21,8 +21,8 @@ import type {
  */
 
 export interface KeyLimit {
-  /** micro-USD (1 USD = 1,000,000). */
-  limitMicroUsd: number;
+  /** micro-SAR (1 SAR = 1,000,000). */
+  limitMicroSar: number;
   /** null: the limit never resets. */
   reset: LimitReset | null;
 }
@@ -32,7 +32,7 @@ const publicColumns = {
   id: apiKey.id,
   name: apiKey.name,
   prefix: apiKey.prefix,
-  limitMicroUsd: apiKey.limitMicroUsd,
+  limitMicroSar: apiKey.limitMicroSar,
   limitReset: apiKey.limitReset,
   expiresAt: apiKey.expiresAt,
   disabledAt: apiKey.disabledAt,
@@ -131,7 +131,7 @@ export const createKey = async (
         virtualKeyId: virtualKey.id,
         prefix: keyPrefix(virtualKey.value),
         valueHash: hashKey(virtualKey.value),
-        limitMicroUsd: limit?.limitMicroUsd ?? null,
+        limitMicroSar: limit?.limitMicroSar ?? null,
         limitReset: limit?.reset ?? null,
         expiresAt: expiresAt ?? null,
       })
@@ -211,7 +211,7 @@ export const updateKey = async (
       ...(input.limit === undefined
         ? {}
         : {
-            limitMicroUsd: input.limit?.limitMicroUsd ?? null,
+            limitMicroSar: input.limit?.limitMicroSar ?? null,
             limitReset: input.limit?.reset ?? null,
           }),
     })

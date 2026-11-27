@@ -1,13 +1,20 @@
 import { and, eq, gte, isNull, sql } from "@workspace/db";
 import { creditLedgerEntry, creditReservation } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
+import { CURRENCY } from "@workspace/shared/utils";
 
-import { getBalance, MICRO_USD } from "../credits/ledger";
+import { getBalance, MICRO_SAR } from "../credits/ledger";
 
 import type { CallingKey } from "./auth";
 
-/** The public API speaks dollars as JSON numbers, as OpenRouter's; the ledger keeps micro-USD. */
-export const toUsd = (microUsd: number) => microUsd / MICRO_USD;
+/**
+ * The public API speaks amounts as JSON numbers, as OpenRouter's, but in the
+ * account's currency, SAR, where OpenRouter's are USD: credits, limits and
+ * usage are what the ledger holds, and a USD figure would be a conversion at
+ * today's rate that changes with it (docs/platform/adr/0017-sar-ledger.md).
+ * Each response says its currency.
+ */
+export const toSar = (microSar: number) => microSar / MICRO_SAR;
 
 const WINDOW_START = {
   daily: sql`date_trunc('day', now() AT TIME ZONE 'UTC')`,
@@ -15,7 +22,7 @@ const WINDOW_START = {
   monthly: sql`date_trunc('month', now() AT TIME ZONE 'UTC')`,
 } as const;
 
-/** What a key spent since `since` (all time without it), in micro-USD, from its usage entries. */
+/** What a key spent since `since` (all time without it), in micro-SAR, from its usage entries. */
 const keyUsage = async (
   virtualKeyId: string,
   since?: keyof typeof WINDOW_START,
@@ -77,16 +84,17 @@ export const describeKey = async (key: CallingKey) => {
     data: {
       label: `${key.prefix}…`,
       name: key.name,
-      limit: key.limitMicroUsd === null ? null : toUsd(key.limitMicroUsd),
+      limit: key.limitMicroSar === null ? null : toSar(key.limitMicroSar),
       limit_remaining:
-        key.limitMicroUsd === null
+        key.limitMicroSar === null
           ? null
-          : toUsd(Math.max(0, key.limitMicroUsd - spentAgainstLimit)),
+          : toSar(Math.max(0, key.limitMicroSar - spentAgainstLimit)),
       limit_reset: reset,
-      usage: toUsd(usage),
-      usage_daily: toUsd(daily),
-      usage_weekly: toUsd(weekly),
-      usage_monthly: toUsd(monthly),
+      usage: toSar(usage),
+      usage_daily: toSar(daily),
+      usage_weekly: toSar(weekly),
+      usage_monthly: toSar(monthly),
+      currency: CURRENCY,
       is_management_key: false,
       disabled: false,
       expires_at: key.expiresAt?.toISOString() ?? null,
@@ -117,6 +125,10 @@ export const describeCredits = async (organizationId: string) => {
   ]);
   const usage = Number(row?.usage ?? 0);
   return {
-    data: { total_credits: toUsd(balance + usage), total_usage: toUsd(usage) },
+    data: {
+      total_credits: toSar(balance + usage),
+      total_usage: toSar(usage),
+      currency: CURRENCY,
+    },
   };
 };

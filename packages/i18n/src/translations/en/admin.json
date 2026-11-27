@@ -163,17 +163,19 @@
   "pricing": {
     "header": {
       "title": "Pricing",
-      "description": "Set the markup on inference per provider, the fee added to top-ups and the top-up limits."
+      "description": "Set the markup on inference per provider, the fee added to top-ups, the top-up limits and the USD to SAR rate."
     },
     "saved": "Prices saved. Gateways apply them within 30 seconds.",
     "error": {
       "decimals": "Use at most two decimals.",
       "maxBelowMin": "The maximum must be at least the minimum.",
-      "presets": "Enter 1 to {{count}} amounts above zero, in dollars and cents, separated by commas.",
-      "presetOutOfRange": "Each quick pick must be between the minimum and the maximum."
+      "presets": "Enter 1 to {{count}} amounts above zero, in riyals and halalas, separated by commas.",
+      "presetOutOfRange": "Each quick pick must be between the minimum and the maximum.",
+      "rate": "Enter a rate between 3 and 5.",
+      "rateDecimals": "Use at most six decimals."
     },
     "settings": {
-      "title": "Default markup, top-up fee and limits",
+      "title": "Default markup, top-up fee, limits and exchange rate",
       "description": "Rates are percentages. Changes reach the gateway within 30 seconds and apply to requests that start after that.",
       "defaultMarkup": {
         "label": "Default markup",
@@ -185,19 +187,33 @@
       },
       "topupFeeMin": {
         "label": "Minimum top-up fee",
-        "description": "The least fee a top-up pays, in dollars: the fee is the larger of the percentage and this amount. OpenRouter charges 5.5% with a $0.80 minimum."
+        "description": "The least fee a top-up pays, in riyals: the fee is the larger of the percentage and this amount. OpenRouter charges 5.5% with a $0.80 minimum."
       },
       "topupMin": {
         "label": "Minimum top-up",
-        "description": "The least credit a customer can buy in one payment, in dollars."
+        "description": "The least credit a customer can buy in one payment, in riyals."
       },
       "topupMax": {
         "label": "Maximum top-up",
-        "description": "The most credit a customer can buy in one payment, in dollars."
+        "description": "The most credit a customer can buy in one payment, in riyals."
       },
       "topupPresets": {
         "label": "Quick picks",
-        "description": "Amounts offered as buttons on the top-up form, in dollars, separated by commas: 1 to {{count}}, each within the limits."
+        "description": "Amounts offered as buttons on the top-up form, in riyals, separated by commas: 1 to {{count}}, each within the limits."
+      },
+      "usdToSarRate": {
+        "label": "USD to SAR rate",
+        "description": "The official rate, set by hand and never fetched: 3.75 is the peg. Provider costs are in USD and each request is converted once, when it is held and charged. A change applies to new requests only; past charges keep the rate they were made at.",
+        "unit": "1 USD ="
+      },
+      "fxSpread": {
+        "label": "Bank spread",
+        "description": "The bank's commission on converting USD to SAR, added to the official rate. 0% uses the official rate as it is."
+      },
+      "effectiveRate": {
+        "label": "Rate new requests use",
+        "description": "The official rate plus the spread, rounded up to the millionth. Every hold and charge records the official rate, the spread and this rate.",
+        "value": "1 USD = {{rate}} SAR"
       }
     },
     "providers": {
@@ -219,15 +235,18 @@
       "what": "What",
       "before": "Before",
       "after": "After",
-      "settings": "Default markup, fee and limits",
+      "settings": "Default markup, fee, limits and exchange rate",
       "none": "None",
       "fields": {
         "defaultMarkupBps": "Default markup",
         "topupFeeBps": "Top-up fee",
-        "topupFeeMinMicroUsd": "Minimum fee",
-        "topupMinMicroUsd": "Minimum top-up",
-        "topupMaxMicroUsd": "Maximum top-up",
-        "topupPresetsMicroUsd": "Quick picks",
+        "topupFeeMinMicroSar": "Minimum fee",
+        "topupMinMicroSar": "Minimum top-up",
+        "topupMaxMicroSar": "Maximum top-up",
+        "topupPresetsMicroSar": "Quick picks",
+        "usdToSarRateE6": "USD to SAR rate",
+        "fxSpreadBps": "Bank spread",
+        "effectiveUsdToSarRateE6": "Rate new requests use",
         "markupBps": "Markup"
       }
     }

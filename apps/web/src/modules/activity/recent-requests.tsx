@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { handle } from "@workspace/api/utils";
 import { useTranslation } from "@workspace/i18n";
+import { formatUsd } from "@workspace/shared/utils";
 import { Badge } from "@workspace/ui-web/badge";
 import { Button } from "@workspace/ui-web/button";
 import {
@@ -34,7 +35,7 @@ import {
 } from "@workspace/ui-web/table";
 
 import { api } from "~/lib/api/client";
-import { formatMicroUsd, MICRO_USD } from "~/modules/keys/money";
+import { formatMicroSar, MICRO_SAR } from "~/modules/keys/money";
 
 const PAGE_SIZE = 25;
 
@@ -130,7 +131,7 @@ export const RecentRequests = ({ organizationId }: RecentRequestsProps) => {
                     {count(row.promptTokens + row.completionTokens)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatMicroUsd(row.cost, i18n.language)}
+                    {formatMicroSar(row.cost, i18n.language)}
                   </TableCell>
                   <TableCell className="text-right">
                     {row.id && (
@@ -193,8 +194,11 @@ const RequestRecord = ({
         param: { organizationId, id },
       }),
   });
+  // the API answers in SAR (the charge) with the provider's USD cost beside it
+  const sar = (value: number) =>
+    formatMicroSar(Math.round(value * MICRO_SAR), i18n.language);
   const usd = (value: number) =>
-    formatMicroUsd(Math.round(value * MICRO_USD), i18n.language);
+    formatUsd(value, i18n.language, { maximumFractionDigits: 6 });
   const count = (value: number) =>
     new Intl.NumberFormat(i18n.language).format(value);
   const unknown = t("organization:activity.record.unknown");
@@ -215,7 +219,11 @@ const RequestRecord = ({
         },
         {
           label: t("organization:activity.spend"),
-          value: usd(data.total_cost),
+          value: sar(data.total_cost),
+        },
+        {
+          label: t("organization:activity.record.upstreamCost"),
+          value: usd(data.upstream_cost_usd),
         },
         {
           label: t("organization:activity.record.latency"),
@@ -333,7 +341,7 @@ const RequestRecord = ({
                           </Badge>
                         </span>
                         <span className="tabular-nums">
-                          {usd(attempt.cost)}
+                          {sar(attempt.cost)}
                         </span>
                       </li>
                     ))}

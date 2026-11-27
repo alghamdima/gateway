@@ -30,7 +30,7 @@ import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
 import { LowBalanceAlert } from "~/modules/credits/low-balance-alert";
 import { TopUp } from "~/modules/credits/top-up";
-import { formatMicroUsd } from "~/modules/keys/money";
+import { formatMicroSar } from "~/modules/keys/money";
 import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
 
 const PAGE_SIZE = 25;
@@ -83,7 +83,7 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
       lastPage.length === PAGE_SIZE ? lastPage.at(-1)?.id : undefined,
   });
 
-  const money = (microUsd: number) => formatMicroUsd(microUsd, i18n.language);
+  const money = (microSar: number) => formatMicroSar(microSar, i18n.language);
   const rows = entries.data?.pages.flat() ?? [];
   const figures = balance.data
     ? [

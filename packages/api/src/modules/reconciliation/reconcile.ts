@@ -14,7 +14,9 @@ import type { GatewayClient } from "@workspace/gateway-client/server";
  * The daily check that the gateway and the ledger agree (step 10.1 in
  * docs/platform/PLAN.md). For one UTC day it compares, per organization, the
  * provider cost the gateway logged with the provider cost the ledger
- * recorded (both before markup, ADR 0005), and lists charges lost because a
+ * recorded on each usage entry, cost_micro_usd: both in USD and before markup
+ * (ADR 0005), so neither the USD to SAR rate nor its changes can make them
+ * differ (ADR 0017). It also lists charges lost because a
  * hold was reaped without a settlement. A request that starts before
  * midnight and settles after it is logged on one day and charged on the
  * next, so a small difference on a busy organization can be that.
@@ -24,6 +26,11 @@ const DAY_MS = 86_400_000;
 /** Differences under this are rounding: USD absolute, and relative to the larger side. */
 const TOLERANCE_USD = 0.000001;
 const TOLERANCE_RATIO = 0.0001;
+/**
+ * Each entry's cost_micro_usd is rounded half up to the micro-USD, so the
+ * ledger's sum may be off the gateway's by up to half a micro-USD per entry.
+ */
+const ROUNDING_PER_ENTRY_USD = 0.0000005;
 
 export interface OrganizationDifference {
   organizationId: string;
@@ -32,10 +39,13 @@ export interface OrganizationDifference {
   differenceUsd: number;
 }
 
+/** micro-USD to USD. */
+const MICRO_USD = 1_000_000;
+
 export interface ReapedHolds {
   organizationId: string;
   holds: number;
-  heldMicroUsd: number;
+  heldMicroSar: number;
 }
 
 export interface ReconciliationFindings {
@@ -121,7 +131,8 @@ const compare = async (
     db
       .select({
         organizationId: creditLedgerEntry.organizationId,
-        costUsd: sql<string>`coalesce(sum((${creditLedgerEntry.metadata}->>'provider_cost_usd')::numeric), 0)`,
+        costMicroUsd: sql<string>`coalesce(sum(${creditLedgerEntry.costMicroUsd}), 0)`,
+        entries: sql<string>`count(*)`,
       })
       .from(creditLedgerEntry)
       .where(and(eq(creditLedgerEntry.kind, "usage"), inWindow))
@@ -154,7 +165,13 @@ const compare = async (
     }
   }
   const ledgerByOrganization = new Map(
-    ledgerCosts.map((row) => [row.organizationId, Number(row.costUsd)]),
+    ledgerCosts.map((row) => [
+      row.organizationId,
+      {
+        costUsd: Number(row.costMicroUsd) / MICRO_USD,
+        entries: Number(row.entries),
+      },
+    ]),
   );
 
   const organizationIds = new Set([
@@ -164,10 +181,12 @@ const compare = async (
   const organizations: OrganizationDifference[] = [];
   for (const organizationId of organizationIds) {
     const gatewayCostUsd = gatewayByOrganization.get(organizationId) ?? 0;
-    const ledgerCostUsd = ledgerByOrganization.get(organizationId) ?? 0;
+    const ledger = ledgerByOrganization.get(organizationId);
+    const ledgerCostUsd = ledger?.costUsd ?? 0;
     const differenceUsd = gatewayCostUsd - ledgerCostUsd;
     const allowed = Math.max(
       TOLERANCE_USD,
+      ROUNDING_PER_ENTRY_USD * (ledger?.entries ?? 0),
       TOLERANCE_RATIO * Math.max(gatewayCostUsd, ledgerCostUsd),
     );
     if (Math.abs(differenceUsd) > allowed) {
@@ -189,7 +208,7 @@ const compare = async (
     reapedHolds: [...reaped].map((row) => ({
       organizationId: row.organization_id,
       holds: Number(row.holds),
-      heldMicroUsd: Number(row.held),
+      heldMicroSar: Number(row.held),
     })),
     checkedOrganizations: organizationIds.size,
   };

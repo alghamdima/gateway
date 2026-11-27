@@ -7671,7 +7671,6 @@ plugins/compat	github.com/maximhq/bifrost/plugins/compat	TestReasoningWithToolsR
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	-	pass
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestBackground_FiftyConcurrentRequestsAgainstTheRealLedger	skip
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestBackground_TheReaperLoopReleasesAnAbandonedHold	skip
-plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestCeilMicroUSD_NeverRoundsBelowTheAmount	pass
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestCleanup_DoesNotHangOnALedgerThatNeverAnswers	pass
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestCleanup_WritesWhatIsQueuedAndLaterSettlementsStillLand	pass
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestConcurrentTraffic_BooksAgreeAndHoldsNeverExceedTheBalance	skip
@@ -7718,9 +7717,6 @@ plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestSettle_RejectsBad
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestSettle_RetriesUntilTheLedgerTakesIt	pass
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestSettle_TheResponseDoesNotWaitForTheLedger	pass
 plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestSettle_ZeroCostReleasesTheHoldAndWritesNothing	skip
-plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestToMicroUSD	pass
-plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestToMicroUSD_IsNearestAndMonotonic	pass
-plugins/credits	github.com/maximhq/bifrost/plugins/credits	TestToMicroUSD_RefusesWhatIsNotACost	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	-	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestARequestIsChargedOnlyToTheProviderConfigItUsed	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestAccounting_ChargesExactlyWhatWasChecked	pass

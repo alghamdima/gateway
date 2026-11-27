@@ -143,10 +143,10 @@ export default async function ModelsPage(props: {
                         {formatCount(model.context_length, locale) ?? "–"}
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                        {perMillion(model.pricing.prompt, locale)}
+                        {perMillion(model, "prompt", locale)}
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
-                        {perMillion(model.pricing.completion, locale)}
+                        {perMillion(model, "completion", locale)}
                       </td>
                     </tr>
                   ))}

@@ -3,7 +3,7 @@ import { creditLedgerEntry, organization } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
-import { HttpException } from "@workspace/shared/utils";
+import { formatMicroSar, HttpException } from "@workspace/shared/utils";
 
 import {
   acceptsTestPayments,
@@ -23,14 +23,14 @@ import type { WebhookCallbacks } from "@workspace/billing-web/server";
  * arrives, never on the redirect back.
  */
 
-export const MICRO_USD_PER_CENT = 10_000;
+export { MICRO_SAR_PER_HALALA } from "@workspace/shared/utils";
 
 const LINE_LABELS = { credits: "Credits", fee: "Payment processing fee" };
 
 export interface TopUpQuote {
-  creditMicroUsd: number;
-  feeMicroUsd: number;
-  totalMicroUsd: number;
+  creditMicroSar: number;
+  feeMicroSar: number;
+  totalMicroSar: number;
 }
 
 /**
@@ -41,14 +41,14 @@ export interface TopUpQuote {
 export interface TopUpOptions {
   /** False when top-ups are off or no payment provider can take them now. */
   isAvailable: boolean;
-  /** The least and most credit one payment may buy, in micro-USD (SAR with ADMIN-06). */
-  minMicroUsd: number;
-  maxMicroUsd: number;
-  /** The quick-pick amounts, smallest first, in micro-USD. */
-  presetsMicroUsd: number[];
+  /** The least and most credit one payment may buy, in micro-SAR. */
+  minMicroSar: number;
+  maxMicroSar: number;
+  /** The quick-pick amounts, smallest first, in micro-SAR. */
+  presetsMicroSar: number[];
   /** The fee rates, so the form can say how the fee is worked out. */
   feeBps: number;
-  feeMinMicroUsd: number;
+  feeMinMicroSar: number;
 }
 
 export const getTopUpOptions = async (): Promise<TopUpOptions> => {
@@ -58,11 +58,11 @@ export const getTopUpOptions = async (): Promise<TopUpOptions> => {
   ]);
   return {
     isAvailable,
-    minMicroUsd: settings.topupMinMicroUsd,
-    maxMicroUsd: settings.topupMaxMicroUsd,
-    presetsMicroUsd: settings.topupPresetsMicroUsd,
+    minMicroSar: settings.topupMinMicroSar,
+    maxMicroSar: settings.topupMaxMicroSar,
+    presetsMicroSar: settings.topupPresetsMicroSar,
     feeBps: settings.topupFeeBps,
-    feeMinMicroUsd: settings.topupFeeMinMicroUsd,
+    feeMinMicroSar: settings.topupFeeMinMicroSar,
   };
 };
 
@@ -72,40 +72,40 @@ export const getTopUpOptions = async (): Promise<TopUpOptions> => {
  * request, and refuses everything while top-ups are unavailable.
  */
 export const quoteTopUp = async (
-  creditMicroUsd: number,
+  creditMicroSar: number,
 ): Promise<TopUpQuote> => {
   await resolveTopUpGateway();
-  return quote(creditMicroUsd);
+  return quote(creditMicroSar);
 };
 
-const quote = async (creditMicroUsd: number): Promise<TopUpQuote> => {
+const quote = async (creditMicroSar: number): Promise<TopUpQuote> => {
   const settings = await getPricingSettings();
   if (
-    creditMicroUsd < settings.topupMinMicroUsd ||
-    creditMicroUsd > settings.topupMaxMicroUsd
+    creditMicroSar < settings.topupMinMicroSar ||
+    creditMicroSar > settings.topupMaxMicroSar
   ) {
     throw new HttpException(HttpStatusCode.BAD_REQUEST, {
       code: "billing:error.topUpAmount",
-      message: `A top-up must be between ${settings.topupMinMicroUsd} and ${settings.topupMaxMicroUsd} micro-USD`,
+      message: `A top-up must be between ${formatMicroSar(settings.topupMinMicroSar)} and ${formatMicroSar(settings.topupMaxMicroSar)}`,
     });
   }
-  const feeMicroUsd = computeTopupFee(creditMicroUsd, settings);
+  const feeMicroSar = computeTopupFee(creditMicroSar, settings);
   return {
-    creditMicroUsd,
-    feeMicroUsd,
-    totalMicroUsd: creditMicroUsd + feeMicroUsd,
+    creditMicroSar,
+    feeMicroSar,
+    totalMicroSar: creditMicroSar + feeMicroSar,
   };
 };
 
 export const startTopUp = async ({
   user,
   organizationId,
-  creditMicroUsd,
+  creditMicroSar,
   origin,
 }: {
   user: { id: string; email: string };
   organizationId: string;
-  creditMicroUsd: number;
+  creditMicroSar: number;
   /** The site the customer is on; the payment page sends them back there. */
   origin: string;
 }) => {
@@ -120,7 +120,7 @@ export const startTopUp = async ({
     throw new HttpException(HttpStatusCode.NOT_FOUND);
   }
 
-  const priced = await quote(creditMicroUsd);
+  const priced = await quote(creditMicroSar);
   const page = new URL(`/dashboard/${org.slug}/credits`, origin);
   const back = (status: string) => {
     const url = new URL(page);
@@ -133,8 +133,8 @@ export const startTopUp = async ({
       mode: gateway.mode,
       user,
       organizationId,
-      creditMicroUsd: priced.creditMicroUsd,
-      feeMicroUsd: priced.feeMicroUsd,
+      creditMicroSar: priced.creditMicroSar,
+      feeMicroSar: priced.feeMicroSar,
       labels: LINE_LABELS,
       redirect: { success: back("success"), cancel: back("cancelled") },
     });
@@ -171,11 +171,11 @@ export const topUpWebhookCallbacks: WebhookCallbacks = {
 };
 
 const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
-  if (event.collectedMicroUsd !== event.creditMicroUsd + event.feeMicroUsd) {
+  if (event.collectedMicroSar !== event.creditMicroSar + event.feeMicroSar) {
     // only a bug or an edit in the provider's dashboard gets here: staff
     // resolve it with an adjustment rather than us guessing the credit
     logger.error(
-      `Top-up ${event.paymentId} collected ${event.collectedMicroUsd} micro-USD, expected ${event.creditMicroUsd + event.feeMicroUsd}: not credited`,
+      `Top-up ${event.paymentId} collected ${event.collectedMicroSar} micro-SAR, expected ${event.creditMicroSar + event.feeMicroSar}: not credited`,
     );
     return { isApplied: false };
   }
@@ -194,19 +194,19 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
 
   const result = await applyEntry({
     organizationId: event.organizationId,
-    amount: event.creditMicroUsd,
+    amount: event.creditMicroSar,
     kind: "top_up",
     idempotencyKey: topUpKey(event.provider, event.paymentId),
     reference: event.paymentId,
     metadata: {
       provider: event.provider,
       mode: event.mode,
-      feeMicroUsd: event.feeMicroUsd,
-      collectedMicroUsd: event.collectedMicroUsd,
+      feeMicroSar: event.feeMicroSar,
+      collectedMicroSar: event.collectedMicroSar,
     },
   });
   logger.info(
-    `💳 Top-up ${event.paymentId}: ${result.isApplied ? "credited" : "already credited"} ${event.creditMicroUsd} micro-USD to ${event.organizationId}`,
+    `💳 Top-up ${event.paymentId}: ${result.isApplied ? "credited" : "already credited"} ${event.creditMicroSar} micro-SAR to ${event.organizationId}`,
   );
   return { isApplied: result.isApplied };
 };
@@ -233,9 +233,9 @@ const applyRefund = async (
   }
 
   const removed = refundedCredit({
-    creditMicroUsd: payment.amount,
-    collectedMicroUsd: Number(payment.metadata?.collectedMicroUsd),
-    refundedMicroUsd: event.refundedMicroUsd,
+    creditMicroSar: payment.amount,
+    collectedMicroSar: Number(payment.metadata?.collectedMicroSar),
+    refundedMicroSar: event.refundedMicroSar,
   });
   if (removed === 0) {
     return { isApplied: false };
@@ -257,11 +257,11 @@ const applyRefund = async (
       provider: event.provider,
       mode: event.mode,
       paymentId: event.paymentId,
-      refundedMicroUsd: event.refundedMicroUsd,
+      refundedMicroSar: event.refundedMicroSar,
     },
   });
   logger.info(
-    `↩️ Refund ${event.refundId}: ${result.isApplied ? "removed" : "already removed"} ${removed} micro-USD from ${payment.organizationId}`,
+    `↩️ Refund ${event.refundId}: ${result.isApplied ? "removed" : "already removed"} ${removed} micro-SAR from ${payment.organizationId}`,
   );
   return { isApplied: result.isApplied };
 };
@@ -272,25 +272,25 @@ const applyRefund = async (
  * credit; the fee's share is never removed as credit.
  */
 export const refundedCredit = ({
-  creditMicroUsd,
-  collectedMicroUsd,
-  refundedMicroUsd,
+  creditMicroSar,
+  collectedMicroSar,
+  refundedMicroSar,
 }: {
-  creditMicroUsd: number;
-  collectedMicroUsd: number;
-  refundedMicroUsd: number;
+  creditMicroSar: number;
+  collectedMicroSar: number;
+  refundedMicroSar: number;
 }) => {
   if (
-    !Number.isSafeInteger(collectedMicroUsd) ||
-    collectedMicroUsd <= 0 ||
-    !Number.isSafeInteger(refundedMicroUsd) ||
-    refundedMicroUsd <= 0
+    !Number.isSafeInteger(collectedMicroSar) ||
+    collectedMicroSar <= 0 ||
+    !Number.isSafeInteger(refundedMicroSar) ||
+    refundedMicroSar <= 0
   ) {
     throw new Error("A refund needs a positive payment and refund amount");
   }
-  const refunded = Math.min(refundedMicroUsd, collectedMicroUsd);
+  const refunded = Math.min(refundedMicroSar, collectedMicroSar);
   return Number(
-    (BigInt(creditMicroUsd) * BigInt(refunded)) / BigInt(collectedMicroUsd),
+    (BigInt(creditMicroSar) * BigInt(refunded)) / BigInt(collectedMicroSar),
   );
 };
 

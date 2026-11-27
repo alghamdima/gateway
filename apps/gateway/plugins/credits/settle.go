@@ -118,7 +118,7 @@ func (p *Plugin) write(st Settlement) {
 		}
 	}
 	// the hold stays until the reaper releases it; reconciliation has to find this charge
-	p.logger.Error("credits: settlement of %s for organization %s (%d micro-USD, request %s) was not written after %d attempts: %v",
+	p.logger.Error("credits: settlement of %s for organization %s (%d micro-SAR, request %s) was not written after %d attempts: %v",
 		st.ReservationID, st.OrganizationID, st.Cost, st.Reference, settleAttempts, err)
 }
 

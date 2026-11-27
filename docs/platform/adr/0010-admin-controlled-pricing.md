@@ -1,6 +1,6 @@
 # ADR 0010: Markup per provider and the top-up fee are set by staff in the admin console
 
-Status: Accepted
+Status: Accepted. Amended by ADR 0017: money settings are micro-SAR, and `pricing_settings` also holds the USD to SAR rate and the bank's spread, read by the plugin with the markups.
 Date: 2026-11-23
 
 ## Context

@@ -26,7 +26,7 @@ import { Skeleton } from "@workspace/ui-web/skeleton";
 import { Spinner } from "@workspace/ui-web/spinner";
 
 import { api } from "~/lib/api/client";
-import { formatMicroUsd, MICRO_USD, usdToMicroUsd } from "~/modules/keys/money";
+import { formatMicroSar, MICRO_SAR, sarToMicroSar } from "~/modules/keys/money";
 
 interface TopUpProps {
   readonly organizationId: string;
@@ -80,9 +80,9 @@ const TopUpUnavailable = () => {
 };
 
 interface TopUpOptions {
-  minMicroUsd: number;
-  maxMicroUsd: number;
-  presetsMicroUsd: number[];
+  minMicroSar: number;
+  maxMicroSar: number;
+  presetsMicroSar: number[];
 }
 
 interface TopUpFormProps {
@@ -92,15 +92,15 @@ interface TopUpFormProps {
 
 const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
   const { t, i18n } = useTranslation(["common", "organization"]);
-  const presetsUsd = options.presetsMicroUsd.map((preset) =>
-    String(preset / MICRO_USD),
+  const presetsUsd = options.presetsMicroSar.map((preset) =>
+    String(preset / MICRO_SAR),
   );
-  const [amountUsd, setAmountUsd] = useState(
+  const [amountSar, setAmountUsd] = useState(
     presetsUsd[Math.min(1, presetsUsd.length - 1)] ?? "",
   );
 
-  const amount = toCreditMicroUsd(amountUsd, options);
-  const money = (microUsd: number) => formatMicroUsd(microUsd, i18n.language);
+  const amount = toCreditMicroSar(amountSar, options);
+  const money = (microSar: number) => formatMicroSar(microSar, i18n.language);
 
   const quote = useQuery({
     queryKey: ["credits", organizationId, "top-up", amount],
@@ -113,10 +113,10 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
   });
 
   const checkout = useMutation({
-    mutationFn: (creditMicroUsd: number) =>
+    mutationFn: (creditMicroSar: number) =>
       handle(api.credits[":organizationId"]["top-up"].$post)({
         param: { organizationId },
-        json: { amount: creditMicroUsd },
+        json: { amount: creditMicroSar },
       }),
     onSuccess: ({ url }) => {
       if (url) {
@@ -130,15 +130,15 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
     ? [
         {
           label: t("organization:credits.topUp.credits"),
-          value: quote.data.creditMicroUsd,
+          value: quote.data.creditMicroSar,
         },
         {
           label: t("organization:credits.topUp.fee"),
-          value: quote.data.feeMicroUsd,
+          value: quote.data.feeMicroSar,
         },
         {
           label: t("organization:credits.topUp.total"),
-          value: quote.data.totalMicroUsd,
+          value: quote.data.totalMicroSar,
         },
       ]
     : [];
@@ -158,11 +158,11 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
               {t("organization:credits.topUp.amount")}
             </FieldLabel>
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">$</span>
+              <span className="text-muted-foreground">SAR</span>
               <Input
                 id="top-up-amount"
                 inputMode="decimal"
-                value={amountUsd}
+                value={amountSar}
                 onChange={(event) => setAmountUsd(event.target.value)}
                 aria-invalid={amount === null}
                 disabled={isRedirecting}
@@ -170,12 +170,12 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
             </div>
           </Field>
           <div className="flex flex-wrap gap-2">
-            {options.presetsMicroUsd.map((pick, index) => (
+            {options.presetsMicroSar.map((pick, index) => (
               <Button
                 key={pick}
                 type="button"
                 variant={
-                  amountUsd === presetsUsd[index] ? "default" : "outline"
+                  amountSar === presetsUsd[index] ? "default" : "outline"
                 }
                 onClick={() => setAmountUsd(presetsUsd[index] ?? "")}
                 disabled={isRedirecting}
@@ -188,8 +188,8 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
         {amount === null && (
           <FieldError>
             {t("organization:credits.topUp.invalid", {
-              min: money(options.minMicroUsd),
-              max: money(options.maxMicroUsd),
+              min: money(options.minMicroSar),
+              max: money(options.maxMicroSar),
             })}
           </FieldError>
         )}
@@ -230,7 +230,7 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
               <Spinner />
             ) : (
               t("organization:credits.topUp.pay", {
-                total: quote.data ? money(quote.data.totalMicroUsd) : "",
+                total: quote.data ? money(quote.data.totalMicroSar) : "",
               })
             )}
           </Button>
@@ -243,15 +243,15 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
   );
 };
 
-/** Whole cents within the limits, in micro-USD; null when the typed amount is not one. */
-const toCreditMicroUsd = (
+/** Whole cents within the limits, in micro-SAR; null when the typed amount is not one. */
+const toCreditMicroSar = (
   value: string,
-  { minMicroUsd, maxMicroUsd }: TopUpOptions,
+  { minMicroSar, maxMicroSar }: TopUpOptions,
 ) => {
   const trimmed = value.trim();
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) {
     return null;
   }
-  const microUsd = usdToMicroUsd(Number(trimmed));
-  return microUsd >= minMicroUsd && microUsd <= maxMicroUsd ? microUsd : null;
+  const microSar = sarToMicroSar(Number(trimmed));
+  return microSar >= minMicroSar && microSar <= maxMicroSar ? microSar : null;
 };

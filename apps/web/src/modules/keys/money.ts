@@ -1,13 +1,11 @@
-/** Amounts are micro-USD (1 USD = 1,000,000) everywhere in the API. */
-export const MICRO_USD = 1_000_000;
+import { formatMicroSar as format } from "@workspace/shared/utils";
 
-export const formatMicroUsd = (microUsd: number, locale?: string) =>
-  new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(microUsd / MICRO_USD);
+/**
+ * Amounts are micro-SAR (1 SAR = 1,000,000) everywhere in the API: the
+ * customer's currency (docs/platform/adr/0017-sar-ledger.md).
+ */
+export { MICRO_SAR, sarToMicroSar } from "@workspace/shared/utils";
 
-/** Dollars typed by a person, to whole micro-USD. */
-export const usdToMicroUsd = (usd: number) => Math.round(usd * MICRO_USD);
+/** "SAR 1,234.56"; small charges keep up to six decimals, the ledger's precision. */
+export const formatMicroSar = (microSar: number, locale?: string) =>
+  format(microSar, locale, { maximumFractionDigits: 6 });

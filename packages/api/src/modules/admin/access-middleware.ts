@@ -14,12 +14,21 @@ import {
 import type { User } from "@workspace/auth";
 
 /**
+ * What a change replaced, when the route knows it: a route sets the
+ * `auditChange` variable and the audit entry keeps it beside the request body.
+ */
+export interface AuditChange {
+  before: unknown;
+  after: unknown;
+}
+
+/**
  * Mounted on /api/admin after enforceAdmin, which has already required a
  * staff role. Refuses what the user's roles do not allow, and records every
  * successful change in the audit log (ADR 0011).
  */
 export const enforceStaffAccess = createMiddleware<{
-  Variables: { user: User };
+  Variables: { user: User; auditChange?: AuditChange };
 }>(async (c, next) => {
   const path = c.req.path.replace(/^.*?\/api\/admin/, "") || "/";
   const user = c.var.user;
@@ -52,6 +61,7 @@ export const enforceStaffAccess = createMiddleware<{
         method: c.req.method,
         path,
         body: withoutSecrets(body, audit.secrets ?? []),
+        ...c.var.auditChange,
       },
       ipAddress: clientIp(c.req.raw.headers),
     });

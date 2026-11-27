@@ -77,25 +77,19 @@ export default async function ModelPage({ params }: PageProps) {
     },
     {
       label: t("models.columns.input"),
-      value: perMillion(model.pricing.prompt, locale),
+      value: perMillion(model, "prompt", locale),
     },
     {
       label: t("models.columns.output"),
-      value: perMillion(model.pricing.completion, locale),
+      value: perMillion(model, "completion", locale),
     },
     {
       label: t("models.detail.cacheRead"),
-      value:
-        model.pricing.input_cache_read === undefined
-          ? null
-          : perMillion(model.pricing.input_cache_read, locale),
+      value: perMillion(model, "input_cache_read", locale),
     },
     {
       label: t("models.detail.cacheWrite"),
-      value:
-        model.pricing.input_cache_write === undefined
-          ? null
-          : perMillion(model.pricing.input_cache_write, locale),
+      value: perMillion(model, "input_cache_write", locale),
     },
   ].filter((fact) => fact.value !== null);
 

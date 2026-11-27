@@ -10,7 +10,7 @@ import { getBalance, getEntries } from "./ledger";
 import { getLowBalanceSetting, setLowBalanceSetting } from "./low-balance";
 import {
   getTopUpOptions,
-  MICRO_USD_PER_CENT,
+  MICRO_SAR_PER_HALALA,
   quoteTopUp,
   startTopUp,
 } from "./top-up";
@@ -21,7 +21,7 @@ const getEntriesQuerySchema = z.object({
 });
 
 /**
- * Credit to buy in micro-USD: whole cents. The limits per payment are admin
+ * Credit to buy in micro-SAR: whole halalas. The limits per payment are admin
  * settings, checked against the stored values when the request is handled
  * (quoteTopUp).
  */
@@ -29,8 +29,8 @@ const topUpAmountSchema = z.coerce
   .number()
   .int()
   .positive()
-  .refine((value) => value % MICRO_USD_PER_CENT === 0, {
-    message: "Must be a whole number of cents",
+  .refine((value) => value % MICRO_SAR_PER_HALALA === 0, {
+    message: "Must be a whole number of halalas",
   });
 
 export const creditsRouter = new Hono()
@@ -80,8 +80,8 @@ export const creditsRouter = new Hono()
     validate(
       "json",
       z.object({
-        // micro-USD, whole cents; null turns the alert off
-        thresholdMicroUsd: z
+        // micro-SAR, whole halalas; null turns the alert off
+        thresholdMicroSar: z
           .number()
           .int()
           .positive()
@@ -94,7 +94,7 @@ export const creditsRouter = new Hono()
       c.json(
         await setLowBalanceSetting(
           c.req.param("organizationId"),
-          c.req.valid("json").thresholdMicroUsd,
+          c.req.valid("json").thresholdMicroSar,
         ),
       ),
   )
@@ -130,7 +130,7 @@ export const creditsRouter = new Hono()
         await startTopUp({
           user: c.var.user,
           organizationId: c.req.param("organizationId"),
-          creditMicroUsd: c.req.valid("json").amount,
+          creditMicroSar: c.req.valid("json").amount,
           origin: new URL(c.req.url).origin,
         }),
       ),

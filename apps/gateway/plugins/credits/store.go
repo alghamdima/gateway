@@ -13,7 +13,9 @@ import (
 
 // Store runs the three statements that move money in the control plane's ledger
 // (docs/platform/adr/0001-credits-ledger.md, 0009-credits-plugin-hooks.md).
-// Every amount is micro-USD (1 USD = 1,000,000). Each method is one SQL statement,
+// Every amount is micro-SAR (1 SAR = 1,000,000; docs/platform/adr/0017-sar-ledger.md). Each
+// hold and charge also records the official USD to SAR rate, the bank's spread and the
+// effective rate it was converted at. Each method is one SQL statement,
 // so it is atomic without an explicit transaction and safe under concurrency.
 // The connection only needs the gateway_ledger role.
 type Store struct {
@@ -49,14 +51,15 @@ WITH hold AS (
    WHERE organization_id = $2 AND balance - held >= $3
   RETURNING organization_id
 )
-INSERT INTO credit_reservation (id, organization_id, amount, expires_at, virtual_key_id)
-SELECT $1, organization_id, $3, now() + make_interval(secs => $4), nullif($5, '')
+INSERT INTO credit_reservation (id, organization_id, amount, expires_at, virtual_key_id,
+                                usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+SELECT $1, organization_id, $3, now() + make_interval(secs => $4), nullif($5, ''), $6, $7, $8
   FROM hold
 RETURNING id`
 
 // keyLimitSQL reads the limit the control plane stored for a virtual key. No row: the
 // key was not made by the control plane, and only the balance applies.
-const keyLimitSQL = `SELECT limit_micro_usd, limit_reset FROM api_key WHERE virtual_key_id = $1`
+const keyLimitSQL = `SELECT limit_micro_sar, limit_reset FROM api_key WHERE virtual_key_id = $1`
 
 // keyLockSQL serializes the limit check of one key: two holds checked at once would both
 // see the same spend. The lock ends with the transaction.
@@ -78,15 +81,20 @@ SELECT coalesce((
          SELECT sum(amount) FROM credit_reservation
           WHERE virtual_key_id = $1 AND settled_at IS NULL), 0)`
 
-// Reserve holds amount against the organization's balance and, when virtualKeyID names a
-// key with a spending limit, against that limit too. amount must be positive.
-func (s *Store) Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error) {
+// Reserve holds amount (micro-SAR) against the organization's balance and, when virtualKeyID
+// names a key with a spending limit, against that limit too. amount must be positive.
+// fx is the rate the amount was converted at; the hold keeps it, so its charge is converted
+// at the same rate and reports can show it.
+func (s *Store) Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, fx fxRate, ttl time.Duration) (string, ReserveOutcome, error) {
 	if amount <= 0 {
 		return "", InsufficientCredits, fmt.Errorf("credits: reservation amount must be positive, got %d", amount)
 	}
+	if fx.officialE6 <= 0 || fx.effectiveE6 <= 0 {
+		return "", InsufficientCredits, fmt.Errorf("credits: reservation rate must be positive, got %+v", fx)
+	}
 	id := uuid.NewString()
 	if virtualKeyID == "" {
-		return s.hold(ctx, s.pool, id, organizationID, "", amount, ttl)
+		return s.hold(ctx, s.pool, id, organizationID, "", amount, fx, ttl)
 	}
 
 	var limit *int64
@@ -97,7 +105,7 @@ func (s *Store) Reserve(ctx context.Context, organizationID, virtualKeyID string
 	}
 	if limit == nil {
 		// no limit: the common case pays nothing more than the balance check
-		return s.hold(ctx, s.pool, id, organizationID, virtualKeyID, amount, ttl)
+		return s.hold(ctx, s.pool, id, organizationID, virtualKeyID, amount, fx, ttl)
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -116,7 +124,7 @@ func (s *Store) Reserve(ctx context.Context, organizationID, virtualKeyID string
 	if spent+amount > *limit {
 		return "", KeyLimitReached, nil
 	}
-	got, outcome, err := s.hold(ctx, tx, id, organizationID, virtualKeyID, amount, ttl)
+	got, outcome, err := s.hold(ctx, tx, id, organizationID, virtualKeyID, amount, fx, ttl)
 	if err != nil || outcome != Reserved {
 		return got, outcome, err
 	}
@@ -131,9 +139,10 @@ type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func (s *Store) hold(ctx context.Context, q querier, id, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error) {
+func (s *Store) hold(ctx context.Context, q querier, id, organizationID, virtualKeyID string, amount int64, fx fxRate, ttl time.Duration) (string, ReserveOutcome, error) {
 	var got string
-	err := q.QueryRow(ctx, reserveSQL, id, organizationID, amount, ttl.Seconds(), virtualKeyID).Scan(&got)
+	err := q.QueryRow(ctx, reserveSQL, id, organizationID, amount, ttl.Seconds(), virtualKeyID,
+		fx.officialE6, fx.spreadBps, fx.effectiveE6).Scan(&got)
 	if err == pgx.ErrNoRows {
 		return "", InsufficientCredits, nil
 	}
@@ -148,13 +157,17 @@ type Settlement struct {
 	// ReservationID is the hold taken for this attempt.
 	ReservationID  string
 	OrganizationID string
-	// Cost is what the attempt is charged, in micro-USD. Zero releases the hold and writes no entry.
+	// Cost is what the attempt is charged, in micro-SAR. Zero releases the hold and writes no entry.
 	Cost int64
+	// CostMicroUSD is the provider's cost before markup, in micro-USD, stored on the entry.
+	CostMicroUSD int64
+	// FX is the rate Cost was converted at: the hold's.
+	FX fxRate
 	// IdempotencyKey identifies the attempt. Settling the same key again changes nothing.
 	IdempotencyKey string
 	// Reference is the request id, for support and reconciliation.
 	Reference string
-	// Metadata is stored with the entry: provider cost before markup, model, provider.
+	// Metadata is stored with the entry: the exact provider cost, markup, model, provider.
 	Metadata map[string]any
 }
 
@@ -177,9 +190,10 @@ WITH released AS (
    WHERE id = $1 AND organization_id = $2 AND settled_at IS NULL
   RETURNING amount
 ), charged AS (
-  INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, metadata, virtual_key_id)
+  INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, metadata, virtual_key_id,
+                                   cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
   SELECT $3, $2, -$4::bigint, 'usage', $5, $6, $7::jsonb,
-         (SELECT virtual_key_id FROM credit_reservation WHERE id = $1)
+         (SELECT virtual_key_id FROM credit_reservation WHERE id = $1), $8, $9, $10, $11
    WHERE $4::bigint > 0
   ON CONFLICT (idempotency_key) DO NOTHING
   RETURNING amount
@@ -202,6 +216,9 @@ func (s *Store) Settle(ctx context.Context, st Settlement) (SettleResult, error)
 	if st.IdempotencyKey == "" {
 		return SettleResult{}, fmt.Errorf("credits: settlement needs an idempotency key")
 	}
+	if st.Cost > 0 && (st.CostMicroUSD < 0 || st.FX.officialE6 <= 0 || st.FX.effectiveE6 <= 0) {
+		return SettleResult{}, fmt.Errorf("credits: a charge needs its USD cost and rate, got %d micro-USD at %+v", st.CostMicroUSD, st.FX)
+	}
 	metadata := []byte("null")
 	if st.Metadata != nil {
 		var err error
@@ -213,6 +230,7 @@ func (s *Store) Settle(ctx context.Context, st Settlement) (SettleResult, error)
 	var accounts int
 	err := s.pool.QueryRow(ctx, settleSQL,
 		st.ReservationID, st.OrganizationID, uuid.NewString(), st.Cost, st.IdempotencyKey, st.Reference, string(metadata),
+		st.CostMicroUSD, st.FX.officialE6, st.FX.spreadBps, st.FX.effectiveE6,
 	).Scan(&res.Charged, &res.Released, &accounts)
 	if err != nil {
 		return SettleResult{}, fmt.Errorf("credits: settle: %w", err)

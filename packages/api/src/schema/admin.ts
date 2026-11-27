@@ -10,9 +10,12 @@ import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
   MAX_MARKUP_BPS,
   MAX_TOPUP_FEE_BPS,
-  MAX_TOPUP_FEE_MIN_MICRO_USD,
-  MAX_TOPUP_MICRO_USD,
+  MAX_TOPUP_FEE_MIN_MICRO_SAR,
+  MAX_TOPUP_MICRO_SAR,
   MAX_TOPUP_PRESETS,
+  MAX_FX_SPREAD_BPS,
+  MAX_USD_TO_SAR_RATE_E6,
+  MIN_USD_TO_SAR_RATE_E6,
   PAYMENT_MODES,
   PAYMENT_PROVIDERS,
   PROVIDER_AGREEMENTS,
@@ -336,7 +339,7 @@ export const setOrganizationRateLimitSchema = z.object({
 });
 
 export const adjustOrganizationCreditsSchema = z.object({
-  /** Signed micro-USD (1 USD = 1,000,000): positive adds credit, negative removes it. */
+  /** Signed micro-SAR (1 SAR = 1,000,000): positive adds credit, negative removes it. */
   amount: z
     .number()
     .int()
@@ -353,16 +356,22 @@ export type AdjustOrganizationCreditsInput = z.infer<
 const markupBpsSchema = z.number().int().min(0).max(MAX_MARKUP_BPS);
 
 /** The admin form checks the same ceilings before sending. */
-export { MAX_TOPUP_MICRO_USD, MAX_TOPUP_PRESETS };
+export {
+  MAX_FX_SPREAD_BPS,
+  MAX_TOPUP_MICRO_SAR,
+  MAX_TOPUP_PRESETS,
+  MAX_USD_TO_SAR_RATE_E6,
+  MIN_USD_TO_SAR_RATE_E6,
+};
 
-/** A top-up amount in micro-USD: whole cents, above zero, under the typo ceiling. */
-const topupAmountMicroUsdSchema = z
+/** A top-up amount in micro-SAR: whole halalas, above zero, under the typo ceiling. */
+const topupAmountMicroSarSchema = z
   .number()
   .int()
   .positive()
-  .max(MAX_TOPUP_MICRO_USD)
+  .max(MAX_TOPUP_MICRO_SAR)
   .refine((value) => value % 10_000 === 0, {
-    message: "Must be a whole number of cents",
+    message: "Must be a whole number of halalas",
   });
 
 /** The same rules as the database checks on pricing_settings (packages/db/src/schema/pricing.ts). */
@@ -372,35 +381,52 @@ export const updatePricingSettingsSchema = z
     defaultMarkupBps: markupBpsSchema,
     /** Basis points added on a top-up payment. */
     topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
-    /** The least fee a top-up pays, in micro-USD (1 USD = 1,000,000). */
-    topupFeeMinMicroUsd: z
+    /** The least fee a top-up pays, in micro-SAR (1 SAR = 1,000,000). */
+    topupFeeMinMicroSar: z
       .number()
       .int()
       .min(0)
-      .max(MAX_TOPUP_FEE_MIN_MICRO_USD),
-    /** The least credit one top-up may buy, in micro-USD. */
-    topupMinMicroUsd: topupAmountMicroUsdSchema,
-    /** The most credit one top-up may buy, in micro-USD. */
-    topupMaxMicroUsd: topupAmountMicroUsdSchema,
-    /** The quick-pick amounts of the top-up form, in micro-USD. */
-    topupPresetsMicroUsd: z
-      .array(topupAmountMicroUsdSchema)
+      .max(MAX_TOPUP_FEE_MIN_MICRO_SAR),
+    /** The least credit one top-up may buy, in micro-SAR. */
+    topupMinMicroSar: topupAmountMicroSarSchema,
+    /** The most credit one top-up may buy, in micro-SAR. */
+    topupMaxMicroSar: topupAmountMicroSarSchema,
+    /** The quick-pick amounts of the top-up form, in micro-SAR. */
+    topupPresetsMicroSar: z
+      .array(topupAmountMicroSarSchema)
       .min(1)
       .max(MAX_TOPUP_PRESETS),
+    /**
+     * The official USD to SAR rate × 1,000,000 (3.75 is 3,750,000). The range
+     * is a ceiling against a typo, as in the database.
+     */
+    usdToSarRateE6: z
+      .number()
+      .int()
+      .min(MIN_USD_TO_SAR_RATE_E6, {
+        message: "The USD to SAR rate must be between 3 and 5",
+      })
+      .max(MAX_USD_TO_SAR_RATE_E6, {
+        message: "The USD to SAR rate must be between 3 and 5",
+      }),
+    /** The bank's conversion commission in bps, added to the official rate: 100 = 1%. */
+    fxSpreadBps: z.number().int().min(0).max(MAX_FX_SPREAD_BPS, {
+      message: "The bank's spread must be between 0% and 10%",
+    }),
   })
   .superRefine((value, ctx) => {
-    if (value.topupMaxMicroUsd < value.topupMinMicroUsd) {
+    if (value.topupMaxMicroSar < value.topupMinMicroSar) {
       ctx.addIssue({
         code: "custom",
-        path: ["topupMaxMicroUsd"],
+        path: ["topupMaxMicroSar"],
         message: "The top-up maximum must be at least the minimum",
       });
     }
-    value.topupPresetsMicroUsd.forEach((preset, index) => {
-      if (preset < value.topupMinMicroUsd || preset > value.topupMaxMicroUsd) {
+    value.topupPresetsMicroSar.forEach((preset, index) => {
+      if (preset < value.topupMinMicroSar || preset > value.topupMaxMicroSar) {
         ctx.addIssue({
           code: "custom",
-          path: ["topupPresetsMicroUsd", index],
+          path: ["topupPresetsMicroSar", index],
           message: "Each quick-pick amount must be within the top-up limits",
         });
       }

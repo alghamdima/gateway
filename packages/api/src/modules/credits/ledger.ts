@@ -8,12 +8,12 @@ import { db } from "@workspace/db/server";
 
 import type { CreditEntryKind } from "@workspace/db/schema";
 
-/** All amounts are micro-USD (1 USD = 1,000,000). */
-export const MICRO_USD = 1_000_000;
+/** All amounts are micro-SAR (1 SAR = 1,000,000; docs/platform/adr/0017-sar-ledger.md). */
+export { MICRO_SAR } from "@workspace/shared/utils";
 
 export interface ApplyEntryInput {
   organizationId: string;
-  /** Signed micro-USD: credits are positive, debits negative. */
+  /** Signed micro-SAR: credits are positive, debits negative. */
   amount: number;
   kind: CreditEntryKind;
   /** The same key applied again changes nothing. */

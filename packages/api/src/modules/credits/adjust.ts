@@ -4,7 +4,7 @@ import { applyEntry } from "./ledger";
 
 export interface AdjustCreditsInput {
   organizationId: string;
-  /** Signed micro-USD. */
+  /** Signed micro-SAR. */
   amount: number;
   reason: string;
   /** The staff user who made the decision. */

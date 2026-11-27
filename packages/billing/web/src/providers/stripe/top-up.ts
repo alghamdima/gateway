@@ -1,4 +1,5 @@
 import { logger } from "@workspace/shared/logger";
+import { MICRO_SAR_PER_HALALA } from "@workspace/shared/utils";
 
 import { BillingProvider, PaymentMode, TOP_UP_PURPOSE } from "../types";
 import { createOrRetrieveCustomer } from "./customer";
@@ -7,7 +8,12 @@ import { stripe } from "./sdk";
 import type { TopUpCheckoutInput, TopUpEvent } from "../types";
 import type { Stripe } from "stripe";
 
-const MICRO_USD_PER_CENT = 10_000;
+/**
+ * Top-ups are charged in SAR. Stripe takes SAR in its minor unit, the halala
+ * (2 decimals: SAR 20.00 is 2000), and a micro-SAR amount is a whole number of
+ * halalas when it divides by 10,000.
+ */
+const CURRENCY = "sar";
 
 /**
  * A one-time payment for credits plus the fee (docs/platform/adr/0012-top-up-checkout.md).
@@ -17,8 +23,8 @@ export const createTopUpCheckout = async ({
   mode,
   user,
   organizationId,
-  creditMicroUsd,
-  feeMicroUsd,
+  creditMicroSar,
+  feeMicroSar,
   labels,
   redirect,
 }: TopUpCheckoutInput) => {
@@ -34,14 +40,14 @@ export const createTopUpCheckout = async ({
     provider: BillingProvider.STRIPE,
     mode,
     organizationId,
-    creditMicroUsd: String(creditMicroUsd),
-    feeMicroUsd: String(feeMicroUsd),
+    creditMicroSar: String(creditMicroSar),
+    feeMicroSar: String(feeMicroSar),
   };
-  const line = (name: string, microUsd: number) => ({
+  const line = (name: string, microSar: number) => ({
     quantity: 1,
     price_data: {
-      currency: "usd",
-      unit_amount: toCents(microUsd),
+      currency: CURRENCY,
+      unit_amount: toHalalas(microSar),
       product_data: { name },
     },
   });
@@ -51,8 +57,8 @@ export const createTopUpCheckout = async ({
     customer: stripeCustomer.id,
     client_reference_id: organizationId,
     line_items: [
-      line(labels.credits, creditMicroUsd),
-      ...(feeMicroUsd > 0 ? [line(labels.fee, feeMicroUsd)] : []),
+      line(labels.credits, creditMicroSar),
+      ...(feeMicroSar > 0 ? [line(labels.fee, feeMicroSar)] : []),
     ],
     metadata,
     payment_intent_data: { metadata },
@@ -107,16 +113,16 @@ const toPaid = (session: Stripe.Checkout.Session): TopUpFact | null => {
 
   const paymentId = idOf(session.payment_intent);
   const organizationId = session.metadata?.organizationId;
-  const creditMicroUsd = toWholeNumber(session.metadata?.creditMicroUsd);
-  const feeMicroUsd = toWholeNumber(session.metadata?.feeMicroUsd);
+  const creditMicroSar = toWholeNumber(session.metadata?.creditMicroSar);
+  const feeMicroSar = toWholeNumber(session.metadata?.feeMicroSar);
 
   if (
     !paymentId ||
     !organizationId ||
-    creditMicroUsd === null ||
-    feeMicroUsd === null ||
+    creditMicroSar === null ||
+    feeMicroSar === null ||
     session.amount_total === null ||
-    session.currency !== "usd"
+    session.currency !== CURRENCY
   ) {
     logger.error(
       `Top-up session ${session.id} is missing what it needs to be credited`,
@@ -128,9 +134,9 @@ const toPaid = (session: Stripe.Checkout.Session): TopUpFact | null => {
     type: "paid",
     paymentId,
     organizationId,
-    creditMicroUsd,
-    feeMicroUsd,
-    collectedMicroUsd: session.amount_total * MICRO_USD_PER_CENT,
+    creditMicroSar,
+    feeMicroSar,
+    collectedMicroSar: session.amount_total * MICRO_SAR_PER_HALALA,
   };
 };
 
@@ -140,7 +146,7 @@ const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {
   if (
     refund.status !== "succeeded" ||
     !paymentId ||
-    refund.currency !== "usd"
+    refund.currency !== CURRENCY
   ) {
     return null;
   }
@@ -149,15 +155,18 @@ const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {
     type: "refunded",
     refundId: refund.id,
     paymentId,
-    refundedMicroUsd: refund.amount * MICRO_USD_PER_CENT,
+    refundedMicroSar: refund.amount * MICRO_SAR_PER_HALALA,
   };
 };
 
-const toCents = (microUsd: number) => {
-  if (!Number.isSafeInteger(microUsd) || microUsd % MICRO_USD_PER_CENT !== 0) {
-    throw new Error(`${microUsd} micro-USD is not a whole number of cents`);
+const toHalalas = (microSar: number) => {
+  if (
+    !Number.isSafeInteger(microSar) ||
+    microSar % MICRO_SAR_PER_HALALA !== 0
+  ) {
+    throw new Error(`${microSar} micro-SAR is not a whole number of halalas`);
   }
-  return microUsd / MICRO_USD_PER_CENT;
+  return microSar / MICRO_SAR_PER_HALALA;
 };
 
 const toWholeNumber = (value: string | undefined) =>

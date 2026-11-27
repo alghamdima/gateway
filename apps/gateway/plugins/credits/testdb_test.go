@@ -121,7 +121,7 @@ func newTestDB(t *testing.T) *testDB {
 	return &testDB{admin: admin, ledger: ledger}
 }
 
-// organization creates an organization with a credit account holding balance micro-USD.
+// organization creates an organization with a credit account holding balance micro-SAR.
 func (db *testDB) organization(t *testing.T, balance int64) string {
 	t.Helper()
 	ctx := context.Background()
@@ -160,6 +160,22 @@ func (db *testDB) setPricing(t *testing.T, defaultBps int64, byProvider map[stri
 		if _, err := db.admin.Exec(ctx, `INSERT INTO provider_markup (provider, markup_bps) VALUES ($1, $2)`, provider, bps); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// setRate sets the USD to SAR rate x 1,000,000, as staff do in the admin console.
+func (db *testDB) setRate(t *testing.T, rateE6 int64) {
+	t.Helper()
+	if _, err := db.admin.Exec(context.Background(), `UPDATE pricing_settings SET usd_to_sar_rate_e6 = $1 WHERE id = 1`, rateE6); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// setSpread sets the bank's FX spread in basis points, as staff do in the admin console.
+func (db *testDB) setSpread(t *testing.T, spreadBps int64) {
+	t.Helper()
+	if _, err := db.admin.Exec(context.Background(), `UPDATE pricing_settings SET fx_spread_bps = $1 WHERE id = 1`, spreadBps); err != nil {
+		t.Fatal(err)
 	}
 }
 

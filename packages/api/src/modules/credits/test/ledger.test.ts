@@ -163,9 +163,10 @@ describe.skipIf(!adminUrl)("credits ledger", () => {
       ).rejects.toMatchObject({ code: "42501" });
 
       await asGateway(async (tx) => {
-        await tx`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key) values ('gw_1', ${organizationId}, -250000, 'usage', 'req_1')`;
+        await tx`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+          values ('gw_1', ${organizationId}, -250000, 'usage', 'req_1', 66667, 3750000, 0, 3750000)`;
         await tx`update credit_account set balance = balance - 250000 where organization_id = ${organizationId}`;
-        await tx`insert into credit_reservation (id, organization_id, amount, expires_at) values ('res_1', ${organizationId}, 1000, now() + interval '5 minutes')`;
+        await tx`insert into credit_reservation (id, organization_id, amount, expires_at, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6) values ('res_1', ${organizationId}, 1000, now() + interval '5 minutes', 3750000, 0, 3750000)`;
         await tx`update credit_reservation set settled_at = now() where id = 'res_1'`;
       });
 
@@ -220,15 +221,17 @@ describe.skipIf(!adminUrl)("credits ledger", () => {
         state = (state * 16807) % 2147483647;
         return state / 2147483647;
       };
-      const kinds = ["top_up", "usage", "refund", "promo"] as const;
+      // charges ("usage") are the gateway's, with their USD cost and rates;
+      // here a negative adjustment takes money out the same way
+      const kinds = ["top_up", "adjustment", "refund", "promo"] as const;
       const entries = Array.from({ length: 300 }, (_, i) => {
-        const kind = kinds[Math.floor(random() * kinds.length)] ?? "usage";
+        const kind = kinds[Math.floor(random() * kinds.length)] ?? "adjustment";
         const magnitude = 1 + Math.floor(random() * 3 * USD);
         return {
           organizationId,
           kind,
           amount:
-            kind === "usage" || kind === "refund" ? -magnitude : magnitude,
+            kind === "adjustment" || kind === "refund" ? -magnitude : magnitude,
           idempotencyKey: `random_${i}`,
         };
       });
@@ -252,8 +255,8 @@ describe.skipIf(!adminUrl)("credits ledger", () => {
         kind: "top_up",
         idempotencyKey: "pay_repair",
       });
-      await sql`insert into credit_reservation (id, organization_id, amount, expires_at) values ('res_open', ${organizationId}, 1500000, now() + interval '5 minutes')`;
-      await sql`insert into credit_reservation (id, organization_id, amount, expires_at, settled_at) values ('res_done', ${organizationId}, 900000, now(), now())`;
+      await sql`insert into credit_reservation (id, organization_id, amount, expires_at, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6) values ('res_open', ${organizationId}, 1500000, now() + interval '5 minutes', 3750000, 0, 3750000)`;
+      await sql`insert into credit_reservation (id, organization_id, amount, expires_at, settled_at, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6) values ('res_done', ${organizationId}, 900000, now(), now(), 3750000, 0, 3750000)`;
       await sql`update credit_account set balance = 123, held = 456 where organization_id = ${organizationId}`;
 
       expect(await ledger.rebuildBalance(organizationId)).toEqual({

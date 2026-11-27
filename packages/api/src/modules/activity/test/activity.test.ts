@@ -34,9 +34,12 @@ describe.skipIf(!adminUrl)("activity", () => {
     },
   ) => {
     const id = `act_${++seq}`;
-    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, virtual_key_id, metadata, created_at)
+    const isUsage = (entry.kind ?? "usage") === "usage";
+    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, virtual_key_id,
+        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6, metadata, created_at)
       values (${id}, ${organizationId}, ${entry.kind === "top_up" ? entry.amount : -entry.amount}, ${entry.kind ?? "usage"}, ${id},
               ${entry.virtualKeyId ?? null},
+              ${isUsage ? Math.round(entry.amount / 3.75) : null}, ${isUsage ? 3_750_000 : null}, ${isUsage ? 0 : null}, ${isUsage ? 3_750_000 : null},
               ${sql.json({ model: entry.model ?? "gpt-4o-mini", provider: entry.provider ?? "openai", prompt_tokens: entry.prompt ?? 0, completion_tokens: entry.completion ?? 0 })},
               ${entry.at})`;
   };

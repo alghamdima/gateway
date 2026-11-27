@@ -39,10 +39,12 @@ export const Pricing = () => {
               canEdit={canEdit}
               defaultMarkupBps={pricing.data.settings.defaultMarkupBps}
               topupFeeBps={pricing.data.settings.topupFeeBps}
-              topupFeeMinMicroUsd={pricing.data.settings.topupFeeMinMicroUsd}
-              topupMinMicroUsd={pricing.data.settings.topupMinMicroUsd}
-              topupMaxMicroUsd={pricing.data.settings.topupMaxMicroUsd}
-              topupPresetsMicroUsd={pricing.data.settings.topupPresetsMicroUsd}
+              topupFeeMinMicroSar={pricing.data.settings.topupFeeMinMicroSar}
+              topupMinMicroSar={pricing.data.settings.topupMinMicroSar}
+              topupMaxMicroSar={pricing.data.settings.topupMaxMicroSar}
+              topupPresetsMicroSar={pricing.data.settings.topupPresetsMicroSar}
+              usdToSarRateE6={pricing.data.settings.usdToSarRateE6}
+              fxSpreadBps={pricing.data.settings.fxSpreadBps}
             />
           ) : (
             <Skeleton className="h-32 w-full" />

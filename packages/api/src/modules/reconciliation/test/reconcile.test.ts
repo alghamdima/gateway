@@ -105,11 +105,15 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
     organizationId: string,
     providerCostUsd: number,
     at: string,
+    rateE6 = 3_750_000,
   ) => {
     const id = `rec_${++seq}`;
-    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, metadata, created_at)
-      values (${id}, ${organizationId}, ${-Math.round(providerCostUsd * 1_000_000)}, 'usage', ${id},
-              ${sql.json({ provider_cost_usd: providerCostUsd })}, ${at})`;
+    // as the gateway writes it: SAR at the rate of the day, the USD cost in its own column
+    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, metadata, created_at,
+        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+      values (${id}, ${organizationId}, ${-Math.max(1, Math.round(providerCostUsd * rateE6))}, 'usage', ${id},
+              ${sql.json({ provider_cost_usd: providerCostUsd })}, ${at},
+              ${Math.round(providerCostUsd * 1_000_000)}, ${rateE6}, 0, ${rateE6})`;
   };
 
   /** A hold the reaper released after it expired, as when a settlement never arrives. */
@@ -119,8 +123,8 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
     settledAt: string,
   ) => {
     const id = `res_${++seq}`;
-    await sql`insert into credit_reservation (id, organization_id, amount, expires_at, settled_at, created_at)
-      values (${id}, ${organizationId}, ${amount}, ${settledAt}::timestamp - interval '1 second', ${settledAt}, ${settledAt}::timestamp - interval '5 minutes')`;
+    await sql`insert into credit_reservation (id, organization_id, amount, expires_at, settled_at, created_at, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+      values (${id}, ${organizationId}, ${amount}, ${settledAt}::timestamp - interval '1 second', ${settledAt}, ${settledAt}::timestamp - interval '5 minutes', 3750000, 0, 3750000)`;
     return id;
   };
 
@@ -164,18 +168,83 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
     expect(run?.status).toBe("ok");
   });
 
+  it("compares USD with USD: the ledger's cost column, whatever rate each charge was converted at", async () => {
+    const org = await createOrganization();
+    // the same USD cost charged at the peg, then after staff raised the rate
+    // and the bank's spread: the SAR amounts differ, the USD costs do not
+    await charged(org, 0.00045, "2026-11-25T09:00:00Z", 3_750_000);
+    await charged(org, 0.00045, "2026-11-25T15:00:00Z", 4_080_000);
+
+    const ok = await reconciliation.reconcile(
+      {
+        from: new Date("2026-11-25T00:00:00Z"),
+        to: new Date("2026-11-26T00:00:00Z"),
+      },
+      gatewayReporting([
+        { customerId: `cust_${org}`, requests: 2, costUsd: 0.0009 },
+      ]),
+    );
+    expect(ok.findings.organizations).toEqual([]);
+
+    // a charge whose stored USD cost disagrees with the gateway is found, even
+    // when its metadata says otherwise: the column is what is compared
+    const other = await createOrganization();
+    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, metadata, created_at,
+        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+      values ('rec_wrong_usd', ${other}, -1688, 'usage', 'rec_wrong_usd', ${sql.json({ provider_cost_usd: 0.00045 })}, '2026-11-25T12:00:00Z',
+              300, 3750000, 0, 3750000)`;
+    const mismatch = await reconciliation.reconcile(
+      {
+        from: new Date("2026-11-25T00:00:00Z"),
+        to: new Date("2026-11-26T00:00:00Z"),
+      },
+      gatewayReporting([
+        { customerId: `cust_${org}`, requests: 2, costUsd: 0.0009 },
+        { customerId: `cust_${other}`, requests: 1, costUsd: 0.00045 },
+      ]),
+    );
+    expect(mismatch.findings.organizations).toEqual([
+      {
+        organizationId: other,
+        gatewayCostUsd: 0.00045,
+        ledgerCostUsd: 0.0003,
+        differenceUsd: expect.closeTo(0.00015, 12),
+      },
+    ]);
+  });
+
+  it("allows half a micro-USD of rounding per charge", async () => {
+    const org = await createOrganization();
+    // 0.4 micro-USD each: stored as 0, charged 2 micro-SAR at 3.75
+    for (const hour of ["01", "02", "03", "04"]) {
+      await charged(org, 0.0000004, `2026-11-26T${hour}:00:00Z`);
+    }
+    const result = await reconciliation.reconcile(
+      {
+        from: new Date("2026-11-26T00:00:00Z"),
+        to: new Date("2026-11-27T00:00:00Z"),
+      },
+      gatewayReporting([
+        { customerId: `cust_${org}`, requests: 4, costUsd: 0.0000016 },
+      ]),
+    );
+    expect(result.findings.organizations).toEqual([]);
+  });
+
   it("reports a dropped settlement: the gateway's cost, the missing charge, and the reaped hold", async () => {
     const org = await createOrganization();
     await charged(org, 0.00045, "2026-11-20T10:00:00Z");
     // the second request reached the provider, but its settlement never arrived
     await reapedHold(org, 2000, "2026-11-20T11:05:00Z");
     // an attempt that cost nothing closes its hold before expiry, with no entry: not lost
-    await sql`insert into credit_reservation (id, organization_id, amount, expires_at, settled_at, created_at)
-      values ('res_free', ${org}, 3000, '2026-11-20T13:10:00Z', '2026-11-20T13:00:05Z', '2026-11-20T13:00:00Z')`;
+    await sql`insert into credit_reservation (id, organization_id, amount, expires_at, settled_at, created_at, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+      values ('res_free', ${org}, 3000, '2026-11-20T13:10:00Z', '2026-11-20T13:00:05Z', '2026-11-20T13:00:00Z', 3750000, 0, 3750000)`;
     // a hold reaped and then settled late is not lost: its charge is in the ledger
     const late = await reapedHold(org, 2000, "2026-11-20T12:05:00Z");
-    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, metadata, created_at)
-      values ('late', ${org}, -450, 'usage', ${`usage:${late}`}, ${sql.json({ provider_cost_usd: 0.00045 })}, '2026-11-20T12:06:00Z')`;
+    await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, metadata, created_at,
+        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+      values ('late', ${org}, -1688, 'usage', ${`usage:${late}`}, ${sql.json({ provider_cost_usd: 0.00045 })}, '2026-11-20T12:06:00Z',
+              450, 3750000, 0, 3750000)`;
 
     const result = await reconciliation.reconcile(
       {
@@ -196,7 +265,7 @@ describe.skipIf(!adminUrl)("daily reconciliation", () => {
       },
     ]);
     expect(result.findings.reapedHolds).toEqual([
-      { organizationId: org, holds: 1, heldMicroUsd: 2000 },
+      { organizationId: org, holds: 1, heldMicroSar: 2000 },
     ]);
   });
 

@@ -280,7 +280,7 @@
       "on": "Owners and admins are emailed when available credits drop below {{threshold}}, once until credits are added.",
       "off": "Low-balance emails are off.",
       "threshold": "Email below",
-      "invalid": "Enter an amount above 0, in dollars and cents.",
+      "invalid": "Enter an amount above 0, in riyals and halalas.",
       "turnOff": "Turn off",
       "saved": "Low-balance email saved.",
       "email": {
@@ -300,7 +300,7 @@
       "total": "Total charged",
       "pay": "Pay {{total}}",
       "feeNote": "The fee is added to the payment and is never taken from your credits. Credits are added when the payment is confirmed, usually within seconds.",
-      "invalid": "Enter an amount between {{min}} and {{max}}, in dollars and cents.",
+      "invalid": "Enter an amount between {{min}} and {{max}}, in riyals and halalas.",
       "returned": {
         "success": {
           "title": "Payment received",
@@ -395,6 +395,7 @@
       "failed": "Failed"
     },
     "record": {
+      "upstreamCost": "Provider cost (USD)",
       "dataTitle": "Where it was processed",
       "termsVerified": "Terms verified on",
       "policy": "Policy in force",

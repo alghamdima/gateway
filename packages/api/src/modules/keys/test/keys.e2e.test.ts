@@ -27,7 +27,7 @@ const COMPLETION_TOKENS = 500;
 // gpt-4o-mini in the local pricing file: 0.15 USD per million input, 0.60 per million output
 const EXPECTED_CHARGE = Math.round(
   PROMPT_TOKENS * 0.15 + COMPLETION_TOKENS * 0.6,
-); // micro-USD at 0% markup: 450
+); // micro-SAR at 0% markup: 450
 const USD = 1_000_000;
 
 const freePort = () =>
@@ -253,7 +253,7 @@ describe.skipIf(!adminUrl || !binary)(
         organizationId: "org_e2e",
         userId: "user_e2e",
         name: "capped",
-        limit: { limitMicroUsd: 100, reset: "daily" },
+        limit: { limitMicroSar: 100, reset: "daily" },
       });
       const refused = await chat(key);
       expect(refused.status).toBe(403);

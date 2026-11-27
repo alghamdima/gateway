@@ -31,7 +31,7 @@ import {
 
 import { api } from "~/lib/api/client";
 import { RecentRequests } from "~/modules/activity/recent-requests";
-import { formatMicroUsd, MICRO_USD } from "~/modules/keys/money";
+import { formatMicroSar, MICRO_SAR } from "~/modules/keys/money";
 
 import type { ChartConfig } from "@workspace/ui-web/chart";
 
@@ -59,7 +59,7 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
       }),
   });
 
-  const money = (microUsd: number) => formatMicroUsd(microUsd, i18n.language);
+  const money = (microSar: number) => formatMicroSar(microSar, i18n.language);
   const count = (value: number) =>
     new Intl.NumberFormat(i18n.language).format(value);
   const dayLabel = new Intl.DateTimeFormat(i18n.language, {
@@ -144,7 +144,7 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
                 accessibilityLayer
                 data={(activity.data?.byDay ?? []).map((day) => ({
                   day: day.day,
-                  spend: day.spend / MICRO_USD,
+                  spend: day.spend / MICRO_SAR,
                 }))}
               >
                 <CartesianGrid vertical={false} />
@@ -164,7 +164,7 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
                       labelFormatter={(value) =>
                         dayLabel.format(new Date(String(value)))
                       }
-                      formatter={(value) => money(Number(value) * MICRO_USD)}
+                      formatter={(value) => money(Number(value) * MICRO_SAR)}
                     />
                   }
                 />

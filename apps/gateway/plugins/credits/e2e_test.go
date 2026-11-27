@@ -332,13 +332,15 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 	gw := startGateway(t, binary, provider, ledgerURL(t, db), []string{funded, broke, cutOff})
 
 	// gpt-4o-mini in the local pricing file: 0.15 USD per million input tokens, 0.60 per million output
-	providerCost := e2ePromptTokens*0.15e-6 + e2eCompletionTokens*0.60e-6
-	charge, err := toMicroUSD(providerCost, 500)
-	if err != nil || charge < 470 || charge > 475 {
+	providerCost := e2ePromptTokens*0.15e-6 + e2eCompletionTokens*0.60e-6 // 0.00045 USD
+	// in SAR at the rate the migration seeds (3.75, the peg), plus 5 percent:
+	// 0.00045 x 3.75 x 1.05 = 0.001771875 SAR, rounded half up to 1,772 micro-SAR
+	charge, err := toMicroSAR(providerCost, pegRate, 500)
+	if err != nil || charge != 1772 {
 		t.Fatalf("expected charge: %d, %v", charge, err)
 	}
 
-	t.Run("a chat completion is charged once at cost plus the provider's markup", func(t *testing.T) {
+	t.Run("a chat completion is charged once at cost plus the provider's markup, in SAR", func(t *testing.T) {
 		status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false))
 		if status != 200 || !strings.Contains(body, "hello") {
 			t.Fatalf("status %d: %s", status, body)
@@ -364,6 +366,17 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		err = db.admin.QueryRow(context.Background(), `SELECT (metadata->>'prompt_tokens')::int, (metadata->>'completion_tokens')::int FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded).Scan(&prompt, &completion)
 		if err != nil || prompt != e2ePromptTokens || completion != e2eCompletionTokens {
 			t.Fatalf("token counts on the entry: %d %d %v", prompt, completion, err)
+		}
+		// the entry stores the provider's USD cost, the official rate, the spread (none is
+		// seeded) and the effective rate it was converted at, as columns, and the hold it
+		// settled was taken at the same rate
+		var amount, costMicroUSD, rate, spread, effective, holdEffective int64
+		err = db.admin.QueryRow(context.Background(), `
+			SELECT -e.amount, e.cost_micro_usd, e.usd_to_sar_rate_e6, e.fx_spread_bps, e.effective_usd_to_sar_rate_e6, r.effective_usd_to_sar_rate_e6
+			  FROM credit_ledger_entry e JOIN credit_reservation r ON e.idempotency_key = 'usage:' || r.id
+			 WHERE e.organization_id = $1 AND e.kind = 'usage'`, funded).Scan(&amount, &costMicroUSD, &rate, &spread, &effective, &holdEffective)
+		if err != nil || amount != charge || costMicroUSD != 450 || rate != pegRate || spread != 0 || effective != pegRate || holdEffective != pegRate {
+			t.Fatalf("entry: %d micro-SAR for %d micro-USD at %d + %d bps = %d (hold at %d), err=%v; want %d for 450 at %d", amount, costMicroUSD, rate, spread, effective, holdEffective, err, charge, pegRate)
 		}
 	})
 
@@ -487,9 +500,84 @@ func TestEndToEnd_TheGatewayChargesTheLedger(t *testing.T) {
 		if status != 200 {
 			t.Fatalf("status %d: %s", status, body)
 		}
-		raised, _ := toMicroUSD(providerCost, 2000)
+		raised, _ := toMicroSAR(providerCost, pegRate, 2000)
 		if s := settled(t, db, funded); s.Balance != before.Balance-raised {
 			t.Fatalf("charged %d, want %d at the new 20 percent markup", before.Balance-s.Balance, raised)
+		}
+	})
+
+	t.Run("a rate and spread staff change apply to the next request only, and past entries keep theirs", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("waits for the plugin's 30 second refresh")
+		}
+		markup := int64(2000) // the markup subtest before this one raised it
+		entries := func() map[string][2]int64 {
+			rows, err := db.admin.Query(context.Background(), `SELECT id, -amount, effective_usd_to_sar_rate_e6 FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage'`, funded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rows.Close()
+			out := map[string][2]int64{}
+			for rows.Next() {
+				var id string
+				var amount, rate int64
+				if err := rows.Scan(&id, &amount, &rate); err != nil {
+					t.Fatal(err)
+				}
+				out[id] = [2]int64{amount, rate}
+			}
+			return out
+		}
+
+		// one request at the peg
+		if status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false)); status != 200 {
+			t.Fatalf("status %d: %s", status, body)
+		}
+		settled(t, db, funded)
+		past := entries()
+		atPeg, _ := toMicroSAR(providerCost, pegRate, markup)
+
+		// staff set 4.00 and a 2 percent bank spread; the next request converts at 4.08
+		db.setRate(t, 4_000_000)
+		db.setSpread(t, 200)
+		const newRate = int64(4_080_000)
+		time.Sleep(markupRefreshInterval + 2*time.Second)
+		before := db.consistent(t, funded)
+		if status, body := gw.post(t, "/v1/chat/completions", "sk-bf-e2e-"+funded, chatBody(false)); status != 200 {
+			t.Fatalf("status %d: %s", status, body)
+		}
+		atNewRate, _ := toMicroSAR(providerCost, newRate, markup)
+		var official, spread int64
+		if s := settled(t, db, funded); s.Balance != before.Balance-atNewRate || atNewRate <= atPeg {
+			t.Fatalf("charged %d, want %d at the new rate (it was %d at the peg)", before.Balance-s.Balance, atNewRate, atPeg)
+		}
+		if err := db.admin.QueryRow(context.Background(), `SELECT usd_to_sar_rate_e6, fx_spread_bps FROM credit_ledger_entry WHERE organization_id = $1 AND kind = 'usage' ORDER BY created_at DESC LIMIT 1`, funded).Scan(&official, &spread); err != nil || official != 4_000_000 || spread != 200 {
+			t.Fatalf("the new entry stores %d + %d bps, want 4,000,000 + 200 (%v)", official, spread, err)
+		}
+
+		now := entries()
+		if len(now) != len(past)+1 {
+			t.Fatalf("%d entries, want %d", len(now), len(past)+1)
+		}
+		for id, entry := range now {
+			if old, ok := past[id]; ok {
+				if old != entry {
+					t.Errorf("entry %s changed from %v to %v when the rate changed", id, old, entry)
+				}
+				continue
+			}
+			if entry != [2]int64{atNewRate, newRate} {
+				t.Errorf("new entry %v, want %d at %d", entry, atNewRate, newRate)
+			}
+		}
+		last := 0
+		for _, entry := range past {
+			if entry[1] == pegRate && entry[0] == atPeg {
+				last++
+			}
+		}
+		if last == 0 {
+			t.Errorf("no past entry of %d at the peg: %v", atPeg, past)
 		}
 	})
 

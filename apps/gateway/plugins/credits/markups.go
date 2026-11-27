@@ -10,8 +10,9 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
-// Staff set the markups in the admin console; the plugin reads them from the control plane
-// database (docs/platform/adr/0010-admin-controlled-pricing.md).
+// Staff set the markups and the USD to SAR rate in the admin console; the plugin reads them
+// from the control plane database (docs/platform/adr/0010-admin-controlled-pricing.md,
+// 0017-sar-ledger.md).
 
 const (
 	markupRefreshInterval = 30 * time.Second
@@ -21,10 +22,13 @@ const (
 	markupBootTimeout   = 3 * time.Second
 )
 
-// markups is one snapshot of the prices staff set. It is never modified once published.
+// markups is one snapshot of the prices staff set: the markups and the USD to SAR rate. It is
+// never modified once published.
 type markups struct {
 	defaultBps int64
 	byProvider map[string]int64
+	// fx is the official rate, the bank's spread and the effective rate a new hold converts at
+	fx fxRate
 }
 
 // forProvider returns the markup for the provider of an attempt, or the default.
@@ -42,15 +46,18 @@ type pricingSource interface {
 
 const loadMarkupsSQL = `
 SELECT s.default_markup_bps,
+       s.usd_to_sar_rate_e6,
+       s.fx_spread_bps,
        coalesce((SELECT jsonb_object_agg(provider, markup_bps) FROM provider_markup), '{}'::jsonb)
   FROM pricing_settings s
  WHERE s.id = 1`
 
-// LoadMarkups reads the default markup and the per-provider markups in one statement, so
-// the snapshot is consistent.
+// LoadMarkups reads the default markup, the USD to SAR rate and spread, and the per-provider
+// markups in one statement, so the snapshot is consistent.
 func (s *Store) LoadMarkups(ctx context.Context) (*markups, error) {
 	m := &markups{}
-	err := s.pool.QueryRow(ctx, loadMarkupsSQL).Scan(&m.defaultBps, &m.byProvider)
+	var rateE6, spreadBps int64
+	err := s.pool.QueryRow(ctx, loadMarkupsSQL).Scan(&m.defaultBps, &rateE6, &spreadBps, &m.byProvider)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errors.New("credits: pricing_settings has no row")
 	}
@@ -60,6 +67,9 @@ func (s *Store) LoadMarkups(ctx context.Context) (*markups, error) {
 	// the database enforces the bounds; a negative value here would mean it does not
 	if m.defaultBps < 0 {
 		return nil, fmt.Errorf("credits: negative default markup %d", m.defaultBps)
+	}
+	if m.fx, err = newFXRate(rateE6, spreadBps); err != nil {
+		return nil, err
 	}
 	for provider, bps := range m.byProvider {
 		if bps < 0 {

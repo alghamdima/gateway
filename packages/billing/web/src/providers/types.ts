@@ -25,16 +25,16 @@ export interface TopUpCheckoutInput {
   mode: PaymentMode;
   user: BillingUser;
   organizationId: string;
-  /** micro-USD, whole cents. */
-  creditMicroUsd: number;
-  /** micro-USD, whole cents; paid on top of the credits. */
-  feeMicroUsd: number;
+  /** micro-SAR, whole halalas. */
+  creditMicroSar: number;
+  /** micro-SAR, whole halalas; paid on top of the credits. */
+  feeMicroSar: number;
   /** The line names the customer sees on the payment page and the receipt. */
   labels: { credits: string; fee: string };
   redirect: { success: string; cancel: string };
 }
 
-/** What a verified payment webhook says about a top-up. Amounts are micro-USD. */
+/** What a verified payment webhook says about a top-up. Amounts are micro-SAR. */
 export type TopUpEvent = TopUpEventSource &
   (
     | {
@@ -42,16 +42,16 @@ export type TopUpEvent = TopUpEventSource &
         /** The provider's payment id: one payment is credited once. */
         paymentId: string;
         organizationId: string;
-        creditMicroUsd: number;
-        feeMicroUsd: number;
+        creditMicroSar: number;
+        feeMicroSar: number;
         /** What the provider actually collected. */
-        collectedMicroUsd: number;
+        collectedMicroSar: number;
       }
     | {
         type: "refunded";
         refundId: string;
         paymentId: string;
-        refundedMicroUsd: number;
+        refundedMicroSar: number;
       }
   );
 

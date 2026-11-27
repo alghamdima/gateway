@@ -50,8 +50,8 @@ export const apiKey = pgTable(
     prefix: text().notNull(),
     /** SHA-256 hex of the key, to recognize a key someone pastes. */
     valueHash: text().notNull().unique(),
-    /** Spending cap in micro-USD, separate from the prepaid balance. Null: no cap. */
-    limitMicroUsd: bigint({ mode: "number" }),
+    /** Spending cap in micro-SAR, separate from the prepaid balance. Null: no cap. */
+    limitMicroSar: bigint({ mode: "number" }),
     /** When the cap resets. Null with a cap: it never resets. */
     limitReset: text({ enum: API_KEY_LIMIT_RESETS }),
     expiresAt: timestamp(),
@@ -66,11 +66,11 @@ export const apiKey = pgTable(
     index("api_key_organizationId_idx").on(t.organizationId),
     check(
       "api_key_limit_positive",
-      sql`${t.limitMicroUsd} is null or ${t.limitMicroUsd} > 0`,
+      sql`${t.limitMicroSar} is null or ${t.limitMicroSar} > 0`,
     ),
     check(
       "api_key_limit_reset_needs_limit",
-      sql`${t.limitReset} is null or ${t.limitMicroUsd} is not null`,
+      sql`${t.limitReset} is null or ${t.limitMicroSar} is not null`,
     ),
     check(
       "api_key_limit_reset_value",

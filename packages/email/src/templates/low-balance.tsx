@@ -50,8 +50,8 @@ LowBalance.subject = async ({ locale }: CommonEmailProps) => {
 LowBalance.PreviewProps = {
   url: "https://example.com/dashboard/acme/credits",
   organization: "Acme",
-  available: "$1.20",
-  threshold: "$5.00",
+  available: "SAR 4.50",
+  threshold: "SAR 20.00",
 };
 
 export default LowBalance;

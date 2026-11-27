@@ -12,20 +12,32 @@ const adminUrl = process.env.DATABASE_URL;
 // The router's middleware imports the auth server and the translations (JSX the
 // test runner does not compile); the request test needs only the English
 // validation messages.
-vi.mock("@workspace/auth/server", () => ({ auth: {} }));
+const audited = vi.hoisted(() => [] as Record<string, unknown>[]);
+vi.mock("@workspace/auth/server", () => ({
+  auth: {},
+  clientIp: () => null,
+  recordStaffAction: async (entry: Record<string, unknown>) => {
+    audited.push(entry);
+  },
+}));
 vi.mock("@workspace/i18n", async () => {
   const z = await import("zod");
   return { getValidationLocale: () => z.locales.en };
 });
 vi.mock("@workspace/i18n/server", () => ({ getLocaleFromRequest: () => "en" }));
 
-const USD = 1_000_000;
+const SAR = 1_000_000;
 
-/** The top-up limits the migration seeds: $5 to $1,000, quick picks 10/25/50/100. */
+/**
+ * What the migration seeds besides the fee: top-ups of SAR 20 to SAR 3,750,
+ * quick picks 40/100/200/400, and the peg (3.75) with no bank spread.
+ */
 const LIMITS = {
-  topupMinMicroUsd: 5 * USD,
-  topupMaxMicroUsd: 1000 * USD,
-  topupPresetsMicroUsd: [10 * USD, 25 * USD, 50 * USD, 100 * USD],
+  topupMinMicroSar: 20 * SAR,
+  topupMaxMicroSar: 3750 * SAR,
+  topupPresetsMicroSar: [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR],
+  usdToSarRateE6: 3_750_000,
+  fxSpreadBps: 0,
 };
 
 describe.skipIf(!adminUrl)("admin pricing", () => {
@@ -61,23 +73,24 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     await database.drop();
   });
 
-  it("starts at no markup, a 5.5% top-up fee and top-ups of $5 to $1,000", async () => {
+  it("starts at no markup, a 5.5% top-up fee (SAR 3 minimum), top-ups of SAR 20 to SAR 3,750 and the peg", async () => {
     const { settings, providers } = await pricing.getPricing();
     expect(settings).toMatchObject({
       defaultMarkupBps: 0,
       topupFeeBps: 550,
-      topupFeeMinMicroUsd: 800_000,
+      topupFeeMinMicroSar: 3_000_000,
       ...LIMITS,
+      effectiveUsdToSarRateE6: 3_750_000,
     });
     expect(providers).toEqual([]);
   });
 
   it("records who changed the settings, and from what to what", async () => {
     const before = await pricing.getPricingSettings();
-    const after = await pricing.updatePricingSettings({
+    const { settings: after } = await pricing.updatePricingSettings({
       defaultMarkupBps: 300,
       topupFeeBps: 500,
-      topupFeeMinMicroUsd: 1_000_000,
+      topupFeeMinMicroSar: 1_000_000,
       ...LIMITS,
       staffId: "staff_1",
     });
@@ -92,15 +105,15 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       before: {
         defaultMarkupBps: before.defaultMarkupBps,
         topupFeeBps: before.topupFeeBps,
-        topupFeeMinMicroUsd: before.topupFeeMinMicroUsd,
-        topupMinMicroUsd: before.topupMinMicroUsd,
-        topupMaxMicroUsd: before.topupMaxMicroUsd,
-        topupPresetsMicroUsd: before.topupPresetsMicroUsd,
+        topupFeeMinMicroSar: before.topupFeeMinMicroSar,
+        topupMinMicroSar: before.topupMinMicroSar,
+        topupMaxMicroSar: before.topupMaxMicroSar,
+        topupPresetsMicroSar: before.topupPresetsMicroSar,
       },
       after: {
         defaultMarkupBps: 300,
         topupFeeBps: 500,
-        topupFeeMinMicroUsd: 1_000_000,
+        topupFeeMinMicroSar: 1_000_000,
         ...LIMITS,
       },
       changed_by: "staff_1",
@@ -115,7 +128,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       pricing.updatePricingSettings({
         defaultMarkupBps: -1,
         topupFeeBps: 0,
-        topupFeeMinMicroUsd: 800_000,
+        topupFeeMinMicroSar: 3_000_000,
         ...LIMITS,
         staffId: "staff_1",
       }),
@@ -126,7 +139,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       pricing.updatePricingSettings({
         defaultMarkupBps: 0,
         topupFeeBps: 10_001,
-        topupFeeMinMicroUsd: 800_000,
+        topupFeeMinMicroSar: 3_000_000,
         ...LIMITS,
         staffId: "staff_1",
       }),
@@ -137,7 +150,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       pricing.updatePricingSettings({
         defaultMarkupBps: 0,
         topupFeeBps: 0,
-        topupFeeMinMicroUsd: 100_000_001,
+        topupFeeMinMicroSar: 400_000_001,
         ...LIMITS,
         staffId: "staff_1",
       }),
@@ -213,7 +226,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         pricing.updatePricingSettings({
           defaultMarkupBps: 1000 + i,
           topupFeeBps: 100 + i,
-          topupFeeMinMicroUsd: 800_000,
+          topupFeeMinMicroSar: 3_000_000,
           ...LIMITS,
           staffId: `staff_${i}`,
         }),
@@ -229,10 +242,13 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     expect(history.at(-1)?.after).toEqual({
       defaultMarkupBps: settings.defaultMarkupBps,
       topupFeeBps: settings.topupFeeBps,
-      topupFeeMinMicroUsd: settings.topupFeeMinMicroUsd,
-      topupMinMicroUsd: settings.topupMinMicroUsd,
-      topupMaxMicroUsd: settings.topupMaxMicroUsd,
-      topupPresetsMicroUsd: settings.topupPresetsMicroUsd,
+      topupFeeMinMicroSar: settings.topupFeeMinMicroSar,
+      topupMinMicroSar: settings.topupMinMicroSar,
+      topupMaxMicroSar: settings.topupMaxMicroSar,
+      topupPresetsMicroSar: settings.topupPresetsMicroSar,
+      usdToSarRateE6: settings.usdToSarRateE6,
+      fxSpreadBps: settings.fxSpreadBps,
+      effectiveUsdToSarRateE6: settings.effectiveUsdToSarRateE6,
     });
   });
 
@@ -242,7 +258,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     await pricing.updatePricingSettings({
       defaultMarkupBps: 42,
       topupFeeBps: 550,
-      topupFeeMinMicroUsd: 800_000,
+      topupFeeMinMicroSar: 3_000_000,
       ...LIMITS,
       staffId: "staff_named",
     });
@@ -290,35 +306,37 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     const fees = {
       defaultMarkupBps: 0,
       topupFeeBps: 550,
-      topupFeeMinMicroUsd: 800_000,
+      topupFeeMinMicroSar: 3_000_000,
+      usdToSarRateE6: 3_750_000,
+      fxSpreadBps: 0,
     };
 
     it("records the limits and quick picks before and after, picks once and smallest first", async () => {
       const before = await pricing.getPricingSettings();
-      const after = await pricing.updatePricingSettings({
+      const { settings: after } = await pricing.updatePricingSettings({
         ...fees,
-        topupMinMicroUsd: 20 * USD,
-        topupMaxMicroUsd: 5000 * USD,
-        topupPresetsMicroUsd: [500 * USD, 20 * USD, 100 * USD, 20 * USD],
+        topupMinMicroSar: 20 * SAR,
+        topupMaxMicroSar: 5000 * SAR,
+        topupPresetsMicroSar: [500 * SAR, 20 * SAR, 100 * SAR, 20 * SAR],
         staffId: "staff_limits",
       });
       expect(after).toMatchObject({
-        topupMinMicroUsd: 20 * USD,
-        topupMaxMicroUsd: 5000 * USD,
-        topupPresetsMicroUsd: [20 * USD, 100 * USD, 500 * USD],
+        topupMinMicroSar: 20 * SAR,
+        topupMaxMicroSar: 5000 * SAR,
+        topupPresetsMicroSar: [20 * SAR, 100 * SAR, 500 * SAR],
       });
 
       const [last] = (await changes("settings")).slice(-1);
       expect(last).toMatchObject({
         before: {
-          topupMinMicroUsd: before.topupMinMicroUsd,
-          topupMaxMicroUsd: before.topupMaxMicroUsd,
-          topupPresetsMicroUsd: before.topupPresetsMicroUsd,
+          topupMinMicroSar: before.topupMinMicroSar,
+          topupMaxMicroSar: before.topupMaxMicroSar,
+          topupPresetsMicroSar: before.topupPresetsMicroSar,
         },
         after: {
-          topupMinMicroUsd: 20 * USD,
-          topupMaxMicroUsd: 5000 * USD,
-          topupPresetsMicroUsd: [20 * USD, 100 * USD, 500 * USD],
+          topupMinMicroSar: 20 * SAR,
+          topupMaxMicroSar: 5000 * SAR,
+          topupPresetsMicroSar: [20 * SAR, 100 * SAR, 500 * SAR],
         },
         changed_by: "staff_limits",
       });
@@ -331,36 +349,36 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
     });
 
     it.each([
-      ["a minimum of zero", { topupMinMicroUsd: 0 }, "limits"],
+      ["a minimum of zero", { topupMinMicroSar: 0 }, "limits"],
       [
         "a maximum under the minimum",
-        { topupMinMicroUsd: 100 * USD, topupMaxMicroUsd: 99 * USD },
+        { topupMinMicroSar: 100 * SAR, topupMaxMicroSar: 99 * SAR },
         "limits",
       ],
       [
-        "a maximum over the $1,000,000 ceiling",
-        { topupMaxMicroUsd: 1_000_000 * USD + 1 },
+        "a maximum over the SAR 4,000,000 ceiling",
+        { topupMaxMicroSar: 4_000_000 * SAR + 1 },
         "limits",
       ],
-      ["no quick picks", { topupPresetsMicroUsd: [] }, "presets"],
+      ["no quick picks", { topupPresetsMicroSar: [] }, "presets"],
       [
         "nine quick picks",
         {
-          topupPresetsMicroUsd: Array.from(
+          topupPresetsMicroSar: Array.from(
             { length: 9 },
-            (_, i) => (10 + i) * USD,
+            (_, i) => (20 + i) * SAR,
           ),
         },
         "presets",
       ],
       [
         "a quick pick under the minimum",
-        { topupPresetsMicroUsd: [4 * USD, 10 * USD] },
+        { topupPresetsMicroSar: [19 * SAR, 40 * SAR] },
         "presets",
       ],
       [
         "a quick pick over the maximum",
-        { topupPresetsMicroUsd: [10 * USD, 1001 * USD] },
+        { topupPresetsMicroSar: [40 * SAR, 3751 * SAR] },
         "presets",
       ],
     ])(
@@ -421,28 +439,210 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         });
 
       const maxBelowMin = await put({
-        topupMinMicroUsd: 50 * USD,
-        topupMaxMicroUsd: 40 * USD,
-        topupPresetsMicroUsd: [50 * USD],
+        topupMinMicroSar: 50 * SAR,
+        topupMaxMicroSar: 40 * SAR,
+        topupPresetsMicroSar: [50 * SAR],
       });
       expect(maxBelowMin.status).toBe(422);
       expect(await maxBelowMin.json()).toEqual({
         message: "The top-up maximum must be at least the minimum",
       });
 
-      const presetOutside = await put({ topupPresetsMicroUsd: [2 * USD] });
+      const presetOutside = await put({ topupPresetsMicroSar: [2 * SAR] });
       expect(presetOutside.status).toBe(422);
       expect(await presetOutside.json()).toEqual({
         message: "Each quick-pick amount must be within the top-up limits",
       });
 
-      const valid = await put({ topupMaxMicroUsd: 2000 * USD });
+      const valid = await put({ topupMaxMicroSar: 2000 * SAR });
       expect(valid.status).toBe(200);
       expect(await valid.json()).toMatchObject({
-        topupMaxMicroUsd: 2000 * USD,
+        topupMaxMicroSar: 2000 * SAR,
         updatedBy: "staff_http",
       });
       await put({});
+    });
+  });
+
+  describe("USD to SAR rate and bank spread (ADMIN-06)", () => {
+    const others = {
+      defaultMarkupBps: 0,
+      topupFeeBps: 550,
+      topupFeeMinMicroSar: 3_000_000,
+      topupMinMicroSar: 20 * SAR,
+      topupMaxMicroSar: 3750 * SAR,
+      topupPresetsMicroSar: [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR],
+    };
+
+    it("records the rate, the spread and the effective rate before and after", async () => {
+      await pricing.updatePricingSettings({
+        ...others,
+        usdToSarRateE6: 3_750_000,
+        fxSpreadBps: 0,
+        staffId: "staff_fx",
+      });
+      const { settings } = await pricing.updatePricingSettings({
+        ...others,
+        usdToSarRateE6: 3_760_000,
+        fxSpreadBps: 250,
+        staffId: "staff_fx",
+      });
+      // 3.76 + 2.5% = 3.854, worked out from the two stored values
+      expect(settings).toMatchObject({
+        usdToSarRateE6: 3_760_000,
+        fxSpreadBps: 250,
+        effectiveUsdToSarRateE6: 3_854_000,
+      });
+      expect(await pricing.getPricingSettings()).toMatchObject({
+        effectiveUsdToSarRateE6: 3_854_000,
+      });
+
+      const [last] = (await changes("settings")).slice(-1);
+      expect(last).toMatchObject({
+        before: {
+          usdToSarRateE6: 3_750_000,
+          fxSpreadBps: 0,
+          effectiveUsdToSarRateE6: 3_750_000,
+        },
+        after: {
+          usdToSarRateE6: 3_760_000,
+          fxSpreadBps: 250,
+          effectiveUsdToSarRateE6: 3_854_000,
+        },
+        changed_by: "staff_fx",
+      });
+
+      await pricing.updatePricingSettings({
+        ...others,
+        ...LIMITS,
+        staffId: "staff_fx",
+      });
+    });
+
+    it.each([
+      ["a rate under 3", { usdToSarRateE6: 2_999_999 }, "usd_to_sar_rate"],
+      ["a rate over 5", { usdToSarRateE6: 5_000_001 }, "usd_to_sar_rate"],
+      [
+        "a rate typed ten times too big",
+        { usdToSarRateE6: 37_500_000 },
+        "usd_to_sar_rate",
+      ],
+      ["a spread over 10%", { fxSpreadBps: 1001 }, "fx_spread"],
+      ["a negative spread", { fxSpreadBps: -1 }, "fx_spread"],
+    ])(
+      "the database refuses %s and records nothing",
+      async (_, change, check) => {
+        const count = (await changes()).length;
+        const current = await pricing.getPricingSettings();
+
+        await expect(
+          pricing.updatePricingSettings({
+            ...others,
+            ...LIMITS,
+            ...change,
+            staffId: "staff_1",
+          }),
+        ).rejects.toMatchObject({
+          cause: { constraint_name: `pricing_settings_${check}_range` },
+        });
+
+        expect(await pricing.getPricingSettings()).toEqual(current);
+        expect(await changes()).toHaveLength(count);
+      },
+    );
+
+    it.each([
+      [3_000_000, true],
+      [5_000_000, true],
+      [2_999_999, false],
+      [5_000_001, false],
+      [3.75, false],
+    ])("the admin API takes a rate of %d: %s", async (rate, isValid) => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      expect(
+        updatePricingSettingsSchema.safeParse({
+          ...others,
+          ...LIMITS,
+          usdToSarRateE6: rate,
+        }).success,
+      ).toBe(isValid);
+    });
+
+    it.each([
+      [0, true],
+      [1000, true],
+      [1001, false],
+      [-1, false],
+    ])(
+      "the admin API takes a spread of %d bps: %s",
+      async (spread, isValid) => {
+        const { updatePricingSettingsSchema } = await import("../../../schema");
+        expect(
+          updatePricingSettingsSchema.safeParse({
+            ...others,
+            ...LIMITS,
+            fxSpreadBps: spread,
+          }).success,
+        ).toBe(isValid);
+      },
+    );
+
+    it("writes the values before and after to the admin audit log", async () => {
+      const { Hono } = await import("hono");
+      const { enforceStaffAccess } =
+        await import("../../admin/access-middleware");
+      const { pricingRouter } = await import("../router");
+      const staff: User = {
+        id: "staff_audit",
+        name: "Staff",
+        email: "audit@example.com",
+        emailVerified: true,
+        banned: false,
+        isAnonymous: false,
+        twoFactorEnabled: false,
+        role: "admin",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const app = new Hono<{ Variables: { user: User } }>()
+        .use(async (c, next) => {
+          c.set("user", staff);
+          await next();
+        })
+        .use("/api/admin/*", enforceStaffAccess)
+        .route("/api/admin/pricing", pricingRouter);
+
+      audited.length = 0;
+      const response = await app.request("/api/admin/pricing/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...others,
+          ...LIMITS,
+          usdToSarRateE6: 3_800_000,
+          fxSpreadBps: 100,
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(audited).toHaveLength(1);
+      expect(audited[0]).toMatchObject({
+        actorId: "staff_audit",
+        action: "pricing.update",
+        details: {
+          before: { usdToSarRateE6: 3_750_000, fxSpreadBps: 0 },
+          after: {
+            usdToSarRateE6: 3_800_000,
+            fxSpreadBps: 100,
+            effectiveUsdToSarRateE6: 3_838_000,
+          },
+        },
+      });
+
+      await pricing.updatePricingSettings({
+        ...others,
+        ...LIMITS,
+        staffId: "staff_audit",
+      });
     });
   });
 
@@ -476,7 +676,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         {
           defaultMarkupBps: 0,
           topupFeeBps: 10_000,
-          topupFeeMinMicroUsd: 0,
+          topupFeeMinMicroSar: 0,
           ...LIMITS,
         },
         true,
@@ -485,7 +685,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         {
           defaultMarkupBps: 0,
           topupFeeBps: 10_001,
-          topupFeeMinMicroUsd: 0,
+          topupFeeMinMicroSar: 0,
           ...LIMITS,
         },
         false,
@@ -494,7 +694,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         {
           defaultMarkupBps: 0,
           topupFeeBps: 550,
-          topupFeeMinMicroUsd: -1,
+          topupFeeMinMicroSar: -1,
           ...LIMITS,
         },
         false,
@@ -503,14 +703,14 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         {
           defaultMarkupBps: 0,
           topupFeeBps: 550,
-          topupFeeMinMicroUsd: 0.5,
+          topupFeeMinMicroSar: 0.5,
           ...LIMITS,
         },
         false,
       ],
       [{ defaultMarkupBps: 0, topupFeeBps: 550 }, false],
       [
-        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroUsd: 0 },
+        { defaultMarkupBps: 0, topupFeeBps: 550, topupFeeMinMicroSar: 0 },
         false,
       ],
     ])("settings %j", async (input, isValid) => {
@@ -524,54 +724,54 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
       ["the seeded limits", {}, true],
       [
         "a maximum equal to the minimum",
-        { topupMaxMicroUsd: 5 * USD, topupPresetsMicroUsd: [5 * USD] },
+        { topupMaxMicroSar: 20 * SAR, topupPresetsMicroSar: [20 * SAR] },
         true,
       ],
       [
         "eight quick picks",
         {
-          topupPresetsMicroUsd: Array.from(
+          topupPresetsMicroSar: Array.from(
             { length: 8 },
-            (_, i) => (10 + i) * USD,
+            (_, i) => (20 + i) * SAR,
           ),
         },
         true,
       ],
       [
         "a maximum under the minimum",
-        { topupMaxMicroUsd: 4 * USD, topupPresetsMicroUsd: [4 * USD] },
+        { topupMaxMicroSar: 19 * SAR, topupPresetsMicroSar: [19 * SAR] },
         false,
       ],
-      ["a minimum of zero", { topupMinMicroUsd: 0 }, false],
+      ["a minimum of zero", { topupMinMicroSar: 0 }, false],
       [
         "a maximum over the ceiling",
-        { topupMaxMicroUsd: 1_000_000 * USD + 10_000 },
+        { topupMaxMicroSar: 4_000_000 * SAR + 10_000 },
         false,
       ],
       [
-        "an amount that is not whole cents",
-        { topupMinMicroUsd: 5 * USD + 1 },
+        "an amount that is not whole halalas",
+        { topupMinMicroSar: 20 * SAR + 1 },
         false,
       ],
-      ["no quick picks", { topupPresetsMicroUsd: [] }, false],
+      ["no quick picks", { topupPresetsMicroSar: [] }, false],
       [
         "nine quick picks",
         {
-          topupPresetsMicroUsd: Array.from(
+          topupPresetsMicroSar: Array.from(
             { length: 9 },
-            (_, i) => (10 + i) * USD,
+            (_, i) => (20 + i) * SAR,
           ),
         },
         false,
       ],
       [
         "a quick pick under the minimum",
-        { topupPresetsMicroUsd: [1 * USD] },
+        { topupPresetsMicroSar: [1 * SAR] },
         false,
       ],
       [
         "a quick pick over the maximum",
-        { topupPresetsMicroUsd: [2000 * USD] },
+        { topupPresetsMicroSar: [4000 * SAR] },
         false,
       ],
     ])("top-up limits: %s", async (_, change, isValid) => {
@@ -580,7 +780,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
         updatePricingSettingsSchema.safeParse({
           defaultMarkupBps: 0,
           topupFeeBps: 550,
-          topupFeeMinMicroUsd: 800_000,
+          topupFeeMinMicroSar: 3_000_000,
           ...LIMITS,
           ...change,
         }).success,
@@ -594,7 +794,7 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
           .safeParse({
             defaultMarkupBps: 0,
             topupFeeBps: 550,
-            topupFeeMinMicroUsd: 800_000,
+            topupFeeMinMicroSar: 3_000_000,
             ...LIMITS,
             ...change,
           })
@@ -602,17 +802,17 @@ describe.skipIf(!adminUrl)("admin pricing", () => {
 
       expect(
         issues({
-          topupMinMicroUsd: 50 * USD,
-          topupMaxMicroUsd: 40 * USD,
-          topupPresetsMicroUsd: [45 * USD],
+          topupMinMicroSar: 50 * SAR,
+          topupMaxMicroSar: 40 * SAR,
+          topupPresetsMicroSar: [45 * SAR],
         }),
       ).toContainEqual({
-        path: ["topupMaxMicroUsd"],
+        path: ["topupMaxMicroSar"],
         message: "The top-up maximum must be at least the minimum",
       });
-      expect(issues({ topupPresetsMicroUsd: [10 * USD, 1001 * USD] })).toEqual([
+      expect(issues({ topupPresetsMicroSar: [40 * SAR, 3751 * SAR] })).toEqual([
         {
-          path: ["topupPresetsMicroUsd", 1],
+          path: ["topupPresetsMicroSar", 1],
           message: "Each quick-pick amount must be within the top-up limits",
         },
       ]);

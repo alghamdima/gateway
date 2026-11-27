@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { computeTopupFee } from "../fee";
 
 const USD = 1_000_000;
-const openRouter = { topupFeeBps: 550, topupFeeMinMicroUsd: 0.8 * USD };
+const openRouter = { topupFeeBps: 550, topupFeeMinMicroSar: 0.8 * USD };
 
 describe("top-up fee", () => {
   it.each([
@@ -29,24 +29,24 @@ describe("top-up fee", () => {
 
   it("rounds a minimum that is not whole cents up, never down", () => {
     expect(
-      computeTopupFee(USD, { topupFeeBps: 0, topupFeeMinMicroUsd: 1 }),
+      computeTopupFee(USD, { topupFeeBps: 0, topupFeeMinMicroSar: 1 }),
     ).toBe(10_000);
   });
 
   it("charges nothing when both rates are zero", () => {
     expect(
-      computeTopupFee(50 * USD, { topupFeeBps: 0, topupFeeMinMicroUsd: 0 }),
+      computeTopupFee(50 * USD, { topupFeeBps: 0, topupFeeMinMicroSar: 0 }),
     ).toBe(0);
   });
 
   it("charges only the minimum when the percentage is zero", () => {
     expect(
-      computeTopupFee(50 * USD, { topupFeeBps: 0, topupFeeMinMicroUsd: USD }),
+      computeTopupFee(50 * USD, { topupFeeBps: 0, topupFeeMinMicroSar: USD }),
     ).toBe(USD);
   });
 
   it("is exact for amounts far beyond any float rounding", () => {
-    // 9 billion USD in micro-USD is close to Number.MAX_SAFE_INTEGER
+    // 9 billion USD in micro-SAR is close to Number.MAX_SAFE_INTEGER
     expect(computeTopupFee(9_000_000_000 * USD, openRouter)).toBe(
       495_000_000 * USD,
     );
@@ -60,7 +60,7 @@ describe("top-up fee", () => {
 
   it("refuses negative rates", () => {
     expect(() =>
-      computeTopupFee(USD, { topupFeeBps: -1, topupFeeMinMicroUsd: 0 }),
+      computeTopupFee(USD, { topupFeeBps: -1, topupFeeMinMicroSar: 0 }),
     ).toThrow(/non-negative/);
   });
 });

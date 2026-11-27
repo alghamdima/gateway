@@ -1,6 +1,6 @@
 # ADR 0001: Credits ledger in Postgres, enforced by a gateway plugin with reservations
 
-Status: Accepted. Where the reserve and settle statements run is revised by ADR 0009.
+Status: Accepted. Where the reserve and settle statements run is revised by ADR 0009. The unit is revised by ADR 0017: the ledger is in micro-SAR, and each hold and charge stores the USD to SAR rate it was converted at and the provider's USD cost.
 Date: 2026-11-21
 
 ## Context

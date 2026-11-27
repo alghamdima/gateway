@@ -21,7 +21,7 @@ import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
-import { formatMicroUsd, MICRO_USD, usdToMicroUsd } from "~/modules/keys/money";
+import { formatMicroSar, MICRO_SAR, sarToMicroSar } from "~/modules/keys/money";
 import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
 
 interface LowBalanceAlertProps {
@@ -47,18 +47,18 @@ export const LowBalanceAlert = ({ organizationId }: LowBalanceAlertProps) => {
       }),
   });
   const [draft, setDraft] = useState<string | null>(null);
-  const current = setting.data?.thresholdMicroUsd ?? null;
-  const value = draft ?? (current === null ? "" : String(current / MICRO_USD));
+  const current = setting.data?.thresholdMicroSar ?? null;
+  const value = draft ?? (current === null ? "" : String(current / MICRO_SAR));
   const parsed =
     /^\d+(\.\d{1,2})?$/.test(value.trim()) && Number(value) > 0
       ? Number(value)
       : null;
 
   const save = useMutation({
-    mutationFn: (thresholdMicroUsd: number | null) =>
+    mutationFn: (thresholdMicroSar: number | null) =>
       handle(api.credits[":organizationId"]["low-balance-alert"].$put)({
         param: { organizationId },
-        json: { thresholdMicroUsd },
+        json: { thresholdMicroSar },
       }),
     onSuccess: async () => {
       setDraft(null);
@@ -80,7 +80,7 @@ export const LowBalanceAlert = ({ organizationId }: LowBalanceAlertProps) => {
             : current === null
               ? t("organization:credits.lowBalance.off")
               : t("organization:credits.lowBalance.on", {
-                  threshold: formatMicroUsd(current, i18n.language),
+                  threshold: formatMicroSar(current, i18n.language),
                 })}
         </CardDescription>
       </CardHeader>
@@ -99,7 +99,7 @@ export const LowBalanceAlert = ({ organizationId }: LowBalanceAlertProps) => {
               {t("organization:credits.lowBalance.threshold")}
             </FieldLabel>
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">$</span>
+              <span className="text-muted-foreground">SAR</span>
               <Input
                 id="low-balance-threshold"
                 inputMode="decimal"
@@ -116,7 +116,7 @@ export const LowBalanceAlert = ({ organizationId }: LowBalanceAlertProps) => {
           </Field>
           <Button
             onClick={() =>
-              parsed !== null && save.mutate(usdToMicroUsd(parsed))
+              parsed !== null && save.mutate(sarToMicroSar(parsed))
             }
             disabled={parsed === null || save.isPending}
           >

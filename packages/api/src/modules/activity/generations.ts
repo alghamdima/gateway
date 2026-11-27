@@ -11,8 +11,9 @@ import {
   getGateway,
 } from "@workspace/gateway-client/server";
 import { logger } from "@workspace/shared/logger";
+import { CURRENCY, MICRO_USD, RATE_E6 } from "@workspace/shared/utils";
 
-import { MICRO_USD } from "../credits/ledger";
+import { MICRO_SAR } from "../credits/ledger";
 import { getDataEvidence } from "../data-policy/evidence";
 
 import type { DataEvidence } from "../data-policy/evidence";
@@ -37,8 +38,11 @@ export interface Generation {
   provider_name: string | null;
   tokens_prompt: number;
   tokens_completion: number;
-  /** USD charged, markup included. */
+  /** SAR charged, markup included (the account's currency, ADR 0017). */
   total_cost: number;
+  /** The providers' cost in USD before markup: what the charge was converted from. */
+  upstream_cost_usd: number;
+  currency: typeof CURRENCY;
   /** Milliseconds; null once the gateway's log has expired. */
   latency: number | null;
   finish_reason: string | null;
@@ -47,7 +51,12 @@ export interface Generation {
     provider: string | null;
     model: string | null;
     status: "success" | "error";
+    /** SAR charged for the attempt. */
     cost: number;
+    /** The provider's cost in USD before markup. */
+    upstream_cost_usd: number;
+    /** The effective USD to SAR rate the attempt was converted at. */
+    usd_to_sar_rate: number;
     created_at: string;
   }[];
   /** Where the serving endpoint processes data; null when unknown. */
@@ -64,6 +73,8 @@ const metadataNumber = (key: string) =>
 const attemptColumns = {
   reference: creditLedgerEntry.reference,
   amount: creditLedgerEntry.amount,
+  costMicroUsd: creditLedgerEntry.costMicroUsd,
+  effectiveUsdToSarRateE6: creditLedgerEntry.effectiveUsdToSarRateE6,
   createdAt: creditLedgerEntry.createdAt,
   model: metadataText("model"),
   provider: metadataText("provider"),
@@ -125,7 +136,10 @@ export const getGeneration = async (
       (sum, a) => sum + Number(a.completionTokens ?? 0),
       0,
     ),
-    total_cost: attempts.reduce((sum, a) => sum - a.amount, 0) / MICRO_USD,
+    total_cost: attempts.reduce((sum, a) => sum - a.amount, 0) / MICRO_SAR,
+    upstream_cost_usd:
+      attempts.reduce((sum, a) => sum + (a.costMicroUsd ?? 0), 0) / MICRO_USD,
+    currency: CURRENCY,
     latency: log?.latency ?? null,
     finish_reason: log?.stop_reason ?? null,
     streamed: log?.stream ?? null,
@@ -133,7 +147,9 @@ export const getGeneration = async (
       provider: a.provider,
       model: a.model,
       status: a.failed ? "error" : "success",
-      cost: -a.amount / MICRO_USD,
+      cost: -a.amount / MICRO_SAR,
+      upstream_cost_usd: (a.costMicroUsd ?? 0) / MICRO_USD,
+      usd_to_sar_rate: (a.effectiveUsdToSarRateE6 ?? 0) / RATE_E6,
       created_at: a.createdAt.toISOString(),
     })),
   };
@@ -180,8 +196,10 @@ export interface RecentRequest {
   keyPrefix: string | null;
   promptTokens: number;
   completionTokens: number;
-  /** micro-USD. */
+  /** micro-SAR charged. */
   cost: number;
+  /** The provider's cost in micro-USD before markup; null on entries older than SAR. */
+  costMicroUsd: number | null;
   failed: boolean;
 }
 
@@ -221,6 +239,7 @@ export const listRecentRequests = async ({
     promptTokens: Number(row.promptTokens ?? 0),
     completionTokens: Number(row.completionTokens ?? 0),
     cost: -row.amount,
+    costMicroUsd: row.costMicroUsd,
     failed: row.failed === true,
   }));
 };

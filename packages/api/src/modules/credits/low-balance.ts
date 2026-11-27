@@ -4,8 +4,9 @@ import { db } from "@workspace/db/server";
 import { EmailTemplate } from "@workspace/email";
 import { sendEmail } from "@workspace/email/server";
 import { logger } from "@workspace/shared/logger";
+import { formatMicroSar } from "@workspace/shared/utils";
 
-import { MICRO_USD } from "./ledger";
+import { MICRO_SAR } from "./ledger";
 
 /**
  * Emails an organization's owners and admins when its spendable credits drop
@@ -13,36 +14,37 @@ import { MICRO_USD } from "./ledger";
  * has been back above it. Run hourly through GET /api/internal/low-balance.
  */
 
-export const DEFAULT_LOW_BALANCE_THRESHOLD = 5 * MICRO_USD;
+/** SAR 20 (it was $5, × 3.75 rounded); staff set it in the admin with ADMIN-14. */
+export const DEFAULT_LOW_BALANCE_THRESHOLD = 20 * MICRO_SAR;
 
 export interface LowBalanceSetting {
-  /** micro-USD; null when the organization turned the alert off. */
-  thresholdMicroUsd: number | null;
+  /** micro-SAR; null when the organization turned the alert off. */
+  thresholdMicroSar: number | null;
 }
 
 export const getLowBalanceSetting = async (
   organizationId: string,
 ): Promise<LowBalanceSetting> => {
   const [row] = await db
-    .select({ thresholdMicroUsd: lowBalanceAlert.thresholdMicroUsd })
+    .select({ thresholdMicroSar: lowBalanceAlert.thresholdMicroSar })
     .from(lowBalanceAlert)
     .where(eq(lowBalanceAlert.organizationId, organizationId));
-  return row ?? { thresholdMicroUsd: DEFAULT_LOW_BALANCE_THRESHOLD };
+  return row ?? { thresholdMicroSar: DEFAULT_LOW_BALANCE_THRESHOLD };
 };
 
 /** A new threshold starts a new watch: the next dip below it is emailed. */
 export const setLowBalanceSetting = async (
   organizationId: string,
-  thresholdMicroUsd: number | null,
+  thresholdMicroSar: number | null,
 ): Promise<LowBalanceSetting> => {
   await db
     .insert(lowBalanceAlert)
-    .values({ organizationId, thresholdMicroUsd, notifiedAt: null })
+    .values({ organizationId, thresholdMicroSar, notifiedAt: null })
     .onConflictDoUpdate({
       target: lowBalanceAlert.organizationId,
-      set: { thresholdMicroUsd, notifiedAt: null },
+      set: { thresholdMicroSar, notifiedAt: null },
     });
-  return { thresholdMicroUsd };
+  return { thresholdMicroSar };
 };
 
 // a row of the raw query below: a type, because the driver wants an index signature
@@ -55,13 +57,8 @@ type Candidate = {
   notified: boolean;
 };
 
-const usd = (microUsd: number) =>
-  new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
-  }).format(microUsd / MICRO_USD);
+const sar = (microSar: number) =>
+  formatMicroSar(microSar, "en", { maximumFractionDigits: 6 });
 
 export const checkLowBalances = async ({
   origin,
@@ -76,12 +73,12 @@ export const checkLowBalances = async ({
     ...(await db.execute<Candidate>(sql`
       SELECT o.id AS organization_id, o.name, o.slug,
              (a.balance - a.held) AS available,
-             coalesce(l.threshold_micro_usd, ${DEFAULT_LOW_BALANCE_THRESHOLD}) AS threshold,
+             coalesce(l.threshold_micro_sar, ${DEFAULT_LOW_BALANCE_THRESHOLD}) AS threshold,
              (l.notified_at IS NOT NULL) AS notified
         FROM credit_account a
         JOIN organization o ON o.id = a.organization_id
         LEFT JOIN low_balance_alert l ON l.organization_id = a.organization_id
-       WHERE (l.organization_id IS NULL OR l.threshold_micro_usd IS NOT NULL)
+       WHERE (l.organization_id IS NULL OR l.threshold_micro_sar IS NOT NULL)
          AND EXISTS (
            SELECT 1 FROM credit_ledger_entry e
             WHERE e.organization_id = a.organization_id AND e.amount > 0
@@ -113,7 +110,7 @@ export const checkLowBalances = async ({
       .insert(lowBalanceAlert)
       .values({
         organizationId: org.organization_id,
-        thresholdMicroUsd: threshold,
+        thresholdMicroSar: threshold,
         notifiedAt: now,
       })
       .onConflictDoUpdate({
@@ -135,8 +132,8 @@ export const checkLowBalances = async ({
           variables: {
             url: new URL(`/dashboard/${org.slug}/credits`, origin).toString(),
             organization: org.name,
-            available: usd(available),
-            threshold: usd(threshold),
+            available: sar(available),
+            threshold: sar(threshold),
           },
         });
         emailed++;

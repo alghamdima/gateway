@@ -32,7 +32,7 @@ import {
 } from "@workspace/ui-web/select";
 import { Spinner } from "@workspace/ui-web/spinner";
 
-import { MICRO_USD, usdToMicroUsd } from "~/modules/keys/money";
+import { MICRO_SAR, sarToMicroSar } from "~/modules/keys/money";
 
 export const RESETS = ["never", "daily", "weekly", "monthly"] as const;
 export type Reset = (typeof RESETS)[number];
@@ -40,14 +40,14 @@ export type Reset = (typeof RESETS)[number];
 export interface KeyFormValues {
   name: string;
   /** Empty: no limit. */
-  limitUsd: string;
+  limitSar: string;
   reset: Reset;
 }
 
 export interface KeyFormResult {
   name: string;
   limit: {
-    limitMicroUsd: number;
+    limitMicroSar: number;
     reset: Exclude<Reset, "never"> | null;
   } | null;
 }
@@ -74,7 +74,7 @@ export const KeyFormModal = ({
 
   const schema = z.object({
     name: z.string().trim().min(1).max(100),
-    limitUsd: z
+    limitSar: z
       .string()
       .trim()
       .refine(
@@ -92,21 +92,21 @@ export const KeyFormModal = ({
     resolver: standardSchemaResolver(schema),
     values: {
       name: initial?.name ?? "",
-      limitUsd: initial?.limitUsd ?? "",
+      limitSar: initial?.limitSar ?? "",
       reset: initial?.reset ?? "monthly",
     },
   });
-  const limitUsd = useWatch({ control: form.control, name: "limitUsd" });
-  const hasLimit = limitUsd.trim() !== "";
+  const limitSar = useWatch({ control: form.control, name: "limitSar" });
+  const hasLimit = limitSar.trim() !== "";
 
   const submit = async (values: z.infer<typeof schema>) => {
     await onSubmit({
       name: values.name,
       limit:
-        values.limitUsd === ""
+        values.limitSar === ""
           ? null
           : {
-              limitMicroUsd: usdToMicroUsd(Number(values.limitUsd)),
+              limitMicroSar: sarToMicroSar(Number(values.limitSar)),
               reset: values.reset === "never" ? null : values.reset,
             },
     });
@@ -157,7 +157,7 @@ export const KeyFormModal = ({
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <Controller
-                name="limitUsd"
+                name="limitSar"
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
@@ -165,7 +165,7 @@ export const KeyFormModal = ({
                       {t("organization:keys.form.limit.label")}
                     </FieldLabel>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">$</span>
+                      <span className="text-muted-foreground">SAR</span>
                       <Input
                         id="key-limit"
                         inputMode="decimal"
@@ -241,14 +241,14 @@ export const KeyFormModal = ({
 /** The form's values for a key as the API returns it. */
 export const toFormValues = (key: {
   name: string;
-  limitMicroUsd: number | null;
+  limitMicroSar: number | null;
   limitReset: string | null;
 }): KeyFormValues => ({
   name: key.name,
-  limitUsd:
-    key.limitMicroUsd === null ? "" : String(key.limitMicroUsd / MICRO_USD),
+  limitSar:
+    key.limitMicroSar === null ? "" : String(key.limitMicroSar / MICRO_SAR),
   reset:
-    key.limitMicroUsd === null
+    key.limitMicroSar === null
       ? "monthly"
       : (RESETS.find((reset) => reset === key.limitReset) ?? "never"),
 });

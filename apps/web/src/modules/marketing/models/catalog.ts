@@ -4,6 +4,13 @@ import { handle } from "@workspace/api/utils";
 
 import { api } from "~/lib/api/server";
 
+const pricingSchema = z.object({
+  prompt: z.string(),
+  completion: z.string(),
+  input_cache_read: z.string().optional(),
+  input_cache_write: z.string().optional(),
+});
+
 /** What GET /api/v1/models returns, as far as these pages read it. */
 const catalogSchema = z.object({
   data: z.array(
@@ -15,12 +22,9 @@ const catalogSchema = z.object({
         input_modalities: z.array(z.string()),
         output_modalities: z.array(z.string()),
       }),
-      pricing: z.object({
-        prompt: z.string(),
-        completion: z.string(),
-        input_cache_read: z.string().optional(),
-        input_cache_write: z.string().optional(),
-      }),
+      pricing: pricingSchema,
+      // the same prices in SAR at the current effective USD to SAR rate (ADR 0017)
+      pricing_sar: pricingSchema,
       top_provider: z.object({
         max_completion_tokens: z.number().nullable(),
       }),
@@ -51,14 +55,37 @@ export const providerOf = (model: CatalogModel) =>
 
 const TOKENS_PER_MILLION = 1_000_000;
 
-/** A price per token as USD per million tokens, the unit customers compare. */
-export const perMillion = (pricePerToken: string, locale: string) =>
+type PriceField = keyof z.infer<typeof pricingSchema>;
+
+const formatPerMillion = (
+  pricePerToken: string,
+  currency: "SAR" | "USD",
+  locale: string,
+) =>
   new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency,
+    currencyDisplay: "code",
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   }).format(Number(pricePerToken) * TOKENS_PER_MILLION);
+
+/**
+ * A price per million tokens, the unit customers compare: SAR, with the USD
+ * price beside it, "SAR 7.50 (USD 2.00)". Null when the model has no such price.
+ */
+export const perMillion = (
+  model: CatalogModel,
+  field: PriceField,
+  locale: string,
+) => {
+  const usd = model.pricing[field];
+  const sar = model.pricing_sar[field];
+  if (usd === undefined || sar === undefined) {
+    return null;
+  }
+  return `${formatPerMillion(sar, "SAR", locale)} (${formatPerMillion(usd, "USD", locale)})`;
+};
 
 export const formatCount = (value: number | null, locale: string) =>
   value === null ? null : new Intl.NumberFormat(locale).format(value);

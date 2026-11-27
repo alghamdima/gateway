@@ -22,7 +22,7 @@ import { toast } from "@workspace/ui-web/toast";
 
 import { api } from "~/lib/api/client";
 import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
-import { formatMicroUsd, usdToMicroUsd } from "~/modules/keys/money";
+import { formatMicroSar, sarToMicroSar } from "~/modules/keys/money";
 
 interface OrganizationCreditsProps {
   readonly organizationId: string;
@@ -54,7 +54,7 @@ export const OrganizationCredits = ({
   });
 
   const schema = z.object({
-    amountUsd: z
+    amountSar: z
       .string()
       .trim()
       .refine(
@@ -76,7 +76,7 @@ export const OrganizationCredits = ({
 
   const form = useForm({
     resolver: standardSchemaResolver(schema),
-    defaultValues: { amountUsd: "", reason: "" },
+    defaultValues: { amountSar: "", reason: "" },
   });
 
   const adjust = useMutation({
@@ -84,7 +84,7 @@ export const OrganizationCredits = ({
       handle(api.admin.organizations[":id"].credits.$post)({
         param: { id: organizationId },
         json: {
-          amount: usdToMicroUsd(Number(input.amountUsd)),
+          amount: sarToMicroSar(Number(input.amountSar)),
           reason: input.reason,
           idempotencyKey,
         },
@@ -100,7 +100,7 @@ export const OrganizationCredits = ({
     },
   });
 
-  const money = (microUsd: number) => formatMicroUsd(microUsd, i18n.language);
+  const money = (microSar: number) => formatMicroSar(microSar, i18n.language);
   const figures = balance.data
     ? [
         {
@@ -143,7 +143,7 @@ export const OrganizationCredits = ({
           className="flex flex-wrap items-start gap-4"
         >
           <Controller
-            name="amountUsd"
+            name="amountSar"
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid} className="w-48">
@@ -151,7 +151,7 @@ export const OrganizationCredits = ({
                   {t("admin:organizations.organization.credits.amount.label")}
                 </FieldLabel>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">$</span>
+                  <span className="text-muted-foreground">SAR</span>
                   <Input
                     id="admin-credits-amount"
                     inputMode="decimal"

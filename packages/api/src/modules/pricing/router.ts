@@ -18,21 +18,29 @@ import {
   updatePricingSettings,
 } from "./pricing";
 
+import type { AuditChange } from "../admin/access-middleware";
 import type { User } from "@workspace/auth";
 
 const providerParamSchema = z.object({ provider: pricingProviderSchema });
 
 /** Mounted under /api/admin, behind enforceAdmin. */
-export const pricingRouter = new Hono<{ Variables: { user: User } }>()
+export const pricingRouter = new Hono<{
+  Variables: { user: User; auditChange?: AuditChange };
+}>()
   .get("/", async (c) => c.json(await getPricing()))
   .get("/changes", async (c) => c.json(await getPricingChanges()))
-  .put("/settings", validate("json", updatePricingSettingsSchema), async (c) =>
-    c.json(
-      await updatePricingSettings({
+  .put(
+    "/settings",
+    validate("json", updatePricingSettingsSchema),
+    async (c) => {
+      const { settings, before, after } = await updatePricingSettings({
         ...c.req.valid("json"),
         staffId: c.var.user.id,
-      }),
-    ),
+      });
+      // the audit log keeps the values before and after, as pricing_change does
+      c.set("auditChange", { before, after });
+      return c.json(settings);
+    },
   )
   .put(
     "/providers/:provider",

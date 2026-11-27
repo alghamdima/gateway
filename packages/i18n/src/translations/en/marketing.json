@@ -83,7 +83,7 @@
     "unavailable": "The model catalog is not available right now. Try again shortly.",
     "count_one": "{{count}} model",
     "count_other": "{{count}} models",
-    "priceNote": "Prices are in US dollars per million tokens and include our fee.",
+    "priceNote": "Prices are in Saudi riyals per million tokens, with the US dollar price beside them, and include our fee. Riyal prices use today's exchange rate; each request is charged at the rate of the moment it is made.",
     "filters": {
       "search": "Search",
       "searchPlaceholder": "Model or provider",

@@ -1,7 +1,8 @@
 // Package credits is the gateway plugin that enforces the prepaid balance: it holds the
 // maximum cost of each attempt before the provider is called and charges the real cost
 // afterwards (docs/platform/adr/0001-credits-ledger.md, 0009-credits-plugin-hooks.md). The
-// markup comes from prices staff set in the admin console (0010-admin-controlled-pricing.md).
+// markup and the USD to SAR rate come from prices staff set in the admin console
+// (0010-admin-controlled-pricing.md); the ledger is in micro-SAR (0017-sar-ledger.md).
 //
 // It fails closed. A request it cannot attribute to an organization, cannot price, or
 // cannot record is refused, not served for free.
@@ -58,7 +59,7 @@ type Config struct {
 // ledger is the part of Store the hooks use.
 type ledger interface {
 	OrganizationFor(ctx context.Context, customerID string) (string, bool, error)
-	Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, ttl time.Duration) (string, ReserveOutcome, error)
+	Reserve(ctx context.Context, organizationID, virtualKeyID string, amount int64, fx fxRate, ttl time.Duration) (string, ReserveOutcome, error)
 	Settle(ctx context.Context, st Settlement) (SettleResult, error)
 	Extend(ctx context.Context, reservationID string, ttl time.Duration) (bool, error)
 }
@@ -103,10 +104,12 @@ type hold struct {
 	reservationID  string
 	organizationID string
 	requestType    schemas.RequestType
-	amount         int64
-	// markupBps is fixed when the hold is taken, so the attempt is charged at the markup
-	// its hold was sized for even if staff change it meanwhile
+	// amount is the hold in micro-SAR
+	amount int64
+	// markupBps and fx are fixed when the hold is taken, so the attempt is charged at the
+	// markup and rate its hold was sized for even if staff change them meanwhile
 	markupBps int64
+	fx        fxRate
 	settled   atomic.Bool
 	// when the hold's lifetime last started (unix nanoseconds): a stream that is still
 	// running pushes it forward (keepAlive)
@@ -267,11 +270,12 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 	}
 	provider, _, _ := req.GetRequestFields()
 	markupBps := prices.forProvider(provider)
+	fx := prices.fx
 
 	if reason := unboundable(ctx, req); reason != "" {
 		return req, refuse(400, ErrorTypeUnsupportedRequest, string(reason)), nil
 	}
-	amount, err := p.estimate(ctx, req, markupBps)
+	amount, err := p.estimate(ctx, req, markupBps, fx.effectiveE6)
 	var cannotBound unboundableError
 	if errors.As(err, &cannotBound) {
 		return req, refuse(400, ErrorTypeUnsupportedRequest, string(cannotBound.reason)), nil
@@ -288,7 +292,7 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 	ledgerCtx, cancel := context.WithTimeout(context.Background(), ledgerTimeout)
 	defer cancel()
 	virtualKeyID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceVirtualKeyID)
-	reservationID, outcome, err := p.ledger.Reserve(ledgerCtx, organizationID, virtualKeyID, amount, p.reservationTTL)
+	reservationID, outcome, err := p.ledger.Reserve(ledgerCtx, organizationID, virtualKeyID, amount, fx, p.reservationTTL)
 	if err != nil {
 		p.logger.Error("credits: reserve failed for organization %s: %v", organizationID, err)
 		return req, refuse(503, ErrorTypeLedgerUnavailable, "Credits could not be checked. Try again shortly."), nil
@@ -306,6 +310,7 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		requestType:    req.RequestType,
 		amount:         amount,
 		markupBps:      markupBps,
+		fx:             fx,
 	}
 	held.renewedAt.Store(time.Now().UnixNano())
 	ctx.SetValue(holdContextKey, held)
@@ -339,11 +344,14 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		// text already received (core/streamusage)
 		costUSD = p.pricer.CalculateCostForUsage(bifrostErr.ExtraFields.BilledUsage, provider, model, requestType, scopes)
 	}
-	cost, err := toMicroUSD(costUSD, held.markupBps)
-	if err != nil {
+	// converted at the hold's rate and markup, so one attempt is never split between two
+	// prices; rounded half up to the nearest micro-SAR (the hold was rounded up)
+	cost, err := toMicroSAR(costUSD, held.fx.effectiveE6, held.markupBps)
+	costMicroUSD, usdErr := toMicroUSD(costUSD)
+	if err = errors.Join(err, usdErr); err != nil {
 		// never guess a charge: release the hold and leave the difference to reconciliation
 		p.logger.Error("credits: attempt %s for organization %s has an unusable cost and was not charged: %v", held.reservationID, held.organizationID, err)
-		cost = 0
+		cost, costMicroUSD = 0, 0
 	}
 
 	requestID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyRequestID)
@@ -351,6 +359,8 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		ReservationID:  held.reservationID,
 		OrganizationID: held.organizationID,
 		Cost:           cost,
+		CostMicroUSD:   costMicroUSD,
+		FX:             held.fx,
 		// one reservation is one attempt, so its id identifies the attempt
 		IdempotencyKey: "usage:" + held.reservationID,
 		Reference:      requestID,
@@ -382,8 +392,10 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 	return resp, bifrostErr, nil
 }
 
-// estimate returns the most this attempt can cost, in micro-USD, markup included.
-func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, markupBps int64) (int64, error) {
+// estimate returns the most this attempt can cost, in micro-SAR at the effective rate rateE6,
+// markup included,
+// rounded up.
+func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, markupBps, rateE6 int64) (int64, error) {
 	provider, model, _ := req.GetRequestFields()
 	if model == "" {
 		return 0, errors.New("request names no model")
@@ -446,7 +458,7 @@ func (p *Plugin) estimate(ctx *schemas.BifrostContext, req *schemas.BifrostReque
 
 	usage := &schemas.BifrostLLMUsage{PromptTokens: inputTokens, CompletionTokens: outputTokens, TotalTokens: inputTokens + outputTokens}
 	scopes := modelcatalog.PricingLookupScopesFromContext(ctx, string(provider))
-	return ceilMicroUSD(p.pricer.CalculateCostForUsage(usage, provider, model, req.RequestType, scopes), markupBps)
+	return ceilMicroSAR(p.pricer.CalculateCostForUsage(usage, provider, model, req.RequestType, scopes), rateE6, markupBps)
 }
 
 func refuse(status int, errorType, message string) *schemas.LLMPluginShortCircuit {
