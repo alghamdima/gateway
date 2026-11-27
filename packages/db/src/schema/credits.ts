@@ -99,6 +99,18 @@ export const creditLedgerEntry = pgTable(
     /** Usage only: the rate × 1,000,000 the cost was converted at: official plus spread. */
     effectiveUsdToSarRateE6: integer("effective_usd_to_sar_rate_e6"),
     /*
+     * Usage only (ACT-04, migration 0041): the parts of the attempt's tokens the
+     * provider reported apart, summed by the activity page for as long as the
+     * ledger is kept. Cached is the prompt read from the provider's cache, cache
+     * write the prompt written to it, reasoning the completion spent thinking.
+     * Null on entries before 0041 and on every other kind. Prompt and completion
+     * tokens stay in metadata, where every earlier entry has them: the ledger is
+     * append-only, so they cannot be moved.
+     */
+    cachedTokens: bigint({ mode: "number" }),
+    cacheWriteTokens: bigint({ mode: "number" }),
+    reasoningTokens: bigint({ mode: "number" }),
+    /*
      * Top-up only: the fee rate the payment was quoted at and where it came
      * from (ADMIN-24), so a later change of the default or the organization's
      * fee does not rewrite what this payment paid. Null on top-ups started
@@ -160,6 +172,14 @@ export const creditLedgerEntry = pgTable(
     check(
       "credit_ledger_entry_usage_has_cost_and_rate",
       sql`${t.kind} <> 'usage' or (${t.costMicroUsd} is not null and ${t.usdToSarRateE6} is not null and ${t.fxSpreadBps} is not null and ${t.effectiveUsdToSarRateE6} is not null)`,
+    ),
+    check(
+      "credit_ledger_entry_tokens_usage_only",
+      sql`(${t.cachedTokens} is null and ${t.cacheWriteTokens} is null and ${t.reasoningTokens} is null) or ${t.kind} = 'usage'`,
+    ),
+    check(
+      "credit_ledger_entry_tokens_not_negative",
+      sql`coalesce(${t.cachedTokens}, 0) >= 0 and coalesce(${t.cacheWriteTokens}, 0) >= 0 and coalesce(${t.reasoningTokens}, 0) >= 0`,
     ),
     check(
       "credit_ledger_entry_promo_code",

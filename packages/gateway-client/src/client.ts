@@ -92,9 +92,95 @@ export interface GatewayLog {
   status?: string;
   stop_reason?: string | null;
   stream?: boolean;
-  /** Milliseconds. */
+  /** Milliseconds, request received to response finished. */
   latency?: number;
+  /** Milliseconds the provider took (with its retries): the generation time. */
+  upstream_latency?: number | null;
+  /** Milliseconds the gateway itself took. */
+  overhead_latency?: number | null;
+  /** Streams only: milliseconds from the request to the first chunk. */
+  time_to_first_token?: number | null;
+  session_id?: string | null;
+  service_tier?: string | null;
+  /** The provider's usage, as the gateway normalized it; never content. */
+  token_usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    prompt_tokens_details?: {
+      cached_read_tokens?: number;
+      cached_write_tokens?: number;
+    } | null;
+    completion_tokens_details?: { reasoning_tokens?: number } | null;
+  } | null;
   timestamp?: string;
+}
+
+/** One UTC day of an organization's requests, from the gateway's log. */
+export interface GatewayGenerationDay {
+  /** YYYY-MM-DD, UTC. */
+  day: string;
+  /** Client requests that reached the model step, once each however many attempts they took. */
+  generations: number;
+  /** Generations no attempt of which succeeded. */
+  failed: number;
+  /** Requests refused before any provider was called. */
+  refused: number;
+}
+
+/** Milliseconds: an average and two percentiles; zero when nothing was measured. */
+export interface GatewayLatencySummary {
+  avg: number;
+  p50: number;
+  p90: number;
+}
+
+/**
+ * One gateway customer's requests over a window (the gateway's
+ * GET /api/logs/generations/summary, ours): generations counted once each,
+ * refusals apart by reason, timings of the successful generations.
+ */
+export interface GatewayGenerationSummary {
+  by_day: GatewayGenerationDay[];
+  by_model: { provider: string; model: string; generations: number }[];
+  by_virtual_key: { virtual_key_id: string; generations: number }[];
+  refusals: {
+    limit_source: string;
+    reason: string;
+    status_code: number;
+    requests: number;
+  }[];
+  timings: {
+    measured: number;
+    streamed: number;
+    /** Streams: to the first chunk; otherwise the whole latency. */
+    time_to_first_token_ms: GatewayLatencySummary;
+    latency_ms: GatewayLatencySummary;
+    generation_time_ms_avg: number;
+    throughput_tokens_per_second_avg: number;
+  };
+}
+
+/** One attempt of a request: the first, or a fallback. No content. */
+export interface GatewayAttempt {
+  id: string;
+  parent_request_id?: string;
+  fallback_index: number;
+  timestamp: string;
+  provider: string;
+  model: string;
+  /** "success", "error" or "cancelled". */
+  status: string;
+  /** The HTTP status the attempt ended with: 200 on success. */
+  status_code?: number;
+  error_type?: string;
+  /** Set when the product refused the attempt (the API-08 contract). */
+  limit_source?: string;
+  reason?: string;
+  stream: boolean;
+  latency?: number;
+  upstream_latency?: number;
+  time_to_first_token?: number;
+  customer_id?: string;
 }
 
 /**
@@ -571,6 +657,38 @@ export const createGatewayClient = ({
         undefined,
         { allowNotFound: true },
       ),
+
+    /** One customer's generations, refusals and timings in [from, to). */
+    getGenerationSummary: async (
+      customerId: string,
+      from: Date,
+      to: Date,
+    ): Promise<GatewayGenerationSummary> => {
+      const query = new URLSearchParams({
+        customer_id: customerId,
+        start_time: from.toISOString(),
+        end_time: to.toISOString(),
+      });
+      const summary = await call<GatewayGenerationSummary>(
+        "GET",
+        `/api/logs/generations/summary?${query.toString()}`,
+        undefined,
+      );
+      if (!summary) {
+        throw new GatewayError("The gateway returned no summary.", 502);
+      }
+      return summary;
+    },
+
+    /** A request's attempts, first then fallbacks; empty once its log has expired. */
+    getAttempts: async (id: string): Promise<GatewayAttempt[]> => {
+      const result = await call<{ attempts?: GatewayAttempt[] | null }>(
+        "GET",
+        `/api/logs/generations/${encodeURIComponent(id)}/attempts`,
+        undefined,
+      );
+      return result?.attempts ?? [];
+    },
 
     /**
      * Logged requests, newest first. Only the fields named here are passed on:

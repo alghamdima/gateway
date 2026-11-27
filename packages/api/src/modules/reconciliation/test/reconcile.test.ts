@@ -77,6 +77,10 @@ const gatewayReporting = (
   refreshProviderModels: async () => {},
   listProviderKeys: async () => [],
   setVirtualKeyAccess: async () => {},
+  getGenerationSummary: async () => {
+    throw new Error("not used");
+  },
+  getAttempts: async () => [],
   getCustomerCosts: async () => {
     if (options.isDown) {
       // loaded here: a static import would open the database before the test points it at its own

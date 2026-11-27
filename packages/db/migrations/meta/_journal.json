@@ -288,6 +288,13 @@
       "when": 1795793477012,
       "tag": "0040_key_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795797013679,
+      "tag": "0041_activity_tokens",
+      "breakpoints": true
     }
   ]
 }

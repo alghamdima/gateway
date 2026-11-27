@@ -123,6 +123,10 @@ export const fakeGateway = () => {
     listProviderKeys: async () => [],
     setVirtualKeyAccess: async () => {},
     getCustomerCosts: async () => [],
+    getGenerationSummary: async () => {
+      throw new Error("not used");
+    },
+    getAttempts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async (id, limit) => {
       if (state.failRateLimit) {

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { TestDatabase } from "@workspace/db/testing";
 import type {
+  GatewayAttempt,
   GatewayClient,
   GatewayLog,
 } from "@workspace/gateway-client/server";
@@ -10,11 +11,18 @@ import type postgres from "postgres";
 // Needs real Postgres: the record is built from ledger entries. Skips without DATABASE_URL.
 const adminUrl = process.env.DATABASE_URL;
 
-/** A gateway that only answers log lookups, from the logs it is given. */
+/** A gateway that only answers log and attempt lookups, from what it is given. */
 const gatewayWithLogs = (
   logs: GatewayLog[],
-  options: { isDown?: boolean } = {},
+  options: { isDown?: boolean; attempts?: GatewayAttempt[] } = {},
 ): GatewayClient => ({
+  getGenerationSummary: async () => {
+    throw new Error("not used");
+  },
+  getAttempts: async (id) =>
+    (options.attempts ?? []).filter(
+      (a) => a.id === id || a.parent_request_id === id,
+    ),
   createCustomer: async () => ({ id: "c" }),
   deleteCustomer: async () => {},
   createVirtualKey: async () => ({ id: "vk", value: "v" }),
@@ -96,15 +104,19 @@ describe.skipIf(!adminUrl)("generation records", () => {
       providerKeyId?: string;
       /** The provider's USD cost; by default the amount at the peg. */
       costMicroUsd?: number;
+      fallbackIndex?: number;
+      reasoning?: number;
+      cached?: number;
     },
   ) => {
     const id = `gen_${++seq}`;
     await sql`insert into credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, virtual_key_id,
-        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6, metadata, created_at)
+        cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6, metadata, created_at,
+        reasoning_tokens, cached_tokens, cache_write_tokens)
       values (${id}, ${organizationId}, ${-entry.amount}, 'usage', ${id}, ${entry.reference}, ${entry.virtualKeyId ?? null},
               ${entry.costMicroUsd ?? Math.round(entry.amount / 3.75)}, 3750000, 0, 3750000,
-              ${sql.json({ model: "gpt-4o-mini", provider: entry.provider ?? "openai", failed: entry.failed ?? false, prompt_tokens: entry.prompt ?? 0, completion_tokens: entry.completion ?? 0, ...(entry.providerKeyId ? { provider_key_id: entry.providerKeyId } : {}) })},
-              ${entry.at})`;
+              ${sql.json({ model: "gpt-4o-mini", provider: entry.provider ?? "openai", failed: entry.failed ?? false, prompt_tokens: entry.prompt ?? 0, completion_tokens: entry.completion ?? 0, ...(entry.fallbackIndex === undefined ? {} : { fallback_index: entry.fallbackIndex }), ...(entry.providerKeyId ? { provider_key_id: entry.providerKeyId } : {}) })},
+              ${entry.at}, ${entry.reasoning ?? null}, ${entry.cached ?? null}, ${entry.cached === undefined ? null : 0})`;
   };
 
   beforeAll(async () => {
@@ -166,22 +178,38 @@ describe.skipIf(!adminUrl)("generation records", () => {
 
     expect(record).toEqual({
       id: "req_1",
+      request_id: "req_1",
       created_at: "2026-11-24T10:00:00.000Z",
       model: "claude-x",
       provider_name: "anthropic",
       tokens_prompt: 1100,
       tokens_completion: 510,
+      native_tokens_prompt: 1100,
+      native_tokens_completion: 510,
+      native_tokens_reasoning: 0,
+      native_tokens_cached: 0,
+      native_tokens_cache_write: 0,
       total_cost: 0.002138,
       upstream_cost_usd: 0.00057,
       currency: "SAR",
+      // a stream whose first chunk was not timed (a log from before ACT-02): the whole latency
       latency: 842,
+      generation_time: null,
+      total_latency: 842,
+      tokens_per_second: null,
+      cancelled: false,
       finish_reason: "stop",
       streamed: true,
+      // the gateway listed no attempts: the charged ones, from the ledger
       provider_responses: [
         {
           provider: "openai",
           model: "gpt-4o-mini",
           status: "error",
+          status_code: null,
+          latency: null,
+          fallback_index: 0,
+          is_byok: false,
           cost: 0.00045,
           upstream_cost_usd: 0.00012,
           usd_to_sar_rate: 3.75,
@@ -191,6 +219,10 @@ describe.skipIf(!adminUrl)("generation records", () => {
           provider: "anthropic",
           model: "gpt-4o-mini",
           status: "success",
+          status_code: null,
+          latency: null,
+          fallback_index: 0,
+          is_byok: false,
           cost: 0.001688,
           upstream_cost_usd: 0.00045,
           usd_to_sar_rate: 3.75,
@@ -209,6 +241,174 @@ describe.skipIf(!adminUrl)("generation records", () => {
           allowed_providers: null,
         },
       },
+    });
+  });
+
+  it("lists every attempt from the gateway, a failed one at 0, and times the one that answered (ACT-02, ROUTE-04)", async () => {
+    const org = await createOrganization();
+    // the failed first attempt wrote no ledger entry (CHARGE-06); the fallback was charged once
+    await attempt(org, {
+      reference: "req_fb",
+      amount: 1688,
+      costMicroUsd: 450,
+      at: "2026-11-24T10:00:01Z",
+      provider: "openai",
+      prompt: 1000,
+      completion: 500,
+      fallbackIndex: 1,
+      reasoning: 120,
+      cached: 400,
+    });
+    const customer = `cust_${org}`;
+    const record = await generations.getGeneration(
+      org,
+      "req_fb",
+      gatewayWithLogs(
+        [
+          {
+            id: "req_fb",
+            customer_id: customer,
+            provider: "openai",
+            model: "gpt-4o-mini",
+            status: "error",
+            latency: 12,
+            stream: true,
+          },
+          {
+            id: "req_fb_1",
+            customer_id: customer,
+            provider: "openai",
+            model: "gpt-4o",
+            status: "success",
+            latency: 1000,
+            stream: true,
+            stop_reason: "stop",
+          },
+        ],
+        {
+          attempts: [
+            {
+              id: "req_fb",
+              fallback_index: 0,
+              timestamp: "2026-11-24T10:00:00Z",
+              provider: "openai",
+              model: "gpt-4o-mini",
+              status: "error",
+              status_code: 500,
+              error_type: "server_error",
+              stream: true,
+              latency: 12,
+              upstream_latency: 10,
+              customer_id: customer,
+            },
+            {
+              id: "req_fb_1",
+              parent_request_id: "req_fb",
+              fallback_index: 1,
+              timestamp: "2026-11-24T10:00:01Z",
+              provider: "openai",
+              model: "gpt-4o",
+              status: "success",
+              status_code: 200,
+              stream: true,
+              latency: 1000,
+              upstream_latency: 800,
+              time_to_first_token: 250,
+              customer_id: customer,
+            },
+          ],
+        },
+      ),
+    );
+    expect(record).toMatchObject({
+      model: "gpt-4o",
+      // OpenRouter's latency: a stream's time to its first chunk
+      latency: 250,
+      generation_time: 800,
+      total_latency: 1000,
+      tokens_per_second: 500 / 0.8,
+      cancelled: false,
+      finish_reason: "stop",
+      native_tokens_reasoning: 120,
+      native_tokens_cached: 400,
+      total_cost: 0.001688,
+      provider_responses: [
+        {
+          model: "gpt-4o-mini",
+          status: "error",
+          status_code: 500,
+          latency: 12,
+          fallback_index: 0,
+          cost: 0,
+          upstream_cost_usd: 0,
+        },
+        {
+          model: "gpt-4o",
+          status: "success",
+          status_code: 200,
+          latency: 1000,
+          fallback_index: 1,
+          cost: 0.001688,
+          upstream_cost_usd: 0.00045,
+          usd_to_sar_rate: 3.75,
+        },
+      ],
+    });
+  });
+
+  it("answers a free request from the gateway's log alone, with its token counts", async () => {
+    const org = await createOrganization();
+    const customer = `cust_${org}`;
+    const record = await generations.getGeneration(
+      org,
+      "req_free",
+      gatewayWithLogs(
+        [
+          {
+            id: "req_free",
+            customer_id: customer,
+            provider: "openai",
+            model: "gpt-free",
+            status: "success",
+            latency: 300,
+            upstream_latency: 200,
+            stream: false,
+            token_usage: {
+              prompt_tokens: 180,
+              completion_tokens: 700,
+              prompt_tokens_details: { cached_read_tokens: 0 },
+              completion_tokens_details: { reasoning_tokens: 629 },
+            },
+          },
+        ],
+        {
+          attempts: [
+            {
+              id: "req_free",
+              fallback_index: 0,
+              timestamp: "2026-11-24T10:00:00Z",
+              provider: "openai",
+              model: "gpt-free",
+              status: "success",
+              status_code: 200,
+              stream: false,
+              latency: 300,
+              upstream_latency: 200,
+              customer_id: customer,
+            },
+          ],
+        },
+      ),
+    );
+    expect(record).toMatchObject({
+      total_cost: 0,
+      native_tokens_prompt: 180,
+      native_tokens_completion: 700,
+      native_tokens_reasoning: 629,
+      // not streamed: the whole latency, as OpenRouter's
+      latency: 300,
+      generation_time: 200,
+      provider_responses: [{ status: "success", status_code: 200, cost: 0 }],
     });
   });
 
@@ -509,7 +709,7 @@ describe.skipIf(!adminUrl)("generation records", () => {
     ).toBeUndefined();
   });
 
-  it("lists the latest charged attempts, newest first, with the key, page by page", async () => {
+  it("lists the latest charged requests, newest first, with the key, page by page, one row per request", async () => {
     const org = await createOrganization();
     const other = await createOrganization();
     await sql`insert into api_key (id, organization_id, created_by, name, virtual_key_id, prefix, value_hash)
@@ -537,8 +737,39 @@ describe.skipIf(!adminUrl)("generation records", () => {
       amount: 9,
       at: "2026-11-24T13:00:00Z",
     });
+    // one request, two charged attempts (billed before failing, then the fallback): one row
+    await attempt(org, {
+      reference: "d",
+      amount: 4,
+      at: "2026-11-24T14:00:00Z",
+      provider: "openai",
+      failed: true,
+      prompt: 10,
+      virtualKeyId: "vk_gen",
+    });
+    await attempt(org, {
+      reference: "d",
+      amount: 5,
+      at: "2026-11-24T14:00:01Z",
+      provider: "anthropic",
+      prompt: 20,
+      virtualKeyId: "vk_gen",
+    });
+    const [request] = await generations.listRecentRequests({
+      organizationId: org,
+      limit: 1,
+    });
+    expect(request).toMatchObject({
+      id: "d",
+      cost: 9,
+      promptTokens: 30,
+      provider: "anthropic",
+      failed: false,
+      createdAt: "2026-11-24T14:00:01.000Z",
+    });
 
     const first = await generations.listRecentRequests({
+      before: new Date("2026-11-24T14:00:00Z"),
       organizationId: org,
       limit: 2,
     });

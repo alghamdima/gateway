@@ -314,6 +314,7 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_model_routing_suggestion_tables"}, run: migrationAddComplexitySuggestionTables},
 	{IDs: []string{"logs_add_model_routing_columns"}, run: migrationAddModelRoutingColumns},
 	{IDs: []string{"logs_tune_retention_autovacuum"}, run: migrationTuneRetentionAutovacuum},
+	{IDs: []string{"logs_add_time_to_first_token_column"}, run: migrationAddTimeToFirstTokenColumn},
 }
 
 // areThereAnyPendingMigrations returns true if there are any pending migrations to be applied.
@@ -4665,4 +4666,29 @@ func retentionAutovacuumMigration(ctx context.Context, logger schemas.Logger) *m
 			})
 		},
 	}
+}
+
+// migrationAddTimeToFirstTokenColumn adds time_to_first_token to logs (Lemru, SPEC ACT-02): a stream's
+// time from the request to its first chunk, which the stream accumulator measured but nothing kept.
+// Nullable and unindexed: rows written before it, and requests that were not streamed, have none.
+func migrationAddTimeToFirstTokenColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	opts := *migrator.DefaultOptions
+	opts.UseTransaction = true
+	return migrator.New(db, &opts, []*migrator.Migration{{
+		ID: "logs_add_time_to_first_token_column",
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := boundDDLLockWait(tx); err != nil {
+				return err
+			}
+			return addColumnIfNotExists(tx, logger, &Log{}, "TimeToFirstToken")
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := boundDDLLockWait(tx); err != nil {
+				return err
+			}
+			return dropColumnIfExists(tx, logger, &Log{}, "TimeToFirstToken")
+		},
+	}}).Migrate()
 }

@@ -202,6 +202,7 @@ const RequestRecord = ({
   const count = (value: number) =>
     new Intl.NumberFormat(i18n.language).format(value);
   const unknown = t("organization:activity.record.unknown");
+  const ms = (value: number) => `${count(Math.round(value))} ms`;
   const data = record.data;
   const facts = data
     ? [
@@ -226,11 +227,34 @@ const RequestRecord = ({
           value: usd(data.upstream_cost_usd),
         },
         {
+          label: t("organization:activity.record.reasoningTokens"),
+          value: count(data.native_tokens_reasoning),
+        },
+        {
+          label: t("organization:activity.record.cachedTokens"),
+          value: count(data.native_tokens_cached),
+        },
+        {
           label: t("organization:activity.record.latency"),
+          value: data.latency === null ? unknown : ms(data.latency),
+        },
+        {
+          label: t("organization:activity.record.totalLatency"),
+          value: data.total_latency === null ? unknown : ms(data.total_latency),
+        },
+        {
+          label: t("organization:activity.record.generationTime"),
           value:
-            data.latency === null
+            data.generation_time === null ? unknown : ms(data.generation_time),
+        },
+        {
+          label: t("organization:activity.record.speed"),
+          value:
+            data.tokens_per_second === null
               ? unknown
-              : `${count(Math.round(data.latency))} ms`,
+              : t("organization:activity.record.speedValue", {
+                  value: count(Math.round(data.tokens_per_second * 10) / 10),
+                }),
         },
         {
           label: t("organization:activity.record.finishReason"),
@@ -341,6 +365,10 @@ const RequestRecord = ({
                           </Badge>
                         </span>
                         <span className="tabular-nums">
+                          {attempt.status_code !== null &&
+                            `${attempt.status_code} · `}
+                          {attempt.latency !== null &&
+                            `${ms(attempt.latency)} · `}
                           {sar(attempt.cost)}
                         </span>
                       </li>

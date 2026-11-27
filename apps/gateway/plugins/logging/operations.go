@@ -112,6 +112,12 @@ func (p *LoggerPlugin) applyStreamingOutputToEntry(entry *logstore.Log, streamRe
 		entry.Latency = &latF
 	}
 
+	// Time to first token, measured by the stream accumulator from the request to the first chunk (Lemru, ACT-02)
+	if ttft := streamResponse.Data.TimeToFirstToken; ttft > 0 {
+		ttftF := float64(ttft)
+		entry.TimeToFirstToken = &ttftF
+	}
+
 	// Update model and alias from resolved/requested model pair.
 	applyModelAlias(entry, streamResponse.RequestedModel, streamResponse.ResolvedModel)
 

@@ -231,6 +231,21 @@ type Settlement struct {
 	Reference string
 	// Metadata is stored with the entry: the exact provider cost, model, provider.
 	Metadata map[string]any
+	// Tokens are the attempt's cached and reasoning token counts, stored in their own columns so
+	// the activity pages can sum them for as long as the ledger is kept (SPEC ACT-04). Nil when
+	// the provider reported no usage.
+	Tokens *TokenDetails
+}
+
+// TokenDetails are the counts the provider reported inside its usage. Prompt and completion
+// tokens stay in the entry's metadata, where every entry before migration 0041 has them.
+type TokenDetails struct {
+	// CachedTokens is the part of the prompt read from the provider's cache.
+	CachedTokens int64
+	// CacheWriteTokens is the part of the prompt written to the provider's cache.
+	CacheWriteTokens int64
+	// ReasoningTokens is the part of the completion spent reasoning.
+	ReasoningTokens int64
 }
 
 // SettleResult says what a settlement changed.
@@ -253,9 +268,11 @@ WITH released AS (
   RETURNING amount
 ), charged AS (
   INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, reference, metadata, virtual_key_id,
-                                   cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6)
+                                   cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6,
+                                   cached_tokens, cache_write_tokens, reasoning_tokens)
   SELECT $3, $2, -$4::bigint, 'usage', $5, $6, $7::jsonb,
-         (SELECT virtual_key_id FROM credit_reservation WHERE id = $1), $8, $9, $10, $11
+         (SELECT virtual_key_id FROM credit_reservation WHERE id = $1), $8, $9, $10, $11,
+         $12::bigint, $13::bigint, $14::bigint
    WHERE $4::bigint > 0
   ON CONFLICT (idempotency_key) DO NOTHING
   RETURNING amount
@@ -288,11 +305,19 @@ func (s *Store) Settle(ctx context.Context, st Settlement) (SettleResult, error)
 			return SettleResult{}, fmt.Errorf("credits: settlement metadata: %w", err)
 		}
 	}
+	var cached, cacheWrite, reasoning *int64
+	if t := st.Tokens; t != nil {
+		if t.CachedTokens < 0 || t.CacheWriteTokens < 0 || t.ReasoningTokens < 0 {
+			return SettleResult{}, fmt.Errorf("credits: token counts cannot be negative, got %+v", *t)
+		}
+		cached, cacheWrite, reasoning = &t.CachedTokens, &t.CacheWriteTokens, &t.ReasoningTokens
+	}
 	var res SettleResult
 	var accounts int
 	err := s.pool.QueryRow(ctx, settleSQL,
 		st.ReservationID, st.OrganizationID, uuid.NewString(), st.Cost, st.IdempotencyKey, st.Reference, string(metadata),
 		st.CostMicroUSD, st.FX.officialE6, st.FX.spreadBps, st.FX.effectiveE6,
+		cached, cacheWrite, reasoning,
 	).Scan(&res.Charged, &res.Released, &accounts)
 	if err != nil {
 		return SettleResult{}, fmt.Errorf("credits: settle: %w", err)

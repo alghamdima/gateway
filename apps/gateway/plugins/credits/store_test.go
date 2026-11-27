@@ -427,3 +427,47 @@ func TestGatewayRole_TheControlPlaneStillCredits(t *testing.T) {
 		t.Fatalf("state: %+v", s)
 	}
 }
+
+func TestSettle_StoresTheTokenDetailsInTheirColumns(t *testing.T) {
+	db := newTestDB(t)
+	store := NewStore(db.ledger)
+	ctx := context.Background()
+	org := db.organization(t, 10*usd)
+
+	settle := func(key string, tokens *TokenDetails) error {
+		id := must[string](t)(reserve(store, org, usd))
+		_, err := store.Settle(ctx, Settlement{ReservationID: id, OrganizationID: org, Cost: 1000, CostMicroUSD: 266, FX: testFX,
+			IdempotencyKey: key, Tokens: tokens})
+		return err
+	}
+	if err := settle("tokens:with", &TokenDetails{CachedTokens: 400, CacheWriteTokens: 30, ReasoningTokens: 120}); err != nil {
+		t.Fatal(err)
+	}
+	if err := settle("tokens:without", nil); err != nil {
+		t.Fatal(err)
+	}
+	read := func(key string) (cached, write, reasoning *int64) {
+		if err := db.admin.QueryRow(ctx, `SELECT cached_tokens, cache_write_tokens, reasoning_tokens FROM credit_ledger_entry WHERE idempotency_key = $1`, key).
+			Scan(&cached, &write, &reasoning); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if c, w, r := read("tokens:with"); c == nil || *c != 400 || w == nil || *w != 30 || r == nil || *r != 120 {
+		t.Fatalf("stored tokens: %v %v %v", c, w, r)
+	}
+	// no usage reported: nothing claimed, not zeros
+	if c, w, r := read("tokens:without"); c != nil || w != nil || r != nil {
+		t.Fatalf("an entry without usage has token counts: %v %v %v", c, w, r)
+	}
+	if err := settle("tokens:negative", &TokenDetails{CachedTokens: -1}); err == nil {
+		t.Fatal("a negative token count was settled")
+	}
+	// the database refuses token counts on anything but usage, and negative ones
+	if _, err := db.admin.Exec(ctx, `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, cached_tokens) VALUES ('tok_adj', $1, 5, 'adjustment', 'tok_adj', 3)`, org); err == nil {
+		t.Fatal("an adjustment with token counts was accepted")
+	}
+	if _, err := db.admin.Exec(ctx, `INSERT INTO credit_ledger_entry (id, organization_id, amount, kind, idempotency_key, cost_micro_usd, usd_to_sar_rate_e6, fx_spread_bps, effective_usd_to_sar_rate_e6, reasoning_tokens) VALUES ('tok_neg', $1, -5, 'usage', 'tok_neg', 1, 3750000, 0, 3750000, -1)`, org); err == nil {
+		t.Fatal("a negative reasoning count was accepted")
+	}
+}

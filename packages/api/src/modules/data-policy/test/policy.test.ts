@@ -39,6 +39,10 @@ const fakeGateway = () => {
     deleteVirtualKey: async () => {},
     listModels: async () => [],
     getCustomerCosts: async () => [],
+    getGenerationSummary: async () => {
+      throw new Error("not used");
+    },
+    getAttempts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async () => {},
     searchRequests: async () => ({ requests: [], total: 0 }),

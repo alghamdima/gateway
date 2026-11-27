@@ -42,8 +42,10 @@ interface ActivityPageProps {
 }
 
 /**
- * Spend, requests and tokens by day, model and key (step 9.1), from the
- * organization's ledger. Only charged requests are counted.
+ * Spend, requests, tokens and timings by day, model and key (step 9.1, SPEC
+ * ACT-01/02/04). Money and tokens come from the ledger; requests (one per
+ * client request, however many attempts), refusals and timings from the
+ * gateway's request log.
  */
 export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
   const { t, i18n } = useTranslation(["common", "organization"]);
@@ -75,17 +77,54 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
     },
   } satisfies ChartConfig;
 
+  const notAvailable = t("organization:activity.notAvailable");
+  const maybeCount = (value: number | null) =>
+    value === null ? notAvailable : count(value);
+  const ms = (value: number) =>
+    t("organization:activity.milliseconds", {
+      value: count(Math.round(value)),
+    });
+  const percent = (value: number | null) =>
+    value === null
+      ? notAvailable
+      : new Intl.NumberFormat(i18n.language, {
+          style: "percent",
+          maximumFractionDigits: 1,
+        }).format(value);
+
   const totals = activity.data?.totals;
+  const timings = activity.data?.timings ?? null;
   const cards = totals
     ? [
         { label: t("organization:activity.spend"), value: money(totals.spend) },
         {
           label: t("organization:activity.requests"),
-          value: count(totals.requests),
+          value: maybeCount(totals.requests),
+          detail:
+            totals.failed && totals.failed > 0
+              ? t("organization:activity.failedRequests", {
+                  count: totals.failed,
+                })
+              : undefined,
+        },
+        {
+          label: t("organization:activity.refused"),
+          value: maybeCount(totals.refused),
         },
         {
           label: t("organization:activity.tokens"),
           value: count(totals.promptTokens + totals.completionTokens),
+        },
+        {
+          label: t("organization:activity.cacheHitRate"),
+          value: percent(totals.cacheHitRate),
+        },
+        {
+          label: t("organization:activity.timeToFirstToken"),
+          value:
+            timings && timings.measured > 0
+              ? `${ms(timings.timeToFirstToken.p50)} / ${ms(timings.timeToFirstToken.p90)}`
+              : notAvailable,
         },
       ]
     : [];
@@ -125,10 +164,20 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
                 <CardTitle className="text-2xl tabular-nums">
                   {card.value}
                 </CardTitle>
+                {card.detail && (
+                  <CardDescription>{card.detail}</CardDescription>
+                )}
               </CardHeader>
             </Card>
           ))}
         </div>
+      )}
+      {activity.data && (
+        <p className="text-muted-foreground text-xs">
+          {activity.data.requestLogAvailable
+            ? t("organization:activity.requestLogNote")
+            : t("organization:activity.requestLogUnavailable")}
+        </p>
       )}
 
       <Card>
@@ -176,6 +225,27 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <TokenCard
+          isPending={activity.isPending}
+          totals={totals}
+          count={count}
+        />
+        <PerformanceCard
+          isPending={activity.isPending}
+          timings={timings}
+          ms={ms}
+          count={count}
+        />
+      </div>
+
+      <RefusalsCard
+        isPending={activity.isPending}
+        refusals={activity.data?.refusals ?? []}
+        isAvailable={activity.data?.requestLogAvailable ?? true}
+        count={count}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-2">
         <BreakdownCard
           title={t("organization:activity.byModel")}
           firstColumn={t("organization:activity.model")}
@@ -184,7 +254,7 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
           rows={(activity.data?.byModel ?? []).map((row) => ({
             key: `${row.provider}/${row.model}`,
             label: `${row.provider}/${row.model}`,
-            requests: count(row.requests),
+            requests: maybeCount(row.requests),
             tokens: count(row.promptTokens + row.completionTokens),
             spend: money(row.spend),
           }))}
@@ -199,7 +269,7 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
             label: row.name ?? t("organization:activity.deletedKey"),
             // names may repeat; the prefix tells keys apart
             detail: row.prefix ? `${row.prefix}…` : undefined,
-            requests: count(row.requests),
+            requests: maybeCount(row.requests),
             tokens: count(row.promptTokens + row.completionTokens),
             spend: money(row.spend),
           }))}
@@ -208,6 +278,254 @@ export const ActivityPage = ({ organizationId }: ActivityPageProps) => {
 
       <RecentRequests organizationId={organizationId} />
     </div>
+  );
+};
+
+interface TokenTotals {
+  promptTokens: number;
+  completionTokens: number;
+  reasoningTokens: number;
+  cachedTokens: number;
+  cacheWriteTokens: number;
+}
+
+/** Prompt (cached and not) and completion (with its reasoning), as OpenRouter's token breakdown. */
+const TokenCard = ({
+  isPending,
+  totals,
+  count,
+}: {
+  readonly isPending: boolean;
+  readonly totals: TokenTotals | undefined;
+  readonly count: (value: number) => string;
+}) => {
+  const { t } = useTranslation("organization");
+  const rows = totals
+    ? [
+        {
+          label: t("activity.promptTokens"),
+          value: count(totals.promptTokens),
+          parts: [
+            [t("activity.cachedTokens"), count(totals.cachedTokens)],
+            [
+              t("activity.uncachedTokens"),
+              count(Math.max(totals.promptTokens - totals.cachedTokens, 0)),
+            ],
+            [t("activity.cacheWriteTokens"), count(totals.cacheWriteTokens)],
+          ],
+        },
+        {
+          label: t("activity.completionTokens"),
+          value: count(totals.completionTokens),
+          parts: [
+            [t("activity.reasoningTokens"), count(totals.reasoningTokens)],
+          ],
+        },
+      ]
+    : [];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("activity.tokenBreakdown")}</CardTitle>
+        <CardDescription>
+          {t("activity.tokenBreakdownDescription")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isPending ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <dl className="space-y-3 text-sm">
+            {rows.map((row) => (
+              <div key={row.label}>
+                <div className="flex justify-between gap-4">
+                  <dt className="font-medium">{row.label}</dt>
+                  <dd className="tabular-nums">{row.value}</dd>
+                </div>
+                {row.parts.map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="text-muted-foreground flex justify-between gap-4 ps-4"
+                  >
+                    <dt>{label}</dt>
+                    <dd className="tabular-nums">{value}</dd>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </dl>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+interface Timings {
+  measured: number;
+  timeToFirstToken: { avg: number; p50: number; p90: number };
+  latency: { avg: number; p50: number; p90: number };
+  generationTimeAvg: number;
+  throughputAvg: number;
+}
+
+const PerformanceCard = ({
+  isPending,
+  timings,
+  ms,
+  count,
+}: {
+  readonly isPending: boolean;
+  readonly timings: Timings | null;
+  readonly ms: (value: number) => string;
+  readonly count: (value: number) => string;
+}) => {
+  const { t } = useTranslation("organization");
+  const hasTimings = timings !== null && timings.measured > 0;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("activity.performance")}</CardTitle>
+        <CardDescription>
+          {t("activity.performanceDescription")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isPending && <Skeleton className="h-24 w-full" />}
+        {!isPending && !hasTimings && (
+          <p className="text-muted-foreground text-sm">{t("activity.empty")}</p>
+        )}
+        {hasTimings && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead />
+                <TableHead className="text-right">
+                  {t("activity.latencyP50")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("activity.latencyP90")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("activity.latencyAverage")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[
+                {
+                  label: t("activity.record.latency"),
+                  figures: timings.timeToFirstToken,
+                },
+                { label: t("activity.totalLatency"), figures: timings.latency },
+              ].map(({ label, figures }) => (
+                <TableRow key={label}>
+                  <TableCell className="font-medium">{label}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {ms(figures.p50)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {ms(figures.p90)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {ms(figures.avg)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              <TableRow>
+                <TableCell className="font-medium">
+                  {t("activity.generationTime")}
+                </TableCell>
+                <TableCell colSpan={3} className="text-right tabular-nums">
+                  {ms(timings.generationTimeAvg)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">
+                  {t("activity.throughput")}
+                </TableCell>
+                <TableCell colSpan={3} className="text-right tabular-nums">
+                  {t("activity.throughputValue", {
+                    value: count(Math.round(timings.throughputAvg * 10) / 10),
+                  })}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const RefusalsCard = ({
+  isPending,
+  refusals,
+  isAvailable,
+  count,
+}: {
+  readonly isPending: boolean;
+  readonly refusals: {
+    limitSource: string;
+    reason: string;
+    statusCode: number;
+    requests: number;
+  }[];
+  readonly isAvailable: boolean;
+  readonly count: (value: number) => string;
+}) => {
+  const { t } = useTranslation("organization");
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("activity.refusals")}</CardTitle>
+        <CardDescription>{t("activity.refusalsDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isPending && <Skeleton className="h-16 w-full" />}
+        {!isPending && isAvailable && refusals.length === 0 && (
+          <p className="text-muted-foreground text-sm">
+            {t("activity.noRefusals")}
+          </p>
+        )}
+        {!isPending && !isAvailable && (
+          <p className="text-muted-foreground text-sm">
+            {t("activity.requestLogUnavailable")}
+          </p>
+        )}
+        {refusals.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("activity.reason")}</TableHead>
+                <TableHead className="text-right">
+                  {t("activity.status")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("activity.requests")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {refusals.map((refusal) => (
+                <TableRow
+                  key={`${refusal.limitSource}/${refusal.reason}/${refusal.statusCode}`}
+                >
+                  <TableCell className="font-mono text-xs">
+                    {refusal.limitSource}: {refusal.reason}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {refusal.statusCode}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {count(refusal.requests)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

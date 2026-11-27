@@ -20,6 +20,10 @@ const fakeGateway = (keys: GatewayProviderKey[], isDown = false) => {
     deleteVirtualKey: async () => {},
     listModels: async () => [],
     getCustomerCosts: async () => [],
+    getGenerationSummary: async () => {
+      throw new Error("not used");
+    },
+    getAttempts: async () => [],
     getLog: async () => undefined,
     setCustomerRateLimit: async () => {},
     setVirtualKeyAccess: async () => {},

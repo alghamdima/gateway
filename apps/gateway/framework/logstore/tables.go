@@ -438,6 +438,7 @@ type Log struct {
 	Latency           *float64 `gorm:"index:idx_logs_latency" json:"latency,omitempty"`
 	UpstreamLatency   *float64 `gorm:"index:idx_logs_upstream_latency" json:"upstream_latency,omitempty"` // Provider socket time for this row's call (with its retries), ms; nil = unmeasured
 	OverheadLatency   *float64 `gorm:"index:idx_logs_overhead_latency" json:"overhead_latency,omitempty"` // Bifrost overhead (total minus upstream), ms; nil = unmeasured
+	TimeToFirstToken  *float64 `gorm:"column:time_to_first_token" json:"time_to_first_token,omitempty"`   // Streams: request received to first chunk, ms; nil when not streamed or not timed (Lemru, ACT-02)
 	OverheadBreakdown string   `gorm:"type:text" json:"-"`                                                // JSON serialized []OverheadBucket: per-span self-time decomposition of overhead
 	TokenUsage        string   `gorm:"type:text" json:"-"`                                                // JSON serialized *schemas.LLMUsage
 	// Denormalized cost split for per-category quota aggregation. input + output +

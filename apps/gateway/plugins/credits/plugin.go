@@ -401,6 +401,7 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		settlement.Metadata["prompt_tokens"] = usage.PromptTokens
 		settlement.Metadata["completion_tokens"] = usage.CompletionTokens
 		settlement.Metadata["total_tokens"] = usage.TotalTokens
+		settlement.Tokens = tokenDetailsOf(usage)
 	}
 	p.settle(settlement)
 	return resp, bifrostErr, nil
@@ -484,6 +485,25 @@ func usageOf(resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) *s
 		return bifrostErr.ExtraFields.BilledUsage
 	}
 	return nil
+}
+
+// tokenDetailsOf reads the cached and reasoning counts out of a usage the gateway has normalized:
+// the cache read is prompt_tokens_details.cached_read_tokens (what OpenAI calls cached_tokens),
+// the cache write cached_write_tokens, reasoning completion_tokens_details.reasoning_tokens.
+func tokenDetailsOf(usage *schemas.BifrostLLMUsage) *TokenDetails {
+	details := &TokenDetails{}
+	if p := usage.PromptTokensDetails; p != nil {
+		details.CachedTokens = int64(p.CachedReadTokens)
+		details.CacheWriteTokens = int64(p.CachedWriteTokens)
+	}
+	if c := usage.CompletionTokensDetails; c != nil {
+		details.ReasoningTokens = int64(c.ReasoningTokens)
+	}
+	if details.ReasoningTokens == 0 && usage.ReasoningTokens > 0 {
+		// a provider that reports reasoning at the top level, not yet folded in
+		details.ReasoningTokens = int64(usage.ReasoningTokens)
+	}
+	return details
 }
 
 // keepAlive extends a streaming attempt's hold once a third of its lifetime has passed.

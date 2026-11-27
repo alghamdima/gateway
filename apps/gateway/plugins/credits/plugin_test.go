@@ -679,3 +679,62 @@ func TestHooks_AgainstTheRealLedger(t *testing.T) {
 		t.Fatalf("a request that fits the remaining balance was refused: %+v", sc.Error)
 	}
 }
+
+func TestPostLLMHook_RecordsCachedAndReasoningTokens(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	plugin := testPlugin(ledger, testPricer())
+	ctx := testContext(testOrg)
+	plugin.PreLLMHook(ctx, chatRequest(schemas.ChatCompletionRequest, nil))
+	resp := chatResponse(schemas.ChatCompletionRequest, 1000, 500)
+	resp.ChatResponse.Usage.PromptTokensDetails = &schemas.ChatPromptTokensDetails{CachedReadTokens: 400, CachedWriteTokens: 30}
+	resp.ChatResponse.Usage.CompletionTokensDetails = &schemas.ChatCompletionTokensDetails{ReasoningTokens: 120}
+	plugin.PostLLMHook(ctx, resp, nil)
+
+	settled := ledger.settlements()
+	if len(settled) != 1 || settled[0].Tokens == nil {
+		t.Fatalf("settlements: %+v", settled)
+	}
+	if got := *settled[0].Tokens; got != (TokenDetails{CachedTokens: 400, CacheWriteTokens: 30, ReasoningTokens: 120}) {
+		t.Fatalf("token details: %+v", got)
+	}
+
+	// a usage with no details records zeros, not nothing: the provider reported none
+	plain := testContext(testOrg)
+	plugin.PreLLMHook(plain, chatRequest(schemas.ChatCompletionRequest, nil))
+	plugin.PostLLMHook(plain, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+	if got := ledger.settlements()[1].Tokens; got == nil || *got != (TokenDetails{}) {
+		t.Fatalf("plain usage: %+v", got)
+	}
+}
+
+// CHARGE-06 and ROUTE-04 (decision D7 still open, behaviour unchanged): an attempt that failed with
+// nothing billed settles at 0, which writes no ledger entry and releases the hold, so a request
+// that fell back is charged once, for the attempt that answered; an attempt the provider billed
+// before failing is charged what it billed.
+func TestPostLLMHook_AFailedFallbackAttemptIsNeverChargedUnlessBilled(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	plugin := testPlugin(ledger, testPricer())
+	status := 500
+	failed := &schemas.BifrostError{StatusCode: &status, Error: &schemas.ErrorField{Message: "upstream failed"},
+		ExtraFields: schemas.BifrostErrorExtraFields{RequestType: schemas.ChatCompletionRequest, Provider: schemas.OpenAI, OriginalModelRequested: "gpt-4o-mini"}}
+
+	// the first attempt fails, the fallback answers: one request id, two attempts, two holds
+	first := testContext(testOrg)
+	plugin.PreLLMHook(first, chatRequest(schemas.ChatCompletionRequest, nil))
+	plugin.PostLLMHook(first, nil, failed)
+	fallback := testContext(testOrg)
+	fallback.SetValue(schemas.BifrostContextKeyFallbackIndex, 1)
+	plugin.PreLLMHook(fallback, chatRequest(schemas.ChatCompletionRequest, nil))
+	plugin.PostLLMHook(fallback, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+
+	settled := ledger.settlements()
+	if len(settled) != 2 {
+		t.Fatalf("settlements: %+v", settled)
+	}
+	if settled[0].Cost != 0 || settled[0].Metadata["failed"] != true || settled[0].Tokens != nil {
+		t.Fatalf("the failed attempt was charged or given tokens: %+v", settled[0])
+	}
+	if settled[1].Cost != 2000 || settled[1].Metadata["fallback_index"] != 1 || settled[1].Reference != settled[0].Reference {
+		t.Fatalf("the answering attempt: %+v", settled[1])
+	}
+}
