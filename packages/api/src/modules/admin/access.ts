@@ -133,6 +133,31 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "payments.update", target: "payments" },
   },
 
+  // promo codes (BILL-08): who may see and change them, as for pricing
+  {
+    method: "GET",
+    path: new RegExp(`^/promo-codes(/${ID}(/report|/changes)?)?$`),
+    needs: { promoCodes: ["read"] },
+  },
+  {
+    method: "POST",
+    path: /^\/promo-codes$/,
+    needs: { promoCodes: ["update"] },
+    audit: { action: "promo.create", target: "promo-code" },
+  },
+  {
+    method: "PUT",
+    path: new RegExp(`^/promo-codes/${ID}$`),
+    needs: { promoCodes: ["update"] },
+    audit: { action: "promo.update", target: "promo-code" },
+  },
+  {
+    method: "PUT",
+    path: new RegExp(`^/promo-codes/${ID}/paused$`),
+    needs: { promoCodes: ["update"] },
+    audit: { action: "promo.pause", target: "promo-code" },
+  },
+
   // the request log: what happened to each call, never its content
   { method: "GET", path: /^\/requests$/, needs: "any-staff" },
 

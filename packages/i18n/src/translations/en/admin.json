@@ -504,5 +504,117 @@
         "mode": "Mode"
       }
     }
+  },
+  "promoCodes": {
+    "header": {
+      "title": "Promo codes",
+      "description": "Codes customers enter to take something off the top-up fee, get bonus credit on a top-up, or receive free credit. Every change is kept with its values before and after."
+    },
+    "list": {
+      "search": "Search codes",
+      "allStatuses": "All statuses",
+      "new": "New code",
+      "empty": "No promo codes yet.",
+      "code": "Code",
+      "kind": "Kind",
+      "value": "Value",
+      "uses": "Uses",
+      "validity": "Valid",
+      "status": "Status",
+      "unlimited": "no limit",
+      "always": "always",
+      "from": "from {{date}}",
+      "until": "until {{date}}",
+      "between": "{{from}} to {{until}}"
+    },
+    "kind": {
+      "fee_discount": "Fee discount",
+      "topup_bonus": "Top-up bonus",
+      "free_credit": "Free credit"
+    },
+    "status": {
+      "active": "Active",
+      "paused": "Paused",
+      "scheduled": "Scheduled",
+      "expired": "Expired",
+      "used_up": "Used up"
+    },
+    "value": {
+      "percentOff": "{{percent}}% off the fee",
+      "amountOff": "{{amount}} off the fee",
+      "bonus": "{{percent}}% bonus, up to {{cap}}",
+      "credit": "{{amount}} free"
+    },
+    "form": {
+      "createTitle": "New promo code",
+      "editTitle": "Edit {{code}}",
+      "code": "Code",
+      "codeDescription": "Letters, digits, - and _, 3 to 32 long. Customers can type it in any case.",
+      "kind": "Kind",
+      "kindLocked": "This code has been used: its kind cannot change.",
+      "discountType": "Discount",
+      "percent": "Percentage of the fee",
+      "fixed": "Fixed amount",
+      "discountPercent": "Percent off the fee",
+      "discountAmount": "Amount off the fee (SAR)",
+      "bonusPercent": "Bonus (% of the top-up)",
+      "bonusCap": "Bonus cap (SAR)",
+      "credit": "Free credit (SAR)",
+      "maxUses": "Total uses",
+      "maxUsesPlaceholder": "No limit",
+      "onePerOrganization": "One use per organization",
+      "startsAt": "Valid from",
+      "endsAt": "Valid through",
+      "minTopup": "Minimum top-up (SAR)",
+      "minTopupPlaceholder": "None",
+      "organizations": "Organizations",
+      "allOrganizations": "All organizations",
+      "organizationIds": "Organization IDs",
+      "organizationIdsDescription": "One organization ID per line, from the organizations page.",
+      "note": "Note",
+      "notePlaceholder": "Why this code exists, for the next person who reads it",
+      "create": "Create code",
+      "saved": "Promo code saved.",
+      "invalidPercent": "Enter a percentage above 0 and at most 100, with up to two decimals.",
+      "invalidAmount": "Enter an amount above 0, in riyals and halalas.",
+      "invalidUses": "Enter a whole number above 0, or leave it empty.",
+      "invalidDates": "The end must be after the start.",
+      "invalidCode": "3 to 32 letters, digits, - or _.",
+      "noOrganizations": "List at least one organization, or choose all organizations."
+    },
+    "detail": {
+      "back": "All promo codes",
+      "edit": "Edit",
+      "pause": "Pause",
+      "resume": "Resume",
+      "paused": "Code paused.",
+      "resumed": "Code resumed.",
+      "terms": "Terms",
+      "organizationsAll": "All organizations",
+      "onePerOrganization": "One use per organization",
+      "repeatable": "Repeatable by an organization",
+      "minTopup": "Minimum top-up {{amount}}"
+    },
+    "report": {
+      "title": "Report",
+      "description": "Credit granted and fee waived are read from the credits ledger.",
+      "uses": "Uses",
+      "organizations": "Organizations",
+      "creditGranted": "Credit granted",
+      "feeWaived": "Fee waived",
+      "redemptions": "Latest uses",
+      "empty": "Not used yet.",
+      "when": "When",
+      "organization": "Organization",
+      "topUp": "Top-up",
+      "discount": "Fee discount",
+      "credit": "Credit"
+    },
+    "changes": {
+      "title": "Changes",
+      "empty": "No changes yet.",
+      "created": "Created",
+      "by": "by {{name}}"
+    }
   }
 }

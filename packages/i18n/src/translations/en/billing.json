@@ -141,5 +141,19 @@
   "model": {
     "one-time": "One-time",
     "recurring": "Recurring"
+  },
+  "promo": {
+    "refused": {
+      "unknown": "This code does not exist. Check the spelling and try again.",
+      "paused": "This code is paused for now.",
+      "not_started": "This code is not valid yet.",
+      "expired": "This code has expired.",
+      "wrong_kind": "This code cannot be used here.",
+      "not_for_organization": "This code is not available for this organization.",
+      "used_up": "This code has been fully used.",
+      "already_used": "This organization has already used this code.",
+      "below_minimum": "This code needs a larger top-up.",
+      "no_effect": "This code changes nothing on this top-up."
+    }
   }
 }

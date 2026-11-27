@@ -16,6 +16,7 @@ import { generateId } from "@workspace/shared/utils";
 import { createInsertSchema, createSelectSchema } from "../lib/zod";
 import { organization } from "./auth";
 import { TOPUP_FEE_SOURCES } from "./pricing";
+import { promoCode } from "./promo-codes";
 
 import type { TopupFeeSource } from "./pricing";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
@@ -90,6 +91,13 @@ export const creditLedgerEntry = pgTable(
     topupFeeBps: integer(),
     topupFeeMinMicroSar: bigint({ mode: "number" }),
     topupFeeSource: text().$type<TopupFeeSource>(),
+    /**
+     * The promo code behind the entry (BILL-08): every promo entry (bonus or
+     * free credit) names one; a top-up names the code it was paid with.
+     */
+    promoCodeId: text().references(() => promoCode.id, {
+      onDelete: "restrict",
+    }),
     createdAt: timestamp().notNull().defaultNow(),
   },
   (t) => [
@@ -118,6 +126,13 @@ export const creditLedgerEntry = pgTable(
       "credit_ledger_entry_usage_has_cost_and_rate",
       sql`${t.kind} <> 'usage' or (${t.costMicroUsd} is not null and ${t.usdToSarRateE6} is not null and ${t.fxSpreadBps} is not null and ${t.effectiveUsdToSarRateE6} is not null)`,
     ),
+    check(
+      "credit_ledger_entry_promo_code",
+      sql`(${t.kind} <> 'promo' or ${t.promoCodeId} is not null) and (${t.promoCodeId} is null or ${t.kind} in ('promo', 'top_up'))`,
+    ),
+    index("credit_ledger_entry_promoCodeId_idx")
+      .on(t.promoCodeId)
+      .where(sql`${t.promoCodeId} is not null`),
     check(
       "credit_ledger_entry_topup_fee",
       sql`(${t.topupFeeBps} is null and ${t.topupFeeMinMicroSar} is null and ${t.topupFeeSource} is null) or (${t.kind} = 'top_up' and ${t.topupFeeBps} >= 0 and ${t.topupFeeMinMicroSar} >= 0 and ${t.topupFeeSource} in (${sql.raw(TOPUP_FEE_SOURCES.map((source) => `'${source}'`).join(", "))}))`,

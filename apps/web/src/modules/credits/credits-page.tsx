@@ -32,6 +32,7 @@ import { LowBalanceAlert } from "~/modules/credits/low-balance-alert";
 import { TopUp } from "~/modules/credits/top-up";
 import { formatMicroSar } from "~/modules/keys/money";
 import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
+import { RedeemCode } from "~/modules/promo-codes/redeem-code";
 
 const PAGE_SIZE = 25;
 /** While back from a payment, look for the webhook's credit this often. */
@@ -146,6 +147,8 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
       </Card>
 
       {canTopUp && <TopUp organizationId={organizationId} />}
+
+      {canTopUp && <RedeemCode organizationId={organizationId} />}
 
       <LowBalanceAlert organizationId={organizationId} />
 

@@ -31,6 +31,8 @@ export interface TopUpCheckoutInput {
   feeMicroSar: number;
   /** The rate the fee was worked out with, carried to the webhook so the payment records it. */
   feeRate: TopUpFeeRate;
+  /** The promo code applied and what the server computed it gives (BILL-08), or null. */
+  promo: TopUpPromo | null;
   /** The line names the customer sees on the payment page and the receipt. */
   labels: { credits: string; fee: string };
   redirect: { success: string; cancel: string };
@@ -38,13 +40,24 @@ export interface TopUpCheckoutInput {
 
 /**
  * The fee rate a top-up was quoted at (ADMIN-24): 100 bps = 1%, the minimum in
- * micro-SAR, and where the rate came from ("default", "organization"), which
+ * micro-SAR, and where the rate came from ("default", "organization", "promo"), which
  * the API checks before it records it.
  */
 export interface TopUpFeeRate {
   feeBps: number;
   feeMinMicroSar: number;
   feeSource: string;
+}
+
+/**
+ * A promo code on a top-up (BILL-08): its id, and the fee discount and bonus
+ * the server computed at checkout, in micro-SAR. The fee charged is already
+ * net of the discount; the webhook grants the bonus.
+ */
+export interface TopUpPromo {
+  codeId: string;
+  feeDiscountMicroSar: number;
+  bonusMicroSar: number;
 }
 
 /** What a verified payment webhook says about a top-up. Amounts are micro-SAR. */
@@ -59,6 +72,8 @@ export type TopUpEvent = TopUpEventSource &
         feeMicroSar: number;
         /** Null for a payment started before the rate was carried (ADMIN-24). */
         feeRate: TopUpFeeRate | null;
+        /** The promo code the checkout carried, or null (BILL-08). */
+        promo: TopUpPromo | null;
         /** What the provider actually collected. */
         collectedMicroSar: number;
       }

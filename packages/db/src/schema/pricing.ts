@@ -121,9 +121,10 @@ export const pricingSettings = pgTable(
 
 /**
  * Where the fee a top-up paid came from (ADMIN-24): the pricing settings, or
- * the organization's own fee below. BILL-08 adds promo codes here.
+ * the organization's own fee below, or either of them with a promo code's
+ * discount taken off (BILL-08; the discount is in the entry's metadata).
  */
-export const TOPUP_FEE_SOURCES = ["default", "organization"] as const;
+export const TOPUP_FEE_SOURCES = ["default", "organization", "promo"] as const;
 export type TopupFeeSource = (typeof TOPUP_FEE_SOURCES)[number];
 
 /** The longest note staff may keep on an organization's fee. */

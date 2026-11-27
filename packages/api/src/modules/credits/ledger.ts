@@ -24,6 +24,8 @@ export interface ApplyEntryInput {
   topupFeeBps?: number;
   topupFeeMinMicroSar?: number;
   topupFeeSource?: TopupFeeSource;
+  /** Promo entries, and top-ups paid with a code: the code (BILL-08). */
+  promoCodeId?: string;
 }
 
 export interface ApplyEntryResult {
@@ -48,60 +50,74 @@ export interface Balance {
 export const applyEntry = async (
   input: ApplyEntryInput,
 ): Promise<ApplyEntryResult> =>
-  db.transaction(async (tx) => {
-    const [inserted] = await tx
-      .insert(creditLedgerEntry)
-      .values(input)
-      .onConflictDoNothing({ target: creditLedgerEntry.idempotencyKey })
-      .returning({ id: creditLedgerEntry.id });
+  db.transaction(async (tx) => applyEntryIn(tx, input));
 
-    if (!inserted) {
-      const [existing] = await tx
-        .select()
-        .from(creditLedgerEntry)
-        .where(eq(creditLedgerEntry.idempotencyKey, input.idempotencyKey));
+/** A transaction of the control plane's database. */
+export type LedgerTransaction = Parameters<
+  Parameters<typeof db.transaction>[0]
+>[0];
 
-      if (
-        !existing ||
-        existing.organizationId !== input.organizationId ||
-        existing.amount !== input.amount ||
-        existing.kind !== input.kind
-      ) {
-        throw new Error(
-          `Idempotency key "${input.idempotencyKey}" was already used for a different ledger entry`,
-        );
-      }
+/**
+ * applyEntry inside a transaction the caller holds, so the entry and what it
+ * stands for (a promo code's redemption, BILL-08) commit or fail together.
+ */
+export const applyEntryIn = async (
+  tx: LedgerTransaction,
+  input: ApplyEntryInput,
+): Promise<ApplyEntryResult> => {
+  const [inserted] = await tx
+    .insert(creditLedgerEntry)
+    .values(input)
+    .onConflictDoNothing({ target: creditLedgerEntry.idempotencyKey })
+    .returning({ id: creditLedgerEntry.id });
 
-      const [account] = await tx
-        .select({ balance: creditAccount.balance })
-        .from(creditAccount)
-        .where(eq(creditAccount.organizationId, input.organizationId));
+  if (!inserted) {
+    const [existing] = await tx
+      .select()
+      .from(creditLedgerEntry)
+      .where(eq(creditLedgerEntry.idempotencyKey, input.idempotencyKey));
 
-      return {
-        isApplied: false,
-        entryId: existing.id,
-        balance: account?.balance ?? 0,
-      };
+    if (
+      !existing ||
+      existing.organizationId !== input.organizationId ||
+      existing.amount !== input.amount ||
+      existing.kind !== input.kind
+    ) {
+      throw new Error(
+        `Idempotency key "${input.idempotencyKey}" was already used for a different ledger entry`,
+      );
     }
 
     const [account] = await tx
-      .insert(creditAccount)
-      .values({ organizationId: input.organizationId, balance: input.amount })
-      .onConflictDoUpdate({
-        target: creditAccount.organizationId,
-        set: {
-          balance: sql`${creditAccount.balance} + ${input.amount}`,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ balance: creditAccount.balance });
+      .select({ balance: creditAccount.balance })
+      .from(creditAccount)
+      .where(eq(creditAccount.organizationId, input.organizationId));
 
-    if (!account) {
-      throw new Error("credit_account upsert returned no row");
-    }
+    return {
+      isApplied: false,
+      entryId: existing.id,
+      balance: account?.balance ?? 0,
+    };
+  }
 
-    return { isApplied: true, entryId: inserted.id, balance: account.balance };
-  });
+  const [account] = await tx
+    .insert(creditAccount)
+    .values({ organizationId: input.organizationId, balance: input.amount })
+    .onConflictDoUpdate({
+      target: creditAccount.organizationId,
+      set: {
+        balance: sql`${creditAccount.balance} + ${input.amount}`,
+        updatedAt: new Date(),
+      },
+    })
+    .returning({ balance: creditAccount.balance });
+
+  if (!account) {
+    throw new Error("credit_account upsert returned no row");
+  }
+
+  return { isApplied: true, entryId: inserted.id, balance: account.balance };
+};
 
 export const getBalance = async (organizationId: string): Promise<Balance> => {
   const [account] = await db

@@ -18,6 +18,7 @@ export const staffAc = createAccessControl({
   payments: ["read", "update"],
   providers: ["read", "update"],
   audit: ["read"],
+  promoCodes: ["read", "update"],
 });
 
 /** Sees everything and changes everything. Kept as "admin" so existing admins keep their access. */
@@ -42,9 +43,10 @@ const admin = staffAc.newRole({
   payments: ["read", "update"],
   providers: ["read", "update"],
   audit: ["read"],
+  promoCodes: ["read", "update"],
 });
 
-/** Money: prices, payment gateways and credit adjustments. Can look at accounts, cannot act on them. */
+/** Money: prices, payment gateways, promo codes and credit adjustments. Can look at accounts, cannot act on them. */
 const finance = staffAc.newRole({
   user: ["list", "get"],
   session: [],
@@ -55,6 +57,7 @@ const finance = staffAc.newRole({
   payments: ["read", "update"],
   providers: ["read"],
   audit: ["read"],
+  promoCodes: ["read", "update"],
 });
 
 /** Helping customers: reads everything, signs in as a customer, ends their sessions. No money. */
@@ -68,6 +71,7 @@ const support = staffAc.newRole({
   payments: ["read"],
   providers: ["read"],
   audit: [],
+  promoCodes: ["read"],
 });
 
 /** Everyone else. */
@@ -81,6 +85,7 @@ const user = staffAc.newRole({
   payments: [],
   providers: [],
   audit: [],
+  promoCodes: [],
 });
 
 export const staffRoles = { admin, finance, support, user } as const;

@@ -26,6 +26,7 @@ export const createTopUpCheckout = async ({
   creditMicroSar,
   feeMicroSar,
   feeRate,
+  promo,
   labels,
   redirect,
 }: TopUpCheckoutInput) => {
@@ -46,6 +47,11 @@ export const createTopUpCheckout = async ({
     feeBps: String(feeRate.feeBps),
     feeMinMicroSar: String(feeRate.feeMinMicroSar),
     feeSource: feeRate.feeSource,
+    ...(promo && {
+      promoCodeId: promo.codeId,
+      promoFeeDiscountMicroSar: String(promo.feeDiscountMicroSar),
+      promoBonusMicroSar: String(promo.bonusMicroSar),
+    }),
   };
   const line = (name: string, microSar: number) => ({
     quantity: 1,
@@ -141,6 +147,7 @@ const toPaid = (session: Stripe.Checkout.Session): TopUpFact | null => {
     creditMicroSar,
     feeMicroSar,
     feeRate: toFeeRate(session.metadata),
+    promo: toPromo(session.metadata),
     collectedMicroSar: session.amount_total * MICRO_SAR_PER_HALALA,
   };
 };
@@ -153,6 +160,21 @@ const toFeeRate = (metadata: Stripe.Metadata | null) => {
   return feeBps === null || feeMinMicroSar === null || !feeSource
     ? null
     : { feeBps, feeMinMicroSar, feeSource };
+};
+
+/** The promo code the checkout carried (BILL-08), or null when it carried none or an incomplete one. */
+const toPromo = (metadata: Stripe.Metadata | null) => {
+  const codeId = metadata?.promoCodeId;
+  const feeDiscountMicroSar = toWholeNumber(metadata?.promoFeeDiscountMicroSar);
+  const bonusMicroSar = toWholeNumber(metadata?.promoBonusMicroSar);
+  if (!codeId) {
+    return null;
+  }
+  if (feeDiscountMicroSar === null || bonusMicroSar === null) {
+    logger.error(`A top-up names promo code ${codeId} without its amounts`);
+    return null;
+  }
+  return { codeId, feeDiscountMicroSar, bonusMicroSar };
 };
 
 const toRefunded = (refund: Stripe.Refund): TopUpFact | null => {

@@ -28,6 +28,11 @@ const pathsConfig = {
     payments: {
       index: `${ADMIN_PREFIX}/payments`,
     },
+    promoCodes: {
+      index: `${ADMIN_PREFIX}/promo-codes`,
+      new: `${ADMIN_PREFIX}/promo-codes/new`,
+      code: (id: string) => `${ADMIN_PREFIX}/promo-codes/${id}`,
+    },
     providers: {
       index: `${ADMIN_PREFIX}/providers`,
     },

@@ -253,6 +253,13 @@
       "when": 1795776764944,
       "tag": "0035_organization_topup_fee",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795778081734,
+      "tag": "0036_promo_codes",
+      "breakpoints": true
     }
   ]
 }

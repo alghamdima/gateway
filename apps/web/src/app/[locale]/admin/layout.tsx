@@ -53,6 +53,12 @@ const menu = [
         icon: <Icons.CreditCard />,
       },
       {
+        title: "promoCodes",
+        href: pathsConfig.admin.promoCodes.index,
+        exact: false,
+        icon: <Icons.Gift />,
+      },
+      {
         title: "providers",
         href: pathsConfig.admin.providers.index,
         icon: <Icons.Globe2 />,
@@ -80,6 +86,7 @@ const menu = [
 const RESTRICTED: Record<string, StaffPermissions> = {
   [pathsConfig.admin.audit.index]: { audit: ["read"] },
   [pathsConfig.admin.providers.index]: { providers: ["read"] },
+  [pathsConfig.admin.promoCodes.index]: { promoCodes: ["read"] },
   [pathsConfig.admin.reconciliation.index]: { credits: ["read"] },
 };
 

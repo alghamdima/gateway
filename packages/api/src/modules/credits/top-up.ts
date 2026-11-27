@@ -17,9 +17,16 @@ import {
 import { computeTopupFee } from "../pricing/fee";
 import { getEffectiveTopupFee } from "../pricing/organization-fee";
 import { getPricingSettings } from "../pricing/pricing";
+import {
+  creditTopUpWithPromo,
+  promoRefusalError,
+  quoteTopUpPromo,
+} from "../promo-codes/redeem";
 import { applyEntry } from "./ledger";
 
 import type { EffectiveTopupFee } from "../pricing/fee";
+import type { AppliedTopUpPromo, TopUpPromoQuote } from "../promo-codes/redeem";
+import type { ApplyEntryInput } from "./ledger";
 import type { TopUpEvent } from "@workspace/billing-web/server";
 import type { WebhookCallbacks } from "@workspace/billing-web/server";
 import type { TopupFeeSource } from "@workspace/db/schema";
@@ -34,10 +41,25 @@ export { MICRO_SAR_PER_HALALA } from "@workspace/shared/utils";
 
 const LINE_LABELS = { credits: "Credits", fee: "Payment processing fee" };
 
+/**
+ * What a top-up costs and gives. With a promo code (BILL-08) the fee is the
+ * base fee less the code's discount, and the credit received adds its bonus.
+ */
 export interface TopUpQuote {
+  /** The credit bought. */
   creditMicroSar: number;
+  /** The fee before a promo code's discount (resolveTopupFee, ADMIN-24). */
+  baseFeeMicroSar: number;
+  feeDiscountMicroSar: number;
+  /** The fee paid: base fee less the discount, never below zero. */
   feeMicroSar: number;
+  /** What the customer pays: credit plus the fee paid. */
   totalMicroSar: number;
+  bonusMicroSar: number;
+  /** What lands in the balance: credit plus bonus. */
+  creditReceivedMicroSar: number;
+  /** The code as applied, or why it was refused; null without a code. */
+  promo: TopUpPromoQuote | null;
 }
 
 /**
@@ -87,21 +109,23 @@ export const getTopUpOptions = async (
 export const quoteTopUp = async (
   organizationId: string,
   creditMicroSar: number,
+  promoCode?: string,
 ): Promise<TopUpQuote> => {
   await resolveTopUpGateway();
   // the customer sees the amounts; the rate behind them is for the payment record
-  const priced = await quote(organizationId, creditMicroSar);
-  return {
-    creditMicroSar: priced.creditMicroSar,
-    feeMicroSar: priced.feeMicroSar,
-    totalMicroSar: priced.totalMicroSar,
-  };
+  const { fee: _fee, ...priced } = await quote(
+    organizationId,
+    creditMicroSar,
+    promoCode,
+  );
+  return priced;
 };
 
 /** The quote, and the fee rate it used, which only the payment record needs. */
 const quote = async (
   organizationId: string,
   creditMicroSar: number,
+  promoCode?: string,
 ): Promise<TopUpQuote & { fee: EffectiveTopupFee }> => {
   const [settings, fee] = await Promise.all([
     getPricingSettings(),
@@ -116,11 +140,29 @@ const quote = async (
       message: `A top-up must be between ${formatMicroSar(settings.topupMinMicroSar)} and ${formatMicroSar(settings.topupMaxMicroSar)}`,
     });
   }
-  const feeMicroSar = computeTopupFee(creditMicroSar, fee);
+  const baseFeeMicroSar = computeTopupFee(creditMicroSar, fee);
+  const promo =
+    promoCode === undefined
+      ? null
+      : await quoteTopUpPromo({
+          organizationId,
+          code: promoCode,
+          creditMicroSar,
+          baseFeeMicroSar,
+        });
+  const applied = promo?.status === "applied" ? promo : null;
+  const feeDiscountMicroSar = applied?.feeDiscountMicroSar ?? 0;
+  const bonusMicroSar = applied?.bonusMicroSar ?? 0;
+  const feeMicroSar = baseFeeMicroSar - feeDiscountMicroSar;
   return {
     creditMicroSar,
+    baseFeeMicroSar,
+    feeDiscountMicroSar,
     feeMicroSar,
     totalMicroSar: creditMicroSar + feeMicroSar,
+    bonusMicroSar,
+    creditReceivedMicroSar: creditMicroSar + bonusMicroSar,
+    promo,
     fee,
   };
 };
@@ -129,11 +171,14 @@ export const startTopUp = async ({
   user,
   organizationId,
   creditMicroSar,
+  promoCode,
   origin,
 }: {
   user: { id: string; email: string };
   organizationId: string;
   creditMicroSar: number;
+  /** A promo code as the customer typed it (BILL-08), checked again here. */
+  promoCode?: string;
   /** The site the customer is on; the payment page sends them back there. */
   origin: string;
 }) => {
@@ -148,7 +193,16 @@ export const startTopUp = async ({
     throw new HttpException(HttpStatusCode.NOT_FOUND);
   }
 
-  const { fee, ...priced } = await quote(organizationId, creditMicroSar);
+  const { fee, ...priced } = await quote(
+    organizationId,
+    creditMicroSar,
+    promoCode,
+  );
+  // a code is checked again now, against the rules as they stand at checkout
+  if (priced.promo?.status === "refused") {
+    throw promoRefusalError(priced.promo.reason);
+  }
+  const promo: AppliedTopUpPromo | null = priced.promo;
   const page = new URL(`/dashboard/${org.slug}/credits`, origin);
   const back = (status: string) => {
     const url = new URL(page);
@@ -166,7 +220,13 @@ export const startTopUp = async ({
       feeRate: {
         feeBps: fee.topupFeeBps,
         feeMinMicroSar: fee.topupFeeMinMicroSar,
-        feeSource: fee.source,
+        // the rate is the default's or the organization's; a discount on it makes it a promo fee
+        feeSource: priced.feeDiscountMicroSar > 0 ? "promo" : fee.source,
+      },
+      promo: promo && {
+        codeId: promo.codeId,
+        feeDiscountMicroSar: promo.feeDiscountMicroSar,
+        bonusMicroSar: promo.bonusMicroSar,
       },
       labels: LINE_LABELS,
       redirect: { success: back("success"), cancel: back("cancelled") },
@@ -225,7 +285,7 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
     return { isApplied: false };
   }
 
-  const result = await applyEntry({
+  const topUp: ApplyEntryInput = {
     organizationId: event.organizationId,
     amount: event.creditMicroSar,
     kind: "top_up",
@@ -238,7 +298,15 @@ const applyPayment = async (event: Extract<TopUpEvent, { type: "paid" }>) => {
       collectedMicroSar: event.collectedMicroSar,
     },
     ...recordedFeeRate(event),
-  });
+  };
+  // with a code, its use and bonus are written in the same transaction as the credit (BILL-08)
+  const result = event.promo
+    ? await creditTopUpWithPromo({
+        promo: event.promo,
+        paymentKey: `${event.provider}:${event.paymentId}`,
+        topUp,
+      })
+    : await applyEntry(topUp);
   logger.info(
     `💳 Top-up ${event.paymentId}: ${result.isApplied ? "credited" : "already credited"} ${event.creditMicroSar} micro-SAR to ${event.organizationId}`,
   );

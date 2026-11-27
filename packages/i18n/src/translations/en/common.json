@@ -273,5 +273,6 @@
   "reconciliation": "Reconciliation",
   "providers": "Providers",
   "dataPolicy": "Data policy",
-  "payments": "Payments"
+  "payments": "Payments",
+  "promoCodes": "Promo codes"
 }

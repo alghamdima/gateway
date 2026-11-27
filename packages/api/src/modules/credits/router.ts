@@ -6,6 +6,7 @@ import {
   enforceOrganizationPermission,
   validate,
 } from "../../middleware";
+import { customerPromoCodeSchema } from "../promo-codes/schema";
 import { getBalance, getEntries } from "./ledger";
 import { getLowBalanceSetting, setLowBalanceSetting } from "./low-balance";
 import {
@@ -32,6 +33,9 @@ const topUpAmountSchema = z.coerce
   .refine((value) => value % MICRO_SAR_PER_HALALA === 0, {
     message: "Must be a whole number of halalas",
   });
+
+/** An optional promo code as typed (BILL-08); the promo codes module checks it. */
+const promoCodeField = customerPromoCodeSchema.optional();
 
 export const creditsRouter = new Hono()
   .use(enforceAuth)
@@ -114,12 +118,16 @@ export const creditsRouter = new Hono()
         organizationId: c.req.param("organizationId"),
         permissions: { billing: ["create"] },
       })(c, next),
-    validate("query", z.object({ amount: topUpAmountSchema })),
+    validate(
+      "query",
+      z.object({ amount: topUpAmountSchema, code: promoCodeField }),
+    ),
     async (c) =>
       c.json(
         await quoteTopUp(
           c.req.param("organizationId"),
           c.req.valid("query").amount,
+          c.req.valid("query").code,
         ),
       ),
   )
@@ -130,13 +138,17 @@ export const creditsRouter = new Hono()
         organizationId: c.req.param("organizationId"),
         permissions: { billing: ["create"] },
       })(c, next),
-    validate("json", z.object({ amount: topUpAmountSchema })),
+    validate(
+      "json",
+      z.object({ amount: topUpAmountSchema, promoCode: promoCodeField }),
+    ),
     async (c) =>
       c.json(
         await startTopUp({
           user: c.var.user,
           organizationId: c.req.param("organizationId"),
           creditMicroSar: c.req.valid("json").amount,
+          promoCode: c.req.valid("json").promoCode,
           origin: new URL(c.req.url).origin,
         }),
       ),

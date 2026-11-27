@@ -222,8 +222,9 @@ describe.skipIf(!adminUrl)("credits ledger", () => {
         return state / 2147483647;
       };
       // charges ("usage") are the gateway's, with their USD cost and rates;
-      // here a negative adjustment takes money out the same way
-      const kinds = ["top_up", "adjustment", "refund", "promo"] as const;
+      // here a negative adjustment takes money out the same way. Promo
+      // entries name their code (BILL-08): the promo codes tests cover them.
+      const kinds = ["top_up", "adjustment", "refund"] as const;
       const entries = Array.from({ length: 300 }, (_, i) => {
         const kind = kinds[Math.floor(random() * kinds.length)] ?? "adjustment";
         const magnitude = 1 + Math.floor(random() * 3 * USD);

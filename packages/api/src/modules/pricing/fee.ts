@@ -50,8 +50,11 @@ export const computeTopupFee = (
 
 /** The fee rates a top-up uses, and where they came from, so the payment can record them. */
 export interface EffectiveTopupFee extends TopupFeeRates {
-  /** "default" or "organization" (ADMIN-24). */
-  source: TopupFeeSource;
+  /**
+   * "default" or "organization" (ADMIN-24). "promo" is not a rate: the
+   * checkout records it when a promo code took something off (BILL-08).
+   */
+  source: Exclude<TopupFeeSource, "promo">;
 }
 
 /** An organization's own fee: a null field uses the default's value. */

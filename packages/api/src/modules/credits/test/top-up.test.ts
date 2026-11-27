@@ -177,6 +177,20 @@ const setOwnFee = async (
   });
 };
 
+/** A quote without a promo code (BILL-08): no discount, no bonus. */
+const plain = (amounts: {
+  creditMicroSar: number;
+  feeMicroSar: number;
+  totalMicroSar: number;
+}) => ({
+  ...amounts,
+  baseFeeMicroSar: amounts.feeMicroSar,
+  feeDiscountMicroSar: 0,
+  bonusMicroSar: 0,
+  creditReceivedMicroSar: amounts.creditMicroSar,
+  promo: null,
+});
+
 /** Back to the limits the migration seeds. */
 const seeded = () =>
   setLimits(20 * SAR, 3750 * SAR, [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR]);
@@ -277,11 +291,13 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
   describe("checkout", () => {
     it("quotes the fee from the admin settings: the minimum, then the percentage", async () => {
       // migration defaults: 5.5% with a SAR 3 minimum
-      expect(await topUp.quoteTopUp(NO_OVERRIDE, 40 * SAR)).toEqual({
-        creditMicroSar: 40 * SAR,
-        feeMicroSar: 3_000_000,
-        totalMicroSar: 43_000_000,
-      });
+      expect(await topUp.quoteTopUp(NO_OVERRIDE, 40 * SAR)).toEqual(
+        plain({
+          creditMicroSar: 40 * SAR,
+          feeMicroSar: 3_000_000,
+          totalMicroSar: 43_000_000,
+        }),
+      );
       expect((await topUp.quoteTopUp(NO_OVERRIDE, 100 * SAR)).feeMicroSar).toBe(
         5_500_000,
       );
@@ -673,11 +689,13 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         feeMinMicroSar: 3_000_000,
       });
       // 2% of SAR 400 is SAR 8; the default would be SAR 22
-      expect(await topUp.quoteTopUp(organizationId, 400 * SAR)).toEqual({
-        creditMicroSar: 400 * SAR,
-        feeMicroSar: 8 * SAR,
-        totalMicroSar: 408 * SAR,
-      });
+      expect(await topUp.quoteTopUp(organizationId, 400 * SAR)).toEqual(
+        plain({
+          creditMicroSar: 400 * SAR,
+          feeMicroSar: 8 * SAR,
+          totalMicroSar: 408 * SAR,
+        }),
+      );
       expect((await topUp.quoteTopUp(other, 400 * SAR)).feeMicroSar).toBe(
         22 * SAR,
       );
@@ -694,9 +712,11 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
       });
       expect(result).toEqual({
         url: "https://checkout.stripe.test/1",
-        creditMicroSar: 400 * SAR,
-        feeMicroSar: 8 * SAR,
-        totalMicroSar: 408 * SAR,
+        ...plain({
+          creditMicroSar: 400 * SAR,
+          feeMicroSar: 8 * SAR,
+          totalMicroSar: 408 * SAR,
+        }),
       });
       expect(stripeCalls.sessions[0]?.metadata).toMatchObject({
         feeMicroSar: String(8 * SAR),
@@ -767,7 +787,7 @@ describe.skipIf(!adminUrl)("credit top-ups", () => {
         feeRate: {
           feeBps: "550",
           feeMinMicroSar: "3000000",
-          feeSource: "promo",
+          feeSource: "coupon",
         },
       });
 

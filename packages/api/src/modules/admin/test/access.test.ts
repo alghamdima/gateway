@@ -40,6 +40,13 @@ const ROUTES = {
   paymentChanges: ["GET", "/payments/changes"],
   updatePaymentSettings: ["PUT", "/payments/settings"],
   updatePaymentProvider: ["PUT", "/payments/providers/stripe"],
+  listPromoCodes: ["GET", "/promo-codes"],
+  readPromoCode: ["GET", "/promo-codes/p1"],
+  promoCodeReport: ["GET", "/promo-codes/p1/report"],
+  promoCodeChanges: ["GET", "/promo-codes/p1/changes"],
+  createPromoCode: ["POST", "/promo-codes"],
+  updatePromoCode: ["PUT", "/promo-codes/p1"],
+  pausePromoCode: ["PUT", "/promo-codes/p1/paused"],
   readProviders: ["GET", "/providers"],
   setProviderTerms: ["PUT", "/providers/k1/terms"],
   removeProviderTerms: ["DELETE", "/providers/k1/terms"],
@@ -74,6 +81,10 @@ const READ_ONLY: Route[] = [
   "pricingChanges",
   "readPayments",
   "paymentChanges",
+  "listPromoCodes",
+  "readPromoCode",
+  "promoCodeReport",
+  "promoCodeChanges",
   "readProviders",
   "readProviderAccounts",
   "readRequests",
@@ -89,6 +100,9 @@ const ALLOWED: Record<string, Route[]> = {
     "clearTopupFee",
     "updatePaymentSettings",
     "updatePaymentProvider",
+    "createPromoCode",
+    "updatePromoCode",
+    "pausePromoCode",
     "readAudit",
   ],
   support: READ_ONLY,
@@ -142,6 +156,8 @@ describe("admin route access", () => {
     ["GET", "/users/u1/accounts/extra/../.."],
     ["DELETE", "/customers"],
     ["HEAD", "/summary"],
+    ["DELETE", "/promo-codes/p1"],
+    ["GET", "/promo-codes/p1/redemptions/extra"],
   ])("refuses %s %s, which no rule covers, to every role", (method, path) => {
     if (findAccessRule(method, path)) {
       return; // a rule exists; the matrix above checks it
@@ -187,6 +203,8 @@ describe("admin audit", () => {
     ["/providers/k1/terms", "k1"],
     ["/providers/accounts/openai", "openai"],
     ["/providers/accounts/openai/keys/k1", "openai"],
+    ["/promo-codes/p1", "p1"],
+    ["/promo-codes/p1/paused", "p1"],
   ])("targets %s at %s", (path, target) => {
     expect(auditTarget(path)).toBe(target);
   });

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { enforceAdmin, enforceAuth } from "../../middleware";
 import { paymentsRouter } from "../payments/router";
 import { pricingRouter } from "../pricing/router";
+import { promoCodesAdminRouter } from "../promo-codes/router";
 import { listReconciliationRuns } from "../reconciliation/reconcile";
 import { enforceStaffAccess } from "./access-middleware";
 import { auditRouter } from "./audit/router";
@@ -24,6 +25,7 @@ export const adminRouter = new Hono()
   .route("/customers", customersRouter)
   .route("/pricing", pricingRouter)
   .route("/payments", paymentsRouter)
+  .route("/promo-codes", promoCodesAdminRouter)
   .route("/providers", providersRouter)
   .route("/requests", requestsRouter)
   .route("/audit", auditRouter)

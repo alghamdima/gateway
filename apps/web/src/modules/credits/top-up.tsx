@@ -28,6 +28,18 @@ import { Spinner } from "@workspace/ui-web/spinner";
 import { api } from "~/lib/api/client";
 import { formatMicroSar, MICRO_SAR, sarToMicroSar } from "~/modules/keys/money";
 
+import type { InferResponseType } from "hono/client";
+
+type TopUpQuote = InferResponseType<
+  (typeof api.credits)[":organizationId"]["top-up"]["quote"]["$get"],
+  200
+>;
+/** A reason the server gives for refusing a code (billing:promo.refused). */
+type PromoRefusal = Extract<
+  NonNullable<TopUpQuote["promo"]>,
+  { status: "refused" }
+>["reason"];
+
 interface TopUpProps {
   readonly organizationId: string;
 }
@@ -99,24 +111,37 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
     presetsUsd[Math.min(1, presetsUsd.length - 1)] ?? "",
   );
 
+  // what is typed, and the code applied to the quote (BILL-08)
+  const [codeInput, setCodeInput] = useState("");
+  const [promoCode, setPromoCode] = useState<string | null>(null);
+
   const amount = toCreditMicroSar(amountSar, options);
   const money = (microSar: number) => formatMicroSar(microSar, i18n.language);
 
   const quote = useQuery({
-    queryKey: ["credits", organizationId, "top-up", amount],
+    queryKey: ["credits", organizationId, "top-up", amount, promoCode],
     queryFn: () =>
       handle(api.credits[":organizationId"]["top-up"].quote.$get)({
         param: { organizationId },
-        query: { amount: String(amount) },
+        query: {
+          amount: String(amount),
+          ...(promoCode ? { code: promoCode } : {}),
+        },
       }),
     enabled: amount !== null,
   });
+  const promo = quote.data?.promo ?? null;
+  // only a code the server applied goes to the checkout, which checks it again
+  const appliedCode = promo?.status === "applied" ? promo.code : undefined;
 
   const checkout = useMutation({
     mutationFn: (creditMicroSar: number) =>
       handle(api.credits[":organizationId"]["top-up"].$post)({
         param: { organizationId },
-        json: { amount: creditMicroSar },
+        json: {
+          amount: creditMicroSar,
+          ...(appliedCode ? { promoCode: appliedCode } : {}),
+        },
       }),
     onSuccess: ({ url }) => {
       if (url) {
@@ -134,14 +159,39 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
         },
         {
           label: t("organization:credits.topUp.fee"),
-          value: quote.data.feeMicroSar,
+          value: quote.data.baseFeeMicroSar,
         },
+        ...(appliedCode && quote.data.feeDiscountMicroSar > 0
+          ? [
+              {
+                label: t("organization:credits.topUp.promo.discount", {
+                  code: appliedCode,
+                }),
+                value: -quote.data.feeDiscountMicroSar,
+              },
+            ]
+          : []),
         {
           label: t("organization:credits.topUp.total"),
           value: quote.data.totalMicroSar,
         },
       ]
     : [];
+  const received =
+    quote.data && appliedCode && quote.data.bonusMicroSar > 0
+      ? [
+          {
+            label: t("organization:credits.topUp.promo.bonus", {
+              code: appliedCode,
+            }),
+            value: quote.data.bonusMicroSar,
+          },
+          {
+            label: t("organization:credits.topUp.promo.received"),
+            value: quote.data.creditReceivedMicroSar,
+          },
+        ]
+      : [];
 
   return (
     <Card>
@@ -194,6 +244,19 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
           </FieldError>
         )}
 
+        <PromoCodeField
+          value={codeInput}
+          onChange={setCodeInput}
+          appliedCode={appliedCode}
+          refusal={promo?.status === "refused" ? promo.reason : null}
+          isBusy={isRedirecting || (promoCode !== null && quote.isFetching)}
+          onApply={() => setPromoCode(codeInput.trim() || null)}
+          onRemove={() => {
+            setPromoCode(null);
+            setCodeInput("");
+          }}
+        />
+
         {amount !== null && quote.isPending && (
           <Skeleton className="h-20 w-64" />
         )}
@@ -213,6 +276,25 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
                 <dd
                   className={`text-right tabular-nums ${index === lines.length - 1 ? "font-semibold" : ""}`}
                 >
+                  {money(line.value)}
+                </dd>
+              </div>
+            ))}
+            {received.map((line, index) => (
+              <div key={line.label} className="contents">
+                <dt
+                  className={
+                    index === received.length - 1
+                      ? "pt-2 font-semibold"
+                      : "text-muted-foreground pt-2"
+                  }
+                >
+                  {line.label}
+                </dt>
+                <dd
+                  className={`pt-2 text-right tabular-nums ${index === received.length - 1 ? "font-semibold" : "text-green-600"}`}
+                >
+                  {index === 0 ? "+" : ""}
                   {money(line.value)}
                 </dd>
               </div>
@@ -240,6 +322,83 @@ const TopUpForm = ({ organizationId, options }: TopUpFormProps) => {
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+interface PromoCodeFieldProps {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  /** The code as the server applied it, normalized. */
+  readonly appliedCode: string | undefined;
+  /** Why the server refused the code. */
+  readonly refusal: PromoRefusal | null;
+  readonly isBusy: boolean;
+  readonly onApply: () => void;
+  readonly onRemove: () => void;
+}
+
+/** An optional promo code (BILL-08): applied to the quote, so its effect shows before paying. */
+const PromoCodeField = ({
+  value,
+  onChange,
+  appliedCode,
+  refusal,
+  isBusy,
+  onApply,
+  onRemove,
+}: PromoCodeFieldProps) => {
+  const { t } = useTranslation(["organization", "billing"]);
+  return (
+    <Field data-invalid={refusal !== null} className="max-w-sm">
+      <FieldLabel htmlFor="top-up-promo-code">
+        {t("organization:credits.topUp.promo.label")}
+      </FieldLabel>
+      <div className="flex items-center gap-2">
+        <Input
+          id="top-up-promo-code"
+          autoComplete="off"
+          placeholder={t("organization:credits.topUp.promo.placeholder")}
+          value={appliedCode ?? value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !appliedCode) {
+              event.preventDefault();
+              onApply();
+            }
+          }}
+          aria-invalid={refusal !== null}
+          disabled={isBusy || appliedCode !== undefined}
+          className="uppercase"
+        />
+        {appliedCode ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onRemove}
+            disabled={isBusy}
+          >
+            {t("organization:credits.topUp.promo.remove")}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onApply}
+            disabled={isBusy || value.trim() === ""}
+          >
+            {isBusy ? <Spinner /> : t("organization:credits.topUp.promo.apply")}
+          </Button>
+        )}
+      </div>
+      {appliedCode && (
+        <FieldDescription>
+          {t("organization:credits.topUp.promo.applied", { code: appliedCode })}
+        </FieldDescription>
+      )}
+      {refusal && (
+        <FieldError>{t(`billing:promo.refused.${refusal}`)}</FieldError>
+      )}
+    </Field>
   );
 };
 

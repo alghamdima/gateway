@@ -314,6 +314,17 @@
       "unavailable": {
         "title": "Top-ups are temporarily unavailable",
         "description": "Adding credits is paused for now. Your balance and API keys keep working as usual. Please check back later."
+      },
+      "promo": {
+        "label": "Promo code",
+        "placeholder": "Enter a code",
+        "apply": "Apply",
+        "remove": "Remove",
+        "applied": "Code {{code}} applied.",
+        "baseFee": "Payment processing fee",
+        "discount": "Discount ({{code}})",
+        "bonus": "Bonus credit ({{code}})",
+        "received": "Credits you receive"
       }
     },
     "title": "Credits",
@@ -335,6 +346,14 @@
       "refund": "Refund",
       "adjustment": "Adjustment",
       "promo": "Promotion"
+    },
+    "redeem": {
+      "title": "Redeem a code",
+      "description": "Have a code for free credit? Enter it here: the credit is added at once.",
+      "label": "Code",
+      "placeholder": "Enter a code",
+      "submit": "Redeem",
+      "success": "{{credit}} of credit added with code {{code}}."
     }
   },
   "dataPolicy": {
