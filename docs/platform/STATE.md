@@ -91,7 +91,7 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - Legal pages: the three under `packages/cms` are the template's text.
 - Before launch, the legal terms must state that credit expires 365 days after purchase (the owner kept 365 days as the default; promo credit on its own date) and the refund rule: a top-up's unused credit is refundable within 24 hours of purchase, never the fee, and the unused part of a promo bonus that came with it is removed (ADR 0019).
 - Analytics: PostHog is the one provider left. As configured it contacts its host before the visitor consents.
-- GitHub: the repository moved to `Lem-ru-sa/Lemru-sa` (pushes to `origin` still land there) and `feat/ai-gateway` is its default branch. On the old name every Actions job has ended within seconds without running a step since 2026-11-25 09:34 UTC (an account matter, not the code); on the new one Actions shows no workflows. The owner enables Actions there and decides what `main` holds. Until then every check runs locally (below), and CI is not re-run.
+- GitHub: the repository is `alghamdima/gateway` (`origin`, https://github.com/alghamdima/gateway.git), and the work happens on `feat/ai-gateway`. Every Actions job has ended within seconds without running a step since 2026-11-25 09:34 UTC (an account matter, not the code). The owner enables Actions and decides what `main` holds. Until then every check runs locally (below), and CI is not re-run.
 
 ## How to check your work
 
