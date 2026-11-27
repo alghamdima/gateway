@@ -60,6 +60,16 @@ func (mc *ModelCatalog) GetCatalogPricingOverrides(model string, provider schema
 	return mc.datasheet.CatalogPricingOverrides(model, provider, mode)
 }
 
+// PricingOverrideName returns the name of the scoped pricing override that
+// prices (model, requestType) under scopes, or "" when none applies. scopes
+// must name the provider, as CalculateCostForUsage's do.
+func (mc *ModelCatalog) PricingOverrideName(model string, requestType schemas.RequestType, scopes *PricingLookupScopes) string {
+	if scopes == nil {
+		return ""
+	}
+	return mc.datasheet.PricingOverrideName(model, requestType, datasheet.LookupScopes(*scopes))
+}
+
 // IsRequestTypeSupported preserves the historical (model, provider,
 // requestType) signature; provider is ignored (the underlying datasheet
 // index is keyed by model only).

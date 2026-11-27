@@ -120,6 +120,55 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "pricing.update", target: "pricing" },
   },
 
+  // the model price table (ADMIN-09, ADR 0018): the same permission as the other prices
+  {
+    method: "GET",
+    path: /^\/model-prices(\/(history|suggestions|check))?$/,
+    needs: { pricing: ["read"] },
+  },
+  {
+    method: "POST",
+    path: /^\/model-prices$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "pricing.model-create", target: "model-price" },
+  },
+  {
+    method: "POST",
+    path: /^\/model-prices\/import$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "pricing.model-import", target: "model-price" },
+  },
+  {
+    method: "POST",
+    path: /^\/model-prices\/push$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "pricing.model-push", target: "model-price" },
+  },
+  {
+    method: "POST",
+    path: /^\/model-prices\/suggestions\/sync$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "pricing.suggestions-sync", target: "model-price" },
+  },
+  {
+    method: "POST",
+    path: new RegExp(`^/model-prices/suggestions/${ID}/approve$`),
+    needs: { pricing: ["update"] },
+    audit: {
+      action: "pricing.suggestion-approve",
+      target: "model-price-suggestion",
+    },
+  },
+  {
+    method: "POST",
+    path: new RegExp(`^/model-prices/suggestions/${ID}/reject$`),
+    needs: { pricing: ["update"] },
+    audit: {
+      action: "pricing.suggestion-reject",
+      target: "model-price-suggestion",
+    },
+  },
+
   // payment gateways (ADMIN-03): the secrets stay in env and never pass through here
   {
     method: "GET",
@@ -271,6 +320,12 @@ export const canAccessAdminRoute = (
  */
 export const auditTarget = (path: string) => {
   const segments = path.split("/").filter(Boolean);
+  // /model-prices/suggestions/7/approve is suggestion 7; a new version names its target in the body
+  if (segments[0] === "model-prices") {
+    return segments[1] === "suggestions" && segments.length === 4
+      ? segments[2]
+      : (segments[1] ?? "model-prices");
+  }
   if (segments[0] === "pricing" || segments[0] === "payments") {
     return segments.at(-1);
   }

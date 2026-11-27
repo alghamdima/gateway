@@ -285,6 +285,7 @@ func buildCustomPricingData(overrides []Override) *customPricingData {
 	for _, o := range overrides {
 		entry := customPricingEntry{
 			id:        o.ID,
+			name:      o.Name,
 			scopeKind: o.ScopeKind,
 			options:   o.Options,
 		}
@@ -342,6 +343,28 @@ func (s *Store) applyPricingOverrides(model string, requestType schemas.RequestT
 		return patchPricing(pricing, *patch), true
 	}
 	return pricing, false
+}
+
+// PricingOverrideName returns the name of the scoped override that prices
+// (model, requestType) under scopes, by the same resolution as
+// applyPricingOverrides, or "" when none applies. A caller that charged a
+// request records it, so the charge names the price it used.
+func (s *Store) PricingOverrideName(model string, requestType schemas.RequestType, scopes LookupScopes) string {
+	s.overridesMu.RLock()
+	custom := s.customPricing
+	s.overridesMu.RUnlock()
+
+	if custom == nil {
+		return ""
+	}
+	mode := normalizeRequestType(requestType)
+	if mode == "unknown" {
+		return ""
+	}
+	if e := custom.resolveEntry(model, mode, scopes); e != nil {
+		return e.name
+	}
+	return ""
 }
 
 // cloneOptions returns a copy of o in which every non-nil pointer field

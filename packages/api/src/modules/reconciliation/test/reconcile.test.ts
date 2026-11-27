@@ -45,6 +45,15 @@ const gatewayReporting = (
   listModels: async () => [],
   searchRequests: async () => ({ requests: [], total: 0 }),
   syncPrices: async () => {},
+  listPricingOverrides: async () => [],
+  createPricingOverride: async () => {
+    throw new Error("not used");
+  },
+  updatePricingOverride: async () => {
+    throw new Error("not used");
+  },
+  deletePricingOverride: async () => {},
+  listDatasheetEntries: async () => [],
   listProviders: async () => [],
   createProvider: async () => {},
   deleteProvider: async () => {},

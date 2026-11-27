@@ -205,6 +205,9 @@ describe("admin audit", () => {
     ["/providers/accounts/openai/keys/k1", "openai"],
     ["/promo-codes/p1", "p1"],
     ["/promo-codes/p1/paused", "p1"],
+    ["/model-prices", "model-prices"],
+    ["/model-prices/import", "import"],
+    ["/model-prices/suggestions/7/approve", "7"],
   ])("targets %s at %s", (path, target) => {
     expect(auditTarget(path)).toBe(target);
   });

@@ -48,6 +48,11 @@ const menu = [
         icon: <Icons.Percent />,
       },
       {
+        title: "modelPrices",
+        href: pathsConfig.admin.modelPrices.index,
+        icon: <Icons.ChartNoAxesGantt />,
+      },
+      {
         title: "payments",
         href: pathsConfig.admin.payments.index,
         icon: <Icons.CreditCard />,

@@ -456,6 +456,7 @@ type costInput struct {
 // customPricingEntry is one flattened override ready for lookup.
 type customPricingEntry struct {
 	id            string
+	name          string // the override's name, recorded on what it priced (PricingOverrideName)
 	scopeKind     ScopeKind
 	userID        string
 	virtualKeyID  string

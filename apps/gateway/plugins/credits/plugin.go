@@ -75,6 +75,9 @@ type pricer interface {
 	GetMaxOutputTokens(model string, provider schemas.ModelProvider) int
 	CalculateCost(result *schemas.BifrostResponse, scopes *modelcatalog.PricingLookupScopes) float64
 	CalculateCostForUsage(usage *schemas.BifrostLLMUsage, provider schemas.ModelProvider, model string, requestType schemas.RequestType, scopes *modelcatalog.PricingLookupScopes) float64
+	// PricingOverrideName names the pricing override that priced the attempt: the control
+	// plane names each one after the version of its price table (docs/platform/adr/0018-model-price-table.md)
+	PricingOverrideName(model string, requestType schemas.RequestType, scopes *modelcatalog.PricingLookupScopes) string
 }
 
 // Plugin implements schemas.LLMPlugin.
@@ -371,6 +374,11 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			"attempt":           bifrost.GetIntFromContext(ctx, schemas.BifrostContextKeyNumberOfRetries),
 			"failed":            bifrostErr != nil,
 		},
+	}
+	// the price it was charged at: the pricing override that priced it, named after the
+	// control plane's price version (ADR 0018); absent when the datasheet priced it alone
+	if name := p.pricer.PricingOverrideName(model, requestType, scopes); name != "" {
+		settlement.Metadata["price_override"] = name
 	}
 	// which provider key served the attempt: the ledger keeps it for good, as evidence
 	// of where the request went (docs/platform/adr/0015-data-policy.md)

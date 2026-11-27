@@ -3,6 +3,10 @@ import { timingSafeEqual } from "node:crypto";
 
 import { checkLowBalances } from "../credits/low-balance";
 import { applyPendingPolicies } from "../data-policy/policy";
+import {
+  runModelPricesJob,
+  runModelPriceSuggestionsJob,
+} from "../model-prices/jobs";
 import { runDailyReconciliation } from "./daily";
 import { env } from "./env";
 
@@ -46,6 +50,26 @@ const dataPolicies = async (c: Context) => {
   return c.json(await applyPendingPolicies());
 };
 
+const modelPrices = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const { pushed, check, repaired, orphansDeleted } = await runModelPricesJob();
+  return c.json({
+    pushed,
+    repaired: repaired ?? null,
+    orphansDeleted,
+    drift: check.drift.length,
+  });
+};
+
+const modelPriceSuggestions = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await runModelPriceSuggestionsJob());
+};
+
 /**
  * /api/internal: jobs a scheduler calls with `Authorization: Bearer
  * <CRON_SECRET>`. Without CRON_SECRET set, every call is refused. GET is
@@ -56,6 +80,10 @@ const dataPolicies = async (c: Context) => {
  * - /low-balance: hourly (step 10.2)
  * - /data-policy: every few minutes; pushes data policies whose keys do not
  *   carry them yet, after a gateway failure (step D2)
+ * - /model-prices: every minute; pushes model prices whose time has come or
+ *   that the gateway lacks, and mends drift (ADMIN-09, ADR 0018)
+ * - /model-price-suggestions: daily, after the gateway's own 24 h price sync;
+ *   proposes the datasheet's prices that differ from ours (ADR 0018)
  */
 export const internalRouter = new Hono()
   .get("/reconciliation", reconcileYesterday)
@@ -63,4 +91,8 @@ export const internalRouter = new Hono()
   .get("/low-balance", lowBalances)
   .post("/low-balance", lowBalances)
   .get("/data-policy", dataPolicies)
-  .post("/data-policy", dataPolicies);
+  .post("/data-policy", dataPolicies)
+  .get("/model-prices", modelPrices)
+  .post("/model-prices", modelPrices)
+  .get("/model-price-suggestions", modelPriceSuggestions)
+  .post("/model-price-suggestions", modelPriceSuggestions);

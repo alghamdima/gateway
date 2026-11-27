@@ -260,6 +260,9 @@ describe.skipIf(!adminUrl || !binary)(
       const catalog = await providers.getProviderCatalog();
       localKeyId = catalog.find((e) => e.name === "in-kingdom")?.keyId ?? "";
       await localTerms(0);
+      // the catalog offers models we price (ADMIN-09): the local pricing file's price
+      await sql`insert into model_price (provider, model, effective_from, input_usd, output_usd, source, created_by)
+        values ('openai', 'gpt-4o-mini', now(), '0.00000015', '0.0000006', 'manual', 'staff_e2e')`;
     }, 120_000);
 
     afterAll(async () => {

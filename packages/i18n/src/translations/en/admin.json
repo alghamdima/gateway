@@ -616,5 +616,126 @@
       "created": "Created",
       "by": "by {{name}}"
     }
+  },
+  "modelPrices": {
+    "header": {
+      "title": "Model prices",
+      "description": "Our price for each model at each provider, and at provider keys with a negotiated rate, in USD as providers price. Customers are charged these, converted at the effective rate, with no markup. A price is never edited: a new version takes over from the time it starts.",
+      "rate": "SAR at the effective rate {{rate}}."
+    },
+    "tabs": {
+      "prices": "Prices",
+      "suggestions": "Suggestions",
+      "check": "Gateway check"
+    },
+    "list": {
+      "search": "Search models",
+      "provider": "Provider",
+      "model": "Model",
+      "key": "Provider key",
+      "allKeys": "All keys",
+      "rates": "Price",
+      "since": "In force since",
+      "gateway": "Gateway",
+      "pushed": "Charged by the gateway",
+      "notPushed": "Not on the gateway yet",
+      "history": "History",
+      "edit": "New version",
+      "new": "Add a price",
+      "empty": "No prices match. Import the gateway's current prices to start.",
+      "scheduled": "New version scheduled",
+      "moreRates": "and {{count}} more units",
+      "scope": {
+        "all": "Provider and key prices",
+        "provider": "Provider prices",
+        "key": "Key prices (negotiated)"
+      }
+    },
+    "field": {
+      "input_cost_per_token": "Input",
+      "output_cost_per_token": "Output",
+      "cache_read_input_token_cost": "Cache read",
+      "cache_creation_input_token_cost": "Cache write"
+    },
+    "rate": {
+      "inputUsd": "Input (USD / 1M tokens)",
+      "outputUsd": "Output (USD / 1M tokens)",
+      "cacheReadUsd": "Cache read (USD / 1M tokens)",
+      "cacheWriteUsd": "Cache write, 5 min (USD / 1M tokens)",
+      "cacheWrite1hUsd": "Cache write, 1 h (USD / 1M tokens)"
+    },
+    "source": {
+      "manual": "Set by staff",
+      "suggestion": "Approved suggestion",
+      "import": "Imported from the gateway"
+    },
+    "history": {
+      "description": "Every version of this model's price, its keys' included. None is ever changed; the one in force at a time is the latest that had started.",
+      "from": "From",
+      "source": "Source",
+      "scheduled": "Scheduled",
+      "removed": "Key price removed: the provider's price applies"
+    },
+    "form": {
+      "newPrice": "Add a price",
+      "newVersion": "New version of this price",
+      "description": "Saving adds a version; the current one stays in the history. Leave a rate empty if the model has none.",
+      "allKeys": "All keys (the provider's price)",
+      "keyHint": "A key's price is its whole price: the gateway does not combine it with the provider's, so it must set every rate the provider's price sets.",
+      "remove": "End this key's own price (the provider's price applies again)",
+      "from": "In force from",
+      "fromHint": "Empty: now. A price cannot start in the past.",
+      "tokenRates": "Token rates",
+      "otherRates": "Other units",
+      "otherRatesHint": "USD per unit, by the gateway's field name, for example output_cost_per_image or input_cost_per_second.",
+      "unit": "Unit",
+      "usdPerUnit": "USD per unit",
+      "addUnit": "Add a unit",
+      "removeUnit": "Remove",
+      "note": "Note",
+      "save": "Save version",
+      "saved": "Price saved"
+    },
+    "import": {
+      "button": "Import current prices",
+      "done": "Imported {{imported}} prices ({{existing}} already had one)"
+    },
+    "suggestions": {
+      "description": "Prices the gateway's datasheet proposes where they differ from ours. Nothing changes until someone approves; a price set by staff always wins.",
+      "sync": "Look for changes now",
+      "synced": "{{created}} new suggestions",
+      "empty": "No suggestions waiting.",
+      "change": "Change",
+      "proposed": "Proposed",
+      "decide": "Decision",
+      "reason": "Reason (required to reject)",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Suggestion approved: a new version is in force",
+      "rejected": "Suggestion rejected: the price is unchanged",
+      "newModel": "No price yet"
+    },
+    "check": {
+      "description": "Compares the gateway's pricing overrides and catalog with our prices.",
+      "summary": "{{targets}} prices checked, {{drift}} differences, at {{at}}.",
+      "run": "Check again",
+      "push": "Push and mend",
+      "pushed": "Prices pushed to the gateway",
+      "clean": "The gateway charges exactly our prices.",
+      "kind": "Difference",
+      "detail": "Detail"
+    },
+    "drift": {
+      "missing": "Missing",
+      "wrong_target": "Wrong scope",
+      "wrong_request_types": "Wrong request types",
+      "wrong_rates": "Different rates",
+      "stale_version": "Older version",
+      "not_removed": "Not removed",
+      "orphan": "Left over",
+      "foreign_override": "Other override",
+      "effective_price": "Charged differently",
+      "not_in_catalog": "Not in the catalog"
+    }
   }
 }

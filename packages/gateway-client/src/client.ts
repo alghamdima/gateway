@@ -281,6 +281,129 @@ const toProviderKey = (
   isEnabled: key.enabled ?? true,
 });
 
+/**
+ * The scopes the control plane prices at (docs/platform/adr/0018-model-price-table.md):
+ * a provider's price, or one provider key's negotiated price.
+ */
+export type PricingOverrideScope =
+  | { kind: "provider"; provider: string }
+  | { kind: "provider_key"; providerKeyId: string };
+
+/** A pricing override as the control plane writes it. Rates are USD per unit, by the gateway's field names. */
+export interface PricingOverrideInput {
+  name: string;
+  scope: PricingOverrideScope;
+  /** Exact model name; the gateway matches it in any casing. */
+  model: string;
+  /** Base request types (no stream variants): the gateway applies the patch to these only. */
+  requestTypes: readonly string[];
+  patch: Record<string, number>;
+}
+
+/** A pricing override as the gateway holds it, whoever wrote it. */
+export interface GatewayPricingOverride {
+  id: string;
+  name: string;
+  scopeKind: string;
+  providerId: string | null;
+  providerKeyId: string | null;
+  matchType: string;
+  pattern: string;
+  requestTypes: string[];
+  /** The patch as the gateway stored it: only the fields it knows survive. */
+  patch: Record<string, number>;
+}
+
+interface PricingOverrideResponse {
+  id?: string;
+  name?: string;
+  scope_kind?: string;
+  provider_id?: string | null;
+  provider_key_id?: string | null;
+  match_type?: string;
+  pattern?: string;
+  request_types?: string[] | null;
+  pricing_patch?: string;
+}
+
+const pricingOverrideBody = ({
+  name,
+  scope,
+  model,
+  requestTypes,
+  patch,
+}: PricingOverrideInput) => ({
+  name,
+  scope_kind: scope.kind,
+  ...(scope.kind === "provider"
+    ? { provider_id: scope.provider, provider_key_id: null }
+    : { provider_key_id: scope.providerKeyId, provider_id: null }),
+  user_id: null,
+  virtual_key_id: null,
+  match_type: "exact",
+  pattern: model,
+  request_types: [...requestTypes],
+  patch,
+});
+
+const parsePatch = (raw: string | undefined): Record<string, number> => {
+  if (!raw) {
+    return {};
+  }
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(parsed).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number",
+    ),
+  );
+};
+
+const toPricingOverride = (
+  row: PricingOverrideResponse,
+): GatewayPricingOverride => ({
+  id: row.id ?? "",
+  name: row.name ?? "",
+  scopeKind: row.scope_kind ?? "",
+  providerId: row.provider_id ?? null,
+  providerKeyId: row.provider_key_id ?? null,
+  matchType: row.match_type ?? "",
+  pattern: row.pattern ?? "",
+  requestTypes: row.request_types ?? [],
+  patch: parsePatch(row.pricing_patch),
+});
+
+/**
+ * One row of the gateway's datasheet: the upstream price list as synced
+ * (`upstream`) and after the gateway's own edits (`effective`, what it
+ * charges absent a pricing override). Cost fields are USD per unit, by the
+ * datasheet's names.
+ */
+export interface GatewayDatasheetEntry {
+  provider: string;
+  model: string;
+  mode: string;
+  isCustom: boolean;
+  upstream: Record<string, unknown> | null;
+  effective: Record<string, unknown> | null;
+}
+
+interface DatasheetPageResponse {
+  entries?: {
+    provider?: string;
+    model?: string;
+    mode?: string;
+    is_custom?: boolean;
+    upstream?: Record<string, unknown> | null;
+    effective?: Record<string, unknown> | null;
+  }[];
+  total_count?: number;
+}
+
+const DATASHEET_PAGE_SIZE = 500;
+
 export const createGatewayClient = ({
   url,
   username,
@@ -653,6 +776,94 @@ export const createGatewayClient = ({
         },
       );
       return toProviderKey(key ?? {});
+    },
+
+    /** Every pricing override the gateway holds, whoever wrote it. */
+    listPricingOverrides: async (): Promise<GatewayPricingOverride[]> => {
+      const result = await call<{
+        pricing_overrides?: PricingOverrideResponse[] | null;
+      }>("GET", "/api/governance/pricing-overrides", undefined);
+      return (result?.pricing_overrides ?? []).map(toPricingOverride);
+    },
+
+    /** The gateway applies it to new requests before it answers. */
+    createPricingOverride: async (
+      input: PricingOverrideInput,
+    ): Promise<GatewayPricingOverride> => {
+      const created = await call<{
+        pricing_override?: PricingOverrideResponse;
+      }>(
+        "POST",
+        "/api/governance/pricing-overrides",
+        pricingOverrideBody(input),
+      );
+      if (!created?.pricing_override?.id) {
+        throw new GatewayError(
+          "gateway created a pricing override without an id",
+        );
+      }
+      return toPricingOverride(created.pricing_override);
+    },
+
+    /** Replaces the override whole, its patch included. One that is gone is a 404 GatewayError. */
+    updatePricingOverride: async (
+      id: string,
+      input: PricingOverrideInput,
+    ): Promise<GatewayPricingOverride> => {
+      const updated = await call<{
+        pricing_override?: PricingOverrideResponse;
+      }>(
+        "PUT",
+        `/api/governance/pricing-overrides/${encodeURIComponent(id)}`,
+        pricingOverrideBody(input),
+      );
+      return toPricingOverride(updated?.pricing_override ?? { id });
+    },
+
+    /** One that is already gone counts as deleted. */
+    deletePricingOverride: async (id: string) => {
+      await call(
+        "DELETE",
+        `/api/governance/pricing-overrides/${encodeURIComponent(id)}`,
+        undefined,
+        { allowNotFound: true },
+      );
+    },
+
+    /** Every datasheet row of one provider, as the gateway synced it and as it charges it. */
+    listDatasheetEntries: async (
+      provider: string,
+    ): Promise<GatewayDatasheetEntry[]> => {
+      const entries: GatewayDatasheetEntry[] = [];
+      for (let offset = 0; ; offset += DATASHEET_PAGE_SIZE) {
+        const query = new URLSearchParams({
+          provider,
+          limit: String(DATASHEET_PAGE_SIZE),
+          offset: String(offset),
+        });
+        const page = await call<DatasheetPageResponse>(
+          "GET",
+          `/api/models/datasheet?${query.toString()}`,
+          undefined,
+        );
+        const rows = page?.entries ?? [];
+        entries.push(
+          ...rows.map((row) => ({
+            provider: row.provider ?? "",
+            model: row.model ?? "",
+            mode: row.mode ?? "",
+            isCustom: row.is_custom ?? false,
+            upstream: row.upstream ?? null,
+            effective: row.effective ?? null,
+          })),
+        );
+        if (
+          rows.length < DATASHEET_PAGE_SIZE ||
+          entries.length >= (page?.total_count ?? 0)
+        ) {
+          return entries;
+        }
+      }
     },
 
     /** Reads the price list again now, instead of waiting for the next scheduled sync. */

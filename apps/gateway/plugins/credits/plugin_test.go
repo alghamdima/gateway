@@ -21,6 +21,8 @@ type fakePricer struct {
 	unknown               bool
 	// cost overrides what a finished response costs; nil prices its usage
 	cost *float64
+	// override is the name of the pricing override that priced the attempt; "" for none
+	override string
 }
 
 func (f *fakePricer) GetPricingEntryForModel(string, schemas.ModelProvider) *modelcatalog.PricingEntry {
@@ -30,6 +32,9 @@ func (f *fakePricer) GetPricingEntryForModel(string, schemas.ModelProvider) *mod
 	return &modelcatalog.PricingEntry{}
 }
 func (f *fakePricer) GetMaxOutputTokens(string, schemas.ModelProvider) int { return f.maxOutput }
+func (f *fakePricer) PricingOverrideName(string, schemas.RequestType, *modelcatalog.PricingLookupScopes) string {
+	return f.override
+}
 func (f *fakePricer) CalculateCostForUsage(u *schemas.BifrostLLMUsage, _ schemas.ModelProvider, _ string, _ schemas.RequestType, _ *modelcatalog.PricingLookupScopes) float64 {
 	return float64(u.PromptTokens)*f.inputRate + float64(u.CompletionTokens)*f.outputRate
 }
@@ -444,6 +449,30 @@ func TestPostLLMHook_RecordsTheProviderKeyThatServedTheAttempt(t *testing.T) {
 	}
 	if _, named := settled[1].Metadata["provider_key_id"]; named {
 		t.Fatalf("a key was named for an attempt that chose none: %+v", settled[1].Metadata)
+	}
+}
+
+func TestPostLLMHook_RecordsThePriceOverrideThatPricedTheAttempt(t *testing.T) {
+	ledger := &fakeLedger{balance: 10 * usd}
+	pricer := testPricer()
+	pricer.override = "lemru-price:42"
+	plugin := testPlugin(ledger, pricer)
+	ctx := testContext(testOrg)
+	plugin.PreLLMHook(ctx, chatRequest(schemas.ChatCompletionRequest, nil))
+	plugin.PostLLMHook(ctx, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+
+	// priced by the datasheet alone: nothing to name
+	pricer.override = ""
+	alone := testContext(testOrg)
+	plugin.PreLLMHook(alone, chatRequest(schemas.ChatCompletionRequest, nil))
+	plugin.PostLLMHook(alone, chatResponse(schemas.ChatCompletionRequest, 1000, 500), nil)
+
+	settled := ledger.settlements()
+	if len(settled) != 2 || settled[0].Metadata["price_override"] != "lemru-price:42" {
+		t.Fatalf("settlements: %+v", settled)
+	}
+	if _, named := settled[1].Metadata["price_override"]; named {
+		t.Fatalf("an override was named for an attempt the datasheet priced: %+v", settled[1].Metadata)
 	}
 }
 

@@ -52,12 +52,14 @@ Only part of the upstream repository was copied: `core`, `framework`, `plugins`,
 | `AGENTS.md`, `transports/README.md` | The MCP sections and links are removed. |
 | `core/changelog.md`, `framework/changelog.md`, `transports/changelog.md` | Entries about the features outside the product are removed. |
 | `transports/Dockerfile.local` | No Node stage and no UI copied into the Go stage. |
+| `framework/modelcatalog/datasheet/types.go`, `framework/modelcatalog/datasheet/overrides.go`, `framework/modelcatalog/pricing.go` | A pricing override keeps its name in the in-memory lookup, and `Store.PricingOverrideName` / `ModelCatalog.PricingOverrideName` return the name of the override that prices a (model, request type) under the request's scopes, by the same resolution as the cost. The credits plugin records it on each usage entry (`metadata.price_override`), so a charge names the version of the control plane's price table it used (`docs/platform/adr/0018-model-price-table.md`). |
 
 ## Added
 
 - `UPSTREAM`, `MODIFICATIONS.md`, `go.work`
 - `scripts/` (build, test and rename helpers), `compose/` (the shipped configuration)
 - `plugins/credits/`: the prepaid credits plugin
+- `framework/modelcatalog/datasheet/overridename_test.go`: tests for `PricingOverrideName`
 
 ## Renaming
 

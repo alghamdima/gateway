@@ -22,6 +22,15 @@ const gatewayWith = (models: GatewayModel[]): GatewayClient => ({
   listModels: async () => models,
   searchRequests: async () => ({ requests: [], total: 0 }),
   syncPrices: async () => {},
+  listPricingOverrides: async () => [],
+  createPricingOverride: async () => {
+    throw new Error("not used");
+  },
+  updatePricingOverride: async () => {
+    throw new Error("not used");
+  },
+  deletePricingOverride: async () => {},
+  listDatasheetEntries: async () => [],
   listProviders: async () => [],
   createProvider: async () => {},
   deleteProvider: async () => {},
@@ -255,7 +264,37 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
   });
 
   describe("GET /models", () => {
-    it("shows each servable model at its provider's price, no markup, as decimal strings", async () => {
+    // our price table (ADMIN-09, ADR 0018) is what the catalog shows, not the
+    // gateway's datasheet: these prices differ from the catalog's on purpose
+    const price = async (
+      provider: string,
+      model: string,
+      input: string,
+      output: string,
+      cacheRead: string | null = null,
+    ) => {
+      await sql`insert into model_price (provider, model, effective_from, input_usd, output_usd, cache_read_usd, source, created_by)
+        values (${provider}, ${model}, now() - interval '1 minute', ${input}, ${output}, ${cacheRead}, 'manual', 'staff')`;
+    };
+
+    beforeAll(async () => {
+      await price(
+        "openai",
+        "gpt-4o-mini",
+        "0.00000015",
+        "0.0000006",
+        "0.000000075",
+      );
+      await price("anthropic", "claude-x", "0.000003", "0.00001");
+      await price("openai", "old", "0.0000001", "0.0000001");
+      await price("humain", "allam-34b", "0.000001", "0.000002");
+      await price("humain", "gpt-oss-120b", "0.000001", "0.000002");
+      // a later version is not in force yet: the catalog shows the one before it
+      await sql`insert into model_price (provider, model, effective_from, input_usd, output_usd, source, created_by)
+        values ('anthropic', 'claude-x', now() + interval '1 day', '0.5', '0.5', 'manual', 'staff')`;
+    });
+
+    it("shows each servable model at our price in force, no markup, as decimal strings", async () => {
       models.clearModelCache();
 
       const { data } = await models.listPublicModels(
@@ -278,14 +317,20 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
             name: "claude-x",
             provider: "anthropic",
             input_cost_per_token: 0.000003,
+            // the datasheet's price; ours (0.00001) is what is charged and shown
             output_cost_per_token: 0.000015,
-            // a gateway override is what the request is charged, so it is what is shown
-            overridden_pricing: { output_cost_per_token: 0.00001 },
           },
           {
             name: "unpriced",
             provider: "anthropic",
             input_cost_per_token: 0.000001,
+          },
+          {
+            // the datasheet prices it, we do not (yet): not offered
+            name: "not-ours",
+            provider: "openai",
+            input_cost_per_token: 0.000001,
+            output_cost_per_token: 0.000002,
           },
           {
             name: "old",
@@ -329,7 +374,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
           max_completion_tokens: 16_384,
         },
       });
-      // every provider is shown at its own price: no markup for any of them
+      // our price, not the datasheet's 0.000015, and not the version that starts tomorrow
       expect(data[0]?.pricing).toEqual({
         prompt: "0.000003",
         completion: "0.00001",

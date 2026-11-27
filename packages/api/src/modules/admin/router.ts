@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { enforceAdmin, enforceAuth } from "../../middleware";
+import { modelPricesAdminRouter } from "../model-prices/router";
 import { paymentsRouter } from "../payments/router";
 import { pricingRouter } from "../pricing/router";
 import { promoCodesAdminRouter } from "../promo-codes/router";
@@ -24,6 +25,7 @@ export const adminRouter = new Hono()
   .route("/organizations", organizationsRouter)
   .route("/customers", customersRouter)
   .route("/pricing", pricingRouter)
+  .route("/model-prices", modelPricesAdminRouter)
   .route("/payments", paymentsRouter)
   .route("/promo-codes", promoCodesAdminRouter)
   .route("/providers", providersRouter)

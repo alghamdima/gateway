@@ -274,5 +274,6 @@
   "providers": "Providers",
   "dataPolicy": "Data policy",
   "payments": "Payments",
-  "promoCodes": "Promo codes"
+  "promoCodes": "Promo codes",
+  "modelPrices": "Model prices"
 }
