@@ -407,6 +407,7 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
       expect(data[1]).toEqual({
         id: "openai/gpt-4o-mini",
         name: "gpt-4o-mini",
+        created: null,
         context_length: 128_000,
         architecture: {
           modality: "text+image->text",
@@ -466,6 +467,34 @@ describe.skipIf(!adminUrl)("OpenRouter-compatible /api/v1", () => {
         await sql`update pricing_settings set fx_spread_bps = 0 where id = 1`;
         models.clearModelCache();
       }
+    });
+
+    it("lists the newest models first, those without a creation time last", async () => {
+      models.clearModelCache();
+      const priced = {
+        input_cost_per_token: 0.000001,
+        output_cost_per_token: 0.000002,
+      };
+
+      const { data } = await models.listPublicModels(
+        gatewayWith([
+          { name: "old", provider: "openai", ...priced, created: 100 },
+          { name: "gpt-4o-mini", provider: "openai", ...priced, created: 300 },
+          { name: "allam-34b", provider: "humain", ...priced },
+          { name: "claude-x", provider: "anthropic", ...priced, created: 200 },
+          { name: "gpt-oss-120b", provider: "humain", ...priced },
+        ]),
+      );
+
+      expect(data.map((model) => [model.id, model.created])).toEqual([
+        ["openai/gpt-4o-mini", 300],
+        ["anthropic/claude-x", 200],
+        ["openai/old", 100],
+        // no time: after the rest, by id
+        ["humain/allam-34b", null],
+        ["humain/gpt-oss-120b", null],
+      ]);
+      models.clearModelCache();
     });
 
     describe("for an organization with a data policy", () => {

@@ -865,8 +865,12 @@ type ListModelsResponse struct {
 
 // ModelDetailsResponse represents a model with capability metadata.
 type ModelDetailsResponse struct {
-	Name                 string                `json:"name"`
-	Provider             string                `json:"provider"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+	// Created is the creation time, in Unix seconds, the provider last reported
+	// for the model in list-models; absent when it gave none. Providers do not
+	// report it on a shared scale.
+	Created              *int64                `json:"created,omitempty"`
 	ContextLength        *int                  `json:"context_length,omitempty"`
 	MaxInputTokens       *int                  `json:"max_input_tokens,omitempty"`
 	MaxOutputTokens      *int                  `json:"max_output_tokens,omitempty"`
@@ -1056,10 +1060,19 @@ func (h *ProviderHandler) listModelDetails(ctx *fasthttp.RequestCtx) {
 
 	responseModels := make([]ModelDetailsResponse, 0, len(allModels))
 	overrideIndex := map[string]ModelPricingOverrideSummary{}
+	createdByProvider := map[schemas.ModelProvider]map[string]int64{}
 	for _, model := range allModels {
 		details := ModelDetailsResponse{
 			Name:     model.Name,
 			Provider: string(model.Provider),
+		}
+		created, seen := createdByProvider[model.Provider]
+		if !seen {
+			created = modelCatalog.GetModelCreatedTimes(model.Provider, query.Unfiltered)
+			createdByProvider[model.Provider] = created
+		}
+		if at, ok := created[model.Name]; ok {
+			details.Created = &at
 		}
 		if len(model.AccessibleByKeys) > 0 {
 			details.AccessibleByKeys = model.AccessibleByKeys

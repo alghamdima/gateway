@@ -151,3 +151,37 @@ func TestListNewestModelsRejectsBadInput(t *testing.T) {
 		}
 	}
 }
+
+// TestListModelDetails_IncludesCreated gives each model the creation time its
+// provider last reported, from the cached catalog, and none when there is none.
+func TestListModelDetails_IncludesCreated(t *testing.T) {
+	h := newestTestHandler()
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.SetRequestURI("/api/models/details?limit=50")
+	h.listModelDetails(ctx)
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("status = %d: %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var body ListModelDetailsResponse
+	if err := json.Unmarshal(ctx.Response.Body(), &body); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]int64{}
+	for _, model := range body.Models {
+		if model.Created != nil {
+			got[model.Provider+"/"+model.Name] = *model.Created
+		} else {
+			got[model.Provider+"/"+model.Name] = -1
+		}
+	}
+	want := map[string]int64{
+		"openai/synthetic-old":     100,
+		"openai/synthetic-new":     300,
+		"openai/synthetic-mid":     200,
+		"openai/synthetic-untimed": -1,
+		"mistral/synthetic-a":      9999,
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("created = %v, want %v", got, want)
+	}
+}

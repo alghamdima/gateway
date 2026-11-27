@@ -58,6 +58,8 @@ export interface GatewayModel {
   provider: string;
   /** With a key filter: the provider keys among them that serve the model. */
   accessible_by_keys?: string[];
+  /** Unix seconds: when the provider says it created the model; absent when it gave no time. */
+  created?: number;
   context_length?: number;
   max_input_tokens?: number;
   max_output_tokens?: number;

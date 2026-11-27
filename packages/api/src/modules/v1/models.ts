@@ -20,7 +20,7 @@ import type {
  * charged. `pricing` is USD per token, as OpenRouter's; `pricing_sar` is the
  * same in SAR at the current effective USD to SAR rate (ADR 0017), which is
  * what new requests convert at. A model the gateway lists without a price of
- * ours is not offered.
+ * ours is not offered. Newest first, by the creation time the provider reports.
  */
 
 export interface PublicPricing {
@@ -33,6 +33,8 @@ export interface PublicPricing {
 export interface PublicModel {
   id: string;
   name: string;
+  /** Unix seconds: when the provider says it created the model, as OpenRouter's `created`. */
+  created: number | null;
   context_length: number | null;
   architecture: {
     modality: string | null;
@@ -91,7 +93,7 @@ export const listPublicModels = async (
         ? [toPublicModel(model, price, settings.effectiveUsdToSarRateE6)]
         : [];
     })
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort(newestFirst);
 
   if (access.allowAll) {
     cached = { at: now, models: publicModels };
@@ -103,6 +105,11 @@ export const listPublicModels = async (
 export const clearModelCache = () => {
   cached = undefined;
 };
+
+// newest first, as people look for the latest models; a model whose provider
+// gave no creation time comes after those with one; ties by id
+const newestFirst = (a: PublicModel, b: PublicModel) =>
+  (b.created ?? -1) - (a.created ?? -1) || a.id.localeCompare(b.id);
 
 // a model without prompt and completion prices is not offered: the catalog
 // shows text models, and the credits plugin refuses what it cannot price
@@ -129,6 +136,7 @@ const toPublicModel = (
   return {
     id: `${model.provider}/${model.name}`,
     name: model.name,
+    created: model.created ?? null,
     context_length: contextLength,
     architecture: {
       modality: model.architecture?.modality ?? null,
