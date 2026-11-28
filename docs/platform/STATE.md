@@ -83,8 +83,8 @@ The mobile app and the browser extension of the template were removed on 2026-11
 
 The one order of work is the table at the top of `SPEC.md` section 5 ("The order now", owner 2026-11-28). The target is OpenRouter's product, its plan table included (`SPEC.md`, PLANS). In short:
 
-1. **Engine cleanup** (in progress). Left: remove the organization hooks that point at tables this build does not have (business units, users, access profiles, roles, the project tag), following the removal rule in `AGENTS.md`. Teams stay: a team is the engine's side of a workspace. Then the template's subscriptions (BILL-11) and decision D11.
-2. **The model page**, stage 2 of `plans/model-page.md`.
+1. **Engine cleanup**: done (2026-11-28). The engine also refuses to start on SQLite now (`-allow-sqlite` for tests). Two removals moved to the step that redesigns their area: the engine's organization hooks (business units, the project tag, users, access profiles, roles) to step 3, the template's subscriptions (BILL-11) to step 4.
+2. **The model page**, stage 2 of `plans/model-page.md`. Next.
 3. **Workspaces and budgets** (ORG-14, ORG-15).
 4. **Plans** (PLANS-01 to PLANS-08).
 5. **Playground**, with Try and Compare. It is a new module that calls the gateway with the account's key, so credits and the data policy apply.
@@ -95,7 +95,6 @@ The one order of work is the table at the top of `SPEC.md` section 5 ("The order
 ## Waiting on the owner
 
 - A domain, hosting for both deployments, a logo (the current mark is a placeholder).
-- Decision D11 (refuse SQLite as a way to run the engine) in `SPEC.md` section 3.
 - The address for the email about contact messages, at `/admin/site-settings`: staging holds a test address.
 - For the work in order: credit on the OpenAI account (every live request on staging fails upstream until then), the data-terms row for that provider, and a second provider account (step 6).
 - The payment gateway. Stripe's availability to a Saudi-registered business is disputed between sources and Stripe does not route mada; the local options are Moyasar, Tap, HyperPay and PayTabs, all quoted on request.

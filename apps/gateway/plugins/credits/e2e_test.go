@@ -122,8 +122,8 @@ type e2eGateway struct {
 // shippedConfig is the config we deploy (apps/gateway/compose/config.json):
 // content logging, retention, inference auth, the admin, the encryption key and
 // the credits plugin are tested as shipped, not as each test would set them.
-// The Postgres stores are left out: the gateway's default local stores serve
-// the tests.
+// The Postgres stores are left out: the gateway's default local stores (SQLite)
+// serve the tests, which is why the binary is started with -allow-sqlite.
 func shippedConfig(t *testing.T, migrations string) map[string]any {
 	t.Helper()
 	path := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(migrations))), "apps", "gateway", "compose", "config.json")
@@ -211,7 +211,7 @@ func bootGateway(t *testing.T, binary string, provider *mockProvider, creditsCon
 
 	logPath := filepath.Join(appDir, "gateway.log")
 	logFile, _ := os.Create(logPath)
-	cmd := exec.Command(binary, "-app-dir", appDir, "-port", fmt.Sprint(port), "-host", "127.0.0.1")
+	cmd := exec.Command(binary, "-allow-sqlite", "-app-dir", appDir, "-port", fmt.Sprint(port), "-host", "127.0.0.1")
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	cmd.Env = append(os.Environ(), env...)
 	if err := cmd.Start(); err != nil {

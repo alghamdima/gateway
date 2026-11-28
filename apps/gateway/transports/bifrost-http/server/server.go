@@ -166,6 +166,10 @@ type BifrostHTTPServer struct {
 	AppDir   string
 	BasePath string // from -base-path / BIFROST_BASE_PATH; resolved against server.base_path in Bootstrap
 
+	// AllowSQLite lets the server start with a store on SQLite. Off by default: the product
+	// runs on Postgres only (see sqliteStores). The tests that start the binary set it.
+	AllowSQLite bool
+
 	LogLevel        string
 	LogOutputStyle  string
 	LogsCleaner     *logstore.LogsCleaner
@@ -2360,6 +2364,38 @@ func (s *BifrostHTTPServer) PrepareCommonMiddlewares() []schemas.BifrostHTTPMidd
 	return commonMiddlewares
 }
 
+// refuseSQLite is the startup rule that the gateway runs on Postgres only: it returns an error
+// naming each store of config that is on SQLite, unless allowed, which the tests that start the
+// binary are.
+func refuseSQLite(config *lib.Config, allowed bool) error {
+	stores := sqliteStores(config)
+	if allowed || len(stores) == 0 {
+		return nil
+	}
+	return fmt.Errorf("the %s on SQLite, which this gateway does not run on: the credits ledger and the request statistics need Postgres. Set config_store and logs_store to postgres in config.json. A missing section falls back to SQLite; -allow-sqlite accepts it for local tests only", strings.Join(stores, " and "))
+}
+
+// sqliteStores names the stores of config that run on SQLite, as "config store is" or "log
+// store is", ready for a message. The product runs on Postgres only: a store on SQLite is a
+// config.json without that store's section, or one that names sqlite outright. The config
+// store is asked for its dialect because a defaulted one records no config; the log store has
+// no handle to ask, and always records the config it was opened with.
+func sqliteStores(config *lib.Config) []string {
+	if config == nil {
+		return nil
+	}
+	var stores []string
+	if config.ConfigStore != nil {
+		if db := config.ConfigStore.DB(); db != nil && db.Dialector.Name() == "sqlite" {
+			stores = append(stores, "config store is")
+		}
+	}
+	if config.LogsStore != nil && config.LogsStoreConfig != nil && config.LogsStoreConfig.Type == logstore.LogStoreTypeSQLite {
+		stores = append(stores, "log store is")
+	}
+	return stores
+}
+
 // ApplyBasePath resolves the base path from the -base-path flag value in
 // s.BasePath and server.base_path in s.Config, then stores the normalized
 // result on s.BasePath, on s.Config.ServerConfig (created when absent) and in
@@ -2405,6 +2441,10 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	s.Config, err = lib.LoadConfig(ctx, configDir)
 	if err != nil {
 		return fmt.Errorf("failed to load config %v", err)
+	}
+	if err := refuseSQLite(s.Config, s.AllowSQLite); err != nil {
+		s.Config.Close(ctx)
+		return err
 	}
 	// The base path is resolved once, before any handler is built.
 	if err := s.ApplyBasePath(); err != nil {

@@ -104,6 +104,7 @@ func init() {
 	flag.StringVar(&server.Host, "host", defaultHost, "Host to bind the server to (default: localhost, override with BIFROST_HOST env var)")
 	flag.StringVar(&server.AppDir, "app-dir", bifrostServer.DefaultAppDir, "Application data directory (contains config.json and logs)")
 	flag.StringVar(&server.BasePath, "base-path", os.Getenv("BIFROST_BASE_PATH"), "URL path prefix to serve under behind a reverse proxy, e.g. /bifrost (default: none, override with BIFROST_BASE_PATH env var or server.base_path in config.json; \"/\" forces the domain root over config.json)")
+	flag.BoolVar(&server.AllowSQLite, "allow-sqlite", false, "Start even when a store is on SQLite. For local tests only: the gateway runs on Postgres")
 	flag.StringVar(&server.LogLevel, "log-level", defaultLogLevel, "Logger level (debug, info, warn, error). Default is info.")
 	flag.StringVar(&server.LogOutputStyle, "log-style", bifrostServer.DefaultLogOutputStyle, "Logger output type (json or pretty). Default is JSON.")
 }

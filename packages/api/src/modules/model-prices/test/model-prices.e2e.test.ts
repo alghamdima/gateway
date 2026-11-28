@@ -219,7 +219,15 @@ describe.skipIf(!adminUrl || !binary)(
       gatewayUrl = `http://127.0.0.1:${port}`;
       gatewayProcess = spawn(
         binary ?? "",
-        ["-app-dir", appDir, "-port", String(port), "-host", "127.0.0.1"],
+        [
+          "-allow-sqlite",
+          "-app-dir",
+          appDir,
+          "-port",
+          String(port),
+          "-host",
+          "127.0.0.1",
+        ],
         { stdio: "ignore" },
       );
       for (let i = 0; i < 300; i++) {
