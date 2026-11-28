@@ -54,6 +54,10 @@ export const creditEntryKindEnum = pgEnum("credit_entry_kind", [
   "expiry",
   // the unused part of a top-up's promo bonus, taken back when the top-up is refunded (ADR 0019)
   "promo_clawback",
+  // credit moved from a personal account to an organization (ADR 0020): the
+  // debit names the lot it leaves, the credit opens a lot with the same expiry
+  "transfer_out",
+  "transfer_in",
 ]);
 
 /**
@@ -62,9 +66,18 @@ export const creditEntryKindEnum = pgEnum("credit_entry_kind", [
  * promo bonus. Compared as text in the checks, because migrations 0038 and
  * 0039 add "expiry" and "promo_clawback" to the enum in the same transaction.
  */
-export const LOT_DEBIT_KINDS = ["refund", "expiry", "promo_clawback"] as const;
+export const LOT_DEBIT_KINDS = [
+  "refund",
+  "expiry",
+  "promo_clawback",
+  "transfer_out",
+] as const;
 /** Lot debits that must name their lot and remove credit (a refund may predate lots). */
-const NAMED_LOT_DEBIT_KINDS = ["expiry", "promo_clawback"] as const;
+const NAMED_LOT_DEBIT_KINDS = [
+  "expiry",
+  "promo_clawback",
+  "transfer_out",
+] as const;
 const textList = (values: readonly string[]) =>
   sql.raw(values.map((value) => `'${value}'`).join(", "));
 
@@ -144,6 +157,11 @@ export const creditLedgerEntry = pgTable(
       "credit_ledger_entry_lot_kind",
       sql`(${t.creditLotId} is null or ${t.kind}::text in (${textList(LOT_DEBIT_KINDS)})) and (${t.kind}::text not in (${textList(NAMED_LOT_DEBIT_KINDS)}) or (${t.creditLotId} is not null and ${t.amount} < 0))`,
     ),
+    // a transfer adds to the organization; what leaves the personal account is a named lot debit
+    check(
+      "credit_ledger_entry_transfer_in_is_credit",
+      sql`${t.kind}::text <> 'transfer_in' or ${t.amount} > 0`,
+    ),
     check(
       "credit_ledger_entry_refund_is_debit",
       sql`${t.kind}::text <> 'refund' or ${t.amount} < 0`,
@@ -217,10 +235,17 @@ export const creditAccount = pgTable(
 );
 
 /**
- * Where a credit lot came from (ADR 0019): a top-up, a promo code's credit, or
- * a positive staff adjustment.
+ * Where a credit lot came from (ADR 0019): a top-up, a promo code's credit, a
+ * positive staff adjustment, or a transfer from a personal account (ADR 0020).
  */
-export const CREDIT_LOT_SOURCES = ["top_up", "promo", "adjustment"] as const;
+export const CREDIT_LOT_SOURCES = [
+  "top_up",
+  "promo",
+  "adjustment",
+  // bought credit moved in from a member's personal account (ADR 0020): it
+  // keeps the expiry of the lot it left and is never refundable
+  "transfer",
+] as const;
 export type CreditLotSource = (typeof CREDIT_LOT_SOURCES)[number];
 
 /**
@@ -328,6 +353,47 @@ export const creditRefund = pgTable(
     check(
       "credit_refund_status",
       sql`${t.status} in (${sql.raw(CREDIT_REFUND_STATUSES.map((status) => `'${status}'`).join(", "))}) and (${t.status} <> 'succeeded' or ${t.providerRefundId} is not null)`,
+    ),
+  ],
+);
+
+/**
+ * One move of credit from a user's personal account to an organization they
+ * belong to (BILL-12, ADR 0020). The money is in the ledger: for each lot the
+ * credit leaves, a `transfer_out` entry in the personal account and a
+ * `transfer_in` entry of the same amount in the organization, both with this
+ * row's id as their reference, all in one transaction. This row is the
+ * request: the customer's idempotency key finds it again, so a retry moves
+ * nothing twice. Append-only (trigger). No foreign keys, as for the ledger:
+ * the record outlives both accounts.
+ */
+export const creditTransfer = pgTable(
+  "credit_transfer",
+  {
+    id: text().primaryKey().$defaultFn(generateId),
+    fromOrganizationId: text().notNull(),
+    toOrganizationId: text().notNull(),
+    /** micro-SAR, whole halalas. */
+    amountMicroSar: microSar().notNull(),
+    /** The user whose personal account it left. */
+    requestedBy: text().notNull(),
+    idempotencyKey: text().notNull().unique(),
+    createdAt: timestamp().notNull().defaultNow(),
+  },
+  (t) => [
+    index("credit_transfer_fromOrganizationId_idx").on(t.fromOrganizationId),
+    // the cooldown reads an organization's latest transfer
+    index("credit_transfer_toOrganizationId_createdAt_idx").on(
+      t.toOrganizationId,
+      t.createdAt,
+    ),
+    check(
+      "credit_transfer_amount_halalas",
+      sql`${t.amountMicroSar} > 0 and ${t.amountMicroSar} % 10000 = 0`,
+    ),
+    check(
+      "credit_transfer_two_accounts",
+      sql`${t.fromOrganizationId} <> ${t.toOrganizationId}`,
     ),
   ],
 );

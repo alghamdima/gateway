@@ -98,7 +98,13 @@ export const reconcile = async (
       unattributed: [],
       reapedHolds: [],
       checkedOrganizations: 0,
-      ledger: { balances: [], held: [], grantsWithoutLot: [], lots: [] },
+      ledger: {
+        balances: [],
+        held: [],
+        grantsWithoutLot: [],
+        lots: [],
+        transfers: [],
+      },
       error: error instanceof Error ? error.message : String(error),
     };
     status = "error";

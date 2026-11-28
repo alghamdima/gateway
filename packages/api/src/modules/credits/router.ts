@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import * as z from "zod";
 
+import { auth } from "@workspace/auth/server";
+
 import {
   enforceAuth,
   enforceOrganizationPermission,
@@ -17,6 +19,12 @@ import {
   quoteTopUp,
   startTopUp,
 } from "./top-up";
+import {
+  countTransferAttempt,
+  getTransferOptions,
+  transferCredits,
+  transferGateRefusal,
+} from "./transfer";
 
 const getEntriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -41,6 +49,45 @@ const promoCodeField = customerPromoCodeSchema.optional();
 
 export const creditsRouter = new Hono()
   .use(enforceAuth)
+  // Moving credit from the user's personal account to one of their
+  // organizations (BILL-12, ADR 0020). No organization permission is asked:
+  // the credit is the user's own, and any member may fund their organization.
+  .get("/transfer/options", async (c) =>
+    c.json({
+      ...(await getTransferOptions(c.var.user.id)),
+      isTwoFactorEnabled: c.var.user.twoFactorEnabled === true,
+    }),
+  )
+  .post(
+    "/transfer",
+    validate(
+      "json",
+      z.object({
+        toOrganizationId: z.string().min(1),
+        amountMicroSar: topUpAmountSchema,
+        /** A fresh code from the user's authenticator app, asked at every move. */
+        code: z.string().regex(/^\d{6}$/),
+        /** The form's key for this one move: sending it again moves nothing twice. */
+        idempotencyKey: z.string().min(16).max(100),
+      }),
+    ),
+    async (c) => {
+      const { code, ...move } = c.req.valid("json");
+      if (c.var.user.twoFactorEnabled !== true) {
+        throw transferGateRefusal("twoFactorRequired");
+      }
+      await countTransferAttempt(c.var.user.id);
+      try {
+        await auth.api.verifyTOTP({
+          body: { code },
+          headers: c.req.raw.headers,
+        });
+      } catch {
+        throw transferGateRefusal("invalidCode");
+      }
+      return c.json(await transferCredits({ ...move, userId: c.var.user.id }));
+    },
+  )
   .get(
     "/:organizationId",
     async (c, next) =>

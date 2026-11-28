@@ -23,15 +23,22 @@ interface OrganizationLimitFormProps {
   /** Whether the field may be left empty, which saves null. */
   readonly isOptional?: boolean;
   readonly description: string;
+  /** The field's label, the largest value it takes and what a wrong value is told; default: the organization limit. */
+  readonly label?: string;
+  readonly max?: number;
+  readonly invalidMessage?: string;
   readonly onSave: (value: number | null) => Promise<unknown>;
 }
 
-/** One number: how many organizations may be owned (ADR 0020). */
+/** One whole number staff set about accounts (ADR 0020): by default, how many organizations may be owned. */
 export const OrganizationLimitForm = ({
   id,
   value,
   isOptional = false,
   description,
+  label,
+  max = MAX_OWNED_ORGANIZATIONS_CEILING,
+  invalidMessage,
   onSave,
 }: OrganizationLimitFormProps) => {
   const { t } = useTranslation(["common", "admin"]);
@@ -43,9 +50,10 @@ export const OrganizationLimitForm = ({
       .refine(
         (text) =>
           (isOptional && text === "") ||
-          (/^\d+$/.test(text) &&
-            Number(text) <= MAX_OWNED_ORGANIZATIONS_CEILING),
-        { message: t("admin:accountSettings.limit.invalid") },
+          (/^\d+$/.test(text) && Number(text) <= max),
+        {
+          message: invalidMessage ?? t("admin:accountSettings.limit.invalid"),
+        },
       ),
   });
   const form = useForm({
@@ -68,7 +76,7 @@ export const OrganizationLimitForm = ({
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid} className="w-56">
             <FieldLabel htmlFor={`${id}-limit`}>
-              {t("admin:accountSettings.limit.label")}
+              {label ?? t("admin:accountSettings.limit.label")}
             </FieldLabel>
             <Input
               id={`${id}-limit`}

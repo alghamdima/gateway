@@ -28,8 +28,13 @@ export interface ApplyEntryInput {
   topupFeeSource?: TopupFeeSource;
   /** Promo entries, and top-ups paid with a code: the code (BILL-08). */
   promoCodeId?: string;
-  /** Refund and expiry entries: the credit lot they take from (ADR 0019). */
+  /** Refund, expiry, clawback and transfer-out entries: the credit lot they take from (ADR 0019). */
   creditLotId?: string;
+  /**
+   * Transfer-in only (ADR 0020): the lot the credit left. The lot this entry
+   * opens takes that lot's expiry, read in Postgres so no precision is lost.
+   */
+  expiryFromLotId?: string;
 }
 
 export interface ApplyEntryResult {
@@ -69,7 +74,7 @@ export type LedgerTransaction = Parameters<
  */
 export const applyEntryIn = async (
   tx: LedgerTransaction,
-  input: ApplyEntryInput,
+  { expiryFromLotId, ...input }: ApplyEntryInput,
 ): Promise<ApplyEntryResult> => {
   const [inserted] = await tx
     .insert(creditLedgerEntry)
@@ -116,6 +121,7 @@ export const applyEntryIn = async (
         source,
         amount: input.amount,
         promoCodeId: input.promoCodeId,
+        expiryFromLotId,
       })
     : null;
 

@@ -22,13 +22,13 @@ import type {
  * Credit lots (BILL-17, BILL-10, docs/platform/adr/0019-credit-lots-expiry-refunds.md).
  *
  * Every grant of credit (a top-up, a promo code's credit, a positive staff
- * adjustment) is a lot with the expiry and refund window in force when it was
+ * adjustment, a transfer in from a personal account) is a lot with the expiry and refund window in force when it was
  * granted. How much of a lot is left is not stored: it is worked out from the
  * ledger by `attributeLots`, so the gateway's settlement stays one statement
  * that knows nothing of lots. The rule, in ledger order (created_at, then id):
  *
  * - a grant opens its lot; it first pays any debt (spending that no lot covered);
- * - a refund, expiry or promo clawback entry takes from the lot it names, up
+ * - a refund, expiry, promo clawback or transfer-out entry takes from the lot it names, up
  *   to what is left of it; any rest is spent like usage;
  * - usage, a negative adjustment and a refund that names no lot are spent from
  *   the open lots, the one that expires first first (never-expiring last); on
@@ -44,6 +44,8 @@ const SOURCE_ORDER: Record<CreditLotSource, number> = {
   promo: 0,
   adjustment: 1,
   top_up: 2,
+  // bought credit a member moved in (ADR 0020): spent as bought credit is
+  transfer: 2,
 };
 
 export interface LotTerms {
@@ -226,6 +228,9 @@ export const lotSourceOf = (
   if (kind === "top_up" || kind === "promo") {
     return kind;
   }
+  if (kind === "transfer_in") {
+    return "transfer";
+  }
   return kind === "adjustment" && amount > 0 ? "adjustment" : null;
 };
 
@@ -234,7 +239,9 @@ export const lotSourceOf = (
  * the terms in force now (ADMIN-23): a top-up expires credit_expiry_days from
  * now and may be refunded for refund_window_hours (none when 0); promo credit
  * expires on its code's own date, else as a top-up (BILL-08 decisions); a
- * positive adjustment never expires (ADR 0019: it corrects the account).
+ * positive adjustment never expires (ADR 0019: it corrects the account);
+ * credit moved in from a personal account keeps the expiry of the lot it
+ * left and has no refund window (ADR 0020).
  */
 export const openLotIn = async (
   tx: LedgerTransaction,
@@ -244,18 +251,25 @@ export const openLotIn = async (
     source: CreditLotSource;
     amount: number;
     promoCodeId?: string;
+    /** A transfer's lot: the lot the credit left, whose expiry it keeps. */
+    expiryFromLotId?: string;
   },
 ) => {
+  if (input.source === "transfer" && !input.expiryFromLotId) {
+    throw new Error("A transfer's lot needs the lot its credit left");
+  }
   const purchaseExpiry = sql`now() + make_interval(days => ${pricingSettings.creditExpiryDays})`;
   const promoExpiry = input.promoCodeId
     ? sql`(SELECT ${promoCode.creditExpiresAt} FROM ${promoCode} WHERE ${promoCode.id} = ${input.promoCodeId})`
     : sql`NULL::timestamp`;
   const expiresAt =
-    input.source === "adjustment"
-      ? sql`NULL::timestamp`
-      : input.source === "promo"
-        ? sql`coalesce(${promoExpiry}, ${purchaseExpiry})`
-        : purchaseExpiry;
+    input.source === "transfer"
+      ? sql`(SELECT source_lot.expires_at FROM ${creditLot} source_lot WHERE source_lot.id = ${input.expiryFromLotId ?? null})`
+      : input.source === "adjustment"
+        ? sql`NULL::timestamp`
+        : input.source === "promo"
+          ? sql`coalesce(${promoExpiry}, ${purchaseExpiry})`
+          : purchaseExpiry;
   const refundableUntil =
     input.source === "top_up"
       ? sql`CASE WHEN ${pricingSettings.refundWindowHours} > 0

@@ -825,9 +825,9 @@
   "accountSettings": {
     "header": {
       "title": "Account limits",
-      "description": "How many organizations one user may own."
+      "description": "How many organizations one user may own, and the waits on moving credit to an organization."
     },
-    "saved": "Limit saved.",
+    "saved": "Saved.",
     "limit": {
       "title": "Organizations per user",
       "description": "The most organizations one user may own. A personal account is not counted, and neither are organizations they are only a member of.",
@@ -838,8 +838,13 @@
     },
     "changes": {
       "title": "History",
-      "description": "Every change to the general limit.",
-      "empty": "No changes yet."
+      "description": "Every change to these settings.",
+      "empty": "No changes yet.",
+      "fields": {
+        "maxOwnedOrganizations": "Organizations per user",
+        "transferMemberTenureHours": "New member waits (hours)",
+        "transferCooldownHours": "Between transfers (hours)"
+      }
     },
     "user": {
       "title": "Organization limit",
@@ -848,6 +853,21 @@
       "own": "Own limit",
       "saved": "The user's limit was saved.",
       "help": "Set a number to allow this user more or fewer organizations than the general limit. Leave it empty to follow the general limit."
+    },
+    "transfers": {
+      "title": "Credit transfers",
+      "description": "A user can move credit they bought from their personal account to an organization they belong to. These two waits slow down misuse, such as moving credit bought with a stolen card.",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "invalid": "Enter a whole number of hours from 0 to 8,760.",
+      "transferMemberTenureHours": {
+        "label": "A new member waits",
+        "help": "How long someone must have been a member before the organization can receive their credit. 0: at once."
+      },
+      "transferCooldownHours": {
+        "label": "Between two transfers",
+        "help": "How long an organization waits after receiving a transfer before it can receive the next. 0: no wait."
+      }
     }
   }
 }

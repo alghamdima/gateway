@@ -112,6 +112,18 @@
       "nothingLeft": "All of this top-up's credit has been spent: there is nothing left to refund.",
       "creditInUse": "Requests in progress are holding part of this credit. Try again in a minute.",
       "providerUnavailable": "The payment provider could not be reached. Try again in a minute: you will not be refunded twice."
+    },
+    "transfer": {
+      "noPersonalAccount": "Your personal account was not found. Contact support.",
+      "notAnOrganization": "Credit can only be moved to an organization.",
+      "notMember": "You are not a member of this organization.",
+      "memberTooNew": "You joined this organization too recently for it to receive your credit. Try again later.",
+      "organizationCoolingDown": "This organization has just received a transfer. Try again later.",
+      "insufficientCredit": "You do not have that much bought credit free to move. Refresh the page and try again.",
+      "keyReused": "This transfer was already sent with different details. Refresh the page and try again.",
+      "twoFactorRequired": "Turn on two-factor authentication to move credits.",
+      "invalidCode": "That code is not right. Enter the current code from your authenticator app.",
+      "tooManyAttempts": "Too many attempts. Wait a minute and try again."
     }
   },
   "subscription": {

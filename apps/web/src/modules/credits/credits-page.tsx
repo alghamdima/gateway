@@ -31,6 +31,7 @@ import { authClient } from "~/lib/auth/client";
 import { CreditLots } from "~/modules/credits/credit-lots";
 import { LowBalanceAlert } from "~/modules/credits/low-balance-alert";
 import { TopUp } from "~/modules/credits/top-up";
+import { TransferCredits } from "~/modules/credits/transfer-credits";
 import { formatMicroSar } from "~/modules/keys/money";
 import { useActiveOrganization } from "~/modules/organization/hooks/use-active-organization";
 import { RedeemCode } from "~/modules/promo-codes/redeem-code";
@@ -152,6 +153,8 @@ export const CreditsPage = ({ organizationId }: CreditsPageProps) => {
       {canTopUp && <TopUp organizationId={organizationId} />}
 
       {canTopUp && <RedeemCode organizationId={organizationId} />}
+
+      <TransferCredits organizationId={organizationId} />
 
       <LowBalanceAlert organizationId={organizationId} />
 

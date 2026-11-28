@@ -309,6 +309,13 @@
       "when": 1795856329716,
       "tag": "0043_organization_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795860008792,
+      "tag": "0044_credit_transfers",
+      "breakpoints": true
     }
   ]
 }

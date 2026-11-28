@@ -51,21 +51,35 @@ describe.skipIf(!adminUrl)("account settings (ADR 0020)", () => {
   it("starts at 5 organizations per user", async () => {
     expect(await settings.getAccountSettings()).toMatchObject({
       maxOwnedOrganizations: 5,
+      transferMemberTenureHours: 24,
+      transferCooldownHours: 1,
     });
   });
 
   it("records a change with before, after and who made it", async () => {
     const change = await settings.updateAccountSettings({
       maxOwnedOrganizations: 3,
+      transferMemberTenureHours: 48,
+      transferCooldownHours: 0,
       staffId: "staff",
     });
 
-    expect(change.before).toEqual({ maxOwnedOrganizations: 5 });
-    expect(change.after).toEqual({ maxOwnedOrganizations: 3 });
+    const before = {
+      maxOwnedOrganizations: 5,
+      transferMemberTenureHours: 24,
+      transferCooldownHours: 1,
+    };
+    const after = {
+      maxOwnedOrganizations: 3,
+      transferMemberTenureHours: 48,
+      transferCooldownHours: 0,
+    };
+    expect(change.before).toEqual(before);
+    expect(change.after).toEqual(after);
     expect(await settings.getAccountSettingsChanges()).toMatchObject([
       {
-        before: { maxOwnedOrganizations: 5 },
-        after: { maxOwnedOrganizations: 3 },
+        before,
+        after,
         changedBy: "staff",
         changedByEmail: "staff@example.com",
       },
@@ -82,6 +96,8 @@ describe.skipIf(!adminUrl)("account settings (ADR 0020)", () => {
     await expect(
       settings.updateAccountSettings({
         maxOwnedOrganizations: 1001,
+        transferMemberTenureHours: 24,
+        transferCooldownHours: 1,
         staffId: "staff",
       }),
     ).rejects.toThrow(/account_settings/);

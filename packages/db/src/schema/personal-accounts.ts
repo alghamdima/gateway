@@ -32,6 +32,9 @@ export const personalAccount = pgTable("personal_account", {
 /** A ceiling against a typo; nobody owns this many organizations. */
 export const MAX_OWNED_ORGANIZATIONS_CEILING = 1000;
 
+/** A ceiling against a typo: one year. */
+export const MAX_TRANSFER_WAIT_HOURS = 8760;
+
 /**
  * What staff set about accounts (ADR 0020, SPEC rule 6). A single row
  * (id = 1), seeded by migration 0043; each change is recorded in
@@ -46,11 +49,22 @@ export const accountSettings = pgTable(
   {
     id: smallint().primaryKey().default(1),
     maxOwnedOrganizations: integer().notNull().default(5),
+    /**
+     * Credit transfers (BILL-12): how long a user must have been a member of
+     * an organization before it can receive their credit, in hours; 0: at once.
+     */
+    transferMemberTenureHours: integer().notNull().default(24),
+    /** How long after receiving a transfer an organization waits for the next, in hours; 0: no wait. */
+    transferCooldownHours: integer().notNull().default(1),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedBy: text(),
   },
   (t) => [
     check("account_settings_single_row", sql`${t.id} = 1`),
+    check(
+      "account_settings_transfer_waits_range",
+      sql`${t.transferMemberTenureHours} between 0 and ${sql.raw(String(MAX_TRANSFER_WAIT_HOURS))} and ${t.transferCooldownHours} between 0 and ${sql.raw(String(MAX_TRANSFER_WAIT_HOURS))}`,
+    ),
     check(
       "account_settings_max_owned_organizations_range",
       sql`${t.maxOwnedOrganizations} between 0 and ${sql.raw(String(MAX_OWNED_ORGANIZATIONS_CEILING))}`,

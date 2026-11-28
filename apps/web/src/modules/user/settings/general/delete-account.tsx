@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+import { handle } from "@workspace/api/utils";
 import { isSubscriptionActive } from "@workspace/billing";
 import { useTranslation } from "@workspace/i18n";
 import { Alert, AlertTitle, AlertDescription } from "@workspace/ui-web/alert";
@@ -23,6 +24,7 @@ import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { pathsConfig } from "~/config/paths";
+import { api } from "~/lib/api/client";
 import { authClient } from "~/lib/auth/client";
 import { billing } from "~/modules/billing/lib/api";
 import {
@@ -34,6 +36,7 @@ import {
   SettingsCardContent,
 } from "~/modules/common/layout/dashboard/settings-card";
 import { TurboLink } from "~/modules/common/turbo-link";
+import { formatMicroSar } from "~/modules/keys/money";
 import { organization } from "~/modules/organization/lib/api";
 
 import { user } from "../../lib/api";
@@ -45,7 +48,20 @@ interface DeleteAccountProps {
 }
 
 export const DeleteAccount = ({ user }: DeleteAccountProps) => {
-  const { t } = useTranslation("auth");
+  const { t, i18n } = useTranslation("auth");
+
+  // the personal account's credit goes with the account (ADR 0020): say how much
+  const personal = useQuery(organization.queries.personal());
+  const personalId = personal.data?.id;
+  const credit = useQuery({
+    queryKey: ["credits", personalId, "balance"],
+    queryFn: () =>
+      handle(api.credits[":organizationId"].$get)({
+        param: { organizationId: personalId ?? "" },
+      }),
+    enabled: !!personalId,
+  });
+  const creditLeft = credit.data?.balance ?? 0;
 
   const summary = useQuery(billing.queries.summary.get(user.id));
   const organizations = useQuery({
@@ -133,6 +149,22 @@ export const DeleteAccount = ({ user }: DeleteAccountProps) => {
               </Alert>
             </TurboLink>
           )}
+        </SettingsCardContent>
+      )}
+
+      {creditLeft > 0 && (
+        <SettingsCardContent>
+          <Alert variant="destructive">
+            <Icons.AlertTriangle />
+            <AlertTitle>
+              {t("account.delete.credit.title", {
+                amount: formatMicroSar(creditLeft, i18n.language),
+              })}
+            </AlertTitle>
+            <AlertDescription>
+              {t("account.delete.credit.description")}
+            </AlertDescription>
+          </Alert>
         </SettingsCardContent>
       )}
 

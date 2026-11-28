@@ -442,7 +442,9 @@
       "adjustment": "Adjustment",
       "promo": "Promotion",
       "expiry": "Expired",
-      "promo_clawback": "Promotion taken back"
+      "promo_clawback": "Promotion taken back",
+      "transfer_out": "Moved to an organization",
+      "transfer_in": "Moved in by a member"
     },
     "redeem": {
       "title": "Redeem a code",
@@ -463,7 +465,8 @@
       "sources": {
         "top_up": "Top-up",
         "promo": "Promotion",
-        "adjustment": "Credit from Lemru"
+        "adjustment": "Credit from Lemru",
+        "transfer": "Moved in by a member"
       },
       "expiring": {
         "title": "{{amount}} of credit expires within {{days}} days",
@@ -489,6 +492,36 @@
           "failed": "Refund failed: contact support",
           "refunded": "Refunded by support"
         }
+      }
+    },
+    "transfer": {
+      "title": "Move credits to an organization",
+      "description": "Give an organization you belong to some of the credit you bought in your personal account.",
+      "available": "{{amount}} can be moved now.",
+      "to": {
+        "label": "Organization",
+        "placeholder": "Choose an organization",
+        "required": "Choose an organization."
+      },
+      "amount": {
+        "label": "Amount (SAR)",
+        "invalid": "Enter an amount up to {{max}}, with at most two decimals."
+      },
+      "code": {
+        "label": "Authenticator code",
+        "invalid": "Enter the 6-digit code from your authenticator app."
+      },
+      "submit": "Move credits",
+      "done": "{{amount}} moved to {{organization}}.",
+      "rules": "Credit moves one way: it cannot be moved back or refunded afterwards. Only credit you bought can be moved, not promotional or free credit, and it keeps its expiry date. Credit held by requests in progress or by a pending refund stays here.",
+      "noOrganizations": "You are not a member of an organization yet. Create one, or accept an invitation, to move credit to it.",
+      "twoFactor": {
+        "required": "Turn on two-factor authentication to move credits: each move asks for a fresh code.",
+        "cta": "Open security settings"
+      },
+      "waiting": {
+        "memberTenure": "You joined this organization recently. It can receive your credit from {{when}}.",
+        "cooldown": "This organization has just received a transfer. It can receive the next from {{when}}."
       }
     }
   },
