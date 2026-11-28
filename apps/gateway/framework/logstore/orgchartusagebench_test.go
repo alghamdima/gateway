@@ -34,24 +34,24 @@ func TestOrgChartUsageReadsBenchmark(t *testing.T) {
 	})
 }
 
-// benchUnits is how many business units the seed spreads traffic over.
+// benchUnits is how many customers the seed spreads traffic over.
 const benchUnits = 13
 
 // seedBenchPostgres writes rows over the last 60 days, each credited to one or two
-// business units through the array columns.
+// customers through the array columns.
 func seedBenchPostgres(t *testing.T, db *gorm.DB, rows int) {
 	start := time.Now()
 	require.NoError(t, db.Exec(fmt.Sprintf(`
 		INSERT INTO logs (id, timestamp, created_at, object_type, provider, model, status, cost, total_tokens,
-			business_unit_ids, business_unit_names, team_ids, team_names, user_id)
+			customer_ids, customer_names, team_ids, team_names, user_id)
 		SELECT 'b-' || g, ts, ts, 'chat_completion',
 			CASE WHEN g %% 3 = 0 THEN 'anthropic' ELSE 'openai' END,
 			'model-' || (g %% 12), 'success', (g %% 100) / 1000.0, g %% 2000,
-			bu, bu, '["team-' || (g %% 50) || '"]', '["team-' || (g %% 50) || '"]', 'user-' || (g %% 2000)
+			cust, cust, '["team-' || (g %% 50) || '"]', '["team-' || (g %% 50) || '"]', 'user-' || (g %% 2000)
 		FROM (
 			SELECT g, now() - (g %% 5184000) * interval '1 second' AS ts,
-				CASE WHEN g %% 4 = 0 THEN '["bu-' || (g %% %[1]d) || '","bu-' || ((g + 1) %% %[1]d) || '"]'
-				     ELSE '["bu-' || (g %% %[1]d) || '"]' END AS bu
+				CASE WHEN g %% 4 = 0 THEN '["cust-' || (g %% %[1]d) || '","cust-' || ((g + 1) %% %[1]d) || '"]'
+				     ELSE '["cust-' || (g %% %[1]d) || '"]' END AS cust
 			FROM generate_series(1, %[2]d) g
 		) s`, benchUnits, rows)).Error)
 	require.NoError(t, db.Exec("ANALYZE logs").Error)
@@ -63,16 +63,16 @@ func seedBenchClickHouse(t *testing.T, db *gorm.DB, rows int) {
 	start := time.Now()
 	require.NoError(t, db.Exec(fmt.Sprintf(`
 		INSERT INTO logs (id, timestamp, created_at, object_type, provider, model, status, cost, total_tokens,
-			business_unit_ids, business_unit_names, team_ids, team_names, user_id)
+			customer_ids, customer_names, team_ids, team_names, user_id)
 		SELECT concat('b-', toString(number)), ts, ts, 'chat_completion',
 			if(number %% 3 = 0, 'anthropic', 'openai'),
 			concat('model-', toString(number %% 12)), 'success', (number %% 100) / 1000.0, number %% 2000,
-			bu, bu, concat('["team-', toString(number %% 50), '"]'), concat('["team-', toString(number %% 50), '"]'), concat('user-', toString(number %% 2000))
+			cust, cust, concat('["team-', toString(number %% 50), '"]'), concat('["team-', toString(number %% 50), '"]'), concat('user-', toString(number %% 2000))
 		FROM (
 			SELECT number, now64(3) - toIntervalSecond(number %% 5184000) AS ts,
 				if(number %% 4 = 0,
-					concat('["bu-', toString(number %% %[1]d), '","bu-', toString((number + 1) %% %[1]d), '"]'),
-					concat('["bu-', toString(number %% %[1]d), '"]')) AS bu
+					concat('["cust-', toString(number %% %[1]d), '","cust-', toString((number + 1) %% %[1]d), '"]'),
+					concat('["cust-', toString(number %% %[1]d), '"]')) AS cust
 			FROM numbers(%[2]d)
 		)`, benchUnits, rows)).Error)
 	t.Logf("seeded %d rows in %s", rows, time.Since(start).Round(time.Millisecond))
@@ -87,16 +87,16 @@ func runOrgChartBench(t *testing.T, s *RDBLogStore) {
 	start := end.Add(-30 * 24 * time.Hour)
 	units := make([]string, benchUnits)
 	for i := range units {
-		units[i] = fmt.Sprintf("bu-%d", i)
+		units[i] = fmt.Sprintf("cust-%d", i)
 	}
 	page := units[:5]
-	window := SearchFilters{StartTime: &start, EndTime: &end, BusinessUnitIDs: units}
+	window := SearchFilters{StartTime: &start, EndTime: &end, CustomerIDs: units}
 
 	before := func() error {
 		unlimited := 0
 		ranking := window
 		ranking.RankingLimit = &unlimited
-		if _, err := s.GetDimensionRankings(ctx, ranking, RankingDimensionBusinessUnit); err != nil {
+		if _, err := s.GetDimensionRankings(ctx, ranking, RankingDimensionCustomer); err != nil {
 			return err
 		}
 		g, _ := errgroup.WithContext(ctx)
@@ -104,7 +104,7 @@ func runOrgChartBench(t *testing.T, s *RDBLogStore) {
 		for _, id := range page {
 			g.Go(func() error {
 				f := window
-				f.BusinessUnitIDs = []string{id}
+				f.CustomerIDs = []string{id}
 				_, err := s.GetModelRankings(ctx, f)
 				return err
 			})
@@ -112,23 +112,23 @@ func runOrgChartBench(t *testing.T, s *RDBLogStore) {
 		return g.Wait()
 	}
 	after := func() error {
-		if _, err := s.GetDimensionUsage(ctx, window, RankingDimensionBusinessUnit, true); err != nil {
+		if _, err := s.GetDimensionUsage(ctx, window, RankingDimensionCustomer, true); err != nil {
 			return err
 		}
 		f := window
-		f.BusinessUnitIDs = page
-		_, err := s.GetDimensionModelUsage(ctx, f, RankingDimensionBusinessUnit)
+		f.CustomerIDs = page
+		_, err := s.GetDimensionModelUsage(ctx, f, RankingDimensionCustomer)
 		return err
 	}
 	ranking := func() error {
 		unlimited := 0
 		f := window
 		f.RankingLimit = &unlimited
-		_, err := s.GetDimensionRankings(ctx, f, RankingDimensionBusinessUnit)
+		_, err := s.GetDimensionRankings(ctx, f, RankingDimensionCustomer)
 		return err
 	}
 	usage := func() error {
-		_, err := s.GetDimensionUsage(ctx, window, RankingDimensionBusinessUnit, true)
+		_, err := s.GetDimensionUsage(ctx, window, RankingDimensionCustomer, true)
 		return err
 	}
 	for _, c := range []struct {

@@ -19,7 +19,7 @@ func TestRealtimeAttributionPersistsAcrossTurns(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close(context.Background())) })
 	g := grant.New()
-	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: "user", Name: "User"}, &schemas.EntityRef{ID: "vk", Name: "Key"}, []schemas.EntityRef{{ID: "team", Name: "Team"}}, []schemas.EntityRef{{ID: "customer", Name: "Customer"}}, []schemas.EntityRef{{ID: "business", Name: "Business"}}, &schemas.EntityRef{ID: "project", Name: "Project"}))
+	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: "user", Name: "User"}, &schemas.EntityRef{ID: "vk", Name: "Key"}, []schemas.EntityRef{{ID: "team", Name: "Team"}}, []schemas.EntityRef{{ID: "customer", Name: "Customer"}}))
 	for i := range 3 {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 		ctx.SetGrant(g)
@@ -40,16 +40,10 @@ func TestRealtimeAttributionPersistsAcrossTurns(t *testing.T) {
 		require.Equal(t, "customer", *entry.CustomerID)
 		require.Equal(t, schemas.Ptr("user"), entry.UserID)
 		require.Equal(t, schemas.Ptr("User"), entry.UserName)
-		require.Equal(t, schemas.Ptr("business"), entry.BusinessUnitID)
-		require.Equal(t, schemas.Ptr("Business"), entry.BusinessUnitName)
-		require.Equal(t, schemas.Ptr("project"), entry.ProjectID)
-		require.Equal(t, schemas.Ptr("Project"), entry.ProjectName)
 		require.Equal(t, []string{"team"}, entry.TeamIDsParsed)
 		require.Equal(t, []string{"Team"}, entry.TeamNamesParsed)
 		require.Equal(t, []string{"customer"}, entry.CustomerIDsParsed)
 		require.Equal(t, []string{"Customer"}, entry.CustomerNamesParsed)
-		require.Equal(t, []string{"business"}, entry.BusinessUnitIDsParsed)
-		require.Equal(t, []string{"Business"}, entry.BusinessUnitNamesParsed)
 	}
 }
 
@@ -59,8 +53,7 @@ func TestGrantAttributionAcrossRealtimeTurns(t *testing.T) {
 	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: "user", Name: "User"},
 		&schemas.EntityRef{ID: "vk", Name: "key"},
 		[]schemas.EntityRef{{ID: "team", Name: "Team"}, {ID: "parent-team", Name: "Parent team"}},
-		[]schemas.EntityRef{{ID: "direct", Name: "Direct"}, {ID: "inherited", Name: "Inherited"}},
-		[]schemas.EntityRef{{ID: "business", Name: "Business"}, {ID: "parent-business", Name: "Parent business"}}, &schemas.EntityRef{ID: "project", Name: "Project"}))
+		[]schemas.EntityRef{{ID: "direct", Name: "Direct"}, {ID: "inherited", Name: "Inherited"}}))
 	for range 3 {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 		ctx.SetGrant(g)
@@ -74,35 +67,20 @@ func TestGrantAttributionAcrossRealtimeTurns(t *testing.T) {
 		require.Equal(t, []string{"Team", "Parent team"}, entry.TeamNamesParsed)
 		require.Equal(t, []string{"direct", "inherited"}, entry.CustomerIDsParsed)
 		require.Equal(t, []string{"Direct", "Inherited"}, entry.CustomerNamesParsed)
-		require.Equal(t, []string{"business", "parent-business"}, entry.BusinessUnitIDsParsed)
-		require.Equal(t, []string{"Business", "Parent business"}, entry.BusinessUnitNamesParsed)
 		require.Equal(t, schemas.Ptr("user"), entry.UserID)
 		require.Equal(t, schemas.Ptr("User"), entry.UserName)
-		require.Equal(t, schemas.Ptr("business"), entry.BusinessUnitID)
-		require.Equal(t, schemas.Ptr("Business"), entry.BusinessUnitName)
-		require.Equal(t, schemas.Ptr("project"), entry.ProjectID)
-		require.Equal(t, schemas.Ptr("Project"), entry.ProjectName)
 		entry.CustomerID = schemas.Ptr("scoped")
 		entry.UserID, entry.UserName = schemas.Ptr("scoped-user"), schemas.Ptr("Scoped user")
-		entry.BusinessUnitID, entry.BusinessUnitName = schemas.Ptr("scoped-business"), schemas.Ptr("Scoped business")
-		entry.ProjectID, entry.ProjectName = schemas.Ptr("scoped-project"), schemas.Ptr("Scoped project")
 		entry.TeamIDsParsed, entry.TeamNamesParsed = []string{"scoped-team"}, []string{"Scoped team"}
 		entry.CustomerIDsParsed, entry.CustomerNamesParsed = []string{"scoped-customer"}, []string{"Scoped customer"}
-		entry.BusinessUnitIDsParsed, entry.BusinessUnitNamesParsed = []string{"scoped-business"}, []string{"Scoped business"}
 		applyGrantAttribution(ctx, entry)
 		require.Equal(t, "scoped", *entry.CustomerID)
 		require.Equal(t, "scoped-user", *entry.UserID)
 		require.Equal(t, "Scoped user", *entry.UserName)
-		require.Equal(t, "scoped-business", *entry.BusinessUnitID)
-		require.Equal(t, "Scoped business", *entry.BusinessUnitName)
-		require.Equal(t, "scoped-project", *entry.ProjectID)
-		require.Equal(t, "Scoped project", *entry.ProjectName)
 		require.Equal(t, []string{"scoped-team"}, entry.TeamIDsParsed)
 		require.Equal(t, []string{"Scoped team"}, entry.TeamNamesParsed)
 		require.Equal(t, []string{"scoped-customer"}, entry.CustomerIDsParsed)
 		require.Equal(t, []string{"Scoped customer"}, entry.CustomerNamesParsed)
-		require.Equal(t, []string{"scoped-business"}, entry.BusinessUnitIDsParsed)
-		require.Equal(t, []string{"Scoped business"}, entry.BusinessUnitNamesParsed)
 	}
 }
 
@@ -281,7 +259,7 @@ func TestRealtimeTranscriptDisabledContent(t *testing.T) {
 func BenchmarkGrantAttribution(b *testing.B) {
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	g := grant.New()
-	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, nil, &schemas.EntityRef{ID: "vk", Name: "Key"}, []schemas.EntityRef{{ID: "team"}}, []schemas.EntityRef{{ID: "customer"}}, nil, nil))
+	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, nil, &schemas.EntityRef{ID: "vk", Name: "Key"}, []schemas.EntityRef{{ID: "team"}}, []schemas.EntityRef{{ID: "customer"}}))
 	ctx.SetGrant(g)
 	b.ReportAllocs()
 	for b.Loop() {

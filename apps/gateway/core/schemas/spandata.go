@@ -104,31 +104,25 @@ type SpanError struct {
 // This overlaps routing/rules.GovernanceScope (a 7-field subset) and the fields
 // logging carries on its queue message; it is the superset both should adopt.
 type SpanEnrichment struct {
-	VirtualKeyID     string
-	VirtualKeyName   string
-	SelectedKeyID    string
-	SelectedKeyName  string
-	RoutingRuleID    string
-	RoutingRuleName  string
-	TeamID           string
-	TeamName         string
-	CustomerID       string
-	CustomerName     string
-	BusinessUnitID   string
-	BusinessUnitName string
-	ProjectID        string
-	ProjectName      string
-	UserID           string
-	UserName         string
-	UserEmail        string
-	App              string
+	VirtualKeyID    string
+	VirtualKeyName  string
+	SelectedKeyID   string
+	SelectedKeyName string
+	RoutingRuleID   string
+	RoutingRuleName string
+	TeamID          string
+	TeamName        string
+	CustomerID      string
+	CustomerName    string
+	UserID          string
+	UserName        string
+	UserEmail       string
+	App             string
 
-	TeamIDs           []string
-	TeamNames         []string
-	CustomerIDs       []string
-	CustomerNames     []string
-	BusinessUnitIDs   []string
-	BusinessUnitNames []string
+	TeamIDs       []string
+	TeamNames     []string
+	CustomerIDs   []string
+	CustomerNames []string
 
 	RoutingEnginesUsed  []string
 	ComplexityTier      string

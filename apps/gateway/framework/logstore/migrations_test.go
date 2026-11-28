@@ -543,23 +543,6 @@ func TestCorrelationColumnsMigrationRollbackGuardsRecordedValues(t *testing.T) {
 	}
 }
 
-// TestPerformanceIndexesCoverProjectIDs pins the project indexes to the background builders: the
-// project column migrations add only the columns (addColumnIfNotExists never creates a field's
-// index), so an upgraded deployment scans logs by project_id unindexed unless a builder carries
-// them. logs gets the (project_id, timestamp) composite from ensureOwnerTimestampIndexes;
-// A fresh database gets
-// them from the model's index tags at table creation.
-func TestPerformanceIndexesCoverProjectIDs(t *testing.T) {
-	tables := map[string]string{}
-	for _, idx := range performanceIndexes {
-		tables[idx.name] = idx.table
-	}
-	for _, idx := range rankingNameTimestampIndexes {
-		tables[idx.name] = idx.table
-	}
-	assert.Equal(t, "logs", tables["idx_logs_project_ts"])
-}
-
 // TestPerformanceIndexesHaveNoDuplicateColumns keeps the background builder from building the
 // same index twice under two names: a second index on the same columns costs a full build on
 // every upgraded deployment and a write on every insert, and the planner still picks one. A
@@ -804,7 +787,6 @@ func TestIndexBuildersIgnoreSameNamedIndexInOtherSchema(t *testing.T) {
 	indexes := []index{
 		{"logs", "idx_logs_metadata_gin"},
 		{"logs", "idx_logs_team_ids_gin"},
-		{"logs", "idx_logs_business_unit_ids_gin"},
 		{"logs", "idx_logs_customer_ids_gin"},
 		{"logs", "idx_logs_histogram_cover"},
 	}
@@ -826,7 +808,7 @@ func TestIndexBuildersIgnoreSameNamedIndexInOtherSchema(t *testing.T) {
 	t.Cleanup(func() { _, _ = conn.ExecContext(context.Background(), "SET search_path TO "+pgTestSchema) })
 
 	require.NoError(t, ensureMetadataGINIndex(ctx, conn))
-	require.NoError(t, ensureMultiTeamBusinessUnitGINIndexes(ctx, conn))
+	require.NoError(t, ensureOrgArrayGINIndexes(ctx, conn))
 	require.NoError(t, ensureDashboardEnhancements(ctx, conn))
 	require.NoError(t, ensurePerformanceIndexes(ctx, conn, testLogger{}))
 

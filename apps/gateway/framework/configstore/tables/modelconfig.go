@@ -13,13 +13,6 @@ import (
 const (
 	ModelConfigScopeGlobal     = "global"
 	ModelConfigScopeVirtualKey = "virtual_key"
-	ModelConfigScopeProject    = "project"
-	// The scopes the enterprise build writes its per-model limits under: one for the profile a user
-	// holds, one for the profile a team, business unit or customer holds. Declared here because the
-	// rows live in this table and the values are persisted in its scope column - they cannot change
-	// without a migration, and the enterprise build resolves limits by reading them back.
-	ModelConfigScopeAccessProfile       = "access_profile"
-	ModelConfigScopeEntityAccessProfile = "entity_access_profile"
 )
 
 // ModelConfigAllModels is the model_name sentinel meaning "all models". Combined with a
@@ -27,14 +20,13 @@ const (
 // with a nil provider it means all models on all providers.
 const ModelConfigAllModels = "*"
 
-// validModelConfigScopes is the set of accepted scope values: global,
-// virtual_key and project. Guarded by validModelConfigScopesMu.
+// validModelConfigScopes is the set of accepted scope values: global and
+// virtual_key. Guarded by validModelConfigScopesMu.
 var (
 	validModelConfigScopesMu sync.RWMutex
 	validModelConfigScopes   = map[string]bool{
 		ModelConfigScopeGlobal:     true,
 		ModelConfigScopeVirtualKey: true,
-		ModelConfigScopeProject:    true,
 	}
 )
 
@@ -45,11 +37,9 @@ var (
 // Embedded rather than nested so the three fields render flat alongside the row's
 // own, and shared so a model config and a quota budget describe their origin with
 // exactly the same keys. A name alone cannot be navigated to, which is what ID is
-// for — and ID addresses the SOURCE, not the row's ScopeID, which for an
-// access-profile-scoped model config is the user's association row rather than the
-// profile.
+// for — and ID addresses the SOURCE, not the row's ScopeID.
 type SourceRef struct {
-	// SourceType names the kind of source, e.g. "access_profile".
+	// SourceType names the kind of source, e.g. "virtual_key".
 	SourceType string `gorm:"-" json:"source_type,omitempty"`
 	// SourceID addresses the source itself.
 	SourceID string `gorm:"-" json:"source_id,omitempty"`

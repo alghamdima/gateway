@@ -69,7 +69,7 @@ type PendingLogData struct {
 	LastActivity atomic.Int64
 	// Live is set for a GPT Live session's row: what its units have folded into it so far.
 	Live             *liveSessionState
-	ProvisionalInput bool           // Input captured before the virtual key's or project's content decision was known
+	ProvisionalInput bool           // Input captured before the virtual key's content decision was known
 	ContentPolicy    *contentPolicy // Content policy resolved in PreLLMHook; nil means the global policy
 	EvictionAttempts int            // Sweeps that could not queue this entry's partial row
 	EvictedPartial   bool           // PostLLMHook stub for an already-evicted request; reconciles by UPDATE
@@ -620,7 +620,7 @@ func (p *LoggerPlugin) pendingClaimLock(requestID string) *sync.Mutex {
 // counted. Content follows the policy resolved for the request in PreLLMHook
 // (ContentPolicy; the global policy when none was recorded), because eviction
 // has no request context. Input captured provisionally, before the virtual
-// key's or project's decision was known, is never kept: PostLLMHook's final-policy drop
+// key's decision was known, is never kept: PostLLMHook's final-policy drop
 // cannot run for it. CreatedAt is reset to now so flushStaleProcessingLogs
 // gives the row a fresh window; Timestamp keeps the original request time. No
 // callback: PreLLMHook already announced the processing entry to subscribers.
@@ -1088,8 +1088,6 @@ func applyOutputFieldsToEntry(
 	teamID, teamName string,
 	customerID, customerName string,
 	userID, userName string,
-	businessUnitID, businessUnitName string,
-	projectID, projectName string,
 	numberOfRetries int,
 	latency int64,
 	upstreamLatency, overheadLatency *int64,
@@ -1126,18 +1124,6 @@ func applyOutputFieldsToEntry(
 	}
 	if userName != "" {
 		entry.UserName = &userName
-	}
-	if businessUnitID != "" {
-		entry.BusinessUnitID = &businessUnitID
-	}
-	if businessUnitName != "" {
-		entry.BusinessUnitName = &businessUnitName
-	}
-	if projectID != "" {
-		entry.ProjectID = &projectID
-	}
-	if projectName != "" {
-		entry.ProjectName = &projectName
 	}
 	if numberOfRetries != 0 {
 		entry.NumberOfRetries = numberOfRetries

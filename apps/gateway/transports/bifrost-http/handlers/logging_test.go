@@ -885,7 +885,6 @@ type dashboardLogManager struct {
 	// statsFunc, when set, supplies the SearchStats for each GetStats call so a
 	// test can tell the current and previous periods apart.
 	statsFunc              func(filters *logstore.SearchFilters) (*logstore.SearchStats, error)
-	projects               []loggingplugin.KeyPair
 	lastLLMFilters         logstore.SearchFilters
 	lastRecalculateFilters logstore.SearchFilters
 	lastRecalculateContext chan context.Context
@@ -1056,16 +1055,6 @@ func (m *dashboardLogManager) GetAvailableUsers(ctx context.Context, limit int, 
 	return nil, nil
 }
 
-// GetAvailableBusinessUnits implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableBusinessUnits(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return nil, nil
-}
-
-// GetAvailableProjects implements the test double used by logging handler tests.
-func (m *dashboardLogManager) GetAvailableProjects(ctx context.Context, limit int, query string) ([]loggingplugin.KeyPair, error) {
-	return m.projects, nil
-}
-
 // GetAvailableMetadataKeys implements the test double used by logging handler tests.
 func (m *dashboardLogManager) GetAvailableMetadataKeys(ctx context.Context, limit int, query string) (map[string][]string, error) {
 	return nil, nil
@@ -1163,69 +1152,6 @@ func (noRedactedKeys) GetAllRedactedVirtualKeys(ctx context.Context, ids []strin
 // GetAllRedactedRoutingRules implements the test double used by logging handler tests.
 func (noRedactedKeys) GetAllRedactedRoutingRules(ctx context.Context, ids []string) []tables.TableRoutingRule {
 	return nil
-}
-
-// TestProjectFilterReachesEveryLogQuery pins that project_ids narrows each route that reads logs:
-// the listing, the stats and every histogram, not just one of them. A filter that one route
-// drops returns another project's traffic in a report that claims to be this one's.
-func TestProjectFilterReachesEveryLogQuery(t *testing.T) {
-	SetLogger(&mockLogger{})
-	routes := []struct {
-		name string
-		uri  string
-		call func(h *LoggingHandler, ctx *fasthttp.RequestCtx)
-	}{
-		{"list", "/api/logs?project_ids=proj-a,proj-b", (*LoggingHandler).getLogs},
-		{"stats", "/api/logs/stats?project_ids=proj-a,proj-b", (*LoggingHandler).getLogsStats},
-		{"histograms", "/api/logs/dashboard?project_ids=proj-a,proj-b", (*LoggingHandler).getDashboard},
-	}
-	for _, route := range routes {
-		t.Run(route.name, func(t *testing.T) {
-			mgr := &dashboardLogManager{}
-			h := &LoggingHandler{logManager: mgr, redactedKeysManager: noRedactedKeys{}}
-			var req fasthttp.Request
-			req.SetRequestURI(route.uri)
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Init(&req, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, nil)
-
-			route.call(h, ctx)
-
-			if got := ctx.Response.StatusCode(); got != fasthttp.StatusOK {
-				t.Fatalf("expected 200, got %d: %s", got, ctx.Response.Body())
-			}
-			if got := mgr.lastLLMFilters.ProjectIDs; len(got) != 2 || got[0] != "proj-a" || got[1] != "proj-b" {
-				t.Fatalf("expected the project filter to reach the store, got %#v", got)
-			}
-		})
-	}
-}
-
-// TestFilterDataListsProjects pins that the filter dropdowns can offer projects: the dimension is
-// known, served from the log manager, and answered under its own key.
-func TestFilterDataListsProjects(t *testing.T) {
-	SetLogger(&mockLogger{})
-	mgr := &dashboardLogManager{projects: []loggingplugin.KeyPair{{ID: "proj-a", Name: "Atlas"}}}
-	h := &LoggingHandler{logManager: mgr}
-	var req fasthttp.Request
-	// A search query bypasses the response cache, which a bare handler does not carry.
-	req.SetRequestURI("/api/logs/filterdata?dimensions=projects&q=at")
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Init(&req, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, nil)
-
-	h.getAvailableFilterData(ctx)
-
-	if got := ctx.Response.StatusCode(); got != fasthttp.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", got, ctx.Response.Body())
-	}
-	var payload struct {
-		Projects []loggingplugin.KeyPair `json:"projects"`
-	}
-	if err := json.Unmarshal(ctx.Response.Body(), &payload); err != nil {
-		t.Fatalf("decode filterdata: %v", err)
-	}
-	if len(payload.Projects) != 1 || payload.Projects[0].ID != "proj-a" || payload.Projects[0].Name != "Atlas" {
-		t.Fatalf("expected the project pair under \"projects\", got %s", ctx.Response.Body())
-	}
 }
 
 // TestCorrelationFilterParsing keeps scalar correlation filters identical across
@@ -1379,7 +1305,6 @@ func TestApplyCurrentRankingNames(t *testing.T) {
 		{logstore.RankingDimensionRoutingRule, rankingRows("rr-1", "Rule Old"), map[string]string{"rr-1": "Rule Now"}},
 		{logstore.RankingDimensionSelectedKey, rankingRows("key-1", "Key Old"), map[string]string{"key-1": "Key Now"}},
 		{logstore.RankingDimensionUser, rankingRows("user-1", "alice-old"), map[string]string{"user-1": "Alice"}},
-		{logstore.RankingDimensionProject, rankingRows("proj-1", "Project From Logs"), map[string]string{"proj-1": "Project From Logs"}},
 		{logstore.RankingDimensionApp, rankingRows("claude-code", "claude-code"), map[string]string{"claude-code": "claude-code"}},
 	}
 	for _, tc := range cases {

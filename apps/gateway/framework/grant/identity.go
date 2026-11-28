@@ -42,11 +42,8 @@ type Identity struct {
 	user       *schemas.UserRef
 	virtualKey *schemas.EntityRef
 
-	teams         []schemas.EntityRef
-	customers     []schemas.EntityRef
-	businessUnits []schemas.EntityRef
-
-	project *schemas.EntityRef
+	teams     []schemas.EntityRef
+	customers []schemas.EntityRef
 }
 
 // NewIdentity builds a Identity. See schemas.Identity for what each value means. The lists are
@@ -57,17 +54,13 @@ func NewIdentity(
 	virtualKey *schemas.EntityRef,
 	teams []schemas.EntityRef,
 	customers []schemas.EntityRef,
-	businessUnits []schemas.EntityRef,
-	project *schemas.EntityRef,
 ) *Identity {
 	return &Identity{
-		credential:    credential,
-		user:          user,
-		virtualKey:    virtualKey,
-		teams:         slices.Clone(teams),
-		customers:     slices.Clone(customers),
-		businessUnits: slices.Clone(businessUnits),
-		project:       project,
+		credential: credential,
+		user:       user,
+		virtualKey: virtualKey,
+		teams:      slices.Clone(teams),
+		customers:  slices.Clone(customers),
 	}
 }
 
@@ -114,20 +107,4 @@ func (p *Identity) Customers() []schemas.EntityRef {
 		return nil
 	}
 	return p.customers
-}
-
-// BusinessUnits implements schemas.Identity.
-func (p *Identity) BusinessUnits() []schemas.EntityRef {
-	if p == nil {
-		return nil
-	}
-	return p.businessUnits
-}
-
-// Project implements schemas.Identity.
-func (p *Identity) Project() *schemas.EntityRef {
-	if p == nil {
-		return nil
-	}
-	return p.project
 }

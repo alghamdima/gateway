@@ -187,7 +187,7 @@ func TestComplexitySessionKeyScopesByIdentityAndHidesIt(t *testing.T) {
 			virtualKey = &schemas.EntityRef{ID: virtualKeyID}
 		}
 		g := grant.New()
-		g.SetIdentity(grant.NewIdentity(schemas.Credential{}, user, virtualKey, nil, nil, nil, nil))
+		g.SetIdentity(grant.NewIdentity(schemas.Credential{}, user, virtualKey, nil, nil))
 		ctx.SetGrant(g)
 		return ctx
 	}

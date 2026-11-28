@@ -23,10 +23,9 @@ type TableRateLimit struct {
 	RequestCurrentUsage  int64     `gorm:"default:0" json:"request_current_usage"`                   // Current request usage
 	RequestLastReset     time.Time `gorm:"index" json:"request_last_reset"`                          // Last time request counter was reset
 
-	// Deprecated: set calendar_aligned on the parent access profile / VK / team
-	// instead. Kept for backward compatibility with older config.json files;
-	// the OSS applyV1Compat path and the enterprise access-profile reconciler
-	// promote any true value here to the owner's top-level CalendarAligned at
+	// Deprecated: set calendar_aligned on the parent VK / team instead. Kept for
+	// backward compatibility with older config.json files; the applyV1Compat path
+	// promotes any true value here to the owner's top-level CalendarAligned at
 	// load time.
 	CalendarAlignedInput *bool `gorm:"-" json:"calendar_aligned,omitempty"`
 

@@ -31,50 +31,15 @@ const (
 	LimitHolderVirtualKeyProviderConfig LimitHolderKind = "vk_provider_config"
 	LimitHolderVirtualKeyModelConfig    LimitHolderKind = "vk_model_config"
 
-	// Held by an access profile attached to a user. Named for the user rather than generically,
-	// because a profile attached to something else is a different holder: see the team, business
-	// unit and customer profile kinds below, which exist for exactly the reason this comment once
-	// anticipated - a refusal has to say whose profile it was.
-	LimitHolderUserAccessProfile               LimitHolderKind = "user_access_profile"
-	LimitHolderUserAccessProfileProviderConfig LimitHolderKind = "user_access_profile_provider_config"
-	LimitHolderUserAccessProfileModelConfig    LimitHolderKind = "user_access_profile_model_config"
-
-	// Held by an access profile attached to a team, business unit or customer. The money is the
-	// entity's: it is charged on every request made under the entity - by a member or with a key the
-	// entity owns - whichever permit admitted the model. One holder each, for the same reason the
-	// permit kinds are separate: a caller told only that "an access profile is exhausted" cannot tell
-	// whose.
-	LimitHolderTeamAccessProfile                       LimitHolderKind = "team_access_profile"
-	LimitHolderTeamAccessProfileProviderConfig         LimitHolderKind = "team_access_profile_provider_config"
-	LimitHolderTeamAccessProfileModelConfig            LimitHolderKind = "team_access_profile_model_config"
-	LimitHolderBusinessUnitAccessProfile               LimitHolderKind = "business_unit_access_profile"
-	LimitHolderBusinessUnitAccessProfileProviderConfig LimitHolderKind = "business_unit_access_profile_provider_config"
-	LimitHolderBusinessUnitAccessProfileModelConfig    LimitHolderKind = "business_unit_access_profile_model_config"
-	LimitHolderCustomerAccessProfile                   LimitHolderKind = "customer_access_profile"
-	LimitHolderCustomerAccessProfileProviderConfig     LimitHolderKind = "customer_access_profile_provider_config"
-	LimitHolderCustomerAccessProfileModelConfig        LimitHolderKind = "customer_access_profile_model_config"
-
 	// Held by the user a request is attributed to, directly — a per-model limit assigned straight
-	// to the user rather than derived from an access profile they hold. Kept distinct from the
-	// LimitHolderUserAccessProfile* kinds because a refusal has to say which one ran out, and from
-	// LimitHolderVirtualKey because a caller can be told to stop counting a request against the key
+	// to the user. Kept distinct from LimitHolderVirtualKey because a caller can be told to stop counting a request against the key
 	// that granted it while still counting it against the user who made it.
 	LimitHolderUserModelConfig LimitHolderKind = "user_model_config"
 
 	// Held by the organization above the caller. Spent by every request made under anything they
 	// contain.
-	LimitHolderTeam         LimitHolderKind = "team"
-	LimitHolderBusinessUnit LimitHolderKind = "business_unit"
-	LimitHolderCustomer     LimitHolderKind = "customer"
-
-	// Held by a project, which is not part of the organization above the caller. A project is a
-	// scope a request opts into rather than a container the caller sits inside, so what it funds
-	// is spent by whoever names it and by nobody else: a caller's own limits and their
-	// organization's are untouched by it, and the same caller reaching the same model outside the
-	// project answers to none of these.
-	LimitHolderProject               LimitHolderKind = "project"
-	LimitHolderProjectProviderConfig LimitHolderKind = "project_provider_config"
-	LimitHolderProjectModelConfig    LimitHolderKind = "project_model_config"
+	LimitHolderTeam     LimitHolderKind = "team"
+	LimitHolderCustomer LimitHolderKind = "customer"
 
 	// Held by no one in the organization. A provider's limits are the deployment's own, and a model
 	// config's are scoped to a (model, provider) pattern. Neither is anybody's allowance, so a

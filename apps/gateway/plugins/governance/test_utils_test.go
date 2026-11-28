@@ -497,7 +497,7 @@ func settleTestIdentity(ctx *schemas.BifrostContext) {
 			credential = grant.NewCredential(grant.CredentialSessionToken, userID)
 		}
 	}
-	ctx.Grant().SetIdentity(grant.NewIdentity(credential, user, nil, nil, nil, nil, nil))
+	ctx.Grant().SetIdentity(grant.NewIdentity(credential, user, nil, nil, nil))
 }
 
 // The helpers below stand in for the per-holder check methods the store used to expose. Each

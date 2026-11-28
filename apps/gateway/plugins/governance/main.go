@@ -45,9 +45,8 @@ const (
 const (
 	// The kinds of entity that can hold budgets and a rate limit of their own. Each may hold several
 	// budgets, one per reset window, and one rate limit.
-	LegacyLimitHolderTeam         = "team"
-	LegacyLimitHolderCustomer     = "customer"
-	LegacyLimitHolderBusinessUnit = "business_unit"
+	LegacyLimitHolderTeam     = "team"
+	LegacyLimitHolderCustomer = "customer"
 )
 
 // LegacyLimitGuard names what already governs an entity's spend, or "" when nothing does. An error
@@ -614,36 +613,6 @@ func (p *GovernancePlugin) PublishRoutingAllowlist(ctx *schemas.BifrostContext, 
 	ctx.SetValue(schemas.BifrostContextKeyRoutingAllowedProviders, modelProviders(access.GrantedProvidersForModel(modelStr)))
 }
 
-// namedProjectNothingScoped reports whether the request named a project and ended up scoped by
-// none, and what it named it.
-//
-// The same shape as presentedGrantBearingCredential above, for the same reason: what the request
-// asked for is read off its own input, and only comparing that against what resolution produced can
-// tell "asked for nothing" from "asked for something that is not there". A project named with no
-// resolved project behind it was not granted (it does not exist, or it does not admit this caller),
-// and those are not told apart here, exactly as a credential that resolves to nothing does not say
-// whether it never existed or was revoked.
-//
-// A header that arrived empty still counts as having asked. It named no project, so no project can
-// be resolved from it, and treating it as not having asked would serve the request against the
-// caller's own access instead of refusing a scope it could not be given.
-//
-// The resolved id rather than the scoping slot, because that id is set at exactly the moment a
-// project is admitted. Reading the slot would answer this question wrongly the moment anything other
-// than a project fills it.
-func namedProjectNothingScoped(ctx *schemas.BifrostContext) (string, bool) {
-	if bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectID) != "" {
-		return "", false
-	}
-	headers, _ := ctx.Value(schemas.BifrostContextKeyRequestHeaders).(map[string]string)
-	for _, header := range []string{schemas.HeaderGovernanceProjectID, schemas.HeaderGovernanceProjectName} {
-		if named, sent := headers[header]; sent {
-			return strings.TrimSpace(named), true
-		}
-	}
-	return "", false
-}
-
 // Evaluate is the governance verdict for a request: whether it may proceed, and why not when it
 // may not. It is the one entry point: every hook and every caller outside the pipeline arrives
 // here, which is also why it resolves what the request may reach if nothing has yet.
@@ -745,15 +714,9 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 	// is refused here: no permit means nothing authorised the request, which is a different answer
 	// from having presented nothing.
 	//
-	// Two ways a request can end up with nothing where it expected something, and they are the same
-	// question asked of each slot: it presented a credential and nothing granted it, or it named a
-	// project and nothing scoped it. Neither is reported by whatever resolved it: a resolver answers
-	// with what it found, and this is where not finding it becomes a refusal.
-	//
-	// The second is why a project the request may not use cannot simply be dropped: doing that would
-	// serve the request against the caller's own access, which is more than they asked for and not
-	// what they asked for. Like the first, it does not say which of "no such project" and "not
-	// yours" it was, because a caller who may not use a project has no business learning it exists.
+	// A request that presented a credential and ended up with nothing granted is not reported by
+	// whatever resolved it: a resolver answers with what it found, and this is where not finding it
+	// becomes a refusal.
 	//
 	// This is the funnel every pipeline passes through, including the streaming and realtime-turn
 	// ones that run no request hook, so refusing here is what makes the answer the same on all
@@ -765,15 +728,6 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 		return p.decide(ctx, &EvaluationResult{
 			Decision: DecisionAccessNotFound,
 			Reason:   "access not found. The provided credential does not exist or has been revoked.",
-		})
-	}
-	// Blocked rather than not-found, though the shape of the question is the same. A credential that
-	// resolves to nothing is an authentication failure and says so; a caller who authenticated fine
-	// and named a project they may not have is being refused, not asked to identify themselves again.
-	if named, nothingScoped := namedProjectNothingScoped(ctx); nothingScoped {
-		return p.decide(ctx, &EvaluationResult{
-			Decision: DecisionAccessBlocked,
-			Reason:   fmt.Sprintf("project %q not found. It does not exist or does not admit this request.", named),
 		})
 	}
 

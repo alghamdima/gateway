@@ -85,8 +85,8 @@ func seedUsageLogs(t *testing.T, s usageParityStore) SearchFilters {
 	}
 	units := func(ids ...string) func(*Log) {
 		return func(l *Log) {
-			l.BusinessUnitIDsParsed = ids
-			l.BusinessUnitNamesParsed = ids
+			l.CustomerIDsParsed = ids
+			l.CustomerNamesParsed = ids
 			l.TeamIDsParsed = []string{"team-" + ids[0]}
 			l.TeamNamesParsed = []string{"team-" + ids[0]}
 			user := "user-" + ids[0]
@@ -94,21 +94,21 @@ func seedUsageLogs(t *testing.T, s usageParityStore) SearchFilters {
 		}
 	}
 	scalar := func(id string) func(*Log) {
-		return func(l *Log) { l.BusinessUnitID = &id }
+		return func(l *Log) { l.CustomerID = &id }
 	}
 
-	add(cur, "gpt-4o", 1.5, 100, units("bu-a", "bu-b"))
-	add(cur, "claude", 2.25, 40, units("bu-a"))
-	add(cur, "gpt-4o", 0, 10, units("bu-b"))
-	add(cur, "gpt-4o", 0.75, 30, scalar("bu-c"))
+	add(cur, "gpt-4o", 1.5, 100, units("cust-a", "cust-b"))
+	add(cur, "claude", 2.25, 40, units("cust-a"))
+	add(cur, "gpt-4o", 0, 10, units("cust-b"))
+	add(cur, "gpt-4o", 0.75, 30, scalar("cust-c"))
 	add(cur, "gpt-4o", 0.5, 5, func(*Log) {})
-	add(prev, "gpt-4o", 3, 300, units("bu-a"))
-	add(prev, "claude", 1, 10, units("bu-a", "bu-c"))
-	add(prev, "gpt-4o", 9, 90, units("bu-gone"))
-	add(prev.Add(-2*time.Hour), "gpt-4o", 100, 1000, units("bu-a"))
-	add(now.Add(2*time.Hour), "gpt-4o", 100, 1000, units("bu-b"))
+	add(prev, "gpt-4o", 3, 300, units("cust-a"))
+	add(prev, "claude", 1, 10, units("cust-a", "cust-c"))
+	add(prev, "gpt-4o", 9, 90, units("cust-gone"))
+	add(prev.Add(-2*time.Hour), "gpt-4o", 100, 1000, units("cust-a"))
+	add(now.Add(2*time.Hour), "gpt-4o", 100, 1000, units("cust-b"))
 	add(cur, "gpt-4o", 100, 1000, func(l *Log) {
-		units("bu-a")(l)
+		units("cust-a")(l)
 		l.Status = "processing"
 	})
 	return SearchFilters{StartTime: &start, EndTime: &end}
@@ -139,9 +139,9 @@ func TestDimensionUsageMatchesRankings(t *testing.T) {
 		window := seedUsageLogs(t, s)
 		contexts := map[string]context.Context{
 			"unbounded":    context.Background(),
-			"with ceiling": withCeiling(context.Background(), "business_unit_id", "bu-a", "bu-c"),
+			"with ceiling": withCeiling(context.Background(), "customer_id", "cust-a", "cust-c"),
 		}
-		for _, dimension := range []RankingDimension{RankingDimensionBusinessUnit, RankingDimensionTeam, RankingDimensionUser, RankingDimensionCustomer} {
+		for _, dimension := range []RankingDimension{RankingDimensionCustomer, RankingDimensionTeam, RankingDimensionUser} {
 			for name, ctx := range contexts {
 				want := rankingsByID(t, s.store, ctx, window, dimension)
 				got, err := s.store.GetDimensionUsage(ctx, window, dimension, true)
@@ -162,21 +162,21 @@ func TestDimensionUsageMatchesRankings(t *testing.T) {
 		}
 
 		// The seed must actually reach the interesting branches, or parity proves little.
-		got, err := s.store.GetDimensionUsage(context.Background(), window, RankingDimensionBusinessUnit, true)
+		got, err := s.store.GetDimensionUsage(context.Background(), window, RankingDimensionCustomer, true)
 		require.NoError(t, err)
 		byID := make(map[string]DimensionUsageEntry, len(got))
 		for _, entry := range got {
 			byID[entry.ID] = entry
 		}
-		assert.Equal(t, int64(2), byID["bu-a"].TotalRequests, "array rows credit every unit they carry")
-		assert.InDelta(t, 3.75, byID["bu-a"].TotalCost, 1e-9)
-		assert.True(t, byID["bu-a"].Trend.HasPreviousPeriod)
-		require.NotNil(t, byID["bu-a"].Trend.CostTrend)
-		assert.InDelta(t, -6.25, *byID["bu-a"].Trend.CostTrend, 1e-9, "3.75 now against 4 before")
-		assert.Equal(t, int64(1), byID["bu-c"].TotalRequests, "scalar-only rows still count")
+		assert.Equal(t, int64(2), byID["cust-a"].TotalRequests, "array rows credit every unit they carry")
+		assert.InDelta(t, 3.75, byID["cust-a"].TotalCost, 1e-9)
+		assert.True(t, byID["cust-a"].Trend.HasPreviousPeriod)
+		require.NotNil(t, byID["cust-a"].Trend.CostTrend)
+		assert.InDelta(t, -6.25, *byID["cust-a"].Trend.CostTrend, 1e-9, "3.75 now against 4 before")
+		assert.Equal(t, int64(1), byID["cust-c"].TotalRequests, "scalar-only rows still count")
 		assert.Contains(t, byID, unassignedDimensionID, "owner-less rows bucket under Unassigned")
-		assert.NotContains(t, byID, "bu-gone", "a unit active only in the previous window is left out")
-		assert.False(t, byID["bu-b"].Trend.HasPreviousPeriod)
+		assert.NotContains(t, byID, "cust-gone", "a unit active only in the previous window is left out")
+		assert.False(t, byID["cust-b"].Trend.HasPreviousPeriod)
 	})
 }
 
@@ -193,8 +193,8 @@ func TestDimensionUsageFilteredOnItsOwnIDsMatchesRankings(t *testing.T) {
 			ids       []string
 			set       func(*SearchFilters, []string)
 		}{
-			{RankingDimensionBusinessUnit, []string{"bu-a", "bu-c", "bu-none"}, func(f *SearchFilters, ids []string) { f.BusinessUnitIDs = ids }},
-			{RankingDimensionTeam, []string{"team-bu-b"}, func(f *SearchFilters, ids []string) { f.TeamIDs = ids }},
+			{RankingDimensionCustomer, []string{"cust-a", "cust-c", "cust-none"}, func(f *SearchFilters, ids []string) { f.CustomerIDs = ids }},
+			{RankingDimensionTeam, []string{"team-cust-b"}, func(f *SearchFilters, ids []string) { f.TeamIDs = ids }},
 		} {
 			filtered := window
 			tc.set(&filtered, tc.ids)
@@ -226,8 +226,8 @@ func TestDimensionUsageWithoutCompareReadsOnlyTheWindow(t *testing.T) {
 	usageParityStores(t, func(t *testing.T, s usageParityStore) {
 		window := seedUsageLogs(t, s)
 		ctx := context.Background()
-		want := rankingsByID(t, s.store, ctx, window, RankingDimensionBusinessUnit)
-		got, err := s.store.GetDimensionUsage(ctx, window, RankingDimensionBusinessUnit, false)
+		want := rankingsByID(t, s.store, ctx, window, RankingDimensionCustomer)
+		got, err := s.store.GetDimensionUsage(ctx, window, RankingDimensionCustomer, false)
 		require.NoError(t, err)
 		require.Len(t, got, len(want))
 		for _, entry := range got {
@@ -257,10 +257,10 @@ func TestDimensionModelUsageMatchesPerEntityModelRankings(t *testing.T) {
 	usageParityStores(t, func(t *testing.T, s usageParityStore) {
 		window := seedUsageLogs(t, s)
 		ctx := context.Background()
-		ids := []string{"bu-a", "bu-b", "bu-c"}
+		ids := []string{"cust-a", "cust-b", "cust-c"}
 		batched := window
-		batched.BusinessUnitIDs = ids
-		got, err := s.store.GetDimensionModelUsage(ctx, batched, RankingDimensionBusinessUnit)
+		batched.CustomerIDs = ids
+		got, err := s.store.GetDimensionModelUsage(ctx, batched, RankingDimensionCustomer)
 		require.NoError(t, err)
 
 		type key struct{ id, model, provider string }
@@ -271,7 +271,7 @@ func TestDimensionModelUsageMatchesPerEntityModelRankings(t *testing.T) {
 		wantKeys := 0
 		for _, id := range ids {
 			single := window
-			single.BusinessUnitIDs = []string{id}
+			single.CustomerIDs = []string{id}
 			models, err := s.store.GetModelRankings(ctx, single)
 			require.NoError(t, err)
 			for _, row := range models.Rankings {
@@ -282,7 +282,7 @@ func TestDimensionModelUsageMatchesPerEntityModelRankings(t *testing.T) {
 				assert.InDeltaf(t, row.TotalCost, entry.TotalCost, 1e-9, "%s %s cost", id, row.Model)
 			}
 		}
-		requested := map[string]bool{"bu-a": true, "bu-b": true, "bu-c": true}
+		requested := map[string]bool{"cust-a": true, "cust-b": true, "cust-c": true}
 		inPage := 0
 		for k := range gotByKey {
 			if requested[k.id] {
@@ -291,7 +291,7 @@ func TestDimensionModelUsageMatchesPerEntityModelRankings(t *testing.T) {
 		}
 		assert.Equal(t, wantKeys, inPage, "no extra groups for the requested units")
 		assert.Equal(t, inPage, len(gotByKey), "only the requested units are returned")
-		assert.Contains(t, gotByKey, key{"bu-a", "claude", "anthropic"})
+		assert.Contains(t, gotByKey, key{"cust-a", "claude", "anthropic"})
 	})
 }
 
@@ -323,21 +323,21 @@ func TestDimensionUsageMalformedArraysMatchRankings(t *testing.T) {
 			store, db := open(t)
 			now := time.Now().UTC()
 			for _, row := range []struct{ id, scalar, array string }{
-				{"bad-1", "bu-x", `not json`},
-				{"bad-2", "bu-x", `[]`},
-				{"bad-3", "bu-y", `{"bu-z": 1}`},
-				{"bad-4", "bu-y", `["bu-z","bu-x"]`},
-				{"bad-5", "", `["bu-z",""]`},
+				{"bad-1", "cust-x", `not json`},
+				{"bad-2", "cust-x", `[]`},
+				{"bad-3", "cust-y", `{"cust-z": 1}`},
+				{"bad-4", "cust-y", `["cust-z","cust-x"]`},
+				{"bad-5", "", `["cust-z",""]`},
 				{"bad-6", "", ""},
 			} {
-				insertDimensionLog(t, db, "business_unit_id", row.id, now, row.scalar, "", row.array, row.array)
+				insertDimensionLog(t, db, "customer_id", row.id, now, row.scalar, "", row.array, row.array)
 			}
 			window := fanoutWindow(now)
-			for _, ids := range [][]string{nil, {"bu-x", "bu-z"}} {
+			for _, ids := range [][]string{nil, {"cust-x", "cust-z"}} {
 				filtered := window
-				filtered.BusinessUnitIDs = ids
-				want := rankingsByID(t, store, context.Background(), filtered, RankingDimensionBusinessUnit)
-				got, err := store.GetDimensionUsage(context.Background(), filtered, RankingDimensionBusinessUnit, false)
+				filtered.CustomerIDs = ids
+				want := rankingsByID(t, store, context.Background(), filtered, RankingDimensionCustomer)
+				got, err := store.GetDimensionUsage(context.Background(), filtered, RankingDimensionCustomer, false)
 				require.NoError(t, err)
 				require.NotEmpty(t, got)
 				for _, entry := range got {

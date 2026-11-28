@@ -86,16 +86,14 @@ func (s *RDBLogStore) usageReadFor(dimension RankingDimension, filters SearchFil
 		read.ownIDs, read.filters.TeamIDs = filters.TeamIDs, nil
 	case "customer_id":
 		read.ownIDs, read.filters.CustomerIDs = filters.CustomerIDs, nil
-	case "business_unit_id":
-		read.ownIDs, read.filters.BusinessUnitIDs = filters.BusinessUnitIDs, nil
 	}
 	return read, nil
 }
 
 // postgresUsageFanoutFrom is the ids-only Postgres fan-out the usage readers read
-// a team, customer or business unit through: one row per id in the JSON-array
+// a team or customer through: one row per id in the JSON-array
 // column, or the scalar column for a row whose array is missing or malformed,
-// the same choice teamOrBUFanoutFrom makes. It stays separate from that text,
+// the same choice orgFanoutFrom makes. It stays separate from that text,
 // which the filter matviews are built from.
 func postgresUsageFanoutFrom(idCol string) (string, bool) {
 	arrIDs, _, _, ok := fanoutDimensionColumns(idCol)

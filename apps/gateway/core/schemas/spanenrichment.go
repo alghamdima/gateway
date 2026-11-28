@@ -33,10 +33,6 @@ func SpanEnrichmentFromContext(ctx context.Context) *SpanEnrichment {
 	e.TeamName = str(BifrostContextKeyGovernanceTeamName)
 	e.CustomerID = str(BifrostContextKeyGovernanceCustomerID)
 	e.CustomerName = str(BifrostContextKeyGovernanceCustomerName)
-	e.BusinessUnitID = str(BifrostContextKeyGovernanceBusinessUnitID)
-	e.BusinessUnitName = str(BifrostContextKeyGovernanceBusinessUnitName)
-	e.ProjectID = str(BifrostContextKeyGovernanceProjectID)
-	e.ProjectName = str(BifrostContextKeyGovernanceProjectName)
 	e.UserID = str(BifrostContextKeyUserID)
 	e.UserName = str(BifrostContextKeyUserName)
 	e.UserEmail = str(BifrostContextKeyUserEmail)
@@ -47,8 +43,6 @@ func SpanEnrichmentFromContext(ctx context.Context) *SpanEnrichment {
 	e.TeamNames = strs(BifrostContextKeyGovernanceTeamNames)
 	e.CustomerIDs = strs(BifrostContextKeyGovernanceCustomerIDs)
 	e.CustomerNames = strs(BifrostContextKeyGovernanceCustomerNames)
-	e.BusinessUnitIDs = strs(BifrostContextKeyGovernanceBusinessUnitIDs)
-	e.BusinessUnitNames = strs(BifrostContextKeyGovernanceBusinessUnitNames)
 
 	if fallbackIndex, ok := ctx.Value(BifrostContextKeyFallbackIndex).(int); ok {
 		e.FallbackIndex = &fallbackIndex
@@ -82,10 +76,6 @@ func (e *SpanEnrichment) ApplyToSpan(span *Span) {
 	setSpanStr(span, AttrBifrostTeamName, e.TeamName)
 	setSpanStr(span, AttrBifrostCustomerID, e.CustomerID)
 	setSpanStr(span, AttrBifrostCustomerName, e.CustomerName)
-	setSpanStr(span, AttrBifrostBusinessUnitID, e.BusinessUnitID)
-	setSpanStr(span, AttrBifrostBusinessUnitName, e.BusinessUnitName)
-	setSpanStr(span, AttrBifrostProjectID, e.ProjectID)
-	setSpanStr(span, AttrBifrostProjectName, e.ProjectName)
 	setSpanStr(span, AttrBifrostUserID, e.UserID)
 	setSpanStr(span, AttrBifrostUserName, e.UserName)
 	setSpanStr(span, AttrBifrostUserEmail, e.UserEmail)
@@ -95,8 +85,6 @@ func (e *SpanEnrichment) ApplyToSpan(span *Span) {
 	setSpanStrs(span, AttrBifrostTeamNames, e.TeamNames)
 	setSpanStrs(span, AttrBifrostCustomerIDs, e.CustomerIDs)
 	setSpanStrs(span, AttrBifrostCustomerNames, e.CustomerNames)
-	setSpanStrs(span, AttrBifrostBusinessUnitIDs, e.BusinessUnitIDs)
-	setSpanStrs(span, AttrBifrostBusinessUnitNames, e.BusinessUnitNames)
 
 	if e.FallbackIndex != nil {
 		span.SetAttribute(AttrBifrostFallbackIndex, *e.FallbackIndex)

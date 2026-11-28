@@ -328,25 +328,6 @@
           "description": "Restrict provider objects (files, batches, videos, containers, container files, cached contents and live sessions) to the virtual key that created them. Another virtual key gets 404 for them and does not see them in list responses. Requests without a virtual key are not restricted. Creators are recorded even while this is off, so turning it back on also covers objects created meanwhile; an object whose creator could not be recorded stays reachable to every virtual key.",
           "default": true
         },
-        "skip_access_profile_user_virtual_key_creation": {
-          "type": "boolean",
-          "description": "Enterprise only. When true, a user's first access profile never creates a virtual key for them. Keys the user already owns are still governed by the profile while they hold one.",
-          "default": false
-        },
-        "skip_access_profile_user_virtual_key_deletion": {
-          "type": "boolean",
-          "description": "Enterprise only. When true, removing a user's last access profile never deletes their virtual keys; they are kept as ordinary keys with none of the profile's providers or access. Deleting the user still deletes their keys.",
-          "default": false
-        },
-        "entity_access_profile_mode": {
-          "type": "string",
-          "enum": [
-            "union",
-            "intersect"
-          ],
-          "default": "union",
-          "description": "Enterprise only. How the access profiles of the teams, business units and customers a caller belongs to combine with the caller's own access. Takes the same values as a project's access_rule. 'union' (default) lets each of them add to what the caller may reach. 'intersect' makes each level that holds an active profile cap it instead: the caller keeps only what their own profiles (or virtual key) allow AND what at least one of their team or business unit profiles allows AND what at least one of their customer profiles allows. A level holding no active profile is skipped. The cap covers providers, models, provider keys; agents are not capped, since team, business unit and customer profiles cannot grant them. Budgets and rate limits are charged as in 'union' mode. The x-bf-customer-id / x-bf-customer-name scope headers are ignored in 'intersect' mode."
-        },
         "vk_rotation_cooldown": {
           "type": [
             "string",
@@ -563,7 +544,7 @@
               },
               "calendar_aligned": {
                 "type": "boolean",
-                "description": "Deprecated: set calendar_aligned on the owner (team / virtual key / access profile) instead. Kept for backward compatibility with older config.json files; ignored unless a reconciler promotes it to its owner.",
+                "description": "Deprecated: set calendar_aligned on the owner (team / virtual key) instead. Kept for backward compatibility with older config.json files; ignored unless a reconciler promotes it to its owner.",
                 "default": false
               },
               "override_amount": {
@@ -771,7 +752,7 @@
               },
               "calendar_aligned": {
                 "type": "boolean",
-                "description": "Deprecated: set calendar_aligned on the owner (team / virtual key / access profile) instead. Kept for backward compatibility with older config.json files; ignored unless a reconciler promotes it to its owner.",
+                "description": "Deprecated: set calendar_aligned on the owner (team / virtual key) instead. Kept for backward compatibility with older config.json files; ignored unless a reconciler promotes it to its owner.",
                 "default": false
               }
             },
@@ -809,10 +790,6 @@
               "rate_limit_id": {
                 "type": "string",
                 "description": "Associated rate limit ID"
-              },
-              "access_profile": {
-                "type": "string",
-                "description": "Name of the access profile (defined in access_profiles) this customer holds. The profile governs everything under the customer and replaces its own budgets and rate limit, so it cannot be combined with them. Under source_of_truth \"split\" the declaration is applied when it is new or changed and dashboard changes are kept otherwise; under \"config.json\" it is enforced on every startup and an entry without access_profile has its profile removed."
               },
               "calendar_aligned": {
                 "type": "boolean",
@@ -869,10 +846,6 @@
                 "type": "string",
                 "description": "Associated rate limit ID"
               },
-              "business_unit_id": {
-                "type": "string",
-                "description": "Associated business unit ID"
-              },
               "profile": {
                 "type": "object",
                 "description": "Team profile data"
@@ -884,10 +857,6 @@
               "claims": {
                 "type": "object",
                 "description": "Team claims data"
-              },
-              "access_profile": {
-                "type": "string",
-                "description": "Name of the access profile (defined in access_profiles) this team holds. The profile governs everything under the team and replaces its own budgets and rate limit, so it cannot be combined with them. Under source_of_truth \"split\" the declaration is applied when it is new or changed and dashboard changes are kept otherwise; under \"config.json\" it is enforced on every startup and an entry without access_profile has its profile removed."
               },
               "calendar_aligned": {
                 "type": "boolean",
@@ -906,158 +875,6 @@
               "name"
             ],
             "additionalProperties": false
-          }
-        },
-        "business_units": {
-          "type": "array",
-          "description": "Business unit configurations with optional team assignments",
-          "items": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Business unit ID"
-              },
-              "name": {
-                "type": "string",
-                "description": "Business unit name"
-              },
-              "budgets": {
-                "type": "array",
-                "description": "Inline budget configurations for this business unit, matched by id. One budget per reset_duration is recommended. Only the business unit's own calendar_aligned is read; calendar_aligned on an entry is ignored.",
-                "items": {
-                  "$ref": "#/$defs/budget_line"
-                }
-              },
-              "budget_id": {
-                "type": "string",
-                "description": "Deprecated: use budgets. ID of a budget declared in governance.budgets that this business unit holds, alongside any inline budgets."
-              },
-              "calendar_aligned": {
-                "type": "boolean",
-                "description": "When true, the business unit's budgets and rate limit reset at calendar boundaries (start of hour, day, week, month, quarter or year) instead of rolling windows.",
-                "default": false
-              },
-              "rate_limit_id": {
-                "type": "string",
-                "description": "Associated rate limit ID"
-              },
-              "profile": {
-                "type": "object",
-                "description": "Business unit profile data"
-              },
-              "config": {
-                "type": "object",
-                "description": "Business unit configuration data"
-              },
-              "claims": {
-                "type": "object",
-                "description": "Business unit claims data"
-              },
-              "access_profile": {
-                "type": "string",
-                "description": "Name of the access profile (defined in access_profiles) this business unit holds. The profile governs everything under the business unit and replaces its own budgets and rate limit, so it cannot be combined with them. Under source_of_truth \"split\" the declaration is applied when it is new or changed and dashboard changes are kept otherwise; under \"config.json\" it is enforced on every startup and an entry without access_profile has its profile removed."
-              },
-              "team_ids": {
-                "type": "array",
-                "description": "Team IDs to assign to this business unit",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "required": [
-              "id",
-              "name"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "roles": {
-          "type": "array",
-          "description": "RBAC role definitions. Roles are created or updated on startup if the config hash changes; system roles and dashboard-created roles are never deleted.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Unique role name"
-              },
-              "description": {
-                "type": "string",
-                "description": "Human-readable description of the role"
-              },
-              "dac": {
-                "type": "string",
-                "description": "Data Access Control scope: own-data (user's own records), team-data (plus records of the user's teams), business-unit-data (plus records of the user's business units), customer-data (everything under the customers the user reaches through their teams or business units), all-data (unrestricted). Defaults to all-data.",
-                "enum": [
-                  "own-data",
-                  "team-data",
-                  "business-unit-data",
-                  "customer-data",
-                  "all-data"
-                ],
-                "default": "all-data"
-              },
-              "entity_dac": {
-                "type": "object",
-                "description": "Per-entity Data Access Control overrides, keyed by resource name. Each entry narrows or widens the role's global dac for that one entity; entities not listed follow dac. Resources accepting an override as of this release: Logs, AuditLogs, VirtualKeys, Users, Teams, Customers, BusinessUnits, RBAC, APIKeys, AccessProfiles, RoutingRules, GuardrailsConfig, Projects. ",
-                "additionalProperties": {
-                  "type": "string",
-                  "enum": [
-                    "own-data",
-                    "team-data",
-                    "business-unit-data",
-                    "customer-data",
-                    "all-data"
-                  ]
-                }
-              },
-              "access_profile": {
-                "type": "string",
-                "description": "Name of the access profile (defined in access_profiles) to attach as the default for this role. Changing this field triggers a re-sync on next startup. Leave unset to let the dashboard manage the assignment."
-              },
-              "access_profiles": {
-                "type": "array",
-                "description": "Names of all access profiles granted by this role. When present, this field takes precedence over access_profile; an empty list removes all profile grants.",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "permissions": {
-                "type": "array",
-                "description": "List of resource+operation permission pairs to grant to this role",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "resource": {
-                      "type": "string",
-                      "description": "Permission resource (e.g. Logs, VirtualKeys, Users, ModelProvider, Metrics, Guardrails, AccessProfiles, Roles, BusinessUnits, AuditLogs, Billing)"
-                    },
-                    "operation": {
-                      "type": "string",
-                      "description": "Permission operation (e.g. View, Create, Update, Delete, Download, RunInference, ManageInference, ViewInference)"
-                    }
-                  },
-                  "required": [
-                    "resource",
-                    "operation"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            },
-            "required": [
-              "name"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "projects": {
-          "type": "array",
-          "description": "Projects: per-request access gates and accounting scopes that requests opt into. Matched by name and created or updated on startup when the config hash changes; membership is managed from the dashboard and is never declared here.",
-          "items": {
-            "$ref": "#/$defs/project"
           }
         },
         "virtual_keys": {
@@ -1134,26 +951,11 @@
               },
               "team_id": {
                 "type": "string",
-                "description": "Associated team ID (mutually exclusive with customer_id and business_unit_id)"
+                "description": "Associated team ID (mutually exclusive with customer_id)"
               },
               "customer_id": {
                 "type": "string",
-                "description": "Associated customer ID (mutually exclusive with team_id and business_unit_id)"
-              },
-              "business_unit_id": {
-                "type": "string",
-                "description": "Associated business unit ID (mutually exclusive with team_id and customer_id)"
-              },
-              "access_profile_id": {
-                "type": "integer",
-                "minimum": 1,
-                "deprecated": true,
-                "description": "Deprecated and ignored: direct access-profile assignment was reverted in v1.5.9 (#3669/#3670) and the column dropped. Accepted only for backward-compatible validation of older config files."
-              },
-              "is_access_profile_managed": {
-                "type": "boolean",
-                "description": "Read-only, server-computed flag: true when the virtual key is governed by an access profile. Never persisted and ignored if set in config.json.",
-                "readOnly": true
+                "description": "Associated customer ID (mutually exclusive with team_id)"
               },
               "assigned_user": {
                 "type": [
@@ -1220,60 +1022,6 @@
                       ],
                       "properties": {
                         "customer_id": {
-                          "pattern": "\\S"
-                        }
-                      }
-                    }
-                  ]
-                }
-              },
-              {
-                "$comment": "A virtual key belongs to at most one owner: team_id and business_unit_id cannot both name one.",
-                "not": {
-                  "allOf": [
-                    {
-                      "required": [
-                        "team_id"
-                      ],
-                      "properties": {
-                        "team_id": {
-                          "pattern": "\\S"
-                        }
-                      }
-                    },
-                    {
-                      "required": [
-                        "business_unit_id"
-                      ],
-                      "properties": {
-                        "business_unit_id": {
-                          "pattern": "\\S"
-                        }
-                      }
-                    }
-                  ]
-                }
-              },
-              {
-                "$comment": "A virtual key belongs to at most one owner: customer_id and business_unit_id cannot both name one.",
-                "not": {
-                  "allOf": [
-                    {
-                      "required": [
-                        "customer_id"
-                      ],
-                      "properties": {
-                        "customer_id": {
-                          "pattern": "\\S"
-                        }
-                      }
-                    },
-                    {
-                      "required": [
-                        "business_unit_id"
-                      ],
-                      "properties": {
-                        "business_unit_id": {
                           "pattern": "\\S"
                         }
                       }
@@ -3044,9 +2792,6 @@
     },
     "websocket": {
       "$ref": "#/$defs/websocket_config"
-    },
-    "access_profiles": {
-      "$ref": "#/$defs/access_profiles"
     },
     "proxy_config": {
       "$ref": "#/$defs/global_proxy_config"
@@ -7145,13 +6890,6 @@
       ],
       "additionalProperties": false
     },
-    "access_profiles": {
-      "type": "array",
-      "description": "Enterprise access profile templates for RBAC-driven governance controls",
-      "items": {
-        "$ref": "#/$defs/access_profile"
-      }
-    },
     "budget_line": {
       "type": "object",
       "allOf": [
@@ -7201,7 +6939,7 @@
         },
         "calendar_aligned": {
           "type": "boolean",
-          "description": "Deprecated: set calendar_aligned on the parent access profile instead. Kept for backward compatibility with older config.json files; the access-profile reconciler promotes any true value here to the profile's top-level calendar_aligned at load time.",
+          "description": "Deprecated: set calendar_aligned on the owner instead. Kept for backward compatibility with older config.json files; ignored unless a reconciler promotes it to its owner.",
           "default": false
         }
       },
@@ -7209,535 +6947,6 @@
         "id",
         "max_limit",
         "reset_duration"
-      ],
-      "additionalProperties": false
-    },
-    "rate_limit_line": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Rate limit ID"
-        },
-        "token_max_limit": {
-          "type": "integer",
-          "description": "Maximum number of tokens allowed in the reset window"
-        },
-        "token_reset_duration": {
-          "type": "string",
-          "description": "Token reset window, e.g. \"1M\", \"1h\""
-        },
-        "request_max_limit": {
-          "type": "integer",
-          "description": "Maximum number of requests allowed in the reset window"
-        },
-        "request_reset_duration": {
-          "type": "string",
-          "description": "Request reset window, e.g. \"1M\", \"1h\""
-        },
-        "calendar_aligned": {
-          "type": "boolean",
-          "description": "Deprecated: set calendar_aligned on the parent access profile instead. Kept for backward compatibility with older config.json files; the access-profile reconciler promotes any true value here to the profile's top-level calendar_aligned at load time.",
-          "default": false
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "additionalProperties": false
-    },
-    "access_profile": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Unique access profile name"
-        },
-        "description": {
-          "type": "string",
-          "description": "Optional profile description"
-        },
-        "is_active": {
-          "type": "boolean",
-          "description": "Whether this access profile is active",
-          "default": true
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional list of tags for filtering and grouping profiles"
-        },
-        "budgets": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/budget_line"
-          },
-          "description": "Profile-level budgets"
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/rate_limit_line"
-        },
-        "calendar_aligned": {
-          "type": "boolean",
-          "description": "Snap budget and rate-limit reset windows to clean calendar boundaries (day, week, month, year) for this profile",
-          "default": false
-        },
-        "allow_all_providers": {
-          "type": "boolean",
-          "description": "Grant access to every provider, including ones without a provider_configs entry and providers added later. A listed provider keeps its own model allow/blacklist, budgets, rate limits, and key selection; an unlisted provider gets all models, all keys, and no per-provider limits. When false (default), access is deny-by-default via provider_configs.",
-          "default": false
-        },
-        "auto_rotation_interval": {
-          "type": [
-            "string",
-            "integer"
-          ],
-          "minimum": 0,
-          "maximum": 31536000000000000,
-          "description": "How often the virtual keys managed by this profile are rotated automatically. Accepts a day count (e.g. \"30d\") or a Go duration string (e.g. \"12h\"); integer values are nanoseconds, so prefer strings. 0, an empty string or omitting the field disables scheduled rotation. An enabled schedule must be between 1h and 365d; a profile with an out-of-range value is skipped at startup. Changing the interval re-anchors the next rotation to now + interval.",
-          "default": 0
-        },
-        "next_rotation_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Optional RFC 3339 time of the first scheduled rotation; requires an enabled (non-zero) auto_rotation_interval. Defaults to now + interval. Applied when the profile is created or its interval changes; otherwise the stored schedule is kept so a stale export does not rewind it."
-        },
-        "provider_configs": {
-          "type": "array",
-          "description": "Per-provider restrictions and limits for this profile",
-          "items": {
-            "$ref": "#/$defs/access_profile_provider_config"
-          }
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "additionalProperties": false,
-      "if": {
-        "required": [
-          "next_rotation_at"
-        ]
-      },
-      "then": {
-        "$comment": "next_rotation_at needs an enabled interval: 0, or a string with no non-zero digit (\"\", \"0\", \"0s\"), disables rotation.",
-        "required": [
-          "auto_rotation_interval"
-        ],
-        "properties": {
-          "auto_rotation_interval": {
-            "not": {
-              "anyOf": [
-                {
-                  "const": 0
-                },
-                {
-                  "type": "string",
-                  "pattern": "^[^1-9]*$"
-                }
-              ]
-            }
-          }
-        }
-      }
-    },
-    "access_profile_provider_config": {
-      "type": "object",
-      "properties": {
-        "provider_name": {
-          "type": "string",
-          "description": "Provider name"
-        },
-        "all_models_allowed": {
-          "type": "boolean",
-          "description": "Whether all models under this provider are allowed",
-          "default": false
-        },
-        "allowed_models": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Allowed model names (ignored when all_models_allowed is true)"
-        },
-        "budgets": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/budget_line"
-          }
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/rate_limit_line"
-        },
-        "blacklisted_models": {
-          "type": "array",
-          "description": "Models blocked for this provider even if matched by allowed_models (denylist wins). Use [\"*\"] to block all; empty array or omitted blocks none.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "weight": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "description": "Load-balancer seed weight for this provider (null opts out of weighted routing / no override)",
-          "default": null
-        },
-        "model_budgets": {
-          "type": "array",
-          "description": "Per-model budgets and rate limits scoped to this provider. Each entry targets one model and materializes as a user-scoped model config on assignment.",
-          "items": {
-            "$ref": "#/$defs/access_profile_provider_model_budget"
-          }
-        },
-        "key_ids": {
-          "type": "array",
-          "description": "Key IDs allowed for this provider config. Use [\"*\"] to allow all keys; empty array or omitted denies all keys. Specific IDs restrict access to those keys only.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "provider_name"
-      ],
-      "additionalProperties": false
-    },
-    "access_profile_provider_model_budget": {
-      "type": "object",
-      "description": "Per-model budget group under an access-profile provider config, with optional per-model rate limit",
-      "properties": {
-        "model_name": {
-          "type": "string",
-          "description": "Model this budget group applies to (scoped to the parent provider)"
-        },
-        "budgets": {
-          "type": "array",
-          "description": "Spend budgets for this model",
-          "items": {
-            "$ref": "#/$defs/budget_line"
-          }
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/rate_limit_line"
-        }
-      },
-      "required": [
-        "model_name"
-      ],
-      "additionalProperties": false
-    },
-    "project": {
-      "type": "object",
-      "description": "A project declared under governance.projects: what it allows, what it may spend, and how that is divided between its members. Members themselves are added from the dashboard or the API.",
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "membership_mode": {
-                "const": "open"
-              }
-            },
-            "required": [
-              "membership_mode"
-            ]
-          },
-          "then": {
-            "properties": {
-              "split_policy": {
-                "const": "none"
-              }
-            }
-          }
-        }
-      ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Unique project name. Requests reference it with the x-bf-project-name header; the reconciler matches the declaration to the stored project by this name."
-        },
-        "description": {
-          "type": "string",
-          "description": "Optional project description"
-        },
-        "is_active": {
-          "type": "boolean",
-          "description": "Whether the project allows and accounts for anything",
-          "default": true
-        },
-        "expires_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "When the project stops allowing anything; omit to never expire"
-        },
-        "access_rule": {
-          "type": "string",
-          "description": "How the project's own access composes with the access a caller already holds: union leaves the caller's own access untouched (a project with no provider config then only accounts for spend), intersect permits only what both allow.",
-          "enum": [
-            "union",
-            "intersect"
-          ]
-        },
-        "membership_mode": {
-          "type": "string",
-          "description": "explicit consults the membership rows; open lets any caller opt in. An open project cannot divide its budget between members.",
-          "enum": [
-            "explicit",
-            "open"
-          ],
-          "default": "explicit"
-        },
-        "accounting_mode": {
-          "type": "string",
-          "description": "Which ledgers a request's spend lands on: the project's, the calling principal's, or both",
-          "enum": [
-            "both",
-            "project_only",
-            "principal_only"
-          ],
-          "default": "both"
-        },
-        "split_policy": {
-          "type": "string",
-          "description": "How the budgets and rate limits the project holds, at every tier (its own, each provider's, and each model's), are divided between members: none leaves them shared, equal gives every member an equal share of each. A change to an equal split's roster or caps recomputes every share in the background.",
-          "enum": [
-            "none",
-            "equal"
-          ],
-          "default": "none"
-        },
-        "calendar_aligned": {
-          "type": "boolean",
-          "description": "Snap the project's budget and rate-limit reset windows to calendar boundaries (day, week, month, quarter, year) instead of rolling from first use. Windows shorter than a day cannot be aligned and stay rolling.",
-          "default": false
-        },
-        "allow_all_providers": {
-          "type": "boolean",
-          "description": "Grant access to every provider, including ones without a provider_configs entry and providers added later. Listed providers keep their own model, key, budget, and rate-limit rules.",
-          "default": false
-        },
-        "disable_content_logging": {
-          "type": "boolean",
-          "description": "Per-project override of content logging for requests scoped to this project. Omit to inherit what the request's virtual key decides, or client.disable_content_logging when the key has no setting or the request has no key. The project's value overrides the virtual key's in both directions. true keeps request and response content out of the log store and out of observability connector export for the project's traffic. false forces content into the log store even when the virtual key or client setting turns it off, and lifts a virtual key's connector stripping; each connector then follows its own disable_content_logging. The x-bf-disable-content-logging request header, when client.allow_per_request_content_storage_override is on, still takes precedence over this value for the log store."
-        },
-        "budgets": {
-          "type": "array",
-          "description": "Project-level spend caps. Declared without ids: on a change, a budget is matched to its stored row by reset_duration so its accumulated spend and window carry over.",
-          "items": {
-            "$ref": "#/$defs/project_budget"
-          }
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/project_rate_limit"
-        },
-        "provider_configs": {
-          "type": "array",
-          "description": "Per-provider access and accounting, one entry per provider",
-          "items": {
-            "$ref": "#/$defs/project_provider_config"
-          }
-        }
-      },
-      "required": [
-        "name",
-        "access_rule"
-      ],
-      "additionalProperties": false
-    },
-    "project_budget": {
-      "type": "object",
-      "description": "A spend cap on a project, a provider inside it, or a model under that provider",
-      "allOf": [
-        {
-          "if": {
-            "required": [
-              "reset_config"
-            ]
-          },
-          "then": {
-            "required": [
-              "reset_duration"
-            ],
-            "properties": {
-              "reset_duration": {
-                "const": "1Q"
-              }
-            }
-          }
-        }
-      ],
-      "properties": {
-        "max_limit": {
-          "type": "number",
-          "minimum": 0,
-          "description": "Maximum spend limit in USD"
-        },
-        "reset_duration": {
-          "type": "string",
-          "description": "Reset window, e.g. \"1M\", \"1h\", \"1Q\". Also what pairs a declared budget with its stored row on a change."
-        },
-        "reset_config": {
-          "type": "object",
-          "description": "Window settings the reset duration cannot express. Only valid when reset_duration is quarterly (\"1Q\").",
-          "properties": {
-            "quarter_start_month": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 12,
-              "description": "First month of Q1 as 1-12. Omitted or 0 means January."
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "max_limit",
-        "reset_duration"
-      ],
-      "additionalProperties": false
-    },
-    "project_rate_limit": {
-      "type": "object",
-      "description": "A request and token rate limit on a project, a provider inside it, or a model under that provider. A cap is enforced only with its window, and a limit with neither pair enforces nothing, so at least one complete pair is required.",
-      "properties": {
-        "token_max_limit": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum number of tokens allowed in the reset window"
-        },
-        "token_reset_duration": {
-          "type": "string",
-          "description": "Token reset window, e.g. \"1M\", \"1h\""
-        },
-        "request_max_limit": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Maximum number of requests allowed in the reset window"
-        },
-        "request_reset_duration": {
-          "type": "string",
-          "description": "Request reset window, e.g. \"1M\", \"1h\""
-        }
-      },
-      "dependentRequired": {
-        "token_max_limit": [
-          "token_reset_duration"
-        ],
-        "token_reset_duration": [
-          "token_max_limit"
-        ],
-        "request_max_limit": [
-          "request_reset_duration"
-        ],
-        "request_reset_duration": [
-          "request_max_limit"
-        ]
-      },
-      "anyOf": [
-        {
-          "required": [
-            "token_max_limit"
-          ]
-        },
-        {
-          "required": [
-            "request_max_limit"
-          ]
-        }
-      ],
-      "additionalProperties": false
-    },
-    "project_provider_config": {
-      "type": "object",
-      "properties": {
-        "provider_name": {
-          "type": "string",
-          "description": "Provider name. A project names each provider at most once; on a change the entry is matched to its stored row by this name."
-        },
-        "all_models_allowed": {
-          "type": "boolean",
-          "description": "Whether all models under this provider are allowed",
-          "default": false
-        },
-        "allowed_models": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Allowed model names (ignored when all_models_allowed is true)"
-        },
-        "blacklisted_models": {
-          "type": "array",
-          "description": "Models blocked for this provider even if matched by allowed_models (denylist wins). Use [\"*\"] to block all; empty array or omitted blocks none.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "key_ids": {
-          "type": "array",
-          "description": "Key IDs allowed for this provider. Use [\"*\"] to allow all keys; empty array or omitted allows none, regardless of the top-level version. Specific IDs restrict access to those keys only, and each must belong to this provider.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "weight": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "description": "Load-balancer seed weight for this provider (null opts out of weighted routing / no override)",
-          "default": null
-        },
-        "budgets": {
-          "type": "array",
-          "description": "Spend caps on this provider inside the project",
-          "items": {
-            "$ref": "#/$defs/project_budget"
-          }
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/project_rate_limit"
-        },
-        "model_budgets": {
-          "type": "array",
-          "description": "Per-model budgets and rate limits under this provider, at most one entry per model",
-          "items": {
-            "$ref": "#/$defs/project_provider_model_budget"
-          }
-        }
-      },
-      "required": [
-        "provider_name"
-      ],
-      "additionalProperties": false
-    },
-    "project_provider_model_budget": {
-      "type": "object",
-      "description": "Per-model budget group under a project provider config, with optional per-model rate limit",
-      "properties": {
-        "model_name": {
-          "type": "string",
-          "not": {
-            "const": "*"
-          },
-          "description": "Model this budget group applies to (scoped to the parent provider). The \"*\" tier is not accepted here; the provider's own budgets cover it."
-        },
-        "budgets": {
-          "type": "array",
-          "description": "Spend caps for this model",
-          "items": {
-            "$ref": "#/$defs/project_budget"
-          }
-        },
-        "rate_limit": {
-          "$ref": "#/$defs/project_rate_limit"
-        }
-      },
-      "required": [
-        "model_name"
       ],
       "additionalProperties": false
     },

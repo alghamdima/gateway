@@ -330,8 +330,6 @@ EXPECTED BEHAVIORS SUMMARY
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11986,49 +11984,21 @@ func TestSQLite_Team_MigratedToProfile_SourceOfTruthAppliesTheFile(t *testing.T)
 	assert.EqualValues(t, 999, limit)
 }
 
-// TestGovernanceHash_AccessProfileOnlyCountsWhenSet: an entry without access_profile hashes exactly as
-// it did before the field existed, so upgrading re-syncs nothing; naming or changing one is a change.
-func TestGovernanceHash_AccessProfileOnlyCountsWhenSet(t *testing.T) {
-	team := tables.TableTeam{ID: "team-1", Name: "Team One"}
-	plain, err := configstore.GenerateTeamHash(team)
-	require.NoError(t, err)
-	team.AccessProfile = "gold"
-	gold, err := configstore.GenerateTeamHash(team)
-	require.NoError(t, err)
-	team.AccessProfile = "silver"
-	silver, err := configstore.GenerateTeamHash(team)
-	require.NoError(t, err)
-	assert.NotEqual(t, plain, gold)
-	assert.NotEqual(t, gold, silver)
-
-	customer := tables.TableCustomer{ID: "customer-1", Name: "Acme"}
-	plainCustomer, err := configstore.GenerateCustomerHash(customer)
-	require.NoError(t, err)
-	customer.AccessProfile = "gold"
-	goldCustomer, err := configstore.GenerateCustomerHash(customer)
-	require.NoError(t, err)
-	assert.NotEqual(t, plainCustomer, goldCustomer)
-
-	// The hash an entry without the field had: ID and name only.
-	legacy := sha256.Sum256([]byte("team-1Team One"))
-	assert.Equal(t, hex.EncodeToString(legacy[:]), plain)
-}
-
-// syncedIDs lists what GovernanceFileSync reports, as "team:id=profile" and "customer:id=profile".
+// syncedIDs lists what GovernanceFileSync reports, as "team:id=name" and "customer:id=name".
 func syncedIDs(config *Config) []string {
 	var out []string
 	for _, team := range config.GovernanceFileSync.Teams {
-		out = append(out, "team:"+team.ID+"="+team.AccessProfile)
+		out = append(out, "team:"+team.ID+"="+team.Name)
 	}
 	for _, customer := range config.GovernanceFileSync.Customers {
-		out = append(out, "customer:"+customer.ID+"="+customer.AccessProfile)
+		out = append(out, "customer:"+customer.ID+"="+customer.Name)
 	}
 	sort.Strings(out)
 	return out
 }
 
 // TestLoadConfig_GovernanceFileSyncReportsOnlyChangedEntries: the report names an entry when it is new
-// or its declaration changed, carrying its access_profile, and nothing on an unchanged restart - which
+// or its declaration changed, and nothing on an unchanged restart - which
 // is what lets a dashboard change to an unchanged entity stand. Under source_of_truth config.json it
 // names every entry.
 func TestLoadConfig_GovernanceFileSyncReportsOnlyChangedEntries(t *testing.T) {
@@ -12036,9 +12006,9 @@ func TestLoadConfig_GovernanceFileSyncReportsOnlyChangedEntries(t *testing.T) {
 	tempDir := createTempDir(t)
 	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
 	configData.Governance = &configstore.GovernanceConfig{
-		Customers: []tables.TableCustomer{{ID: "customer-1", Name: "Acme", AccessProfile: "gold"}},
+		Customers: []tables.TableCustomer{{ID: "customer-1", Name: "Acme"}},
 		Teams: []tables.TableTeam{
-			{ID: "team-1", Name: "Team One", AccessProfile: "gold"},
+			{ID: "team-1", Name: "Team One"},
 			{ID: "team-2", Name: "Team Two"},
 		},
 	}
@@ -12053,16 +12023,16 @@ func TestLoadConfig_GovernanceFileSyncReportsOnlyChangedEntries(t *testing.T) {
 		return syncedIDs(config)
 	}
 
-	assert.Equal(t, []string{"customer:customer-1=gold", "team:team-1=gold", "team:team-2="}, load(), "first boot writes every entry")
+	assert.Equal(t, []string{"customer:customer-1=Acme", "team:team-1=Team One", "team:team-2=Team Two"}, load(), "first boot writes every entry")
 	assert.Empty(t, load(), "an unchanged file writes nothing")
 
-	configData.Governance.Teams[0].AccessProfile = "silver"
+	configData.Governance.Teams[0].Name = "Team One Renamed"
 	createConfigFile(t, tempDir, configData)
-	assert.Equal(t, []string{"team:team-1=silver"}, load(), "changing access_profile changes only that entry")
+	assert.Equal(t, []string{"team:team-1=Team One Renamed"}, load(), "changing an entry's declaration changes only that entry")
 
 	configData.SourceOfTruth = SourceOfTruthConfigJSON
 	createConfigFile(t, tempDir, configData)
-	assert.Equal(t, []string{"customer:customer-1=gold", "team:team-1=silver", "team:team-2="}, load(), "source of truth writes every entry")
+	assert.Equal(t, []string{"customer:customer-1=Acme", "team:team-1=Team One Renamed", "team:team-2=Team Two"}, load(), "source of truth writes every entry")
 }
 
 // TestSQLite_Customer_HashMismatch_FileSync tests file sync when hash differs
@@ -16755,8 +16725,7 @@ func getSchemaTypeMappings() []schemaTypeMapping {
 
 // enterpriseSchemaPaths are schema paths that exist only in enterprise version
 var enterpriseSchemaPaths = map[string]bool{
-	"$schema":         true,
-	"access_profiles": true,
+	"$schema": true,
 }
 
 // excludedGoFields are Go struct fields that should not be in the schema (internal use only)
@@ -16787,7 +16756,6 @@ var excludedGoFields = map[string]map[string]bool{
 		"updated_at":         true,
 		"virtual_key_id":     true, // Internal DB FK for multi-budget ownership
 		"provider_config_id": true, // Internal DB FK for multi-budget ownership
-		"business_unit_id":   true, // Enterprise owner FK; the OSS loader clears it with a warning (ignoreBudgetBusinessUnitIDs)
 	},
 	"tables.TableRateLimit": {
 		"config_hash": true,
@@ -16824,7 +16792,6 @@ var excludedGoFields = map[string]map[string]bool{
 		"rate_limit":                true, // GORM relation
 		"team":                      true, // GORM relation
 		"customer":                  true, // GORM relation
-		"business_unit":             true, // Response-only (gorm:"-"), resolved on read from business_unit_id
 	},
 	"tables.TableVirtualKeyProviderConfig": {
 		"rate_limit":     true, // GORM relation
@@ -16854,11 +16821,6 @@ var excludedSchemaFields = map[string]map[string]bool{
 	"client": {
 		"allowed_headers": true, // Not in ClientConfig
 	},
-	"governance": {
-		"business_units": true, // Enterprise feature; not in OSS GovernanceConfig
-		"roles":          true, // Enterprise RBAC role bootstrap; not in OSS GovernanceConfig
-		"projects":       true, // Enterprise feature; not in OSS GovernanceConfig
-	},
 	"governance.complexity_analyzer_config.tier_boundaries": {
 		"complex_reasoning": true, // Retired boundary; accepted for backward-compatible config.json validation and ignored
 	},
@@ -16869,11 +16831,7 @@ var excludedSchemaFields = map[string]map[string]bool{
 		"disable_auth_on_inference": true, // Deprecated and ignored; kept in schema for backward-compatible config.json validation. Use enforce_auth_on_inference.
 	},
 	"governance.teams": {
-		"budget_id":        true, // Replaced by budgets[] relationship with team_id FK on TableBudget
-		"business_unit_id": true, // Enterprise feature; not in OSS TableTeam
-	},
-	"governance.virtual_keys": {
-		"access_profile_id": true, // Enterprise access-profile assignment; not on OSS TableVirtualKey
+		"budget_id": true, // Replaced by budgets[] relationship with team_id FK on TableBudget
 	},
 	"governance.virtual_keys.provider_configs": {
 		"keys":    true, // Complex nested type, validated separately
@@ -17130,8 +17088,7 @@ func TestConfigSchemaSyncTopLevel(t *testing.T) {
 	// Enterprise-only features: These fields exist in the JSON schema for documentation
 	// and validation purposes, but are only available in the enterprise version.
 	enterpriseSchemaFields := map[string]bool{
-		"$schema":         true,
-		"access_profiles": true,
+		"$schema": true,
 	}
 
 	schema := loadJSONSchema(t)
@@ -21592,27 +21549,6 @@ func TestNormalizeUsageEstimationTokenizers(t *testing.T) {
 
 	// config.json and stored rows reach the runtime through validateClientConfig.
 	require.Error(t, validateClientConfig(&configstore.ClientConfig{UsageEstimationTokenizers: []string{"gpt2"}}))
-}
-
-// TestIgnoreBudgetBusinessUnitIDs pins that business_unit_id on a governance.budgets entry is not
-// read: it is cleared with a warning naming the budget, and every other field and entry is kept.
-func TestIgnoreBudgetBusinessUnitIDs(t *testing.T) {
-	buID := "bu-1"
-	teamID := "team-1"
-	data := &ConfigData{Governance: &configstore.GovernanceConfig{Budgets: []configstoreTables.TableBudget{
-		{ID: "named", MaxLimit: 10, ResetDuration: "1M", BusinessUnitID: &buID},
-		{ID: "team", MaxLimit: 20, ResetDuration: "1w", TeamID: &teamID},
-	}}}
-	var warned []string
-	ignoreBudgetBusinessUnitIDs(data, func(format string, args ...any) { warned = append(warned, args[0].(string)) })
-
-	assert.Nil(t, data.Governance.Budgets[0].BusinessUnitID)
-	assert.Equal(t, 10.0, data.Governance.Budgets[0].MaxLimit)
-	assert.Equal(t, &teamID, data.Governance.Budgets[1].TeamID, "other owners are left alone")
-	assert.Equal(t, []string{"named"}, warned)
-
-	ignoreBudgetBusinessUnitIDs(nil, func(string, ...any) { t.Fatal("no warning for a nil config") })
-	ignoreBudgetBusinessUnitIDs(&ConfigData{}, func(string, ...any) { t.Fatal("no warning without governance") })
 }
 
 // DrainStartupAuditChanges returns and clears the config.json syncs recorded

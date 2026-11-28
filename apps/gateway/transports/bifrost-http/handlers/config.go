@@ -358,15 +358,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, "enforce_vk_object_ownership must be true or false")
 		return
 	}
-	// The access-profile user key settings are plain bools that default to false, so a JSON null would
-	// decode as false and silently hand user key creation or deletion back to access profiles. Refuse
-	// it; omit the field to keep the stored value.
-	for _, field := range []string{"skip_access_profile_user_virtual_key_creation", "skip_access_profile_user_virtual_key_deletion"} {
-		if raw, present := clientConfigFields[field]; present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-			SendError(ctx, fasthttp.StatusBadRequest, field+" must be true or false")
-			return
-		}
-	}
 
 	// vk_rotation_cooldown bounds: negative is meaningless, and anything past 30
 	// days keeps a retired credential alive long enough to defeat the rotation.
@@ -495,14 +486,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("extra_fields_placement must be 'body' or 'headers', got %q", payload.ClientConfig.ExtraFieldsPlacement))
 		return
 	}
-	// The same for the entity access profile mode: only an omitted field keeps the stored mode.
-	if _, present := clientConfigFields["entity_access_profile_mode"]; present &&
-		payload.ClientConfig.EntityAccessProfileMode != configstoreTables.EntityAccessProfileModeUnion &&
-		payload.ClientConfig.EntityAccessProfileMode != configstoreTables.EntityAccessProfileModeIntersect {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("entity_access_profile_mode must be 'union' or 'intersect', got %q", payload.ClientConfig.EntityAccessProfileMode))
-		return
-	}
-
 	if payload.ClientConfig.LogRetentionDays < 1 {
 		logger.Warn("log_retention_days must be at least 1")
 		SendError(ctx, fasthttp.StatusBadRequest, "log_retention_days must be at least 1")
@@ -647,17 +630,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// re-enable ownership on a partial save. Readers pick the saved value up on the next request.
 	if _, present := clientConfigFields["enforce_vk_object_ownership"]; present {
 		updatedConfig.EnforceVKObjectOwnership = payload.ClientConfig.EnforceVKObjectOwnership
-	}
-	// Copied only when sent, so a partial save doesn't silently hand key lifecycle back to access profiles.
-	if _, present := clientConfigFields["skip_access_profile_user_virtual_key_creation"]; present {
-		updatedConfig.SkipAccessProfileUserVirtualKeyCreation = payload.ClientConfig.SkipAccessProfileUserVirtualKeyCreation
-	}
-	if _, present := clientConfigFields["skip_access_profile_user_virtual_key_deletion"]; present {
-		updatedConfig.SkipAccessProfileUserVirtualKeyDeletion = payload.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion
-	}
-	// Copied only when sent (validated up front), so a partial save keeps the stored entity access profile mode.
-	if _, present := clientConfigFields["entity_access_profile_mode"]; present {
-		updatedConfig.EntityAccessProfileMode = payload.ClientConfig.EntityAccessProfileMode
 	}
 
 	// Rotation grace period; bounds validated up front. Copied unconditionally

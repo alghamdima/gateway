@@ -30,59 +30,42 @@ const (
 	ExtraFieldsPlacementHeaders ExtraFieldsPlacement = "headers"
 )
 
-// EntityAccessProfileMode controls how the access profiles of the entities a caller belongs to
-// (teams, business units, customers) combine with the caller's own access. The values match a
-// project's access rule, since they are the same choice.
-type EntityAccessProfileMode string
-
-const (
-	// EntityAccessProfileModeUnion lets those profiles add to what the caller may reach
-	// (default when unset). Shown as "Extend".
-	EntityAccessProfileModeUnion EntityAccessProfileMode = "union"
-	// EntityAccessProfileModeIntersect makes each level holding a profile cap what the caller
-	// may reach: the caller keeps only what every such level also allows. Shown as "Restrict".
-	EntityAccessProfileModeIntersect EntityAccessProfileMode = "intersect"
-)
-
 // TableClientConfig represents global client configuration in the database
 type TableClientConfig struct {
-	ID                                      uint                           `gorm:"primaryKey;autoIncrement" json:"id"`
-	DropExcessRequests                      bool                           `gorm:"default:false" json:"drop_excess_requests"`
-	PrometheusLabelsJSON                    string                         `gorm:"type:text" json:"-"` // JSON serialized []string
-	AllowedOriginsJSON                      string                         `gorm:"type:text" json:"-"` // JSON serialized []string
-	AllowedHeadersJSON                      string                         `gorm:"type:text" json:"-"` // JSON serialized []string
-	HeaderFilterConfigJSON                  string                         `gorm:"type:text" json:"-"` // JSON serialized GlobalHeaderFilterConfig
-	MetadataJSON                            string                         `gorm:"type:text" json:"-"` // JSON serialized map[string]any for UI/admin preferences (e.g. onboarding_dismissed). Bypasses config.json sync.
-	InitialPoolSize                         int                            `gorm:"default:300" json:"initial_pool_size"`
-	EnableLogging                           *bool                          `gorm:"default:true" json:"enable_logging"`
-	DisableContentLogging                   bool                           `gorm:"default:false" json:"disable_content_logging"`          // DisableContentLogging controls whether sensitive content (inputs, outputs, embeddings, etc.) is logged
-	RetainContentInObjectStorage            bool                           `gorm:"default:false" json:"retain_content_in_object_storage"` // When content logging is disabled, still offload content to object storage as hidden instead of dropping it
-	DisableDBPingsInHealth                  bool                           `gorm:"default:false" json:"disable_db_pings_in_health"`
-	DumpErrorsInConsoleLogs                 bool                           `gorm:"default:false" json:"dump_errors_in_console_logs"`       // Dump full error details to the server console logs
-	LogRetentionDays                        int                            `gorm:"default:365" json:"log_retention_days" validate:"min=1"` // Number of days to retain logs (minimum 1 day)
-	EnforceAuthOnInference                  bool                           `gorm:"default:false" json:"enforce_auth_on_inference"`
-	EnforceGovernanceHeader                 bool                           `gorm:"" json:"enforce_governance_header"`
-	EnforceSCIMAuth                         bool                           `gorm:"default:false" json:"enforce_scim_auth"`
-	DualCredentialConflictBehavior          DualCredentialConflictBehavior `gorm:"column:dual_credential_conflict_behavior;type:varchar(20);not null;default:'prefer_idp'" json:"dual_credential_conflict_behavior"`
-	ExtraFieldsPlacement                    ExtraFieldsPlacement           `gorm:"column:extra_fields_placement;type:varchar(20);not null;default:'body'" json:"extra_fields_placement"`
-	EntityAccessProfileMode                 EntityAccessProfileMode        `gorm:"column:entity_access_profile_mode;type:varchar(20);not null;default:'union'" json:"entity_access_profile_mode"`
-	MaxRequestBodySizeMB                    int                            `gorm:"default:100" json:"max_request_body_size_mb"`
-	AsyncJobResultTTL                       int                            `gorm:"default:3600" json:"async_job_result_ttl"`                           // Default TTL for async job results in seconds (default: 3600 = 1 hour)
-	RequiredHeadersJSON                     string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
-	LoggingHeadersJSON                      string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
-	HideDeletedVirtualKeysInFilters         bool                           `gorm:"default:false" json:"hide_deleted_virtual_keys_in_filters"`          // Hide deleted virtual keys in logs filter dropdowns
-	DeleteExpiredVirtualKeys                bool                           `gorm:"default:false" json:"delete_expired_virtual_keys"`                   // Default for virtual keys without an explicit delete_after_expire: delete them once expired
-	EnforceVKObjectOwnership                bool                           `gorm:"default:true" json:"enforce_vk_object_ownership"`                    // Restrict provider objects to the virtual key that created them
-	SkipAccessProfileUserVirtualKeyCreation bool                           `gorm:"default:false" json:"skip_access_profile_user_virtual_key_creation"` // A user's first access profile does not create a virtual key for them
-	SkipAccessProfileUserVirtualKeyDeletion bool                           `gorm:"default:false" json:"skip_access_profile_user_virtual_key_deletion"` // Losing the last access profile does not delete the user's virtual keys
-	HiddenRequestTypesJSON                  string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string of request types hidden from log reads
-	UsageEstimationTokenizersJSON           string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string of tokenizer families used to estimate a cancelled stream's usage
-	RoutingChainMaxDepth                    int                            `gorm:"default:10" json:"routing_chain_max_depth"`                          // Maximum depth for routing rule chain evaluation (default: 10)
-	WhitelistedRoutesJSON                   string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
-	AllowPerRequestContentStorageOverride   bool                           `gorm:"default:false" json:"allow_per_request_content_storage_override"`    // Allow per-request override for content storage (e.g. long-term vs ephemeral)
-	AllowPerRequestRawOverride              bool                           `gorm:"default:false" json:"allow_per_request_raw_override"`                // Allow per-request override for raw request/response storage
-	AllowDirectKeys                         bool                           `gorm:"default:false" json:"allow_direct_keys"`                             // Allow callers to bypass the registered key pool via x-bf-direct-key header
-	VKRotationCooldownNS                    int64                          `gorm:"column:vk_rotation_cooldown_ns;default:0" json:"-"`                  // Rotation grace period in nanoseconds (Go duration encoding); 0 = previous value stops working immediately
+	ID                                    uint                           `gorm:"primaryKey;autoIncrement" json:"id"`
+	DropExcessRequests                    bool                           `gorm:"default:false" json:"drop_excess_requests"`
+	PrometheusLabelsJSON                  string                         `gorm:"type:text" json:"-"` // JSON serialized []string
+	AllowedOriginsJSON                    string                         `gorm:"type:text" json:"-"` // JSON serialized []string
+	AllowedHeadersJSON                    string                         `gorm:"type:text" json:"-"` // JSON serialized []string
+	HeaderFilterConfigJSON                string                         `gorm:"type:text" json:"-"` // JSON serialized GlobalHeaderFilterConfig
+	MetadataJSON                          string                         `gorm:"type:text" json:"-"` // JSON serialized map[string]any for UI/admin preferences (e.g. onboarding_dismissed). Bypasses config.json sync.
+	InitialPoolSize                       int                            `gorm:"default:300" json:"initial_pool_size"`
+	EnableLogging                         *bool                          `gorm:"default:true" json:"enable_logging"`
+	DisableContentLogging                 bool                           `gorm:"default:false" json:"disable_content_logging"`          // DisableContentLogging controls whether sensitive content (inputs, outputs, embeddings, etc.) is logged
+	RetainContentInObjectStorage          bool                           `gorm:"default:false" json:"retain_content_in_object_storage"` // When content logging is disabled, still offload content to object storage as hidden instead of dropping it
+	DisableDBPingsInHealth                bool                           `gorm:"default:false" json:"disable_db_pings_in_health"`
+	DumpErrorsInConsoleLogs               bool                           `gorm:"default:false" json:"dump_errors_in_console_logs"`       // Dump full error details to the server console logs
+	LogRetentionDays                      int                            `gorm:"default:365" json:"log_retention_days" validate:"min=1"` // Number of days to retain logs (minimum 1 day)
+	EnforceAuthOnInference                bool                           `gorm:"default:false" json:"enforce_auth_on_inference"`
+	EnforceGovernanceHeader               bool                           `gorm:"" json:"enforce_governance_header"`
+	EnforceSCIMAuth                       bool                           `gorm:"default:false" json:"enforce_scim_auth"`
+	DualCredentialConflictBehavior        DualCredentialConflictBehavior `gorm:"column:dual_credential_conflict_behavior;type:varchar(20);not null;default:'prefer_idp'" json:"dual_credential_conflict_behavior"`
+	ExtraFieldsPlacement                  ExtraFieldsPlacement           `gorm:"column:extra_fields_placement;type:varchar(20);not null;default:'body'" json:"extra_fields_placement"`
+	MaxRequestBodySizeMB                  int                            `gorm:"default:100" json:"max_request_body_size_mb"`
+	AsyncJobResultTTL                     int                            `gorm:"default:3600" json:"async_job_result_ttl"`                        // Default TTL for async job results in seconds (default: 3600 = 1 hour)
+	RequiredHeadersJSON                   string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string
+	LoggingHeadersJSON                    string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string
+	HideDeletedVirtualKeysInFilters       bool                           `gorm:"default:false" json:"hide_deleted_virtual_keys_in_filters"`       // Hide deleted virtual keys in logs filter dropdowns
+	DeleteExpiredVirtualKeys              bool                           `gorm:"default:false" json:"delete_expired_virtual_keys"`                // Default for virtual keys without an explicit delete_after_expire: delete them once expired
+	EnforceVKObjectOwnership              bool                           `gorm:"default:true" json:"enforce_vk_object_ownership"`                 // Restrict provider objects to the virtual key that created them
+	HiddenRequestTypesJSON                string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string of request types hidden from log reads
+	UsageEstimationTokenizersJSON         string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string of tokenizer families used to estimate a cancelled stream's usage
+	RoutingChainMaxDepth                  int                            `gorm:"default:10" json:"routing_chain_max_depth"`                       // Maximum depth for routing rule chain evaluation (default: 10)
+	WhitelistedRoutesJSON                 string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string
+	AllowPerRequestContentStorageOverride bool                           `gorm:"default:false" json:"allow_per_request_content_storage_override"` // Allow per-request override for content storage (e.g. long-term vs ephemeral)
+	AllowPerRequestRawOverride            bool                           `gorm:"default:false" json:"allow_per_request_raw_override"`             // Allow per-request override for raw request/response storage
+	AllowDirectKeys                       bool                           `gorm:"default:false" json:"allow_direct_keys"`                          // Allow callers to bypass the registered key pool via x-bf-direct-key header
+	VKRotationCooldownNS                  int64                          `gorm:"column:vk_rotation_cooldown_ns;default:0" json:"-"`               // Rotation grace period in nanoseconds (Go duration encoding); 0 = previous value stops working immediately
 
 	// Compat plugin feature flags
 	CompatConvertTextToChat                   bool `gorm:"column:compat_convert_text_to_chat;default:false" json:"-"`

@@ -1364,7 +1364,7 @@ func TestProcessStreamingChunk_PricesWithRequestUserScope(t *testing.T) {
 			name: "grant identity",
 			identify: func(ctx *schemas.BifrostContext) {
 				g := grant.New()
-				g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: userID}, nil, nil, nil, nil, nil))
+				g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: userID}, nil, nil, nil))
 				require.True(t, ctx.SetGrant(g))
 			},
 		},

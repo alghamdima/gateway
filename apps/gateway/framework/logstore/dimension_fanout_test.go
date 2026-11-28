@@ -20,13 +20,13 @@ import (
 )
 
 // TestDimensionFanoutFrom_PerDialect pins the dispatcher: Postgres must delegate
-// to teamOrBUFanoutFrom byte-for-byte (the filter matviews are built from that
+// to orgFanoutFrom byte-for-byte (the filter matviews are built from that
 // exact text, and drift makes repairMatViewShapes drop them on boot), the other
 // supported dialects must produce their own array-or-scalar subquery, and every
 // unsupported (dialect, dimension) pair must fall back to the scalar path.
 func TestDimensionFanoutFrom_PerDialect(t *testing.T) {
-	for _, idCol := range []string{"team_id", "customer_id", "business_unit_id"} {
-		pgWant, ok := teamOrBUFanoutFrom(idCol)
+	for _, idCol := range []string{"team_id", "customer_id"} {
+		pgWant, ok := orgFanoutFrom(idCol)
 		require.True(t, ok)
 
 		pgGot, ok := dimensionFanoutFrom("postgres", idCol)
@@ -35,9 +35,9 @@ func TestDimensionFanoutFrom_PerDialect(t *testing.T) {
 	}
 
 	// Every fan-out dimension must be wired on every dialect: a column-mapping
-	// slip (e.g. business unit reading the team arrays) is invisible unless each
+	// slip (e.g. customer reading the team arrays) is invisible unless each
 	// dimension is asserted against its own columns.
-	for _, idCol := range []string{"team_id", "customer_id", "business_unit_id"} {
+	for _, idCol := range []string{"team_id", "customer_id"} {
 		arrIDs, arrNames, scalarName, ok := fanoutDimensionColumns(idCol)
 		require.True(t, ok)
 
@@ -63,7 +63,7 @@ func TestDimensionFanoutFrom_PerDialect(t *testing.T) {
 		assert.Contains(t, chSQL, ") AS logs")
 
 		// No dimension may read another's columns.
-		for _, other := range []string{"team_ids", "customer_ids", "business_unit_ids"} {
+		for _, other := range []string{"team_ids", "customer_ids"} {
 			if other == arrIDs {
 				continue
 			}
@@ -195,7 +195,6 @@ func TestDimensionRankings_SQLiteFanoutAllDimensions(t *testing.T) {
 	}{
 		{RankingDimensionTeam, "team_id"},
 		{RankingDimensionCustomer, "customer_id"},
-		{RankingDimensionBusinessUnit, "business_unit_id"},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.dimension), func(t *testing.T) {
@@ -238,17 +237,16 @@ func TestDimensionRankings_FanoutDimensionsAreIndependent(t *testing.T) {
 
 	require.NoError(t, db.Exec(`
 		INSERT INTO logs (id, timestamp, object_type, provider, model, status,
-			team_ids, team_names, customer_ids, customer_names, business_unit_ids, business_unit_names,
+			team_ids, team_names, customer_ids, customer_names,
 			created_at, latency, cost, prompt_tokens, completion_tokens, total_tokens)
 		VALUES ('log-1', ?, 'chat_completion', 'openai', 'gpt-4', 'success',
-			'["t-1"]', '["Team One"]', '["c-1","c-2"]', '["Cust One","Cust Two"]', '["b-1"]', '["BU One"]',
+			'["t-1"]', '["Team One"]', '["c-1","c-2"]', '["Cust One","Cust Two"]',
 			?, 100, 0.01, 10, 5, 15)
 	`, now, now).Error)
 
 	expected := map[RankingDimension][]string{
-		RankingDimensionTeam:         {"t-1"},
-		RankingDimensionCustomer:     {"c-1", "c-2"},
-		RankingDimensionBusinessUnit: {"b-1"},
+		RankingDimensionTeam:     {"t-1"},
+		RankingDimensionCustomer: {"c-1", "c-2"},
 	}
 	for dim, wantIDs := range expected {
 		res, err := s.GetDimensionRankings(ctx, fanoutWindow(now), dim)
@@ -444,10 +442,10 @@ func otherRankingStores(t *testing.T, fn func(t *testing.T, store *RDBLogStore, 
 func TestDimensionRankings_HiddenTeamsGoToOther(t *testing.T) {
 	otherRankingStores(t, func(t *testing.T, store *RDBLogStore, db *gorm.DB) {
 		now := time.Now().UTC()
-		insertTeamBULog(t, db, now, "u-1", "", "", `["t-a","t-b"]`, `["Team A","Team B"]`, "", "", "", "")
-		insertTeamBULog(t, db, now, "u-1", "t-a", "Team A", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "u-2", "", "", `["t-c"]`, `["Team C"]`, "", "", "", "")
-		insertTeamBULog(t, db, now, "u-3", "", "", "", "", "", "", "", "")
+		insertTeamLog(t, db, now, "u-1", "", "", `["t-a","t-b"]`, `["Team A","Team B"]`)
+		insertTeamLog(t, db, now, "u-1", "t-a", "Team A", "", "")
+		insertTeamLog(t, db, now, "u-2", "", "", `["t-c"]`, `["Team C"]`)
+		insertTeamLog(t, db, now, "u-3", "", "", "", "")
 
 		start, end := now.Add(-time.Hour), now.Add(time.Hour)
 		ctx := withCeiling(context.Background(), "team_id", "t-a")
@@ -473,10 +471,10 @@ func TestDimensionRankings_HiddenTeamsGoToOther(t *testing.T) {
 func TestDimensionRankings_HiddenUsersGoToOther(t *testing.T) {
 	otherRankingStores(t, func(t *testing.T, store *RDBLogStore, db *gorm.DB) {
 		now := time.Now().UTC()
-		insertTeamBULog(t, db, now, "u-1", "", "", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "u-2", "", "", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "u-2", "", "", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "", "", "", "", "", "", "", "", "")
+		insertTeamLog(t, db, now, "u-1", "", "", "", "")
+		insertTeamLog(t, db, now, "u-2", "", "", "", "")
+		insertTeamLog(t, db, now, "u-2", "", "", "", "")
+		insertTeamLog(t, db, now, "", "", "", "", "")
 
 		start, end := now.Add(-time.Hour), now.Add(time.Hour)
 		ctx := withCeiling(context.Background(), "user_id", "u-1")
@@ -501,8 +499,8 @@ func TestDimensionRankings_HiddenUsersGoToOther(t *testing.T) {
 func TestDimensionRankings_EmptyCeilingPutsAllOwnedInOther(t *testing.T) {
 	otherRankingStores(t, func(t *testing.T, store *RDBLogStore, db *gorm.DB) {
 		now := time.Now().UTC()
-		insertTeamBULog(t, db, now, "u-1", "", "", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "", "", "", "", "", "", "", "", "")
+		insertTeamLog(t, db, now, "u-1", "", "", "", "")
+		insertTeamLog(t, db, now, "", "", "", "", "")
 
 		start, end := now.Add(-time.Hour), now.Add(time.Hour)
 		res, err := store.GetDimensionRankings(withCeiling(context.Background(), "user_id"), SearchFilters{StartTime: &start, EndTime: &end}, RankingDimensionUser)
@@ -519,9 +517,9 @@ func TestDimensionRankings_EmptyCeilingPutsAllOwnedInOther(t *testing.T) {
 func TestDimensionRankings_OtherCarriesTrend(t *testing.T) {
 	otherRankingStores(t, func(t *testing.T, store *RDBLogStore, db *gorm.DB) {
 		now := time.Now().UTC()
-		insertTeamBULog(t, db, now.Add(-90*time.Minute), "u-2", "", "", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "u-2", "", "", "", "", "", "", "", "")
-		insertTeamBULog(t, db, now, "u-3", "", "", "", "", "", "", "", "")
+		insertTeamLog(t, db, now.Add(-90*time.Minute), "u-2", "", "", "", "")
+		insertTeamLog(t, db, now, "u-2", "", "", "", "")
+		insertTeamLog(t, db, now, "u-3", "", "", "", "")
 
 		start, end := now.Add(-time.Hour), now.Add(time.Hour)
 		ctx := withCeiling(context.Background(), "user_id", "u-1")
@@ -542,7 +540,7 @@ func TestDimensionRankings_OtherCarriesTrend(t *testing.T) {
 func TestDimensionRankings_NoCeilingHasNoOther(t *testing.T) {
 	store := newTestSQLiteStore(t)
 	now := time.Now().UTC()
-	insertTeamBULog(t, store.db, now, "u-1", "", "", "", "", "", "", "", "")
+	insertTeamLog(t, store.db, now, "u-1", "", "", "", "")
 
 	start, end := now.Add(-time.Hour), now.Add(time.Hour)
 	res, err := store.GetDimensionRankings(context.Background(), SearchFilters{StartTime: &start, EndTime: &end}, RankingDimensionUser)
@@ -558,7 +556,7 @@ func TestDimensionRankings_OtherStaysWithinRankingLimit(t *testing.T) {
 	store := newTestSQLiteStore(t)
 	now := time.Now().UTC()
 	for _, user := range []string{"u-1", "u-1", "u-2", "u-3", "u-3", "u-3"} {
-		insertTeamBULog(t, store.db, now, user, "", "", "", "", "", "", "", "")
+		insertTeamLog(t, store.db, now, user, "", "", "", "")
 	}
 
 	start, end := now.Add(-time.Hour), now.Add(time.Hour)
@@ -580,8 +578,8 @@ func TestDimensionRankings_OtherStaysWithinRankingLimit(t *testing.T) {
 func TestDimensionRankings_NoVisibleRowsSkipsPreviousGroupBy(t *testing.T) {
 	store := newTestSQLiteStore(t)
 	now := time.Now().UTC()
-	insertTeamBULog(t, store.db, now.Add(-90*time.Minute), "u-1", "", "", "", "", "", "", "", "")
-	insertTeamBULog(t, store.db, now, "u-1", "", "", "", "", "", "", "", "")
+	insertTeamLog(t, store.db, now.Add(-90*time.Minute), "u-1", "", "", "", "")
+	insertTeamLog(t, store.db, now, "u-1", "", "", "", "")
 
 	var grouped []string
 	require.NoError(t, store.db.Callback().Query().After("gorm:query").Register("test:capture_group_by", func(tx *gorm.DB) {
@@ -616,7 +614,6 @@ func assertFilterMatchesFanoutRankings(t *testing.T, s *RDBLogStore, insert func
 	}{
 		{RankingDimensionTeam, "team_id", func(f *SearchFilters, ids []string) { f.TeamIDs = ids }},
 		{RankingDimensionCustomer, "customer_id", func(f *SearchFilters, ids []string) { f.CustomerIDs = ids }},
-		{RankingDimensionBusinessUnit, "business_unit_id", func(f *SearchFilters, ids []string) { f.BusinessUnitIDs = ids }},
 	}
 	for _, c := range cases {
 		prefix := c.idCol + "-"

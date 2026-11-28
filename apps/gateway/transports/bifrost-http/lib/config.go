@@ -667,24 +667,6 @@ func promoteDeprecatedCalendarAligned(configData *ConfigData) {
 	}
 }
 
-// ignoreBudgetBusinessUnitIDs clears business_unit_id on every governance.budgets entry, with a
-// warning. A business unit's budgets are declared on the business unit (business_units[].budgets, or
-// its budget_id), so a governance.budgets row does not name a unit itself; honouring the field would
-// give a unit a budget its own entry knows nothing about.
-func ignoreBudgetBusinessUnitIDs(configData *ConfigData, warn func(string, ...any)) {
-	if configData == nil || configData.Governance == nil {
-		return
-	}
-	for i := range configData.Governance.Budgets {
-		budget := &configData.Governance.Budgets[i]
-		if budget.BusinessUnitID == nil {
-			continue
-		}
-		warn("config.json sets business_unit_id on budget %q in governance.budgets, which is not read: declare a business unit's budgets on the business unit (business_units[].budgets)", budget.ID)
-		budget.BusinessUnitID = nil
-	}
-}
-
 // promoteCalendarAligned ORs each child's legacy calendar_aligned input into
 // the owner's flag and clears the child field. Treats a nil child pointer as
 // "not set" — only explicit true contributes.
@@ -800,7 +782,6 @@ func LoadConfig(ctx context.Context, configDirPath string) (*Config, error) {
 		// owning VK / Team. Independent of config version — the deprecation
 		// predates the v1/v2 allow-list split.
 		promoteDeprecatedCalendarAligned(&configData)
-		ignoreBudgetBusinessUnitIDs(&configData, logger.Warn)
 		// If version is 1, apply v1.4.x compatibility: empty allow-list arrays mean "allow all"
 		if configData.Version == 1 {
 			logger.Info("config version 1 detected, applying v1.4.x compatibility semantics (empty arrays = allow all)")
@@ -5783,15 +5764,6 @@ func (c *Config) ShouldEnforceVKObjectOwnership() bool {
 	return c.ClientConfig == nil || c.ClientConfig.EnforceVKObjectOwnership
 }
 
-// ShouldIntersectEntityAccessProfiles reports client.entity_access_profile_mode == "intersect".
-// It reads under Mu, the lock config saves and reloads hold while they copy the client config in;
-// unset, or any other value, means union.
-func (c *Config) ShouldIntersectEntityAccessProfiles() bool {
-	c.Mu.RLock()
-	defer c.Mu.RUnlock()
-	return c.ClientConfig != nil && c.ClientConfig.EntityAccessProfileMode == configstoreTables.EntityAccessProfileModeIntersect
-}
-
 // ShouldSendExtraFieldsInHeaders reports client.extra_fields_placement == "headers". It reads under
 // Mu, the lock config saves and reloads hold while they copy the client config in; unset means body.
 func (c *Config) ShouldSendExtraFieldsInHeaders() bool {
@@ -7646,7 +7618,7 @@ func governedEntitiesInConfig(
 	stored := map[string]*configstoreTables.TableVirtualKey{}
 	if len(touched) > 0 {
 		var rows []configstoreTables.TableVirtualKey
-		if err := tx.Select("id", "team_id", "business_unit_id", "customer_id", "rate_limit_id").Where("id IN ?", touched).Find(&rows).Error; err != nil {
+		if err := tx.Select("id", "team_id", "customer_id", "rate_limit_id").Where("id IN ?", touched).Find(&rows).Error; err != nil {
 			return governedConfigEntities{}, fmt.Errorf("failed to read the owners of virtual keys: %w", err)
 		}
 		for i := range rows {
@@ -7754,14 +7726,12 @@ func (g *governedConfigEntities) holdBackKeyRateLimits(governanceInConfigJSON *c
 	}
 }
 
-// virtualKeyLegacyLimitHolder names the team, business unit or customer that owns the key, in the
+// virtualKeyLegacyLimitHolder names the team or customer that owns the key, in the
 // guard's terms, or "" when none does.
 func virtualKeyLegacyLimitHolder(vk *configstoreTables.TableVirtualKey) (holderKind, holderID string) {
 	switch {
 	case vk.TeamID != nil && *vk.TeamID != "":
 		return governance.LegacyLimitHolderTeam, *vk.TeamID
-	case vk.BusinessUnitID != nil && *vk.BusinessUnitID != "":
-		return governance.LegacyLimitHolderBusinessUnit, *vk.BusinessUnitID
 	case vk.CustomerID != nil && *vk.CustomerID != "":
 		return governance.LegacyLimitHolderCustomer, *vk.CustomerID
 	}

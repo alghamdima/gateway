@@ -115,12 +115,6 @@ type LogManager interface {
 	// GetAvailableUsers returns all unique user IDs from logs
 	GetAvailableUsers(ctx context.Context, limit int, query string) ([]KeyPair, error)
 
-	// GetAvailableBusinessUnits returns all unique business unit ID-Name pairs from logs
-	GetAvailableBusinessUnits(ctx context.Context, limit int, query string) ([]KeyPair, error)
-
-	// GetAvailableProjects returns all unique project ID-Name pairs from logs
-	GetAvailableProjects(ctx context.Context, limit int, query string) ([]KeyPair, error)
-
 	// GetAvailableMetadataKeys returns distinct metadata keys and their values from recent logs
 	GetAvailableMetadataKeys(ctx context.Context, limit int, query string) (map[string][]string, error)
 
@@ -345,14 +339,6 @@ func (p *PluginLogManager) GetAvailableCustomers(ctx context.Context, limit int,
 
 func (p *PluginLogManager) GetAvailableUsers(ctx context.Context, limit int, query string) ([]KeyPair, error) {
 	return p.plugin.GetAvailableUsers(ctx, limit, query)
-}
-
-func (p *PluginLogManager) GetAvailableBusinessUnits(ctx context.Context, limit int, query string) ([]KeyPair, error) {
-	return p.plugin.GetAvailableBusinessUnits(ctx, limit, query)
-}
-
-func (p *PluginLogManager) GetAvailableProjects(ctx context.Context, limit int, query string) ([]KeyPair, error) {
-	return p.plugin.GetAvailableProjects(ctx, limit, query)
 }
 
 // GetDimensionCostHistogram returns time-bucketed cost data grouped by the specified dimension.

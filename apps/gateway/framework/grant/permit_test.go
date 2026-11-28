@@ -266,12 +266,6 @@ func TestPermitTypePrettyStringNamesEveryKind(t *testing.T) {
 		want string
 	}{
 		{PermitVirtualKey, "virtual key"},
-		{PermitAccessProfile, "access profile"},
-		{PermitTeamAccessProfile, "team access profile"},
-		{PermitBusinessUnitAccessProfile, "business unit access profile"},
-		{PermitCustomerAccessProfile, "customer access profile"},
-		// Unlabelled on purpose: "project" is already the word a refusal should say.
-		{PermitProject, "project"},
 	} {
 		assert.Equal(t, tc.want, tc.kind.PrettyString())
 		assert.NotContains(t, tc.kind.PrettyString(), "_", "a refusal must not read as an identifier")

@@ -410,7 +410,7 @@ func TestVirtualKeyReloadDoesNotResurrectOverrideCycles(t *testing.T) {
 //
 // Both first-write branches used to refresh the caller's struct in place and then
 // store that same pointer. Callers legitimately pass a pointer into a slice they keep
-// using (BulkLoadUserAccessProfiles passes &p.Budgets[j]), so the caller's copy would
+// using, so the caller's copy would
 // be silently rewritten and any later write through it would race BumpBudgetUsage's
 // clone-and-CAS. sync.Map makes the map operation atomic, not the pointed-to struct.
 func TestUpsertBudgetConfigDoesNotAliasOrMutateCallerConfig(t *testing.T) {

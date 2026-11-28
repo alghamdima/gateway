@@ -1180,14 +1180,10 @@ func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 	}
 	routingEngineUsed := strings.Join(routingEngines, ",")
 
-	// Team/customer/BU sets: plural arrays, else scalar as a set of one. Emitted
+	// Team/customer sets: plural arrays, else scalar as a set of one. Emitted
 	// under the singular label names for dashboard compatibility.
 	teamIDs, teamNames := canonicalEntitySet(ctx, schemas.BifrostContextKeyGovernanceTeamIDs, schemas.BifrostContextKeyGovernanceTeamNames, schemas.BifrostContextKeyGovernanceTeamID, schemas.BifrostContextKeyGovernanceTeamName)
 	customerID, customerName := canonicalEntitySet(ctx, schemas.BifrostContextKeyGovernanceCustomerIDs, schemas.BifrostContextKeyGovernanceCustomerNames, schemas.BifrostContextKeyGovernanceCustomerID, schemas.BifrostContextKeyGovernanceCustomerName)
-	businessUnitID, businessUnitName := canonicalEntitySet(ctx, schemas.BifrostContextKeyGovernanceBusinessUnitIDs, schemas.BifrostContextKeyGovernanceBusinessUnitNames, schemas.BifrostContextKeyGovernanceBusinessUnitID, schemas.BifrostContextKeyGovernanceBusinessUnitName)
-	// A request is scoped to at most one project, so there is no plural form to canonicalize.
-	projectID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectID)
-	projectName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectName)
 	app := schemas.DetectAppFromUserAgent(bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserAgent))
 
 	// Extract ALL context values BEFORE spawning the goroutine.
@@ -1211,10 +1207,6 @@ func (p *PrometheusPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *sche
 		"team_name":            teamNames,
 		"customer_id":          customerID,
 		"customer_name":        customerName,
-		"business_unit_id":     businessUnitID,
-		"business_unit_name":   businessUnitName,
-		"project_id":           projectID,
-		"project_name":         projectName,
 	}
 	if p.userLabelsEnabled.Load() {
 		labelValues["user_id"] = bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID)

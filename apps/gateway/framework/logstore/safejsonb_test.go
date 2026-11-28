@@ -428,7 +428,7 @@ func setupPGTextSafetyStore(t *testing.T) (*RDBLogStore, *gorm.DB) {
 	require.NoError(t, err)
 	defer conn.Close()
 	require.NoError(t, ensureMetadataGINIndex(ctx, conn))
-	require.NoError(t, ensureMultiTeamBusinessUnitGINIndexes(ctx, conn))
+	require.NoError(t, ensureOrgArrayGINIndexes(ctx, conn))
 	return store, db
 }
 

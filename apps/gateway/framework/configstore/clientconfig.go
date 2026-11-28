@@ -89,43 +89,40 @@ type ClientConfig struct {
 	// Input-only presence information; never persisted or included in responses/hashes.
 	inferenceAuthProvided bool
 
-	DropExcessRequests                      bool                                  `json:"drop_excess_requests"`                       // Drop excess requests if the provider queue is full
-	InitialPoolSize                         int                                   `json:"initial_pool_size"`                          // The initial pool size for the bifrost client
-	PrometheusLabels                        []string                              `json:"prometheus_labels"`                          // The labels to be used for prometheus metrics
-	EnableLogging                           *bool                                 `json:"enable_logging"`                             // Enable logging of requests and responses
-	DisableContentLogging                   bool                                  `json:"disable_content_logging"`                    // Disable logging of content
-	RetainContentInObjectStorage            bool                                  `json:"retain_content_in_object_storage"`           // When content logging is disabled (config or header), still offload content to object storage as hidden instead of dropping it
-	AllowPerRequestContentStorageOverride   bool                                  `json:"allow_per_request_content_storage_override"` // Allow per-request override of content storage via x-bf-disable-content-logging header/context
-	AllowPerRequestRawOverride              bool                                  `json:"allow_per_request_raw_override"`             // Allow per-request override of raw request/response visibility via x-bf-send-back-raw-request and x-bf-send-back-raw-response headers
-	AllowDirectKeys                         bool                                  `json:"allow_direct_keys"`                          // Allow callers to bypass the registered key pool via x-bf-direct-key: true header
-	VKRotationCooldown                      schemas.Duration                      `json:"vk_rotation_cooldown,omitempty"`             // Grace period during which a rotated virtual key's previous value still authenticates (e.g. "5m"); 0 = old value stops working immediately
-	DisableDBPingsInHealth                  bool                                  `json:"disable_db_pings_in_health"`
-	LogRetentionDays                        int                                   `json:"log_retention_days" validate:"min=1"`           // Number of days to retain logs (minimum 1 day)
-	EnforceAuthOnInference                  bool                                  `json:"enforce_auth_on_inference"`                     // Require auth (VK, API key, or user token) on inference endpoints
-	DualCredentialConflictBehavior          tables.DualCredentialConflictBehavior `json:"dual_credential_conflict_behavior,omitempty"`   // Behavior when both an IDP token and a VK are present on an inference request
-	ExtraFieldsPlacement                    tables.ExtraFieldsPlacement           `json:"extra_fields_placement,omitempty"`              // Where inference responses carry extra_fields: "body" (default) or "headers"
-	EnforceGovernanceHeader                 bool                                  `json:"enforce_governance_header,omitempty"`           // Deprecated: use EnforceAuthOnInference
-	EnforceSCIMAuth                         bool                                  `json:"enforce_scim_auth,omitempty"`                   // Deprecated: use EnforceAuthOnInference
-	AllowedOrigins                          []string                              `json:"allowed_origins,omitempty"`                     // Additional allowed origins for CORS and WebSocket (localhost is always allowed)
-	AllowedHeaders                          []string                              `json:"allowed_headers,omitempty"`                     // Additional allowed headers for CORS and WebSocket
-	MaxRequestBodySizeMB                    int                                   `json:"max_request_body_size_mb"`                      // The maximum request body size in MB
-	Compat                                  CompatConfig                          `json:"compat"`                                        // Compat plugin configuration
-	HeaderFilterConfig                      *tables.GlobalHeaderFilterConfig      `json:"header_filter_config,omitempty"`                // Global header filtering configuration for x-bf-eh-* headers
-	AsyncJobResultTTL                       int                                   `json:"async_job_result_ttl"`                          // Default TTL for async job results in seconds (default: 3600 = 1 hour)
-	RequiredHeaders                         []string                              `json:"required_headers,omitempty"`                    // Headers that must be present on every request (case-insensitive)
-	LoggingHeaders                          []string                              `json:"logging_headers,omitempty"`                     // Headers to capture in log metadata
-	WhitelistedRoutes                       []string                              `json:"whitelisted_routes,omitempty"`                  // Routes that bypass auth middleware
-	HideDeletedVirtualKeysInFilters         bool                                  `json:"hide_deleted_virtual_keys_in_filters"`          // Hide deleted virtual keys from logs filter data
-	DeleteExpiredVirtualKeys                bool                                  `json:"delete_expired_virtual_keys"`                   // Delete expired virtual keys by default; a key's delete_after_expire overrides this
-	EnforceVKObjectOwnership                bool                                  `json:"enforce_vk_object_ownership"`                   // Restrict provider objects (files, batches, containers, ...) to the virtual key that created them
-	SkipAccessProfileUserVirtualKeyCreation bool                                  `json:"skip_access_profile_user_virtual_key_creation"` // Enterprise: a user's first access profile does not create a virtual key for them
-	SkipAccessProfileUserVirtualKeyDeletion bool                                  `json:"skip_access_profile_user_virtual_key_deletion"` // Enterprise: losing the last access profile does not delete the user's virtual keys
-	EntityAccessProfileMode                 tables.EntityAccessProfileMode        `json:"entity_access_profile_mode,omitempty"`          // Enterprise: "union" (default) or "intersect" combination of team, business unit and customer access profiles with a caller's own access
-	HiddenRequestTypes                      []string                              `json:"hidden_request_types,omitempty"`                // Request types excluded from dashboard and log API reads; logs are still written
-	UsageEstimationTokenizers               []string                              `json:"usage_estimation_tokenizers,omitempty"`         // Embedded tokenizer families ("anthropic", "deepseek", "llama2", "llama3", "all") used to estimate a cancelled stream's usage; empty uses only o200k_base/cl100k_base
-	RoutingChainMaxDepth                    int                                   `json:"routing_chain_max_depth"`                       // Maximum depth for routing rule chain evaluation (default: 10)
-	ConfigHash                              string                                `json:"-"`                                             // Config hash for reconciliation (not serialized)
-	DumpErrorsInConsoleLogs                 bool                                  `json:"dump_errors_in_console_logs"`                   // Dump error details in console logs
+	DropExcessRequests                    bool                                  `json:"drop_excess_requests"`                       // Drop excess requests if the provider queue is full
+	InitialPoolSize                       int                                   `json:"initial_pool_size"`                          // The initial pool size for the bifrost client
+	PrometheusLabels                      []string                              `json:"prometheus_labels"`                          // The labels to be used for prometheus metrics
+	EnableLogging                         *bool                                 `json:"enable_logging"`                             // Enable logging of requests and responses
+	DisableContentLogging                 bool                                  `json:"disable_content_logging"`                    // Disable logging of content
+	RetainContentInObjectStorage          bool                                  `json:"retain_content_in_object_storage"`           // When content logging is disabled (config or header), still offload content to object storage as hidden instead of dropping it
+	AllowPerRequestContentStorageOverride bool                                  `json:"allow_per_request_content_storage_override"` // Allow per-request override of content storage via x-bf-disable-content-logging header/context
+	AllowPerRequestRawOverride            bool                                  `json:"allow_per_request_raw_override"`             // Allow per-request override of raw request/response visibility via x-bf-send-back-raw-request and x-bf-send-back-raw-response headers
+	AllowDirectKeys                       bool                                  `json:"allow_direct_keys"`                          // Allow callers to bypass the registered key pool via x-bf-direct-key: true header
+	VKRotationCooldown                    schemas.Duration                      `json:"vk_rotation_cooldown,omitempty"`             // Grace period during which a rotated virtual key's previous value still authenticates (e.g. "5m"); 0 = old value stops working immediately
+	DisableDBPingsInHealth                bool                                  `json:"disable_db_pings_in_health"`
+	LogRetentionDays                      int                                   `json:"log_retention_days" validate:"min=1"`         // Number of days to retain logs (minimum 1 day)
+	EnforceAuthOnInference                bool                                  `json:"enforce_auth_on_inference"`                   // Require auth (VK, API key, or user token) on inference endpoints
+	DualCredentialConflictBehavior        tables.DualCredentialConflictBehavior `json:"dual_credential_conflict_behavior,omitempty"` // Behavior when both an IDP token and a VK are present on an inference request
+	ExtraFieldsPlacement                  tables.ExtraFieldsPlacement           `json:"extra_fields_placement,omitempty"`            // Where inference responses carry extra_fields: "body" (default) or "headers"
+	EnforceGovernanceHeader               bool                                  `json:"enforce_governance_header,omitempty"`         // Deprecated: use EnforceAuthOnInference
+	EnforceSCIMAuth                       bool                                  `json:"enforce_scim_auth,omitempty"`                 // Deprecated: use EnforceAuthOnInference
+	AllowedOrigins                        []string                              `json:"allowed_origins,omitempty"`                   // Additional allowed origins for CORS and WebSocket (localhost is always allowed)
+	AllowedHeaders                        []string                              `json:"allowed_headers,omitempty"`                   // Additional allowed headers for CORS and WebSocket
+	MaxRequestBodySizeMB                  int                                   `json:"max_request_body_size_mb"`                    // The maximum request body size in MB
+	Compat                                CompatConfig                          `json:"compat"`                                      // Compat plugin configuration
+	HeaderFilterConfig                    *tables.GlobalHeaderFilterConfig      `json:"header_filter_config,omitempty"`              // Global header filtering configuration for x-bf-eh-* headers
+	AsyncJobResultTTL                     int                                   `json:"async_job_result_ttl"`                        // Default TTL for async job results in seconds (default: 3600 = 1 hour)
+	RequiredHeaders                       []string                              `json:"required_headers,omitempty"`                  // Headers that must be present on every request (case-insensitive)
+	LoggingHeaders                        []string                              `json:"logging_headers,omitempty"`                   // Headers to capture in log metadata
+	WhitelistedRoutes                     []string                              `json:"whitelisted_routes,omitempty"`                // Routes that bypass auth middleware
+	HideDeletedVirtualKeysInFilters       bool                                  `json:"hide_deleted_virtual_keys_in_filters"`        // Hide deleted virtual keys from logs filter data
+	DeleteExpiredVirtualKeys              bool                                  `json:"delete_expired_virtual_keys"`                 // Delete expired virtual keys by default; a key's delete_after_expire overrides this
+	EnforceVKObjectOwnership              bool                                  `json:"enforce_vk_object_ownership"`                 // Restrict provider objects (files, batches, containers, ...) to the virtual key that created them
+	HiddenRequestTypes                    []string                              `json:"hidden_request_types,omitempty"`              // Request types excluded from dashboard and log API reads; logs are still written
+	UsageEstimationTokenizers             []string                              `json:"usage_estimation_tokenizers,omitempty"`       // Embedded tokenizer families ("anthropic", "deepseek", "llama2", "llama3", "all") used to estimate a cancelled stream's usage; empty uses only o200k_base/cl100k_base
+	RoutingChainMaxDepth                  int                                   `json:"routing_chain_max_depth"`                     // Maximum depth for routing rule chain evaluation (default: 10)
+	ConfigHash                            string                                `json:"-"`                                           // Config hash for reconciliation (not serialized)
+	DumpErrorsInConsoleLogs               bool                                  `json:"dump_errors_in_console_logs"`                 // Dump error details in console logs
 }
 
 // UnmarshalJSON defaults all bool fields to true when absent from JSON.
@@ -234,15 +231,6 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 	}
 	if c.DeleteExpiredVirtualKeys {
 		hash.Write([]byte("deleteExpiredVirtualKeys:true"))
-	}
-	if c.SkipAccessProfileUserVirtualKeyCreation {
-		hash.Write([]byte("skipAccessProfileUserVirtualKeyCreation:true"))
-	}
-	if c.SkipAccessProfileUserVirtualKeyDeletion {
-		hash.Write([]byte("skipAccessProfileUserVirtualKeyDeletion:true"))
-	}
-	if c.EntityAccessProfileMode != "" && c.EntityAccessProfileMode != tables.EntityAccessProfileModeUnion {
-		hash.Write([]byte("entityAccessProfileMode:" + string(c.EntityAccessProfileMode)))
 	}
 	// Default is true; only hash the opt-out to avoid config hash churn on upgrade.
 	if !c.EnforceVKObjectOwnership {
@@ -1384,11 +1372,6 @@ func GenerateVirtualKeyHash(vk tables.TableVirtualKey) (string, error) {
 	if vk.CustomerID != nil {
 		hash.Write([]byte("customerID:" + *vk.CustomerID))
 	}
-	// Hash BusinessUnitID. Written only when set, like the owners above, so every key that
-	// predates business-unit ownership keeps the hash it already has and config sync sees no drift.
-	if vk.BusinessUnitID != nil {
-		hash.Write([]byte("businessUnitID:" + *vk.BusinessUnitID))
-	}
 	// Hash RateLimitID
 	if vk.RateLimitID != nil {
 		hash.Write([]byte("rateLimitID:" + *vk.RateLimitID))
@@ -1564,11 +1547,6 @@ func GenerateCustomerHash(c tables.TableCustomer) (string, error) {
 		hash.Write([]byte("budgetID:" + id))
 	}
 
-	// Only when set, so a customer declaring none keeps the hash it had before the field existed.
-	if c.AccessProfile != "" {
-		hash.Write([]byte("accessProfile:" + c.AccessProfile))
-	}
-
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
@@ -1641,11 +1619,6 @@ func GenerateTeamHash(t tables.TableTeam) (string, error) {
 			return "", err
 		}
 		hash.Write([]byte("claims:" + string(data)))
-	}
-
-	// Only when set, so a team declaring none keeps the hash it had before the field existed.
-	if t.AccessProfile != "" {
-		hash.Write([]byte("accessProfile:" + t.AccessProfile))
 	}
 
 	return hex.EncodeToString(hash.Sum(nil)), nil

@@ -13,7 +13,7 @@ import (
 
 // grantSections builds one value of each section, for tests that need something to record.
 func grantSections() (*Identity, *Access, *Limits) {
-	identity := NewIdentity(NewCredential(CredentialVirtualKey, "sk-1"), nil, nil, nil, nil, nil, nil)
+	identity := NewIdentity(NewCredential(CredentialVirtualKey, "sk-1"), nil, nil, nil, nil)
 	access := NewAccess(held(permitWithProviders(PermitVirtualKey, "vk1", "Caller Key", "openai")), "", nil, "", nil)
 	limits := NewLimits([]schemas.Limit{{ID: "b-1", HolderKind: string(LimitHolderVirtualKey), HolderID: "vk1"}}, nil)
 	return identity, access, limits

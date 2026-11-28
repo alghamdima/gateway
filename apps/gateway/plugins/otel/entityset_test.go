@@ -44,8 +44,6 @@ func TestBuildSpanAttrs_TypedMatchesAttributeMap(t *testing.T) {
 		SelectedKeyID: "sk-1", SelectedKeyName: "sk-name",
 		TeamIDs: []string{"t1", "t2"}, TeamNames: []string{"team one", "team two"},
 		CustomerID: "c1", CustomerName: "cust one",
-		BusinessUnitIDs: []string{"bu1"}, BusinessUnitNames: []string{"bu one"},
-		ProjectID: "p1", ProjectName: "proj one",
 		FallbackIndex: &fallbackIdx,
 	}
 

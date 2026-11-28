@@ -214,16 +214,11 @@ type TableVirtualKey struct {
 	DeleteAfterExpire *bool                           `gorm:"type:boolean" json:"delete_after_expire,omitempty"`                           // Nil inherits client.delete_expired_virtual_keys; true/false override it for this key
 	ProviderConfigs   []TableVirtualKeyProviderConfig `gorm:"foreignKey:VirtualKeyID;constraint:OnDelete:CASCADE" json:"provider_configs"` // Empty means no providers allowed (deny-by-default)
 
-	// Foreign key relationships. TeamID, CustomerID and BusinessUnitID are mutually exclusive: a
-	// key belongs to at most one owner, which is what decides whose money it spends and whose
-	// access profile it answers to.
-	TeamID     *string `gorm:"type:varchar(255);index" json:"team_id,omitempty"`
-	CustomerID *string `gorm:"type:varchar(255);index" json:"customer_id,omitempty"`
-	// BusinessUnitID is a bare indexed column rather than a GORM association: business units are
-	// an enterprise table this package does not know, so the column records the owner without this
-	// side being able to preload it. Whoever owns the business unit resolves the name.
-	BusinessUnitID *string `gorm:"type:varchar(255);index" json:"business_unit_id,omitempty"`
-	RateLimitID    *string `gorm:"type:varchar(255);index" json:"rate_limit_id,omitempty"`
+	// Foreign key relationships. TeamID and CustomerID are mutually exclusive: a key belongs to at
+	// most one owner, which is what decides whose money it spends.
+	TeamID      *string `gorm:"type:varchar(255);index" json:"team_id,omitempty"`
+	CustomerID  *string `gorm:"type:varchar(255);index" json:"customer_id,omitempty"`
+	RateLimitID *string `gorm:"type:varchar(255);index" json:"rate_limit_id,omitempty"`
 
 	CalendarAligned bool `gorm:"default:false" json:"calendar_aligned"`
 
@@ -248,14 +243,8 @@ type TableVirtualKey struct {
 	RateLimit *TableRateLimit `gorm:"foreignKey:RateLimitID;onDelete:CASCADE" json:"rate_limit,omitempty"`
 	Budgets   []TableBudget   `gorm:"foreignKey:VirtualKeyID;constraint:OnDelete:CASCADE" json:"budgets,omitempty"` // Multiple budgets with different reset intervals
 
-	// IsAccessProfileManaged is a read-only, computed flag (never persisted): true when
-	// the VK is governed by an access profile, so the UI can lock edits and show the
-	// managed-key notice without a separate, differently-gated access-profile lookup.
-	// Populated on the governance read paths from the external resolver; false in OSS.
-	IsAccessProfileManaged bool `gorm:"-" json:"is_access_profile_managed,omitempty"`
-
-	// AssignedUser is the user this key is assigned to, when any. Like
-	// IsAccessProfileManaged it is read-only and never persisted: the VK-user link
+	// AssignedUser is the user this key is assigned to, when any. It is read-only and never
+	// persisted: the VK-user link
 	// lives in an enterprise table, so it is filled in on the governance read paths
 	// by a downstream resolver and stays nil in OSS. No omitempty - "no assignee" has
 	// to reach the UI as an explicit null. Absence carries the other half of the
@@ -270,11 +259,6 @@ type TableVirtualKey struct {
 	// MarshalJSON drops the field so callers refetch instead of reading nil as
 	// "unassigned". Never persisted; set by the governance read paths.
 	AssigneeResolved bool `gorm:"-" json:"-"`
-
-	// BusinessUnit names the business unit that owns this key, the counterpart of the Team and
-	// Customer relations. Business units are an enterprise table, so it cannot be preloaded: the
-	// governance read paths fill it from a downstream resolver, and it stays nil in OSS.
-	BusinessUnit *VirtualKeyBusinessUnit `gorm:"-" json:"business_unit,omitempty"`
 
 	// Config hash is used to detect the changes synced from config.json file
 	// Every time we sync the config.json file, we will update the config hash
@@ -308,13 +292,6 @@ type AssignedUser struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
-}
-
-// VirtualKeyBusinessUnit is the minimal projection of a key's owning business unit carried on
-// read responses, so the UI can name it the way it names a team or customer.
-type VirtualKeyBusinessUnit struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
 }
 
 // TableName sets the table name for each model
@@ -419,7 +396,7 @@ func normalizeVirtualKeyOwnerID(id *string) *string {
 	return id
 }
 
-// BeforeSave is a GORM hook that enforces mutual exclusion (team vs customer vs business unit),
+// BeforeSave is a GORM hook that enforces mutual exclusion (team vs customer),
 // computes a SHA-256 hash of the plaintext value for indexed lookups, and encrypts the virtual key
 // value before writing to the database.
 func (vk *TableVirtualKey) BeforeSave(tx *gorm.DB) error {
@@ -429,11 +406,9 @@ func (vk *TableVirtualKey) BeforeSave(tx *gorm.DB) error {
 	// naming one real owner alongside a blank one look like two.
 	vk.TeamID = normalizeVirtualKeyOwnerID(vk.TeamID)
 	vk.CustomerID = normalizeVirtualKeyOwnerID(vk.CustomerID)
-	vk.BusinessUnitID = normalizeVirtualKeyOwnerID(vk.BusinessUnitID)
 
-	// Enforce mutual exclusion: a VK belongs to at most one of Team, Customer or Business Unit.
-	// Checked as a count rather than pairwise so adding a fourth owner cannot silently leave a
-	// pair unguarded.
+	// Enforce mutual exclusion: a VK belongs to at most one of Team or Customer. Checked as a count
+	// rather than pairwise so adding another owner cannot silently leave a pair unguarded.
 	owners := 0
 	if vk.TeamID != nil {
 		owners++
@@ -441,11 +416,8 @@ func (vk *TableVirtualKey) BeforeSave(tx *gorm.DB) error {
 	if vk.CustomerID != nil {
 		owners++
 	}
-	if vk.BusinessUnitID != nil {
-		owners++
-	}
 	if owners > 1 {
-		return fmt.Errorf("virtual key cannot belong to more than one of team, customer or business unit")
+		return fmt.Errorf("virtual key cannot belong to more than one of team or customer")
 	}
 
 	if err := ValidateVirtualKeyMetadata(vk.Metadata); err != nil {

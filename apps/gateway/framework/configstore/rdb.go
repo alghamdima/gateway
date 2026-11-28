@@ -102,12 +102,6 @@ func lockClientConfigRow(tx *gorm.DB) error {
 	}
 }
 
-// budgetNamesNoOwner reports whether a budget write names none of the owner columns.
-func budgetNamesNoOwner(budget *tables.TableBudget) bool {
-	return budget.TeamID == nil && budget.VirtualKeyID == nil && budget.ProviderConfigID == nil &&
-		budget.ModelConfigID == nil && budget.CustomerID == nil && budget.BusinessUnitID == nil
-}
-
 // lockBudgetOwner locks the owning governance parent before mutating a budget row.
 func lockBudgetOwner(ctx context.Context, txDB *gorm.DB, budget tables.TableBudget) error {
 	switch {
@@ -299,9 +293,6 @@ func (s *RDBConfigStore) UpdateClientConfig(ctx context.Context, config *ClientC
 		HideDeletedVirtualKeysInFilters:           config.HideDeletedVirtualKeysInFilters,
 		DeleteExpiredVirtualKeys:                  config.DeleteExpiredVirtualKeys,
 		EnforceVKObjectOwnership:                  config.EnforceVKObjectOwnership,
-		SkipAccessProfileUserVirtualKeyCreation:   config.SkipAccessProfileUserVirtualKeyCreation,
-		SkipAccessProfileUserVirtualKeyDeletion:   config.SkipAccessProfileUserVirtualKeyDeletion,
-		EntityAccessProfileMode:                   config.EntityAccessProfileMode,
 		HiddenRequestTypes:                        config.HiddenRequestTypes,
 		UsageEstimationTokenizers:                 config.UsageEstimationTokenizers,
 		RoutingChainMaxDepth:                      config.RoutingChainMaxDepth,
@@ -565,25 +556,22 @@ func (s *RDBConfigStore) GetClientConfig(ctx context.Context) (*ClientConfig, er
 			ForceReasoningOnlyModelsToResponses: dbConfig.CompatForceReasoningOnlyModelsToResponses,
 			ConvertDecisionToResponses:          dbConfig.CompatConvertDecisionToResponses,
 		},
-		AsyncJobResultTTL:                       dbConfig.AsyncJobResultTTL,
-		RequiredHeaders:                         dbConfig.RequiredHeaders,
-		LoggingHeaders:                          dbConfig.LoggingHeaders,
-		WhitelistedRoutes:                       dbConfig.WhitelistedRoutes,
-		HideDeletedVirtualKeysInFilters:         dbConfig.HideDeletedVirtualKeysInFilters,
-		DeleteExpiredVirtualKeys:                dbConfig.DeleteExpiredVirtualKeys,
-		EnforceVKObjectOwnership:                dbConfig.EnforceVKObjectOwnership,
-		SkipAccessProfileUserVirtualKeyCreation: dbConfig.SkipAccessProfileUserVirtualKeyCreation,
-		SkipAccessProfileUserVirtualKeyDeletion: dbConfig.SkipAccessProfileUserVirtualKeyDeletion,
-		EntityAccessProfileMode:                 dbConfig.EntityAccessProfileMode,
-		HiddenRequestTypes:                      dbConfig.HiddenRequestTypes,
-		UsageEstimationTokenizers:               dbConfig.UsageEstimationTokenizers,
-		RoutingChainMaxDepth:                    dbConfig.RoutingChainMaxDepth,
-		HeaderFilterConfig:                      dbConfig.HeaderFilterConfig,
-		AllowPerRequestContentStorageOverride:   dbConfig.AllowPerRequestContentStorageOverride,
-		AllowPerRequestRawOverride:              dbConfig.AllowPerRequestRawOverride,
-		AllowDirectKeys:                         dbConfig.AllowDirectKeys,
-		VKRotationCooldown:                      schemas.Duration(dbConfig.VKRotationCooldownNS),
-		ConfigHash:                              dbConfig.ConfigHash,
+		AsyncJobResultTTL:                     dbConfig.AsyncJobResultTTL,
+		RequiredHeaders:                       dbConfig.RequiredHeaders,
+		LoggingHeaders:                        dbConfig.LoggingHeaders,
+		WhitelistedRoutes:                     dbConfig.WhitelistedRoutes,
+		HideDeletedVirtualKeysInFilters:       dbConfig.HideDeletedVirtualKeysInFilters,
+		DeleteExpiredVirtualKeys:              dbConfig.DeleteExpiredVirtualKeys,
+		EnforceVKObjectOwnership:              dbConfig.EnforceVKObjectOwnership,
+		HiddenRequestTypes:                    dbConfig.HiddenRequestTypes,
+		UsageEstimationTokenizers:             dbConfig.UsageEstimationTokenizers,
+		RoutingChainMaxDepth:                  dbConfig.RoutingChainMaxDepth,
+		HeaderFilterConfig:                    dbConfig.HeaderFilterConfig,
+		AllowPerRequestContentStorageOverride: dbConfig.AllowPerRequestContentStorageOverride,
+		AllowPerRequestRawOverride:            dbConfig.AllowPerRequestRawOverride,
+		AllowDirectKeys:                       dbConfig.AllowDirectKeys,
+		VKRotationCooldown:                    schemas.Duration(dbConfig.VKRotationCooldownNS),
+		ConfigHash:                            dbConfig.ConfigHash,
 	}, nil
 }
 
@@ -3063,10 +3051,6 @@ func (s *RDBConfigStore) getVirtualKeysWindow(ctx context.Context, db *gorm.DB, 
 		assignmentClauses = append(assignmentClauses, "team_id = ?")
 		assignmentArgs = append(assignmentArgs, params.TeamID)
 	}
-	if params.BusinessUnitID != "" {
-		assignmentClauses = append(assignmentClauses, "business_unit_id = ?")
-		assignmentArgs = append(assignmentArgs, params.BusinessUnitID)
-	}
 	if params.UserID != "" {
 		assignmentClauses = append(assignmentClauses, "1 = 0")
 	}
@@ -3308,7 +3292,7 @@ func (s *RDBConfigStore) UpdateVirtualKey(ctx context.Context, virtualKey *table
 				virtualKey.RateLimitID = nil
 			}
 		}
-		columns := []string{"name", "description", "value", "is_active", "expires_at", "delete_after_expire", "team_id", "customer_id", "business_unit_id", "rate_limit_id", "calendar_aligned", "allow_all_providers", "disable_content_logging", "config_hash", "updated_at", "encryption_status", "value_hash", "previous_value", "previous_value_hash", "previous_value_expires_at", "rotated_at"}
+		columns := []string{"name", "description", "value", "is_active", "expires_at", "delete_after_expire", "team_id", "customer_id", "rate_limit_id", "calendar_aligned", "allow_all_providers", "disable_content_logging", "config_hash", "updated_at", "encryption_status", "value_hash", "previous_value", "previous_value_hash", "previous_value_expires_at", "rotated_at"}
 		// Nil metadata means the caller did not set it (a config.json entry without a metadata
 		// field, or an update of other fields), so the stored metadata is kept. An empty map is an
 		// explicit clear and is written (as NULL, see BeforeSave). Decided here, before BeforeSave
@@ -4526,13 +4510,6 @@ func (s *RDBConfigStore) UpdateBudget(ctx context.Context, budget *tables.TableB
 		// applied by CreateBudget on first import, and inert thereafter.
 		budget.CurrentUsage = existing.CurrentUsage
 		budget.LastReset = existing.LastReset
-		// A write that names no owner at all keeps the business unit the row already has: a budget a
-		// unit links by budget_id is written here naming no owner, and saving the row as given would
-		// detach it from its unit with nothing on the unit's side to notice. A write that names any
-		// owner is an ownership change and is applied as given.
-		if budgetNamesNoOwner(budget) {
-			budget.BusinessUnitID = existing.BusinessUnitID
-		}
 		// Preserve MC ownership if already migrated; config.json sync would otherwise revert it.
 		if existing.ModelConfigID != nil {
 			budget.ModelConfigID = existing.ModelConfigID

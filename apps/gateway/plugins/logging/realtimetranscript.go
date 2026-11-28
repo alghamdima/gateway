@@ -14,12 +14,11 @@ import (
 
 // grantAttributionTarget points at the attribution fields of a row.
 type grantAttributionTarget struct {
-	virtualKeyID, virtualKeyName, teamID, teamName, customerID, customerName           **string
-	businessUnitID, businessUnitName, projectID, projectName, userID, userName         **string
-	userEmail                                                                          **string
-	teamIDs, teamNames, customerIDs, customerNames, businessUnitIDs, businessUnitNames *[]string
+	virtualKeyID, virtualKeyName, teamID, teamName, customerID, customerName **string
+	userID, userName, userEmail                                              **string
+	teamIDs, teamNames, customerIDs, customerNames                           *[]string
 	// The serialized set columns: a set already stored on the row is never replaced.
-	storedTeamIDs, storedTeamNames, storedCustomerIDs, storedCustomerNames, storedBusinessUnitIDs, storedBusinessUnitNames *string
+	storedTeamIDs, storedTeamNames, storedCustomerIDs, storedCustomerNames *string
 }
 
 // applyGrantAttribution supplies identity fields absent on a fresh realtime turn context.
@@ -29,15 +28,11 @@ func applyGrantAttribution(ctx *schemas.BifrostContext, entry *logstore.Log) {
 		virtualKeyID: &entry.VirtualKeyID, virtualKeyName: &entry.VirtualKeyName,
 		teamID: &entry.TeamID, teamName: &entry.TeamName,
 		customerID: &entry.CustomerID, customerName: &entry.CustomerName,
-		businessUnitID: &entry.BusinessUnitID, businessUnitName: &entry.BusinessUnitName,
-		projectID: &entry.ProjectID, projectName: &entry.ProjectName,
 		userID: &entry.UserID, userName: &entry.UserName, userEmail: &entry.UserEmail,
 		teamIDs: &entry.TeamIDsParsed, teamNames: &entry.TeamNamesParsed,
 		customerIDs: &entry.CustomerIDsParsed, customerNames: &entry.CustomerNamesParsed,
-		businessUnitIDs: &entry.BusinessUnitIDsParsed, businessUnitNames: &entry.BusinessUnitNamesParsed,
 		storedTeamIDs: entry.TeamIDs, storedTeamNames: entry.TeamNames,
 		storedCustomerIDs: entry.CustomerIDs, storedCustomerNames: entry.CustomerNames,
-		storedBusinessUnitIDs: entry.BusinessUnitIDs, storedBusinessUnitNames: entry.BusinessUnitNames,
 	})
 }
 
@@ -60,8 +55,6 @@ func applyGrantAttributionTo(ctx *schemas.BifrostContext, t grantAttributionTarg
 	fill(t.virtualKeyID, t.virtualKeyName, identity.VirtualKey())
 	fill(t.teamID, t.teamName, first(identity.Teams()))
 	fill(t.customerID, t.customerName, first(identity.Customers()))
-	fill(t.businessUnitID, t.businessUnitName, first(identity.BusinessUnits()))
-	fill(t.projectID, t.projectName, identity.Project())
 	if user := identity.User(); user != nil && *t.userID == nil {
 		*t.userID, *t.userName = schemas.Ptr(user.ID), schemas.Ptr(user.Name)
 		if user.Email != "" {
@@ -87,7 +80,6 @@ func applyGrantAttributionTo(ctx *schemas.BifrostContext, t grantAttributionTarg
 	}
 	set(t.teamIDs, t.teamNames, t.storedTeamIDs, t.storedTeamNames, identity.Teams())
 	set(t.customerIDs, t.customerNames, t.storedCustomerIDs, t.storedCustomerNames, identity.Customers())
-	set(t.businessUnitIDs, t.businessUnitNames, t.storedBusinessUnitIDs, t.storedBusinessUnitNames, identity.BusinessUnits())
 }
 
 const realtimeInputItemsMetadata = "realtime_input_items"

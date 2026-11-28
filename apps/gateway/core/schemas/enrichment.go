@@ -71,12 +71,6 @@ var EnrichmentDims = []EnrichmentDim{
 	{Name: "team_name", SpanAttr: AttrBifrostTeamName, Tier: TierMetric},
 	{Name: "customer_id", SpanAttr: AttrBifrostCustomerID, Tier: TierMetric},
 	{Name: "customer_name", SpanAttr: AttrBifrostCustomerName, Tier: TierMetric},
-	{Name: "business_unit_id", SpanAttr: AttrBifrostBusinessUnitID, Tier: TierMetric},
-	{Name: "business_unit_name", SpanAttr: AttrBifrostBusinessUnitName, Tier: TierMetric},
-	// A request is scoped to at most one project, so unlike team/customer/business
-	// unit there is no array form of this dimension.
-	{Name: "project_id", SpanAttr: AttrBifrostProjectID, Tier: TierMetric},
-	{Name: "project_name", SpanAttr: AttrBifrostProjectName, Tier: TierMetric},
 	{Name: "fallback_index", SpanAttr: AttrBifrostFallbackIndex, Tier: TierMetric},
 
 	// --- High cardinality. ---
@@ -87,8 +81,6 @@ var EnrichmentDims = []EnrichmentDim{
 	{Name: "team_names", SpanAttr: AttrBifrostTeamNames, Multi: true, Tier: TierRecord},
 	{Name: "customer_ids", SpanAttr: AttrBifrostCustomerIDs, Multi: true, Tier: TierRecord},
 	{Name: "customer_names", SpanAttr: AttrBifrostCustomerNames, Multi: true, Tier: TierRecord},
-	{Name: "business_unit_ids", SpanAttr: AttrBifrostBusinessUnitIDs, Multi: true, Tier: TierRecord},
-	{Name: "business_unit_names", SpanAttr: AttrBifrostBusinessUnitNames, Multi: true, Tier: TierRecord},
 }
 
 // HighCardinalityMetricEnrichmentDimNames returns the names of the metric-safe dimensions plus

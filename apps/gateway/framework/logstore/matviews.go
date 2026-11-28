@@ -46,8 +46,6 @@ SELECT
     COALESCE(user_id, '') AS user_id,
     COALESCE(team_id, '') AS team_id,
     COALESCE(customer_id, '') AS customer_id,
-    COALESCE(business_unit_id, '') AS business_unit_id,
-    COALESCE(project_id, '') AS project_id,
     COALESCE(alias, '') AS alias,
     COALESCE(canonical_model_name, '') AS canonical_model_name,
     COALESCE(user_agent, '') AS user_agent,
@@ -95,7 +93,7 @@ SELECT
     COUNT(*) FILTER (WHERE ` + cacheDebugJSONGuard + `) AS cache_debug_count
 FROM logs
 WHERE status IN ('success', 'error', 'cancelled')
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 `
 
 // cacheDebugJSONGuard matches rows whose cache_debug column holds a loose
@@ -113,7 +111,7 @@ const cacheDebugHitTypeExpr = `substring(cache_debug from '"hit_type"[[:space:]]
 // during startup ensure / repair paths.
 const mvLogsHourlyUniqueIdx = `
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS mv_logs_hourly_uniq
-ON mv_logs_hourly (hour, provider, model, status, object_type, selected_key_id, virtual_key_id, routing_rule_id, user_id, team_id, customer_id, business_unit_id, project_id, alias, canonical_model_name, user_agent, app)
+ON mv_logs_hourly (hour, provider, model, status, object_type, selected_key_id, virtual_key_id, routing_rule_id, user_id, team_id, customer_id, alias, canonical_model_name, user_agent, app)
 `
 
 // mvLogsHourlyRequiredColumns is the canonical column set used by
@@ -131,8 +129,6 @@ var mvLogsHourlyRequiredColumns = []string{
 	"user_id",
 	"team_id",
 	"customer_id",
-	"business_unit_id",
-	"project_id",
 	"alias",
 	"canonical_model_name",
 	"throughput_completion_tokens",
@@ -214,21 +210,18 @@ type filterMatViewDef struct {
 }
 
 // multiValueFilterMatViewBody builds the SELECT body for a filter matview whose
-// dimension is single-valued on the scalar column (old / pre-migration rows and
-// the VK-team path) and multi-valued on the JSON-array column (the enterprise
-// user/AP path). It reuses teamOrBUFanoutFrom — the same fan-out the ranking /
-// histogram readers reach through dimensionFanoutFrom — so a team / business
-// unit that only ever appears in the JSON array still surfaces in the filter
-// dropdown. The emitted body text is pinned: repairMatViewShapes treats a
-// change as drift and drops the views on boot. The fanned-out
-// dim_id/dim_name become the dropdown id/name; the visibility columns
-// (scopeProjection) come from the original log row (exposed via l.* by the
-// fan-out subquery) so DAC scope still applies — including the scalar
-// customer_id / business_unit_id, which stay the row's own owner columns and
-// are independent of the fanned-out dim_id. idCol is the scalar id column
-// ("team_id" / "business_unit_id").
+// dimension is single-valued on the scalar column (old rows and the VK path)
+// and multi-valued on the JSON-array column. It reuses orgFanoutFrom — the same
+// fan-out the ranking / histogram readers reach through dimensionFanoutFrom —
+// so a team or customer that only ever appears in the JSON array still
+// surfaces in the filter dropdown. The emitted body text is pinned:
+// repairMatViewShapes treats a change as drift and drops the views on boot.
+// The fanned-out dim_id/dim_name become the dropdown id/name; the visibility
+// columns (scopeProjection) come from the original log row (exposed via l.* by
+// the fan-out subquery) so scope still applies. idCol is the scalar id column
+// ("team_id" / "customer_id").
 func multiValueFilterMatViewBody(idCol string) string {
-	from, _ := teamOrBUFanoutFrom(idCol)
+	from, _ := orgFanoutFrom(idCol)
 	return fmt.Sprintf(
 		"SELECT DISTINCT dim_id AS id, dim_name AS name, "+scopeProjection+
 			" FROM %s WHERE timestamp >= NOW() - INTERVAL '%s' AND dim_id != '' AND dim_name != ''",
@@ -244,29 +237,27 @@ func multiValueFilterMatViewBody(idCol string) string {
 const scopeProjection = "COALESCE(user_id, '') AS user_id, " +
 	"COALESCE(team_id, '') AS team_id, " +
 	"COALESCE(virtual_key_id, '') AS virtual_key_id, " +
-	"COALESCE(customer_id, '') AS customer_id, " +
-	"COALESCE(business_unit_id, '') AS business_unit_id"
+	"COALESCE(customer_id, '') AS customer_id"
 
 // scopeIdxColumns is the unique-index suffix that pairs with scopeProjection.
-const scopeIdxColumns = "user_id, team_id, virtual_key_id, customer_id, business_unit_id"
+const scopeIdxColumns = "user_id, team_id, virtual_key_id, customer_id"
 
 // scopeRequiredColumns lists the resolved column aliases produced by
 // scopeProjection. Appended to each matview's requiredColumns so
 // repairMatViewShapes can verify them against pg_attribute.
 //
-// customer_id / business_unit_id are part of the set because a team-data
-// DAC principal widens visibility by those org dimensions: the scope
-// predicate ORs them in alongside user_id / team_id / virtual_key_id, and
-// a matview missing the columns would fail the query outright rather than
-// filter it. Adding them here also drives the rebuild — repairMatViewShapes
-// sees the old three-column views as drifted and drops them on boot, so no
-// separate migration is needed.
-var scopeRequiredColumns = []string{"user_id", "team_id", "virtual_key_id", "customer_id", "business_unit_id"}
+// customer_id is part of the set because a scope can widen visibility by
+// customer: the scope predicate ORs it in alongside user_id / team_id /
+// virtual_key_id, and a matview missing the column would fail the query
+// outright rather than filter it. A change to this set drives the rebuild:
+// repairMatViewShapes sees views of the old shape as drifted and drops them on
+// boot.
+var scopeRequiredColumns = []string{"user_id", "team_id", "virtual_key_id", "customer_id"}
 
 // filterMatViews enumerates every per-dimension materialized view used to
 // populate filter dropdowns on the logs page. Each view carries the
 // dropdown's dimension columns plus the visibility columns
-// (user_id, team_id, virtual_key_id, customer_id, business_unit_id) so
+// (user_id, team_id, virtual_key_id, customer_id) so
 // every DAC scope predicate applies in-matview.
 // Order matters only for deterministic startup logs.
 var filterMatViews = []filterMatViewDef{
@@ -356,23 +347,6 @@ var filterMatViews = []filterMatViewDef{
 		requiredColumns: append([]string{"id", "name"}, scopeRequiredColumns...),
 	},
 	{
-		name: "mv_filter_business_units",
-		// Same scalar-or-JSON-array union as mv_filter_teams: a request can carry
-		// one business unit (scalar) or many (JSON-array business_unit_ids).
-		bodyOverride:    multiValueFilterMatViewBody("business_unit_id"),
-		uniqueIdx:       "id, name, " + scopeIdxColumns,
-		requiredColumns: append([]string{"id", "name"}, scopeRequiredColumns...),
-	},
-	{
-		// One project per request, so a plain scalar pair like users and
-		// virtual keys; nothing to fan out.
-		name:            "mv_filter_projects",
-		selectExpr:      "project_id AS id, project_name AS name, " + scopeProjection,
-		whereExpr:       "project_id IS NOT NULL AND project_id != '' AND project_name IS NOT NULL AND project_name != ''",
-		uniqueIdx:       "id, name, " + scopeIdxColumns,
-		requiredColumns: append([]string{"id", "name"}, scopeRequiredColumns...),
-	},
-	{
 		name:            "mv_filter_apps",
 		selectExpr:      "app, " + scopeProjection,
 		whereExpr:       "app IS NOT NULL AND app != ''",
@@ -392,14 +366,12 @@ var filterMatViews = []filterMatViewDef{
 // filterMatViewKeyPairColumns maps the (idCol, nameCol) pair callers pass into
 // GetDistinctKeyPairs to the per-dimension matview that pre-aggregates it.
 var filterMatViewKeyPairColumns = map[[2]string]string{
-	{"selected_key_id", "selected_key_name"}:   "mv_filter_selected_keys",
-	{"virtual_key_id", "virtual_key_name"}:     "mv_filter_virtual_keys",
-	{"routing_rule_id", "routing_rule_name"}:   "mv_filter_routing_rules",
-	{"team_id", "team_name"}:                   "mv_filter_teams",
-	{"customer_id", "customer_name"}:           "mv_filter_customers",
-	{"user_id", "user_name"}:                   "mv_filter_users",
-	{"business_unit_id", "business_unit_name"}: "mv_filter_business_units",
-	{"project_id", "project_name"}:             "mv_filter_projects",
+	{"selected_key_id", "selected_key_name"}: "mv_filter_selected_keys",
+	{"virtual_key_id", "virtual_key_name"}:   "mv_filter_virtual_keys",
+	{"routing_rule_id", "routing_rule_name"}: "mv_filter_routing_rules",
+	{"team_id", "team_name"}:                 "mv_filter_teams",
+	{"customer_id", "customer_name"}:         "mv_filter_customers",
+	{"user_id", "user_name"}:                 "mv_filter_users",
 }
 
 // filterMatViewDDL returns the CREATE MATERIALIZED VIEW statement for one filter view.
@@ -487,8 +459,8 @@ var matviewUniqueIndexes = func() []matviewIndexDef {
 
 // matviewScopeIndexes enumerates the secondary BTREE indexes that make
 // DAC-scoped reads on the per-dimension filter matviews cheap. The
-// composite (user_id, team_id, virtual_key_id, customer_id,
-// business_unit_id) is a covering index for
+// composite (user_id, team_id, virtual_key_id, customer_id) is a covering
+// index for
 // the only column subset every filter-dropdown query selects, so
 // Postgres can serve scoped DISTINCT queries via an index-only scan
 // even when only the trailing columns are in the predicate. Filter
@@ -1261,7 +1233,6 @@ func canUseMatViewFilters(f SearchFilters) bool {
 		len(f.GuardrailOutcomes) == 0 &&
 		len(f.UserAgents) == 0 &&
 		len(f.TeamIDs) == 0 &&
-		len(f.BusinessUnitIDs) == 0 &&
 		len(f.CustomerIDs) == 0 &&
 		// The hourly views group by object_type only; a passthrough row stored under its inferred
 		// type is told apart by is_passthrough, which they do not carry.
@@ -1389,12 +1360,6 @@ func applyMatViewFiltersOnly(q *gorm.DB, f SearchFilters) *gorm.DB {
 	}
 	if len(f.UserIDs) > 0 {
 		q = q.Where("user_id IN ?", f.UserIDs)
-	}
-	if len(f.BusinessUnitIDs) > 0 {
-		q = q.Where("business_unit_id IN ?", f.BusinessUnitIDs)
-	}
-	if len(f.ProjectIDs) > 0 {
-		q = q.Where("project_id IN ?", f.ProjectIDs)
 	}
 	if len(f.Apps) > 0 {
 		q = q.Where("app IN ?", f.Apps)

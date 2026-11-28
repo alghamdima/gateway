@@ -15,6 +15,17 @@ import (
 // the mode between them. What is covered here is the fold: every question a consumer can ask of a
 // request, and how the two sides combine to answer it.
 
+// Permit kinds for these tests. The access engine reads a permit's level and whether it scopes, not
+// its kind, so the kinds only label which side of a case a permit stands on: a caller's own, an
+// organization level above the caller, or a scope the request names.
+const (
+	testCallerPermit   PermitType = "test_caller"
+	testTeamPermit     PermitType = "test_team"
+	testUnitPermit     PermitType = "test_unit"
+	testCustomerPermit PermitType = "test_customer"
+	testScopePermit    PermitType = "test_scope"
+)
+
 func TestAccess_DegenerateCases(t *testing.T) {
 	basePermit := permitWithProviders(PermitVirtualKey, "vk1", "Caller Key", "openai")
 	scopingPermit := permitWithProviders("other", "o1", "Other", "anthropic")
@@ -638,7 +649,7 @@ func TestAccess_ProvidersForCandidateKeysAreACopy(t *testing.T) {
 	t.Run("keys composeKeyIDs passes through untouched", func(t *testing.T) {
 		base := newBase()
 		scoping := newPermit(permitSpec{
-			Type: PermitProject, ID: "p1", Name: "Project",
+			Type: testScopePermit, ID: "p1", Name: "Project",
 			ProviderPermits: []schemas.ProviderPermit{
 				{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"*"}},
 			},
@@ -1049,8 +1060,8 @@ func TestAccess_Accessors(t *testing.T) {
 }
 
 func TestAccess_NewAccessDropsWhatIsNotThere(t *testing.T) {
-	first := permitWithProviders(PermitAccessProfile, "ap1", "First", "openai")
-	second := permitWithProviders(PermitAccessProfile, "ap2", "Second", "anthropic")
+	first := permitWithProviders(testCallerPermit, "ap1", "First", "openai")
+	second := permitWithProviders(testCallerPermit, "ap2", "Second", "anthropic")
 
 	// A resolver that found nothing for one source does not have to say so twice: nil entries,
 	// bare or typed, are dropped, and a typed-nil scoping permit is no scoping permit.
@@ -1072,7 +1083,7 @@ func TestAccess_NewAccessDropsWhatIsNotThere(t *testing.T) {
 // bedrock, disagree about what each permits there, and each holds a provider the other does not.
 func twoProfilesAndAProject() (first, second, project *Permit) {
 	first = newPermit(permitSpec{
-		Type: PermitAccessProfile, ID: "ap1", Name: "First Profile",
+		Type: testCallerPermit, ID: "ap1", Name: "First Profile",
 		ProviderPermits: []schemas.ProviderPermit{
 			{
 				Provider: "openai", AllowedModels: []string{"gpt-4o"}, KeyIDs: []string{"key-first"}, Weight: ptr(0.5),
@@ -1083,7 +1094,7 @@ func twoProfilesAndAProject() (first, second, project *Permit) {
 		},
 	})
 	second = newPermit(permitSpec{
-		Type: PermitAccessProfile, ID: "ap2", Name: "Second Profile",
+		Type: testCallerPermit, ID: "ap2", Name: "Second Profile",
 		ProviderPermits: []schemas.ProviderPermit{
 			{
 				Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-second"}, Weight: ptr(0.9),
@@ -1097,7 +1108,7 @@ func twoProfilesAndAProject() (first, second, project *Permit) {
 		},
 	})
 	project = newPermit(permitSpec{
-		Type: PermitProject, ID: "p1", Name: "Some Project",
+		Type: testScopePermit, ID: "p1", Name: "Some Project",
 		ProviderPermits: []schemas.ProviderPermit{
 			{
 				Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-first", "key-project"},
@@ -1247,7 +1258,7 @@ func TestAccess_KeysForPoolTheCallersPermits(t *testing.T) {
 
 	t.Run("a wildcard in any permitting base opens the caller's side", func(t *testing.T) {
 		everyKey := newPermit(permitSpec{
-			Type: PermitAccessProfile, ID: "ap3", Name: "Every Key",
+			Type: testCallerPermit, ID: "ap3", Name: "Every Key",
 			ProviderPermits: []schemas.ProviderPermit{
 				{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"*"}},
 			},
@@ -1347,7 +1358,7 @@ func TestAccess_ProvidersForOffersEveryBaseInFull(t *testing.T) {
 
 	t.Run("within one base nothing shadows either", func(t *testing.T) {
 		twice := newPermit(permitSpec{
-			Type: PermitAccessProfile, ID: "ap3", Name: "Twice",
+			Type: testCallerPermit, ID: "ap3", Name: "Twice",
 			ProviderPermits: []schemas.ProviderPermit{
 				{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-a"}, Weight: ptr(0.2)},
 				{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-b"}, Weight: ptr(0.8)},
@@ -1434,7 +1445,7 @@ func TestAccess_DeniedByNamesEveryRefusingSide(t *testing.T) {
 func TestAccess_CandidatesAreOfferedByPermitsForModel(t *testing.T) {
 	first, second, project := twoProfilesAndAProject()
 	twice := newPermit(permitSpec{
-		Type: PermitAccessProfile, ID: "ap3", Name: "Twice",
+		Type: testCallerPermit, ID: "ap3", Name: "Twice",
 		ProviderPermits: []schemas.ProviderPermit{
 			{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-a"}, Weight: ptr(0.2)},
 			{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-b"}, Weight: ptr(0.8)},
@@ -1708,9 +1719,9 @@ func atLevel(p *Permit, level int) *Permit {
 // present grants and each level above caps.
 
 func TestAccessLevels_UnionReadsEveryPermitAsOne(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-b"), 1)
-	customer := atLevel(permitWithModels(PermitCustomerAccessProfile, "c1", "Customer", "openai", "model-c"), 2)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-b"), 1)
+	customer := atLevel(permitWithModels(testCustomerPermit, "c1", "Customer", "openai", "model-c"), 2)
 
 	for _, access := range []*Access{
 		NewAccess(held(caller, team, customer), "", nil, "", nil),
@@ -1727,8 +1738,8 @@ func TestAccessLevels_UnionReadsEveryPermitAsOne(t *testing.T) {
 
 func TestAccessLevels_AHigherLevelTakesAwayWhatTheCallerHolds(t *testing.T) {
 	// The caller holds models a and b; the level above allows only c. Nothing is left.
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-c"), 1)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a", "model-b")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-c"), 1)
 
 	access := NewAccess(held(caller, team), Intersect, nil, "", nil)
 
@@ -1744,8 +1755,8 @@ func TestAccessLevels_AHigherLevelTakesAwayWhatTheCallerHolds(t *testing.T) {
 // literal-name check is capped exactly as the access it was made from. Rebuilding from Bases, which
 // is only the granting level, would drop the cap and allow more than the access does.
 func TestAccessLevels_WithModelMatcherKeepsTheLevels(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a"), 1)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a", "model-b")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a"), 1)
 	byName := func(_, model string, allowed []string) bool { return schemas.WhiteList(allowed).IsAllowed(model) }
 
 	access := NewAccess(held(caller, team), Intersect, nil, "", byName)
@@ -1761,9 +1772,9 @@ func TestAccessLevels_WithModelMatcherKeepsTheLevels(t *testing.T) {
 }
 
 func TestAccessLevels_ALevelIsReadAsOne(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a"), 1)
-	unit := atLevel(permitWithModels(PermitBusinessUnitAccessProfile, "b1", "Unit", "openai", "model-b"), 1)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a", "model-b")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a"), 1)
+	unit := atLevel(permitWithModels(testUnitPermit, "b1", "Unit", "openai", "model-b"), 1)
 
 	access := NewAccess(held(caller, team, unit), Intersect, nil, "", nil)
 
@@ -1773,9 +1784,9 @@ func TestAccessLevels_ALevelIsReadAsOne(t *testing.T) {
 }
 
 func TestAccessLevels_EveryLevelMustAllow(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a", "model-b"), 1)
-	customer := atLevel(permitWithModels(PermitCustomerAccessProfile, "c1", "Customer", "openai", "model-b"), 2)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a", "model-b")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a", "model-b"), 1)
+	customer := atLevel(permitWithModels(testCustomerPermit, "c1", "Customer", "openai", "model-b"), 2)
 
 	access := NewAccess(held(caller, team, customer), Intersect, nil, "", nil)
 
@@ -1786,8 +1797,8 @@ func TestAccessLevels_EveryLevelMustAllow(t *testing.T) {
 }
 
 func TestAccessLevels_TheLowestLevelPresentGrants(t *testing.T) {
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a", "model-b"), 1)
-	customer := atLevel(permitWithModels(PermitCustomerAccessProfile, "c1", "Customer", "openai", "model-b", "model-c"), 2)
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a", "model-b"), 1)
+	customer := atLevel(permitWithModels(testCustomerPermit, "c1", "Customer", "openai", "model-b", "model-c"), 2)
 
 	t.Run("a caller holding nothing of their own is granted by their teams and capped above", func(t *testing.T) {
 		access := NewAccess(held(team, customer), Intersect, nil, "", nil)
@@ -1812,9 +1823,9 @@ func TestAccessLevels_TheLowestLevelPresentGrants(t *testing.T) {
 }
 
 func TestAccessLevels_TheOrderPermitsArriveInDoesNotMatter(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a", "model-b"), 1)
-	customer := atLevel(permitWithModels(PermitCustomerAccessProfile, "c1", "Customer", "openai", "model-b"), 2)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a", "model-b")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a", "model-b"), 1)
+	customer := atLevel(permitWithModels(testCustomerPermit, "c1", "Customer", "openai", "model-b"), 2)
 
 	ordered := NewAccess(held(caller, team, customer), Intersect, nil, "", nil)
 	shuffled := NewAccess(held(customer, caller, team), Intersect, nil, "", nil)
@@ -1827,10 +1838,10 @@ func TestAccessLevels_TheOrderPermitsArriveInDoesNotMatter(t *testing.T) {
 }
 
 func TestAccessLevels_ProvidersAndBlacklists(t *testing.T) {
-	caller := permitWithProviders(PermitAccessProfile, "ap1", "Member", "openai", "anthropic")
+	caller := permitWithProviders(testCallerPermit, "ap1", "Member", "openai", "anthropic")
 
 	t.Run("a provider the level does not permit is refused", func(t *testing.T) {
-		team := atLevel(permitWithProviders(PermitTeamAccessProfile, "t1", "Team", "anthropic"), 1)
+		team := atLevel(permitWithProviders(testTeamPermit, "t1", "Team", "anthropic"), 1)
 		access := NewAccess(held(caller, team), Intersect, nil, "", nil)
 		assert.False(t, access.IsProviderAllowed("openai"))
 		assert.True(t, access.IsProviderAllowed("anthropic"))
@@ -1841,7 +1852,7 @@ func TestAccessLevels_ProvidersAndBlacklists(t *testing.T) {
 
 	t.Run("a blacklist in the level blocks", func(t *testing.T) {
 		team := atLevel(newPermit(permitSpec{
-			Type: PermitTeamAccessProfile, ID: "t1", Name: "Team", IsActive: true,
+			Type: testTeamPermit, ID: "t1", Name: "Team", IsActive: true,
 			ProviderPermits: []schemas.ProviderPermit{{
 				Provider: "openai", AllowedModels: []string{"*"}, BlacklistedModels: []string{"gpt-4o"},
 			}},
@@ -1853,7 +1864,7 @@ func TestAccessLevels_ProvidersAndBlacklists(t *testing.T) {
 	})
 
 	t.Run("a level that allows all providers caps nothing", func(t *testing.T) {
-		team := atLevel(NewPermit(PermitTeamAccessProfile, "t1", "Team", true, false, nil, WithAllowAllProviders(true)), 1)
+		team := atLevel(NewPermit(testTeamPermit, "t1", "Team", true, false, nil, WithAllowAllProviders(true)), 1)
 		access := NewAccess(held(caller, team), Intersect, nil, "", nil)
 		assert.True(t, access.IsModelAllowed("openai", "gpt-4o"))
 		assert.ElementsMatch(t, []string{"openai", "anthropic"}, access.GrantedProvidersForModel(""))
@@ -1862,20 +1873,20 @@ func TestAccessLevels_ProvidersAndBlacklists(t *testing.T) {
 
 func TestAccessLevels_KeysAreNarrowed(t *testing.T) {
 	caller := newPermit(permitSpec{
-		Type: PermitAccessProfile, ID: "ap1", Name: "Member", IsActive: true,
+		Type: testCallerPermit, ID: "ap1", Name: "Member", IsActive: true,
 		ProviderPermits: []schemas.ProviderPermit{
 			{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-a", "key-b"}},
 			{Provider: "anthropic", AllowedModels: []string{"*"}, KeyIDs: []string{"*"}},
 		},
 	})
 	team := atLevel(newPermit(permitSpec{
-		Type: PermitTeamAccessProfile, ID: "t1", Name: "Team", IsActive: true,
+		Type: testTeamPermit, ID: "t1", Name: "Team", IsActive: true,
 		ProviderPermits: []schemas.ProviderPermit{
 			{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"key-b", "key-c"}},
 			{Provider: "anthropic", AllowedModels: []string{"*"}, KeyIDs: []string{"key-team"}},
 		},
 	}), 1)
-	customer := atLevel(NewPermit(PermitCustomerAccessProfile, "c1", "Customer", true, false, nil, WithAllowAllProviders(true)), 2)
+	customer := atLevel(NewPermit(testCustomerPermit, "c1", "Customer", true, false, nil, WithAllowAllProviders(true)), 2)
 
 	access := NewAccess(held(caller, team, customer), Intersect, nil, "", nil)
 
@@ -1897,16 +1908,16 @@ func TestAccessLevels_KeysAreNarrowed(t *testing.T) {
 // The scope composes with the capped keys, and candidates agree with KeysForModel.
 func TestAccessLevels_CandidateKeysKeepTheCapUnderAScope(t *testing.T) {
 	caller := newPermit(permitSpec{
-		Type: PermitAccessProfile, ID: "ap1", Name: "Member", IsActive: true,
+		Type: testCallerPermit, ID: "ap1", Name: "Member", IsActive: true,
 		ProviderPermits: []schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"k1", "k2"}}},
 	})
 	team := atLevel(newPermit(permitSpec{
-		Type: PermitTeamAccessProfile, ID: "t1", Name: "Team", IsActive: true,
+		Type: testTeamPermit, ID: "t1", Name: "Team", IsActive: true,
 		ProviderPermits: []schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: []string{"k1"}}},
 	}), 1)
 	scopeWith := func(keys ...string) *Permit {
 		return newPermit(permitSpec{
-			Type: PermitProject, ID: "p1", Name: "Project", IsActive: true,
+			Type: testScopePermit, ID: "p1", Name: "Project", IsActive: true,
 			ProviderPermits: []schemas.ProviderPermit{{Provider: "openai", AllowedModels: []string{"*"}, KeyIDs: keys}},
 		})
 	}
@@ -1934,12 +1945,12 @@ func TestAccessLevels_CandidateKeysKeepTheCapUnderAScope(t *testing.T) {
 }
 
 func TestAccessLevels_ComposeWithAScope(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a", "model-b")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a"), 1)
-	project := permitWithModels(PermitProject, "p1", "Project", "openai", "model-a", "model-b", "model-c")
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a", "model-b")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a"), 1)
+	project := permitWithModels(testScopePermit, "p1", "Project", "openai", "model-a", "model-b", "model-c")
 
 	t.Run("intersect narrows the capped caller further", func(t *testing.T) {
-		narrow := permitWithModels(PermitProject, "p2", "Project", "openai", "model-b")
+		narrow := permitWithModels(testScopePermit, "p2", "Project", "openai", "model-b")
 		access := NewAccess(held(caller, team), Intersect, narrow, Intersect, nil)
 		assert.False(t, access.IsModelAllowed("openai", "model-a"), "the project refuses it")
 		assert.False(t, access.IsModelAllowed("openai", "model-b"), "the team refuses it")
@@ -1960,7 +1971,7 @@ func TestAccessLevels_ComposeWithAScope(t *testing.T) {
 
 	t.Run("a level above is not named for what only the scope admitted", func(t *testing.T) {
 		// Only the project lets model-c through, so only the project answers for it.
-		widerTeam := atLevel(permitWithModels(PermitTeamAccessProfile, "t2", "Team", "openai", "model-a", "model-c"), 1)
+		widerTeam := atLevel(permitWithModels(testTeamPermit, "t2", "Team", "openai", "model-a", "model-c"), 1)
 		access := NewAccess(held(caller, widerTeam), Intersect, project, Union, nil)
 		assert.True(t, access.IsModelAllowed("openai", "model-c"))
 		assertPermitsAre(t, access.PermitsForModel("openai", "model-c"), project)
@@ -1968,8 +1979,8 @@ func TestAccessLevels_ComposeWithAScope(t *testing.T) {
 }
 
 func TestAccessLevels_BasesAreTheGrantingLevel(t *testing.T) {
-	caller := permitWithModels(PermitAccessProfile, "ap1", "Member", "openai", "model-a")
-	team := atLevel(permitWithModels(PermitTeamAccessProfile, "t1", "Team", "openai", "model-a"), 1)
+	caller := permitWithModels(testCallerPermit, "ap1", "Member", "openai", "model-a")
+	team := atLevel(permitWithModels(testTeamPermit, "t1", "Team", "openai", "model-a"), 1)
 	access := NewAccess(held(caller, team), Intersect, nil, "", nil)
 
 	assert.Equal(t, "intersect", access.LevelMode())
@@ -2001,7 +2012,7 @@ func (m matrixPermit) build(kind PermitType, level int, id string) *Permit {
 }
 
 // matrixLevelKinds is the permit kind at each matrix level.
-var matrixLevelKinds = []PermitType{PermitAccessProfile, PermitTeamAccessProfile, PermitCustomerAccessProfile}
+var matrixLevelKinds = []PermitType{testCallerPermit, testTeamPermit, testCustomerPermit}
 
 // matrixCase is one access shape: the permits at each level (some possibly empty) and the scope.
 type matrixCase struct {
@@ -2227,7 +2238,7 @@ func TestAccessLevelsMatrix(t *testing.T) {
 			}
 			var scoping schemas.Permit
 			if c.scoping != nil {
-				scoping = c.scoping.build(PermitProject, 0, "scope")
+				scoping = c.scoping.build(testScopePermit, 0, "scope")
 			}
 			access := NewAccess(permits, Intersect, scoping, c.mode, nil)
 			callerAllows, want := c.oracle()

@@ -1804,7 +1804,7 @@ func TestLiteralAccessKeepsTheLevelsThatCapTheAccess(t *testing.T) {
 	caller := grant.NewPermit(grant.PermitVirtualKey, "vk1", "Key", true, false, []schemas.ProviderPermit{{
 		Provider: "openai", AllowedModels: []string{"gpt-4o", "gpt-4o-mini"}, KeyIDs: []string{"*"},
 	}})
-	team := grant.NewPermit(grant.PermitTeamAccessProfile, "t1", "Team", true, false, []schemas.ProviderPermit{{
+	team := grant.NewPermit(testTeamLevelPermit, "t1", "Team", true, false, []schemas.ProviderPermit{{
 		Provider: "openai", AllowedModels: []string{"gpt-4o-mini"}, KeyIDs: []string{"*"},
 	}}, grant.WithLevel(1))
 	store := &mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{schemas.OpenAI: {}}}

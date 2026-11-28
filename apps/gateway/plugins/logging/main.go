@@ -19,6 +19,7 @@ import (
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
+	"github.com/maximhq/bifrost/framework/grant"
 	"github.com/maximhq/bifrost/framework/jobaccounting"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
@@ -176,8 +177,7 @@ func (c contentPolicy) visible() bool { return c.storeContent && !c.hidden }
 //  1. the static disable_content_logging client config;
 //  2. governance's decision for the request, stamped as
 //     BifrostContextKeyGovernanceDisableContentLogging: the resolved virtual
-//     key's own disable_content_logging, or that of a project the request is
-//     scoped to, which overrides the key's (absent when both inherit). Admin
+//     key's own disable_content_logging (absent when it inherits). Admin
 //     configuration, so it needs no gate;
 //  3. the x-bf-disable-content-logging header, honored only when
 //     BifrostContextKeyAllowPerRequestStorageOverride is true in context (set
@@ -223,9 +223,9 @@ func (p *LoggerPlugin) contentLoggingEnabled(ctx *schemas.BifrostContext) bool {
 }
 
 // dropCapturedInput removes everything PreLLMHook captured from the request. PreLLMHook decides
-// with the policy as the context stood then; on the passthrough path, and for a request that names
-// a project, governance stamps the key's or project's decision only after ours has run, so the
-// final policy in PostLLMHook can be stricter than the one the inputs were captured under.
+// with the policy as the context stood then; on the passthrough path governance stamps the key's
+// decision only after ours has run, so the final policy in PostLLMHook can be stricter than the one
+// the inputs were captured under.
 func dropCapturedInput(entry *logstore.Log) {
 	if entry == nil {
 		return
@@ -247,15 +247,9 @@ func dropCapturedInput(entry *logstore.Log) {
 }
 
 // governanceDecisionPending reports whether governance may still stamp a content-logging decision
-// for this request after our hook has run, so the policy on the context is not final yet. Two
-// things carry such a decision: a presented virtual key governance has not resolved onto the context
-// yet, and a project the request named that governance has not admitted yet (a project's decision
-// overrides the key's).
-//
-// A named project is read off the request headers the way the governance funnel reads it, so a
-// header that arrived empty still counts as having named one, and it is admitted once the request's
-// identity carries it. The presented key is read the way governance reads it: off the settled
-// identity first, then off the transport's context key.
+// for this request after our hook has run, so the policy on the context is not final yet: a
+// presented virtual key governance has not resolved onto the context yet. The presented key is read
+// the way governance reads it: off the settled identity first, then off the transport's context key.
 func governanceDecisionPending(ctx *schemas.BifrostContext) bool {
 	if ctx == nil {
 		return false
@@ -264,18 +258,10 @@ func governanceDecisionPending(ctx *schemas.BifrostContext) bool {
 	if grant := ctx.Grant(); grant != nil {
 		identity = grant.Identity()
 	}
-	if identity == nil || identity.Project() == nil {
-		headers, _ := ctx.Value(schemas.BifrostContextKeyRequestHeaders).(map[string]string)
-		for _, header := range []string{schemas.HeaderGovernanceProjectID, schemas.HeaderGovernanceProjectName} {
-			if _, named := headers[header]; named {
-				return true
-			}
-		}
-	}
 	if stamped, _ := ctx.Value(schemas.BifrostContextKeyGovernanceVirtualKeyID).(string); stamped != "" {
 		return false
 	}
-	if identity != nil && identity.Credential().Kind == string(schemas.EntityVirtualKey) {
+	if identity != nil && identity.Credential().Kind == string(grant.CredentialVirtualKey) {
 		return true
 	}
 	presented, _ := ctx.Value(schemas.BifrostContextKeyVirtualKey).(string)
@@ -689,10 +675,6 @@ func (p *LoggerPlugin) emitSettlementSpan(ctx context.Context, entry *logstore.L
 	setStrPtr(schemas.AttrBifrostTeamName, entry.TeamName)
 	setStrPtr(schemas.AttrBifrostCustomerID, entry.CustomerID)
 	setStrPtr(schemas.AttrBifrostCustomerName, entry.CustomerName)
-	setStrPtr(schemas.AttrBifrostBusinessUnitID, entry.BusinessUnitID)
-	setStrPtr(schemas.AttrBifrostBusinessUnitName, entry.BusinessUnitName)
-	setStrPtr(schemas.AttrBifrostProjectID, entry.ProjectID)
-	setStrPtr(schemas.AttrBifrostProjectName, entry.ProjectName)
 	setStrPtr(schemas.AttrBifrostUserID, entry.UserID)
 	setStrPtr(schemas.AttrBifrostUserName, entry.UserName)
 	setStrPtr(schemas.AttrBifrostAlias, entry.Alias)
@@ -1921,8 +1903,7 @@ func (p *LoggerPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 	}
 
 	// Capture while content is on, and also while governance has yet to resolve the presented virtual
-	// key or the named project: it may stamp a decision that turns content on after ours runs (the
-	// passthrough path, and any request that names a project).
+	// key: it may stamp a decision that turns content on after ours runs (the passthrough path).
 	// PostLLMHook applies the final policy and drops whatever it does not allow, and the processing
 	// notification below never carries input captured this way.
 	if req.PassthroughRequest != nil {
@@ -2002,7 +1983,7 @@ func (p *LoggerPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 	// The entry does not exist in the DB yet - it will be written when PostLLMHook fires.
 	initialEntry := buildInitialLogEntry(pending)
 	if captureProvisional || !p.contentLoggingEnabled(ctx) {
-		// Subscribers see this entry before governance has decided for the key or project, so it
+		// Subscribers see this entry before governance has decided for the key, so it
 		// carries no input until the final policy in PostLLMHook says it may.
 		dropCapturedInput(initialEntry)
 	}
@@ -2160,12 +2141,6 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 				}
 				entry.MetadataParsed["isAsyncRequest"] = true
 			}
-			if projectID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectID); projectID != "" {
-				entry.ProjectID = &projectID
-			}
-			if projectName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectName); projectName != "" {
-				entry.ProjectName = &projectName
-			}
 			applyModelAlias(entry, originalModelRequested, resolvedModelUsed)
 			applyResolvedAliasInfo(entry, resolvedKeyAlias)
 			// A passthrough call still gets its tag; with no pending entry there is no route or
@@ -2264,12 +2239,8 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 	customerName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerName)
 	userID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID)
 	userName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserName)
-	businessUnitID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceBusinessUnitID)
-	businessUnitName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceBusinessUnitName)
 	numberOfRetries := bifrost.GetIntFromContext(ctx, schemas.BifrostContextKeyNumberOfRetries)
 	attemptTrail, _ := ctx.Value(schemas.BifrostContextKeyAttemptTrail).([]schemas.KeyAttemptRecord)
-	projectID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectID)
-	projectName := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectName)
 
 	// Extract routing engine logs from context before entering goroutine
 	routingEngineLogs := formatRoutingEngineLogs(ctx.GetRoutingEngineLogs())
@@ -2287,8 +2258,8 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 	// Build the complete log entry with input (from PreLLMHook) + output (from PostLLMHook)
 	entry := buildCompleteLogEntryFromPending(pending)
 	if !contentLoggingEnabled {
-		// The final policy is stricter than the one the inputs were captured under (a virtual key or
-		// project stamped after our PreLLMHook, as on the passthrough path): take them back out.
+		// The final policy is stricter than the one the inputs were captured under (a virtual key
+		// stamped after our PreLLMHook, as on the passthrough path): take them back out.
 		dropCapturedInput(entry)
 	}
 	tagPassthroughEntry(ctx, entry, pending.InitialData, contentLoggingEnabled)
@@ -2323,7 +2294,7 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 			entry.ServerSideFallbackModel = &m
 		}
 	}
-	applyOutputFieldsToEntry(entry, selectedKeyID, selectedKeyName, virtualKeyID, virtualKeyName, routingRuleID, routingRuleName, teamID, teamName, customerID, customerName, userID, userName, businessUnitID, businessUnitName, projectID, projectName, numberOfRetries, latency, upstreamLatency, overheadLatency, attemptTrail)
+	applyOutputFieldsToEntry(entry, selectedKeyID, selectedKeyName, virtualKeyID, virtualKeyName, routingRuleID, routingRuleName, teamID, teamName, customerID, customerName, userID, userName, numberOfRetries, latency, upstreamLatency, overheadLatency, attemptTrail)
 	applyUserEmail(ctx, entry)
 	if complexityTier != "" {
 		entry.ComplexityTier = &complexityTier
@@ -2354,12 +2325,6 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 	}
 	if teamNames, ok := ctx.Value(schemas.BifrostContextKeyGovernanceTeamNames).([]string); ok && len(teamNames) > 0 {
 		entry.TeamNamesParsed = teamNames
-	}
-	if buIDs, ok := ctx.Value(schemas.BifrostContextKeyGovernanceBusinessUnitIDs).([]string); ok && len(buIDs) > 0 {
-		entry.BusinessUnitIDsParsed = buIDs
-	}
-	if buNames, ok := ctx.Value(schemas.BifrostContextKeyGovernanceBusinessUnitNames).([]string); ok && len(buNames) > 0 {
-		entry.BusinessUnitNamesParsed = buNames
 	}
 	if customerIDs, ok := ctx.Value(schemas.BifrostContextKeyGovernanceCustomerIDs).([]string); ok && len(customerIDs) > 0 {
 		entry.CustomerIDsParsed = customerIDs

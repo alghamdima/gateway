@@ -108,12 +108,7 @@ func TestVirtualKeyAssignedUserSerialization(t *testing.T) {
 }
 
 // TestVirtualKeyOwnerMutualExclusion pins that a key belongs to at most one owner. The owner is
-// what decides whose money a request spends and whose access profile the key answers to, so a key
-// claiming two of them has no answer to either question.
-//
-// Every pair is exercised rather than just the team/customer one the check originally covered:
-// business_unit_id joined team_id and customer_id as an owner, and a pairwise check is exactly the
-// kind that leaves a new pair unguarded.
+// what decides whose money a request spends, so a key claiming two of them has no answer.
 func TestVirtualKeyOwnerMutualExclusion(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
@@ -137,7 +132,6 @@ func TestVirtualKeyOwnerMutualExclusion(t *testing.T) {
 		}{
 			{"team", func(vk *TableVirtualKey) { vk.TeamID = ptr("team-1") }},
 			{"customer", func(vk *TableVirtualKey) { vk.CustomerID = ptr("cust-1") }},
-			{"business unit", func(vk *TableVirtualKey) { vk.BusinessUnitID = ptr("bu-1") }},
 			{"none", func(vk *TableVirtualKey) {}},
 		} {
 			vk := newKey("solo-" + tc.name)
@@ -151,15 +145,21 @@ func TestVirtualKeyOwnerMutualExclusion(t *testing.T) {
 		// would store an owner nothing resolves, and would make a body naming one real owner beside a
 		// blank one read as two.
 		vk := newKey("blank-owner")
-		vk.TeamID, vk.CustomerID, vk.BusinessUnitID = ptr(""), ptr("   "), ptr("bu-1")
+		vk.TeamID, vk.CustomerID = ptr(""), ptr("cust-1")
 		require.NoError(t, db.Create(&vk).Error, "blank owner ids must not count as owners")
 
 		var stored TableVirtualKey
 		require.NoError(t, db.First(&stored, "id = ?", vk.ID).Error)
 		assert.Nil(t, stored.TeamID, "a blank team id is stored as no team")
-		assert.Nil(t, stored.CustomerID, "a whitespace customer id is stored as no customer")
-		require.NotNil(t, stored.BusinessUnitID)
-		assert.Equal(t, "bu-1", *stored.BusinessUnitID, "the one real owner survives")
+		require.NotNil(t, stored.CustomerID)
+		assert.Equal(t, "cust-1", *stored.CustomerID, "the one real owner survives")
+
+		spaced := newKey("whitespace-owner")
+		spaced.CustomerID = ptr("   ")
+		require.NoError(t, db.Create(&spaced).Error)
+		var storedSpaced TableVirtualKey
+		require.NoError(t, db.First(&storedSpaced, "id = ?", spaced.ID).Error)
+		assert.Nil(t, storedSpaced.CustomerID, "a whitespace customer id is stored as no customer")
 	})
 
 	t.Run("two owners are rejected", func(t *testing.T) {
@@ -170,21 +170,12 @@ func TestVirtualKeyOwnerMutualExclusion(t *testing.T) {
 			{"team and customer", func(vk *TableVirtualKey) {
 				vk.TeamID, vk.CustomerID = ptr("team-1"), ptr("cust-1")
 			}},
-			{"team and business unit", func(vk *TableVirtualKey) {
-				vk.TeamID, vk.BusinessUnitID = ptr("team-1"), ptr("bu-1")
-			}},
-			{"customer and business unit", func(vk *TableVirtualKey) {
-				vk.CustomerID, vk.BusinessUnitID = ptr("cust-1"), ptr("bu-1")
-			}},
-			{"all three", func(vk *TableVirtualKey) {
-				vk.TeamID, vk.CustomerID, vk.BusinessUnitID = ptr("team-1"), ptr("cust-1"), ptr("bu-1")
-			}},
 		} {
 			vk := newKey("dual-" + tc.name)
 			tc.apply(&vk)
 			err := db.Create(&vk).Error
 			require.Error(t, err, "a key owned by %s must be rejected", tc.name)
-			assert.Contains(t, err.Error(), "more than one of team, customer or business unit")
+			assert.Contains(t, err.Error(), "more than one of team or customer")
 		}
 	})
 }

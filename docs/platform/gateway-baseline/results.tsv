@@ -5065,7 +5065,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	-	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestBeforeSave_DoesNotMutateSharedProviderConfigs	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestBeforeSave_SecretVarBackedFields_NotEncrypted	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestBudgetDurationFormats	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestBudgetTagsBuildBusinessUnitIDIndex	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestCancelSidekiqJob	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestClaimPartitionedSidekiqJobFIFOAndExclusion	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestClaimPartitionedSidekiqJobSelfNotBlockedByPrecisionSkew	pass
@@ -5267,7 +5266,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestFullVirtualKeyFlo
 framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateBudgetHashAgreesAcrossConfigAndDatabaseSources	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateBudgetHashTracksQuarterStartMonth	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateBudgetHashUnchangedForNonQuarterlyBudgets	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateClientConfigHashCoversEntityAccessProfileMode	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateClientConfigHash_CompatConvertDecisionToResponses	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateClientConfigHash_CompatForceReasoningOnlyModelsToResponses	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestGenerateClientConfigHash_UsageEstimationTokenizers	pass
@@ -5373,15 +5371,11 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestMergeComplexityAn
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddAnthropicWorkloadIdentityColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBatchJobsAttributionColumns	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBatchJobsFileIDIndexes	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBudgetBusinessUnitIDColumn	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBudgetBusinessUnitIDIndex	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBudgetOverrideAnchorColumns	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBudgetOverrideColumns	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddBudgetResetConfigColumn_NonRollbackable	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddClientConfigDeleteExpiredVirtualKeysColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddClientConfigEnforceVKObjectOwnershipColumn	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddClientConfigEntityAccessProfileModeColumn	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddCompatAzureDeepseekColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddCompatConvertDecisionToResponsesColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddCompatForceReasoningOnlyModelsToResponsesColumn	pass
@@ -5412,7 +5406,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVKRot
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVertexAWSWorkloadIdentityColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVertexAWSWorkloadIdentityColumn_RollbackRefuses	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVideoResolutionPricingColumns	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVirtualKeyBusinessUnitColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVirtualKeyDeleteAfterExpireColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVirtualKeyDisableContentLoggingColumn	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestMigrationAddVirtualKeyDisableContentLoggingColumn_NonRollbackable	pass
@@ -5549,7 +5542,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestTryAcquireLock_Mu
 framework	github.com/maximhq/bifrost/framework/configstore	TestTryAcquireLock_Success	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateBudget	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateBudgetClearsResetConfigWhenLeavingQuarterly	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateBudgetKeepsTheBusinessUnitOwnerOnAnOwnerlessWrite	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateBudgetOverrideAnchorsAtCalendarPeriodStart	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateBudgetOverrideAnchorsAtCurrentWindow	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateBudgetOverridePreservesBudgetState	pass
@@ -5563,7 +5555,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfi
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfig_EnforceVKObjectOwnershipRoundTrip	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfig_ExtraFieldsPlacementRoundTrip	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfig_PreservesMetadataAcrossSync	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfig_SkipAccessProfileUserVirtualKeyLifecycleRoundTrip	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfig_UsageEstimationTokenizersRoundTrip	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientConfig_VKRotationCooldownRoundTrip	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateClientMetadata	pass
@@ -5585,7 +5576,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateRateLimitPr
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateSidekiqJobProgress	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateTeamChangesAndClearsCustomer	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateVirtualKey	pass
-framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateVirtualKey_PersistsBusinessUnitOwner	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateVirtualKey_PreservesRotationStateOnPlainUpdate	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateVirtualKey_RotationWithoutCooldownClearsPreviousValue	pass
 framework	github.com/maximhq/bifrost/framework/configstore	TestUpdateVirtualKey_UnresolvablePreviousValueRejected	pass
@@ -5632,7 +5622,6 @@ framework	github.com/maximhq/bifrost/framework/configstore	TestVirtualKeyPreviou
 framework	github.com/maximhq/bifrost/framework/configstore/tables	-	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestAdoptCalendarAlignmentOnRateLimits	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestAdoptCalendarAlignmentPreservesTheOpenWindow	pass
-framework	github.com/maximhq/bifrost/framework/configstore/tables	TestBeforeSave_ProjectScope	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestBudgetAfterFindRejectsMalformedResetConfig	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestBudgetQuarterStartMonthDefaultsToJanuary	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestBudgetRejectsZeroLengthQuarter	pass
@@ -5689,7 +5678,6 @@ framework	github.com/maximhq/bifrost/framework/configstore/tables	TestRoutingFal
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestRoutingFallback_ProviderOnlyObjectSurvivesPersistence	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestRoutingFallback_ResolvedReparsesLegacyString	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestRoutingFallback_UnpinnedRoundTripsByteIdentically	pass
-framework	github.com/maximhq/bifrost/framework/configstore/tables	TestTableBudgetBeforeSaveCountsTheBusinessUnitOwner	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestTableBudgetOverrideLifecycle	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestTableBudgetRefreshOverrideCyclesRemaining	pass
 framework	github.com/maximhq/bifrost/framework/configstore/tables	TestTableBudgetRefreshOverrideCyclesRemainingIsIdempotent	pass
@@ -5853,7 +5841,6 @@ framework	github.com/maximhq/bifrost/framework/grant	TestNewLimits	pass
 framework	github.com/maximhq/bifrost/framework/grant	TestNewPermit	pass
 framework	github.com/maximhq/bifrost/framework/grant	TestPermitTypePrettyStringNamesEveryKind	pass
 framework	github.com/maximhq/bifrost/framework/grant	TestPermit_NilReceiver	pass
-framework	github.com/maximhq/bifrost/framework/grant	TestProjectLimitsSeparateTheirHolderFromTheirProviderConfig	pass
 framework	github.com/maximhq/bifrost/framework/grant	TestProviderPermitAllowsModel	pass
 framework	github.com/maximhq/bifrost/framework/grant	TestProviderPermitFor	pass
 framework	github.com/maximhq/bifrost/framework/jobaccounting	-	pass
@@ -5999,7 +5986,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestCanUseMatViewFilters
 framework	github.com/maximhq/bifrost/framework/logstore	TestCanUseMatViewFiltersRejectsRequestID	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestCanUseMatViewFiltersRejectsSessionGrouping	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestCanUseMatViewFiltersRejectsToolCallNames	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestCanUseMatViewFilters_ExcludesTeamBU	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestCancelledStatusIncludedInLogAggregates	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestCanonicalModelRankings_PostgresMatView	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestCanonicalModelRankings_PostgresRaw	skip
@@ -6112,7 +6098,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestDimensionUsageMalfor
 framework	github.com/maximhq/bifrost/framework/logstore	TestDimensionUsageMatchesRankings	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestDimensionUsageRejectsDimensionsWithoutAnIDColumn	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestDimensionUsageWithoutCompareReadsOnlyTheWindow	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestDistinctProjectsAreListedByName	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestDrainExpiredContinuesPastShortBatch	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestDrainExpiredDoesNotShrinkOnOtherErrors	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestDrainExpiredFailsWhenOneRowTimesOut	pass
@@ -6130,14 +6115,12 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestEnsurePerformanceInd
 framework	github.com/maximhq/bifrost/framework/logstore	TestExtractPayload_CarriesCallerIdentity	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestExtractPayload_NilOrEmptyMetadataOmittedFromSnapshot	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestExtractPayload_RoundTrip	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestFilterBusinessUnitMatView_CollectsScalarAndArray	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterMatViewScopeIdx_IsConcurrentAndIdempotent	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterMatViewShapeErrorFallsBack	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterMatViewUniqueIdx_StillConcurrent	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterMatViews_AllCarryVisibilityColumns	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterMatViews_UniqueIdxIncludesVisibilityColumns	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterMultiValueMatViews_TeamDataScopeResolves	skip
-framework	github.com/maximhq/bifrost/framework/logstore	TestFilterProjectsMatView_ListsProjects	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterTeamMatView_CollectsScalarAndArray	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterTeamMatView_DACScopeAppliesAfterFanout	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestFilterUsersMatView_TeamDataScopeIncludesOrgDimensions	skip
@@ -6188,7 +6171,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestHighFixesPGRankingNa
 framework	github.com/maximhq/bifrost/framework/logstore	TestHighFixesPGRankingNamesFallbackUsesAllHistory	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestHighFixesRankingNameIndexes	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestHighFixesSearchCountIsExact	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestHourlyMatView_FiltersByProject	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestHybridLogStoreForwardsRetentionInterval	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestHybridMigrationInProgressForwardsToInner	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestHybridObjectKeysFollowFormat	pass
@@ -6266,7 +6248,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestLatencyOverheadHisto
 framework	github.com/maximhq/bifrost/framework/logstore	TestListComplexityReplayUsage	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestListProjectionExcludesOutputPayloadBlobs	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestListProjectionIncludesBillingScalars	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestListRowsCarryTheProject	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestLogCreateSerializesFields	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestLogListsPreserveStopReasons	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestLogPassthroughObjectType	pass
@@ -6344,7 +6325,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestPauseMatViewMaintena
 framework	github.com/maximhq/bifrost/framework/logstore	TestPauseMatViewsForMigrationsFailsOpen	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestPerDimensionReaders_TargetTheirOwnMatview	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestPerformanceIndexesCoverCorrelationIDs	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestPerformanceIndexesCoverProjectIDs	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestPerformanceIndexesHaveNoDuplicateColumns	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestPgDropIndexConcurrentlyRebuildsAfterPeerBuildFails	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestPgDropIndexConcurrentlyWaitsForLiveBuild	skip
@@ -6353,10 +6333,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestPostgresDeleteLogsCh
 framework	github.com/maximhq/bifrost/framework/logstore	TestPostgresRetentionBatchNeverExceedsBatchSize	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestPostgresRetentionBatchSkipsLockedRows	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestPostgresRetentionBatchYieldsWhileLockHeld	skip
-framework	github.com/maximhq/bifrost/framework/logstore	TestProjectColumnsRoundTrip	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestProjectCostHistogramGroupsByProject	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestProjectFilterNarrowsTheRawQuery	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestProjectRankingsBucketUnattributedTraffic	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestRDBRetentionIntervalByDialect	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestRaiseRetentionStatementTimeout	skip
 framework	github.com/maximhq/bifrost/framework/logstore	TestRankingTrendsZeroBaseline	pass
@@ -6424,7 +6400,6 @@ framework	github.com/maximhq/bifrost/framework/logstore	TestSubmitJob_OperationF
 framework	github.com/maximhq/bifrost/framework/logstore	TestSubmitJob_PropagatesContextValues	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestSubmitJob_PropagatesGrant	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestSubmitJob_StoresRequestID	pass
-framework	github.com/maximhq/bifrost/framework/logstore	TestTeamOrBUFanoutFrom	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestThroughputHistogramMath	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestThroughputInferenceOnly_Postgres	pass
 framework	github.com/maximhq/bifrost/framework/logstore	TestTimestampBoundClickHouseRoundsTowardTheRange	pass
@@ -7764,7 +7739,6 @@ plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluateLim
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluateLimitsEnforcesTheSettledLimitsWhicheverCredentialProducedThem	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluateRefusesAPermitThatMayNotBeUsed	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluateRefusesAPresentedCredentialThatGrantsNothing	pass
-plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluateRefusesARequestNothingScoped	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluateSkipsASettlingErrorWhenSpendingChecksAreSkipped	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEvaluate_ScopedCustomerSkipsScalarTeamCustomerEnforcement	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestEveryRefusalDeclaresAnErrorType	pass
@@ -7860,7 +7834,6 @@ plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestLoadBalance
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestLocalGovernanceStore_GetGovernanceUsageDataExcludesUnrelatedState	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestMandatoryAuthAcceptsAnAuthenticatedIdentity	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelConfigScopesForIgnoresExtraScopedIDsResolvers	pass
-plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelConfigScopesIncludeTheProjectScopingARequest	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelLimitOnAliasTargetGovernsTheAliasThroughTheHookChain	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelMatcherReadsOnlyTheProviderItChecks	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestNonPositiveDurationsAreNeverDue	pass
@@ -8289,7 +8262,6 @@ plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestProcessBatchSQLit
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestProcessBatchStatementTimeoutSingleRowDropped	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestProcessBatchStatementTimeoutSplitsBatch	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestProcessBatchUnknownErrorStillFallsBackPerRow	pass
-plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestProjectDecisionAppliesToContentCapturedBeforeAdmission	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestRawErrorDetailsPreservedWhenEnabled	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestRealtimeAttributionPersistsAcrossTurns	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestRealtimeInputAssociationsPreserveMergedHistory	pass
@@ -9284,7 +9256,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAd
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAddProvider_ReturnsErrorWhenRuntimeReloadFails	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAddProvider_ZeroKeyCustomProviderResolvesByPrefix	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyAssignees	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyBusinessUnits	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyCurrentRankingNames	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyCurrentRankingNamesBatchesLookups	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyExternalBudgets_ManagedWithNoGovernanceFlagsAndClears	pass
@@ -9304,7 +9275,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestAp
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVKGovernanceFromModelConfigs_OverlaysModelConfigGovernance	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVKGovernanceFromModelConfigs_PreservesDirectlyAttachedBudget	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVirtualKeyContentLoggingUpdate	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVirtualKeyOwnershipUpdateBusinessUnit	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVirtualKeyOwnershipUpdatePreservesOmittedAssociation	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVirtualKeyOwnershipUpdateRejectsDualAssociation	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestApplyVirtualKeyOwnershipUpdateSwitchesAndClearsAssociation	pass
@@ -9497,7 +9467,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestEx
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFasthttpToHTTPRequest	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFasthttpToHTTPRequest_PathParams	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFilterDataCacheIdentity_PartitionsPerCaller	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFilterDataListsProjects	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFinalizeRealtimeTurnHooksMarksVoiceLiveTurns	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFinalizeRealtimeTurnHooksWithErrorCompletesActiveHooks	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestFinalizedRealtimeInputSummary	pass
@@ -9820,7 +9789,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestPr
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestPriceComplexitySuggestionImpact	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestPriceComplexitySuggestionImpactUsesCurrentTargetsForLive	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestProbeChatRequestStopParse	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestProjectFilterReachesEveryLogQuery	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestProviderBaseURLShape	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestProviderBudgetFrequencyChangePreservesUsageWhenRequested	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestProviderGovernance_DecodesEncodedProviderName	pass
@@ -10113,7 +10081,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUp
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_ConcurrentSavesAreSerialized	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_EmptyDatasheetURLsResetToDefaults	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_EnforceVKObjectOwnershipPresence	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_EntityAccessProfileMode	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_ExtraFieldsPlacement	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_FirstAdminAcceptsSetupTokenHeader	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_FirstAdminStillRequiresSetupToken	pass
@@ -10123,7 +10090,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUp
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_InferenceAuthStoreFailures	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_PersistsVKRotationCooldown	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_RejectsFileURLsOverAPI	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_SkipAccessProfileUserVirtualKeyLifecyclePresence	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_StoredCredentialsRequireProofWhenAuthBypassed	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_UnchangedFileURLsPassOverAPI	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers	TestUpdateConfig_UsageEstimationTokenizers	pass
@@ -10599,7 +10565,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestGetConf
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestGetConfigForProvider_UnreadableGlobalProxyFailsClosed	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestGetCustomProviderPassthrough	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestGetPluginOrder_MatchesSortedOrder	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestGovernanceHash_AccessProfileOnlyCountsWhenSet	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHeaderMatcher_AllowlistPrefixWithDenylistExact	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHeaderMatcher_AllowlistWithDenylist	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHeaderMatcher_CaseInsensitive	pass
@@ -10614,7 +10579,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHeaderM
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHeaderMatcher_WildcardDenylist	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHiddenRequestTypesAffectClientConfigHash	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestHiddenRequestTypesPersistInConfigStore	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestIgnoreBudgetBusinessUnitIDs	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestInheritGlobalProxy	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestInheritGlobalProxy_BareAddressKeepsTheProxy	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestIsGatewayOwnedResponseHeader	pass
@@ -10951,7 +10915,6 @@ transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaC
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaComplexityLLMTimeout	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaComplexitySemanticTimeout	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaGovernanceModelConfigs	pass
-transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaGovernanceProjectsValidation	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaGovernanceProviders	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaKeyAliases	pass
 transports	github.com/maximhq/bifrost/transports/v2/bifrost-http/lib	TestSchemaLiveModelsSyncInterval	pass

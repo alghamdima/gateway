@@ -13,11 +13,7 @@ import (
 )
 
 // TestGetModelConfigsPaginatedScopesFilter covers the multi-value scope filter.
-// One UI filter option can cover several scope values, so the query must OR them:
-// in an enterprise build the "User" option covers both "user" and
-// "access_profile". Those two scopes are registered by enterprise at runtime and
-// fail model-config validation in an OSS-only test, so this exercises the same
-// OR-ing over the OSS-native scopes.
+// One UI filter option can cover several scope values, so the query must OR them.
 func TestGetModelConfigsPaginatedScopesFilter(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)

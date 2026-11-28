@@ -61,16 +61,13 @@ func unixBucketExpr(dialect string, bucketSizeSeconds int64) string {
 // fanoutDimensionColumns maps a scalar dimension id column to its JSON-array
 // id/name columns and its scalar name column. The org-hierarchy dimensions are
 // single-valued on the scalar column (set by the VK path and by pre-migration
-// rows) and multi-valued on the JSON-array column (set by the enterprise
-// user/AP path, which is the only writer that knows a request's full hierarchy).
+// rows) and multi-valued on the JSON-array column.
 // ok is false for dimensions that have no array column at all (user, virtual
 // key, provider, app, user agent) — those keep plain scalar attribution.
 func fanoutDimensionColumns(idCol string) (arrIDs, arrNames, scalarName string, ok bool) {
 	switch idCol {
 	case "team_id":
 		return "team_ids", "team_names", "team_name", true
-	case "business_unit_id":
-		return "business_unit_ids", "business_unit_names", "business_unit_name", true
 	case "customer_id":
 		return "customer_ids", "customer_names", "customer_name", true
 	}
@@ -97,8 +94,8 @@ func dimensionFanoutFrom(dialect, idCol string) (string, bool) {
 	switch dialect {
 	case "postgres":
 		// Delegated so the Postgres text stays byte-identical to what the
-		// filter matviews were built from (see teamOrBUFanoutFrom).
-		return teamOrBUFanoutFrom(idCol)
+		// filter matviews were built from (see orgFanoutFrom).
+		return orgFanoutFrom(idCol)
 	case "sqlite":
 		return sqliteDimensionFanoutFrom(arrIDs, arrNames, idCol, scalarName), true
 	case "clickhouse":

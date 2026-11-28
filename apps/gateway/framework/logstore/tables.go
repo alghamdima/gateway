@@ -138,8 +138,6 @@ type SearchFilters struct {
 	TeamIDs              []string   `json:"team_ids,omitempty"`
 	CustomerIDs          []string   `json:"customer_ids,omitempty"`
 	UserIDs              []string   `json:"user_ids,omitempty"`
-	BusinessUnitIDs      []string   `json:"business_unit_ids,omitempty"`
-	ProjectIDs           []string   `json:"project_ids,omitempty"`
 	RoutingEngineUsed    []string   `json:"routing_engine_used,omitempty"` // For filtering by routing engine (routing-rule, governance, loadbalancing)
 	Apps                 []string   `json:"apps,omitempty"`                // Backend-detected client apps
 	UserAgents           []string   `json:"user_agents,omitempty"`         // Raw User-Agent strings; kept for compatibility/debug filtering
@@ -389,16 +387,10 @@ type Log struct {
 	TeamName                *string   `gorm:"type:varchar(255)" json:"team_name"`
 	CustomerID              *string   `gorm:"type:varchar(255);index:idx_logs_customer_ts,priority:1" json:"customer_id"` // (customer_id, timestamp) composite; replaces idx_logs_customer_id
 	CustomerName            *string   `gorm:"type:varchar(255)" json:"customer_name"`
-	BusinessUnitID          *string   `gorm:"type:varchar(255);index:idx_logs_business_unit_ts,priority:1" json:"business_unit_id"` // (business_unit_id, timestamp) composite; replaces idx_logs_business_unit_id
-	BusinessUnitName        *string   `gorm:"type:varchar(255)" json:"business_unit_name"`
-	ProjectID               *string   `gorm:"type:varchar(255);index:idx_logs_project_ts,priority:1" json:"project_id"` // (project_id, timestamp) composite; replaces idx_logs_project_id
-	ProjectName             *string   `gorm:"type:varchar(255)" json:"project_name"`
 	TeamIDs                 *string   `gorm:"type:text" json:"-"`
 	TeamNames               *string   `gorm:"type:text" json:"-"`
 	CustomerIDs             *string   `gorm:"type:text" json:"-"`
 	CustomerNames           *string   `gorm:"type:text" json:"-"`
-	BusinessUnitIDs         *string   `gorm:"type:text" json:"-"`
-	BusinessUnitNames       *string   `gorm:"type:text" json:"-"`
 	UserAgent               *string   `gorm:"type:varchar(512);index:idx_logs_user_agent" json:"user_agent,omitempty"` // Raw HTTP User-Agent of the calling client
 	App                     *string   `gorm:"type:varchar(128);index:idx_logs_app" json:"app,omitempty"`               // Backend-detected client app derived from user_agent
 	ClientIP                *string   `gorm:"type:varchar(45)" json:"client_ip,omitempty"`                             // Caller IP: leftmost X-Forwarded-For, else X-Real-IP, else the TCP peer
@@ -588,8 +580,6 @@ type Log struct {
 	TeamNamesParsed             []string                                `gorm:"-" json:"team_names,omitempty"`
 	CustomerIDsParsed           []string                                `gorm:"-" json:"customer_ids,omitempty"`
 	CustomerNamesParsed         []string                                `gorm:"-" json:"customer_names,omitempty"`
-	BusinessUnitIDsParsed       []string                                `gorm:"-" json:"business_unit_ids,omitempty"`
-	BusinessUnitNamesParsed     []string                                `gorm:"-" json:"business_unit_names,omitempty"`
 
 	// Populated in handlers after find using the virtual key id and key id
 	VirtualKey  *tables.TableVirtualKey  `gorm:"-" json:"virtual_key,omitempty"`  // redacted
@@ -1088,22 +1078,6 @@ func (l *Log) SerializeFields() error {
 			l.CustomerNames = &s
 		}
 	}
-	if len(l.BusinessUnitIDsParsed) > 0 {
-		if data, err := sonic.Marshal(l.BusinessUnitIDsParsed); err != nil {
-			return err
-		} else {
-			s := string(data)
-			l.BusinessUnitIDs = &s
-		}
-	}
-	if len(l.BusinessUnitNamesParsed) > 0 {
-		if data, err := sonic.Marshal(l.BusinessUnitNamesParsed); err != nil {
-			return err
-		} else {
-			s := string(data)
-			l.BusinessUnitNames = &s
-		}
-	}
 
 	// Build content summary for search.
 	// Skip if already set (e.g., by the hybrid log store which builds input-only summaries).
@@ -1428,16 +1402,6 @@ func (l *Log) DeserializeFields() error {
 	if l.CustomerNames != nil && *l.CustomerNames != "" {
 		if err := sonic.Unmarshal([]byte(*l.CustomerNames), &l.CustomerNamesParsed); err != nil {
 			l.CustomerNamesParsed = nil
-		}
-	}
-	if l.BusinessUnitIDs != nil && *l.BusinessUnitIDs != "" {
-		if err := sonic.Unmarshal([]byte(*l.BusinessUnitIDs), &l.BusinessUnitIDsParsed); err != nil {
-			l.BusinessUnitIDsParsed = nil
-		}
-	}
-	if l.BusinessUnitNames != nil && *l.BusinessUnitNames != "" {
-		if err := sonic.Unmarshal([]byte(*l.BusinessUnitNames), &l.BusinessUnitNamesParsed); err != nil {
-			l.BusinessUnitNamesParsed = nil
 		}
 	}
 
@@ -2031,26 +1995,22 @@ type ProviderThroughputHistogramResult struct {
 type HistogramDimension string
 
 const (
-	DimensionProvider     HistogramDimension = "provider"
-	DimensionTeam         HistogramDimension = "team_id"
-	DimensionCustomer     HistogramDimension = "customer_id"
-	DimensionUser         HistogramDimension = "user_id"
-	DimensionBusinessUnit HistogramDimension = "business_unit_id"
-	DimensionProject      HistogramDimension = "project_id"
-	DimensionApp          HistogramDimension = "app"
-	DimensionUserAgent    HistogramDimension = "user_agent"
+	DimensionProvider  HistogramDimension = "provider"
+	DimensionTeam      HistogramDimension = "team_id"
+	DimensionCustomer  HistogramDimension = "customer_id"
+	DimensionUser      HistogramDimension = "user_id"
+	DimensionApp       HistogramDimension = "app"
+	DimensionUserAgent HistogramDimension = "user_agent"
 )
 
 // ValidHistogramDimensions is the set of allowed dimension values
 var ValidHistogramDimensions = map[HistogramDimension]bool{
-	DimensionProvider:     true,
-	DimensionTeam:         true,
-	DimensionCustomer:     true,
-	DimensionUser:         true,
-	DimensionBusinessUnit: true,
-	DimensionProject:      true,
-	DimensionApp:          true,
-	DimensionUserAgent:    true,
+	DimensionProvider:  true,
+	DimensionTeam:      true,
+	DimensionCustomer:  true,
+	DimensionUser:      true,
+	DimensionApp:       true,
+	DimensionUserAgent: true,
 }
 
 // histogramDimensionColumn maps a validated dimension to its SQL column name.
@@ -2067,10 +2027,6 @@ func histogramDimensionColumn(dimension HistogramDimension) (string, bool) {
 		return "customer_id", true
 	case DimensionUser:
 		return "user_id", true
-	case DimensionBusinessUnit:
-		return "business_unit_id", true
-	case DimensionProject:
-		return "project_id", true
 	}
 	return "", false
 }
@@ -2220,14 +2176,12 @@ type UserRankingResult struct {
 type RankingDimension string
 
 const (
-	RankingDimensionTeam         RankingDimension = "team"
-	RankingDimensionCustomer     RankingDimension = "customer"
-	RankingDimensionBusinessUnit RankingDimension = "business_unit"
-	RankingDimensionProject      RankingDimension = "project"
-	RankingDimensionUser         RankingDimension = "user"
-	RankingDimensionVirtualKey   RankingDimension = "virtual_key"
-	RankingDimensionApp          RankingDimension = "app"
-	RankingDimensionUserAgent    RankingDimension = "user_agent"
+	RankingDimensionTeam       RankingDimension = "team"
+	RankingDimensionCustomer   RankingDimension = "customer"
+	RankingDimensionUser       RankingDimension = "user"
+	RankingDimensionVirtualKey RankingDimension = "virtual_key"
+	RankingDimensionApp        RankingDimension = "app"
+	RankingDimensionUserAgent  RankingDimension = "user_agent"
 	// The routing dimensions: which rule, provider key, alias or complexity tier
 	// handled a request. Each has been filterable on the Logs page for as long as
 	// it has existed and could be ranked by nothing, so "which rule takes the most
@@ -2249,14 +2203,12 @@ const (
 // reachable through GetDimensionRankings for in-process callers, and adding one
 // here is a change to the public API.
 var ValidRankingDimensions = map[RankingDimension]bool{
-	RankingDimensionTeam:         true,
-	RankingDimensionCustomer:     true,
-	RankingDimensionBusinessUnit: true,
-	RankingDimensionProject:      true,
-	RankingDimensionUser:         true,
-	RankingDimensionVirtualKey:   true,
-	RankingDimensionApp:          true,
-	RankingDimensionUserAgent:    true,
+	RankingDimensionTeam:       true,
+	RankingDimensionCustomer:   true,
+	RankingDimensionUser:       true,
+	RankingDimensionVirtualKey: true,
+	RankingDimensionApp:        true,
+	RankingDimensionUserAgent:  true,
 	// The Model Routers page counts each router's requests with it.
 	RankingDimensionModelRouter: true,
 	// A router's page splits its requests by tier, filtered to that router.
@@ -2271,17 +2223,15 @@ type dimensionColumnDef struct {
 }
 
 var dimensionColumns = map[RankingDimension]dimensionColumnDef{
-	RankingDimensionTeam:         {IDCol: "team_id", NameCol: "team_name"},
-	RankingDimensionCustomer:     {IDCol: "customer_id", NameCol: "customer_name"},
-	RankingDimensionBusinessUnit: {IDCol: "business_unit_id", NameCol: "business_unit_name"},
-	RankingDimensionProject:      {IDCol: "project_id", NameCol: "project_name"},
-	RankingDimensionUser:         {IDCol: "user_id", NameCol: "user_name"},
-	RankingDimensionVirtualKey:   {IDCol: "virtual_key_id", NameCol: "virtual_key_name"},
-	RankingDimensionApp:          {IDCol: "app", NameCol: "app"},
-	RankingDimensionUserAgent:    {IDCol: "user_agent", NameCol: "user_agent"},
-	RankingDimensionRoutingRule:  {IDCol: "routing_rule_id", NameCol: "routing_rule_name"},
-	RankingDimensionSelectedKey:  {IDCol: "selected_key_id", NameCol: "selected_key_name"},
-	RankingDimensionAlias:        {IDCol: "alias", NameCol: "alias"},
+	RankingDimensionTeam:        {IDCol: "team_id", NameCol: "team_name"},
+	RankingDimensionCustomer:    {IDCol: "customer_id", NameCol: "customer_name"},
+	RankingDimensionUser:        {IDCol: "user_id", NameCol: "user_name"},
+	RankingDimensionVirtualKey:  {IDCol: "virtual_key_id", NameCol: "virtual_key_name"},
+	RankingDimensionApp:         {IDCol: "app", NameCol: "app"},
+	RankingDimensionUserAgent:   {IDCol: "user_agent", NameCol: "user_agent"},
+	RankingDimensionRoutingRule: {IDCol: "routing_rule_id", NameCol: "routing_rule_name"},
+	RankingDimensionSelectedKey: {IDCol: "selected_key_id", NameCol: "selected_key_name"},
+	RankingDimensionAlias:       {IDCol: "alias", NameCol: "alias"},
 	// Not carried by mv_logs_hourly, so always read from the raw table.
 	RankingDimensionComplexityTier:      {IDCol: "complexity_tier", NameCol: "complexity_tier", RawOnly: true},
 	RankingDimensionComplexityMechanism: {IDCol: "complexity_mechanism", NameCol: "complexity_mechanism", RawOnly: true},
@@ -2320,14 +2270,14 @@ type DimensionRankingResult struct {
 	Rankings  []DimensionRankingWithTrend `json:"rankings"`
 	Dimension RankingDimension            `json:"dimension"`
 	// TotalActualRequests / TotalAttributedRequests are set for every rollup
-	// dimension (team / business unit / customer / user / virtual key), and both
+	// dimension (team / customer / user / virtual key), and both
 	// include the "Unassigned" bucket that owner-less traffic falls into and the
 	// "Other" bucket holding traffic whose entity the caller may not be shown.
 	//
 	// TotalActualRequests is the real number of requests in the window.
-	// TotalAttributedRequests is the sum of every ranking row. For team /
-	// customer / business unit a request is credited to every entity it carries
-	// (the enterprise user/AP path records the full hierarchy), so attributed
+	// TotalAttributedRequests is the sum of every ranking row. For team and
+	// customer a request is credited to every entity it carries (the JSON-array
+	// columns can record several), so attributed
 	// can exceed actual and the rankings are NOT an additive split of org
 	// traffic. User and virtual key have a single owner per request, so for them
 	// the two counts are equal.
@@ -2381,7 +2331,7 @@ type DashboardModelRankings struct {
 
 // DashboardResult is the full consolidated payload for GET /api/logs/dashboard.
 // DimensionRankings is keyed by RankingDimension ("team", "user", "virtual_key",
-// "customer", "business_unit"); each value is that dimension's ranking table.
+// "customer"); each value is that dimension's ranking table.
 type DashboardResult struct {
 	Meta              DashboardMeta                      `json:"meta"`
 	Overview          DashboardOverview                  `json:"overview"`

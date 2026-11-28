@@ -64,7 +64,7 @@ func SettleIdentity(bifrostCtx *schemas.BifrostContext) {
 	if g == nil {
 		return
 	}
-	g.SetIdentity(grant.NewIdentity(credentialFromContext(bifrostCtx), userFromContext(bifrostCtx), nil, nil, nil, nil, nil))
+	g.SetIdentity(grant.NewIdentity(credentialFromContext(bifrostCtx), userFromContext(bifrostCtx), nil, nil, nil))
 }
 
 // credentialFromContext is the credential the request goes by: a virtual key presented in a header,
@@ -95,7 +95,7 @@ func userFromContext(bifrostCtx *schemas.BifrostContext) *schemas.UserRef {
 // it learned.
 func identityWith(current schemas.Identity, credential schemas.Credential) schemas.Identity {
 	if current == nil {
-		return grant.NewIdentity(credential, nil, nil, nil, nil, nil, nil)
+		return grant.NewIdentity(credential, nil, nil, nil, nil)
 	}
-	return grant.NewIdentity(credential, current.User(), current.VirtualKey(), current.Teams(), current.Customers(), current.BusinessUnits(), current.Project())
+	return grant.NewIdentity(credential, current.User(), current.VirtualKey(), current.Teams(), current.Customers())
 }

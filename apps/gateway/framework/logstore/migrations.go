@@ -275,9 +275,9 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_cluster_governance_columns"}, run: migrationAddClusterGovernanceColumns},
 	{IDs: []string{"logs_add_inc_number_column"}, run: migrationAddLogIncNumberColumn},
 	{IDs: []string{"logs_recreate_filter_users_matview"}, run: migrationRecreateFilterUsersMatView},
-	{IDs: []string{"logs_add_multi_team_business_unit_columns"}, run: migrationAddMultiTeamBusinessUnitColumns},
-	{IDs: []string{"logs_add_multi_team_bu_gin_indexes_v1"}, run: migrationAddMultiTeamBusinessUnitGINIndexes},
-	{IDs: []string{"logs_recreate_filter_team_bu_matviews_multivalue"}, run: migrationRecreateFilterTeamBUMatViews},
+	{IDs: []string{"logs_add_multi_team_business_unit_columns"}, run: migrationAddMultiTeamColumns},
+	{IDs: []string{"logs_add_multi_team_bu_gin_indexes_v1"}, run: migrationAddMultiTeamGINIndexes},
+	{IDs: []string{"logs_recreate_filter_team_bu_matviews_multivalue"}, run: migrationRecreateFilterTeamsMatView},
 	{IDs: []string{"logs_add_customer_array_columns"}, run: migrationAddCustomerArrayColumns},
 	{IDs: []string{"logs_add_customer_array_gin_indexes_v1"}, run: migrationAddCustomerArrayGINIndexes},
 	{IDs: []string{"logs_recreate_filter_customers_matview_multivalue"}, run: migrationRecreateFilterCustomersMatView},
@@ -299,7 +299,6 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_recreate_matviews_with_cost_breakdown"}, run: migrationRecreateMatViewsWithCostBreakdown},
 	{IDs: []string{"logs_add_overhead_breakdown_column"}, run: migrationAddOverheadBreakdownColumn},
 	{IDs: []string{"logs_add_video_debug_column"}, run: migrationAddVideoDebugColumn},
-	{IDs: []string{"logs_add_project_columns"}, run: migrationAddProjectColumns},
 	{IDs: []string{"logs_add_served_model_column"}, run: migrationAddServedModelColumn},
 	{IDs: []string{"logs_add_tool_call_names_column"}, run: migrationAddToolCallNamesColumn},
 	{IDs: []string{"logs_add_embedding_input_column"}, run: migrationAddEmbeddingInputColumn},
@@ -315,6 +314,7 @@ var logstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"logs_add_model_routing_columns"}, run: migrationAddModelRoutingColumns},
 	{IDs: []string{"logs_tune_retention_autovacuum"}, run: migrationTuneRetentionAutovacuum},
 	{IDs: []string{"logs_add_time_to_first_token_column"}, run: migrationAddTimeToFirstTokenColumn},
+	{IDs: []string{"logs_drop_business_unit_and_project_columns"}, run: migrationDropBusinessUnitAndProjectColumns},
 }
 
 // areThereAnyPendingMigrations returns true if there are any pending migrations to be applied.
@@ -1879,12 +1879,13 @@ func migrationAddMetadataGINIndex(ctx context.Context, db *gorm.DB, logger schem
 	return nil
 }
 
-// migrationAddMultiTeamBusinessUnitGINIndexes registers the GIN indexes backing
-// multi-team / multi-BU log filtering. Like migrationAddMetadataGINIndex, the
-// build itself is deferred to ensureMultiTeamBusinessUnitGINIndexes (post-startup,
-// background, CONCURRENTLY); this migration exists only to provide a rollback that
-// drops the indexes. Postgres-only.
-func migrationAddMultiTeamBusinessUnitGINIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+// migrationAddMultiTeamGINIndexes registers the GIN index backing multi-team log
+// filtering. Like migrationAddMetadataGINIndex, the build itself is deferred to
+// ensureOrgArrayGINIndexes (post-startup, background, CONCURRENTLY); this
+// migration exists only to provide a rollback that drops the index. Its ID still
+// names business units, which it once covered too: databases have recorded it.
+// Postgres-only.
+func migrationAddMultiTeamGINIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_multi_team_bu_gin_indexes_v1"
 	logger.Info("[logstore] starting migration %s", migrationName)
 	defer logger.Info("[logstore] finished migration %s", migrationName)
@@ -1901,15 +1902,12 @@ func migrationAddMultiTeamBusinessUnitGINIndexes(ctx context.Context, db *gorm.D
 				if err := tx.Exec("DROP INDEX IF EXISTS idx_logs_team_ids_gin").Error; err != nil {
 					return fmt.Errorf("failed to drop team_ids GIN index: %w", err)
 				}
-				if err := tx.Exec("DROP INDEX IF EXISTS idx_logs_business_unit_ids_gin").Error; err != nil {
-					return fmt.Errorf("failed to drop business_unit_ids GIN index: %w", err)
-				}
 			}
 			return nil
 		},
 	}})
 	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while registering multi team/BU GIN indexes: %s", err.Error())
+		return fmt.Errorf("error while registering multi team GIN index: %s", err.Error())
 	}
 	return nil
 }
@@ -2093,13 +2091,10 @@ func ensureArrayGINIndex(ctx context.Context, conn *sql.Conn, indexName, column 
 	return nil
 }
 
-// ensureMultiTeamBusinessUnitGINIndexes builds the GIN indexes backing multi-team
-// and multi-BU log filtering (team_ids / business_unit_ids).
-func ensureMultiTeamBusinessUnitGINIndexes(ctx context.Context, conn *sql.Conn) error {
+// ensureOrgArrayGINIndexes builds the GIN indexes backing multi-team and
+// multi-customer log filtering (team_ids / customer_ids).
+func ensureOrgArrayGINIndexes(ctx context.Context, conn *sql.Conn) error {
 	if err := ensureArrayGINIndex(ctx, conn, "idx_logs_team_ids_gin", "team_ids"); err != nil {
-		return err
-	}
-	if err := ensureArrayGINIndex(ctx, conn, "idx_logs_business_unit_ids_gin", "business_unit_ids"); err != nil {
 		return err
 	}
 	return ensureArrayGINIndex(ctx, conn, "idx_logs_customer_ids_gin", "customer_ids")
@@ -2527,8 +2522,6 @@ var rankingNameTimestampIndexes = []ownerTimestampIndexDef{
 	{table: "logs", name: "idx_logs_selected_key_ts", column: "selected_key_id", replaces: "idx_logs_selected_key_id"},
 	{table: "logs", name: "idx_logs_routing_rule_ts", column: "routing_rule_id", replaces: "idx_logs_routing_rule_id"},
 	{table: "logs", name: "idx_logs_customer_ts", column: "customer_id", replaces: "idx_logs_customer_id"},
-	{table: "logs", name: "idx_logs_business_unit_ts", column: "business_unit_id", replaces: "idx_logs_business_unit_id"},
-	{table: "logs", name: "idx_logs_project_ts", column: "project_id", replaces: "idx_logs_project_id"},
 }
 
 // pgIndexValid reports whether the named index on table exists and is valid in
@@ -2691,8 +2684,7 @@ func migrationAddOwnerTimestampIndexes(ctx context.Context, db *gorm.DB, logger 
 }
 
 // migrationAddRankingNameTimestampIndexes swaps the single-column
-// selected_key_id, routing_rule_id, customer_id, business_unit_id and project_id
-// indexes on logs for (id, timestamp) composites on SQLite and other
+// selected_key_id, routing_rule_id and customer_id indexes on logs for (id, timestamp) composites on SQLite and other
 // non-Postgres databases; Postgres builds them CONCURRENTLY in the background
 // (ensureOwnerTimestampIndexes).
 func migrationAddRankingNameTimestampIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -3087,8 +3079,8 @@ func migrationAddUserNameColumn(ctx context.Context, db *gorm.DB, logger schemas
 	return nil
 }
 
-// migrationAddGovernanceContextColumns adds user_id, team_id, team_name, customer_id, customer_name,
-// business_unit_id, business_unit_name columns to the logs table.
+// migrationAddGovernanceContextColumns adds user_id, team_id, team_name, customer_id and
+// customer_name columns to the logs table.
 func migrationAddGovernanceContextColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_governance_context_columns"
 	logger.Info("[logstore] starting migration %s", migrationName)
@@ -3096,7 +3088,7 @@ func migrationAddGovernanceContextColumns(ctx context.Context, db *gorm.DB, logg
 	opts := *migrator.DefaultOptions
 	opts.UseTransaction = true
 
-	columns := []string{"user_id", "team_id", "team_name", "customer_id", "customer_name", "business_unit_id", "business_unit_name"}
+	columns := []string{"user_id", "team_id", "team_name", "customer_id", "customer_name"}
 
 	m := migrator.New(db, &opts, []*migrator.Migration{{
 		ID: migrationName,
@@ -3126,65 +3118,18 @@ func migrationAddGovernanceContextColumns(ctx context.Context, db *gorm.DB, logg
 	return nil
 }
 
-// migrationAddMultiTeamBusinessUnitColumns adds the JSON-array columns capturing
-// the full deduped set of teams / business units a request belongs to (enterprise
-// user/AP path). The scalar team_id/business_unit_id remain the primary; these
-// power display, multi-team filtering (jsonb @> + GIN), and fan-out aggregation.
-// migrationAddProjectColumns adds the project dimension to the request log. A request records the
-// project it was scoped to the way it records the team or business unit it was made under: as the
-// resolved id and its display name, so a log row still reads correctly after the project is renamed
-// or deleted.
-//
-// Indexed on the id alone, because that is what filtering and rollups ask about; the name is only
-// ever read back off a row that has already been found. The index is built CONCURRENTLY by
-// ensurePerformanceIndexes (an entry appended to performanceIndexes), since addColumnIfNotExists
-// adds only the column and an in-migration build would block writes on a populated table.
-func migrationAddProjectColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "logs_add_project_columns"
-	logger.Info("[logstore] starting migration %s", migrationName)
-	defer logger.Info("[logstore] finished migration %s", migrationName)
-	opts := *migrator.DefaultOptions
-	opts.UseTransaction = true
-
-	columns := []string{"project_id", "project_name"}
-
-	m := migrator.New(db, &opts, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range columns {
-				if err := addColumnIfNotExists(tx, logger, &Log{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, col := range columns {
-				if err := dropColumnIfExists(tx, logger, &Log{}, col); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while adding project columns: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddMultiTeamBusinessUnitColumns adds the JSON-array team and business-unit
-// id/name columns to logs.
-func migrationAddMultiTeamBusinessUnitColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+// migrationAddMultiTeamColumns adds the JSON-array team id/name columns to logs: the full deduped
+// set of teams a request belongs to, for display, multi-team filtering (jsonb @> + GIN) and fan-out
+// aggregation. Its ID still names business units, which it once added too: databases have recorded
+// it.
+func migrationAddMultiTeamColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_multi_team_business_unit_columns"
 	logger.Info("[logstore] starting migration %s", migrationName)
 	defer logger.Info("[logstore] finished migration %s", migrationName)
 	opts := *migrator.DefaultOptions
 	opts.UseTransaction = true
 
-	columns := []string{"team_ids", "team_names", "business_unit_ids", "business_unit_names"}
+	columns := []string{"team_ids", "team_names"}
 
 	m := migrator.New(db, &opts, []*migrator.Migration{{
 		ID: migrationName,
@@ -3209,13 +3154,13 @@ func migrationAddMultiTeamBusinessUnitColumns(ctx context.Context, db *gorm.DB, 
 	}})
 	err := m.Migrate()
 	if err != nil {
-		return fmt.Errorf("error while adding multi team/business-unit columns: %s", err.Error())
+		return fmt.Errorf("error while adding multi team columns: %s", err.Error())
 	}
 	return nil
 }
 
 // migrationRecreateMatViewsWithGovernanceColumns drops and recreates materialized views
-// so they include the new governance context columns (user_id, team_id, customer_id, business_unit_id).
+// so they include the new governance context columns (user_id, team_id, customer_id).
 // The actual rebuild is deferred to ensureMatViews, which runs after startup on
 // a dedicated connection. Dropping materialized views inline in this migration
 // can queue heavy locks during rolling deploys on large log tables.
@@ -3907,15 +3852,14 @@ func migrationRecreateFilterUsersMatView(ctx context.Context, db *gorm.DB, logge
 	return nil
 }
 
-// migrationRecreateFilterTeamBUMatViews drops mv_filter_teams and
-// mv_filter_business_units so ensureMatViews recreates them with the multi-value
-// body (scalar column UNION the JSON-array column). Required because
+// migrationRecreateFilterTeamsMatView drops mv_filter_teams so ensureMatViews
+// recreates it with the multi-value body (scalar column UNION the JSON-array column). Required because
 // repairMatViewShapes only detects drift by column presence, and the column
 // shape (id, name, user_id, team_id, virtual_key_id) is unchanged — only the
 // SELECT body changed — so the views would otherwise keep their old scalar-only
 // definition. Recreated views keep identical columns, so old replicas reading
 // them during a rolling deploy are unaffected (no legacyMatViewNames dance).
-func migrationRecreateFilterTeamBUMatViews(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+func migrationRecreateFilterTeamsMatView(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_recreate_filter_team_bu_matviews_multivalue"
 	logger.Info("[logstore] starting migration %s", migrationName)
 	defer logger.Info("[logstore] finished migration %s", migrationName)
@@ -3928,10 +3872,8 @@ func migrationRecreateFilterTeamBUMatViews(ctx context.Context, db *gorm.DB, log
 				return nil
 			}
 			tx = tx.WithContext(ctx)
-			for _, view := range []string{"mv_filter_teams", "mv_filter_business_units"} {
-				if err := tx.Exec("DROP MATERIALIZED VIEW IF EXISTS " + view + " CASCADE").Error; err != nil {
-					return fmt.Errorf("failed to drop %s: %w", view, err)
-				}
+			if err := tx.Exec("DROP MATERIALIZED VIEW IF EXISTS mv_filter_teams CASCADE").Error; err != nil {
+				return fmt.Errorf("failed to drop mv_filter_teams: %w", err)
 			}
 			return nil
 		},
@@ -3940,7 +3882,7 @@ func migrationRecreateFilterTeamBUMatViews(ctx context.Context, db *gorm.DB, log
 		},
 	}})
 	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while recreating filter team/business-unit matviews: %s", err.Error())
+		return fmt.Errorf("error while recreating filter teams matview: %s", err.Error())
 	}
 	return nil
 }
@@ -3949,7 +3891,7 @@ func migrationRecreateFilterTeamBUMatViews(ctx context.Context, db *gorm.DB, log
 // deduped set of customers a request belongs to (a team can belong to many
 // customers via the enterprise team↔customer M2M). The scalar customer_id remains
 // the primary; these power display, multi-customer filtering (jsonb @> + GIN), and
-// fan-out aggregation, mirroring team_ids / business_unit_ids.
+// fan-out aggregation, mirroring team_ids.
 func migrationAddCustomerArrayColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_customer_array_columns"
 	logger.Info("[logstore] starting migration %s", migrationName)
@@ -3987,8 +3929,8 @@ func migrationAddCustomerArrayColumns(ctx context.Context, db *gorm.DB, logger s
 }
 
 // migrationAddCustomerArrayGINIndexes registers the GIN index backing multi-customer
-// log filtering. Like the team/BU GIN migration, the build itself is deferred to
-// ensureMultiTeamBusinessUnitGINIndexes (post-startup, background, CONCURRENTLY);
+// log filtering. Like the team GIN migration, the build itself is deferred to
+// ensureOrgArrayGINIndexes (post-startup, background, CONCURRENTLY);
 // this migration exists only to provide a rollback that drops the index. Postgres-only.
 func migrationAddCustomerArrayGINIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "logs_add_customer_array_gin_indexes_v1"
@@ -4691,4 +4633,53 @@ func migrationAddTimeToFirstTokenColumn(ctx context.Context, db *gorm.DB, logger
 			return dropColumnIfExists(tx, logger, &Log{}, "TimeToFirstToken")
 		},
 	}}).Migrate()
+}
+
+// migrationDropBusinessUnitAndProjectColumns drops the request log's business unit and project
+// columns, taken out of the product on 2026-11-28 (MODIFICATIONS.md, "Features outside the
+// product"): both were filled only by upstream's paid edition. Their own migrations are gone, so a
+// new database never creates them; this removes them from a database created before that.
+//
+// On Postgres the summary views select some of these columns, so the drop cascades to them, and to
+// the two filter views of the removed dimensions; ensureMatViews builds the views again, in their
+// new shape, after startup. Each column's indexes go with it. Nothing is restored on rollback: the
+// code that read them is gone.
+func migrationDropBusinessUnitAndProjectColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "logs_drop_business_unit_and_project_columns"
+	logger.Info("[logstore] starting migration %s", migrationName)
+	defer logger.Info("[logstore] finished migration %s", migrationName)
+	columns := []string{"business_unit_id", "business_unit_name", "business_unit_ids", "business_unit_names", "project_id", "project_name"}
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if tx.Dialector.Name() == "postgres" {
+				for _, view := range []string{"mv_filter_business_units", "mv_filter_projects"} {
+					if err := tx.Exec("DROP MATERIALIZED VIEW IF EXISTS " + view + " CASCADE").Error; err != nil {
+						return fmt.Errorf("drop %s: %w", view, err)
+					}
+				}
+				for _, column := range columns {
+					if err := tx.Exec("ALTER TABLE logs DROP COLUMN IF EXISTS " + column + " CASCADE").Error; err != nil {
+						return fmt.Errorf("drop logs.%s: %w", column, err)
+					}
+				}
+				return nil
+			}
+			mg := tx.Migrator()
+			for _, column := range columns {
+				if !mg.HasColumn("logs", column) {
+					continue
+				}
+				if err := mg.DropColumn("logs", column); err != nil {
+					return fmt.Errorf("drop logs.%s: %w", column, err)
+				}
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error while dropping business unit and project columns: %s", err.Error())
+	}
+	return nil
 }

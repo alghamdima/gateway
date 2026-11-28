@@ -53,7 +53,7 @@ func FromContext(ctx context.Context) QueryScope {
 // Grouping that row by customer names the second customer, and every ranking,
 // histogram and filter dropdown built on the same column repeats it.
 //
-// Given a scalar id column ("customer_id", "team_id", "business_unit_id",
+// Given a scalar id column ("customer_id", "team_id",
 // "user_id", "virtual_key_id"), a DimensionScope returns the ids the caller may
 // be shown on that dimension and whether a ceiling applies at all. Returning
 // false means "unconstrained" — dimensions that describe the request rather

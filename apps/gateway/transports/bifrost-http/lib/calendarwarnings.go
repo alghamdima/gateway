@@ -52,7 +52,6 @@ func warnMultiUnitCalendarConfig(data []byte, warn func(string, ...any)) {
 		}
 	}
 	collectOwners(governance, false)
-	collectOwners(root["access_profiles"], false)
 	seen := make(map[string]bool)
 	var visit func(any, string, bool)
 	visit = func(value any, path string, inherited bool) {
@@ -63,7 +62,7 @@ func warnMultiUnitCalendarConfig(data []byte, warn func(string, ...any)) {
 			}
 		case map[string]any:
 			aligned := inherited
-			for _, key := range []string{"virtual_key_id", "team_id", "customer_id", "model_config_id", "provider_config_id", "access_profile_id", "project_id"} {
+			for _, key := range []string{"virtual_key_id", "team_id", "customer_id", "model_config_id", "provider_config_id"} {
 				if id, ok := object[key].(string); ok && alignedOwners[id] {
 					aligned = true
 				}
@@ -101,7 +100,6 @@ func warnMultiUnitCalendarConfig(data []byte, warn func(string, ...any)) {
 		}
 	}
 	visit(governance, "governance", false)
-	visit(root["access_profiles"], "access_profiles", false)
 }
 
 // isMultiUnitConfigDuration recognizes integer multiples without treating months

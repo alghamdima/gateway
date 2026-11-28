@@ -376,8 +376,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"drop_allow_direct_keys_column_ddl"}, run: migrationDropAllowDirectKeysColumnDDL},
 	{IDs: []string{"add_team_calendar_aligned_column"}, run: migrationAddTeamCalendarAlignedColumn},
 	{IDs: []string{"drop_legacy_calendar_aligned_columns"}, run: migrationDropLegacyCalendarAlignedColumns},
-	{IDs: []string{"add_vk_access_profile_id_column"}, run: migrationAddVKAccessProfileIDColumn},
-	{IDs: []string{"drop_vk_access_profile_id_column"}, run: migrationDropVKAccessProfileIDColumn},
 	{IDs: []string{"add_framework_config_hash_column"}, run: migrationAddFrameworkConfigHashColumn},
 	{IDs: []string{"add_model_parameters_url_column"}, run: migrationAddModelParametersURLColumn},
 	{IDs: []string{"add_client_config_metadata_json_column"}, run: migrationAddClientConfigMetadataColumn},
@@ -445,7 +443,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_use_openai_endpoints_column"}, run: migrationAddUseOpenAIEndpointsColumn},
 	{IDs: []string{"add_time_of_day_pricing_columns"}, run: migrationAddTimeOfDayPricingColumns},
 	{IDs: []string{"migrate_vk_standalone_limits_to_model_configs"}, run: migrationMigrateVKStandaloneLimitsToModelConfigs},
-	{IDs: []string{"add_virtual_key_business_unit_column"}, run: migrationAddVirtualKeyBusinessUnitColumn},
 	{IDs: []string{"add_virtual_key_disable_content_logging_column"}, run: migrationAddVirtualKeyDisableContentLoggingColumn},
 	{IDs: []string{"add_ttft_timeout_ms_column_to_routing_targets"}, run: migrationAddTTFTTimeoutMsColumnToRoutingTargets},
 	{IDs: []string{"add_web_search_cost_per_request_column"}, run: migrationAddWebSearchCostPerRequestColumn},
@@ -472,7 +469,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_client_config_extra_fields_placement_column"}, run: migrationAddClientConfigExtraFieldsPlacementColumn},
 	{IDs: []string{"add_virtual_key_metadata_column"}, run: migrationAddVirtualKeyMetadataColumn},
 	{IDs: []string{"add_vertex_use_session_routing_column"}, run: migrationAddVertexUseSessionRoutingColumn},
-	{IDs: []string{"add_client_config_skip_access_profile_user_virtual_key_lifecycle_columns"}, run: migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns},
 	{IDs: []string{"add_passthrough_json_column"}, run: migrationAddPassthroughJSONColumn},
 	{IDs: []string{"add_azure_use_speech_endpoints_column"}, run: migrationAddAzureUseSpeechEndpointsColumn},
 	{IDs: []string{"add_azure_use_voice_live_endpoints_column"}, run: migrationAddAzureUseVoiceLiveEndpointsColumn},
@@ -483,17 +479,51 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_cache_creation_above_12hr_pricing_columns"}, run: migrationAddCacheCreationAbove12hrPricingColumns},
 	{IDs: []string{"add_datasheet_overrides_table"}, run: migrationAddDatasheetOverridesTable},
 	{IDs: []string{"add_usage_estimation_tokenizers_json_column"}, run: migrationAddUsageEstimationTokenizersJSONColumn},
-	{IDs: []string{"add_budget_business_unit_id_column"}, run: migrationAddBudgetBusinessUnitIDColumn},
-	{IDs: []string{"add_budget_business_unit_id_index"}, run: migrationAddBudgetBusinessUnitIDIndex},
 	{IDs: []string{"add_databricks_scopes_column"}, run: migrationAddDatabricksScopesColumn},
 	{IDs: []string{"add_model_routing_suggestion_schedules_table"}, run: migrationAddComplexitySuggestionSchedulesTable},
 	{IDs: []string{"add_model_routers_table"}, run: migrationAddModelRoutersTable},
 	{IDs: []string{"add_model_router_targets_and_routing"}, run: migrationAddModelRouterTargetsAndRouting},
 	{IDs: []string{"add_model_router_suggestions_tier_columns"}, run: migrationAddModelRouterSuggestionTierColumns},
-	{IDs: []string{"add_client_config_entity_access_profile_mode_column"}, run: migrationAddClientConfigEntityAccessProfileModeColumn},
 	{IDs: []string{"drop_notifications_and_feature_flags_tables"}, run: migrationDropNotificationsAndFeatureFlagsTables},
 	{IDs: []string{"drop_skills_repository"}, run: migrationDropSkillsRepository},
 	{IDs: []string{"drop_sessions_table"}, run: migrationDropSessionsTable},
+	{IDs: []string{"drop_business_unit_and_access_profile_columns"}, run: migrationDropBusinessUnitAndAccessProfileColumns},
+}
+
+// migrationDropBusinessUnitAndAccessProfileColumns drops the columns of two owner kinds taken out of
+// the product on 2026-11-28 (MODIFICATIONS.md, "Features outside the product"): a virtual key's and a
+// budget's business unit, and the client settings of access profiles. Both served tables of
+// upstream's paid edition that this build never had. Their own migrations are gone, so a new
+// database never creates them; this removes them from a database created before that, together
+// with access_profile_id, which an older pair of migrations added and dropped. The indexes go with
+// their columns. Nothing is restored on rollback: the code that read them is gone.
+func migrationDropBusinessUnitAndAccessProfileColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "drop_business_unit_and_access_profile_columns"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	columns := []struct{ table, column string }{
+		{"governance_virtual_keys", "business_unit_id"},
+		{"governance_virtual_keys", "access_profile_id"},
+		{"governance_budgets", "business_unit_id"},
+		{"config_client", "entity_access_profile_mode"},
+		{"config_client", "skip_access_profile_user_virtual_key_creation"},
+		{"config_client", "skip_access_profile_user_virtual_key_deletion"},
+	}
+	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			mg := tx.WithContext(ctx).Migrator()
+			for _, c := range columns {
+				if !mg.HasColumn(c.table, c.column) {
+					continue
+				}
+				if err := mg.DropColumn(c.table, c.column); err != nil {
+					return fmt.Errorf("drop column %s.%s: %w", c.table, c.column, err)
+				}
+			}
+			return nil
+		},
+	})
 }
 
 // migrationDropSessionsTable drops the table of the admin UI's login sessions, taken out of the
@@ -7661,65 +7691,6 @@ func migrationBackfillVirtualKeyBlacklistedModels(ctx context.Context, db *gorm.
 	return nil
 }
 
-// migrationAddVKAccessProfileIDColumn adds the access_profile_id column to governance_virtual_keys.
-func migrationAddVKAccessProfileIDColumn(_ context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_vk_access_profile_id_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running add_vk_access_profile_id_column migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationDropVKAccessProfileIDColumn drops the access_profile_id column and its
-// index from governance_virtual_keys, reverting migrationAddVKAccessProfileIDColumn.
-func migrationDropVKAccessProfileIDColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_vk_access_profile_id_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			// DROP INDEX IF EXISTS avoids aborting the Postgres transaction when
-			// the index was never created (e.g. fresh installs where the add
-			// migration ran as a no-op).
-			if err := tx.Exec("DROP INDEX IF EXISTS idx_governance_virtual_keys_access_profile_id").Error; err != nil {
-				return fmt.Errorf("failed to drop index idx_governance_virtual_keys_access_profile_id: %w", err)
-			}
-			// Use raw ALTER TABLE instead of GORM's DropColumn: GORM's SQLite
-			// DropColumn does a full table rebuild inside a transaction where
-			// PRAGMA foreign_keys cannot be disabled, causing FK checks on
-			// unrelated columns to fail against test data.
-			// ALTER TABLE DROP COLUMN (SQLite 3.35+) modifies the schema in place.
-			if tx.Migrator().HasColumn("governance_virtual_keys", "access_profile_id") {
-				if err := tx.Exec("ALTER TABLE governance_virtual_keys DROP COLUMN access_profile_id").Error; err != nil {
-					return fmt.Errorf("failed to drop access_profile_id column from governance_virtual_keys: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableVirtualKeyProviderConfig{}, "blacklisted_models"); err != nil {
-				return fmt.Errorf("failed to drop blacklisted_models column: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running drop_vk_access_profile_id_column migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddCreatedByUserIDColumnForVirtualKeys adds the created_by_user_id column to the governance_virtual_keys table.
 func migrationAddCreatedByUserIDColumnForVirtualKeys(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_created_by_user_id_column_for_virtual_keys"
@@ -10277,44 +10248,6 @@ func moveVKTierRateLimit(tx *gorm.DB, vkID string, provider *string, mcID string
 	return int(res.RowsAffected), nil
 }
 
-// migrationAddVirtualKeyBusinessUnitColumn adds business_unit_id to governance_virtual_keys, the
-// third owner a key can have alongside a team and a customer. A business unit is an enterprise
-// table this module does not model, so the column is a bare indexed varchar with no foreign key:
-// what it points at is resolved by whoever owns business units, and a deployment without them
-// simply never writes it.
-func migrationAddVirtualKeyBusinessUnitColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_virtual_key_business_unit_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if err := addColumnIfNotExists(tx, logger, &tables.TableVirtualKey{}, "business_unit_id"); err != nil {
-				return fmt.Errorf("failed to add business_unit_id column: %w", err)
-			}
-			// Every request made with a key owned by a business unit walks this column, and AddColumn
-			// does not create indexes from struct tags.
-			if !mg.HasIndex(&tables.TableVirtualKey{}, "idx_governance_virtual_keys_business_unit_id") {
-				if err := mg.CreateIndex(&tables.TableVirtualKey{}, "BusinessUnitID"); err != nil {
-					return fmt.Errorf("failed to create index on governance_virtual_keys.business_unit_id: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			// The index belongs to the column and goes with it.
-			return dropColumnIfExists(tx, logger, &tables.TableVirtualKey{}, "business_unit_id")
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddVirtualKeyDisableContentLoggingColumn adds disable_content_logging to
 // governance_virtual_keys: the key's own tri-state say on content logging. The column is nullable
 // with no default because NULL is a meaning of its own (inherit the client setting), so every
@@ -11372,40 +11305,6 @@ func rollbackPassthroughJSONColumn(*gorm.DB) error {
 	return fmt.Errorf("add_passthrough_json_column is non-rollbackable: dropping passthrough_json would delete every provider's passthrough allowlist, and after a re-upgrade built-in providers would silently forward every passthrough route again; the column is additive and older binaries safely ignore it")
 }
 
-// migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns adds
-// skip_access_profile_user_virtual_key_creation and skip_access_profile_user_virtual_key_deletion to
-// config_client. Existing rows default to false, keeping access profiles managing user keys.
-func migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_client_config_skip_access_profile_user_virtual_key_lifecycle_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, column := range []string{"skip_access_profile_user_virtual_key_creation", "skip_access_profile_user_virtual_key_deletion"} {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, column := range []string{"skip_access_profile_user_virtual_key_creation", "skip_access_profile_user_virtual_key_deletion"} {
-				if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
 // migrationAddAzureUseSpeechEndpointsColumn adds the azure_use_speech_endpoints column to the key table.
 // Existing keys default to false (NULL), so their audio keeps going to Azure OpenAI.
 func migrationAddAzureUseSpeechEndpointsColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -11622,77 +11521,6 @@ func migrationAddUsageEstimationTokenizersJSONColumn(ctx context.Context, db *go
 	return nil
 }
 
-// migrationAddBudgetBusinessUnitIDColumn adds the business_unit_id owner column to
-// governance_budgets, so a business unit can hold one budget per reset window the
-// way a team or customer does (TableBudget.TeamID / CustomerID). Adding a nullable
-// column is a catalog change and does not rewrite the table. Its index is built by
-// the migration after this one, migrationAddBudgetBusinessUnitIDIndex.
-//
-// Index only, no foreign key: the config loader may write a budget naming a business
-// unit before any row for that unit exists, so no database constraint ties the two.
-func migrationAddBudgetBusinessUnitIDColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_budget_business_unit_id_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			if err := addColumnIfNotExists(tx, logger, &tables.TableBudget{}, "BusinessUnitID"); err != nil {
-				return fmt.Errorf("add business_unit_id column to governance_budgets: %w", err)
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := dropColumnIfExists(tx, logger, &tables.TableBudget{}, "BusinessUnitID"); err != nil {
-				return fmt.Errorf("drop business_unit_id column from governance_budgets: %w", err)
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddBudgetBusinessUnitIDIndex indexes governance_budgets.business_unit_id, which a
-// business unit's budget preload, its deletion and the config.json prune guard all filter on.
-// Upgraded databases get the column from addColumnIfNotExists, which does not build the tag
-// index. Built concurrently so the upgrade never blocks writes: budget usage is written to this
-// table on every dump.
-func migrationAddBudgetBusinessUnitIDIndex(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_budget_business_unit_id_index"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	noTxOpts := *migrator.DefaultOptions
-	noTxOpts.UseTransaction = false
-	if err := RunSingleMigration(ctx, &noTxOpts, db, logger, budgetBusinessUnitIDIndexMigration(ctx, migrationName)); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// budgetBusinessUnitIDIndexMigration builds the migration applied by
-// migrationAddBudgetBusinessUnitIDIndex, so tests exercise the same Migrate and Rollback
-// callbacks the upgrade runs.
-func budgetBusinessUnitIDIndexMigration(ctx context.Context, id string) *migrator.Migration {
-	const name = "idx_governance_budgets_business_unit_id"
-	return &migrator.Migration{
-		ID: id,
-		Migrate: func(tx *gorm.DB) error {
-			return ensureIndexConcurrently(tx.WithContext(ctx), "governance_budgets", name, "business_unit_id", false)
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return dropIndexConcurrently(tx.WithContext(ctx), "governance_budgets", name)
-		},
-	}
-}
-
 // migrationAddDatabricksScopesColumn adds the databricks_scopes column to config_keys. There is
 // nothing to backfill: a NULL column keeps the key on the all-apis default it already requested.
 func migrationAddDatabricksScopesColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -11749,33 +11577,6 @@ func migrationAddComplexitySuggestionSchedulesTable(ctx context.Context, db *gor
 		},
 		Rollback: func(tx *gorm.DB) error {
 			return tx.WithContext(ctx).Migrator().DropTable(&tables.TableComplexitySuggestionSchedule{})
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// migrationAddClientConfigEntityAccessProfileModeColumn adds entity_access_profile_mode to
-// config_client. It defaults to "union", so an upgrade keeps team, business unit and customer
-// access profiles adding to a caller's access, as they did before the setting existed.
-func migrationAddClientConfigEntityAccessProfileModeColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_client_config_entity_access_profile_mode_column"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			if err := setMigrationLockTimeout(tx); err != nil {
-				return err
-			}
-			return addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "entity_access_profile_mode")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			return dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "entity_access_profile_mode")
 		},
 	}})
 	if err := m.Migrate(); err != nil {

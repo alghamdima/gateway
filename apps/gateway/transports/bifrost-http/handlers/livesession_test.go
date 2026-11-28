@@ -165,7 +165,7 @@ func liveCallerCtx(t testing.TB, vkID string) *schemas.BifrostContext {
 	ctx.SetGrant(grant.New())
 	if vkID != "" {
 		ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-"+vkID)
-		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-"+vkID), nil, &schemas.EntityRef{ID: vkID, Name: vkID}, nil, nil, nil, nil))
+		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-"+vkID), nil, &schemas.EntityRef{ID: vkID, Name: vkID}, nil, nil))
 	}
 	return ctx
 }
@@ -965,7 +965,7 @@ func BenchmarkLiveSessionControlRoute(b *testing.B) {
 				preReqCtx, cancel := schemas.NewBifrostContextWithCancel(context.Background())
 				preReqCtx.SetGrant(grant.New())
 				preReqCtx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-vk-a")
-				preReqCtx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-vk-a"), nil, &schemas.EntityRef{ID: "vk-a", Name: "vk-a"}, nil, nil, nil, nil))
+				preReqCtx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-vk-a"), nil, &schemas.EntityRef{ID: "vk-a", Name: "vk-a"}, nil, nil))
 				req := &liveRequest{path: path, setupHeaders: &sessionHeaders{}, preReqCtx: preReqCtx, cancel: func() {}, middlewareValues: map[any]any{}}
 				ctx := &fasthttp.RequestCtx{}
 				ctx.Request.SetRequestURI(path)

@@ -18,7 +18,6 @@ import (
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 	cstables "github.com/maximhq/bifrost/framework/configstore/tables"
-	"github.com/maximhq/bifrost/framework/grant"
 	"github.com/maximhq/bifrost/framework/jobaccounting"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
@@ -494,8 +493,6 @@ func TestPostLLMHookNoPendingErrorPreservesMetadata(t *testing.T) {
 		"region": "us-east",
 	})
 	ctx.SetValue(schemas.BifrostIsAsyncRequest, true)
-	ctx.SetValue(schemas.BifrostContextKeyGovernanceProjectID, "proj-1")
-	ctx.SetValue(schemas.BifrostContextKeyGovernanceProjectName, "Project One")
 	ctx.SetValue(schemas.BifrostContextKeySessionID, "session-no-pending-error")
 
 	statusCode := 500
@@ -540,12 +537,6 @@ func TestPostLLMHookNoPendingErrorPreservesMetadata(t *testing.T) {
 	}
 	if got := logEntry.MetadataParsed["isAsyncRequest"]; got != true {
 		t.Fatalf("expected async metadata true, got %#v", got)
-	}
-	if logEntry.ProjectID == nil || *logEntry.ProjectID != "proj-1" {
-		t.Fatalf("expected project ID proj-1 on the minimal-error entry, got %v", logEntry.ProjectID)
-	}
-	if logEntry.ProjectName == nil || *logEntry.ProjectName != "Project One" {
-		t.Fatalf("expected project name %q on the minimal-error entry, got %v", "Project One", logEntry.ProjectName)
 	}
 	if logEntry.SessionID == nil || *logEntry.SessionID != "session-no-pending-error" {
 		t.Fatalf("expected session ID on the minimal-error entry, got %v", logEntry.SessionID)
@@ -1939,140 +1930,24 @@ func TestPreLLMHookNotificationCarriesNoEmbeddingInputWhileKeyIsUnresolved(t *te
 	}
 }
 
-// projectNamingCtx is a request with no virtual key that names a project through the request
-// header, before governance has admitted it: the caller is a dashboard session.
-func projectNamingCtx(requestID string, header string) *schemas.BifrostContext {
-	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
-	ctx.SetValue(schemas.BifrostContextKeyRequestID, requestID)
-	ctx.SetValue(schemas.BifrostContextKeyRequestHeaders, map[string]string{header: "proj-1"})
-	ctx.SetGrant(grant.New())
-	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialSessionToken, "session"), nil, nil, nil, nil, nil, nil))
-	return ctx
-}
-
-// admitProject leaves the context the way the documented contract describes a request once its
-// named project is admitted: the identity carries the project, and the governance content
-// decision key carries the project's decision when it has one.
-func admitProject(ctx *schemas.BifrostContext, disableContentLogging *bool) {
-	project := &schemas.EntityRef{ID: "proj-1", Name: "Project One"}
-	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialSessionToken, "session"), nil, nil, nil, nil, nil, project))
-	if disableContentLogging != nil {
-		ctx.SetValue(schemas.BifrostContextKeyGovernanceDisableContentLogging, *disableContentLogging)
-	}
-}
-
 // TestGovernanceDecisionPending pins when the logging hooks treat the content decision on the
-// context as not final yet: while a presented virtual key or a named project is still unresolved.
+// context as not final yet: while a presented virtual key is still unresolved.
 func TestGovernanceDecisionPending(t *testing.T) {
-	t.Run("nothing presented or named", func(t *testing.T) {
+	t.Run("nothing presented", func(t *testing.T) {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 		require.False(t, governanceDecisionPending(ctx))
 	})
-	t.Run("project named by id", func(t *testing.T) {
-		require.True(t, governanceDecisionPending(projectNamingCtx("req-pending-id", schemas.HeaderGovernanceProjectID)))
-	})
-	t.Run("project named by name", func(t *testing.T) {
-		require.True(t, governanceDecisionPending(projectNamingCtx("req-pending-name", schemas.HeaderGovernanceProjectName)))
-	})
-	t.Run("an empty project header still names one", func(t *testing.T) {
-		// The governance funnel treats an empty header as having asked, and refuses the request
-		// when nothing was admitted behind it; until then its decision is not known either.
-		ctx := projectNamingCtx("req-pending-empty", schemas.HeaderGovernanceProjectID)
-		ctx.SetValue(schemas.BifrostContextKeyRequestHeaders, map[string]string{schemas.HeaderGovernanceProjectID: ""})
-		require.True(t, governanceDecisionPending(ctx))
-	})
-	t.Run("an admitted project is settled", func(t *testing.T) {
-		ctx := projectNamingCtx("req-pending-admitted", schemas.HeaderGovernanceProjectID)
-		admitProject(ctx, nil)
-		require.False(t, governanceDecisionPending(ctx))
-	})
-	t.Run("an admitted project still waits on an unresolved key", func(t *testing.T) {
-		ctx := projectNamingCtx("req-pending-key", schemas.HeaderGovernanceProjectID)
-		admitProject(ctx, nil)
+	t.Run("a presented key not yet resolved", func(t *testing.T) {
+		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 		ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-presented")
 		require.True(t, governanceDecisionPending(ctx))
 	})
-	t.Run("a stamped key with no project named is settled", func(t *testing.T) {
+	t.Run("a stamped key is settled", func(t *testing.T) {
 		ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 		ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-presented")
 		ctx.SetValue(schemas.BifrostContextKeyGovernanceVirtualKeyID, "vk-1")
 		require.False(t, governanceDecisionPending(ctx))
 	})
-}
-
-// TestProjectDecisionAppliesToContentCapturedBeforeAdmission pins the hook ordering hole for a
-// request that names a project and presents no virtual key: governance admits the project, and
-// stamps its content decision, only after the logging pre-hooks have captured. Content must be
-// held provisionally so the final policy in the post-hooks decides, in both directions.
-func TestProjectDecisionAppliesToContentCapturedBeforeAdmission(t *testing.T) {
-	passthroughRequest := func(body string) *schemas.BifrostRequest {
-		return &schemas.BifrostRequest{
-			RequestType: schemas.PassthroughRequest,
-			PassthroughRequest: &schemas.BifrostPassthroughRequest{
-				Provider:    schemas.OpenAI,
-				Method:      "POST",
-				Path:        "/v1/fine-tuning/jobs",
-				Body:        []byte(body),
-				SafeHeaders: map[string]string{"content-type": "application/json"},
-			},
-		}
-	}
-	passthroughResponse := &schemas.BifrostResponse{
-		PassthroughResponse: &schemas.BifrostPassthroughResponse{
-			StatusCode:  200,
-			Body:        []byte(`{"id":"ftjob-1"}`),
-			Path:        "/v1/fine-tuning/jobs",
-			ExtraFields: schemas.BifrostResponseExtraFields{RequestType: schemas.PassthroughRequest, Provider: schemas.OpenAI},
-		},
-	}
-
-	t.Run("project turning content on over the client flag keeps llm input", func(t *testing.T) {
-		store := newTestStore(t)
-		plugin, err := Init(context.Background(), &Config{DisableContentLogging: new(true)}, testLogger{}, store, nil, nil)
-		require.NoError(t, err)
-		ctx := projectNamingCtx("req-project-on-llm", schemas.HeaderGovernanceProjectID)
-		_, _, err = plugin.PreLLMHook(ctx, passthroughRequest(`{"training_file":"file-kept"}`))
-		require.NoError(t, err)
-		admitProject(ctx, new(false))
-		_, _, err = plugin.PostLLMHook(ctx, passthroughResponse, nil)
-		require.NoError(t, err)
-		require.NoError(t, plugin.Cleanup())
-		logEntry, err := store.FindByID(context.Background(), "req-project-on-llm")
-		require.NoError(t, err)
-		require.False(t, logEntry.ContentHidden, "a project that turns content on must leave the row visible")
-		require.Equal(t, `{"training_file":"file-kept"}`, logEntry.PassthroughRequestBody, "input captured before admission belongs to a content-on project")
-	})
-
-	t.Run("project turning content off drops llm input", func(t *testing.T) {
-		store := newTestStore(t)
-		plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
-		require.NoError(t, err)
-		ctx := projectNamingCtx("req-project-off-llm", schemas.HeaderGovernanceProjectName)
-		_, _, err = plugin.PreLLMHook(ctx, passthroughRequest(`{"training_file":"file-secret"}`))
-		require.NoError(t, err)
-		admitProject(ctx, new(true))
-		_, _, err = plugin.PostLLMHook(ctx, passthroughResponse, nil)
-		require.NoError(t, err)
-		require.NoError(t, plugin.Cleanup())
-		logEntry, err := store.FindByID(context.Background(), "req-project-off-llm")
-		require.NoError(t, err)
-		require.Empty(t, logEntry.PassthroughRequestBody, "a content-off project must persist no input")
-	})
-
-	t.Run("processing notification carries no input before admission", func(t *testing.T) {
-		store := newTestStore(t)
-		plugin, err := Init(context.Background(), &Config{}, testLogger{}, store, nil, nil)
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = plugin.Cleanup() })
-		var notified []*logstore.Log
-		plugin.SetLogCallback(func(_ context.Context, logEntry *logstore.Log) { notified = append(notified, logEntry) })
-		ctx := projectNamingCtx("req-project-notify", schemas.HeaderGovernanceProjectID)
-		_, _, err = plugin.PreLLMHook(ctx, passthroughRequest(`{"training_file":"file-secret"}`))
-		require.NoError(t, err)
-		require.NotEmpty(t, notified, "expected the processing notification")
-		require.Empty(t, notified[0].PassthroughRequestBody, "the notification went out before the project was admitted and must carry no input")
-	})
-
 }
 
 // TestActiveStreamSurvivesCleanup is the regression test for the prod issue where

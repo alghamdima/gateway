@@ -1135,7 +1135,6 @@ func buildSpanAttrs(span *schemas.Span) []attribute.KeyValue {
 	e := span.Enrichment
 	teamIDs, teamNames := entitySet(e, attrs, entityTeam)
 	customerIDs, customerNames := entitySet(e, attrs, entityCustomer)
-	buIDs, buNames := entitySet(e, attrs, entityBusinessUnit)
 
 	return BuildBifrostAttributes(
 		provider,
@@ -1150,10 +1149,6 @@ func buildSpanAttrs(span *schemas.Span) []attribute.KeyValue {
 		teamNames,
 		customerIDs,
 		customerNames,
-		buIDs,
-		buNames,
-		enrichedStr(e, attrs, schemas.AttrBifrostProjectID, func(e *schemas.SpanEnrichment) string { return e.ProjectID }),
-		enrichedStr(e, attrs, schemas.AttrBifrostProjectName, func(e *schemas.SpanEnrichment) string { return e.ProjectName }),
 	)
 }
 
@@ -1174,13 +1169,12 @@ func fallbackIndex(e *schemas.SpanEnrichment, attrs map[string]any) int {
 	return schemas.GetIntAttr(attrs, schemas.AttrBifrostFallbackIndex)
 }
 
-// entityKind names one of the three multi-valued governance entity sets.
+// entityKind names one of the multi-valued governance entity sets.
 type entityKind int
 
 const (
 	entityTeam entityKind = iota
 	entityCustomer
-	entityBusinessUnit
 )
 
 // entitySet resolves a multi-valued entity set, preferring the typed dimensions.
@@ -1201,12 +1195,6 @@ func entitySet(e *schemas.SpanEnrichment, attrs map[string]any, kind entityKind)
 		scalarIDKey, scalarNameKey = schemas.AttrBifrostCustomerID, schemas.AttrBifrostCustomerName
 		if e != nil {
 			ids, names, scalarID, scalarName = e.CustomerIDs, e.CustomerNames, e.CustomerID, e.CustomerName
-		}
-	case entityBusinessUnit:
-		idsKey, namesKey = schemas.AttrBifrostBusinessUnitIDs, schemas.AttrBifrostBusinessUnitNames
-		scalarIDKey, scalarNameKey = schemas.AttrBifrostBusinessUnitID, schemas.AttrBifrostBusinessUnitName
-		if e != nil {
-			ids, names, scalarID, scalarName = e.BusinessUnitIDs, e.BusinessUnitNames, e.BusinessUnitID, e.BusinessUnitName
 		}
 	}
 	if e == nil {
@@ -1229,7 +1217,6 @@ func buildContextAttrs(ctx context.Context, resp *schemas.BifrostResponse, bifro
 	}
 	teamIDs, teamNames := entitySetFromContext(ctx, schemas.BifrostContextKeyGovernanceTeamIDs, schemas.BifrostContextKeyGovernanceTeamNames, schemas.BifrostContextKeyGovernanceTeamID, schemas.BifrostContextKeyGovernanceTeamName)
 	customerIDs, customerNames := entitySetFromContext(ctx, schemas.BifrostContextKeyGovernanceCustomerIDs, schemas.BifrostContextKeyGovernanceCustomerNames, schemas.BifrostContextKeyGovernanceCustomerID, schemas.BifrostContextKeyGovernanceCustomerName)
-	buIDs, buNames := entitySetFromContext(ctx, schemas.BifrostContextKeyGovernanceBusinessUnitIDs, schemas.BifrostContextKeyGovernanceBusinessUnitNames, schemas.BifrostContextKeyGovernanceBusinessUnitID, schemas.BifrostContextKeyGovernanceBusinessUnitName)
 	return BuildBifrostAttributes(
 		string(provider),
 		schemas.NormalizeModelName(model),
@@ -1243,10 +1230,6 @@ func buildContextAttrs(ctx context.Context, resp *schemas.BifrostResponse, bifro
 		teamNames,
 		customerIDs,
 		customerNames,
-		buIDs,
-		buNames,
-		bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectID),
-		bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyGovernanceProjectName),
 	)
 }
 

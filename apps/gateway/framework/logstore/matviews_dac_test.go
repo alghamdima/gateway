@@ -11,13 +11,12 @@ import (
 
 // TestFilterMatViews_AllCarryVisibilityColumns asserts the widening
 // from Fix 4 — every per-dimension matview projects user_id, team_id,
-// virtual_key_id, customer_id and business_unit_id (or has them as part
-// of its dimension columns). Without these columns the DAC scope WHERE
-// applied via ScopedDB would error at the SQL layer with "no such
-// column"; customer_id / business_unit_id specifically are the ones a
-// team-data principal's scope ORs in.
+// virtual_key_id and customer_id (or has them as part of its dimension
+// columns). Without these columns the scope WHERE applied via ScopedDB
+// would error at the SQL layer with "no such column"; customer_id
+// specifically is the one a team-data principal's scope ORs in.
 func TestFilterMatViews_AllCarryVisibilityColumns(t *testing.T) {
-	required := []string{"user_id", "team_id", "virtual_key_id", "customer_id", "business_unit_id"}
+	required := []string{"user_id", "team_id", "virtual_key_id", "customer_id"}
 	for _, v := range filterMatViews {
 		cols := filterMatViewRequiredColumns(v)
 		colSet := make(map[string]struct{}, len(cols))

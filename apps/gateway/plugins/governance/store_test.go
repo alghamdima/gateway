@@ -2656,7 +2656,7 @@ func TestResolveAccessStampsVirtualKeyMetadata(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
 			ctx := emptyCtx()
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil))
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
 			require.Equal(t, vk.ID, ctx.Value(schemas.BifrostContextKeyGovernanceVirtualKeyID), "the key resolved")
@@ -2775,7 +2775,7 @@ func TestResolveAccessStampsVirtualKeyMetadataIntoDimensions(t *testing.T) {
 			ctx.SetValue(schemas.BifrostContextKeyTracer, recorder)
 			ctx.SetValue(schemas.BifrostContextKeyTraceID, "trace-1")
 			ctx.SetValue(schemas.BifrostContextKeyDimensions, headerDims)
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil))
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
 
@@ -2865,7 +2865,7 @@ func TestGovernanceStore_UpdateTeamInMemory_MovesKeysToNewCustomer(t *testing.T)
 				charged = append(charged, b.ID)
 			}
 		}
-		reqCtx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-team"), nil, nil, nil, nil, nil, nil))
+		reqCtx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-team"), nil, nil, nil, nil))
 		StampVirtualKeyScope(reqCtx, key)
 		if identity := reqCtx.Grant().Identity(); identity != nil && len(identity.Customers()) > 0 {
 			stamped = identity.Customers()[0].ID

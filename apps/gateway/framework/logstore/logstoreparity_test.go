@@ -99,13 +99,11 @@ type parityLogSpec struct {
 	vkID, vkName *string
 	teamID       *string
 	customerID   *string
-	buID         *string
 	userID       *string
-	// JSON-array hierarchy columns (enterprise user/AP path). Set without the
+	// JSON-array hierarchy columns. Set without the
 	// scalar ids to exercise the dimension fan-out on every backend.
 	teamIDs, teamNames         *string
 	customerIDs, customerNames *string
-	buIDs, buNames             *string
 	cost                       *float64
 	latency                    *float64
 	tokens                     [3]int // prompt, completion, total
@@ -150,14 +148,11 @@ func (s parityLogSpec) toLog(base time.Time) *Log {
 		VirtualKeyName:        s.vkName,
 		TeamID:                s.teamID,
 		CustomerID:            s.customerID,
-		BusinessUnitID:        s.buID,
 		UserID:                s.userID,
 		TeamIDs:               s.teamIDs,
 		TeamNames:             s.teamNames,
 		CustomerIDs:           s.customerIDs,
 		CustomerNames:         s.customerNames,
-		BusinessUnitIDs:       s.buIDs,
-		BusinessUnitNames:     s.buNames,
 		Cost:                  s.cost,
 		Latency:               s.latency,
 		PromptTokens:          s.tokens[0],
@@ -186,7 +181,7 @@ func paritySpecs() []parityLogSpec {
 	return []parityLogSpec{
 		{id: "p1", offsetSec: 100, object: "chat.completion", provider: "openai", model: "gpt-4o", status: "success",
 			alias: strPtrP("a1"), canonical: strPtrP("gpt-4o-2024-11-20"), selectedKey: "sk1", vkID: strPtrP("vk1"), vkName: strPtrP("VK One"),
-			teamID: strPtrP("t1"), customerID: strPtrP("c1"), buID: strPtrP("b1"), userID: strPtrP("u1"),
+			teamID: strPtrP("t1"), customerID: strPtrP("c1"), userID: strPtrP("u1"),
 			cost: f64PtrP(0.5), latency: f64PtrP(100), tokens: [3]int{100, 50, 150}, stopReason: strPtrP("stop"),
 			routing: strPtrP("governance,loadbalancing"), metadata: strPtrP(`{"env":"prod"}`), toolCallNames: strPtrP("search"),
 			tier: strPtrP("COMPLEX"), mechanism: strPtrP("lexical"), tierScore: f64PtrP(0.55), sessionID: strPtrP("session-1"),
@@ -211,7 +206,7 @@ func paritySpecs() []parityLogSpec {
 			cost: f64PtrP(0), latency: f64PtrP(75), tokens: [3]int{10, 5, 15}},
 		{id: "p7", offsetSec: 40, object: "chat.completion", provider: "mistral", model: "mistral-small", status: "success",
 			alias: strPtrP("a2"), canonical: strPtrP("mistral-small-2409"), vkID: strPtrP("vk3"), vkName: strPtrP("VK Three"), customerID: strPtrP("c2"),
-			buID: strPtrP("b2"), userID: strPtrP("u4"), cost: f64PtrP(3.0), latency: f64PtrP(800),
+			userID: strPtrP("u4"), cost: f64PtrP(3.0), latency: f64PtrP(800),
 			tokens: [3]int{900, 100, 1000}, stopReason: strPtrP("stop"), content: "golf hotel"},
 		{id: "p8", offsetSec: 30, object: "chat.completion", provider: "openai", model: "gpt-4o", status: "success",
 			vkID: strPtrP("vk3"), vkName: strPtrP("VK Three"), teamID: strPtrP("t3"), userID: strPtrP("u1"),
@@ -225,7 +220,7 @@ func paritySpecs() []parityLogSpec {
 		{id: "p10", offsetSec: 10, object: "chat.completion", provider: "openai", model: "gpt-4o", status: "success",
 			cost: f64PtrP(2.0), latency: f64PtrP(110), tokens: [3]int{80, 40, 120},
 			nodeID: strPtrP("pnode"), budgetIDs: strPtrP(`["bud1","bud2"]`), rateLimitIDs: strPtrP(`["rl1"]`)},
-		// Enterprise user/AP path: the hierarchy lives in the JSON arrays and the
+		// The hierarchy lives in the JSON arrays and the
 		// scalar ids stay NULL, so the dimension readers must fan out. p11 spans
 		// two teams / two customers, p12 a single one, and p13 carries a scalar
 		// id with no array (the fan-out's fallback branch). Every dialect's
@@ -233,15 +228,13 @@ func paritySpecs() []parityLogSpec {
 		{id: "p11", offsetSec: 15, object: "chat.completion", provider: "openai", model: "gpt-4o", status: "success",
 			userID: strPtrP("u5"), cost: f64PtrP(4.0), latency: f64PtrP(140), tokens: [3]int{60, 30, 90},
 			teamIDs: strPtrP(`["t4","t5"]`), teamNames: strPtrP(`["Team Four","Team Five"]`),
-			customerIDs: strPtrP(`["c3","c4"]`), customerNames: strPtrP(`["Cust Three","Cust Four"]`),
-			buIDs: strPtrP(`["b3","b4"]`), buNames: strPtrP(`["BU Three","BU Four"]`)},
+			customerIDs: strPtrP(`["c3","c4"]`), customerNames: strPtrP(`["Cust Three","Cust Four"]`)},
 		{id: "p12", offsetSec: 14, object: "chat.completion", provider: "anthropic", model: "claude-3", status: "success",
 			userID: strPtrP("u5"), cost: f64PtrP(0.25), latency: f64PtrP(160), tokens: [3]int{20, 10, 30},
 			teamIDs: strPtrP(`["t4"]`), teamNames: strPtrP(`["Team Four"]`),
-			customerIDs: strPtrP(`["c3"]`), customerNames: strPtrP(`["Cust Three"]`),
-			buIDs: strPtrP(`["b3"]`), buNames: strPtrP(`["BU Three"]`)},
+			customerIDs: strPtrP(`["c3"]`), customerNames: strPtrP(`["Cust Three"]`)},
 		{id: "p13", offsetSec: 13, object: "chat.completion", provider: "openai", model: "gpt-4o-mini", status: "success",
-			teamID: strPtrP("t4"), customerID: strPtrP("c3"), buID: strPtrP("b3"), userID: strPtrP("u6"),
+			teamID: strPtrP("t4"), customerID: strPtrP("c3"), userID: strPtrP("u6"),
 			cost: f64PtrP(0.1), latency: f64PtrP(35), tokens: [3]int{5, 5, 10}},
 	}
 }
@@ -436,8 +429,8 @@ func logProjection(l *Log) map[string]any {
 		"provider": l.Provider, "model": l.Model, "status": l.Status,
 		"alias": l.Alias, "selected_key_id": l.SelectedKeyID,
 		"virtual_key_id": l.VirtualKeyID, "team_id": l.TeamID,
-		"customer_id": l.CustomerID, "business_unit_id": l.BusinessUnitID,
-		"user_id": l.UserID, "cost": l.Cost, "latency": l.Latency,
+		"customer_id": l.CustomerID,
+		"user_id":     l.UserID, "cost": l.Cost, "latency": l.Latency,
 		"prompt_tokens": l.PromptTokens, "completion_tokens": l.CompletionTokens,
 		"total_tokens": l.TotalTokens, "stop_reason": l.StopReason,
 		"complexity_tier": l.ComplexityTier, "complexity_mechanism": l.ComplexityMechanism,
@@ -527,7 +520,6 @@ func TestLogStoreParity(t *testing.T) {
 		"teams":                 {TeamIDs: []string{"t1", "t3"}},
 		"customers":             {CustomerIDs: []string{"c1"}},
 		"users":                 {UserIDs: []string{"u1"}},
-		"business_units":        {BusinessUnitIDs: []string{"b1"}},
 		"routing_engines":       {RoutingEngineUsed: []string{"loadbalancing", "routing-rule"}},
 		"tool_call_names":       {ToolCallNames: []string{"get_weather"}},
 		"tool_call_names_any":   {ToolCallNames: []string{"get_weather", "search"}},
@@ -625,8 +617,8 @@ func TestLogStoreParity(t *testing.T) {
 		"dimension_latency_team": func(ctx context.Context, s LogStore) (any, error) {
 			return s.GetDimensionLatencyHistogram(ctx, window, 60, DimensionTeam)
 		},
-		"dimension_cost_business_unit": func(ctx context.Context, s LogStore) (any, error) {
-			return s.GetDimensionCostHistogram(ctx, window, 60, DimensionBusinessUnit)
+		"dimension_cost_customer": func(ctx context.Context, s LogStore) (any, error) {
+			return s.GetDimensionCostHistogram(ctx, window, 60, DimensionCustomer)
 		},
 		// Filter on the same column the SELECT aliases (SUM(cost) AS cost):
 		// without prefer_column_name_to_alias=1 ClickHouse resolves the WHERE
@@ -666,9 +658,8 @@ func TestLogStoreParity(t *testing.T) {
 	// exercise each backend's fan-out SQL and its scalar fallback — including the
 	// attributed-vs-actual totals, which every dialect must now agree on.
 	for name, dim := range map[string]RankingDimension{
-		"dimension_team":          RankingDimensionTeam,
-		"dimension_customer":      RankingDimensionCustomer,
-		"dimension_business_unit": RankingDimensionBusinessUnit,
+		"dimension_team":     RankingDimensionTeam,
+		"dimension_customer": RankingDimensionCustomer,
 	} {
 		t.Run("Rankings/"+name, func(t *testing.T) {
 			assertParity(t, stores, 1e-6, func(ctx context.Context, s LogStore) (any, error) {

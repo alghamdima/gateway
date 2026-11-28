@@ -98,21 +98,16 @@ type TableBudget struct {
 	// with no error anywhere to show for it.
 	ResetConfig *BudgetResetConfig `gorm:"-" json:"reset_config,omitempty"`
 
-	// Owner FKs: a budget belongs to at most one Team, VK, ProviderConfig, ModelConfig, Customer or
-	// Business Unit. The business unit column is an index only: the config loader may write a budget
-	// before the unit it names exists, so no database constraint ties the two.
+	// Owner FKs: a budget belongs to at most one Team, VK, ProviderConfig, ModelConfig or Customer.
 	TeamID           *string `gorm:"type:varchar(255);index" json:"team_id,omitempty"`
 	VirtualKeyID     *string `gorm:"type:varchar(255);index" json:"virtual_key_id,omitempty"`
 	ProviderConfigID *uint   `gorm:"index" json:"provider_config_id,omitempty"`
 	ModelConfigID    *string `gorm:"type:varchar(255);index" json:"model_config_id,omitempty"`
 	CustomerID       *string `gorm:"type:varchar(255);index" json:"customer_id,omitempty"`
-	BusinessUnitID   *string `gorm:"type:varchar(255);index" json:"business_unit_id,omitempty"`
 
-	// Deprecated: set calendar_aligned on the parent access profile / VK / team
-	// instead. Kept for backward compatibility with older config.json files;
-	// the OSS applyV1Compat path and the enterprise access-profile reconciler
-	// promote any true value here to the owner's top-level CalendarAligned at
-	// load time.
+	// Deprecated: set calendar_aligned on the parent VK / team instead. Kept for backward
+	// compatibility with older config.json files; the applyV1Compat path promotes any true value
+	// here to the owner's top-level CalendarAligned at load time.
 	CalendarAlignedInput *bool `gorm:"-" json:"calendar_aligned,omitempty"`
 
 	// Derived from the owning entity (VK / PC's parent VK / Team). Populated by
@@ -282,7 +277,7 @@ func (b *TableBudget) AdoptCalendarAlignment(now time.Time) bool {
 // so every owner has to stamp it on load. Miss it and the governance reset path
 // silently takes the rolling branch, so a calendar-aligned owner's "1d" budget
 // resets on a rolling 24h clock instead of at midnight UTC. Every owner type
-// (virtual key, team, customer, model config, and the enterprise access profiles)
+// (virtual key, team, customer, model config)
 // funnels through here so a new owner cannot reintroduce that bug by forgetting
 // one of the two field sets.
 func StampCalendarAlignment(calendarAligned bool, budgets []TableBudget, rateLimit *TableRateLimit) {
@@ -523,11 +518,8 @@ func (b *TableBudget) BeforeSave(tx *gorm.DB) error {
 	if b.CustomerID != nil {
 		owners++
 	}
-	if b.BusinessUnitID != nil {
-		owners++
-	}
 	if owners > 1 {
-		return fmt.Errorf("budget cannot have more than one owner (team/virtual key/provider config/model config/customer/business unit)")
+		return fmt.Errorf("budget cannot have more than one owner (team/virtual key/provider config/model config/customer)")
 	}
 	// Validate that ResetDuration is in correct format (e.g., "30s", "5m", "1h", "1d", "1w", "1M", "1Q", "1Y")
 	if d, err := ParseDuration(b.ResetDuration); err != nil {

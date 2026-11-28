@@ -101,12 +101,9 @@ func TestLimitsFrom(t *testing.T) {
 func TestLimitHolderKindsAreDistinct(t *testing.T) {
 	kinds := []LimitHolderKind{
 		LimitHolderVirtualKey, LimitHolderVirtualKeyProviderConfig,
-		LimitHolderUserAccessProfile, LimitHolderUserAccessProfileProviderConfig,
-		LimitHolderTeam, LimitHolderBusinessUnit, LimitHolderCustomer,
-		LimitHolderProject, LimitHolderProjectProviderConfig,
+		LimitHolderTeam, LimitHolderCustomer,
 		LimitHolderProvider, LimitHolderModelConfig,
-		LimitHolderVirtualKeyModelConfig, LimitHolderProjectModelConfig,
-		LimitHolderUserAccessProfileModelConfig, LimitHolderUserModelConfig,
+		LimitHolderVirtualKeyModelConfig, LimitHolderUserModelConfig,
 	}
 	seen := make(map[LimitHolderKind]bool, len(kinds))
 	for _, k := range kinds {
@@ -117,19 +114,18 @@ func TestLimitHolderKindsAreDistinct(t *testing.T) {
 	assert.Len(t, seen, len(kinds))
 }
 
-// A project's own limits and its per-provider limits have to be separable, for the same reason the
-// holder's own and its provider permit's are everywhere else: what one provider's permit funds
-// cannot answer for a request served by another.
-func TestProjectLimitsSeparateTheirHolderFromTheirProviderConfig(t *testing.T) {
+// A holder's own limits and its per-provider limits have to be separable: what one provider's
+// permit funds cannot answer for a request served by another.
+func TestLimitsSeparateTheirHolderFromTheirProviderConfig(t *testing.T) {
 	limits := []schemas.Limit{
-		{ID: "b-project", HolderKind: string(LimitHolderProject), HolderID: "proj-1"},
-		{ID: "b-project-openai", HolderKind: string(LimitHolderProjectProviderConfig), HolderID: "proj-1:7"},
 		{ID: "b-key", HolderKind: string(LimitHolderVirtualKey), HolderID: "vk-1"},
+		{ID: "b-key-openai", HolderKind: string(LimitHolderVirtualKeyProviderConfig), HolderID: "vk-1:7"},
+		{ID: "b-team", HolderKind: string(LimitHolderTeam), HolderID: "team-1"},
 	}
-	assert.Equal(t, []string{"b-project"}, limitIDs(LimitsFrom(limits, LimitHolderProject)))
-	assert.Equal(t, []string{"b-project-openai"}, limitIDs(LimitsFrom(limits, LimitHolderProjectProviderConfig)))
-	assert.Equal(t, []string{"b-project", "b-project-openai"},
-		limitIDs(LimitsFrom(limits, LimitHolderProject, LimitHolderProjectProviderConfig)))
+	assert.Equal(t, []string{"b-key"}, limitIDs(LimitsFrom(limits, LimitHolderVirtualKey)))
+	assert.Equal(t, []string{"b-key-openai"}, limitIDs(LimitsFrom(limits, LimitHolderVirtualKeyProviderConfig)))
+	assert.Equal(t, []string{"b-key", "b-key-openai"},
+		limitIDs(LimitsFrom(limits, LimitHolderVirtualKey, LimitHolderVirtualKeyProviderConfig)))
 }
 
 // The limits a request answers to are resolved by its caller and held as one list. This package

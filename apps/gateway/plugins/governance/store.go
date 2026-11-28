@@ -100,13 +100,6 @@ type GovernanceData struct {
 	Providers    []*configstoreTables.TableProvider            `json:"providers"`
 }
 
-// BusinessUnitGovernance names the budgets and rate limit a business unit holds itself, as the
-// in-memory store publishes them. BudgetIDs carries one id per reset window, like a team's.
-type BusinessUnitGovernance struct {
-	BudgetIDs   []string
-	RateLimitID *string
-}
-
 // UserGovernance holds governance data for a user (enterprise-only)
 type UserGovernance struct {
 	BudgetID    *string `json:"budget_id,omitempty"`
@@ -152,12 +145,6 @@ type GovernanceStore interface {
 	// Answering with nothing means one of two things the funnel tells apart by what was presented: a
 	// request that presented nothing carries no access and is governed as unrestricted, and one that
 	// presented something this store resolves permits from, which resolved to nothing, is refused.
-	//
-	// A store that resolves a project the request named answers the same way about that: the scoping
-	// slot is filled when the request may be scoped by the project it named, and left empty when it
-	// may not. Which of those happened is not this store's to report: the funnel refuses a request
-	// that named a project and carries no scoping permit, exactly as it refuses one that presented a
-	// credential nothing granted.
 	//
 	// levelMode says how the caller's levels combine (see grant.NewAccess), separately from mode.
 	ResolvePermits(ctx *schemas.BifrostContext) (bases []schemas.Permit, levelMode grant.CompositionMode, scoping schemas.Permit, mode grant.CompositionMode)
@@ -418,8 +405,8 @@ func (gs *LocalGovernanceStore) UpsertBudgetConfig(ctx context.Context, budgetID
 			// mutate it in place via the refresh and then alias it as the live map
 			// entry, so any later caller-side write would race BumpBudgetUsage's
 			// clone-and-CAS. Callers legitimately pass a pointer into a slice they keep
-			// using (BulkLoadUserAccessProfiles passes &p.Budgets[j]), so the copy has
-			// to happen here rather than relying on every caller to make one.
+			// using, so the copy has to happen here rather than relying on every caller
+			// to make one.
 			fresh := *config
 			fresh.RefreshOverrideCyclesRemaining()
 			if _, loaded := gs.budgets.LoadOrStore(budgetID, &fresh); !loaded {
@@ -1353,9 +1340,6 @@ func StampVirtualKeyScope(ctx *schemas.BifrostContext, virtualKey *configstoreTa
 // connectors are handed the finished trace without the request context, so the span is the only
 // place they can read the decision from. The mark is one-directional: a key that keeps content on
 // says nothing to a connector, whose own disable_content_logging stays in charge.
-//
-// A project the request is scoped to can override the key's decision once it is admitted, on the
-// context and on the span alike.
 func stampVirtualKeyContentLogging(ctx *schemas.BifrostContext, virtualKey *configstoreTables.TableVirtualKey) {
 	if ctx == nil || virtualKey == nil || virtualKey.DisableContentLogging == nil {
 		return
@@ -1460,8 +1444,6 @@ func recordVirtualKeyIdentity(ctx *schemas.BifrostContext, virtualKey *configsto
 		&schemas.EntityRef{ID: virtualKey.ID, Name: virtualKey.Name},
 		teams,
 		customers,
-		current.BusinessUnits(),
-		current.Project(),
 	))
 }
 
@@ -1591,8 +1573,8 @@ func (gs *LocalGovernanceStore) PermitProviderLimits(ctx context.Context, permit
 // times. PermitProviderLimits answers what discriminates, and this answers the rest.
 //
 // This is the seam a deployment reimplements to fund requests from something other than a key.
-// Nothing downstream asks what kind of holder came back, so answering with a project's limits, or a
-// user's, or both according to how that deployment is configured, needs no other path to change.
+// Nothing downstream asks what kind of holder came back, so answering with a user's limits, or a
+// key's, according to how that deployment is configured, needs no other path to change.
 func (gs *LocalGovernanceStore) HolderLimits(ctx context.Context, permit schemas.Permit) (budgets []schemas.Limit, rateLimits []schemas.Limit) {
 	vk := gs.virtualKeyOf(ctx, permit)
 	if vk == nil {
@@ -5112,14 +5094,6 @@ func modelConfigScopeFor(permitType string) string {
 	switch grant.PermitType(permitType) {
 	case grant.PermitVirtualKey:
 		return configstoreTables.ModelConfigScopeVirtualKey
-	case grant.PermitProject:
-		return configstoreTables.ModelConfigScopeProject
-	case grant.PermitAccessProfile:
-		return configstoreTables.ModelConfigScopeAccessProfile
-	case grant.PermitTeamAccessProfile, grant.PermitBusinessUnitAccessProfile, grant.PermitCustomerAccessProfile:
-		// One scope for all three: an attachment's rows are keyed by the attachment's own id, and the
-		// kind below is what tells a refusal whose profile it was.
-		return configstoreTables.ModelConfigScopeEntityAccessProfile
 	default:
 		return permitType
 	}
@@ -5133,16 +5107,6 @@ func scopedModelConfigKind(permitType string) grant.LimitHolderKind {
 	switch grant.PermitType(permitType) {
 	case grant.PermitVirtualKey:
 		return grant.LimitHolderVirtualKeyModelConfig
-	case grant.PermitProject:
-		return grant.LimitHolderProjectModelConfig
-	case grant.PermitAccessProfile:
-		return grant.LimitHolderUserAccessProfileModelConfig
-	case grant.PermitTeamAccessProfile:
-		return grant.LimitHolderTeamAccessProfileModelConfig
-	case grant.PermitBusinessUnitAccessProfile:
-		return grant.LimitHolderBusinessUnitAccessProfileModelConfig
-	case grant.PermitCustomerAccessProfile:
-		return grant.LimitHolderCustomerAccessProfileModelConfig
 	default:
 		return grant.LimitHolderModelConfig
 	}

@@ -3383,7 +3383,7 @@ func TestListModels_UnfilteredListingSkipsCallerAccess(t *testing.T) {
 	SetLogger(&mockLogger{})
 
 	sessionAccess := func(permits ...schemas.ProviderPermit) schemas.Access {
-		permit := grant.NewPermit(grant.PermitAccessProfile, "profile-test", "Test Profile", true, false, permits)
+		permit := grant.NewPermit(grant.PermitType("test_session"), "session-test", "Test Session", true, false, permits)
 		return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
 	}
 	signedIn := func(ctx *fasthttp.RequestCtx) {

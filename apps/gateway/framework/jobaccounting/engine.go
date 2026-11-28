@@ -526,14 +526,10 @@ func applyLogDenormalizations(entry *logstore.Log, source *logstore.Log) {
 	entry.TeamName = source.TeamName
 	entry.CustomerID = source.CustomerID
 	entry.CustomerName = source.CustomerName
-	entry.BusinessUnitID = source.BusinessUnitID
-	entry.BusinessUnitName = source.BusinessUnitName
 	entry.TeamIDsParsed = source.TeamIDsParsed
 	entry.TeamNamesParsed = source.TeamNamesParsed
 	entry.CustomerIDsParsed = source.CustomerIDsParsed
 	entry.CustomerNamesParsed = source.CustomerNamesParsed
-	entry.BusinessUnitIDsParsed = source.BusinessUnitIDsParsed
-	entry.BusinessUnitNamesParsed = source.BusinessUnitNamesParsed
 	entry.ClusterNodeID = source.ClusterNodeID
 	entry.Alias = source.Alias
 	entry.CanonicalModelName = source.CanonicalModelName

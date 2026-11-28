@@ -475,7 +475,7 @@ func TestResolveAccess(t *testing.T) {
 
 	t.Run("a store answering with intersecting levels caps the caller's permits", func(t *testing.T) {
 		// The key allows every openai model and the team only one, so only that one is left.
-		team := grant.NewPermit(grant.PermitTeamAccessProfile, "t1", "Team", true, false, []schemas.ProviderPermit{{
+		team := grant.NewPermit(testTeamLevelPermit, "t1", "Team", true, false, []schemas.ProviderPermit{{
 			Provider: "openai", AllowedModels: []string{"gpt-4o-mini"}, KeyIDs: []string{"*"},
 		}}, grant.WithLevel(1))
 		store := &permitStore{above: []schemas.Permit{team}, levelMode: grant.Intersect}
@@ -486,7 +486,7 @@ func TestResolveAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, access)
 		assert.Equal(t, string(grant.Intersect), access.LevelMode())
-		require.Len(t, access.Bases(), 1, "the key grants; the team's profile only caps it")
+		require.Len(t, access.Bases(), 1, "the key grants; the team level only caps it")
 		assert.True(t, access.IsModelAllowed("openai", "gpt-4o-mini"))
 		assert.False(t, access.IsModelAllowed("openai", "gpt-4o"))
 		denied := access.DeniedPermitsForModel("openai", "gpt-4o")
@@ -629,7 +629,7 @@ func TestResolveAccessCompletesTheIdentity(t *testing.T) {
 
 	// As the transport leaves it: the credential settled, nothing resolved.
 	ctx := emptyCtx()
-	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
+	ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil))
 
 	_, err = plugin.ResolveAccess(ctx)
 	require.NoError(t, err)
@@ -676,7 +676,7 @@ func TestResolveAccessStampsContentLoggingDecision(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, plugin.Cleanup()) })
 
 			ctx := emptyCtx()
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil))
 
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
@@ -731,7 +731,7 @@ func TestResolveAccessMarksTraceWhenContentLoggingOff(t *testing.T) {
 			ctx.SetValue(schemas.BifrostContextKeyTraceID, traceID)
 			_, handle := tracer.StartSpanID(ctx, "request", schemas.SpanKindHTTPRequest)
 			require.NotNil(t, handle, "root span must open for the trace")
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, accessTestVKValue), nil, nil, nil, nil))
 
 			_, err = plugin.ResolveAccess(ctx)
 			require.NoError(t, err)
@@ -763,14 +763,14 @@ func TestPresentedVirtualKey(t *testing.T) {
 	t.Run("an identity that presented a key answers with it", func(t *testing.T) {
 		ctx := emptyCtx()
 		ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-stale")
-		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-settled"), nil, nil, nil, nil, nil, nil))
+		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-settled"), nil, nil, nil, nil))
 		assert.Equal(t, "sk-bf-settled", PresentedVirtualKey(ctx), "what the transport settled, not what else the context carries")
 	})
 
 	t.Run("an identity that presented something else presented no key", func(t *testing.T) {
 		ctx := emptyCtx()
 		ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-stale")
-		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialSessionToken, "u1"), &schemas.UserRef{ID: "u1"}, nil, nil, nil, nil, nil))
+		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialSessionToken, "u1"), &schemas.UserRef{ID: "u1"}, nil, nil, nil))
 		assert.Equal(t, "", PresentedVirtualKey(ctx))
 	})
 }
@@ -1051,7 +1051,7 @@ func TestEvaluateRefusesAPresentedCredentialThatGrantsNothing(t *testing.T) {
 	t.Run("a credential the transport settled is read the same way", func(t *testing.T) {
 		// What was presented is the identity's to say once the transport has settled one.
 		ctx := emptyCtx()
-		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-revoked"), nil, nil, nil, nil, nil, nil))
+		ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-revoked"), nil, nil, nil, nil))
 
 		result, bifrostErr := plugin.Evaluate(ctx, &EvaluationRequest{
 			RequestType: schemas.ChatCompletionRequest,
@@ -1154,7 +1154,7 @@ func TestMandatoryAuthAcceptsAnAuthenticatedIdentity(t *testing.T) {
 	t.Run("an identity that presented nothing is refused too", func(t *testing.T) {
 		// The transport settles an identity on every request, including one that presented nothing.
 		bifrostErr := evaluate(t, func(ctx *schemas.BifrostContext) {
-			ctx.Grant().SetIdentity(grant.NewIdentity(schemas.Credential{}, nil, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(schemas.Credential{}, nil, nil, nil, nil))
 		})
 
 		require.NotNil(t, bifrostErr)
@@ -1169,7 +1169,7 @@ func TestMandatoryAuthAcceptsAnAuthenticatedIdentity(t *testing.T) {
 		// store's answer, not this step's: this store resolves permits from keys alone, so an identity
 		// it has no access for is refused as access not found, not as unauthenticated.
 		bifrostErr := evaluate(t, func(ctx *schemas.BifrostContext) {
-			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialSessionToken, "user-1"), &schemas.UserRef{ID: "user-1"}, nil, nil, nil, nil, nil))
+			ctx.Grant().SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialSessionToken, "user-1"), &schemas.UserRef{ID: "user-1"}, nil, nil, nil))
 		})
 
 		require.NotNil(t, bifrostErr)
@@ -1207,21 +1207,21 @@ func TestEvaluateRefusesAnUngrantedUser(t *testing.T) {
 	}
 
 	t.Run("a user with no access is refused", func(t *testing.T) {
-		result, bifrostErr := evaluate(t, grant.NewIdentity(session, user, nil, nil, nil, nil, nil))
+		result, bifrostErr := evaluate(t, grant.NewIdentity(session, user, nil, nil, nil))
 
 		require.NotNil(t, bifrostErr)
 		assert.Equal(t, DecisionAccessNotFound, result.Decision)
 	})
 
 	t.Run("a presented key that resolves to nothing is refused", func(t *testing.T) {
-		result, bifrostErr := evaluate(t, grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-nobody"), user, nil, nil, nil, nil, nil))
+		result, bifrostErr := evaluate(t, grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-nobody"), user, nil, nil, nil))
 
 		require.NotNil(t, bifrostErr)
 		assert.Equal(t, DecisionAccessNotFound, result.Decision)
 	})
 
 	t.Run("a credential naming no user is refused", func(t *testing.T) {
-		result, bifrostErr := evaluate(t, grant.NewIdentity(session, nil, nil, nil, nil, nil, nil))
+		result, bifrostErr := evaluate(t, grant.NewIdentity(session, nil, nil, nil, nil))
 
 		require.NotNil(t, bifrostErr)
 		assert.Equal(t, DecisionAccessNotFound, result.Decision)
@@ -1372,117 +1372,6 @@ func TestEvaluateJudgesEveryPermit(t *testing.T) {
 	})
 }
 
-// TestEvaluateRefusesARequestNothingScoped is the mirror of the credential rule beside it: a
-// request that named a project and ended up scoped by nothing is refused, not served.
-//
-// Dropping the project instead would serve the request against the caller's own access, which is
-// more than they asked for and not what they asked for. The refusal does not say whether the project
-// was missing or merely not theirs, for the same reason the credential one does not distinguish
-// "does not exist" from "has been revoked".
-func TestEvaluateRefusesARequestNothingScoped(t *testing.T) {
-	vk := buildAccessTestVK()
-	base := permitWithProviders("other", "h1", "Holder", "openai")
-
-	// A request names a project by header, and whatever resolves it stamps the resolved id once the
-	// project has admitted the caller. Those two facts, and the gap between them, are the whole
-	// mechanism, so the test supplies them the way a request does.
-	newCtx := func(headers map[string]string, resolvedProjectID string) *schemas.BifrostContext {
-		ctx := emptyCtx()
-		if headers != nil {
-			ctx.SetValue(schemas.BifrostContextKeyRequestHeaders, headers)
-		}
-		if resolvedProjectID != "" {
-			ctx.SetValue(schemas.BifrostContextKeyGovernanceProjectID, resolvedProjectID)
-		}
-		return ctx
-	}
-	named := map[string]string{schemas.HeaderGovernanceProjectName: "Atlas"}
-	chat := &EvaluationRequest{Provider: schemas.OpenAI, Model: "gpt-4o"}
-
-	t.Run("named a project and nothing scoped it", func(t *testing.T) {
-		plugin := newAccessTestPlugin(t, vk, &permitStore{baseOverride: base})
-
-		result, bifrostErr := plugin.Evaluate(newCtx(named, ""), chat)
-
-		require.NotNil(t, bifrostErr, "a request whose project went missing was served against the caller's own access")
-		assert.Equal(t, DecisionAccessBlocked, result.Decision)
-		assert.Equal(t, `project "Atlas" not found. It does not exist or does not admit this request.`, result.Reason)
-		require.NotNil(t, bifrostErr.StatusCode)
-		assert.Equal(t, 403, *bifrostErr.StatusCode, "the caller authenticated fine; what they asked for is refused")
-	})
-
-	t.Run("named a project and it scoped the request", func(t *testing.T) {
-		scoping := permitWithProviders(grant.PermitProject, "s1", "Atlas", "openai")
-		plugin := newAccessTestPlugin(t, vk, &permitStore{
-			baseOverride: base, scoping: scoping, mode: grant.Intersect,
-		})
-
-		result, bifrostErr := plugin.Evaluate(newCtx(named, "s1"), chat)
-
-		assert.Nil(t, bifrostErr)
-		assert.Equal(t, DecisionAllow, result.Decision)
-	})
-
-	t.Run("named no project", func(t *testing.T) {
-		// Every ordinary request carries no scoping permit, so the rule must key off having named one
-		// rather than off the empty slot, or it refuses everything.
-		plugin := newAccessTestPlugin(t, vk, &permitStore{baseOverride: base})
-
-		result, bifrostErr := plugin.Evaluate(newCtx(nil, ""), chat)
-
-		assert.Nil(t, bifrostErr)
-		assert.Equal(t, DecisionAllow, result.Decision)
-	})
-
-	t.Run("named a project with an empty header", func(t *testing.T) {
-		// It named no project, so none can be resolved from it. Treating that as not having asked
-		// would serve the request against the caller's own access.
-		plugin := newAccessTestPlugin(t, vk, &permitStore{baseOverride: base})
-
-		result, bifrostErr := plugin.Evaluate(newCtx(map[string]string{schemas.HeaderGovernanceProjectID: ""}, ""), chat)
-
-		require.NotNil(t, bifrostErr)
-		assert.Equal(t, DecisionAccessBlocked, result.Decision)
-	})
-}
-
-// A project fills the scoping slot, and limits are gathered for every permit a request carries, so a
-// project's own per-model limits come off its permit the way any other holder's do. The scope name
-// and the holder kind are the project's, so its per-model spend is looked up where it is stored and
-// attributed to the project rather than to somebody else.
-//
-// The permit is only ever built once a project has been resolved and admitted, so a request that
-// named one it may not use is refused before this ever runs.
-func TestModelConfigScopesIncludeTheProjectScopingARequest(t *testing.T) {
-	scopeNamed := func(scopes []limitScope, name string) (limitScope, bool) {
-		for _, scope := range scopes {
-			if scope.name == name {
-				return scope, true
-			}
-		}
-		return limitScope{}, false
-	}
-
-	t.Run("the project's permit", func(t *testing.T) {
-		project := permitWithProviders(grant.PermitProject, "proj-1", "Atlas", "openai")
-
-		scope, found := scopeNamed(modelConfigScopesFor(project), configstoreTables.ModelConfigScopeProject)
-
-		require.True(t, found, "a request running inside a project answers to none of its per-model limits")
-		assert.Equal(t, "proj-1", scope.id)
-		assert.Equal(t, grant.LimitHolderProjectModelConfig, scope.kind,
-			"a project's per-model spend would be attributed to somebody else")
-	})
-
-	t.Run("a permit that is not a project's", func(t *testing.T) {
-		key := permitWithProviders(grant.PermitVirtualKey, "vk-1", "Key", "openai")
-
-		_, found := scopeNamed(modelConfigScopesFor(key), configstoreTables.ModelConfigScopeProject)
-
-		assert.False(t, found, "a request outside every project was held to a project's per-model limits")
-	})
-}
-
 // settlingErrorStore wraps a real store so GatherLimits fails the way a store composing several
 // possible payers can: the payers could not be settled at all, not a limit being exhausted.
 type settlingErrorStore struct {
@@ -1539,3 +1428,8 @@ func TestEvaluateSkipsASettlingErrorWhenSpendingChecksAreSkipped(t *testing.T) {
 		assert.Equal(t, DecisionAllow, result.Decision)
 	})
 }
+
+// testTeamLevelPermit labels a permit a store places one level above the caller, as an
+// organization above a key would be. The access engine reads the level, not the kind, so the kind
+// only names which side of a case the permit stands on.
+const testTeamLevelPermit grant.PermitType = "test_team_level"

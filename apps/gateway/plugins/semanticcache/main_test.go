@@ -170,7 +170,7 @@ func identityContext(t *testing.T, cacheKey string, who identityRef) *schemas.Bi
 		user = &schemas.UserRef{ID: who.user}
 	}
 	g := grant.New()
-	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, user, vk, nil, nil, nil, nil))
+	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, user, vk, nil, nil))
 	if !ctx.SetGrant(g) {
 		t.Fatal("SetGrant refused the test grant")
 	}

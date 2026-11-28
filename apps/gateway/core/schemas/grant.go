@@ -55,11 +55,11 @@ type Grant interface {
 //
 // It is settled in two steps by two layers. The transport records what was presented, which is all
 // it can know. Resolving the request's access then fills in what that resolves to: the key row, the
-// user it belongs to, and the teams, business units and customers above them. Everything downstream
+// user it belongs to, and the teams and customers above them. Everything downstream
 // that attributes the request, whether to a log row, a routing rule or a budget, reads it from here
 // rather than looking any of it up again.
 //
-// Teams, Customers and BusinessUnits are every one the identity reaches, for attribution that fans
+// Teams and Customers are every one the identity reaches, for attribution that fans
 // out across an organization. Each list is ordered with the one the request is attributed to first:
 // the team a key is attached to, the customer that key names directly, the user's primary team.
 type Identity interface {
@@ -81,15 +81,10 @@ type Identity interface {
 	// row. Nil when no key was presented or it resolved to nothing.
 	VirtualKey() *EntityRef
 
-	// Teams, Customers and BusinessUnits are every one the identity reaches, the attributed one
-	// first. Empty when unknown.
+	// Teams and Customers are every one the identity reaches, the attributed one first. Empty when
+	// unknown.
 	Teams() []EntityRef
 	Customers() []EntityRef
-	BusinessUnits() []EntityRef
-
-	// Project is the scope the request named and was admitted to. Nil when the request named no
-	// project, or named one it may not use; the two are told apart by reading the request itself.
-	Project() *EntityRef
 }
 
 // Permit is what one source confers: a named bundle of access.

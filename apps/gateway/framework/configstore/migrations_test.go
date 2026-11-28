@@ -3183,54 +3183,6 @@ func TestMigrationClearPluginConfigHashes(t *testing.T) {
 	require.NoError(t, migrationClearPluginConfigHashes(ctx, db, testMigrationLogger))
 }
 
-// TestMigrationAddVirtualKeyBusinessUnitColumn covers the upgrade path for business-unit key
-// ownership: an installation whose governance_virtual_keys predates the column gets it and its
-// index, and a re-run over an already-migrated table is a no-op rather than an error.
-func TestMigrationAddVirtualKeyBusinessUnitColumn(t *testing.T) {
-	db := setupVKTestDBWithoutRotationColumns(t)
-	ctx := context.Background()
-	mg := db.Migrator()
-
-	require.False(t, mg.HasColumn(&tables.TableVirtualKey{}, "business_unit_id"),
-		"business_unit_id must not exist before the migration")
-
-	require.NoError(t, migrationAddVirtualKeyBusinessUnitColumn(ctx, db, testMigrationLogger))
-
-	assert.True(t, mg.HasColumn(&tables.TableVirtualKey{}, "business_unit_id"),
-		"business_unit_id column should exist after migration")
-	assert.True(t, mg.HasIndex(&tables.TableVirtualKey{}, "idx_governance_virtual_keys_business_unit_id"),
-		"business_unit_id must be indexed: it is walked per request to find the key's owner")
-
-	// Idempotent: the column and index already being there is the normal case on every pod that
-	// is not the one that ran the migration first.
-	require.NoError(t, db.Exec("DELETE FROM migrations WHERE id IN (?, ?)",
-		"add_virtual_key_business_unit_column", "add_virtual_key_business_unit_column_index").Error)
-	require.NoError(t, migrationAddVirtualKeyBusinessUnitColumn(ctx, db, testMigrationLogger))
-
-	// A key owned by a business unit hashes that owner, and config synchronization compares the hash
-	// it stores against the one it computes. Seeded here so the two cannot drift apart and report a
-	// business-unit-owned key as changed on every sync.
-	// This fixture's table is the pre-migration skeleton; fill in the rest of the columns the
-	// struct declares so a row can be written through it.
-	require.NoError(t, db.AutoMigrate(&tables.TableVirtualKey{}))
-	buID := "bu-1"
-	vk := tables.TableVirtualKey{
-		ID: "vk-bu-hash", Name: "vk-bu-hash", Value: *schemas.NewSecretVar("sk-bf-vk-bu-hash"), BusinessUnitID: &buID,
-	}
-	hash, err := GenerateVirtualKeyHash(vk)
-	require.NoError(t, err)
-	vk.ConfigHash = hash
-	require.NoError(t, db.Create(&vk).Error)
-
-	var stored tables.TableVirtualKey
-	require.NoError(t, db.First(&stored, "id = ?", vk.ID).Error)
-	require.NotNil(t, stored.BusinessUnitID)
-	assert.Equal(t, buID, *stored.BusinessUnitID)
-	recomputed, err := GenerateVirtualKeyHash(stored)
-	require.NoError(t, err)
-	assert.Equal(t, stored.ConfigHash, recomputed, "the stored hash must match what synchronization recomputes")
-}
-
 // TestMigrationAddVirtualKeyDisableContentLoggingColumn pins the tri-state column: the migration
 // adds it and is idempotent, NULL survives a write and a read (it means "inherit"), and the config
 // hash only moves when the key actually says something, so every pre-existing key keeps the hash
@@ -3394,58 +3346,6 @@ func TestMigrationAddClientConfigDeleteExpiredVirtualKeysColumn(t *testing.T) {
 	// Idempotent: a re-run with the column already present must not fail.
 	require.NoError(t, db.Exec("DELETE FROM migrations WHERE id = ?", "add_client_config_delete_expired_virtual_keys_column").Error)
 	require.NoError(t, migrationAddClientConfigDeleteExpiredVirtualKeysColumn(ctx, db, testMigrationLogger))
-}
-
-// TestMigrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns pins that the migration
-// adds both access-profile user-key columns, that existing rows read back as off so an upgrade keeps
-// access profiles managing user keys, and that a re-run is harmless.
-func TestMigrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns(t *testing.T) {
-	db := setupVKTestDBWithoutRotationColumns(t)
-	ctx := context.Background()
-	require.NoError(t, db.AutoMigrate(&tables.TableClientConfig{}))
-	require.NoError(t, db.Create(&tables.TableClientConfig{}).Error)
-	mg := db.Migrator()
-	columns := []string{"skip_access_profile_user_virtual_key_creation", "skip_access_profile_user_virtual_key_deletion"}
-	for _, column := range columns {
-		require.NoError(t, mg.DropColumn(&tables.TableClientConfig{}, column))
-		require.False(t, mg.HasColumn(&tables.TableClientConfig{}, column))
-	}
-
-	require.NoError(t, migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns(ctx, db, testMigrationLogger))
-	for _, column := range columns {
-		assert.True(t, mg.HasColumn(&tables.TableClientConfig{}, column), column)
-	}
-
-	var cfg tables.TableClientConfig
-	require.NoError(t, db.First(&cfg).Error)
-	assert.False(t, cfg.SkipAccessProfileUserVirtualKeyCreation)
-	assert.False(t, cfg.SkipAccessProfileUserVirtualKeyDeletion)
-
-	require.NoError(t, db.Exec("DELETE FROM migrations WHERE id = ?", "add_client_config_skip_access_profile_user_virtual_key_lifecycle_columns").Error)
-	require.NoError(t, migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns(ctx, db, testMigrationLogger))
-}
-
-// TestMigrationAddClientConfigEntityAccessProfileModeColumn pins that the migration adds the
-// entity access profile mode column, that existing rows read back as union so an upgrade keeps entity access
-// profiles adding to a caller's access, and that a re-run is harmless.
-func TestMigrationAddClientConfigEntityAccessProfileModeColumn(t *testing.T) {
-	db := setupVKTestDBWithoutRotationColumns(t)
-	ctx := context.Background()
-	require.NoError(t, db.AutoMigrate(&tables.TableClientConfig{}))
-	require.NoError(t, db.Create(&tables.TableClientConfig{}).Error)
-	mg := db.Migrator()
-	require.NoError(t, mg.DropColumn(&tables.TableClientConfig{}, "entity_access_profile_mode"))
-	require.False(t, mg.HasColumn(&tables.TableClientConfig{}, "entity_access_profile_mode"))
-
-	require.NoError(t, migrationAddClientConfigEntityAccessProfileModeColumn(ctx, db, testMigrationLogger))
-	assert.True(t, mg.HasColumn(&tables.TableClientConfig{}, "entity_access_profile_mode"))
-
-	var cfg tables.TableClientConfig
-	require.NoError(t, db.First(&cfg).Error)
-	assert.Equal(t, tables.EntityAccessProfileModeUnion, cfg.EntityAccessProfileMode)
-
-	require.NoError(t, db.Exec("DELETE FROM migrations WHERE id = ?", "add_client_config_entity_access_profile_mode_column").Error)
-	require.NoError(t, migrationAddClientConfigEntityAccessProfileModeColumn(ctx, db, testMigrationLogger))
 }
 
 func TestMigrationAddClientConfigEnforceVKObjectOwnershipColumn(t *testing.T) {
@@ -3885,29 +3785,6 @@ func TestMigrationAddDatasheetOverridesTable(t *testing.T) {
 	require.True(t, db.Migrator().HasTable(&tables.TableDatasheetOverride{}))
 	require.True(t, db.Migrator().HasIndex(&tables.TableDatasheetOverride{}, "idx_datasheet_override_target"))
 	require.NoError(t, migrationAddDatasheetOverridesTable(ctx, db, testMigrationLogger))
-}
-
-// TestMigrationAddBudgetBusinessUnitIDColumn pins the owner column a business unit's budgets name
-// it from: added where it is missing, left alone where it is there, and never tied to a business
-// unit row by a constraint, since the config loader may write the budget first. The column's index
-// is its own migration (TestMigrationAddBudgetBusinessUnitIDIndex).
-func TestMigrationAddBudgetBusinessUnitIDColumn(t *testing.T) {
-	ctx := context.Background()
-	db := setupCalendarAlignedPreMigrationDB(t)
-	mig := db.Migrator()
-	require.NoError(t, mig.AutoMigrate(&tables.TableBudget{}))
-	require.NoError(t, mig.DropColumn(&tables.TableBudget{}, "BusinessUnitID"))
-	require.False(t, mig.HasColumn(&tables.TableBudget{}, "business_unit_id"))
-
-	require.NoError(t, migrationAddBudgetBusinessUnitIDColumn(ctx, db, testMigrationLogger))
-	assert.True(t, mig.HasColumn(&tables.TableBudget{}, "business_unit_id"))
-	assert.False(t, mig.HasConstraint(&tables.TableBudget{}, "fk_governance_budgets_business_unit"), "no constraint ties the owner column to a business unit row")
-
-	// A budget naming a unit that this store has no row for is accepted: the owner lives elsewhere.
-	buID := "bu-elsewhere"
-	require.NoError(t, db.Create(&tables.TableBudget{ID: "bud-bu", MaxLimit: 10, ResetDuration: "1M", BusinessUnitID: &buID}).Error)
-
-	require.NoError(t, migrationAddBudgetBusinessUnitIDColumn(ctx, db, testMigrationLogger), "running again is a no-op")
 }
 
 // TestMigrationAddModelRoutersTable pins that the migration creates the

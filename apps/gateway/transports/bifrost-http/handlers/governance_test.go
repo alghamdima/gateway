@@ -740,31 +740,6 @@ func TestApplyVirtualKeyOwnershipUpdateTreatsBlankOwnerAsAbsent(t *testing.T) {
 	}
 }
 
-// A business unit is the third owner a key can have. Naming it clears a team or customer the key
-// held before, and naming it alongside either is refused like any other pair.
-func TestApplyVirtualKeyOwnershipUpdateBusinessUnit(t *testing.T) {
-	team := "team-1"
-	vk := &configstoreTables.TableVirtualKey{ID: "vk-1", TeamID: &team}
-	var req UpdateVirtualKeyRequest
-	if err := json.Unmarshal([]byte(`{"business_unit_id":"bu-1"}`), &req); err != nil {
-		t.Fatalf("unmarshal request: %v", err)
-	}
-	if err := applyVirtualKeyOwnershipUpdate(vk, &req); err != nil {
-		t.Fatalf("apply ownership update: %v", err)
-	}
-	bu := "bu-1"
-	assertStringPtrEqual(t, "business unit", vk.BusinessUnitID, &bu)
-	assertStringPtrEqual(t, "team", vk.TeamID, nil)
-
-	var dual UpdateVirtualKeyRequest
-	if err := json.Unmarshal([]byte(`{"business_unit_id":"bu-1","customer_id":"customer-1"}`), &dual); err != nil {
-		t.Fatalf("unmarshal request: %v", err)
-	}
-	if err := applyVirtualKeyOwnershipUpdate(vk, &dual); !errors.Is(err, errVirtualKeyDualAssociation) {
-		t.Fatalf("expected dual-association error, got %v", err)
-	}
-}
-
 func assertStringPtrEqual(t *testing.T, label string, got *string, want *string) {
 	t.Helper()
 	if got == nil || want == nil {
@@ -2368,9 +2343,6 @@ func TestApplyExternalBudgets_RateLimitOnlyDropsNativeBudgets(t *testing.T) {
 	if vk.RateLimit == nil || vk.RateLimit.ID != "ap-rl" {
 		t.Fatalf("expected the AP rate limit ap-rl to replace the native rl-vk-mirror, got %#v", vk.RateLimit)
 	}
-	if !vk.IsAccessProfileManaged {
-		t.Fatalf("expected IsAccessProfileManaged=true for an AP-managed VK")
-	}
 }
 
 // TestApplyExternalBudgets_ManagedWithNoGovernanceFlagsAndClears verifies that a VK the
@@ -2393,9 +2365,6 @@ func TestApplyExternalBudgets_ManagedWithNoGovernanceFlagsAndClears(t *testing.T
 
 	h.applyExternalBudgets(context.Background(), vk)
 
-	if !vk.IsAccessProfileManaged {
-		t.Fatalf("expected IsAccessProfileManaged=true")
-	}
 	if len(vk.Budgets) != 0 {
 		t.Fatalf("expected mirror budgets cleared for a managed VK with no AP budget, got %#v", vk.Budgets)
 	}
@@ -4763,62 +4732,6 @@ func TestBudgetLastResetUsesBudgetQuarterStart(t *testing.T) {
 	// A nil budget must not panic; callers reach this on the non-aligned path.
 	assert.False(t, budgetLastReset(false, nil).IsZero())
 	assert.False(t, budgetLastReset(true, nil).IsZero())
-}
-
-// TestApplyBusinessUnits covers the hook that names each virtual key's owning business unit on
-// the read responses, the counterpart of the preloaded Team and Customer relations.
-func TestApplyBusinessUnits(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	newVKs := func() []*configstoreTables.TableVirtualKey {
-		return []*configstoreTables.TableVirtualKey{
-			{ID: "vk-1", BusinessUnitID: new("bu-1")},
-			{ID: "vk-2", BusinessUnitID: new("bu-1")},
-			{ID: "vk-3", BusinessUnitID: new("bu-2")},
-			{ID: "vk-4"},
-		}
-	}
-
-	t.Run("names owners in one call over the distinct business units", func(t *testing.T) {
-		var gotIDs [][]string
-		h := &GovernanceHandler{
-			virtualKeyBusinessUnitResolver: func(_ context.Context, ids []string) (map[string]*configstoreTables.VirtualKeyBusinessUnit, error) {
-				gotIDs = append(gotIDs, ids)
-				return map[string]*configstoreTables.VirtualKeyBusinessUnit{"bu-1": {ID: "bu-1", Name: "Payments"}}, nil
-			},
-		}
-		vks := newVKs()
-		h.applyBusinessUnits(context.Background(), vks)
-
-		if len(gotIDs) != 1 || len(gotIDs[0]) != 2 || gotIDs[0][0] != "bu-1" || gotIDs[0][1] != "bu-2" {
-			t.Fatalf("expected one call with the distinct business units, got %#v", gotIDs)
-		}
-		for _, vk := range vks[:2] {
-			if vk.BusinessUnit == nil || vk.BusinessUnit.Name != "Payments" {
-				t.Fatalf("expected %s to name its business unit, got %#v", vk.ID, vk.BusinessUnit)
-			}
-		}
-		if vks[2].BusinessUnit != nil || vks[3].BusinessUnit != nil {
-			t.Fatalf("expected unknown and unowned keys to carry no business unit, got %#v / %#v", vks[2].BusinessUnit, vks[3].BusinessUnit)
-		}
-	})
-
-	t.Run("no-ops without a resolver or when the resolver fails", func(t *testing.T) {
-		failing := &GovernanceHandler{
-			virtualKeyBusinessUnitResolver: func(_ context.Context, _ []string) (map[string]*configstoreTables.VirtualKeyBusinessUnit, error) {
-				return nil, errors.New("boom")
-			},
-		}
-		for _, h := range []*GovernanceHandler{{}, failing} {
-			vks := newVKs()
-			h.applyBusinessUnits(context.Background(), vks)
-			for _, vk := range vks {
-				if vk.BusinessUnit != nil {
-					t.Fatalf("expected no business unit, got %#v", vk.BusinessUnit)
-				}
-			}
-		}
-	})
 }
 
 // TestApplyAssignees covers the hook that puts each virtual key's assigned user on

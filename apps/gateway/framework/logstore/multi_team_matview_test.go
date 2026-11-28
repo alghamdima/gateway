@@ -16,8 +16,8 @@ import (
 // team / business-unit columns. Empty-string args are stored as NULL so the
 // matview's scalar-vs-array branch selection (team_ids IS JSON ARRAY) is
 // exercised faithfully — a row with no array column must fall back to the scalar.
-func insertTeamBULog(t *testing.T, db *gorm.DB, ts time.Time,
-	userID, teamID, teamName, teamIDs, teamNames, buID, buName, buIDs, buNames string) {
+func insertTeamLog(t *testing.T, db *gorm.DB, ts time.Time,
+	userID, teamID, teamName, teamIDs, teamNames string) {
 	t.Helper()
 	nz := func(s string) any {
 		if s == "" {
@@ -28,13 +28,11 @@ func insertTeamBULog(t *testing.T, db *gorm.DB, ts time.Time,
 	err := db.Exec(`
 		INSERT INTO logs (id, timestamp, object_type, provider, model, status,
 			user_id, team_id, team_name, team_ids, team_names,
-			business_unit_id, business_unit_name, business_unit_ids, business_unit_names,
 			created_at, latency, cost, prompt_tokens, completion_tokens, total_tokens)
 		VALUES (?, ?, 'chat_completion', 'openai', 'gpt-4', 'success',
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 100, 0.01, 10, 5, 15)
-	`, uuid.New().String(), ts, nz(userID), nz(teamID), nz(teamName), nz(teamIDs), nz(teamNames),
-		nz(buID), nz(buName), nz(buIDs), nz(buNames), ts).Error
-	require.NoError(t, err, "failed to insert team/BU test log")
+			?, ?, ?, ?, ?, ?, 100, 0.01, 10, 5, 15)
+	`, uuid.New().String(), ts, nz(userID), nz(teamID), nz(teamName), nz(teamIDs), nz(teamNames), ts).Error
+	require.NoError(t, err, "failed to insert team test log")
 }
 
 func keyPairsByID(pairs []KeyPairResult) map[string]string {
@@ -56,9 +54,9 @@ func TestFilterTeamMatView_CollectsScalarAndArray(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Old / VK-team log: scalar team only, no JSON array.
-	insertTeamBULog(t, db, now, "u-1", "t-scalar", "Scalar Team", "", "", "", "", "", "")
+	insertTeamLog(t, db, now, "u-1", "t-scalar", "Scalar Team", "", "")
 	// Enterprise log: teams only in the JSON array, scalar team NULL.
-	insertTeamBULog(t, db, now, "u-1", "", "", `["t-arr1","t-arr2"]`, `["Array One","Array Two"]`, "", "", "", "")
+	insertTeamLog(t, db, now, "u-1", "", "", `["t-arr1","t-arr2"]`, `["Array One","Array Two"]`)
 	refreshTestMatViews(t, db)
 
 	pairs, err := store.GetDistinctKeyPairs(ctx, "team_id", "team_name", 1000, "")
@@ -68,27 +66,6 @@ func TestFilterTeamMatView_CollectsScalarAndArray(t *testing.T) {
 	assert.Equal(t, "Scalar Team", byID["t-scalar"], "scalar-only team must still appear (backward compatibility)")
 	assert.Equal(t, "Array One", byID["t-arr1"], "array-only team must now appear")
 	assert.Equal(t, "Array Two", byID["t-arr2"], "second array team must appear, name aligned by ordinality")
-}
-
-// TestFilterBusinessUnitMatView_CollectsScalarAndArray mirrors the team test for
-// the business-unit dropdown (mv_filter_business_units), which had the identical
-// scalar-only bug.
-func TestFilterBusinessUnitMatView_CollectsScalarAndArray(t *testing.T) {
-	store, db := setupPerfTestDB(t)
-	store.matViewsReady.Store(true)
-	ctx := context.Background()
-	now := time.Now().UTC()
-
-	insertTeamBULog(t, db, now, "u-1", "", "", "", "", "bu-scalar", "Scalar BU", "", "")
-	insertTeamBULog(t, db, now, "u-1", "", "", "", "", "", "", `["bu-arr1"]`, `["BU One"]`)
-	refreshTestMatViews(t, db)
-
-	pairs, err := store.GetDistinctKeyPairs(ctx, "business_unit_id", "business_unit_name", 1000, "")
-	require.NoError(t, err)
-	byID := keyPairsByID(pairs)
-
-	assert.Equal(t, "Scalar BU", byID["bu-scalar"], "scalar-only business unit must still appear")
-	assert.Equal(t, "BU One", byID["bu-arr1"], "array-only business unit must now appear")
 }
 
 // TestDimensionRankings_ArrayFanout pins the attribution semantics for the org
@@ -107,9 +84,9 @@ func TestDimensionRankings_ArrayFanout(t *testing.T) {
 	// Row 1: array-only multi-team request -> credited to both teams.
 	// Row 2: single-team request with a scalar owner -> t-a.
 	// Row 3: no owner at all -> Unassigned.
-	insertTeamBULog(t, db, now, "u-1", "", "", `["t-a","t-b"]`, `["Team A","Team B"]`, "", "", "", "")
-	insertTeamBULog(t, db, now, "u-1", "t-a", "Team A", "", "", "", "", "", "")
-	insertTeamBULog(t, db, now, "u-1", "", "", "", "", "", "", "", "")
+	insertTeamLog(t, db, now, "u-1", "", "", `["t-a","t-b"]`, `["Team A","Team B"]`)
+	insertTeamLog(t, db, now, "u-1", "t-a", "Team A", "", "")
+	insertTeamLog(t, db, now, "u-1", "", "", "", "")
 
 	start := now.Add(-time.Hour)
 	end := now.Add(time.Hour)
@@ -195,8 +172,8 @@ func TestFilterTeamMatView_DACScopeAppliesAfterFanout(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Array team owned by u-secret; scalar team visible to u-visible.
-	insertTeamBULog(t, db, now, "u-secret", "", "", `["t-secret"]`, `["Secret Team"]`, "", "", "", "")
-	insertTeamBULog(t, db, now, "u-visible", "t-public", "Public Team", "", "", "", "", "", "")
+	insertTeamLog(t, db, now, "u-secret", "", "", `["t-secret"]`, `["Secret Team"]`)
+	insertTeamLog(t, db, now, "u-visible", "t-public", "Public Team", "", "")
 	refreshTestMatViews(t, db)
 
 	scope := queryscope.QueryScope(func(db *gorm.DB) *gorm.DB {
@@ -214,11 +191,10 @@ func TestFilterTeamMatView_DACScopeAppliesAfterFanout(t *testing.T) {
 }
 
 // insertOrgScopeLog inserts a log row carrying the full set of ownership
-// columns a DAC scope can predicate on, so the org dimensions
-// (customer_id / business_unit_id) can be exercised independently of the
-// user / team ones.
+// columns a scope can predicate on, so the customer dimension can be exercised
+// independently of the user / team ones.
 func insertOrgScopeLog(t *testing.T, db *gorm.DB, ts time.Time,
-	userID, userName, teamID, customerID, buID string) {
+	userID, userName, teamID, customerID string) {
 	t.Helper()
 	nz := func(s string) any {
 		if s == "" {
@@ -228,12 +204,12 @@ func insertOrgScopeLog(t *testing.T, db *gorm.DB, ts time.Time,
 	}
 	err := db.Exec(`
 		INSERT INTO logs (id, timestamp, object_type, provider, model, status,
-			user_id, user_name, team_id, customer_id, business_unit_id,
+			user_id, user_name, team_id, customer_id,
 			created_at, latency, cost, prompt_tokens, completion_tokens, total_tokens)
 		VALUES (?, ?, 'chat_completion', 'openai', 'gpt-4', 'success',
-			?, ?, ?, ?, ?, ?, 100, 0.01, 10, 5, 15)
+			?, ?, ?, ?, ?, 100, 0.01, 10, 5, 15)
 	`, uuid.New().String(), ts, nz(userID), nz(userName), nz(teamID),
-		nz(customerID), nz(buID), ts).Error
+		nz(customerID), ts).Error
 	require.NoError(t, err, "failed to insert org-scope test log")
 }
 
@@ -242,19 +218,18 @@ func insertOrgScopeLog(t *testing.T, db *gorm.DB, ts time.Time,
 // the org ones. Kept faithful to that shape because the failure mode it guards
 // is a column the matview does not project, which errors the whole query rather
 // than under-filtering it.
-func teamDataScope(userIDs, teamIDs, customerIDs, buIDs []string) queryscope.QueryScope {
+func teamDataScope(userIDs, teamIDs, customerIDs []string) queryscope.QueryScope {
 	return func(db *gorm.DB) *gorm.DB {
 		return db.Where(
-			"(user_id IN ? OR team_id IN ? OR customer_id IN ? OR business_unit_id IN ?)",
-			userIDs, teamIDs, customerIDs, buIDs,
+			"(user_id IN ? OR team_id IN ? OR customer_id IN ?)",
+			userIDs, teamIDs, customerIDs,
 		)
 	}
 }
 
 // TestFilterUsersMatView_TeamDataScopeIncludesOrgDimensions is the regression for
 // the org-dimension gap: mv_filter_* projected only (user_id, team_id,
-// virtual_key_id), while a team-data DAC scope also ORs customer_id and
-// business_unit_id. The matview query then failed with 42703 undefined_column,
+// virtual_key_id), while a team-data scope also ORs customer_id. The matview query then failed with 42703 undefined_column,
 // which fallBackToRaw classifies as a shape error — so every team-data
 // filterdata request silently disabled the matview read path process-wide,
 // kicked a self-heal that rebuilt the same too-narrow views, and served a raw
@@ -271,16 +246,14 @@ func TestFilterUsersMatView_TeamDataScopeIncludesOrgDimensions(t *testing.T) {
 	store.matViewsReady.Store(true)
 	now := time.Now().UTC()
 
-	// Visible only via customer_id, and only via business_unit_id respectively;
-	// neither shares the principal's user or team, so the predicate cannot be
-	// satisfied without those two columns being present on the view.
-	insertOrgScopeLog(t, db, now, "u-cust", "Customer Peer", "t-other", "c-mine", "")
-	insertOrgScopeLog(t, db, now, "u-bu", "BU Peer", "t-other", "", "bu-mine")
-	insertOrgScopeLog(t, db, now, "u-outsider", "Outsider", "t-other", "c-other", "bu-other")
+	// Visible only via customer_id: it shares neither the principal's user nor
+	// team, so the predicate cannot be satisfied without that column on the view.
+	insertOrgScopeLog(t, db, now, "u-cust", "Customer Peer", "t-other", "c-mine")
+	insertOrgScopeLog(t, db, now, "u-outsider", "Outsider", "t-other", "c-other")
 	refreshTestMatViews(t, db)
 
 	ctx := queryscope.WithQueryScope(context.Background(),
-		teamDataScope([]string{"u-me"}, []string{"t-mine"}, []string{"c-mine"}, []string{"bu-mine"}))
+		teamDataScope([]string{"u-me"}, []string{"t-mine"}, []string{"c-mine"}))
 
 	pairs, served, err := store.getDistinctKeyPairsFromMatView(ctx, "user_id", "user_name", 1000, "")
 	require.True(t, served, "mv_filter_users must serve the users dimension")
@@ -288,9 +261,8 @@ func TestFilterUsersMatView_TeamDataScopeIncludesOrgDimensions(t *testing.T) {
 	byID := keyPairsByID(pairs)
 
 	assert.Equal(t, "Customer Peer", byID["u-cust"], "user sharing the principal's customer must appear")
-	assert.Equal(t, "BU Peer", byID["u-bu"], "user sharing the principal's business unit must appear")
 	_, leaked := byID["u-outsider"]
-	assert.False(t, leaked, "user in another customer and BU must stay hidden")
+	assert.False(t, leaked, "user in another customer must stay hidden")
 
 	// The public path must agree, and must not have tripped the shape-error
 	// fallback on the way (that flag flip is the production symptom).
@@ -302,7 +274,7 @@ func TestFilterUsersMatView_TeamDataScopeIncludesOrgDimensions(t *testing.T) {
 }
 
 // TestFilterMultiValueMatViews_TeamDataScopeResolves covers the bodyOverride
-// views (teams / business units), whose visibility columns are projected by
+// views (teams / customers), whose visibility columns are projected by
 // multiValueFilterMatViewBody rather than scopeProjection — the two are easy to
 // let drift apart, and drift there means the same silent demotion to raw scans.
 func TestFilterMultiValueMatViews_TeamDataScopeResolves(t *testing.T) {
@@ -310,16 +282,16 @@ func TestFilterMultiValueMatViews_TeamDataScopeResolves(t *testing.T) {
 	store.matViewsReady.Store(true)
 	now := time.Now().UTC()
 
-	insertOrgScopeLog(t, db, now, "u-cust", "Customer Peer", "t-visible", "c-mine", "bu-mine")
-	insertOrgScopeLog(t, db, now, "u-outsider", "Outsider", "t-hidden", "c-other", "bu-other")
-	// Name the teams/BUs so they qualify for the dropdown (the views drop rows
-	// with an empty name).
+	insertOrgScopeLog(t, db, now, "u-cust", "Customer Peer", "t-visible", "c-mine")
+	insertOrgScopeLog(t, db, now, "u-outsider", "Outsider", "t-hidden", "c-other")
+	// Name the teams and customers so they qualify for the dropdown (the views
+	// drop rows with an empty name).
 	require.NoError(t, db.Exec(`UPDATE logs SET team_name = 'Team ' || team_id,
-		business_unit_name = 'BU ' || business_unit_id`).Error)
+		customer_name = 'Customer ' || customer_id`).Error)
 	refreshTestMatViews(t, db)
 
 	ctx := queryscope.WithQueryScope(context.Background(),
-		teamDataScope([]string{"u-me"}, []string{"t-mine"}, []string{"c-mine"}, []string{"bu-mine"}))
+		teamDataScope([]string{"u-me"}, []string{"t-mine"}, []string{"c-mine"}))
 
 	teams, served, err := store.getDistinctKeyPairsFromMatView(ctx, "team_id", "team_name", 1000, "")
 	require.True(t, served)
@@ -328,10 +300,10 @@ func TestFilterMultiValueMatViews_TeamDataScopeResolves(t *testing.T) {
 	assert.Contains(t, teamsByID, "t-visible", "team on a row inside the principal's customer must appear")
 	assert.NotContains(t, teamsByID, "t-hidden", "team on an out-of-scope row must not leak")
 
-	bus, served, err := store.getDistinctKeyPairsFromMatView(ctx, "business_unit_id", "business_unit_name", 1000, "")
+	customers, served, err := store.getDistinctKeyPairsFromMatView(ctx, "customer_id", "customer_name", 1000, "")
 	require.True(t, served)
-	require.NoError(t, err, "team-data scope must resolve against mv_filter_business_units")
-	busByID := keyPairsByID(bus)
-	assert.Contains(t, busByID, "bu-mine", "the principal's own business unit must appear")
-	assert.NotContains(t, busByID, "bu-other", "an out-of-scope business unit must not leak")
+	require.NoError(t, err, "team-data scope must resolve against mv_filter_customers")
+	customersByID := keyPairsByID(customers)
+	assert.Contains(t, customersByID, "c-mine", "the principal's own customer must appear")
+	assert.NotContains(t, customersByID, "c-other", "an out-of-scope customer must not leak")
 }

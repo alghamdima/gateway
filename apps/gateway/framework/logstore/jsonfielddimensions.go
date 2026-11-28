@@ -27,7 +27,7 @@ import (
 //     uses real JSON functions instead: Postgres's `::jsonb` cast guarded by
 //     the `IS JSON` predicate (Postgres 16+), SQLite's json1 extension, and
 //     ClickHouse's JSON functions.
-//   - teamOrBUFanoutFrom / dimensionFanoutFrom (dialectsql.go) proved the
+//   - orgFanoutFrom / dimensionFanoutFrom (dialectsql.go) proved the
 //     fan-out shape: a FROM subquery, aliased AS logs, that turns one row
 //     with an array into one row per array element, so the same
 //     GetDimensionRankings grouping machinery (Group/Order/applyRankingLimit)
@@ -150,7 +150,7 @@ func jsonFieldDimensionSource(dialect string, dimension RankingDimension) (dimen
 func jsonObjectFieldExpr(dialect, column, nestedUnder, field string) (string, bool) {
 	switch dialect {
 	case "postgres":
-		// IS JSON OBJECT is the Postgres 16+ predicate teamOrBUFanoutFrom
+		// IS JSON OBJECT is the Postgres 16+ predicate orgFanoutFrom
 		// already relies on (as IS JSON ARRAY) to test JSON-shapedness
 		// without risking the hard error a malformed ::jsonb cast raises.
 		return fmt.Sprintf(

@@ -15,19 +15,17 @@ import (
 
 // VirtualKeyQueryParams holds pagination, filtering, and search parameters for virtual key queries.
 type VirtualKeyQueryParams struct {
-	Limit                              int
-	Offset                             int
-	Search                             string
-	CustomerID                         string
-	TeamID                             string
-	BusinessUnitID                     string // Enterprise-only owner kind; a key names at most one owner, so it ORs with the other two
-	UserID                             string // Enterprise-only: filters to VKs assigned to this user; matches nothing in OSS
-	SortBy                             string // name, budget_spent, created_at, status (default: created_at)
-	Order                              string // asc, desc (default: asc)
-	Export                             bool   // When true, skip default pagination limits (caller controls limit)
-	ExcludeAccessProfileManagedVirtual bool   // When true, exclude VKs managed through enterprise access profiles
-	ExcludeAssignedVirtualKeys         bool   // When true, exclude VKs that already have any user assignment
-	ForUserAssignment                  bool   // When true, exclude VKs assigned to any entity (team, customer, access profile, or user) — intended for user-assignment pickers
+	Limit                      int
+	Offset                     int
+	Search                     string
+	CustomerID                 string
+	TeamID                     string
+	UserID                     string // Enterprise-only: filters to VKs assigned to this user; matches nothing in OSS
+	SortBy                     string // name, budget_spent, created_at, status (default: created_at)
+	Order                      string // asc, desc (default: asc)
+	Export                     bool   // When true, skip default pagination limits (caller controls limit)
+	ExcludeAssignedVirtualKeys bool   // When true, exclude VKs that already have any user assignment
+	ForUserAssignment          bool   // When true, exclude VKs assigned to any entity (team, customer, or user) — intended for user-assignment pickers
 	// MetadataFilters narrows to keys whose metadata has every listed key set to exactly the given
 	// value (AND). Keys failing tables.IsValidVirtualKeyMetadataKey match nothing.
 	MetadataFilters map[string]string

@@ -1437,34 +1437,6 @@ func TestUpdateVirtualKey(t *testing.T) {
 	assert.Nil(t, result.DisableContentLogging, "clearing the override must write NULL, back to inherit")
 }
 
-// TestUpdateVirtualKey_PersistsBusinessUnitOwner verifies an update writes business_unit_id, so
-// assigning an existing key to a business unit sticks and moving it elsewhere clears it.
-func TestUpdateVirtualKey_PersistsBusinessUnitOwner(t *testing.T) {
-	store := setupRDBTestStore(t)
-	ctx := context.Background()
-
-	vk := &tables.TableVirtualKey{
-		ID:       "vk-bu-owner",
-		Name:     "BU Owner",
-		Value:    *schemas.NewSecretVar("vk-bu-owner-value"),
-		IsActive: schemas.Ptr(true),
-	}
-	require.NoError(t, store.CreateVirtualKey(ctx, vk))
-
-	vk.BusinessUnitID = schemas.Ptr("bu-1")
-	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
-	result, err := store.GetVirtualKey(ctx, "vk-bu-owner")
-	require.NoError(t, err)
-	require.NotNil(t, result.BusinessUnitID, "assigning a business unit must persist")
-	assert.Equal(t, "bu-1", *result.BusinessUnitID)
-
-	vk.BusinessUnitID = nil
-	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
-	result, err = store.GetVirtualKey(ctx, "vk-bu-owner")
-	require.NoError(t, err)
-	assert.Nil(t, result.BusinessUnitID, "clearing the business unit must write NULL")
-}
-
 // TestVirtualKeyMetadata_PersistsThroughCreateAndUpdate pins the metadata round trip: create
 // stores it, update replaces it (the update path names its columns, so a missing "metadata" would
 // silently drop the change), an empty map clears it to NULL, and invalid metadata is refused.
@@ -2466,47 +2438,6 @@ func TestUpdateClientConfig_EnforceVKObjectOwnershipRoundTrip(t *testing.T) {
 	offHash, err := off.GenerateClientConfigHash()
 	require.NoError(t, err)
 	assert.NotEqual(t, onHash, offHash)
-}
-
-// TestUpdateClientConfig_SkipAccessProfileUserVirtualKeyLifecycleRoundTrip pins that the two
-// access-profile user-key settings persist independently, and that only an opt-in is hashed so a
-// config written before the fields existed keeps its hash.
-func TestUpdateClientConfig_SkipAccessProfileUserVirtualKeyLifecycleRoundTrip(t *testing.T) {
-	store := setupRDBTestStore(t)
-	ctx := context.Background()
-
-	off := ClientConfig{EnableLogging: new(true), InitialPoolSize: 100, LogRetentionDays: 30, MaxRequestBodySizeMB: 50, EnforceVKObjectOwnership: true}
-	require.NoError(t, store.UpdateClientConfig(ctx, &off))
-	result, err := store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	assert.False(t, result.SkipAccessProfileUserVirtualKeyCreation)
-	assert.False(t, result.SkipAccessProfileUserVirtualKeyDeletion)
-
-	creationOnly := off
-	creationOnly.SkipAccessProfileUserVirtualKeyCreation = true
-	require.NoError(t, store.UpdateClientConfig(ctx, &creationOnly))
-	result, err = store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	assert.True(t, result.SkipAccessProfileUserVirtualKeyCreation)
-	assert.False(t, result.SkipAccessProfileUserVirtualKeyDeletion, "the settings are independent")
-
-	deletionOnly := off
-	deletionOnly.SkipAccessProfileUserVirtualKeyDeletion = true
-	require.NoError(t, store.UpdateClientConfig(ctx, &deletionOnly))
-	result, err = store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	assert.False(t, result.SkipAccessProfileUserVirtualKeyCreation, "the settings are independent")
-	assert.True(t, result.SkipAccessProfileUserVirtualKeyDeletion)
-
-	offHash, err := off.GenerateClientConfigHash()
-	require.NoError(t, err)
-	creationHash, err := creationOnly.GenerateClientConfigHash()
-	require.NoError(t, err)
-	deletionHash, err := deletionOnly.GenerateClientConfigHash()
-	require.NoError(t, err)
-	assert.NotEqual(t, offHash, creationHash)
-	assert.NotEqual(t, offHash, deletionHash)
-	assert.NotEqual(t, creationHash, deletionHash)
 }
 
 func TestUpdateClientConfig_ExtraFieldsPlacementRoundTrip(t *testing.T) {
@@ -4808,29 +4739,3 @@ func TestDatasheetOverride_UpsertCancelledAfterInsertSavesNothing(t *testing.T) 
 	assert.Empty(t, rows, "an upsert that returns an error must not have committed the row")
 }
 
-// TestUpdateBudgetKeepsTheBusinessUnitOwnerOnAnOwnerlessWrite pins that a budget a business unit
-// holds stays the unit's when a write names no owner, as an edit of the budget's limits alone does.
-// Saving that row as given would null the owner, and the unit would silently stop being capped. A
-// write that names an owner is an ownership change and wins.
-func TestUpdateBudgetKeepsTheBusinessUnitOwnerOnAnOwnerlessWrite(t *testing.T) {
-	store := setupRDBTestStore(t)
-	ctx := context.Background()
-	buID := "bu-1"
-	require.NoError(t, store.CreateBudget(ctx, &tables.TableBudget{ID: "bud-bu", MaxLimit: 100, ResetDuration: "1M", BusinessUnitID: &buID}))
-
-	// The file's edit: a new limit, no owner named.
-	require.NoError(t, store.UpdateBudget(ctx, &tables.TableBudget{ID: "bud-bu", MaxLimit: 200, ResetDuration: "1M"}))
-	edited, err := store.GetBudget(ctx, "bud-bu")
-	require.NoError(t, err)
-	assert.Equal(t, 200.0, edited.MaxLimit)
-	require.NotNil(t, edited.BusinessUnitID, "an ownerless write must not detach the budget from its business unit")
-	assert.Equal(t, buID, *edited.BusinessUnitID)
-
-	// Another unit named outright takes it.
-	other := "bu-2"
-	require.NoError(t, store.UpdateBudget(ctx, &tables.TableBudget{ID: "bud-bu", MaxLimit: 200, ResetDuration: "1M", BusinessUnitID: &other}))
-	moved, err := store.GetBudget(ctx, "bud-bu")
-	require.NoError(t, err)
-	require.NotNil(t, moved.BusinessUnitID)
-	assert.Equal(t, other, *moved.BusinessUnitID)
-}

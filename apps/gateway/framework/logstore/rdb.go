@@ -140,7 +140,7 @@ func (s *RDBLogStore) ScopedDB(ctx context.Context) *gorm.DB {
 // index) with array containment per id (partial jsonb_path_ops GIN index). The
 // `IS NOT NULL AND IS JSON ARRAY` guard matches the partial index predicate so
 // the planner uses the GIN. The scalar matches only on rows with no valid array,
-// the rows teamOrBUFanoutFrom falls back to it on. Returns the parenthesised
+// the rows orgFanoutFrom falls back to it on. Returns the parenthesised
 // SQL and its args.
 func multiValueDimensionFilterSQL(scalarCol, arrayCol string, ids []string) (string, []interface{}) {
 	arrConds := make([]string, len(ids))
@@ -190,16 +190,16 @@ func dimensionMembershipFilterSQL(dialect, scalarCol, arrayCol string, ids []str
 	return scalarCol + " IN ?", []interface{}{ids}
 }
 
-// teamOrBUFanoutFrom is the Postgres implementation behind dimensionFanoutFrom
+// orgFanoutFrom is the Postgres implementation behind dimensionFanoutFrom
 // (dialectsql.go): a FROM subquery (aliased AS logs) that fans each log row out
-// to one row per associated team / business unit / customer, exposing derived
+// to one row per associated team or customer, exposing derived
 // `dim_id` and `dim_name` columns alongside all original log columns (l.*) so
 // DAC scope and filters still resolve. Rows with the JSON-array column set are
 // unnested (id+name aligned by ordinality); rows without it (pre-upgrade or
 // VK-team logs) fall back to the scalar id/name — so historical logs keep
 // contributing. The two branches are mutually exclusive, so no row is counted
 // twice for the same dimension value. Returns ("", false) for non-fan-out
-// dimensions. idCol is the scalar id column ("team_id" / "business_unit_id"),
+// dimensions. idCol is the scalar id column ("team_id" / "customer_id"),
 // which both the ranking and histogram dimensions resolve to. No bind args: all
 // identifiers are internal constants.
 //
@@ -207,7 +207,7 @@ func dimensionMembershipFilterSQL(dialect, scalarCol, arrayCol string, ids []str
 // (multiValueFilterMatViewBody), and repairMatViewShapes treats a changed body
 // as drift and drops the views on boot. Change it only when a rebuild is
 // intended.
-func teamOrBUFanoutFrom(idCol string) (string, bool) {
+func orgFanoutFrom(idCol string) (string, bool) {
 	arrIDs, arrNames, scalarName, ok := fanoutDimensionColumns(idCol)
 	if !ok {
 		return "", false
@@ -227,15 +227,13 @@ func teamOrBUFanoutFrom(idCol string) (string, bool) {
 ) AS logs`, arrIDs, arrNames, idCol, scalarName), true
 }
 
-// Rollup dimensions (team / business unit / customer / user / virtual key)
+// Rollup dimensions (team / customer / user / virtual key)
 // group owner-less traffic under a synthetic "Unassigned" entry rather than
 // dropping it, so the rollup still reconciles to total spend.
 //
 // How a request is attributed depends on whether the dimension has a
-// multi-value column. Team / business unit / customer do: the enterprise
-// user/AP path is the only writer that knows a request's full hierarchy, and it
-// records it in the JSON-array columns (team_ids, customer_ids, ...) while
-// leaving the scalar column NULL. The aggregate readers therefore fan those
+// multi-value column. Team and customer do: a request can be recorded in the
+// JSON-array columns (team_ids, customer_ids) with the scalar column left NULL. The aggregate readers therefore fan those
 // rows out to every id they carry (dimensionFanoutFrom), falling back to the
 // scalar column for rows that have no array — otherwise all enterprise traffic
 // collapses into "Unassigned". A request touching N teams is credited in full
@@ -268,7 +266,7 @@ const OtherDimensionID = otherDimensionID
 // total spend. idCol is an internal constant.
 func isBucketedDimension(idCol string) bool {
 	switch idCol {
-	case "team_id", "business_unit_id", "customer_id", "user_id", "virtual_key_id", "project_id":
+	case "team_id", "customer_id", "user_id", "virtual_key_id":
 		return true
 	}
 	return false
@@ -301,8 +299,8 @@ type dimensionReadSource struct {
 	FannedOut bool
 }
 
-// dimensionReadSourceFor resolves how to read a dimension. Team / customer /
-// business unit fan out to every id in their JSON-array column when the dialect
+// dimensionReadSourceFor resolves how to read a dimension. Team and customer
+// fan out to every id in their JSON-array column when the dialect
 // supports it, falling back to the scalar column for rows without an array;
 // user / virtual key have no array column and keep single-owner scalar
 // attribution with an Unassigned bucket; every other dimension (provider, app,
@@ -435,15 +433,6 @@ func (s *RDBLogStore) applyFilters(baseQuery *gorm.DB, filters SearchFilters) *g
 	}
 	if len(filters.UserIDs) > 0 {
 		baseQuery = baseQuery.Where("user_id IN ?", filters.UserIDs)
-	}
-	// Scalar, unlike the team, customer and business-unit dimensions: a request is scoped to at most
-	// one project, so there is no array column to OR against.
-	if len(filters.ProjectIDs) > 0 {
-		baseQuery = baseQuery.Where("project_id IN ?", filters.ProjectIDs)
-	}
-	if len(filters.BusinessUnitIDs) > 0 {
-		sql, args := dimensionMembershipFilterSQL(s.db.Dialector.Name(), "business_unit_id", "business_unit_ids", filters.BusinessUnitIDs)
-		baseQuery = baseQuery.Where(sql, args...)
 	}
 	if len(filters.UserAgents) > 0 {
 		baseQuery = baseQuery.Where("user_agent IN ?", filters.UserAgents)
@@ -1684,9 +1673,7 @@ func (s *RDBLogStore) listSelectColumns() string {
 		"complexity_tier", "complexity_mechanism", "session_id", "agent_correlation_id",
 		"model_router_id", "model_router_name",
 		"user_id", "user_name", "user_email", "team_id", "team_name", "customer_id", "customer_name",
-		"business_unit_id", "business_unit_name",
-		"team_ids", "team_names", "customer_ids", "customer_names", "business_unit_ids", "business_unit_names",
-		"project_id", "project_name",
+		"team_ids", "team_names", "customer_ids", "customer_names",
 		"user_agent", "app", "client_ip",
 		"speech_input", "transcription_input", "image_generation_input", "video_generation_input",
 		// error_details is intentionally excluded from the list select: for status=error
@@ -3494,9 +3481,9 @@ func (s *RDBLogStore) GetDimensionRankings(ctx context.Context, filters SearchFi
 		return nil, fmt.Errorf("invalid ranking dimension: %s", dimension)
 	}
 
-	// Team / customer / business unit fan out to every id on the row (the
-	// enterprise user/AP path records the full hierarchy in the JSON-array
-	// columns and leaves the scalar NULL); user / virtual key stay single-owner.
+	// Team and customer fan out to every id on the row (the JSON-array columns
+	// can hold several, with the scalar left NULL); user / virtual key stay
+	// single-owner.
 	// Owner-less rows bucket under a synthetic "Unassigned" entry either way.
 	src := s.dimensionReadSourceFor(idCol, nameCol)
 	groupExpr := src.IDExpr
@@ -4321,7 +4308,7 @@ func (s *RDBLogStore) GetDimensionCostHistogram(ctx context.Context, filters Sea
 	}
 	dialect := s.db.Dialector.Name()
 	// Rollup dimensions bucket owner-less traffic as "unassigned"; team /
-	// customer / business unit additionally fan out to every id the row carries.
+	// customer additionally fan out to every id the row carries.
 	// Both force the raw path — the matview reader has neither the unassigned
 	// bucket nor the array columns.
 	src := s.dimensionReadSourceFor(dimCol, "")
@@ -4424,7 +4411,7 @@ func (s *RDBLogStore) GetDimensionTokenHistogram(ctx context.Context, filters Se
 	}
 	dialect := s.db.Dialector.Name()
 	// Rollup dimensions bucket owner-less traffic as "unassigned"; team /
-	// customer / business unit additionally fan out to every id the row carries.
+	// customer additionally fan out to every id the row carries.
 	// Both force the raw path — the matview reader has neither the unassigned
 	// bucket nor the array columns.
 	src := s.dimensionReadSourceFor(dimCol, "")
@@ -4547,7 +4534,7 @@ func (s *RDBLogStore) GetDimensionLatencyHistogram(ctx context.Context, filters 
 		bucketSizeSeconds = 3600
 	}
 	// Rollup dimensions bucket owner-less traffic as "unassigned"; team /
-	// customer / business unit additionally fan out to every id the row carries.
+	// customer additionally fan out to every id the row carries.
 	// Both force the raw path — the matview reader has neither the unassigned
 	// bucket nor the array columns.
 	src := s.dimensionReadSourceFor(dimCol, "")
@@ -4782,22 +4769,18 @@ func (s *RDBLogStore) GetDistinctAliases(ctx context.Context, limit int, query s
 // allowedKeyPairColumns is a whitelist of column names that can be used in GetDistinctKeyPairs
 // to prevent SQL injection from interpolated column names.
 var allowedKeyPairColumns = map[string]struct{}{
-	"selected_key_id":    {},
-	"selected_key_name":  {},
-	"virtual_key_id":     {},
-	"virtual_key_name":   {},
-	"routing_rule_id":    {},
-	"routing_rule_name":  {},
-	"team_id":            {},
-	"team_name":          {},
-	"customer_id":        {},
-	"customer_name":      {},
-	"user_id":            {},
-	"user_name":          {},
-	"business_unit_id":   {},
-	"business_unit_name": {},
-	"project_id":         {},
-	"project_name":       {},
+	"selected_key_id":   {},
+	"selected_key_name": {},
+	"virtual_key_id":    {},
+	"virtual_key_name":  {},
+	"routing_rule_id":   {},
+	"routing_rule_name": {},
+	"team_id":           {},
+	"team_name":         {},
+	"customer_id":       {},
+	"customer_name":     {},
+	"user_id":           {},
+	"user_name":         {},
 }
 
 // GetDistinctKeyPairs returns unique non-empty ID-Name pairs for the given columns using SELECT DISTINCT.

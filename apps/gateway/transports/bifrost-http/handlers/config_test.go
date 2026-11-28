@@ -383,66 +383,6 @@ func TestUpdateConfig_EnforceVKObjectOwnershipPresence(t *testing.T) {
 	}
 }
 
-// TestUpdateConfig_SkipAccessProfileUserVirtualKeyLifecyclePresence pins that each access-profile
-// user-key setting is copied only when sent, so a partial save from an API client can't silently hand
-// user key lifecycle back to access profiles, and that the two move independently.
-func TestUpdateConfig_SkipAccessProfileUserVirtualKeyLifecyclePresence(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	cfg.ClientConfig.SkipAccessProfileUserVirtualKeyCreation = true
-	cfg.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion = true
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	stored := func() (creation, deletion bool) {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted.SkipAccessProfileUserVirtualKeyCreation, persisted.SkipAccessProfileUserVirtualKeyDeletion
-	}
-	put := func(body string) {
-		t.Helper()
-		req := putConfigCtx(body)
-		h.updateConfig(req)
-		require.Equal(t, fasthttp.StatusOK, req.Response.StatusCode(), string(req.Response.Body()))
-	}
-
-	put(`{"client_config":{"log_retention_days":8}}`)
-	creation, deletion := stored()
-	assert.True(t, creation && deletion, "omitted fields keep the stored values")
-	assert.True(t, cfg.ClientConfig.SkipAccessProfileUserVirtualKeyCreation && cfg.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion, "omitted fields keep the live values")
-
-	put(`{"client_config":{"log_retention_days":8,"skip_access_profile_user_virtual_key_creation":false}}`)
-	creation, deletion = stored()
-	assert.False(t, creation)
-	assert.True(t, deletion, "turning creation back on leaves deletion alone")
-	assert.False(t, cfg.ClientConfig.SkipAccessProfileUserVirtualKeyCreation)
-
-	put(`{"client_config":{"log_retention_days":8,"skip_access_profile_user_virtual_key_deletion":false}}`)
-	creation, deletion = stored()
-	assert.False(t, creation)
-	assert.False(t, deletion)
-	assert.False(t, cfg.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion)
-
-	put(`{"client_config":{"log_retention_days":8,"skip_access_profile_user_virtual_key_creation":true,"skip_access_profile_user_virtual_key_deletion":true}}`)
-	creation, deletion = stored()
-	assert.True(t, creation && deletion)
-
-	// null would decode as false and pass the presence check, silently handing user key creation or
-	// deletion back to access profiles, so it is refused before anything changes.
-	for _, body := range []string{
-		`{"client_config":{"log_retention_days":8,"skip_access_profile_user_virtual_key_creation":null}}`,
-		`{"client_config":{"log_retention_days":8,"skip_access_profile_user_virtual_key_deletion":null}}`,
-	} {
-		refused := putConfigCtx(body)
-		h.updateConfig(refused)
-		assert.Equal(t, fasthttp.StatusBadRequest, refused.Response.StatusCode(), "%s: %s", body, refused.Response.Body())
-		creation, deletion = stored()
-		assert.True(t, creation && deletion, "%s left the stored values unchanged", body)
-		assert.True(t, cfg.ClientConfig.SkipAccessProfileUserVirtualKeyCreation && cfg.ClientConfig.SkipAccessProfileUserVirtualKeyDeletion, "%s left the live values unchanged", body)
-	}
-}
-
 // extra_fields_placement is copied only when sent, so a partial save keeps the stored value,
 // and anything other than body/headers is refused before any live mutation.
 func TestUpdateConfig_ExtraFieldsPlacement(t *testing.T) {
@@ -489,53 +429,6 @@ func TestUpdateConfig_ExtraFieldsPlacement(t *testing.T) {
 	require.Equal(t, fasthttp.StatusOK, body.Response.StatusCode(), string(body.Response.Body()))
 	assert.False(t, cfg.ShouldSendExtraFieldsInHeaders())
 	assert.Equal(t, configtables.ExtraFieldsPlacementBody, stored())
-}
-
-// entity_access_profile_mode is copied only when sent, so a partial save keeps the stored mode,
-// and anything other than union/intersect is refused before any live mutation.
-func TestUpdateConfig_EntityAccessProfileMode(t *testing.T) {
-	SetLogger(&mockLogger{})
-	store := newRealConfigStore(t)
-	cfg := newTestConfig(store, false)
-	require.NoError(t, store.UpdateClientConfig(bgCtx(), cfg.ClientConfig))
-	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
-	stored := func() configtables.EntityAccessProfileMode {
-		t.Helper()
-		persisted, err := store.GetClientConfig(bgCtx())
-		require.NoError(t, err)
-		return persisted.EntityAccessProfileMode
-	}
-	assert.False(t, cfg.ShouldIntersectEntityAccessProfiles(), "union until set")
-
-	intersect := putConfigCtx(`{"client_config":{"log_retention_days":8,"entity_access_profile_mode":"intersect"}}`)
-	h.updateConfig(intersect)
-	require.Equal(t, fasthttp.StatusOK, intersect.Response.StatusCode(), string(intersect.Response.Body()))
-	assert.True(t, cfg.ShouldIntersectEntityAccessProfiles())
-	assert.Equal(t, configtables.EntityAccessProfileModeIntersect, stored())
-
-	omitted := putConfigCtx(`{"client_config":{"log_retention_days":8}}`)
-	h.updateConfig(omitted)
-	require.Equal(t, fasthttp.StatusOK, omitted.Response.StatusCode(), string(omitted.Response.Body()))
-	assert.True(t, cfg.ShouldIntersectEntityAccessProfiles(), "an omitted field keeps the live value")
-	assert.Equal(t, configtables.EntityAccessProfileModeIntersect, stored(), "an omitted field keeps the stored value")
-
-	for _, body := range []string{
-		`{"client_config":{"log_retention_days":8,"entity_access_profile_mode":"restrictive"}}`,
-		`{"client_config":{"log_retention_days":8,"entity_access_profile_mode":""}}`,
-		`{"client_config":{"log_retention_days":8,"entity_access_profile_mode":null}}`,
-	} {
-		refused := putConfigCtx(body)
-		h.updateConfig(refused)
-		assert.Equal(t, fasthttp.StatusBadRequest, refused.Response.StatusCode(), "%s: %s", body, refused.Response.Body())
-		assert.True(t, cfg.ShouldIntersectEntityAccessProfiles(), "%s left the live value unchanged", body)
-		assert.Equal(t, configtables.EntityAccessProfileModeIntersect, stored(), "%s left the stored value unchanged", body)
-	}
-
-	union := putConfigCtx(`{"client_config":{"log_retention_days":8,"entity_access_profile_mode":"union"}}`)
-	h.updateConfig(union)
-	require.Equal(t, fasthttp.StatusOK, union.Response.StatusCode(), string(union.Response.Body()))
-	assert.False(t, cfg.ShouldIntersectEntityAccessProfiles())
-	assert.Equal(t, configtables.EntityAccessProfileModeUnion, stored())
 }
 
 // TestUpdateConfig_EmptyDatasheetURLsResetToDefaults pins the regression where

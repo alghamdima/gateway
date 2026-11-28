@@ -27,11 +27,10 @@ import (
 
 // mockHandlerStore implements lib.HandlerStore for testing
 type mockHandlerStore struct {
-	headerMatcher              *lib.HeaderMatcher
-	availableProviders         []schemas.ModelProvider
-	mcpHeaderCombinedAllowlist schemas.WhiteList
-	modelCatalog               *modelcatalog.ModelCatalog
-	customProviders            map[schemas.ModelProvider]mockCustomProvider
+	headerMatcher      *lib.HeaderMatcher
+	availableProviders []schemas.ModelProvider
+	modelCatalog       *modelcatalog.ModelCatalog
+	customProviders    map[schemas.ModelProvider]mockCustomProvider
 }
 
 // mockCustomProvider is what GetCustomProviderPassthrough reports for one custom provider.

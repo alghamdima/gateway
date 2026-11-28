@@ -369,10 +369,10 @@ func buildBackgroundIndexes(ctx context.Context, db *gorm.DB, logger schemas.Log
 		logger.Info("logstore: owner/timestamp indexes are ready")
 	}
 
-	if err := ensureMultiTeamBusinessUnitGINIndexes(ctx, lock.conn); err != nil {
-		logger.Warn(fmt.Sprintf("logstore: team/business-unit GIN index build failed: %s (filtering will still work without the index)", err))
+	if err := ensureOrgArrayGINIndexes(ctx, lock.conn); err != nil {
+		logger.Warn(fmt.Sprintf("logstore: team/customer GIN index build failed: %s (filtering will still work without the index)", err))
 	} else {
-		logger.Info("logstore: team/business-unit GIN indexes are ready")
+		logger.Info("logstore: team/customer GIN indexes are ready")
 	}
 
 	if err := ensureDashboardEnhancements(ctx, lock.conn); err != nil {

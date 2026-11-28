@@ -129,7 +129,7 @@ func TestSubmitJob_PropagatesGrant(t *testing.T) {
 	submitCtx := schemas.NewBifrostContext(context.Background(), time.Now().Add(1*time.Minute))
 	submitCtx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
 	g := grant.New()
-	g.SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-test"), nil, nil, nil, nil, nil, nil))
+	g.SetIdentity(grant.NewIdentity(grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-test"), nil, nil, nil, nil))
 	require.True(t, submitCtx.SetGrant(g))
 
 	var gotGrant schemas.Grant

@@ -94,7 +94,7 @@ func TestRecordCredentialKeepsTheUser(t *testing.T) {
 
 	g := grant.New()
 	ctx.SetGrant(g)
-	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: "u1", Name: "Ada"}, nil, nil, nil, nil, nil))
+	g.SetIdentity(grant.NewIdentity(schemas.Credential{}, &schemas.UserRef{ID: "u1", Name: "Ada"}, nil, nil, nil))
 
 	RecordCredential(ctx, grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-1"))
 	assert.Equal(t, grant.NewCredential(grant.CredentialVirtualKey, "sk-bf-1"), g.Identity().Credential())
@@ -111,8 +111,6 @@ func TestRecordingKeepsWhatResolutionSettled(t *testing.T) {
 		&schemas.EntityRef{ID: "vk1", Name: "Key"},
 		[]schemas.EntityRef{{ID: "t1"}},
 		[]schemas.EntityRef{{ID: "c1"}},
-		[]schemas.EntityRef{{ID: "bu1"}},
-		&schemas.EntityRef{ID: "p1"},
 	))
 
 	RecordCredential(ctx, grant.NewCredential(grant.CredentialAPIKey, "key-7"))
@@ -121,8 +119,6 @@ func TestRecordingKeepsWhatResolutionSettled(t *testing.T) {
 	assert.Equal(t, "vk1", identity.VirtualKey().ID)
 	assert.Equal(t, []schemas.EntityRef{{ID: "t1"}}, identity.Teams())
 	assert.Equal(t, []schemas.EntityRef{{ID: "c1"}}, identity.Customers())
-	assert.Equal(t, []schemas.EntityRef{{ID: "bu1"}}, identity.BusinessUnits())
-	assert.Equal(t, "p1", identity.Project().ID)
 	assert.Equal(t, "u1", identity.User().ID)
 }
 
