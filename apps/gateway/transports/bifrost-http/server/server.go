@@ -176,7 +176,7 @@ type BifrostHTTPServer struct {
 	Config *lib.Config
 
 	// HTTPClientFactory hands out clients for outbound traffic other than provider
-	// inference (skills, plugin downloads, catalog sync) that honour
+	// inference (plugin downloads, catalog sync) that honour
 	// the global proxy for their purpose and follow proxy changes live.
 	HTTPClientFactory *network.HTTPClientFactory
 
@@ -187,13 +187,12 @@ type BifrostHTTPServer struct {
 	// drops complexity request capture's vectors with their logs.
 	unsubscribeCaptureDeletes func()
 
-	WebSocketHandler     *handlers.WebSocketHandler
-	devPprofHandler      *handlers.DevPprofHandler
-	skillsServingHandler *handlers.SkillsServingHandler
-	IntegrationHandler   *handlers.IntegrationHandler
-	wsLiveHandler        *handlers.WSLiveHandler
-	wsSpeechHandler      *handlers.WSSpeechSessionHandler
-	webrtcLiveHandler    *handlers.WebRTCLiveHandler
+	WebSocketHandler   *handlers.WebSocketHandler
+	devPprofHandler    *handlers.DevPprofHandler
+	IntegrationHandler *handlers.IntegrationHandler
+	wsLiveHandler      *handlers.WSLiveHandler
+	wsSpeechHandler    *handlers.WSSpeechSessionHandler
+	webrtcLiveHandler  *handlers.WebRTCLiveHandler
 
 	AuthMiddleware     *handlers.AuthMiddleware
 	setupLockInstalled bool // OSS setup-lock gate guards /api (see AuthMiddleware.SetupLockMiddleware); never set on enterprise
@@ -2194,15 +2193,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	if sessionHandler != nil {
 		sessionHandler.RegisterRoutes(s.Router, middlewares...)
 	}
-	skillsHandler := handlers.NewSkillsHandler(s.Config.ConfigStore, s.Config.ObjectStore)
-	if skillsHandler != nil {
-		skillsHandler.RegisterRoutes(s.Router, middlewares...)
-	}
-	skillsServingHandler := handlers.NewSkillsServingHandler(s.Config.ConfigStore, s.Config.ObjectStore, s.Config)
-	if skillsServingHandler != nil {
-		skillsServingHandler.RegisterRoutes(s.Router, middlewares...)
-	}
-	s.skillsServingHandler = skillsServingHandler
 	cacheHandler.RegisterRoutes(s.Router, middlewares...)
 	if governanceHandler != nil {
 		var overrides handlers.GovernanceRouteOverrides
@@ -2379,32 +2369,6 @@ func (s *BifrostHTTPServer) PrepareCommonMiddlewares() []schemas.BifrostHTTPMidd
 	return commonMiddlewares
 }
 
-// shouldRun, when non-nil, is consulted once before the sweep starts;
-// returning false skips it entirely. Deployments running several instances
-// against one config store can use it to restrict the sweep to a single
-// instance. nil means always run.
-func startSkillsOrphanCleanupWorker(ctx context.Context, config *lib.Config, shouldRun func() bool) {
-	if config == nil || config.ConfigStore == nil {
-		return
-	}
-	if shouldRun != nil && !shouldRun() {
-		return
-	}
-
-	// Run once on startup asynchronously with a 10-minute timeout so a stalled
-	// DB or object-store call does not leave the goroutine hanging indefinitely.
-	go func() {
-		cleanupCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		defer cancel()
-		result, err := handlers.CleanupOrphanSkillFiles(cleanupCtx, config.ConfigStore, config.ObjectStore, false)
-		if err != nil {
-			logger.Warn("skills orphan cleanup failed during startup: %v", err)
-		} else {
-			logger.Info("skills orphan cleanup completed during startup: deleted_db_blobs=%d deleted_storage_objects=%d", result.DeletedDBBlobs, result.DeletedStorageObjects)
-		}
-	}()
-}
-
 // ApplyBasePath resolves the base path from the -base-path flag value in
 // s.BasePath and server.base_path in s.Config, then stores the normalized
 // result on s.BasePath, on s.Config.ServerConfig (created when absent) and in
@@ -2461,7 +2425,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	// Outbound clients for non-inference traffic, built by LoadConfig on the global
 	// proxy it loaded.
 	s.HTTPClientFactory = s.Config.HTTPClientFactory
-	handlers.SetSkillFetchHTTPClientFactory(s.HTTPClientFactory)
 	// Initialize WebSocket handler early so plugins can wire event broadcasters during Init.
 	// Log callbacks are registered later in RegisterAPIRoutes when logging plugin is available.
 	s.WebSocketHandler = handlers.NewWebSocketHandler(s.Ctx, s.Config.ClientConfig.AllowedOrigins)
@@ -2720,7 +2683,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	lib.ApplyBodyBufferPoolLimit(s.Config.ServerConfig, maxRequestBodySizeMB*1024*1024)
 	// Create fasthttp server instance
 	s.Server = newFastHTTPServer(handlers.ServerRootHandler(s.CORSMiddleware, s.Config, s.Router.Handler), maxRequestBodySizeMB, s.Config.ServerConfig.ReadBufferSize, logger.Warn)
-	startSkillsOrphanCleanupWorker(s.Ctx, s.Config, nil)
 	// Keep the live model catalog current after boot. Without this, a model an
 	// upstream starts serving mid-uptime stays invisible until a restart or a
 	// key edit, since nothing else re-fetches list-models.
@@ -2820,9 +2782,6 @@ func (s *BifrostHTTPServer) Start() error {
 				logger.Info("stopping dev pprof handler...")
 				s.devPprofHandler.Cleanup()
 			}
-			if s.skillsServingHandler != nil {
-				s.skillsServingHandler.Close()
-			}
 			if s.wsPool != nil {
 				logger.Info("closing websocket connection pool...")
 				s.wsPool.Close()
@@ -2848,7 +2807,7 @@ func (s *BifrostHTTPServer) Start() error {
 }
 
 // cleanupAfterServeError releases what Start had set up when Serve itself
-// fails: open realtime sessions, the websocket pool, and the skills serving
+// fails: open realtime sessions and the websocket pool
 // cache, whose exported bare repositories live in temp directories that only
 // Close removes. The graceful-shutdown path above does the same as part of
 // its full teardown.
@@ -2867,9 +2826,6 @@ func (s *BifrostHTTPServer) cleanupAfterServeError() {
 	}
 	if s.wsPool != nil {
 		s.wsPool.Close()
-	}
-	if s.skillsServingHandler != nil {
-		s.skillsServingHandler.Close()
 	}
 }
 

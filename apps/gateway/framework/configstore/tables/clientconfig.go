@@ -78,7 +78,6 @@ type TableClientConfig struct {
 	HiddenRequestTypesJSON                  string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string of request types hidden from log reads
 	UsageEstimationTokenizersJSON           string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string of tokenizer families used to estimate a cancelled stream's usage
 	RoutingChainMaxDepth                    int                            `gorm:"default:10" json:"routing_chain_max_depth"`                          // Maximum depth for routing rule chain evaluation (default: 10)
-	SkillsExternalClientURL                 string                         `gorm:"type:varchar(512)" json:"skills_external_client_url,omitempty"`      // Public base URL for Skills Repository marketplaces; empty disables marketplace serving
 	WhitelistedRoutesJSON                   string                         `gorm:"type:text" json:"-"`                                                 // JSON serialized []string
 	AllowPerRequestContentStorageOverride   bool                           `gorm:"default:false" json:"allow_per_request_content_storage_override"`    // Allow per-request override for content storage (e.g. long-term vs ephemeral)
 	AllowPerRequestRawOverride              bool                           `gorm:"default:false" json:"allow_per_request_raw_override"`                // Allow per-request override for raw request/response storage

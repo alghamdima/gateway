@@ -3745,25 +3745,6 @@ func TestMigrationAddOAuthKeyConfigColumns_BoundsTheLockWait(t *testing.T) {
 	}
 }
 
-// TestMigrationSkillsExternalClientURL adds the skills marketplace URL column idempotently,
-// leaving existing rows without a value.
-func TestMigrationSkillsExternalClientURL(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-	require.NoError(t, db.Exec("CREATE TABLE config_client (id INTEGER PRIMARY KEY)").Error)
-	require.NoError(t, migrationAddSkillsExternalClientURLColumn(ctx, db, testMigrationLogger))
-	require.True(t, db.Migrator().HasColumn("config_client", "skills_external_client_url"))
-	require.NoError(t, db.Exec("INSERT INTO config_client (id) VALUES (1)").Error)
-	require.NoError(t, migrationAddSkillsExternalClientURLColumn(ctx, db, testMigrationLogger))
-	var rows []struct {
-		ID                      int
-		SkillsExternalClientURL string
-	}
-	require.NoError(t, db.Table("config_client").Order("id").Find(&rows).Error)
-	require.Len(t, rows, 1)
-	require.Empty(t, rows[0].SkillsExternalClientURL)
-}
-
 // TestMigrationAddPassthroughJSONColumn_NonRollbackable pins that rolling the passthrough
 // column back is refused. passthrough_json is the only home for a provider's passthrough
 // allowlist, and a provider without one forwards every route, so the rollback must fail

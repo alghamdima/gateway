@@ -198,7 +198,7 @@ func suggestionHandler(t *testing.T) (*router.Router, *suggestionManagerFake) {
 	ls, err := logstore.NewLogStore(ctx, &logstore.Config{
 		Enabled: true, Type: logstore.LogStoreTypeSQLite,
 		Config: &logstore.SQLiteConfig{Path: filepath.Join(t.TempDir(), "logs.db")},
-	}, testLogger{})
+	}, &mockLogger{})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ls.Close(ctx) })
 	manager := &suggestionManagerFake{store: ls, texts: map[string]string{"log-1": "where is my refund for order 12"}, version: "bank-v2"}
@@ -257,7 +257,7 @@ func TestComplexitySuggestionsRouterNotServed(t *testing.T) {
 	ls, err := logstore.NewLogStore(context.Background(), &logstore.Config{
 		Enabled: true, Type: logstore.LogStoreTypeSQLite,
 		Config: &logstore.SQLiteConfig{Path: filepath.Join(t.TempDir(), "logs.db")},
-	}, testLogger{})
+	}, &mockLogger{})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ls.Close(context.Background()) })
 	// The plugin serves only "default"; "unserved" is saved but not loaded.

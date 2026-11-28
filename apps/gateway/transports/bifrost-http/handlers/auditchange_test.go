@@ -221,24 +221,6 @@ func TestAuditChange_ProviderKeyUpdate(t *testing.T) {
 	requireNoSecret(t, change, newValue)
 }
 
-func TestAuditSkillOmitsFreeFormValues(t *testing.T) {
-	snap := auditSkill(&configstoreTables.TableSkill{
-		Name:             "s",
-		Metadata:         configstoreTables.SkillStringMap{"api_key": "plaintext-secret"},
-		ExtraFrontmatter: configstoreTables.SkillJSONMap{"token": "plaintext-secret"},
-	})
-	raw, err := json.Marshal(snap)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(raw), "plaintext-secret") {
-		t.Fatalf("skill snapshot leaks free-form values: %s", raw)
-	}
-	if !strings.Contains(string(raw), "api_key") || !strings.Contains(string(raw), "token") {
-		t.Fatalf("skill snapshot should still list the keys: %s", raw)
-	}
-}
-
 func TestAuditChange_VirtualKeyDeleteSnapshotIncludesBudgets(t *testing.T) {
 	h, _ := newAuditVKHandler(t)
 	createCtx := newTestRequestCtx(`{"name":"audit-vk","customer_id":"cust-audit","budgets":[{"max_limit":123.5,"reset_duration":"1d"}]}`)

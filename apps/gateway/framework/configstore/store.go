@@ -9,7 +9,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/logstore"
-	"github.com/maximhq/bifrost/framework/objectstore"
 	"github.com/maximhq/bifrost/framework/vectorstore"
 	"gorm.io/gorm"
 )
@@ -76,23 +75,6 @@ func (p ModelConfigsQueryParams) effectiveScopes() []string {
 		return nil
 	}
 	return out
-}
-
-// SkillListQueryParams holds pagination, filtering, and search parameters for skill repository queries.
-type SkillListQueryParams struct {
-	Limit  int
-	Offset int
-	Search string
-	SortBy string // name, updated_at, created_at (default: created_at)
-	Order  string // asc, desc (default: desc)
-}
-
-type SkillVersionListQueryParams struct {
-	Limit  int
-	Offset int
-	SortBy string // version, created_at (default: created_at)
-	Order  string // asc, desc (default: desc)
-	Search string // substring match on the version string (optional)
 }
 
 // RoutingRulesQueryParams holds pagination, filtering, and search parameters for routing rules queries.
@@ -416,23 +398,6 @@ type ConfigStore interface {
 
 	// Not found retry wrapper
 	RetryOnNotFound(ctx context.Context, fn func(ctx context.Context) (any, error), maxRetries int, retryDelay time.Duration) (any, error)
-
-	// Skills Repository
-	CreateSkill(ctx context.Context, skill *tables.TableSkill, version string, objectStore objectstore.ObjectStore) error
-	GetSkill(ctx context.Context, id string) (*tables.TableSkill, error)
-	GetSkillLean(ctx context.Context, id string) (*tables.TableSkill, error)
-	GetSkillByName(ctx context.Context, name string) (*tables.TableSkill, error)
-	GetSkillVersion(ctx context.Context, skillID, version string) (*tables.TableSkillVersion, error)
-	ListSkillVersions(ctx context.Context, skillID string, params SkillVersionListQueryParams) ([]tables.TableSkillVersion, int64, error)
-	UpdateSkill(ctx context.Context, skill *tables.TableSkill, version string, serve bool, objectStore objectstore.ObjectStore) error
-	DeleteSkill(ctx context.Context, id string, objectStore objectstore.ObjectStore) error
-	ListSkills(ctx context.Context, params SkillListQueryParams) ([]tables.TableSkill, int64, error)
-	ShiftSkillVersion(ctx context.Context, skillID string, targetVersion string, objectStore objectstore.ObjectStore) error
-	GetAllSkillsVersion(ctx context.Context) (string, error)
-	BumpAllSkillsVersion(ctx context.Context, bump string) (string, error)
-	CreateSkillFileBlob(ctx context.Context, blob *tables.TableSkillFileBlob) error
-	CleanupOrphanSkillFileBlobs(ctx context.Context, force bool) (int64, error)
-	UpdateSkillConfigHash(ctx context.Context, skillID string, configHash string) error
 
 	// Sidekiq - generic durable background jobs
 	CreateSidekiqJob(ctx context.Context, job *tables.TableSidekiqJob) error

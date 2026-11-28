@@ -220,8 +220,6 @@ func (h *ConfigHandler) getConfig(ctx *fasthttp.RequestCtx) {
 		mapConfig["env_label"] = h.store.EnvLabel
 	}
 	mapConfig["disable_onboarding"] = h.store.DisableOnboarding
-	mapConfig["is_git_available"] = CheckGitAvailability()
-	mapConfig["skills_marketplace_base_url"] = h.store.GetSkillsExternalClientURL()
 	mapConfig["is_cache_connected"] = h.store.VectorStore != nil
 	mapConfig["is_logs_connected"] = h.store.LogsStore != nil
 	mapConfig["is_object_storage_connected"] = h.store.LogsStoreConfig != nil && h.store.LogsStoreConfig.ObjectStorage != nil
@@ -353,14 +351,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	clientConfigFields := requestFields.ClientConfig
-
-	// Validate URL overrides up front — the rest of this handler applies live
-	// mutations (drop-excess flag, compat plugin reload) before persisting, so a
-	// late rejection would leave the process in a partially-updated state.
-	if err := configstore.ValidatePublicBaseURL(payload.ClientConfig.SkillsExternalClientURL.GetValue()); err != nil {
-		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("skills_external_client_url %v", err))
-		return
-	}
 
 	// enforce_vk_object_ownership is a plain bool that defaults to true, so a JSON null would
 	// decode as true and silently re-enable ownership. Refuse it; omit the field to keep the stored value.
@@ -677,12 +667,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// No restart needed - routing engine reads via pointer, change is effective immediately.
 	if payload.ClientConfig.RoutingChainMaxDepth > 0 {
 		updatedConfig.RoutingChainMaxDepth = payload.ClientConfig.RoutingChainMaxDepth
-	}
-
-	// Preserve the stored URLs when an older or partial client omits
-	// the field. An explicit null still clears the override.
-	if _, present := clientConfigFields["skills_external_client_url"]; present {
-		updatedConfig.SkillsExternalClientURL = payload.ClientConfig.SkillsExternalClientURL
 	}
 
 	// Handle HeaderFilterConfig changes

@@ -2021,10 +2021,6 @@ var apiWhitelistedPrefixes = []string{
 	// A bare "/api/dev" prefix also matches "/api/devices" (and any other
 	// "/api/dev*" route), which would silently bypass auth on those routes.
 	"/api/dev/",
-	// Skills serving endpoints are public — marketplace URLs cannot carry
-	// credentials securely. Management endpoints under /api/skills (without
-	// /serve/) remain authenticated.
-	"/api/skills/serve/",
 }
 
 // isAPIRouteWhitelisted reports whether url (the raw PathOriginal) is a public API route:
@@ -2261,9 +2257,9 @@ func (m *AuthMiddleware) middleware(shouldSkip func(*configstore.AuthConfig, str
 			// decoded/normalized ctx.Path(). fasthttp/router dispatches routes by matching
 			// PathOriginal() directly against registered patterns (it never decodes %2F or
 			// collapses ".." before route selection - see router.Handler), so an encoded
-			// traversal like "/api/providers/..%2Fskills%2Fserve%2Fx" is ONE opaque segment
+			// traversal like "/api/providers/..%2Fdev%2Fpprof%2Fx" is ONE opaque segment
 			// to the router (matching the protected "/api/providers/{provider}" route) but
-			// decodes+normalizes to "/api/skills/serve/x" via ctx.Path() - a whitelisted
+			// decodes+normalizes to "/api/dev/pprof/x" via ctx.Path() - a whitelisted
 			// prefix. Matching on ctx.Path() here let that request sail through unauthenticated
 			// while the router dispatched it to a protected, parameterized admin handler.
 			// Using the same raw string the router uses keeps this decision congruent with

@@ -399,7 +399,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_fast_mode_pricing_columns"}, run: migrationAddFastModePricingColumns},
 	{IDs: []string{"add_customer_name_unique_constraint_dedup", "add_customer_name_unique_constraint_index"}, run: migrationAddCustomerNameUniqueConstraint},
 	{IDs: []string{"null_legacy_customer_budget_id_refs"}, run: migrationNullLegacyCustomerBudgetID},
-	{IDs: []string{"add_skills_repo_tables"}, run: migrationAddSkillsRepoTables},
 	{IDs: []string{"add_dump_errors_in_console_logs_column"}, run: migrationAddDumpErrorsInConsoleLogsColumn},
 	{IDs: []string{"add_bedrock_mantle_key_columns"}, run: migrationAddBedrockMantleKeyColumns},
 	{IDs: []string{"add_model_pricing_is_deprecated_column"}, run: migrationAddModelPricingIsDeprecatedColumn},
@@ -472,7 +471,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_provider_objects_object_id_index"}, run: migrationAddProviderObjectsObjectIDIndex},
 	{IDs: []string{"add_client_config_enforce_vk_object_ownership_column"}, run: migrationAddClientConfigEnforceVKObjectOwnershipColumn},
 	{IDs: []string{"add_client_config_extra_fields_placement_column"}, run: migrationAddClientConfigExtraFieldsPlacementColumn},
-	{IDs: []string{"add_skills_external_client_url_column"}, run: migrationAddSkillsExternalClientURLColumn},
 	{IDs: []string{"add_virtual_key_metadata_column"}, run: migrationAddVirtualKeyMetadataColumn},
 	{IDs: []string{"add_vertex_use_session_routing_column"}, run: migrationAddVertexUseSessionRoutingColumn},
 	{IDs: []string{"add_client_config_skip_access_profile_user_virtual_key_lifecycle_columns"}, run: migrationAddClientConfigSkipAccessProfileUserVirtualKeyLifecycleColumns},
@@ -495,6 +493,36 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_model_router_suggestions_tier_columns"}, run: migrationAddModelRouterSuggestionTierColumns},
 	{IDs: []string{"add_client_config_entity_access_profile_mode_column"}, run: migrationAddClientConfigEntityAccessProfileModeColumn},
 	{IDs: []string{"drop_notifications_and_feature_flags_tables"}, run: migrationDropNotificationsAndFeatureFlagsTables},
+	{IDs: []string{"drop_skills_repository"}, run: migrationDropSkillsRepository},
+}
+
+// migrationDropSkillsRepository drops what the skills repository kept, a feature taken out of the
+// product on 2026-11-28 (MODIFICATIONS.md, "Features outside the product"): its four tables and the
+// marketplace URL column of the client config. Its own migrations are gone, so a new database never
+// creates them; this removes them from a database created before that. Files come before versions
+// and versions before skills, the order their foreign keys need. Nothing is restored on rollback:
+// the code that read them is gone.
+func migrationDropSkillsRepository(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "drop_skills_repository"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			mg := tx.WithContext(ctx).Migrator()
+			for _, table := range []string{"skill_files", "skill_versions", "skills", "skill_file_blobs"} {
+				if err := mg.DropTable(table); err != nil {
+					return fmt.Errorf("drop table %s: %w", table, err)
+				}
+			}
+			if mg.HasColumn(&tables.TableClientConfig{}, "skills_external_client_url") {
+				if err := mg.DropColumn(&tables.TableClientConfig{}, "skills_external_client_url"); err != nil {
+					return fmt.Errorf("drop column skills_external_client_url: %w", err)
+				}
+			}
+			return nil
+		},
+	})
 }
 
 // migrationDropNotificationsAndFeatureFlagsTables drops the tables of two features taken out of
@@ -5720,70 +5748,6 @@ func migrationRepairBareWildcardAllowedModels(ctx context.Context, db *gorm.DB, 
 	return nil
 }
 
-// migrationAddSkillsRepoTables adds the skills repository tables.
-// Files belong to skill_versions (not directly to skills); blobs are reused
-// across versions via shared blob_id/storage_key references.
-//
-// Idempotent: guards each table create so retrying after a partially applied
-// migration does not fail when some tables were already created.
-func migrationAddSkillsRepoTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	logger.Info("[configstore] running migrationAddSkillsRepoTables")
-	defer logger.Info("[configstore] migrationAddSkillsRepoTables finished")
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: "add_skills_repo_tables",
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			// --- skills table ---
-			if !mg.HasTable(&tables.TableSkill{}) {
-				if err := mg.CreateTable(&tables.TableSkill{}); err != nil {
-					return fmt.Errorf("create skills table: %w", err)
-				}
-			}
-			// --- skill_versions table ---
-			if !mg.HasTable(&tables.TableSkillVersion{}) {
-				if err := mg.CreateTable(&tables.TableSkillVersion{}); err != nil {
-					return fmt.Errorf("create skill_versions table: %w", err)
-				}
-			}
-			// --- skill_file_blobs table ---
-			if !mg.HasTable(&tables.TableSkillFileBlob{}) {
-				if err := mg.CreateTable(&tables.TableSkillFileBlob{}); err != nil {
-					return fmt.Errorf("create skill_file_blobs table: %w", err)
-				}
-			}
-			// --- skill_files table ---
-			if !mg.HasTable(&tables.TableSkillFile{}) {
-				if err := mg.CreateTable(&tables.TableSkillFile{}); err != nil {
-					return fmt.Errorf("create skill_files table: %w", err)
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			mg := tx.Migrator()
-			if err := mg.DropTable(&tables.TableSkillFile{}); err != nil {
-				return err
-			}
-			if err := mg.DropTable(&tables.TableSkillVersion{}); err != nil {
-				return err
-			}
-			if err := mg.DropTable(&tables.TableSkill{}); err != nil {
-				return err
-			}
-			if err := mg.DropTable(&tables.TableSkillFileBlob{}); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running skills repo tables migration: %s", err.Error())
-	}
-	return nil
-}
-
 // migrationAddPluginOrderColumns adds placement and exec_order columns to config_plugins table
 func migrationAddPluginOrderColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_plugin_order_columns"
@@ -7501,20 +7465,6 @@ func migrationUniqueTeamNames(ctx context.Context, db *gorm.DB, logger schemas.L
 			logger.Info("[configstore] %s: dropping index idx_governance_teams_name on TableTeam", migrationName)
 			_ = tx.Migrator().DropIndex(&tables.TableTeam{}, "idx_governance_teams_name")
 			return nil
-		},
-	})
-}
-
-// migrationAddSkillsExternalClientURLColumn adds the public marketplace URL setting.
-// DDL runs separately from the backfill so its exclusive lock is released before updating rows.
-func migrationAddSkillsExternalClientURLColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: "add_skills_external_client_url_column",
-		Migrate: func(tx *gorm.DB) error {
-			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "SkillsExternalClientURL")
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return fmt.Errorf("add_skills_external_client_url_column is non-rollbackable: dropping it would discard marketplace configuration")
 		},
 	})
 }

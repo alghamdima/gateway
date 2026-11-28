@@ -1154,50 +1154,6 @@ func TestAuthMiddleware_EnabledAuthConfig_NoAuth(t *testing.T) {
 	}
 }
 
-func TestAuthMiddleware_SkillsPublicServeManagementSplit(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	am := &AuthMiddleware{}
-	am.UpdateAuthConfig(&configstore.AuthConfig{
-		AdminUserName: schemas.NewSecretVar("admin"),
-		AdminPassword: schemas.NewSecretVar("hashedpassword"),
-		IsEnabled:     true,
-	})
-
-	t.Run("serve routes bypass auth", func(t *testing.T) {
-		ctx := &fasthttp.RequestCtx{}
-		ctx.Request.SetRequestURI("/api/skills/serve/my-skill.git/info/refs?service=git-upload-pack")
-
-		nextCalled := false
-		handler := am.APIMiddleware()(func(ctx *fasthttp.RequestCtx) {
-			nextCalled = true
-		})
-		handler(ctx)
-
-		if !nextCalled {
-			t.Fatal("expected public skills serving route to bypass auth")
-		}
-	})
-
-	t.Run("management routes require auth", func(t *testing.T) {
-		ctx := &fasthttp.RequestCtx{}
-		ctx.Request.SetRequestURI("/api/skills")
-
-		nextCalled := false
-		handler := am.APIMiddleware()(func(ctx *fasthttp.RequestCtx) {
-			nextCalled = true
-		})
-		handler(ctx)
-
-		if nextCalled {
-			t.Fatal("expected skills management route to require auth")
-		}
-		if ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
-			t.Fatalf("expected %d, got %d", fasthttp.StatusUnauthorized, ctx.Response.StatusCode())
-		}
-	})
-}
-
 // TestAuthMiddleware_EncodedTraversalDoesNotBypassAuth exercises the same raw-path
 // router dispatch as production. Authorization must never use the decoded path
 // to whitelist a request dispatched to a protected parameterized handler.
@@ -1207,15 +1163,14 @@ func TestAuthMiddleware_EncodedTraversalDoesNotBypassAuth(t *testing.T) {
 		name, method, route, uri string
 		status                   int
 	}{
-		{"provider update", "PUT", "/api/providers/{provider}", "/api/providers/..%2Fskills%2Fserve%2Fmalicious", 401},
-		{"provider key creation", "POST", "/api/providers/{provider}/keys", "/api/providers/..%2Fskills%2Fserve%2Fmalicious/keys", 401},
-		{"provider deletion", "DELETE", "/api/providers/{provider}", "/api/providers/..%2Fskills%2Fserve%2Fmalicious", 401},
+		{"provider update", "PUT", "/api/providers/{provider}", "/api/providers/..%2Fdev%2Fpprof%2Fmalicious", 401},
+		{"provider key creation", "POST", "/api/providers/{provider}/keys", "/api/providers/..%2Fdev%2Fpprof%2Fmalicious/keys", 401},
+		{"provider deletion", "DELETE", "/api/providers/{provider}", "/api/providers/..%2Fdev%2Fpprof%2Fmalicious", 401},
 		{"plugin dev prefix", "PUT", "/api/plugins/{name}", "/api/plugins/..%2Fdev%2Fmalicious", 401},
-		{"lowercase slash", "PUT", "/api/providers/{provider}", "/api/providers/..%2fskills%2fserve%2fmalicious", 401},
-		{"encoded dots", "PUT", "/api/providers/{provider}", "/api/providers/%2e%2e%2Fskills%2Fserve%2Fmalicious", 401},
-		{"double encoding", "PUT", "/api/providers/{provider}", "/api/providers/%252e%252e%252Fskills%252Fserve%252Fmalicious", 401},
-		{"query string", "PUT", "/api/providers/{provider}", "/api/providers/..%2Fskills%2Fserve%2Fmalicious?source=test", 401},
-		{"public skills", "GET", "/api/skills/serve/{path:*}", "/api/skills/serve/my-skill.git/info/refs?service=git-upload-pack", 204},
+		{"lowercase slash", "PUT", "/api/providers/{provider}", "/api/providers/..%2fdev%2fpprof%2fmalicious", 401},
+		{"encoded dots", "PUT", "/api/providers/{provider}", "/api/providers/%2e%2e%2Fdev%2Fpprof%2Fmalicious", 401},
+		{"double encoding", "PUT", "/api/providers/{provider}", "/api/providers/%252e%252e%252Fdev%252Fpprof%252Fmalicious", 401},
+		{"query string", "PUT", "/api/providers/{provider}", "/api/providers/..%2Fdev%2Fpprof%2Fmalicious?source=test", 401},
 		{"public dev", "GET", "/api/dev/pprof/{profile}", "/api/dev/pprof/goroutine", 204},
 	}
 	for _, tc := range cases {
@@ -6331,8 +6286,8 @@ func BenchmarkBasePathMiddleware(b *testing.B) {
 
 // encodedTraversalPath is routed by fasthttp/router as one opaque segment of
 // /api/providers/{provider}, but ctx.Path() decodes it to the whitelisted
-// /api/skills/serve/x.
-const encodedTraversalPath = "/api/providers/..%2Fskills%2Fserve%2Fx"
+// /api/dev/pprof/x.
+const encodedTraversalPath = "/api/providers/..%2Fdev%2Fpprof%2Fx"
 
 // TestPluginRequestPathIsRawPath verifies plugins receive the raw path the router
 // dispatched on, not the decoded and normalized ctx.Path(), so a plugin deciding by
@@ -6379,7 +6334,7 @@ func TestApplyHTTPRequestToCtxAcceptsUnchangedEncodedPath(t *testing.T) {
 	}
 
 	ctx = newCtx()
-	req.Path = "/api/skills/serve/x"
+	req.Path = "/api/dev/pprof/x"
 	if applyHTTPRequestToCtx(ctx, req) {
 		t.Fatal("a plugin rewrite to the normalized path must be refused")
 	}

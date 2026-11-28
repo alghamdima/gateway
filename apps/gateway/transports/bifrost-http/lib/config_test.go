@@ -354,7 +354,6 @@ import (
 	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
-	"github.com/maximhq/bifrost/framework/objectstore"
 	"github.com/maximhq/bifrost/framework/vectorstore"
 	"github.com/maximhq/bifrost/plugins/governance"
 	otelPlugin "github.com/maximhq/bifrost/plugins/otel"
@@ -1934,66 +1933,6 @@ func testFileComplexityAnalyzerConfig() *configstore.ComplexityAnalyzerConfig {
 			SimpleKeywords:  []string{"file-simple"},
 		},
 	}
-}
-
-// Skills Repository
-func (m *MockConfigStore) CreateSkill(ctx context.Context, skill *tables.TableSkill, version string, objectStore objectstore.ObjectStore) error {
-	return nil
-}
-
-func (m *MockConfigStore) GetSkill(ctx context.Context, id string) (*tables.TableSkill, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetSkillLean(ctx context.Context, id string) (*tables.TableSkill, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) GetSkillByName(ctx context.Context, name string) (*tables.TableSkill, error) {
-	return nil, configstore.ErrNotFound
-}
-
-func (m *MockConfigStore) GetSkillVersion(ctx context.Context, skillID, version string) (*tables.TableSkillVersion, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) ListSkillVersions(ctx context.Context, skillID string, params configstore.SkillVersionListQueryParams) ([]tables.TableSkillVersion, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *MockConfigStore) UpdateSkill(ctx context.Context, skill *tables.TableSkill, version string, serve bool, objectStore objectstore.ObjectStore) error {
-	return nil
-}
-
-func (m *MockConfigStore) DeleteSkill(ctx context.Context, id string, objectStore objectstore.ObjectStore) error {
-	return nil
-}
-
-func (m *MockConfigStore) ListSkills(ctx context.Context, params configstore.SkillListQueryParams) ([]tables.TableSkill, int64, error) {
-	return nil, 0, nil
-}
-
-func (m *MockConfigStore) ShiftSkillVersion(ctx context.Context, skillID string, targetVersion string, objectStore objectstore.ObjectStore) error {
-	return nil
-}
-
-func (m *MockConfigStore) GetAllSkillsVersion(ctx context.Context) (string, error) {
-	return "1.0.0", nil
-}
-
-func (m *MockConfigStore) BumpAllSkillsVersion(ctx context.Context, bump string) (string, error) {
-	return "1.0.1", nil
-}
-
-func (m *MockConfigStore) CreateSkillFileBlob(ctx context.Context, blob *tables.TableSkillFileBlob) error {
-	return nil
-}
-
-func (m *MockConfigStore) CleanupOrphanSkillFileBlobs(ctx context.Context, force bool) (int64, error) {
-	return 0, nil
-}
-func (m *MockConfigStore) UpdateSkillConfigHash(ctx context.Context, skillID string, configHash string) error {
-	return nil
 }
 
 // Helper functions for tests
@@ -21671,52 +21610,6 @@ func TestMergeProviderWithHash_UnverifiableLegacyOverrideHashKeepsAPIKeys(t *tes
 		require.NotContains(t, keyNames(merged), "file", "a key removed from config.json must be removed once the hash is sorted-era")
 		require.Len(t, DrainStartupAuditChanges(), 1, "the edit is audited")
 	})
-}
-
-// TestLoadClientConfigExplicitEmptySkillsURL disables a stored marketplace URL while omission preserves dashboard edits.
-func TestLoadClientConfigExplicitEmptySkillsURL(t *testing.T) {
-	initTestLogger()
-	store := createTestSQLiteConfigStore(t, t.TempDir())
-	ctx := context.Background()
-	start := func(raw string) *Config {
-		t.Helper()
-		cfg := &Config{ConfigStore: store}
-		require.NoError(t, loadClientConfig(ctx, cfg, parseConfigData(t, raw)))
-		return cfg
-	}
-	start(`{"client":{"log_retention_days":7}}`)
-	stored, err := store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	stored.SkillsExternalClientURL = schemas.NewSecretVar("https://skills.example.com")
-	require.NoError(t, store.UpdateClientConfig(ctx, stored))
-	require.Equal(t, "https://skills.example.com", start(`{"client":{"log_retention_days":7}}`).GetSkillsExternalClientURL())
-	require.Empty(t, start(`{"client":{"log_retention_days":7,"skills_external_client_url":""}}`).GetSkillsExternalClientURL())
-	stored, err = store.GetClientConfig(ctx)
-	require.NoError(t, err)
-	require.Empty(t, stored.SkillsExternalClientURL.GetValue())
-	require.Empty(t, start(`{"client":{"log_retention_days":7,"skills_external_client_url":""}}`).GetSkillsExternalClientURL())
-}
-
-// TestSkillsURLRejectsPrivateComponents blocks unsafe file and stored settings from public serving.
-func TestSkillsURLRejectsPrivateComponents(t *testing.T) {
-	initTestLogger()
-	for _, value := range []string{"https://user:password@example.com", "https://example.com?token=private", "https://example.com?"} {
-		client := &configstore.ClientConfig{SkillsExternalClientURL: schemas.NewSecretVar(value)}
-		require.Empty(t, (&Config{ClientConfig: client}).GetSkillsExternalClientURL())
-	}
-}
-
-// BenchmarkGetSkillsExternalClientURL measures per-request public URL resolution and validation.
-func BenchmarkGetSkillsExternalClientURL(b *testing.B) {
-	for _, value := range []string{"", "https://skills.example/path"} {
-		b.Run(value, func(b *testing.B) {
-			cfg := &Config{ClientConfig: &configstore.ClientConfig{SkillsExternalClientURL: schemas.NewSecretVar(value)}}
-			b.ReportAllocs()
-			for b.Loop() {
-				cfg.GetSkillsExternalClientURL()
-			}
-		})
-	}
 }
 
 func TestNormalizeUsageEstimationTokenizers(t *testing.T) {

@@ -124,7 +124,6 @@ type ClientConfig struct {
 	HiddenRequestTypes                      []string                              `json:"hidden_request_types,omitempty"`                // Request types excluded from dashboard and log API reads; logs are still written
 	UsageEstimationTokenizers               []string                              `json:"usage_estimation_tokenizers,omitempty"`         // Embedded tokenizer families ("anthropic", "deepseek", "llama2", "llama3", "all") used to estimate a cancelled stream's usage; empty uses only o200k_base/cl100k_base
 	RoutingChainMaxDepth                    int                                   `json:"routing_chain_max_depth"`                       // Maximum depth for routing rule chain evaluation (default: 10)
-	SkillsExternalClientURL                 *schemas.SecretVar                    `json:"skills_external_client_url,omitempty"`          // Public base URL for Skills Repository marketplaces; empty disables marketplace serving
 	ConfigHash                              string                                `json:"-"`                                             // Config hash for reconciliation (not serialized)
 	DumpErrorsInConsoleLogs                 bool                                  `json:"dump_errors_in_console_logs"`                   // Dump error details in console logs
 }
@@ -443,23 +442,12 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 		}
 	}
 
-	if c.SkillsExternalClientURL != nil {
-		if c.SkillsExternalClientURL.IsFromSecret() {
-			hash.Write([]byte("skillsExternalClientURL:ref:" + c.SkillsExternalClientURL.GetRawRef()))
-		} else {
-			hash.Write([]byte("skillsExternalClientURL:val:" + c.SkillsExternalClientURL.GetValue()))
-		}
-	}
-
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 // Redacted returns a copy of ClientConfig with any env-backed SecretVar fields masked.
 func (c *ClientConfig) Redacted() ClientConfig {
 	out := *c
-	if c.SkillsExternalClientURL != nil && c.SkillsExternalClientURL.IsFromSecret() {
-		out.SkillsExternalClientURL = c.SkillsExternalClientURL.Redacted()
-	}
 	return out
 }
 
@@ -2090,8 +2078,7 @@ type GovernanceConfig struct {
 	ComplexityAnalyzerConfig *ComplexityAnalyzerConfig     `json:"complexity_analyzer_config,omitempty"`
 }
 
-// MaxPublicURLLength is the longest public URL a setting accepts: the Skills
-// external client URL is stored in a varchar(512) column, so a longer value would be accepted and then fail to save.
+// MaxPublicURLLength is the longest public URL a setting accepts.
 const MaxPublicURLLength = 512
 
 // ValidatePublicBaseURL accepts an empty setting or a public HTTP base URL without private URL components.

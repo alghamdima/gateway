@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -405,170 +404,6 @@ func TestRDBConfigStore_UpdateComplexityAnalyzerConfigRejectsInvalidConfig(t *te
 			require.Error(t, err)
 		})
 	}
-}
-
-func TestValidateSkillVersionIncrementRequiresGreaterVersion(t *testing.T) {
-	tests := []struct {
-		name    string
-		latest  string
-		next    string
-		wantErr bool
-	}{
-		{name: "rejects lower prerelease core", latest: "1.0.3", next: "1.0.2-1", wantErr: true},
-		{name: "accepts same core with suffix after release", latest: "1.0.3", next: "1.0.3-1", wantErr: false},
-		{name: "accepts release after same core suffix", latest: "1.0.3-beta1", next: "1.0.3", wantErr: false},
-		{name: "accepts higher patch", latest: "1.0.3", next: "1.0.4", wantErr: false},
-		{name: "accepts higher minor", latest: "1.0.3", next: "1.1.0", wantErr: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateSkillVersionIncrement(tt.latest, tt.next)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-		})
-	}
-}
-
-func TestLatestCreatedSkillVersionUsesCreationOrder(t *testing.T) {
-	store := setupRDBTestStore(t)
-	err := store.DB().AutoMigrate(
-		&tables.TableSkill{},
-		&tables.TableSkillVersion{},
-		&tables.TableSkillFile{},
-		&tables.TableSkillFileBlob{},
-	)
-	require.NoError(t, err)
-	ctx := context.Background()
-	baseTime := time.Now()
-
-	skillID := "skill-latest-created"
-	err = store.DB().Create(&tables.TableSkill{
-		ID:            skillID,
-		Name:          "latest-created",
-		Description:   "Latest created version test",
-		SkillMDBody:   "body",
-		LatestVersion: "1.0.3",
-		CreatedAt:     baseTime,
-		UpdatedAt:     baseTime,
-	}).Error
-	require.NoError(t, err)
-	err = store.DB().Create(&tables.TableSkillVersion{
-		ID:                  "skill-version-old",
-		SkillID:             skillID,
-		Version:             "1.0.3",
-		SkillMDBody:         "body",
-		FrontmatterSnapshot: tables.SkillJSONMap{"name": "latest-created", "description": "Latest created version test"},
-		CreatedAt:           baseTime,
-	}).Error
-	require.NoError(t, err)
-	err = store.DB().Create(&tables.TableSkillVersion{
-		ID:                  "skill-version-new",
-		SkillID:             skillID,
-		Version:             "1.0.2-1",
-		SkillMDBody:         "body",
-		FrontmatterSnapshot: tables.SkillJSONMap{"name": "latest-created", "description": "Latest created version test"},
-		CreatedAt:           baseTime.Add(time.Minute),
-	}).Error
-	require.NoError(t, err)
-
-	latest, err := latestCreatedSkillVersion(store.DB(), skillID)
-	require.NoError(t, err)
-	assert.Equal(t, "1.0.2-1", latest)
-
-	skill, err := store.GetSkillLean(ctx, skillID)
-	require.NoError(t, err)
-	assert.Equal(t, "1.0.2-1", skill.HighestVersion)
-}
-
-func setupSkillTestStore(t *testing.T) *RDBConfigStore {
-	store := setupRDBTestStore(t)
-	err := store.DB().AutoMigrate(
-		&tables.TableSkill{},
-		&tables.TableSkillVersion{},
-		&tables.TableSkillFile{},
-		&tables.TableSkillFileBlob{},
-	)
-	require.NoError(t, err)
-	return store
-}
-
-func skillURLFile(path string) tables.TableSkillFile {
-	sourceURL := "https://example.com/" + path
-	return tables.TableSkillFile{Path: path, SourceType: tables.SkillSourceTypeURL, SourceURL: &sourceURL}
-}
-
-// The config-driven skills registry passes a freshly built skill whose
-// LatestVersion is empty, so serving the new version must not depend on it.
-func TestUpdateSkillServesNewVersionWhenLatestVersionIsUnset(t *testing.T) {
-	store := setupSkillTestStore(t)
-	ctx := context.Background()
-
-	created := &tables.TableSkill{
-		Name:        "config-update",
-		Description: "first",
-		SkillMDBody: "body 1",
-		Files:       []tables.TableSkillFile{skillURLFile("references/v1.md")},
-	}
-	require.NoError(t, store.CreateSkill(ctx, created, "1.0.0", nil))
-
-	updated := &tables.TableSkill{
-		ID:          created.ID,
-		Name:        created.Name,
-		Description: "second",
-		SkillMDBody: "body 2",
-		Files:       []tables.TableSkillFile{skillURLFile("references/v2.md")},
-	}
-	require.NoError(t, store.UpdateSkill(ctx, updated, "1.1.0", true, nil))
-
-	assert.Equal(t, "1.1.0", updated.LatestVersion)
-	require.Len(t, updated.Files, 1)
-	assert.Equal(t, "references/v2.md", updated.Files[0].Path)
-
-	skill, err := store.GetSkill(ctx, created.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "1.1.0", skill.LatestVersion)
-	assert.Equal(t, "body 2", skill.SkillMDBody)
-	require.Len(t, skill.Files, 1)
-	assert.Equal(t, "references/v2.md", skill.Files[0].Path)
-}
-
-func TestUpdateSkillWithoutServeKeepsServingVersion(t *testing.T) {
-	store := setupSkillTestStore(t)
-	ctx := context.Background()
-
-	created := &tables.TableSkill{
-		Name:        "config-draft",
-		Description: "first",
-		SkillMDBody: "body 1",
-		Files:       []tables.TableSkillFile{skillURLFile("references/v1.md")},
-	}
-	require.NoError(t, store.CreateSkill(ctx, created, "1.0.0", nil))
-
-	updated := &tables.TableSkill{
-		ID:          created.ID,
-		Name:        created.Name,
-		Description: "second",
-		SkillMDBody: "body 2",
-		Files:       []tables.TableSkillFile{skillURLFile("references/v2.md")},
-	}
-	require.NoError(t, store.UpdateSkill(ctx, updated, "1.1.0", false, nil))
-
-	assert.Equal(t, "1.0.0", updated.LatestVersion)
-	require.Len(t, updated.Files, 1)
-	assert.Equal(t, "references/v1.md", updated.Files[0].Path)
-
-	skill, err := store.GetSkill(ctx, created.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "1.0.0", skill.LatestVersion)
-	assert.Equal(t, "body 1", skill.SkillMDBody)
-
-	version, err := store.GetSkillVersion(ctx, created.ID, "1.1.0")
-	require.NoError(t, err)
-	assert.Equal(t, "body 2", version.SkillMDBody)
 }
 
 // =============================================================================
@@ -4719,45 +4554,6 @@ func TestClientConfigUnmarshal_CompatConvertDecisionToResponsesDefaultsOff(t *te
 	}
 }
 
-// TestGenerateClientConfigHash_SkillsExternalClientURL keeps unset hashes stable and distinguishes configured URLs.
-func TestGenerateClientConfigHash_SkillsExternalClientURL(t *testing.T) {
-	base := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30}
-	baseHash, err := base.GenerateClientConfigHash()
-	require.NoError(t, err)
-
-	// An explicit empty URL must differ from omission so file reconciliation
-	// can disable a URL previously configured through the dashboard or migration.
-	unset := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, SkillsExternalClientURL: schemas.NewSecretVar("")}
-	unsetHash, err := unset.GenerateClientConfigHash()
-	require.NoError(t, err)
-	assert.NotEqual(t, baseHash, unsetHash)
-
-	// A configured URL is a meaningful config change.
-	withURL := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, SkillsExternalClientURL: schemas.NewSecretVar("https://bifrost.example.com")}
-	urlHash, err := withURL.GenerateClientConfigHash()
-	require.NoError(t, err)
-	assert.NotEqual(t, baseHash, urlHash)
-	t.Setenv("BIFROST_SKILLS_URL_TEST", "https://skills.example")
-	store := setupRDBTestStore(t)
-	require.NoError(t, store.UpdateClientConfig(context.Background(), base))
-	withEnv, err := store.GetClientConfig(context.Background())
-	require.NoError(t, err)
-	withEnv.SkillsExternalClientURL = schemas.NewSecretVar("env.BIFROST_SKILLS_URL_TEST")
-	require.NoError(t, store.UpdateClientConfig(context.Background(), withEnv))
-	stored, err := store.GetClientConfig(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, "env.BIFROST_SKILLS_URL_TEST", stored.SkillsExternalClientURL.GetRawRef())
-	require.Equal(t, "https://skills.example", stored.SkillsExternalClientURL.GetValue())
-	wantHash, err := withEnv.GenerateClientConfigHash()
-	require.NoError(t, err)
-	gotHash, err := stored.GenerateClientConfigHash()
-	require.NoError(t, err)
-	require.Equal(t, wantHash, gotHash)
-	redacted := stored.Redacted()
-	require.NotEqual(t, "https://skills.example", redacted.SkillsExternalClientURL.GetValue())
-	require.Equal(t, "env.BIFROST_SKILLS_URL_TEST", redacted.SkillsExternalClientURL.GetRawRef())
-}
-
 // TestValidatePublicBaseURL permits public base paths and rejects credential-bearing components without echoing input.
 func TestValidatePublicBaseURL(t *testing.T) {
 	for _, value := range []string{"", "https://skills.example/path", "http://localhost:8080", "https://example.com/path%23section", "http://[::1]:8080"} {
@@ -4770,22 +4566,12 @@ func TestValidatePublicBaseURL(t *testing.T) {
 	}
 }
 
-// The public URL settings accept exactly what their varchar columns store: a URL
-// of MaxPublicURLLength characters is accepted, one longer is refused before it
-// reaches UpdateClientConfig, and every column holding one is that wide.
-func TestValidatePublicBaseURLLengthMatchesColumns(t *testing.T) {
+// A public URL setting accepts a URL of MaxPublicURLLength characters and refuses one longer.
+func TestValidatePublicBaseURLLength(t *testing.T) {
 	prefix := "https://example.com/"
 	require.NoError(t, ValidatePublicBaseURL(prefix+strings.Repeat("a", MaxPublicURLLength-len(prefix))))
 	err := ValidatePublicBaseURL(prefix + strings.Repeat("a", MaxPublicURLLength-len(prefix)+1))
 	require.ErrorContains(t, err, "at most 512 characters")
-
-	columns := map[string]string{"SkillsExternalClientURL": ""}
-	typ := reflect.TypeOf(tables.TableClientConfig{})
-	for name := range columns {
-		field, ok := typ.FieldByName(name)
-		require.True(t, ok, name)
-		require.Contains(t, field.Tag.Get("gorm"), fmt.Sprintf("varchar(%d)", MaxPublicURLLength), "%s's column width must match the limit validation applies", name)
-	}
 }
 
 // vkMetadataPGSchema keeps these tests' tables apart from the shared test schema, so the whole
