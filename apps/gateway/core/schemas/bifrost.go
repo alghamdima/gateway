@@ -1865,6 +1865,11 @@ type BifrostError struct {
 	AllowFallbacks *bool                   `json:"-"` // Optional: Controls fallback behavior (nil = true by default)
 	StreamControl  *StreamControl          `json:"-"` // Optional: Controls stream behavior
 	ExtraFields    BifrostErrorExtraFields `json:"extra_fields"`
+	// FromProvider: the provider itself answered with this error (set where a provider's error
+	// response is read, core/providers/utils), as opposed to a refusal the product made, a
+	// plugin's error or a gateway fault. The HTTP layer hides a provider's words about the
+	// platform's account with it (lib.SanitizeBifrostErrorForClient). Not serialized.
+	FromProvider bool `json:"-"`
 }
 
 // PopulateExtraFields sets RequestType, Provider, OriginalModelRequested, and ResolvedModelUsed on the
@@ -2071,6 +2076,10 @@ type FallbackAttempt struct {
 	Type       string        `json:"type,omitempty"`
 	Message    string        `json:"message,omitempty"`
 	Skipped    bool          `json:"skipped,omitempty"` // never attempted: no provider config, or the request type has no fallback support
+	// FromProvider: the provider itself answered with this error, as opposed to a refusal the
+	// product made or a gateway fault. The HTTP layer hides a provider's words about the
+	// platform's account with it (lib.SanitizeBifrostErrorForClient). Not serialized.
+	FromProvider bool `json:"-"`
 }
 
 // BifrostErrorExtraFields contains additional fields in an error response.

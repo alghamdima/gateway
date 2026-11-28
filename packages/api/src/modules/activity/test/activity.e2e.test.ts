@@ -354,7 +354,8 @@ describe.skipIf(!adminUrl || !binary)(
       ).toEqual({
         plain: { status: 200, hasId: true },
         fallback: { status: 200, hasId: true },
-        failed: { status: 500, hasId: true },
+        // the provider's 500 reaches the caller as the product's 502 (api-errors.md, "provider")
+        failed: { status: 502, hasId: true },
         free: { status: 200, hasId: true },
         stream: { status: 200, hasId: true },
         refused: { status: 402, hasId: true },

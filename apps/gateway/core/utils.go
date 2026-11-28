@@ -272,6 +272,19 @@ func routingErrorSummary(e *schemas.BifrostError) string {
 	return strings.Join(parts, " ")
 }
 
+// markProviderError marks an error that came back from a provider call as the provider's own
+// answer (schemas.BifrostError.FromProvider), so the HTTP layer can keep the provider's words about
+// the platform's account with it from the caller. The provider code sets IsBifrostError for its
+// own faults (a request it could not build, a network failure), which are not the provider's
+// answer, and a refusal is the product's. Called where the worker gets a provider's result, before
+// any plugin runs: a plugin's error never passes here.
+func markProviderError(err *schemas.BifrostError) {
+	if err == nil || err.IsBifrostError || (err.Error != nil && err.Error.Refusal != nil) {
+		return
+	}
+	err.FromProvider = true
+}
+
 // fallbackAttemptOf records what became of one fallback for the primary's error, which is what the
 // caller gets once the whole chain has failed (see schemas.FallbackAttempt). A nil err is a fallback
 // that was skipped before any attempt.
@@ -284,6 +297,7 @@ func fallbackAttemptOf(fallback schemas.Fallback, err *schemas.BifrostError) sch
 	if err.StatusCode != nil {
 		attempt.StatusCode = new(*err.StatusCode)
 	}
+	attempt.FromProvider = err.FromProvider
 	// The nested type first, as in routingErrorSummary: a Responses stream failure's top-level type
 	// is the event name ("response.failed", "error"), not the provider's error type.
 	if err.Error != nil && err.Error.Type != nil && *err.Error.Type != "" {

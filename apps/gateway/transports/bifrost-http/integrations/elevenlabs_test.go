@@ -339,19 +339,21 @@ func TestElevenlabsRouterWritesElevenlabsErrors(t *testing.T) {
 		gateway := newElevenlabsGateway(t)
 		*gateway.status = http.StatusUnauthorized
 		ctx := gateway.do(fasthttp.MethodPost, "/elevenlabs/v1/text-to-speech/voice123", `{"text":"hi","model_id":"elevenlabs/eleven_v4_turbo"}`)
-		require.Equal(t, fasthttp.StatusUnauthorized, ctx.Response.StatusCode())
+		// ElevenLabs refusing the platform's key is the platform's to fix: the caller is told the
+		// provider is unavailable, never ElevenLabs' words about the key (lib/errorsanitizer.go)
+		require.Equal(t, fasthttp.StatusServiceUnavailable, ctx.Response.StatusCode())
 		assert.Contains(t, string(ctx.Response.Body()), `"detail":{`)
-		assert.Contains(t, string(ctx.Response.Body()), "Invalid API key")
+		assert.NotContains(t, string(ctx.Response.Body()), "Invalid API key")
 	})
 	// Before its first audio byte a stream is still an ordinary HTTP answer, so its failure keeps its status.
 	t.Run("an error of ElevenLabs on the stream endpoint", func(t *testing.T) {
 		gateway := newElevenlabsGateway(t)
 		*gateway.status = http.StatusUnauthorized
 		ctx := gateway.do(fasthttp.MethodPost, "/elevenlabs/v1/text-to-speech/voice123/stream", `{"text":"hi","model_id":"elevenlabs/eleven_v4_turbo"}`)
-		require.Equal(t, fasthttp.StatusUnauthorized, ctx.Response.StatusCode())
+		require.Equal(t, fasthttp.StatusServiceUnavailable, ctx.Response.StatusCode())
 		assert.NotContains(t, string(ctx.Response.Header.ContentType()), "event-stream")
 		assert.Contains(t, string(ctx.Response.Body()), `"detail":{`)
-		assert.Contains(t, string(ctx.Response.Body()), "Invalid API key")
+		assert.NotContains(t, string(ctx.Response.Body()), "Invalid API key")
 	})
 	t.Run("a refusal by a plugin on the stream endpoint", func(t *testing.T) {
 		gateway := newElevenlabsGateway(t)

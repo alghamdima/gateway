@@ -7449,6 +7449,8 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 						result.PopulateRoutingInfo(perAttemptRoutingInfo)
 					}
 					if err != nil {
+						// a chunk's error comes from the provider's stream, before any plugin has run
+						markProviderError(err)
 						err.PopulateExtraFields(attemptRequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
 						err.PopulateRoutingInfo(perAttemptRoutingInfo)
 						// Keyless providers keep no trail of their own, as in the retry loop.
@@ -7508,6 +7510,7 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 				default:
 					streamCh, streamErr = bifrost.handleProviderStreamRequest(provider, config, req, k, postHookRunner, postHookSpanFinalizer)
 				}
+				markProviderError(streamErr)
 				// If stream setup failed before any provider goroutine started,
 				// no deferred finalizer will run — release the pipeline directly
 				// so a retry doesn't inherit a leaked pool entry.
@@ -7544,9 +7547,13 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 				applyProviderProxySignal(req.Context, config)
 				attemptRoutingInfo = schemas.BuildRoutingInfo(req.Context, provider.GetProviderKey(), originalModelRequested, k)
 				if injectedTools != nil {
-					return bifrost.runInjectedTools(provider, config, req, k, injectedTools)
+					response, providerErr := bifrost.runInjectedTools(provider, config, req, k, injectedTools)
+					markProviderError(providerErr)
+					return response, providerErr
 				}
-				return bifrost.handleProviderRequest(provider, config, req, k, keys)
+				response, providerErr := bifrost.handleProviderRequest(provider, config, req, k, keys)
+				markProviderError(providerErr)
+				return response, providerErr
 			}, keyProvider, req.RequestType, provider.GetProviderKey(), model, &req.BifrostRequest, bifrost.logger)
 			if bifrostError != nil && req.RequestType == schemas.ListModelsRequest {
 				if fallback := bifrost.lastKnownListModelsResponse(req.Context, provider.GetProviderKey(), req.BifrostRequest.ListModelsRequest, bifrostError); fallback != nil {

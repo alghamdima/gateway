@@ -1188,6 +1188,24 @@ func TestFallbackAttemptOfPrefersNestedErrorType(t *testing.T) {
 	}
 }
 
+// Only an error the provider itself answered with is marked as the provider's: a refusal the
+// product made, and a gateway fault, are not (the HTTP layer hides a provider's words about the
+// platform's account with it).
+func TestFallbackAttemptOfMarksProviderErrors(t *testing.T) {
+	fallback := schemas.Fallback{Provider: schemas.OpenAI, Model: "m"}
+	status := 429
+	fromProvider := &schemas.BifrostError{StatusCode: &status, FromProvider: true, Error: &schemas.ErrorField{Message: "You have no credits remaining."}}
+	plugin := &schemas.BifrostError{StatusCode: &status, Error: &schemas.ErrorField{Message: "model is not allowed"}}
+	ownRefusal := schemas.NewRefusalError(403, "provider_blocked", "not allowed", schemas.Refusal{LimitSource: schemas.LimitSourceDataPolicy})
+	gatewayFault := &schemas.BifrostError{IsBifrostError: true, Error: &schemas.ErrorField{Message: "no keys"}}
+
+	assert.True(t, fallbackAttemptOf(fallback, fromProvider).FromProvider)
+	assert.False(t, fallbackAttemptOf(fallback, ownRefusal).FromProvider)
+	assert.False(t, fallbackAttemptOf(fallback, gatewayFault).FromProvider)
+	assert.False(t, fallbackAttemptOf(fallback, plugin).FromProvider)
+	assert.False(t, fallbackAttemptOf(fallback, nil).FromProvider)
+}
+
 func TestWrapConvertedStreamPostHookRunner_ToolCallIndexes(t *testing.T) {
 	added := func(output int, itemType schemas.ResponsesMessageType, callID string) *schemas.BifrostResponsesStreamResponse {
 		return &schemas.BifrostResponsesStreamResponse{
@@ -1244,4 +1262,22 @@ func TestWrapConvertedStreamPostHookRunner_ToolCallIndexes(t *testing.T) {
 		)
 		assert.Equal(t, []uint16{0, 0, 1, 1}, got)
 	})
+}
+
+// What comes back from a provider call is the provider's answer unless the provider code says it
+// is its own fault or the product refused.
+func TestMarkProviderError(t *testing.T) {
+	status := 429
+	answer := &schemas.BifrostError{StatusCode: &status, Error: &schemas.ErrorField{Message: "You have no credits remaining."}}
+	fault := &schemas.BifrostError{IsBifrostError: true, Error: &schemas.ErrorField{Message: "dial tcp: timeout"}}
+	refusal := schemas.NewRefusalError(403, "provider_blocked", "not allowed", schemas.Refusal{LimitSource: schemas.LimitSourceDataPolicy})
+
+	markProviderError(answer)
+	markProviderError(fault)
+	markProviderError(refusal)
+	markProviderError(nil)
+
+	assert.True(t, answer.FromProvider)
+	assert.False(t, fault.FromProvider)
+	assert.False(t, refusal.FromProvider)
 }

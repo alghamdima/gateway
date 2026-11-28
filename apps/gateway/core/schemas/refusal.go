@@ -47,6 +47,10 @@ const (
 	LimitSourceBudget = "budget"
 	// LimitSourceService: the gateway could not check credits or prices; temporary.
 	LimitSourceService = "service"
+	// LimitSourceProvider: the model's provider refused or failed for a reason that is the
+	// platform's to fix (its account, key or quota there) or the provider's own outage. The
+	// provider's words are kept in the logs and never sent to the caller.
+	LimitSourceProvider = "provider"
 )
 
 // RetryAfterSeconds is RetryAfter in whole seconds, rounded up; 0 when retrying will not help.

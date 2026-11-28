@@ -2749,6 +2749,10 @@ func rootErrorMessage(raw interface{}) string {
 func HandleProviderAPIError(resp *fasthttp.Response, errorResp any) *schemas.BifrostError {
 	bifrostErr := handleProviderAPIError(resp, errorResp)
 	ApplyRetryAfter(bifrostErr, &resp.Header)
+	if bifrostErr != nil {
+		// the provider's own answer: what the HTTP layer may have to hide from the caller
+		bifrostErr.FromProvider = true
+	}
 	return bifrostErr
 }
 
@@ -3380,6 +3384,7 @@ func NewProviderAPIError(message string, err error, statusCode int, errorType *s
 			Error:   err,
 			Type:    errorType,
 		},
+		FromProvider: true,
 	}
 }
 
