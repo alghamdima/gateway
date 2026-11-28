@@ -1763,7 +1763,7 @@ func TestAccountBatchResults_FillsNamesFromSourceLog(t *testing.T) {
 	assert.Equal(t, "team-1", *logged.TeamID)
 }
 
-// An access profile hands one virtual key to many users, so matching on the key
+// One virtual key can be shared by several members, so matching on the key
 // cannot tell two people apart. The settling user's identity must not land on the
 // creator's cost row even though both requests carry the same virtual key.
 func TestAccountBatchResults_SharedVirtualKeyKeepsUsersApart(t *testing.T) {

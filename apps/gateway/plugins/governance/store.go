@@ -282,12 +282,11 @@ type GovernanceStore interface {
 	// limits are settled, one pair at a time, so it gathers rather than reads the settled set.
 	GetBudgetAndRateLimitStatus(ctx *schemas.BifrostContext, provider schemas.ModelProvider, model string, budgetBaselines map[string]float64, tokenBaselines map[string]int64, requestBaselines map[string]int64) *BudgetAndRateLimitStatus
 	// CollectModelScopedGovernanceIDs returns the budget and rate-limit IDs owned by
-	// model configs matching (provider, model) across the global and virtual-key scopes,
-	// plus whatever scopes a registered resolver derives from the IDs (see
-	// collectExtraScopedIDs). It takes the virtual key's ID rather than its
+	// model configs matching (provider, model) across the global and virtual-key scopes.
+	// It takes the virtual key's ID rather than its
 	// value, so a caller settling long after the request — batch accounting, which has
 	// only a stored row — can still reach the same configs.
-	CollectModelScopedGovernanceIDs(ctx context.Context, virtualKeyID string, userID string, provider schemas.ModelProvider, model string) (budgetIDs []string, rateLimitIDs []string)
+	CollectModelScopedGovernanceIDs(ctx context.Context, virtualKeyID string, provider schemas.ModelProvider, model string) (budgetIDs []string, rateLimitIDs []string)
 }
 
 // NewLocalGovernanceStore creates a new in-memory governance store.
@@ -359,8 +358,7 @@ func (gs *LocalGovernanceStore) LoadBudget(ctx context.Context, budgetID string)
 // derived override count safe. It is a pure function of (OverrideAnchorReset,
 // OverrideCyclesTotal, LastReset), so deriving it at the moment of storage means no
 // caller can install a stale count by accident: a config reload replaying a persisted
-// row, an admin edit, access-profile propagation and the initial load from the database
-// all converge on the same answer. It also means a restarting node recomputes the count
+// row, an admin edit and the initial load from the database all converge on the same answer. It also means a restarting node recomputes the count
 // rather than trusting whatever was last persisted.
 //
 // Callers stay responsible for preserving CurrentUsage and LastReset, since LastReset
@@ -440,17 +438,6 @@ func (gs *LocalGovernanceStore) DeleteBudget(ctx context.Context, budgetID strin
 	delete(gs.LastDBUsagesBudgets, budgetID)
 	// A dump holding this budget in an earlier snapshot must not resurrect its row.
 	gs.markBudgetResetLocked(budgetID)
-	gs.LastDBUsagesBudgetsMu.Unlock()
-}
-
-// SetBudgetDBBaseline records the DB-authoritative usage for a budget so that
-// gossip delta calculations (CurrentUsage - LastDBUsage) start from the correct
-// base. Must be called whenever a budget with non-zero usage is loaded into
-// memory outside of the initial loadFromDatabase path (e.g., access-profile
-// propagation that preserves usage under a new ID).
-func (gs *LocalGovernanceStore) SetBudgetDBBaseline(budgetID string, currentUsage float64) {
-	gs.LastDBUsagesBudgetsMu.Lock()
-	gs.LastDBUsagesBudgets[budgetID] = currentUsage
 	gs.LastDBUsagesBudgetsMu.Unlock()
 }
 
@@ -559,20 +546,6 @@ func (gs *LocalGovernanceStore) DeleteRateLimit(ctx context.Context, rateLimitID
 	gs.LastDBUsagesRateLimitsTokensMu.Unlock()
 	gs.LastDBUsagesRateLimitsRequestsMu.Lock()
 	delete(gs.LastDBUsagesRequestsRateLimits, rateLimitID)
-	gs.LastDBUsagesRateLimitsRequestsMu.Unlock()
-}
-
-// SetRateLimitDBBaseline records the DB-authoritative usage for a rate limit so
-// that gossip delta calculations (TokenCurrentUsage - LastDBTokenUsage) start
-// from the correct base. Must be called whenever a rate limit with non-zero
-// usage is loaded into memory outside of the initial loadFromDatabase path
-// (e.g., access-profile propagation that preserves usage under a new ID).
-func (gs *LocalGovernanceStore) SetRateLimitDBBaseline(rateLimitID string, tokenUsage int64, requestUsage int64) {
-	gs.LastDBUsagesRateLimitsTokensMu.Lock()
-	gs.LastDBUsagesTokensRateLimits[rateLimitID] = tokenUsage
-	gs.LastDBUsagesRateLimitsTokensMu.Unlock()
-	gs.LastDBUsagesRateLimitsRequestsMu.Lock()
-	gs.LastDBUsagesRequestsRateLimits[rateLimitID] = requestUsage
 	gs.LastDBUsagesRateLimitsRequestsMu.Unlock()
 }
 
@@ -3080,8 +3053,7 @@ func (gs *LocalGovernanceStore) DumpRateLimits(ctx context.Context, tokenBaselin
 	}
 	// Range over ALL rate limits in memory (mirrors DumpBudgets pattern).
 	// This covers rate limits from every source: virtual keys, model configs,
-	// providers, teams, customers, AND access profiles — whose IDs were
-	// previously missing, causing AP rate-limit usage to never reach the DB.
+	// providers, teams and customers.
 	var rateLimitUpdates []rateLimitDumpRow
 	gs.rateLimits.Range(func(key, value interface{}) bool {
 		rateLimit, ok := value.(*configstoreTables.TableRateLimit)
@@ -3596,22 +3568,19 @@ func limitIDsOf(lists ...[]schemas.Limit) []string {
 }
 
 // CollectModelScopedGovernanceIDs returns only the model-config-owned IDs for a
-// (provider, model) pair, across the global and virtual-key scopes plus whatever
-// scopes a registered resolver derives from the IDs (see collectExtraScopedIDs).
+// (provider, model) pair, across the global and virtual-key scopes.
 //
 // It exists for delayed settlement. A request's limits are settled while it is in
 // flight, and a batch create carries no top-level model (each input-file row names
 // its own), so collectModelConfigsFor matches only the all-models wildcards and
-// never the exact-model configs. Those are precisely where
-// a model-level budget lives (an access profile's per-model limits materialise as
-// user-scoped configs naming one model and provider), so batch spend never reached
-// them. Settlement does know the models, and calls this per model to charge what
+// never the exact-model configs. Those are precisely where a model-level budget
+// lives, so batch spend never reached them. Settlement does know the models, and calls this per model to charge what
 // the create-time collection could not see.
 //
 // Callers must subtract the IDs already charged for the request: the wildcard tiers
 // returned here overlap what was settled at create time by design, since both walk
 // the same four tiers.
-func (gs *LocalGovernanceStore) CollectModelScopedGovernanceIDs(ctx context.Context, virtualKeyID string, userID string, provider schemas.ModelProvider, model string) (budgetIDs []string, rateLimitIDs []string) {
+func (gs *LocalGovernanceStore) CollectModelScopedGovernanceIDs(ctx context.Context, virtualKeyID string, provider schemas.ModelProvider, model string) (budgetIDs []string, rateLimitIDs []string) {
 	seenBudgets := map[string]bool{}
 	seenRateLimits := map[string]bool{}
 
@@ -3646,14 +3615,6 @@ func (gs *LocalGovernanceStore) CollectModelScopedGovernanceIDs(ctx context.Cont
 			addModelConfigIDs(mc)
 		}
 	}
-	// Downstream-registered scopes (e.g. enterprise's per-access-profile per-model
-	// budgets, keyed by a user-access-profile association ID rather than the raw
-	// user/VK ID) — see collectExtraScopedIDs.
-	for _, pair := range collectExtraScopedIDs(ctx, virtualKeyID, userID) {
-		for _, mc := range gs.collectModelConfigsFor(ctx, pair.Scope, pair.ScopeID, model, providerStr, targets) {
-			addModelConfigIDs(mc)
-		}
-	}
 	return budgetIDs, rateLimitIDs
 }
 
@@ -3665,37 +3626,6 @@ type ScopedID struct {
 	Scope   string
 	ScopeID string
 	Kind    grant.LimitHolderKind
-}
-
-// ExtraScopedIDsResolver returns additional (scope, scope_id) pairs to check for
-// model-config-based budgets/rate-limits on a request, given its virtual key and
-// user IDs. Lets downstream consumers (e.g. enterprise access profiles) graft
-// extra scopes onto CollectModelScopedGovernanceIDs's built-in global/
-// virtual_key set without this package needing to know their scope semantics.
-// Must be fast and non-blocking (in-memory only) — called on every request.
-//
-// modelConfigScopesFor does not consult these resolvers: a caller wanting one of these scopes
-// enforced passes it to ScopedModelLimits / ProviderScopedModelLimitsInScope, where the ScopedID's
-// Kind is what a refusal names as the holder of the limit that ran out — see ScopedID.
-type ExtraScopedIDsResolver func(ctx context.Context, virtualKeyID, userID string) []ScopedID
-
-var (
-	extraScopedIDsResolversMu sync.RWMutex
-	extraScopedIDsResolvers   []ExtraScopedIDsResolver
-)
-
-func collectExtraScopedIDs(ctx context.Context, virtualKeyID, userID string) []ScopedID {
-	extraScopedIDsResolversMu.RLock()
-	resolvers := extraScopedIDsResolvers
-	extraScopedIDsResolversMu.RUnlock()
-	if len(resolvers) == 0 {
-		return nil
-	}
-	var out []ScopedID
-	for _, fn := range resolvers {
-		out = append(out, fn(ctx, virtualKeyID, userID)...)
-	}
-	return out
 }
 
 // PUBLIC API METHODS
@@ -5141,8 +5071,8 @@ func idOrEmpty(id *string) []string {
 //
 // It is the only budget check: what to check is decided by whoever assembled the limits (an attempt's
 // resolved set, filtered to the holder kinds in force), and this evaluates whatever it is handed. That
-// is what lets a caller stop knowing whether a virtual key, a team, an access profile or a model
-// config is paying.
+// is what lets a caller stop knowing whether a virtual key, a team, a customer or a model config
+// is paying.
 func (gs *LocalGovernanceStore) CheckBudgets(ctx context.Context, limits []schemas.Limit, baselines map[string]float64) (Decision, error) {
 	if len(limits) == 0 {
 		return DecisionAllow, nil

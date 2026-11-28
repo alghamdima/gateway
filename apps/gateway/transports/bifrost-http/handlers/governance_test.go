@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1993,7 +1992,6 @@ type quotaResponse struct {
 	IsActive        bool                                              `json:"is_active"`
 	Budgets         []quotaBudget                                     `json:"budgets"`
 	RateLimit       *configstoreTables.TableRateLimit                 `json:"rate_limit"`
-	RateLimits      []SourcedRateLimit                                `json:"rate_limits"`
 	ProviderConfigs []configstoreTables.TableVirtualKeyProviderConfig `json:"provider_configs"`
 	Models          []quotaModelUsage                                 `json:"model_configs"`
 }
@@ -2151,255 +2149,6 @@ func TestGetVirtualKeyQuota_HydratesBudgetsFromModelConfigs(t *testing.T) {
 	}
 }
 
-// TestGetVirtualKeyQuota_ExternalResolverReplacesWithAccessProfileBudgets verifies the
-// AP-managed-VK path: when a registered ExternalQuotaBudgetResolver returns budgets
-// (enterprise access-profile budgets, which carry the real usage), they REPLACE the VK's
-// own budget rows in the quota response. Those rows are reset to current_usage=0 at
-// adoption and never charged again, so reporting them would be a misleading $0 row.
-func TestGetVirtualKeyQuota_ExternalResolverReplacesWithAccessProfileBudgets(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	active := true
-	cycleStart := time.Date(2026, time.January, 2, 15, 4, 5, 0, time.UTC)
-	store := &mockQuotaConfigStore{
-		vk: &configstoreTables.TableVirtualKey{
-			ID:       "vk-1",
-			Name:     "AP Key",
-			IsActive: &active,
-		},
-		modelConfigs: []configstoreTables.TableModelConfig{
-			{
-				ID:        "mc-vk",
-				Scope:     configstoreTables.ModelConfigScopeVirtualKey,
-				ScopeID:   schemas.Ptr("vk-1"),
-				ModelName: configstoreTables.ModelConfigAllModels,
-				// VK mirror row: zero usage, reset at adoption — must NOT appear in the response.
-				Budgets: []configstoreTables.TableBudget{
-					{ID: "b-vk", MaxLimit: 100, CurrentUsage: 0, ResetDuration: "1d", LastReset: cycleStart},
-				},
-			},
-		},
-	}
-	// The AP user's inference is logged under user-1 (virtual_key_id is empty on SSO/AP
-	// log rows), so the per-model usage query must be scoped to the user, not the VK.
-	logMgr := &mockQuotaLogManager{
-		rankings: &logstore.ModelRankingResult{
-			Rankings: []logstore.ModelRankingWithTrend{
-				{ModelRankingEntry: logstore.ModelRankingEntry{Model: "claude-opus-4-7", Provider: "anthropic", TotalRequests: 2, TotalTokens: 900, TotalCost: 42}},
-			},
-		},
-	}
-	h := &GovernanceHandler{
-		configStore: store,
-		logManager:  logMgr,
-		externalQuotaBudgetResolver: func(_ context.Context, vk *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {
-			if vk.ID != "vk-1" {
-				return nil, nil
-			}
-			return &ExternalQuotaBudgetResult{
-				// The access-profile budget that holds the real ongoing usage.
-				Budgets: []SourcedBudget{
-					{TableBudget: configstoreTables.TableBudget{ID: "b-ap", MaxLimit: 500, CurrentUsage: 42, ResetDuration: "1d", LastReset: cycleStart}},
-				},
-				Managed:     true,
-				UsageUserID: "user-1",
-			}, nil
-		},
-	}
-
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.Header.Set("x-bf-vk", "sk-bf-secret")
-
-	h.getVirtualKeyQuota(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatalf("expected status 200, got %d: %s", ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	}
-	var resp quotaResponse
-	if err := json.Unmarshal(ctx.Response.Body(), &resp); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	// Only the access-profile budget — the VK's own b-vk row is replaced, not appended.
-	if len(resp.Budgets) != 1 || resp.Budgets[0].ID != "b-ap" || resp.Budgets[0].CurrentUsage != 42 {
-		t.Fatalf("expected only the access-profile budget b-ap (usage 42), got %#v", resp.Budgets)
-	}
-	// Per-model spend on that budget comes from the user-scoped log query and reconciles
-	// with current_usage (both 42).
-	if len(resp.Budgets[0].Models) != 1 || resp.Budgets[0].Models[0].Model != "claude-opus-4-7" || resp.Budgets[0].Models[0].TotalCost != 42 {
-		t.Fatalf("expected per-model spend from user-scoped logs, got %#v", resp.Budgets[0].Models)
-	}
-	// The usage query must be scoped to the AP user, NOT the VK (whose logs are empty).
-	if len(logMgr.calls) != 1 {
-		t.Fatalf("expected GetModelRankings called once, got %d", len(logMgr.calls))
-	}
-	call := logMgr.calls[0]
-	if len(call.UserIDs) != 1 || call.UserIDs[0] != "user-1" {
-		t.Fatalf("expected usage query scoped to user-1, got UserIDs=%#v", call.UserIDs)
-	}
-	if len(call.VirtualKeyIDs) != 0 {
-		t.Fatalf("expected no VK scoping on the AP usage query, got %#v", call.VirtualKeyIDs)
-	}
-}
-
-// TestGetVirtualKeyQuota_ExternalResolverRateLimitOnly verifies a rate-limit-only
-// external result (AP has a rate limit but no budget): the AP rate limit REPLACES the
-// VK's own rate limit, and the VK's own budget mirror rows are dropped rather than
-// reported — an AP-managed VK whose profile has no budget genuinely has no budget, and
-// the VK's own rows are untracked $0 mirrors. Pins the empty-budget semantics shared by
-// the quota and detail/list paths.
-func TestGetVirtualKeyQuota_ExternalResolverRateLimitOnly(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	active := true
-	cycleStart := time.Date(2026, time.January, 2, 15, 4, 5, 0, time.UTC)
-	tokMax := int64(1000)
-	store := &mockQuotaConfigStore{
-		vk: &configstoreTables.TableVirtualKey{
-			ID:       "vk-1",
-			Name:     "AP Key",
-			IsActive: &active,
-			// Native mirror rate limit — must be replaced by the AP one below.
-			RateLimit: &configstoreTables.TableRateLimit{ID: "rl-vk"},
-		},
-		modelConfigs: []configstoreTables.TableModelConfig{
-			{
-				ID:        "mc-vk",
-				Scope:     configstoreTables.ModelConfigScopeVirtualKey,
-				ScopeID:   schemas.Ptr("vk-1"),
-				ModelName: configstoreTables.ModelConfigAllModels,
-				// VK mirror budget: zero usage — must NOT appear once the VK is AP-managed.
-				Budgets: []configstoreTables.TableBudget{
-					{ID: "b-vk", MaxLimit: 100, CurrentUsage: 0, ResetDuration: "1d", LastReset: cycleStart},
-				},
-			},
-		},
-	}
-	h := &GovernanceHandler{
-		configStore: store,
-		externalQuotaBudgetResolver: func(_ context.Context, vk *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {
-			if vk.ID != "vk-1" {
-				return nil, nil
-			}
-			// AP-managed VK whose profile carries a rate limit but no budget.
-			return &ExternalQuotaBudgetResult{
-				RateLimit:   &configstoreTables.TableRateLimit{ID: "ap-rl", TokenMaxLimit: &tokMax, TokenCurrentUsage: 250},
-				Managed:     true,
-				UsageUserID: "user-1",
-			}, nil
-		},
-	}
-
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.Header.Set("x-bf-vk", "sk-bf-secret")
-
-	h.getVirtualKeyQuota(ctx)
-
-	if ctx.Response.StatusCode() != 200 {
-		t.Fatalf("expected status 200, got %d: %s", ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	}
-	var resp quotaResponse
-	if err := json.Unmarshal(ctx.Response.Body(), &resp); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-	// No AP budget → no budgets reported (the VK's own b-vk mirror is dropped, not surfaced).
-	if len(resp.Budgets) != 0 {
-		t.Fatalf("expected no budgets for a rate-limit-only AP-managed VK, got %#v", resp.Budgets)
-	}
-	// The AP rate limit replaces the VK's own rl-vk.
-	if resp.RateLimit == nil || resp.RateLimit.ID != "ap-rl" || resp.RateLimit.TokenCurrentUsage != 250 {
-		t.Fatalf("expected the access-profile rate limit ap-rl (usage 250), got %#v", resp.RateLimit)
-	}
-}
-
-// TestApplyExternalBudgets_RateLimitOnlyDropsNativeBudgets pins the detail/list-path
-// twin of the quota semantics: for an AP-managed VK whose external result carries a rate
-// limit but no budget, applyExternalBudgets drops the VK's own mirror budgets (rather
-// than preserving them) and swaps in the AP rate limit — so getVirtualKey/getVirtualKeys
-// agree with getVirtualKeyQuota.
-func TestApplyExternalBudgets_RateLimitOnlyDropsNativeBudgets(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	h := &GovernanceHandler{
-		externalQuotaBudgetResolver: func(_ context.Context, _ *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {
-			return &ExternalQuotaBudgetResult{
-				RateLimit: &configstoreTables.TableRateLimit{ID: "ap-rl"},
-				Managed:   true,
-			}, nil
-		},
-	}
-	vk := &configstoreTables.TableVirtualKey{
-		ID: "vk-1",
-		Budgets: []configstoreTables.TableBudget{
-			{ID: "b-vk-mirror", MaxLimit: 100, CurrentUsage: 0},
-		},
-		RateLimit: &configstoreTables.TableRateLimit{ID: "rl-vk-mirror"},
-	}
-
-	h.applyExternalBudgets(context.Background(), vk)
-
-	if len(vk.Budgets) != 0 {
-		t.Fatalf("expected native mirror budgets dropped for a rate-limit-only AP result, got %#v", vk.Budgets)
-	}
-	if vk.RateLimit == nil || vk.RateLimit.ID != "ap-rl" {
-		t.Fatalf("expected the AP rate limit ap-rl to replace the native rl-vk-mirror, got %#v", vk.RateLimit)
-	}
-}
-
-// TestApplyExternalBudgets_ManagedWithNoGovernanceFlagsAndClears verifies that a VK the
-// resolver reports as managed but whose profile has NO budget and NO rate limit is still
-// flagged managed (so the UI locks edits / shows the notice) and has its untracked mirror
-// budget and rate-limit rows cleared rather than shown.
-func TestApplyExternalBudgets_ManagedWithNoGovernanceFlagsAndClears(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	h := &GovernanceHandler{
-		externalQuotaBudgetResolver: func(_ context.Context, _ *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {
-			return &ExternalQuotaBudgetResult{Managed: true}, nil
-		},
-	}
-	vk := &configstoreTables.TableVirtualKey{
-		ID:        "vk-1",
-		Budgets:   []configstoreTables.TableBudget{{ID: "b-vk-mirror", MaxLimit: 100, CurrentUsage: 0}},
-		RateLimit: &configstoreTables.TableRateLimit{ID: "rl-vk-mirror"},
-	}
-
-	h.applyExternalBudgets(context.Background(), vk)
-
-	if len(vk.Budgets) != 0 {
-		t.Fatalf("expected mirror budgets cleared for a managed VK with no AP budget, got %#v", vk.Budgets)
-	}
-	if vk.RateLimit != nil {
-		t.Fatalf("expected mirror rate limit cleared for a managed VK with no AP rate limit, got %#v", vk.RateLimit)
-	}
-}
-
-// TestGetVirtualKeyQuota_ExternalResolverErrorFailsClosed verifies the endpoint returns
-// 500 (not a partial response) when the registered resolver errors — usage must not be
-// silently under-reported.
-func TestGetVirtualKeyQuota_ExternalResolverErrorFailsClosed(t *testing.T) {
-	SetLogger(&mockLogger{})
-
-	active := true
-	store := &mockQuotaConfigStore{
-		vk: &configstoreTables.TableVirtualKey{ID: "vk-1", Name: "AP Key", IsActive: &active},
-	}
-	h := &GovernanceHandler{
-		configStore: store,
-		externalQuotaBudgetResolver: func(_ context.Context, _ *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {
-			return nil, errors.New("boom")
-		},
-	}
-
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.Header.Set("x-bf-vk", "sk-bf-secret")
-
-	h.getVirtualKeyQuota(ctx)
-
-	if ctx.Response.StatusCode() != 500 {
-		t.Fatalf("expected status 500 on resolver error, got %d: %s", ctx.Response.StatusCode(), string(ctx.Response.Body()))
-	}
-}
-
 // TestGetVirtualKeyQuota_NoGovernanceReturnsEmpty verifies that a VK without any
 // VK-scoped model configs reports empty governance (not a stale direct-relationship
 // read) and still returns 200 with identity fields.
@@ -2444,14 +2193,8 @@ func TestGetVirtualKeyQuota_NoGovernanceReturnsEmpty(t *testing.T) {
 	if len(resp.ProviderConfigs) != 1 || len(resp.ProviderConfigs[0].Budgets) != 0 {
 		t.Fatalf("expected provider config with no budgets, got %#v", resp.ProviderConfigs)
 	}
-	if resp.RateLimits == nil {
-		t.Fatalf("expected rate_limits to serialize as [], got a nil slice (renders as null)")
-	}
-	if len(resp.RateLimits) != 0 {
-		t.Fatalf("expected no rate limits, got %#v", resp.RateLimits)
-	}
-	if !bytes.Contains(ctx.Response.Body(), []byte(`"rate_limits":[]`)) {
-		t.Fatalf("expected raw response to contain \"rate_limits\":[], got %s", string(ctx.Response.Body()))
+	if resp.RateLimit != nil {
+		t.Fatalf("expected no rate limit, got %#v", resp.RateLimit)
 	}
 }
 
@@ -4092,7 +3835,7 @@ func TestUpdateCustomer_CalendarAligned_NoSnapWhenAlreadyEnabled(t *testing.T) {
 }
 
 // TestApplyVKGovernanceFromModelConfigs_PreservesDirectlyAttachedBudget is a
-// regression test for BF-1497: VKs provisioned via an access profile / config.json
+// regression test for BF-1497: VKs provisioned through config.json
 // carry their global budget directly (TableBudget.VirtualKeyID set, preloaded into
 // vk.Budgets) and have no VK-scoped model config. Hydration must not wipe that
 // budget when no model config matches.

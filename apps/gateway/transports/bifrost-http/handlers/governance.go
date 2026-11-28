@@ -171,79 +171,12 @@ func lookupScopeNameBatchResolver(scope string) (ScopeNameBatchResolver, bool) {
 	return fn, ok
 }
 
-// ManagedByResolver returns a human-readable label for what externally manages
-// a non-global model config's scope target (e.g. the access profile that
-// materialized it), distinct from ScopeNameResolver's "who this applies to"
-// name. The second return value is false when no managing entity applies; the
-// UI then renders nothing extra. Implementations must be safe to call
-// concurrently.
-type ManagedByResolver func(ctx context.Context, scopeID string) (configstoreTables.SourceRef, bool)
-
-// managedByResolvers is the package-level registry consulted by
-// resolveModelConfigManagedBy. Nothing registers a resolver, so it stays empty.
-// Guarded by managedByResolversMu.
-var (
-	managedByResolversMu sync.RWMutex
-	managedByResolvers   = map[string]ManagedByResolver{}
-)
-
-func lookupManagedByResolver(scope string) (ManagedByResolver, bool) {
-	managedByResolversMu.RLock()
-	defer managedByResolversMu.RUnlock()
-	fn, ok := managedByResolvers[scope]
-	return fn, ok
-}
-
-// ExternalQuotaBudgetResolver returns budgets that govern a VK but whose usage is
-// tracked OUTSIDE the VK's own budget rows
-type ExternalQuotaBudgetResolver func(ctx context.Context, vk *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error)
-
 // VirtualKeyAssigneeResolver returns the user each of the given virtual keys is
 // assigned to, keyed by virtual key ID. Keys with no assignee are simply absent
 // from the map. Batched rather than per-key because the list endpoint resolves a
 // whole page at once, and a per-key hook would reintroduce the N+1 the UI used to
 // do over the /virtual-keys/{id}/users endpoint.
 type VirtualKeyAssigneeResolver func(ctx context.Context, vkIDs []string) (map[string]*configstoreTables.AssignedUser, error)
-
-// SourcedBudget pairs a budget with what governs it (e.g. an access profile), for
-// quota responses that can be composed from more than one source. The embedded
-// SourceRef is the same one model configs carry, so both APIs describe an origin
-// with identical keys. All three fields are empty when there is nothing to
-// disambiguate, e.g. a virtual key's own budget rows.
-type SourcedBudget struct {
-	configstoreTables.TableBudget
-	configstoreTables.SourceRef
-}
-
-// SourcedRateLimit is SourcedBudget's counterpart for rate limits.
-type SourcedRateLimit struct {
-	configstoreTables.TableRateLimit
-	configstoreTables.SourceRef
-}
-
-// ExternalQuotaBudgetResult is what an external resolver returns for a VK whose
-// authoritative usage lives outside its own budget rows.
-type ExternalQuotaBudgetResult struct {
-	// Budgets replaces the VK's own budget rows in the quota response, each tagged
-	// with what governs it.
-	Budgets []SourcedBudget
-	// RateLimit, when non-nil, replaces the VK's own rate-limit row (enterprise: the
-	// single effective, tightest-per-dimension rate limit that carries the real
-	// usage for an AP-managed VK). Kept for backward compatibility with existing
-	// readers of this field.
-	RateLimit *configstoreTables.TableRateLimit
-	// RateLimits lists every rate limit RateLimit was merged from, each tagged with
-	// its source, so a caller can see which one is actually binding instead of only
-	// the merged result. Empty when there's at most one source.
-	RateLimits []SourcedRateLimit
-	// Managed reports that the VK is access-profile-managed. Set independently of
-	// Budgets/RateLimit so the flag reaches the response even when the profile has
-	// neither — it drives the managed-key UI (lock + notice).
-	Managed bool
-	// UsageUserID, when non-empty, scopes the per_model_usage query to this user id
-	// instead of the VK id.
-	UsageUserID string
-}
 
 type GovernanceHandler struct {
 	configStore       configstore.ConfigStore
@@ -252,10 +185,6 @@ type GovernanceHandler struct {
 	// endpoint's model_usage breakdown. Optional: nil when the logging plugin is
 	// not enabled, in which case the breakdown is simply omitted.
 	logManager logging.LogManager
-	// externalQuotaBudgetResolver, when non-nil, supplies budgets that govern a VK
-	// but whose usage lives outside the VK's own budget rows (enterprise
-	// access-profile-managed VKs). Injected at construction; nil on OSS builds.
-	externalQuotaBudgetResolver ExternalQuotaBudgetResolver
 	// virtualKeyAssigneeResolver, when non-nil, supplies the user each VK is
 	// assigned to (enterprise: the enterprise_virtual_key_users link). Injected at
 	// construction; nil on OSS builds, which have no user directory.
@@ -288,15 +217,12 @@ type GovernanceRouteOverrides struct {
 // NewGovernanceHandler creates a new governance handler instance.
 // logManager is optional (may be nil); when supplied it powers the quota
 // endpoint's per-budget actual per-model usage breakdown.
-// externalQuotaBudgetResolver is optional (may be nil); when supplied the quota
-// endpoint uses it to resolve budgets/usage for VKs whose authoritative usage
-// is tracked outside their own budget rows.
 // virtualKeyAssigneeResolver is optional (may be nil); when supplied the virtual
 // key read paths use it to fill in each key's assigned user.
 // Side effect: ensures the default virtual_key scope-name resolver is
 // registered against the supplied configStore, so resolveModelConfigScopeName
 // can render VK names for OSS-only builds without further wiring.
-func NewGovernanceHandler(manager GovernanceManager, configStore configstore.ConfigStore, logManager logging.LogManager, externalQuotaBudgetResolver ExternalQuotaBudgetResolver, virtualKeyAssigneeResolver VirtualKeyAssigneeResolver) (*GovernanceHandler, error) {
+func NewGovernanceHandler(manager GovernanceManager, configStore configstore.ConfigStore, logManager logging.LogManager, virtualKeyAssigneeResolver VirtualKeyAssigneeResolver) (*GovernanceHandler, error) {
 	if manager == nil {
 		return nil, fmt.Errorf("governance manager is required")
 	}
@@ -327,11 +253,10 @@ func NewGovernanceHandler(manager GovernanceManager, configStore configstore.Con
 		return names, true
 	})
 	return &GovernanceHandler{
-		governanceManager:           manager,
-		configStore:                 configStore,
-		logManager:                  logManager,
-		externalQuotaBudgetResolver: externalQuotaBudgetResolver,
-		virtualKeyAssigneeResolver:  virtualKeyAssigneeResolver,
+		governanceManager:          manager,
+		configStore:                configStore,
+		logManager:                 logManager,
+		virtualKeyAssigneeResolver: virtualKeyAssigneeResolver,
 	}, nil
 }
 
@@ -552,36 +477,6 @@ type UpdateRateLimitRequest struct {
 	TokenResetDuration   *string `json:"token_reset_duration,omitempty"`   // e.g., "30s", "5m", "1h", "1d", "1w", "1M"
 	RequestMaxLimit      *int64  `json:"request_max_limit,omitempty"`      // Maximum requests allowed
 	RequestResetDuration *string `json:"request_reset_duration,omitempty"` // e.g., "30s", "5m", "1h", "1d", "1w", "1M"
-}
-
-// teamUpdateSetsOwnLimits reports whether this update would leave the team with a budget or a rate
-// limit of its own.
-//
-// An empty budget list, or a rate limit carrying neither maximum, clears rather than sets: that is
-// what an operator sends to take a team off its own limits, usually just before attaching an access
-// profile, so it must not be read as setting one.
-func teamUpdateSetsOwnLimits(req *UpdateTeamRequest) bool {
-	if len(req.Budgets) > 0 {
-		return true
-	}
-	return req.RateLimit != nil && (req.RateLimit.TokenMaxLimit != nil || req.RateLimit.RequestMaxLimit != nil)
-}
-
-// customerUpdateSetsOwnLimits reports whether this update would leave the customer with a budget or a
-// rate limit of its own. It looks at all three ways an update can carry one: the budget list, the
-// deprecated single budget, and the rate limit.
-//
-// Only an outright removal does not count - an empty list, a rate limit with neither maximum, or a
-// deprecated budget carrying neither field. A deprecated budget that names just one field is not a
-// removal: BudgetsFromSingleBudgetUpdate merges it with the stored budget and keeps the maximum already there.
-func customerUpdateSetsOwnLimits(req *UpdateCustomerRequest) bool {
-	if req.Budgets != nil && len(*req.Budgets) > 0 {
-		return true
-	}
-	if req.Budget != nil && !isBudgetRemovalRequest(req.Budget) {
-		return true
-	}
-	return req.RateLimit != nil && (req.RateLimit.TokenMaxLimit != nil || req.RateLimit.RequestMaxLimit != nil)
 }
 
 // isBudgetRemovalRequest reports whether a deprecated single-budget update asks for the budget to be
@@ -1311,7 +1206,7 @@ func rateLimitFromRequestFields(tokenMax *int64, tokenDur *string, reqMax *int64
 }
 
 // maxVKModelBudgetsPerProvider bounds how many per-model budget groups a single provider
-// config on a VK may declare. Mirrors the access-profile limit.
+// config on a VK may declare.
 const maxVKModelBudgetsPerProvider = 100
 
 // validateVKModelBudgetNames enforces the per-provider model-budget invariants: at most
@@ -1552,53 +1447,9 @@ func (h *GovernanceHandler) hydrateVKListGovernance(ctx context.Context, vks []c
 	return nil
 }
 
-// applyExternalBudgets swaps a VK's own budget and rate-limit rows for the ones
-// that actually govern its spend when an external resolver supplies them
-// (enterprise: the access-profile budgets and rate limit that carry the real usage
-// for an AP-managed VK, in place of the VK's own untracked mirror rows). This is the
-// same resolution the self-service quota endpoint performs, applied to the admin
-// read paths so the VK detail/list responses show the effective limits without the
-// caller needing a separate, differently-gated access-profile lookup. No-op in OSS
-// (resolver nil) and for non-AP-managed VKs (resolver returns nil). A resolver error
-// degrades gracefully to the VK's own rows rather than failing the whole read.
-func (h *GovernanceHandler) applyExternalBudgets(ctx context.Context, vk *configstoreTables.TableVirtualKey) {
-	if _, err := applyExternalQuotaBudgets(ctx, h.externalQuotaBudgetResolver, vk); err != nil {
-		logger.Error("failed to resolve external budgets for VK %s: %v", vk.ID, err)
-	}
-}
-
-// applyExternalQuotaBudgets overlays a resolver's answer onto a key row, for
-// every read path that shows a key's governance. It returns the result so a caller can
-// name what governs the key (the sources on each budget); nil when the
-// resolver had nothing to say or there is no resolver.
-func applyExternalQuotaBudgets(ctx context.Context, resolver ExternalQuotaBudgetResolver, vk *configstoreTables.TableVirtualKey) (*ExternalQuotaBudgetResult, error) {
-	if resolver == nil || vk == nil {
-		return nil, nil
-	}
-	ext, err := resolver(ctx, vk)
-	if err != nil {
-		return nil, err
-	}
-	if ext == nil {
-		return nil, nil
-	}
-	// The VK is access-profile-managed: its own budget/rate-limit rows are untracked
-	// mirrors (reset to current_usage=0 at adoption and never charged), so surface the
-	// AP's governance verbatim. An empty budget slice or nil rate limit means the AP has
-	// none — we must NOT fall back to the misleading VK rows. This mirrors the UI's
-	// managing-profile branch and getVirtualKeyQuota, so all read paths agree.
-	budgets := make([]configstoreTables.TableBudget, len(ext.Budgets))
-	for i := range ext.Budgets {
-		budgets[i] = ext.Budgets[i].TableBudget
-	}
-	vk.Budgets = budgets
-	vk.RateLimit = ext.RateLimit
-	return ext, nil
-}
-
 // applyAssignees fills in the AssignedUser of each virtual key from the injected
 // resolver, in one batched call. A resolver error logs and leaves every AssignedUser
-// nil rather than failing the whole read, matching applyExternalBudgets: a missing
+// nil rather than failing the whole read: a missing
 // assignee degrades one column, a failed read degrades the page.
 //
 // It also marks AssigneeResolved, which decides whether assigned_user is serialized at
@@ -1879,7 +1730,6 @@ func (h *GovernanceHandler) getVirtualKeys(ctx *fasthttp.RequestCtx) {
 			copy(pcs, vk.ProviderConfigs)
 			clone.ProviderConfigs = pcs
 			applyVKGovernanceFromModelConfigs(&clone, byKey, perModelByKey)
-			h.applyExternalBudgets(ctx, &clone)
 			hydratedVKs[i] = &clone
 		}
 		// Resolved here too, even though the rest of this branch is served from the
@@ -1969,9 +1819,6 @@ func (h *GovernanceHandler) getVirtualKeys(ctx *fasthttp.RequestCtx) {
 			SendError(ctx, 500, "Failed to load virtual key governance")
 			return
 		}
-		for i := range virtualKeys {
-			h.applyExternalBudgets(ctx, &virtualKeys[i])
-		}
 		h.applyAssignees(ctx, virtualKeyPtrs(virtualKeys))
 		SendJSON(ctx, map[string]interface{}{
 			"virtual_keys": virtualKeys,
@@ -1994,9 +1841,6 @@ func (h *GovernanceHandler) getVirtualKeys(ctx *fasthttp.RequestCtx) {
 		logger.Error("%v", err)
 		SendError(ctx, 500, "Failed to load virtual key governance")
 		return
-	}
-	for i := range virtualKeys {
-		h.applyExternalBudgets(ctx, &virtualKeys[i])
 	}
 	h.applyAssignees(ctx, virtualKeyPtrs(virtualKeys))
 	SendJSON(ctx, map[string]interface{}{
@@ -2313,7 +2157,6 @@ func (h *GovernanceHandler) getVirtualKey(ctx *fasthttp.RequestCtx) {
 				copy(pcs, vk.ProviderConfigs)
 				clone.ProviderConfigs = pcs
 				applyVKGovernanceFromModelConfigs(&clone, byKey, perModelByKey)
-				h.applyExternalBudgets(ctx, &clone)
 				h.applyAssignees(ctx, []*configstoreTables.TableVirtualKey{&clone})
 				SendJSON(ctx, map[string]interface{}{
 					"virtual_key": &clone,
@@ -2335,9 +2178,6 @@ func (h *GovernanceHandler) getVirtualKey(ctx *fasthttp.RequestCtx) {
 	}
 	// Reverse-map governance from VK-scoped model configs for display.
 	h.hydrateVKGovernance(ctx, vk)
-	// Surface the effective (e.g. access-profile) budgets in place of the VK's own
-	// untracked rows so the admin detail panel matches the self-service quota view.
-	h.applyExternalBudgets(ctx, vk)
 	h.applyAssignees(ctx, []*configstoreTables.TableVirtualKey{vk})
 
 	SendJSON(ctx, map[string]interface{}{
@@ -3251,24 +3091,6 @@ func (h *GovernanceHandler) updateTeam(ctx *fasthttp.RequestCtx) {
 	// reconciliation and collected there, so the in-memory store can be cleared
 	// once the transaction commits.
 	usageReset := &budgetUsageReset{requested: req.ResetBudgetUsage != nil && *req.ResetBudgetUsage}
-	// A team governed another way - by an access profile attached to it, in the enterprise build -
-	// cannot also carry budgets and a rate limit of its own: they would be a second cap on the same
-	// keys, and one that is invisible in the profile's editor. Every other field here, and every edit
-	// to a team that holds no profile, is untouched.
-	if teamUpdateSetsOwnLimits(&req) {
-		governedBy, err := governance.LegacyLimitsGovernedBy(ctx, governance.LegacyLimitHolderTeam, teamID)
-		if err != nil {
-			// Fail closed: without knowing whether something else governs this team, accepting a budget
-			// could put a second cap on its keys.
-			logger.Error("failed to check whether team %s is governed: %v", teamID, err)
-			SendError(ctx, 503, "unable to verify whether an access profile governs this team, please retry")
-			return
-		}
-		if governedBy != "" {
-			SendError(ctx, 409, "this team is governed by access profile \""+governedBy+"\", so it cannot have budgets or a rate limit of its own - edit the access profile instead")
-			return
-		}
-	}
 	// Whether this request switches alignment on. Captured before the update so the
 	// open windows can be adopted onto the calendar grid afterwards instead of
 	// being reset out from under the operator; see adoptCalendarAlignment.
@@ -3660,24 +3482,6 @@ func (h *GovernanceHandler) updateCustomer(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, 400, "only one of 'budget' or 'budgets' may be set")
 		return
 	}
-	// A customer governed another way - by an access profile, in the enterprise build - cannot also
-	// carry budgets and a rate limit of its own: they would be a second cap on the same keys, and one
-	// that is invisible in the profile's editor. Editing a customer that holds no profile is
-	// untouched, and so is every field here but these two.
-	if customerUpdateSetsOwnLimits(&req) {
-		governedBy, err := governance.LegacyLimitsGovernedBy(ctx, governance.LegacyLimitHolderCustomer, customerID)
-		if err != nil {
-			// Fail closed: without knowing whether something else governs this customer, accepting a
-			// budget could put a second cap on its keys.
-			logger.Error("failed to check whether customer %s is governed: %v", customerID, err)
-			SendError(ctx, 503, "unable to verify whether an access profile governs this customer, please retry")
-			return
-		}
-		if governedBy != "" {
-			SendError(ctx, 409, "this customer is governed by access profile \""+governedBy+"\", so it cannot have budgets or a rate limit of its own - edit the access profile instead")
-			return
-		}
-	}
 	// Fetching customer from database
 	customer, err := h.configStore.GetCustomer(ctx, customerID)
 	if err != nil {
@@ -4040,7 +3844,6 @@ func (h *GovernanceHandler) getModelConfigs(ctx *fasthttp.RequestCtx) {
 		}
 		page := all[offset:end]
 		h.enrichModelConfigScopeNames(ctx, page)
-		h.enrichModelConfigManagedBy(ctx, page)
 		SendJSON(ctx, map[string]any{
 			"model_configs": page,
 			"count":         len(page),
@@ -4108,7 +3911,6 @@ func (h *GovernanceHandler) getModelConfigs(ctx *fasthttp.RequestCtx) {
 			return
 		}
 		h.enrichModelConfigScopeNames(ctx, modelConfigs)
-		h.enrichModelConfigManagedBy(ctx, modelConfigs)
 		SendJSON(ctx, map[string]any{
 			"model_configs": modelConfigs,
 			"count":         len(modelConfigs),
@@ -4138,7 +3940,6 @@ func (h *GovernanceHandler) getModelConfigs(ctx *fasthttp.RequestCtx) {
 	// Pages come newest first; this route has always answered in id order.
 	sort.Slice(modelConfigs, func(i, j int) bool { return modelConfigs[i].ID < modelConfigs[j].ID })
 	h.enrichModelConfigScopeNames(ctx, modelConfigs)
-	h.enrichModelConfigManagedBy(ctx, modelConfigs)
 	SendJSON(ctx, map[string]any{
 		"model_configs": modelConfigs,
 		"count":         len(modelConfigs),
@@ -4161,7 +3962,6 @@ func (h *GovernanceHandler) getModelConfig(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	h.resolveModelConfigScopeName(ctx, mc, map[string]string{})
-	h.resolveModelConfigManagedBy(ctx, mc, map[string]configstoreTables.SourceRef{})
 	SendJSON(ctx, map[string]interface{}{
 		"model_config": mc,
 	})
@@ -4190,41 +3990,6 @@ func (h *GovernanceHandler) resolveModelConfigScopeName(ctx context.Context, mc 
 		cache[key] = name
 	}
 	mc.ScopeName = name
-}
-
-// resolveModelConfigManagedBy populates the transient ManagedBy for a single non-global
-// model config by dispatching to the resolver registered for mc.Scope. Unknown scopes
-// (no resolver registered) and resolution failures are non-fatal — ManagedBy stays empty
-// and the UI renders nothing extra. The cache lets callers dedupe lookups across many
-// configs; it is keyed by (scope, scope_id) so distinct scopes never collide. Kept
-// separate from resolveModelConfigScopeName (different registry, different meaning —
-// "who this applies to" vs. "what manages it") so neither can affect the other.
-func (h *GovernanceHandler) resolveModelConfigManagedBy(ctx context.Context, mc *configstoreTables.TableModelConfig, cache map[string]configstoreTables.SourceRef) {
-	if mc == nil || mc.Scope == "" || mc.ScopeID == nil {
-		return
-	}
-	resolver, ok := lookupManagedByResolver(mc.Scope)
-	if !ok {
-		return
-	}
-	id := *mc.ScopeID
-	key := mc.Scope + "|" + id
-	ref, cached := cache[key]
-	if !cached {
-		if resolved, found := resolver(ctx, id); found {
-			ref = resolved
-		}
-		cache[key] = ref
-	}
-	mc.SourceRef = ref
-}
-
-// enrichModelConfigManagedBy populates ManagedBy for each non-global config in the slice.
-func (h *GovernanceHandler) enrichModelConfigManagedBy(ctx context.Context, configs []configstoreTables.TableModelConfig) {
-	cache := map[string]configstoreTables.SourceRef{}
-	for i := range configs {
-		h.resolveModelConfigManagedBy(ctx, &configs[i], cache)
-	}
 }
 
 // enrichModelConfigScopeNames populates ScopeName for each non-global config in the slice.
@@ -4461,7 +4226,6 @@ func (h *GovernanceHandler) createModelConfig(ctx *fasthttp.RequestCtx) {
 		preloadedMC = &mc
 	}
 	h.resolveModelConfigScopeName(ctx, preloadedMC, map[string]string{})
-	h.resolveModelConfigManagedBy(ctx, preloadedMC, map[string]configstoreTables.SourceRef{})
 	lib.RecordAuditChange(ctx, "model_config.created", "model_config", mc.ID, mc.ModelName, nil, preloadedMC)
 	SendJSON(ctx, map[string]interface{}{
 		"message":      "Model config created successfully",
@@ -4613,7 +4377,6 @@ func (h *GovernanceHandler) updateModelConfig(ctx *fasthttp.RequestCtx) {
 		}
 	}
 	h.resolveModelConfigScopeName(ctx, updatedMC, map[string]string{})
-	h.resolveModelConfigManagedBy(ctx, updatedMC, map[string]configstoreTables.SourceRef{})
 	lib.RecordAuditChange(ctx, "model_config.updated", "model_config", mc.ID, mc.ModelName, before, updatedMC)
 	SendJSON(ctx, map[string]interface{}{
 		"message":      "Model config updated successfully",
@@ -5469,32 +5232,25 @@ type quotaModelSpend struct {
 // (both measured since last_reset). models is empty when logging is disabled.
 type quotaBudget struct {
 	configstoreTables.TableBudget
-	// Identifies what governs this budget (e.g. an access profile), when the caller
-	// supplied one. Empty for a VK's own budget rows.
-	configstoreTables.SourceRef
 	Models []quotaModelSpend `json:"per_model_usage"`
 }
 
 // buildBudgetsWithUsage wraps each budget with its per-model actual usage, queried from
 // request logs over that budget's current cycle
-func (h *GovernanceHandler) buildBudgetsWithUsage(ctx context.Context, vkID, usageUserID string, budgets []SourcedBudget, now time.Time) ([]quotaBudget, error) {
+func (h *GovernanceHandler) buildBudgetsWithUsage(ctx context.Context, vkID string, budgets []configstoreTables.TableBudget, now time.Time) ([]quotaBudget, error) {
 	out := make([]quotaBudget, 0, len(budgets))
 	for i := range budgets {
-		b := &budgets[i].TableBudget
-		entry := quotaBudget{TableBudget: *b, SourceRef: budgets[i].SourceRef, Models: []quotaModelSpend{}}
+		b := &budgets[i]
+		entry := quotaBudget{TableBudget: *b, Models: []quotaModelSpend{}}
 		if h.logManager != nil {
 			start := b.LastReset
 			if b.CreatedAt.After(start) {
 				start = b.CreatedAt
 			}
 			filters := &logstore.SearchFilters{
-				StartTime: &start,
-				EndTime:   &now,
-			}
-			if usageUserID != "" {
-				filters.UserIDs = []string{usageUserID}
-			} else {
-				filters.VirtualKeyIDs = []string{vkID}
+				StartTime:     &start,
+				EndTime:       &now,
+				VirtualKeyIDs: []string{vkID},
 			}
 			ranking, err := h.logManager.GetModelRankings(ctx, filters)
 			if err != nil {
@@ -5567,38 +5323,9 @@ func (h *GovernanceHandler) getVirtualKeyQuota(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	budgetRows := make([]SourcedBudget, len(vk.Budgets))
-	for i := range vk.Budgets {
-		budgetRows[i] = SourcedBudget{TableBudget: vk.Budgets[i]}
-	}
-	rateLimit := vk.RateLimit
-	rateLimits := []SourcedRateLimit{}
-	if vk.RateLimit != nil {
-		rateLimits = []SourcedRateLimit{{TableRateLimit: *vk.RateLimit}}
-	}
-	usageUserID := ""
-	if resolve := h.externalQuotaBudgetResolver; resolve != nil {
-		ext, err := resolve(ctx, vk)
-		if err != nil {
-			SendError(ctx, 500, "Failed to load access-profile usage")
-			return
-		}
-		if ext != nil {
-			// AP-managed VK: surface the AP's governance verbatim in place of the VK's own
-			// untracked mirror rows. Empty budgets / nil rate limit mean the AP has none.
-			budgetRows = ext.Budgets
-			rateLimit = ext.RateLimit
-			rateLimits = ext.RateLimits
-			if rateLimits == nil {
-				rateLimits = []SourcedRateLimit{}
-			}
-			usageUserID = ext.UsageUserID
-		}
-	}
-
 	// Each budget carries its actual per-model spend (from request logs) for the current
 	// cycle. Must run after collectVKModelUsage, which hydrates vk.Budgets.
-	budgets, err := h.buildBudgetsWithUsage(ctx, vk.ID, usageUserID, budgetRows, time.Now())
+	budgets, err := h.buildBudgetsWithUsage(ctx, vk.ID, vk.Budgets, time.Now())
 	if err != nil {
 		SendError(ctx, 500, "Failed to load per-model usage")
 		return
@@ -5608,8 +5335,7 @@ func (h *GovernanceHandler) getVirtualKeyQuota(ctx *fasthttp.RequestCtx) {
 		"virtual_key_name": vk.Name,
 		"is_active":        vk.IsActiveValue(),
 		"budgets":          budgets,
-		"rate_limit":       rateLimit,
-		"rate_limits":      rateLimits,
+		"rate_limit":       vk.RateLimit,
 		"provider_configs": vk.ProviderConfigs,
 		"model_configs":    models,
 	})

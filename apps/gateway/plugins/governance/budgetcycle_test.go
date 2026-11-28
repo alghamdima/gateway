@@ -558,8 +558,7 @@ func newQuarterlyBudget(id string, quarterStartMonth time.Month, usage float64) 
 //
 // This is the cluster property the whole feature rests on. Each node derives the
 // boundary from its own copy of the row, so if a peer failed to load the quarter
-// definition - the AfterFind hook not firing on a preload, or an access profile
-// materialising a managed key without copying it - the two nodes would land on
+// definition - the AfterFind hook not firing on a preload - the two nodes would land on
 // different boundaries and reset each other's usage repeatedly.
 func TestQuarterlyBudgetResetTargetIsDeterministicAcrossNodes(t *testing.T) {
 	for _, quarterStart := range []time.Month{time.January, time.February, time.April, time.November} {

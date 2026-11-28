@@ -35,49 +35,6 @@ const (
 	VirtualKeyPrefix = "sk-bf-"
 )
 
-// A team or a customer can carry budgets and a rate limit of its own. The enterprise build adds a
-// second way to govern the same entity - an access profile attached to it - and the two cannot both
-// apply, or the entity ends up with two caps on the same keys.
-//
-// Enterprise registers the check here, and the paths that write those limits ask before writing: the
-// team and customer update handlers, and the config reconcile that applies governance.budgets from
-// config.json. In the OSS build nothing is registered, so nothing is refused.
-const (
-	// The kinds of entity that can hold budgets and a rate limit of their own. Each may hold several
-	// budgets, one per reset window, and one rate limit.
-	LegacyLimitHolderTeam     = "team"
-	LegacyLimitHolderCustomer = "customer"
-)
-
-// LegacyLimitGuard names what already governs an entity's spend, or "" when nothing does. An error
-// means the question could not be answered; callers fail closed rather than write a second cap.
-type LegacyLimitGuard func(ctx context.Context, holderKind, holderID string) (governedBy string, err error)
-
-var (
-	legacyLimitGuardMu sync.RWMutex
-	legacyLimitGuard   LegacyLimitGuard
-)
-
-// RegisterLegacyLimitGuard installs the guard for this process. Passing nil clears it, which is how a
-// test puts the process back as it found it.
-func RegisterLegacyLimitGuard(guard LegacyLimitGuard) {
-	legacyLimitGuardMu.Lock()
-	legacyLimitGuard = guard
-	legacyLimitGuardMu.Unlock()
-}
-
-// LegacyLimitsGovernedBy names what already governs this entity's spend, or "" when nothing does -
-// including every build where no guard is registered.
-func LegacyLimitsGovernedBy(ctx context.Context, holderKind, holderID string) (string, error) {
-	legacyLimitGuardMu.RLock()
-	guard := legacyLimitGuard
-	legacyLimitGuardMu.RUnlock()
-	if guard == nil || holderID == "" {
-		return "", nil
-	}
-	return guard(ctx, holderKind, holderID)
-}
-
 // Config is the configuration for the governance plugin
 type Config struct {
 	IsVkMandatory   *bool     `json:"is_vk_mandatory"`
@@ -1906,9 +1863,8 @@ func (p *GovernancePlugin) ReportUsage(ctx context.Context, usage jobaccounting.
 // They are missing from usage.BudgetIDs by construction: those ids were collected
 // while the request was in flight, and a batch create carries no top-level model
 // (each input-file row names its own), so only the all-models wildcards matched.
-// A downstream consumer's per-model limits (e.g. an access profile's, from a registered
-// extra-scoped-IDs resolver, see collectExtraScopedIDs) materialise as configs naming exactly one model and
-// provider, which is why a model-level budget never moved for a batch. Settlement does
+// A model-level budget lives on a config naming exactly one model and provider, which
+// is why it never moved for a batch. Settlement does
 // know the models, so each one is resolved and charged with its own share here.
 //
 // Ids already charged above are subtracted rather than skipped by construction: the
@@ -1930,7 +1886,7 @@ func (p *GovernancePlugin) reportBatchModelUsage(ctx context.Context, usage joba
 	// Every model here is one a result row actually ran, as written, so no alias target is charged.
 	ctx = context.WithValue(ctx, literalLimitsContextKey, true)
 	for _, modelUsage := range usage.ModelUsage {
-		budgetIDs, rateLimitIDs := p.store.CollectModelScopedGovernanceIDs(ctx, usage.VirtualKeyID, usage.UserID, usage.Provider, modelUsage.Model)
+		budgetIDs, rateLimitIDs := p.store.CollectModelScopedGovernanceIDs(ctx, usage.VirtualKeyID, usage.Provider, modelUsage.Model)
 		if modelUsage.Cost > 0 {
 			for _, budgetID := range budgetIDs {
 				if alreadyCharged["budget:"+budgetID] {

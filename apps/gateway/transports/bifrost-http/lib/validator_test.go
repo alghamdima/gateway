@@ -2885,7 +2885,7 @@ func TestSchemaBudgetQuarterStartMonth(t *testing.T) {
 	})
 
 	// $defs/budget_line is a second copy of the same shape, reached through
-	// customers, access profiles and provider configs. A budget written there
+	// customers and provider configs. A budget written there
 	// deserializes into the same Go struct, so the two copies have to agree on
 	// which values they accept.
 	t.Run("the budget_line copy accepts the same range", func(t *testing.T) {

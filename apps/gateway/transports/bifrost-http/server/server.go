@@ -201,11 +201,6 @@ type BifrostHTTPServer struct {
 	setupLockInstalled bool // OSS setup-lock gate guards /api (see AuthMiddleware.SetupLockMiddleware); never set on enterprise
 	CORSMiddleware     *handlers.CorsMiddleware
 	TracingMiddleware  *handlers.TracingMiddleware
-	// ExternalQuotaBudgetResolver supplies budgets/usage for VKs whose
-	// authoritative usage is tracked outside their own budget rows (enterprise
-	// access-profile-managed VKs). Optional; wired at server init when available,
-	// otherwise left nil so the quota endpoint reads the VK's own budget rows.
-	ExternalQuotaBudgetResolver handlers.ExternalQuotaBudgetResolver
 	// VirtualKeyAssigneeResolver supplies the user each VK is assigned to, batched
 	// per page. Optional; wired at server init when available, otherwise left nil
 	// so the VK read paths report no assignee (OSS has no user directory).
@@ -373,9 +368,8 @@ func (s *BifrostHTTPServer) applyVirtualKeyReload(ctx context.Context, store gov
 	id := virtualKey.ID
 	store.UpdateVirtualKeyInMemory(ctx, virtualKey, nil, nil, nil)
 	// Snapshot in-memory VK-scoped config IDs before the upserts so we can evict
-	// the ones that no longer exist in the DB (e.g. a standalone VK adopted into
-	// an access profile has its VK-scoped governance model configs deleted).
-	// Without this their stale budgets keep enforcing.
+	// the ones that no longer exist in the DB. Without this their stale budgets
+	// keep enforcing.
 	staleIDs := make(map[string]bool)
 	for _, mcID := range store.ScopedModelConfigIDs(tables.ModelConfigScopeVirtualKey, id) {
 		staleIDs[mcID] = true
@@ -2129,7 +2123,7 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	}
 	governancePlugin, _ := lib.FindPluginAs[schemas.LLMPlugin](s.Config, governancePluginName)
 	if governancePlugin != nil {
-		governanceHandler, err = handlers.NewGovernanceHandler(callbacks, s.Config.ConfigStore, govLogManager, s.ExternalQuotaBudgetResolver, s.VirtualKeyAssigneeResolver)
+		governanceHandler, err = handlers.NewGovernanceHandler(callbacks, s.Config.ConfigStore, govLogManager, s.VirtualKeyAssigneeResolver)
 		if err != nil {
 			return fmt.Errorf("failed to initialize governance handler: %v", err)
 		}

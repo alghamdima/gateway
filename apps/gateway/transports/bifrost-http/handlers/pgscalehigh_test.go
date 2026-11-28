@@ -258,7 +258,7 @@ func TestEnrichModelConfigScopeNamesBatchesVirtualKeyLookups(t *testing.T) {
 	inner := newScaleTestStore(t)
 	ids := seedScaleVKs(t, inner, 5, 0)
 	store := &scaleCountingConfigStore{ConfigStore: inner}
-	h, err := NewGovernanceHandler(&mockGovernanceManagerForVK{}, store, nil, nil, nil)
+	h, err := NewGovernanceHandler(&mockGovernanceManagerForVK{}, store, nil, nil)
 	require.NoError(t, err)
 
 	missing := "vk-does-not-exist"
@@ -301,11 +301,11 @@ func TestRegisterScopeNameResolverOverridesBatchResolver(t *testing.T) {
 	inner := newScaleTestStore(t)
 	ids := seedScaleVKs(t, inner, 1, 0)
 	store := &scaleCountingConfigStore{ConfigStore: inner}
-	h, err := NewGovernanceHandler(&mockGovernanceManagerForVK{}, store, nil, nil, nil)
+	h, err := NewGovernanceHandler(&mockGovernanceManagerForVK{}, store, nil, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		// Restore the default resolvers for later tests in the package.
-		_, _ = NewGovernanceHandler(&mockGovernanceManagerForVK{}, inner, nil, nil, nil)
+		_, _ = NewGovernanceHandler(&mockGovernanceManagerForVK{}, inner, nil, nil)
 	})
 
 	RegisterScopeNameResolver(configstoreTables.ModelConfigScopeVirtualKey, func(_ context.Context, id string) (string, bool) {

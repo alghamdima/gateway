@@ -30,23 +30,6 @@ var (
 	}
 )
 
-// SourceRef identifies what a row came from or is governed by, for API responses
-// where that is not the same thing as the row's own scope. It is non-persisted and
-// populated by the HTTP layer on read.
-//
-// Embedded rather than nested so the three fields render flat alongside the row's
-// own, and shared so a model config and a quota budget describe their origin with
-// exactly the same keys. A name alone cannot be navigated to, which is what ID is
-// for — and ID addresses the SOURCE, not the row's ScopeID.
-type SourceRef struct {
-	// SourceType names the kind of source, e.g. "virtual_key".
-	SourceType string `gorm:"-" json:"source_type,omitempty"`
-	// SourceID addresses the source itself.
-	SourceID string `gorm:"-" json:"source_id,omitempty"`
-	// SourceName is the human-readable label for SourceID.
-	SourceName string `gorm:"-" json:"source_name,omitempty"`
-}
-
 // IsValidModelConfigScope reports whether scope is a recognized model config scope.
 func IsValidModelConfigScope(scope string) bool {
 	validModelConfigScopesMu.RLock()
@@ -74,11 +57,6 @@ type TableModelConfig struct {
 	// the scope target (e.g. the virtual key's name) so the UI can render a label
 	// instead of an opaque scope_id. Populated by the HTTP layer on read.
 	ScopeName string `gorm:"-" json:"scope_name,omitempty"`
-	// Identifies what externally manages this config (e.g. the access profile that
-	// materialized it), distinct from ScopeName's "who this applies to". Empty when
-	// nothing manages it or no resolver is registered for the scope. Populated by the
-	// HTTP layer on read.
-	SourceRef
 	// BudgetIDs is a config-file-only field listing pre-declared budget IDs (from
 	// governance.budgets) to link to this model config. Not persisted; used by the
 	// config sync path to set model_config_id on each referenced budget row.

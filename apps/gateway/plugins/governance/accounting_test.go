@@ -309,8 +309,7 @@ func TestReportUsage_UserOnReportDoesNotAddASecondCharge(t *testing.T) {
 		"naming the user must not change the amount charged; the user is a co-payer on the grant, not a tier of its own")
 }
 
-// modelScopedFixture wires a user-scoped per-model budget (how an access profile's
-// model-level limits are stored) alongside a user-scoped all-models wildcard, so a
+// modelScopedFixture wires a user-scoped per-model budget alongside a user-scoped all-models wildcard, so a
 // settlement can be checked for charging the first and not double-charging the second.
 type modelScopedFixture struct {
 	store   GovernanceStore

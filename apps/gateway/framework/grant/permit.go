@@ -31,8 +31,7 @@ const (
 	PermitVirtualKey PermitType = "vk"
 )
 
-// PrettyString is what a refusal calls this permit kind: "your team's access profile", not
-// "team_access_profile". Every kind is named here because every kind is declared here - the labels
+// PrettyString is what a refusal calls this permit kind: "virtual key", not "vk". Every kind is named here because every kind is declared here - the labels
 // are fixed words, so there is nothing for another build to supply. A kind with no case renders as
 // its identifier, which is ugly but still says what ran out.
 func (t PermitType) PrettyString() string {

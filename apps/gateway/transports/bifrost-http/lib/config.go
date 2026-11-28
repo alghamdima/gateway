@@ -3,7 +3,6 @@
 package lib
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -404,16 +403,6 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// GovernanceFileSync names the teams and customers a LoadConfig wrote from config.json, as the file
-// declares them: the ones that are new, or whose declaration changed since the hash stored at the last
-// sync - every one the file declares, under source_of_truth config.json. Enterprise reads it to apply
-// what an entry declares beyond the OSS fields, such as access_profile, exactly where the entry
-// changed, so a dashboard edit to an unchanged entity is left alone.
-type GovernanceFileSync struct {
-	Teams     []configstoreTables.TableTeam
-	Customers []configstoreTables.TableCustomer
-}
-
 // Config represents a high-performance in-memory configuration store for Bifrost.
 // It provides thread-safe access to provider configurations with database persistence.
 //
@@ -430,9 +419,6 @@ type Config struct {
 	client *bifrost.Bifrost
 
 	configPath string
-
-	// GovernanceFileSync is what the last LoadConfig wrote from config.json's teams and customers.
-	GovernanceFileSync GovernanceFileSync
 
 	// Stores
 	ConfigStore configstore.ConfigStore
@@ -596,9 +582,8 @@ func applyV1Compat(configData *ConfigData) {
 // promoteDeprecatedCalendarAligned lifts the legacy per-budget / per-rate-limit
 // calendar_aligned input to the owning VK or Team. Owner wins if already true;
 // otherwise OR across descendants (own budgets/rate-limit + every provider
-// config's budgets/rate-limit). Inner pointers are always cleared. Mirrors the
-// enterprise promoteDeprecatedAccessProfileCalendarAligned at the access
-// profile level. Runs on every load regardless of config version
+// config's budgets/rate-limit). Inner pointers are always cleared. Runs on
+// every load regardless of config version
 func promoteDeprecatedCalendarAligned(configData *ConfigData) {
 	if configData == nil || configData.Governance == nil {
 		return
@@ -920,7 +905,6 @@ func initStores(ctx context.Context, config *Config, configData *ConfigData, con
 		logger.Info("config store initialized (default SQLite)")
 	}
 	// else: ConfigStoreConfig is present but Enabled == false — leave ConfigStore nil
-	runConfigStoreReadyHook(ctx, config.ConfigStore)
 
 	// Clear restart required flag on server startup
 	if config.ConfigStore != nil {
@@ -2472,11 +2456,6 @@ func mergeGovernanceConfig(ctx context.Context, config *Config, configData *Conf
 		config.GovernanceConfig.ComplexityAnalyzerConfig = complexityAnalyzerConfigToUpdate
 	}
 	if config.ConfigStore != nil && hasChanges {
-		// Taken before the write, which strips the customers' inline budgets in place.
-		fileSync := GovernanceFileSync{
-			Teams:     append(append([]configstoreTables.TableTeam{}, teamsToAdd...), teamsToUpdate...),
-			Customers: append(append([]configstoreTables.TableCustomer{}, customersToAdd...), customersToUpdate...),
-		}
 		err := updateGovernanceConfigInStore(ctx, config,
 			budgetsToAdd, budgetsToUpdate,
 			rateLimitsToAdd, rateLimitsToUpdate,
@@ -2494,7 +2473,6 @@ func mergeGovernanceConfig(ctx context.Context, config *Config, configData *Conf
 		if err != nil {
 			logger.Fatal("failed to sync governance config: %v", err)
 		}
-		config.GovernanceFileSync = fileSync
 	}
 
 	// Sync pricing overrides into the model catalog in one batch to avoid
@@ -2597,79 +2575,8 @@ func mergeComplexityAnalyzerConfigFromFile(current, fileConfig *configstore.Comp
 	return configstore.MergeComplexityAnalyzerConfigByHashes(base, fileConfig)
 }
 
-// VirtualKeyPruneGuard reports which of the candidate virtual keys must survive
-// config.json reconciliation even though the file no longer lists them. Enterprise
-// registers one so keys attached to a user who holds an access profile are never
-// pruned - those keys are materialised from the access profile, not authored in
-// config.json, and deleting them revokes live access. It takes the store because it
-// runs inside LoadConfig, before any wrapper around the store exists. Nil in OSS
-// (nothing to guard).
-type VirtualKeyPruneGuard func(ctx context.Context, store configstore.ConfigStore, virtualKeyIDs []string) (map[string]bool, error)
-
-var (
-	virtualKeyPruneGuardMu sync.RWMutex
-	virtualKeyPruneGuard   VirtualKeyPruneGuard
-)
-
-// GovernanceLimitPruneGuard reports which of the candidate budgets and rate limits must survive the
-// source_of_truth config.json prune although governance.budgets and governance.rate_limits do not
-// declare them: rows another owner holds, such as the enterprise build's access profiles, which their
-// own section of config.json governs. Any error keeps every candidate for this boot.
-type GovernanceLimitPruneGuard func(ctx context.Context, store configstore.ConfigStore, budgetIDs, rateLimitIDs []string) (budgets, rateLimits map[string]bool, err error)
-
-var (
-	governanceLimitPruneGuardMu sync.RWMutex
-	governanceLimitPruneGuard   GovernanceLimitPruneGuard
-)
-
-// ConfigStoreReadyHook runs once LoadConfig has opened the config store, before anything from
-// config.json is written to it. Enterprise registers one to install the governance plugin's legacy
-// limit guard against this store, so the governance reconcile below can already tell which teams and
-// customers an access profile governs; the enterprise store wrapper does not exist yet at this point.
-// Nil in OSS.
-type ConfigStoreReadyHook func(ctx context.Context, store configstore.ConfigStore)
-
-var (
-	configStoreReadyHookMu sync.RWMutex
-	configStoreReadyHook   ConfigStoreReadyHook
-)
-
-// runConfigStoreReadyHook calls the registered hook with the store LoadConfig just opened.
-func runConfigStoreReadyHook(ctx context.Context, store configstore.ConfigStore) {
-	configStoreReadyHookMu.RLock()
-	hook := configStoreReadyHook
-	configStoreReadyHookMu.RUnlock()
-	if hook == nil || store == nil {
-		return
-	}
-	hook(ctx, store)
-}
-
-// resolveProtectedVirtualKeys asks the registered guard which of the virtual keys
-// missing from config.json must be kept. Resolved before the prune transaction
-// opens, since the guard reads through the store's own connection. A guard error
-// protects every candidate: deleting keys we cannot classify is unrecoverable,
-// while keeping a stale key is fixed by the next reload.
-func resolveProtectedVirtualKeys(ctx context.Context, store configstore.ConfigStore, candidates []string) map[string]bool {
-	virtualKeyPruneGuardMu.RLock()
-	guard := virtualKeyPruneGuard
-	virtualKeyPruneGuardMu.RUnlock()
-	if guard == nil || len(candidates) == 0 {
-		return nil
-	}
-	protected, err := guard(ctx, store, candidates)
-	if err != nil {
-		logger.Error("failed to resolve protected virtual keys, skipping virtual key pruning: %v", err)
-		protected = make(map[string]bool, len(candidates))
-		for _, vkID := range candidates {
-			protected[vkID] = true
-		}
-	}
-	return protected
-}
-
 // virtualKeyPruneCandidates lists the in-memory virtual keys config.json no longer
-// declares - the rows the prune would delete before the guard has its say. Nil when
+// declares - the rows the prune deletes. Nil when
 // the file declares no virtual_keys section at all, since nothing is pruned then.
 func virtualKeyPruneCandidates(existing []configstoreTables.TableVirtualKey, configData *ConfigData) []string {
 	if !configData.governanceSectionPresent("virtual_keys") {
@@ -2690,8 +2597,8 @@ func virtualKeyPruneCandidates(existing []configstoreTables.TableVirtualKey, con
 
 // fileManagedModelConfigScope reports whether config.json can declare a model config of this scope -
 // "global" and "virtual_key" - which is what makes a stored row of that scope the file's to prune. A
-// row of any other scope belongs to whatever registered the scope, such as the enterprise build's
-// per-model limits for an access profile, and is pruned with its owner instead.
+// row of any other scope belongs to whatever registered the scope, and is pruned with its owner
+// instead.
 func fileManagedModelConfigScope(scope string) bool {
 	return scope == "" || scope == configstoreTables.ModelConfigScopeGlobal || scope == configstoreTables.ModelConfigScopeVirtualKey
 }
@@ -2811,7 +2718,7 @@ func providerConfigTiers(ctx context.Context, store configstore.ConfigStore) (ma
 }
 
 // virtualKeyLimitModelConfigs names the tiers holding limits config.json declares, which the prune keeps.
-func virtualKeyLimitModelConfigs(existing *configstore.GovernanceConfig, configData *ConfigData, protected map[string]bool, tierOfProviderConfig map[uint]string, tiersKnown bool) map[string]bool {
+func virtualKeyLimitModelConfigs(existing *configstore.GovernanceConfig, configData *ConfigData, tierOfProviderConfig map[uint]string, tiersKnown bool) map[string]bool {
 	kept := map[string]bool{}
 	if existing == nil || configData == nil || configData.Governance == nil {
 		return kept
@@ -2853,8 +2760,7 @@ func virtualKeyLimitModelConfigs(existing *configstore.GovernanceConfig, configD
 			mc.ModelName != configstoreTables.ModelConfigAllModels || mc.ScopeID == nil {
 			continue
 		}
-		// A guarded key keeps its tiers.
-		if !fileSpeaksForLimits || protected[*mc.ScopeID] {
+		if !fileSpeaksForLimits {
 			kept[mc.ID] = true
 			continue
 		}
@@ -2877,14 +2783,9 @@ func virtualKeyLimitModelConfigs(existing *configstore.GovernanceConfig, configD
 //     itself, so the budgets and rate limit it owns stay with it
 //   - a row declared inline on a team, customer, virtual key or provider config in the file
 //     (markInlineGovernanceLimits)
-//   - whatever the registered GovernanceLimitPruneGuard claims, such as an access profile's rows
-//
-// Resolved before the prune transaction opens, since the guard reads through the store's own
-// connection. A guard error keeps every candidate this boot: the rows are left for the next boot to
-// prune rather than deleted while something may still use them.
-func governanceLimitsToKeep(ctx context.Context, store configstore.ConfigStore, existing *configstore.GovernanceConfig, configData *ConfigData, protected map[string]bool, tierOfProviderConfig map[uint]string, tiersKnown bool) (budgets, rateLimits map[string]bool) {
+func governanceLimitsToKeep(existing *configstore.GovernanceConfig, configData *ConfigData, tierOfProviderConfig map[uint]string, tiersKnown bool) (budgets, rateLimits map[string]bool) {
 	budgets, rateLimits = map[string]bool{}, map[string]bool{}
-	ownedByKeptModelConfig := virtualKeyLimitModelConfigs(existing, configData, protected, tierOfProviderConfig, tiersKnown)
+	ownedByKeptModelConfig := virtualKeyLimitModelConfigs(existing, configData, tierOfProviderConfig, tiersKnown)
 	for _, mc := range existing.ModelConfigs {
 		if fileManagedModelConfigScope(mc.Scope) && !ownedByKeptModelConfig[mc.ID] {
 			continue
@@ -2899,52 +2800,13 @@ func governanceLimitsToKeep(ctx context.Context, store configstore.ConfigStore, 
 	}
 	markInlineGovernanceLimits(configData.Governance, budgets, rateLimits)
 
-	var budgetCandidates, rateLimitCandidates []string
 	if configData.governanceSectionPresent("budgets") {
-		declared := make(map[string]bool, len(configData.Governance.Budgets))
-		for _, budget := range configData.Governance.Budgets {
-			declared[budget.ID] = true
-		}
 		for _, budget := range existing.Budgets {
 			if budget.ModelConfigID != nil && ownedByKeptModelConfig[*budget.ModelConfigID] {
 				budgets[budget.ID] = true
 			}
-			if budget.ID != "" && !declared[budget.ID] && !budgets[budget.ID] {
-				budgetCandidates = append(budgetCandidates, budget.ID)
-			}
 		}
 	}
-	if configData.governanceSectionPresent("rate_limits") {
-		declared := make(map[string]bool, len(configData.Governance.RateLimits))
-		for _, rateLimit := range configData.Governance.RateLimits {
-			declared[rateLimit.ID] = true
-		}
-		for _, rateLimit := range existing.RateLimits {
-			if rateLimit.ID != "" && !declared[rateLimit.ID] && !rateLimits[rateLimit.ID] {
-				rateLimitCandidates = append(rateLimitCandidates, rateLimit.ID)
-			}
-		}
-	}
-
-	governanceLimitPruneGuardMu.RLock()
-	guard := governanceLimitPruneGuard
-	governanceLimitPruneGuardMu.RUnlock()
-	if guard == nil || (len(budgetCandidates) == 0 && len(rateLimitCandidates) == 0) {
-		return budgets, rateLimits
-	}
-	guardedBudgets, guardedRateLimits, err := guard(ctx, store, budgetCandidates, rateLimitCandidates)
-	if err != nil {
-		logger.Error("failed to resolve which budgets and rate limits are owned outside config.json, skipping their pruning this boot: %v", err)
-		guardedBudgets, guardedRateLimits = map[string]bool{}, map[string]bool{}
-		for _, id := range budgetCandidates {
-			guardedBudgets[id] = true
-		}
-		for _, id := range rateLimitCandidates {
-			guardedRateLimits[id] = true
-		}
-	}
-	maps.Copy(budgets, guardedBudgets)
-	maps.Copy(rateLimits, guardedRateLimits)
 	return budgets, rateLimits
 }
 
@@ -3296,11 +3158,9 @@ func pruneGovernanceConfigToFile(ctx context.Context, config *Config, configData
 		return
 	}
 	logger.Debug("source_of_truth=config.json: pruning governance rows not present in config file")
-	protected := resolveProtectedVirtualKeys(ctx, config.ConfigStore,
-		virtualKeyPruneCandidates(config.GovernanceConfig.VirtualKeys, configData))
 	// From the store: the merged entries came from the file, which carries no provider-config ids.
 	tierOfProviderConfig, tiersKnown := providerConfigTiers(ctx, config.ConfigStore)
-	keepBudgets, keepRateLimits := governanceLimitsToKeep(ctx, config.ConfigStore, config.GovernanceConfig, configData, protected, tierOfProviderConfig, tiersKnown)
+	keepBudgets, keepRateLimits := governanceLimitsToKeep(config.GovernanceConfig, configData, tierOfProviderConfig, tiersKnown)
 	budgetIDsInConfigJSON := declaredBudgetIDs(configData.Governance.Budgets)
 	pruneDeclarations := declarationsInFile(configData.Governance)
 	prunedFileModelConfigIDs := pruneDeclarations.modelConfigIDs
@@ -3319,23 +3179,12 @@ func pruneGovernanceConfigToFile(ctx context.Context, config *Config, configData
 				}
 			}
 			for _, vkID := range virtualKeyPruneCandidates(config.GovernanceConfig.VirtualKeys, configData) {
-				if protected[vkID] {
-					logger.Debug("keeping virtual key %s absent from config.json: protected by prune guard", vkID)
-					continue
-				}
 				if err := config.ConfigStore.DeleteVirtualKey(ctx, vkID, tx); err != nil {
 					return fmt.Errorf("failed to delete virtual key %s: %w", vkID, err)
 				}
 			}
-			// Guarded keys survive in the DB, so they must survive in memory too -
-			// the governance store is seeded from this slice.
-			nextVKs := append([]configstoreTables.TableVirtualKey(nil), configData.Governance.VirtualKeys...)
-			for _, existing := range config.GovernanceConfig.VirtualKeys {
-				if protected[existing.ID] && !keep[existing.ID] {
-					nextVKs = append(nextVKs, existing)
-				}
-			}
-			config.GovernanceConfig.VirtualKeys = nextVKs
+			// The governance store is seeded from this slice.
+			config.GovernanceConfig.VirtualKeys = append([]configstoreTables.TableVirtualKey(nil), configData.Governance.VirtualKeys...)
 		}
 		// Routing rules are pruned in mergeGovernanceConfig instead, where the deletes can run
 		// in the same transaction as the inserts and before them.
@@ -3358,7 +3207,7 @@ func pruneGovernanceConfigToFile(ctx context.Context, config *Config, configData
 			for _, row := range configData.Governance.ModelConfigs {
 				keep[row.ID] = true
 			}
-			keyLimits := virtualKeyLimitModelConfigs(config.GovernanceConfig, configData, protected, tierOfProviderConfig, tiersKnown)
+			keyLimits := virtualKeyLimitModelConfigs(config.GovernanceConfig, configData, tierOfProviderConfig, tiersKnown)
 			nextModelConfigs := append([]configstoreTables.TableModelConfig(nil), configData.Governance.ModelConfigs...)
 			for _, existing := range config.GovernanceConfig.ModelConfigs {
 				if existing.ID == "" || keep[existing.ID] {
@@ -3525,21 +3374,8 @@ func updateGovernanceConfigInStore(
 		fileRateLimitIDs := declarations.rateLimitIDs
 		fileTiers := declarations.tiers
 
-		// Which teams, customers and virtual keys an access profile governs, settled before the first
-		// limit is written: the rate-limit rows below are shared by id, so a governed entity's row has
-		// to be known before the file's version of it is applied.
-		governed, err := governedEntitiesInConfig(ctx, config, tx, isConfigJSONSourceOfTruth,
-			rateLimitsToAdd, rateLimitsToUpdate, customersToAdd, customersToUpdate, teamsToAdd, teamsToUpdate,
-			governanceInConfigJSON, virtualKeysToAdd, virtualKeysToUpdate, budgetsToAdd, budgetsToUpdate, modelConfigsToAdd, modelConfigsToUpdate)
-		if err != nil {
-			return err
-		}
-
 		// Create budgets
 		for _, budget := range budgetsToAdd {
-			if governed.modelConfigBudgets[budget.ID] {
-				continue
-			}
 			if budget.TeamID != nil {
 				pendingTeamBudgetsToAdd = append(pendingTeamBudgetsToAdd, budget)
 				continue
@@ -3563,9 +3399,6 @@ func updateGovernanceConfigInStore(
 
 		// Update budgets (config.json changed)
 		for _, budget := range budgetsToUpdate {
-			if governed.modelConfigBudgets[budget.ID] {
-				continue
-			}
 			if budget.TeamID != nil {
 				pendingTeamBudgetsToUpdate = append(pendingTeamBudgetsToUpdate, budget)
 				continue
@@ -3589,9 +3422,6 @@ func updateGovernanceConfigInStore(
 
 		// Create rate limits
 		for _, rateLimit := range rateLimitsToAdd {
-			if governed.rateLimits[rateLimit.ID] {
-				continue
-			}
 			if err := config.ConfigStore.CreateRateLimit(ctx, &rateLimit, tx); err != nil {
 				return fmt.Errorf("failed to create rate limit %s: %w", rateLimit.ID, err)
 			}
@@ -3599,12 +3429,6 @@ func updateGovernanceConfigInStore(
 
 		// Update rate limits (config.json changed)
 		for _, rateLimit := range rateLimitsToUpdate {
-			// The row a governed team or customer links keeps the numbers it has. Its link is preserved
-			// below, and writing the file's numbers onto it would apply the limits that preservation
-			// exists to keep out.
-			if governed.rateLimits[rateLimit.ID] {
-				continue
-			}
 			if err := config.ConfigStore.UpdateRateLimit(ctx, &rateLimit, tx); err != nil {
 				return fmt.Errorf("failed to update rate limit %s: %w", rateLimit.ID, err)
 			}
@@ -3613,16 +3437,6 @@ func updateGovernanceConfigInStore(
 		// Create customers — strip inline Budgets first; created explicitly after the row exists.
 		for i := range customersToAdd {
 			customer := &customersToAdd[i]
-			if governed.customers[customer.ID] {
-				customer.RateLimitID = governed.rateLimitOfCustomer[customer.ID]
-				customer.RateLimit = nil
-				if governed.limitsUnknown["customer:"+customer.ID] {
-					customer.ConfigHash = ""
-				}
-				// Nothing the file says about this customer's budgets is applied: not the ones declared
-				// inline, and not the link named by budget_id, which the loops below leave alone.
-				customer.Budgets = nil
-			}
 			for j := range customer.Budgets {
 				cid := customer.ID
 				customer.Budgets[j].CustomerID = &cid
@@ -3637,17 +3451,6 @@ func updateGovernanceConfigInStore(
 		// Update customers (config.json changed)
 		for i := range customersToUpdate {
 			customer := &customersToUpdate[i]
-			if governed.customers[customer.ID] {
-				customer.RateLimitID = governed.rateLimitOfCustomer[customer.ID]
-				customer.RateLimit = nil
-				if governed.limitsUnknown["customer:"+customer.ID] {
-					customer.ConfigHash = ""
-				}
-				// Emptied before the reconcile below reads it, so a governed customer's stored budgets are
-				// neither rewritten nor deleted as stale: the file's list is not the desired state while a
-				// profile governs the customer, so nothing may be compared against it.
-				customer.Budgets = nil
-			}
 			if customer.Budgets != nil {
 				// Fetch existing budget IDs for this customer so we can route
 				// to add vs update — avoids INSERT conflicts on second sync.
@@ -3691,7 +3494,7 @@ func updateGovernanceConfigInStore(
 		// For adds: verify the budget is unowned before taking it.
 		// For updates: also clear any stale link from the old budget_id.
 		for _, customer := range customersToAdd {
-			if governed.customers[customer.ID] || customer.BudgetID == nil {
+			if customer.BudgetID == nil {
 				continue
 			}
 			if err := linkCustomerBudgetID(tx, customer.ID, *customer.BudgetID, false); err != nil {
@@ -3699,11 +3502,6 @@ func updateGovernanceConfigInStore(
 			}
 		}
 		for _, customer := range customersToUpdate {
-			// A governed customer keeps the links it has. Falling through would take the branch below on
-			// the file's silence and unlink the budgets the profile's arrival left in place.
-			if governed.customers[customer.ID] {
-				continue
-			}
 			if customer.BudgetID == nil {
 				// budget_id removed — unlink any budget previously owned via this path.
 				if err := tx.Model(&configstoreTables.TableBudget{}).
@@ -3720,16 +3518,6 @@ func updateGovernanceConfigInStore(
 
 		// Create teams
 		for _, team := range teamsToAdd {
-			if governed.teams[team.ID] {
-				team.RateLimitID = governed.rateLimitOfTeam[team.ID]
-				team.RateLimit = nil
-				if governed.limitsUnknown["team:"+team.ID] {
-					team.ConfigHash = ""
-				}
-				// The save writes the inline budgets as associations, which would hand a governed team
-				// budgets of its own beside the profile's.
-				team.Budgets = nil
-			}
 			if err := config.ConfigStore.CreateTeam(ctx, &team, tx); err != nil {
 				return fmt.Errorf("failed to create team %s: %w", team.ID, err)
 			}
@@ -3737,15 +3525,6 @@ func updateGovernanceConfigInStore(
 
 		// Update teams (config.json changed)
 		for _, team := range teamsToUpdate {
-			if governed.teams[team.ID] {
-				team.RateLimitID = governed.rateLimitOfTeam[team.ID]
-				team.RateLimit = nil
-				if governed.limitsUnknown["team:"+team.ID] {
-					team.ConfigHash = ""
-				}
-				// Same as the create above: Save upserts the inline budgets as the team's own.
-				team.Budgets = nil
-			}
 			if err := config.ConfigStore.UpdateTeam(ctx, &team, tx); err != nil {
 				return fmt.Errorf("failed to update team %s: %w", team.ID, err)
 			}
@@ -3753,9 +3532,6 @@ func updateGovernanceConfigInStore(
 
 		// Create team-owned budgets after teams exist.
 		for _, budget := range pendingTeamBudgetsToAdd {
-			if governed.skipBudget(ctx, governance.LegacyLimitHolderTeam, budget.TeamID, budget.ID) {
-				continue
-			}
 			if err := config.ConfigStore.CreateBudget(ctx, &budget, tx); err != nil {
 				return fmt.Errorf("failed to create budget %s: %w", budget.ID, err)
 			}
@@ -3763,9 +3539,6 @@ func updateGovernanceConfigInStore(
 
 		// Update team-owned budgets after teams exist.
 		for _, budget := range pendingTeamBudgetsToUpdate {
-			if governed.skipBudget(ctx, governance.LegacyLimitHolderTeam, budget.TeamID, budget.ID) {
-				continue
-			}
 			if err := config.ConfigStore.UpdateBudget(ctx, &budget, tx); err != nil {
 				return fmt.Errorf("failed to update budget %s: %w", budget.ID, err)
 			}
@@ -3773,9 +3546,6 @@ func updateGovernanceConfigInStore(
 
 		// Create customer-owned budgets after customers exist (inline budgets + top-level with customer_id).
 		for _, budget := range pendingCustomerBudgetsToAdd {
-			if governed.skipBudget(ctx, governance.LegacyLimitHolderCustomer, budget.CustomerID, budget.ID) {
-				continue
-			}
 			if err := config.ConfigStore.CreateBudget(ctx, &budget, tx); err != nil {
 				return fmt.Errorf("failed to create budget %s: %w", budget.ID, err)
 			}
@@ -3783,9 +3553,6 @@ func updateGovernanceConfigInStore(
 
 		// Update customer-owned budgets declared in top-level governance.budgets.
 		for _, budget := range pendingCustomerBudgetsToUpdate {
-			if governed.skipBudget(ctx, governance.LegacyLimitHolderCustomer, budget.CustomerID, budget.ID) {
-				continue
-			}
 			if err := config.ConfigStore.UpdateBudget(ctx, &budget, tx); err != nil {
 				return fmt.Errorf("failed to update budget %s: %w", budget.ID, err)
 			}
@@ -3794,16 +3561,6 @@ func updateGovernanceConfigInStore(
 		// Create virtual keys with explicit association handling
 		for i := range virtualKeysToAdd {
 			virtualKey := &virtualKeysToAdd[i]
-			if governed.skipKeyLimits(virtualKey.ID) {
-				// Created as the profile's: nothing of its own, the state an adopt leaves a key in.
-				virtualKey.Budgets = nil
-				virtualKey.ProviderConfigs = nil
-				virtualKey.RateLimitID = nil
-				virtualKey.AllowAllProviders = false
-				if governed.keys[virtualKey.ID] == governorUnknown {
-					virtualKey.ConfigHash = ""
-				}
-			}
 			providerConfigs := virtualKey.ProviderConfigs
 			// Written to the key's tier below; left here the save would cascade them as the key's own.
 			inlineBudgets := virtualKey.Budgets
@@ -3848,15 +3605,7 @@ func updateGovernanceConfigInStore(
 
 		// Update virtual keys (config.json changed)
 		for _, virtualKey := range virtualKeysToUpdate {
-			if governed.skipKeyUpdate(virtualKey.ID) {
-				continue
-			}
-			if governed.skipKeyLimits(virtualKey.ID) {
-				// The associations are left as they stand - the profile's adopt has already cleared them,
-				// or will - and the save keeps the links the row has, like a governed team's.
-				virtualKey.RateLimitID = governed.rateLimitOfKey[virtualKey.ID]
-				virtualKey.AllowAllProviders = false
-			} else if err := reconcileVirtualKeyAssociations(ctx, config.ConfigStore, tx, virtualKey.ID, virtualKey.Budgets, virtualKey.RateLimitID, virtualKey.CalendarAligned, func(pending virtualKeyTierState) error {
+			if err := reconcileVirtualKeyAssociations(ctx, config.ConfigStore, tx, virtualKey.ID, virtualKey.Budgets, virtualKey.RateLimitID, virtualKey.CalendarAligned, func(pending virtualKeyTierState) error {
 				pendingVKLimits = append(pendingVKLimits, pending)
 				return nil
 			}, fileModelConfigIDs, fileTiers, fileRateLimitIDs, isConfigJSONSourceOfTruth, virtualKey.ProviderConfigs, budgetIDsInConfigJSON); err != nil {
@@ -3869,9 +3618,6 @@ func updateGovernanceConfigInStore(
 
 		// virtual_key_id names the key a budget funds; the key's tier owns the row.
 		for _, budget := range pendingVirtualKeyBudgetsToAdd {
-			if governed.skipKeyLimits(*budget.VirtualKeyID) {
-				continue
-			}
 			pendingVKLimits = append(pendingVKLimits, virtualKeyTierState{
 				vkID: *budget.VirtualKeyID, budgets: []configstoreTables.TableBudget{budget},
 				declared: declaredTier(fileTiers, *budget.VirtualKeyID, nil),
@@ -3880,9 +3626,6 @@ func updateGovernanceConfigInStore(
 
 		// Existing rows take the same path, which moves a directly owned one onto the tier.
 		for _, budget := range pendingVirtualKeyBudgetsToUpdate {
-			if governed.skipKeyLimits(*budget.VirtualKeyID) {
-				continue
-			}
 			pendingVKLimits = append(pendingVKLimits, virtualKeyTierState{
 				vkID: *budget.VirtualKeyID, budgets: []configstoreTables.TableBudget{budget},
 				declared: declaredTier(fileTiers, *budget.VirtualKeyID, nil),
@@ -3891,9 +3634,6 @@ func updateGovernanceConfigInStore(
 
 		// As above, keyed by provider_config_id.
 		for _, budget := range pendingProviderConfigBudgetsToAdd {
-			if governed.skipProviderConfigBudget(*budget.ProviderConfigID) {
-				continue
-			}
 			vkID, provider, err := providerConfigLimitOwner(ctx, tx, *budget.ProviderConfigID)
 			if err != nil {
 				return fmt.Errorf("failed to resolve provider config %d of budget %s: %w", *budget.ProviderConfigID, budget.ID, err)
@@ -3906,9 +3646,6 @@ func updateGovernanceConfigInStore(
 
 		// As above.
 		for _, budget := range pendingProviderConfigBudgetsToUpdate {
-			if governed.skipProviderConfigBudget(*budget.ProviderConfigID) {
-				continue
-			}
 			vkID, provider, err := providerConfigLimitOwner(ctx, tx, *budget.ProviderConfigID)
 			if err != nil {
 				return fmt.Errorf("failed to resolve provider config %d of budget %s: %w", *budget.ProviderConfigID, budget.ID, err)
@@ -3953,9 +3690,6 @@ func updateGovernanceConfigInStore(
 		}
 		// Create model configs (new from config.json)
 		for _, modelConfig := range modelConfigsToAdd {
-			if governed.skipModelConfig(&modelConfig) {
-				continue
-			}
 			if err := validateModelConfigGovernanceOwnership(tx, modelConfig); err != nil {
 				return err
 			}
@@ -3971,9 +3705,6 @@ func updateGovernanceConfigInStore(
 
 		// Update model configs (config.json changed)
 		for _, modelConfig := range modelConfigsToUpdate {
-			if governed.skipModelConfig(&modelConfig) {
-				continue
-			}
 			if err := validateModelConfigGovernanceOwnership(tx, modelConfig); err != nil {
 				return err
 			}
@@ -3989,11 +3720,6 @@ func updateGovernanceConfigInStore(
 
 		// Held back until the file's own model configs exist, so find-or-create resolves to them.
 		for _, pending := range pendingVKLimits {
-			// A governed key's tier is the profile's: creating one here would restore by another route
-			// the rows governedEntitiesInConfig holds back, for the next adopt to strip again.
-			if governed.skipKeyLimits(pending.vkID) {
-				continue
-			}
 			if err := writeVirtualKeyTierLimits(ctx, config.ConfigStore, tx, pending, fileRateLimitIDs); err != nil {
 				return fmt.Errorf("failed to write limits of virtual key %s: %w", pending.vkID, err)
 			}
@@ -7361,533 +7087,6 @@ func DeepCopy[T any](in T) (T, error) {
 	}
 	err = sonic.Unmarshal(b, &out)
 	return out, err
-}
-
-// governedConfigEntities is what a reconcile may not write over: the teams and customers an access
-// profile governs, and the rate-limit rows they link.
-//
-// An entity governed by a profile answers to the profile's money, and config.json declaring limits for
-// it is a stale file rather than the desired state - the boot-time report asks the operator to clear
-// one or the other. Until they do, none of the file's limits are applied to it: not the budgets, not
-// the rate limit, and not the links to either.
-type governedConfigEntities struct {
-	customers           map[string]bool
-	teams               map[string]bool
-	rateLimitOfCustomer map[string]*string
-	rateLimitOfTeam     map[string]*string
-	// rateLimits are the rows those entities link. A rate limit is declared once in config.json and
-	// referenced by id, so this is what tells a row belonging to a governed entity from any other.
-	rateLimits map[string]bool
-	// limitsUnknown are the entities, as "customer:<id>" or "team:<id>", handled as governed only
-	// because the lookup failed. They are saved without a config hash, so the next boot retries their
-	// limits rather than matching a hash whose limits were never applied.
-	limitsUnknown map[string]bool
-	// answers is each entity's one lookup, keyed like limitsUnknown: the governing profile's name, ""
-	// for none, governorUnknown for a failed lookup. Every decision about an entity's limits reads it,
-	// so its own save and its budgets cannot be decided by two lookups that disagree.
-	answers            map[string]string
-	keys               map[string]string  // governed virtual key -> governing profile, or governorUnknown
-	keyOwner           map[string]string  // governed virtual key -> its owner, as "team <id>", for the logs
-	rateLimitOfKey     map[string]*string // governed virtual key -> the rate limit it links in the store
-	providerConfigKey  map[uint]string    // provider config a budget being written names -> its key
-	modelConfigBudgets map[string]bool    // budgets of model configs scoped to governed keys
-	warnedKeys         map[string]bool    // governed keys already logged
-	// isConfigJSONSourceOfTruth is source_of_truth "config.json", under which nothing is governed.
-	isConfigJSONSourceOfTruth bool
-}
-
-// governedEntitiesInConfig asks which of the teams and customers this reconcile touches are governed by
-// an access profile, and reads the rate limit each one links today.
-//
-// Settled before anything is written, because the writes come in an order that would otherwise decide
-// it too late: the rate-limit rows are saved first, and by the time a governed customer is reached its
-// row would already carry the file's numbers.
-//
-// Two kinds of entity are asked about. The ones the file changed, whose own save must keep the links
-// it has; and the ones that link a rate limit this reconcile is about to write, which a file can edit
-// without touching the entity at all - the row is declared once and referenced by id.
-//
-// The rate-limit reads run inside the caller's transaction, so they see what it has already written.
-// Whether a profile governs an entity is asked of the registered guard, which reads through its own
-// connection; that is safe because this transaction never writes the table it reads.
-//
-// Virtual keys are governed through their owner: a team, business unit or customer holding a profile
-// governs every key under it, and what config.json declares as such a key's own - budgets, rate limits,
-// provider access, model configs - is left unwritten. The profile replaces it, and adopt strips
-// it again, so writing it only leaves rows for the next boot to re-insert by an id every node of a
-// cluster races to insert. A key is asked about when it is saved, or when a rate limit, budget or
-// model config of its own is written; its owner is config.json's when it is saved, the store's
-// otherwise - a move made through the API stands - and config.json's again when it has no row.
-//
-// isConfigJSONSourceOfTruth (source_of_truth "config.json") answers that nothing is governed: the file's limits are
-// the desired state then, so they are applied, and the enterprise reconcile that runs next removes the
-// access profile from every entity the file funds.
-func governedEntitiesInConfig(
-	ctx context.Context,
-	config *Config,
-	tx *gorm.DB,
-	isConfigJSONSourceOfTruth bool,
-	rateLimitsToAdd, rateLimitsToUpdate []configstoreTables.TableRateLimit,
-	customersToAdd, customersToUpdate []configstoreTables.TableCustomer,
-	teamsToAdd, teamsToUpdate []configstoreTables.TableTeam,
-	governanceInConfigJSON *configstore.GovernanceConfig,
-	virtualKeysToAdd, virtualKeysToUpdate []configstoreTables.TableVirtualKey,
-	budgetsToAdd, budgetsToUpdate []configstoreTables.TableBudget,
-	modelConfigsToAdd, modelConfigsToUpdate []configstoreTables.TableModelConfig,
-) (governedConfigEntities, error) {
-	governed := governedConfigEntities{
-		customers:                 map[string]bool{},
-		teams:                     map[string]bool{},
-		rateLimitOfCustomer:       map[string]*string{},
-		rateLimitOfTeam:           map[string]*string{},
-		rateLimits:                map[string]bool{},
-		limitsUnknown:             map[string]bool{},
-		answers:                   map[string]string{},
-		keys:                      map[string]string{},
-		keyOwner:                  map[string]string{},
-		rateLimitOfKey:            map[string]*string{},
-		providerConfigKey:         map[uint]string{},
-		modelConfigBudgets:        map[string]bool{},
-		warnedKeys:                map[string]bool{},
-		isConfigJSONSourceOfTruth: isConfigJSONSourceOfTruth,
-	}
-	if isConfigJSONSourceOfTruth {
-		return governed, nil
-	}
-
-	writing := map[string]bool{}
-	for i := range rateLimitsToAdd {
-		writing[rateLimitsToAdd[i].ID] = true
-	}
-	for i := range rateLimitsToUpdate {
-		writing[rateLimitsToUpdate[i].ID] = true
-	}
-
-	// declaresLimits says whether the warning applies: an entity reached only because a row it links is
-	// being written has limits in the file all the same, but one saved with none does not.
-	customerCandidates := map[string]bool{}
-	for _, customers := range [][]configstoreTables.TableCustomer{customersToAdd, customersToUpdate} {
-		for i := range customers {
-			customerCandidates[customers[i].ID] = len(customers[i].Budgets) > 0 || customers[i].RateLimit != nil || customers[i].BudgetID != nil
-		}
-	}
-	teamCandidates := map[string]bool{}
-	for _, teams := range [][]configstoreTables.TableTeam{teamsToAdd, teamsToUpdate} {
-		for i := range teams {
-			teamCandidates[teams[i].ID] = len(teams[i].Budgets) > 0 || teams[i].RateLimit != nil
-		}
-	}
-	if config.GovernanceConfig != nil {
-		for i := range config.GovernanceConfig.Customers {
-			customer := &config.GovernanceConfig.Customers[i]
-			if customer.RateLimitID != nil && writing[*customer.RateLimitID] {
-				customerCandidates[customer.ID] = true
-			}
-		}
-		for i := range config.GovernanceConfig.Teams {
-			team := &config.GovernanceConfig.Teams[i]
-			if team.RateLimitID != nil && writing[*team.RateLimitID] {
-				teamCandidates[team.ID] = true
-			}
-		}
-	}
-
-	for id, declaresLimits := range customerCandidates {
-		governedBy, rateLimitID, err := governingAccessProfile(ctx, config.ConfigStore, tx, governance.LegacyLimitHolderCustomer, id, declaresLimits)
-		if err != nil {
-			return governedConfigEntities{}, err
-		}
-		governed.answers["customer:"+id] = governedBy
-		if governedBy == "" {
-			continue
-		}
-		governed.customers[id] = true
-		governed.limitsUnknown["customer:"+id] = governedBy == governorUnknown
-		governed.rateLimitOfCustomer[id] = rateLimitID
-		if rateLimitID != nil {
-			governed.rateLimits[*rateLimitID] = true
-		}
-	}
-	for id, declaresLimits := range teamCandidates {
-		governedBy, rateLimitID, err := governingAccessProfile(ctx, config.ConfigStore, tx, governance.LegacyLimitHolderTeam, id, declaresLimits)
-		if err != nil {
-			return governedConfigEntities{}, err
-		}
-		governed.answers["team:"+id] = governedBy
-		if governedBy == "" {
-			continue
-		}
-		governed.teams[id] = true
-		governed.limitsUnknown["team:"+id] = governedBy == governorUnknown
-		governed.rateLimitOfTeam[id] = rateLimitID
-		if rateLimitID != nil {
-			governed.rateLimits[*rateLimitID] = true
-		}
-	}
-
-	var keysInConfigJSON []configstoreTables.TableVirtualKey
-	var modelConfigsInConfigJSON []configstoreTables.TableModelConfig
-	if governanceInConfigJSON != nil {
-		keysInConfigJSON, modelConfigsInConfigJSON = governanceInConfigJSON.VirtualKeys, governanceInConfigJSON.ModelConfigs
-	}
-	savedKeys := slices.Concat(virtualKeysToAdd, virtualKeysToUpdate)
-	budgets := slices.Concat(budgetsToAdd, budgetsToUpdate)
-	// held are the rate limits governed keys hold; holdBackKeyRateLimits settles which stay unwritten.
-	held := map[string]bool{}
-	hold := func(rateLimitID *string) {
-		if rateLimitID != nil && *rateLimitID != "" {
-			held[*rateLimitID] = true
-		}
-	}
-
-	// The keys touched: saved, or linked to a rate limit, budget or model config being written - on the
-	// key, on one of its provider configs, or on a model config scoped to it.
-	candidates := map[string]bool{}
-	for i := range savedKeys {
-		candidates[savedKeys[i].ID] = true
-	}
-	providerConfigOfFile := map[uint]string{}
-	for i := range keysInConfigJSON {
-		vk := &keysInConfigJSON[i]
-		linked := vk.RateLimitID != nil && writing[*vk.RateLimitID]
-		for j := range vk.ProviderConfigs {
-			linked = linked || (vk.ProviderConfigs[j].RateLimitID != nil && writing[*vk.ProviderConfigs[j].RateLimitID])
-			if vk.ProviderConfigs[j].ID != 0 {
-				providerConfigOfFile[vk.ProviderConfigs[j].ID] = vk.ID
-			}
-		}
-		candidates[vk.ID] = candidates[vk.ID] || linked
-	}
-	writingBudget, writingModelConfigBudget := map[string]bool{}, map[string]bool{}
-	var unresolvedProviderConfigs []uint
-	for i := range budgets {
-		writingBudget[budgets[i].ID] = true
-		if budgets[i].VirtualKeyID != nil {
-			candidates[*budgets[i].VirtualKeyID] = true
-		}
-		if budgets[i].ModelConfigID != nil {
-			writingModelConfigBudget[*budgets[i].ModelConfigID] = true
-		}
-		if id := budgets[i].ProviderConfigID; id != nil {
-			if vkID, ok := providerConfigOfFile[*id]; ok {
-				governed.providerConfigKey[*id] = vkID
-			} else {
-				unresolvedProviderConfigs = append(unresolvedProviderConfigs, *id)
-			}
-		}
-	}
-	// A provider config id config.json does not give was assigned by the store: its row names the key.
-	if len(unresolvedProviderConfigs) > 0 {
-		var providerConfigs []configstoreTables.TableVirtualKeyProviderConfig
-		if err := tx.Select("id", "virtual_key_id").Where("id IN ?", unresolvedProviderConfigs).Find(&providerConfigs).Error; err != nil {
-			return governedConfigEntities{}, fmt.Errorf("failed to read the virtual keys of provider configs: %w", err)
-		}
-		for i := range providerConfigs {
-			governed.providerConfigKey[providerConfigs[i].ID] = providerConfigs[i].VirtualKeyID
-		}
-	}
-	for _, vkID := range governed.providerConfigKey {
-		candidates[vkID] = true
-	}
-	writingModelConfig := map[string]bool{}
-	for _, modelConfig := range slices.Concat(modelConfigsToAdd, modelConfigsToUpdate) {
-		writingModelConfig[modelConfig.ID] = true
-	}
-	for i := range modelConfigsInConfigJSON {
-		modelConfig := &modelConfigsInConfigJSON[i]
-		if modelConfig.Scope != configstoreTables.ModelConfigScopeVirtualKey || modelConfig.ScopeID == nil {
-			continue
-		}
-		linked := writingModelConfig[modelConfig.ID] || writingModelConfigBudget[modelConfig.ID] ||
-			(modelConfig.RateLimitID != nil && writing[*modelConfig.RateLimitID])
-		for _, id := range modelConfig.BudgetIDs {
-			linked = linked || writingBudget[id]
-		}
-		candidates[*modelConfig.ScopeID] = candidates[*modelConfig.ScopeID] || linked
-	}
-
-	// Each touched key's owner, and the rate limit it links in the store: config.GovernanceConfig already
-	// carries the file's entry for a key being updated, whose rate limit adopt may have deleted.
-	touched := make([]string, 0, len(candidates))
-	for id, isTouched := range candidates {
-		if isTouched {
-			touched = append(touched, id)
-		}
-	}
-	slices.Sort(touched)
-	stored := map[string]*configstoreTables.TableVirtualKey{}
-	if len(touched) > 0 {
-		var rows []configstoreTables.TableVirtualKey
-		if err := tx.Select("id", "team_id", "customer_id", "rate_limit_id").Where("id IN ?", touched).Find(&rows).Error; err != nil {
-			return governedConfigEntities{}, fmt.Errorf("failed to read the owners of virtual keys: %w", err)
-		}
-		for i := range rows {
-			stored[rows[i].ID] = &rows[i]
-		}
-	}
-	saved, inFile := map[string]*configstoreTables.TableVirtualKey{}, map[string]*configstoreTables.TableVirtualKey{}
-	for i := range savedKeys {
-		saved[savedKeys[i].ID] = &savedKeys[i]
-	}
-	for i := range keysInConfigJSON {
-		inFile[keysInConfigJSON[i].ID] = &keysInConfigJSON[i]
-	}
-	for _, id := range touched {
-		owner := cmp.Or(saved[id], stored[id], inFile[id])
-		if owner == nil {
-			continue
-		}
-		holderKind, holderID := virtualKeyLegacyLimitHolder(owner)
-		if holderKind == "" {
-			continue
-		}
-		governedBy := governed.lookup(ctx, holderKind, holderID)
-		if governedBy == "" {
-			continue
-		}
-		governed.keys[id] = governedBy
-		governed.keyOwner[id] = strings.ReplaceAll(holderKind, "_", " ") + " " + holderID
-		if row := stored[id]; row != nil {
-			governed.rateLimitOfKey[id] = row.RateLimitID
-			hold(row.RateLimitID)
-		}
-		if vk := inFile[id]; vk != nil {
-			hold(vk.RateLimitID)
-			for j := range vk.ProviderConfigs {
-				hold(vk.ProviderConfigs[j].RateLimitID)
-			}
-		}
-	}
-
-	// A model config scoped to a governed key is skipped, and so are the budgets it links through
-	// budget_ids and those naming it by model_config_id, which would be orphaned or fail the foreign key.
-	modelConfigKey := map[string]string{}
-	for i := range modelConfigsInConfigJSON {
-		modelConfig := &modelConfigsInConfigJSON[i]
-		if modelConfig.Scope != configstoreTables.ModelConfigScopeVirtualKey || modelConfig.ScopeID == nil || !governed.isKey(*modelConfig.ScopeID) {
-			continue
-		}
-		modelConfigKey[modelConfig.ID] = *modelConfig.ScopeID
-		hold(modelConfig.RateLimitID)
-		for _, id := range modelConfig.BudgetIDs {
-			governed.modelConfigBudgets[id] = true
-		}
-	}
-	for i := range budgets {
-		if id := budgets[i].ModelConfigID; id != nil && modelConfigKey[*id] != "" && governed.skipKeyLimits(modelConfigKey[*id]) {
-			governed.modelConfigBudgets[budgets[i].ID] = true
-		}
-	}
-	governed.holdBackKeyRateLimits(governanceInConfigJSON, held)
-	return governed, nil
-}
-
-// holdBackKeyRateLimits leaves unwritten each rate limit a governed key holds that nothing else in
-// config.json links. A rate limit is shared by id, so one another owner links stays written: held
-// back, that owner's save would point at a row that was never written.
-func (g *governedConfigEntities) holdBackKeyRateLimits(governanceInConfigJSON *configstore.GovernanceConfig, held map[string]bool) {
-	linkedElsewhere := map[string]bool{}
-	link := func(rateLimitID *string) {
-		if rateLimitID != nil {
-			linkedElsewhere[*rateLimitID] = true
-		}
-	}
-	if governanceInConfigJSON != nil {
-		for i := range governanceInConfigJSON.VirtualKeys {
-			vk := &governanceInConfigJSON.VirtualKeys[i]
-			if g.isKey(vk.ID) {
-				continue
-			}
-			link(vk.RateLimitID)
-			for j := range vk.ProviderConfigs {
-				link(vk.ProviderConfigs[j].RateLimitID)
-			}
-		}
-		for i := range governanceInConfigJSON.Teams {
-			link(governanceInConfigJSON.Teams[i].RateLimitID)
-		}
-		for i := range governanceInConfigJSON.Customers {
-			link(governanceInConfigJSON.Customers[i].RateLimitID)
-		}
-		for i := range governanceInConfigJSON.ModelConfigs {
-			modelConfig := &governanceInConfigJSON.ModelConfigs[i]
-			if modelConfig.Scope != configstoreTables.ModelConfigScopeVirtualKey || modelConfig.ScopeID == nil || !g.isKey(*modelConfig.ScopeID) {
-				link(modelConfig.RateLimitID)
-			}
-		}
-		for i := range governanceInConfigJSON.Providers {
-			link(governanceInConfigJSON.Providers[i].RateLimitID)
-		}
-	}
-	for id := range held {
-		if !linkedElsewhere[id] {
-			g.rateLimits[id] = true
-		}
-	}
-}
-
-// virtualKeyLegacyLimitHolder names the team or customer that owns the key, in the
-// guard's terms, or "" when none does.
-func virtualKeyLegacyLimitHolder(vk *configstoreTables.TableVirtualKey) (holderKind, holderID string) {
-	switch {
-	case vk.TeamID != nil && *vk.TeamID != "":
-		return governance.LegacyLimitHolderTeam, *vk.TeamID
-	case vk.CustomerID != nil && *vk.CustomerID != "":
-		return governance.LegacyLimitHolderCustomer, *vk.CustomerID
-	}
-	return "", ""
-}
-
-// lookup names the profile governing an entity, "" for none, governorUnknown when the guard failed,
-// asking the guard once per entity and recording the answer for the reason answers gives.
-func (g *governedConfigEntities) lookup(ctx context.Context, holderKind, holderID string) string {
-	key := holderKind + ":" + holderID
-	if governedBy, asked := g.answers[key]; asked {
-		return governedBy
-	}
-	governedBy, err := governance.LegacyLimitsGovernedBy(ctx, holderKind, holderID)
-	if err != nil {
-		logger.Error("could not check whether %s %s is governed by an access profile, so its limits from config.json are skipped this boot: %v", holderKind, holderID, err)
-		governedBy = governorUnknown
-	}
-	g.answers[key] = governedBy
-	return governedBy
-}
-
-// isKey reports whether a profile governs the virtual key through its owner.
-func (g *governedConfigEntities) isKey(vkID string) bool {
-	_, ok := g.keys[vkID]
-	return ok
-}
-
-// skipKeyLimits reports whether what config.json declares as this key's own must be left unwritten,
-// logging once per key.
-func (g *governedConfigEntities) skipKeyLimits(vkID string) bool {
-	governedBy, ok := g.keys[vkID]
-	if !ok || g.warnedKeys[vkID] {
-		return ok
-	}
-	g.warnedKeys[vkID] = true
-	if governedBy == governorUnknown {
-		logger.Error("the budgets, rate limit, provider access and model configs virtual key %q carries in config.json are skipped this boot: whether an access profile governs %s is unknown", vkID, g.keyOwner[vkID])
-	} else {
-		logger.Warn("virtual key %q in config.json carries budgets, a rate limit, provider access or model configs of its own, but %s holds access profile %q, which governs its keys: they are not applied. Take them out of the key's entry in config.json.", vkID, g.keyOwner[vkID], governedBy)
-	}
-	return true
-}
-
-// skipKeyUpdate reports whether a changed key's entry must not be applied at all, because whether a
-// profile governs it could not be checked: saving any of it would guess at the key's access. Its
-// stored hash still differs from the file's, so the next boot retries the whole entry.
-func (g *governedConfigEntities) skipKeyUpdate(vkID string) bool {
-	if g.keys[vkID] != governorUnknown {
-		return false
-	}
-	g.warnedKeys[vkID] = true
-	logger.Error("virtual key %q in config.json is not applied this boot: whether an access profile governs %s could not be checked, so the key is left as stored and the next restart retries it", vkID, g.keyOwner[vkID])
-	return true
-}
-
-// skipModelConfig reports whether a model config scoped to a governed key must be left unwritten.
-func (g *governedConfigEntities) skipModelConfig(modelConfig *configstoreTables.TableModelConfig) bool {
-	return modelConfig.Scope == configstoreTables.ModelConfigScopeVirtualKey && modelConfig.ScopeID != nil && g.skipKeyLimits(*modelConfig.ScopeID)
-}
-
-// skipProviderConfigBudget reports whether a budget declared with provider_config_id belongs to a
-// governed key's provider config.
-func (g *governedConfigEntities) skipProviderConfigBudget(providerConfigID uint) bool {
-	vkID, ok := g.providerConfigKey[providerConfigID]
-	return ok && g.skipKeyLimits(vkID)
-}
-
-// governorUnknown stands in for the governing profile's name when the lookup failed, so the entity is
-// handled as governed without a name to report.
-const governorUnknown = "(unknown: the lookup failed)"
-
-// governingAccessProfile names the access profile that governs a team or customer, and gives back the
-// rate limit that entity links today so the caller can save the row with what it has.
-//
-// Governed means an access profile is attached to the entity: the profile's budgets and rate limits
-// then cover every key under it, and the entity is not allowed limits of its own as well. governedBy
-// is empty when no profile is attached, and the caller then applies config.json as usual.
-//
-// The saves write every column, so applying the file's values would give the entity a second cap, and
-// blanking them would delete what it already has; answering with the stored link leaves the row as it
-// stands. warn says whether config.json actually declares limits for this entity, which is what the
-// operator has to clear.
-//
-// A lookup that fails is treated as governed for this boot: the entity's limits are skipped and an
-// error is logged. Writing them could put a second cap beside a profile, and stopping startup over a
-// rare database error would cost more than one boot without a budget edit, which the next restart
-// applies.
-func governingAccessProfile(ctx context.Context, store configstore.ConfigStore, tx *gorm.DB, holderKind, id string, warn bool) (governedBy string, rateLimitID *string, err error) {
-	governedBy, err = governance.LegacyLimitsGovernedBy(ctx, holderKind, id)
-	if err != nil {
-		logger.Error("could not check whether %s %s is governed by an access profile, so its limits from config.json are skipped this boot: %v", holderKind, id, err)
-		governedBy = governorUnknown
-		warn = false
-	}
-	if governedBy == "" {
-		return "", nil, nil
-	}
-	switch holderKind {
-	case governance.LegacyLimitHolderTeam:
-		team, err := store.GetTeam(ctx, id, tx)
-		if errors.Is(err, configstore.ErrNotFound) {
-			// The file is creating the entity in this same transaction, so it links nothing yet.
-			return governedBy, nil, nil
-		}
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to read team %s before applying its limits: %w", id, err)
-		}
-		rateLimitID = team.RateLimitID
-	case governance.LegacyLimitHolderCustomer:
-		customer, err := store.GetCustomer(ctx, id, tx)
-		if errors.Is(err, configstore.ErrNotFound) {
-			return governedBy, nil, nil
-		}
-		if err != nil {
-			return "", nil, fmt.Errorf("failed to read customer %s before applying its limits: %w", id, err)
-		}
-		rateLimitID = customer.RateLimitID
-	default:
-		return "", nil, fmt.Errorf("cannot read the limits of %q %s: not a legacy limit holder", holderKind, id)
-	}
-	if warn {
-		logger.Warn("config.json declares limits for %s %s, which is governed by access profile %q: they are not applied, since an entity cannot have both. Edit the profile, or remove the limits from config.json.", holderKind, id, governedBy)
-	}
-	return governedBy, rateLimitID, nil
-}
-
-// skipBudget reports whether a budget declared in config.json must be left unwritten because an access
-// profile already governs the team or customer that owns it: the two would be caps on the same keys.
-//
-// It is skipped with a warning rather than refused, because a config file left declaring a budget for
-// an entity since moved onto a profile is stale, not broken, and the rest of the file should still
-// apply. A lookup that fails skips the budget too, with an error logged, for the reason
-// governingAccessProfile gives.
-//
-// The owner is looked up at most once per reconcile: the answer governedEntitiesInConfig recorded for
-// it is reused, and an owner it did not ask about - one whose budget changed while the entity itself
-// did not - is asked here and recorded. Two lookups could disagree, and either way round that breaks
-// something: a failed second one skips a budget its owner was just saved as having, and a successful
-// second one writes a budget its owner was just held back from.
-//
-// Under isConfigJSONSourceOfTruth (source_of_truth "config.json") nothing is skipped, for the reason
-// governedEntitiesInConfig gives.
-func (g *governedConfigEntities) skipBudget(ctx context.Context, holderKind string, holderID *string, budgetID string) bool {
-	if g.isConfigJSONSourceOfTruth || holderID == nil || *holderID == "" {
-		return false
-	}
-	switch governedBy := g.lookup(ctx, holderKind, *holderID); governedBy {
-	case "":
-		return false
-	case governorUnknown:
-		logger.Error("budget %s from config.json is skipped this boot: whether an access profile governs %s %s is unknown", budgetID, holderKind, *holderID)
-	default:
-		logger.Warn("config.json declares a budget for %s %s, which is governed by access profile %q: the budget is skipped, since an entity cannot have both. Edit the profile, or remove the budget from config.json.", holderKind, *holderID, governedBy)
-	}
-	return true
 }
 
 // RedactURLCredentials masks the parts of a URL (spec_url, base_url) that can carry a

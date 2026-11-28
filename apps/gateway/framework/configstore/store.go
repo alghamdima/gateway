@@ -45,9 +45,8 @@ type ModelConfigsQueryParams struct {
 	Scope string
 	// Scopes optionally filters to one or more exact scope values. Several values
 	// are OR-ed, which lets a UI present one filter option covering scopes a user
-	// thinks of as the same thing — e.g. rows scoped to a user directly and rows
-	// materialized onto them from an access profile. Empty (with Scope also empty)
-	// means no scope filter.
+	// thinks of as the same thing. Empty (with Scope also empty) means no scope
+	// filter.
 	Scopes   []string
 	ScopeID  string // optional; filters to an exact scope target (e.g. a virtual key or user ID)
 	Provider string // optional; filters to an exact provider value (e.g. "openai")

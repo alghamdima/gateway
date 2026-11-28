@@ -2,7 +2,6 @@ package governance
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"sync"
@@ -1704,8 +1703,7 @@ func ptrInt64(i int64) *int64 {
 	return &i
 }
 
-// A downstream consumer's (e.g. an access profile's) per-model budgets materialise
-// as virtual-key-scoped model configs naming one model and provider. A batch create
+// Per-model budgets live on virtual-key-scoped model configs naming one model and provider. A batch create
 // carries no top-level model, so the in-flight collection matches only the wildcard
 // tiers and those per-model budgets are invisible to it — which is why batch spend
 // never reached them. Settlement knows the models and asks for them by name.
@@ -1732,19 +1730,19 @@ func TestCollectModelScopedGovernanceIDs_FindsExactModelConfigMissedAtCreateTime
 	require.NoError(t, err)
 
 	// What settlement sees: the model is known, so the per-model budget is reachable.
-	atSettlement, _ := store.CollectModelScopedGovernanceIDs(ctx, vkID, "", schemas.ModelProvider(providerName), "gpt-5")
+	atSettlement, _ := store.CollectModelScopedGovernanceIDs(ctx, vkID, schemas.ModelProvider(providerName), "gpt-5")
 	assert.Contains(t, atSettlement, perModel.ID)
 	// The wildcard is returned too and overlaps the in-flight set by design; callers
 	// subtract what they already charged rather than relying on it being absent.
 	assert.Contains(t, atSettlement, wildcard.ID)
 
 	// A model with no config of its own still finds the wildcard and nothing else.
-	otherModel, _ := store.CollectModelScopedGovernanceIDs(ctx, vkID, "", schemas.ModelProvider(providerName), "gpt-4o")
+	otherModel, _ := store.CollectModelScopedGovernanceIDs(ctx, vkID, schemas.ModelProvider(providerName), "gpt-4o")
 	assert.NotContains(t, otherModel, perModel.ID)
 	assert.Contains(t, otherModel, wildcard.ID)
 
 	// Scope isolation: another virtual key's id must not reach these configs.
-	otherVK, _ := store.CollectModelScopedGovernanceIDs(ctx, "vk-bob", "", schemas.ModelProvider(providerName), "gpt-5")
+	otherVK, _ := store.CollectModelScopedGovernanceIDs(ctx, "vk-bob", schemas.ModelProvider(providerName), "gpt-5")
 	assert.Empty(t, otherVK)
 }
 
@@ -2085,84 +2083,6 @@ func TestGetBudgetAndRateLimitStatusReachesEverySource(t *testing.T) {
 	})
 }
 
-// TestModelConfigScopesForIgnoresExtraScopedIDsResolvers pins #6724's contract: one permit selects
-// exactly one scope, and registered resolvers are not folded in here. Callers wanting an extra
-// scope enforced ask for it by name via ScopedModelLimits / ProviderScopedModelLimitsInScope.
-func TestModelConfigScopesForIgnoresExtraScopedIDsResolvers(t *testing.T) {
-	extraScopedIDsResolversMu.Lock()
-	saved := extraScopedIDsResolvers
-	extraScopedIDsResolvers = nil
-	extraScopedIDsResolversMu.Unlock()
-	t.Cleanup(func() {
-		extraScopedIDsResolversMu.Lock()
-		extraScopedIDsResolvers = saved
-		extraScopedIDsResolversMu.Unlock()
-	})
-
-	RegisterExtraScopedIDsResolver(func(_ context.Context, _, _ string) []ScopedID {
-		return []ScopedID{
-			{Scope: "batch_only", ScopeID: "b-1"}, // Kind deliberately empty
-			{Scope: "with_kind", ScopeID: "w-1", Kind: grant.LimitHolderModelConfig},
-		}
-	})
-
-	scopes := modelConfigScopesFor(nil)
-
-	require.Len(t, scopes, 1, "a nil permit selects the deployment's global scope and nothing else")
-	assert.Equal(t, configstoreTables.ModelConfigScopeGlobal, scopes[0].name)
-	assert.Equal(t, grant.LimitHolderModelConfig, scopes[0].kind)
-	for _, s := range scopes {
-		assert.NotEqual(t, "batch_only", s.name, "a resolver-supplied scope must not reach request-time enforcement here")
-		assert.NotEqual(t, "with_kind", s.name, "a resolver-supplied scope must not reach request-time enforcement here")
-	}
-}
-
-// With no guard registered - every OSS build - nothing is governed and nothing is refused, whatever
-// is asked about.
-func TestLegacyLimitsGovernedByAnswersNothingWhenUnregistered(t *testing.T) {
-	governedBy, err := LegacyLimitsGovernedBy(context.Background(), LegacyLimitHolderTeam, "team-1")
-	require.NoError(t, err)
-	assert.Empty(t, governedBy)
-}
-
-// A registered guard is asked about the entity in hand, and its answer - a name, nothing, or a
-// failure - is what callers act on.
-func TestLegacyLimitsGovernedByUsesTheRegisteredGuard(t *testing.T) {
-	t.Cleanup(func() { RegisterLegacyLimitGuard(nil) })
-
-	var askedKind, askedID string
-	RegisterLegacyLimitGuard(func(_ context.Context, holderKind, holderID string) (string, error) {
-		askedKind, askedID = holderKind, holderID
-		if holderID == "customer-governed" {
-			return "platform-access", nil
-		}
-		if holderID == "customer-unknowable" {
-			return "", errors.New("database unavailable")
-		}
-		return "", nil
-	})
-
-	governedBy, err := LegacyLimitsGovernedBy(context.Background(), LegacyLimitHolderCustomer, "customer-governed")
-	require.NoError(t, err)
-	assert.Equal(t, "platform-access", governedBy)
-	assert.Equal(t, LegacyLimitHolderCustomer, askedKind)
-	assert.Equal(t, "customer-governed", askedID)
-
-	governedBy, err = LegacyLimitsGovernedBy(context.Background(), LegacyLimitHolderTeam, "team-free")
-	require.NoError(t, err)
-	assert.Empty(t, governedBy, "an entity nothing governs keeps its own budgets")
-
-	_, err = LegacyLimitsGovernedBy(context.Background(), LegacyLimitHolderCustomer, "customer-unknowable")
-	require.Error(t, err, "an unanswerable question is an error, not a silent yes")
-
-	// An empty id is nobody: the guard is not asked, so a caller with no owner in hand writes as usual.
-	askedID = ""
-	governedBy, err = LegacyLimitsGovernedBy(context.Background(), LegacyLimitHolderTeam, "")
-	require.NoError(t, err)
-	assert.Empty(t, governedBy)
-	assert.Empty(t, askedID, "the guard must not be asked about an entity with no id")
-}
-
 // modelKeyStore builds a store over the given model configs with the offline pricing catalog, so
 // base-model aliasing ("gpt-4o-2024-08-06" is a "gpt-4o") is live the way it is in a deployment.
 func modelKeyStore(t *testing.T, mcs ...*configstoreTables.TableModelConfig) *LocalGovernanceStore {
@@ -2423,7 +2343,7 @@ func TestGovernanceStore_CollectModelConfigsForKeyAliases(t *testing.T) {
 		store.inMemoryStore = &mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{
 			schemas.Bedrock: {Keys: []schemas.Key{{Models: anyModel, Aliases: schemas.KeyAliases{"claude-sonnet": {ModelID: sonnet}}}}},
 		}}
-		budgetIDs, _ := store.CollectModelScopedGovernanceIDs(ctx, vkID, "", schemas.Bedrock, "claude-sonnet")
+		budgetIDs, _ := store.CollectModelScopedGovernanceIDs(ctx, vkID, schemas.Bedrock, "claude-sonnet")
 		assert.Equal(t, []string{"b-vk-sonnet"}, budgetIDs)
 	})
 	t.Run("a store that cannot see provider config leaves the lookup as it was", func(t *testing.T) {
@@ -2495,9 +2415,9 @@ func TestGovernanceStore_CollectModelConfigsForKeyAliases(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, budgets, "the name runs as written, so the target's limit does not apply")
 
-		sonnetBudgets, _ := store.CollectModelScopedGovernanceIDs(normal, "", "", schemas.Bedrock, "claude-opus-4-6")
+		sonnetBudgets, _ := store.CollectModelScopedGovernanceIDs(normal, "", schemas.Bedrock, "claude-opus-4-6")
 		assert.Equal(t, []string{"b-sonnet-cfg"}, sonnetBudgets)
-		sonnetBudgets, _ = store.CollectModelScopedGovernanceIDs(literal, "", "", schemas.Bedrock, "claude-opus-4-6")
+		sonnetBudgets, _ = store.CollectModelScopedGovernanceIDs(literal, "", schemas.Bedrock, "claude-opus-4-6")
 		assert.Empty(t, sonnetBudgets)
 	})
 }
@@ -2551,7 +2471,7 @@ func TestGovernanceStore_KeyAliasTargetsResolvedOncePerAttempt(t *testing.T) {
 	})
 	t.Run("CollectModelScopedGovernanceIDs", func(t *testing.T) {
 		counting.single = 0
-		budgetIDs, _ := store.CollectModelScopedGovernanceIDs(ctx, "vk-a", "", schemas.Bedrock, "claude-sonnet")
+		budgetIDs, _ := store.CollectModelScopedGovernanceIDs(ctx, "vk-a", schemas.Bedrock, "claude-sonnet")
 		assert.ElementsMatch(t, []string{"b-global-sonnet", "b-vk-a-sonnet"}, budgetIDs)
 		assert.Equal(t, 1, counting.single)
 	})
@@ -3100,16 +3020,4 @@ func TestGovernanceStore_ResetDoesNotRevertAConcurrentTeamEdit(t *testing.T) {
 	final := got.(*configstoreTables.TableTeam)
 	assert.Equal(t, "customer-b", *final.CustomerID, "the edit is kept")
 	assert.Zero(t, final.Budgets[0].CurrentUsage, "and the reset still applies")
-}
-
-// RegisterExtraScopedIDsResolver adds fn to the resolvers consulted by
-// CollectModelScopedGovernanceIDs. Intended to be called once at process
-// startup; safe to call concurrently.
-func RegisterExtraScopedIDsResolver(fn ExtraScopedIDsResolver) {
-	if fn == nil {
-		return
-	}
-	extraScopedIDsResolversMu.Lock()
-	extraScopedIDsResolvers = append(extraScopedIDsResolvers, fn)
-	extraScopedIDsResolversMu.Unlock()
 }

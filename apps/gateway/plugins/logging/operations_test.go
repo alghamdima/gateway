@@ -3246,7 +3246,7 @@ func TestStartBatchAccountingSweeperAfterCleanupIsRefused(t *testing.T) {
 
 // The batch job row is the only durable record of who to bill: settlement can run
 // hours later from a sweeper with no request context. A virtual key alone is not
-// enough — an access profile shares one across users — so the user, team, customer
+// enough — several members can share one — so the user, team, customer
 // and the creating log row must all be captured at create time.
 func TestRecordBatchJobLifecycle_CreatePersistsRequesterIdentity(t *testing.T) {
 	store := newTestStore(t)

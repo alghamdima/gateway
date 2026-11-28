@@ -353,7 +353,6 @@ import (
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/framework/vectorstore"
-	"github.com/maximhq/bifrost/plugins/governance"
 	otelPlugin "github.com/maximhq/bifrost/plugins/otel"
 	"github.com/maximhq/bifrost/plugins/routing/complexity"
 	"github.com/stretchr/testify/assert"
@@ -10912,116 +10911,6 @@ func TestSQLite_Customer_NewFromFile(t *testing.T) {
 	t.Log("✓ New customer from file added to DB with hash")
 }
 
-// A customer an access profile governs keeps the budgets it already has, whatever config.json still
-// declares for it. The file is stale, not authoritative, and every path that would write over those
-// rows - the inline reconcile, the budget_id link, and the unlink the file's silence would trigger -
-// has to leave them alone.
-func TestSQLite_Customer_GovernedByProfileKeepsItsStoredBudgets(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-
-	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-	configData.Governance = &configstore.GovernanceConfig{
-		Customers: []tables.TableCustomer{
-			{ID: "customer-1", Name: "Test Customer", Budgets: []tables.TableBudget{
-				{ID: "customer-1-budget", MaxLimit: 100, ResetDuration: "1M"},
-			}},
-		},
-	}
-	createConfigFile(t, tempDir, configData)
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	config1.Close(ctx)
-
-	// From here on an access profile governs the customer, the way the enterprise build reports it.
-	governance.RegisterLegacyLimitGuard(func(_ context.Context, holderKind, holderID string) (string, error) {
-		if holderKind == governance.LegacyLimitHolderCustomer && holderID == "customer-1" {
-			return "Finance Cap", nil
-		}
-		return "", nil
-	})
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	// The file changes - a new budget declared for the same customer, and the customer itself edited so
-	// the reconcile takes the update path.
-	configData.Governance.Customers[0].Name = "Renamed Customer"
-	configData.Governance.Customers[0].Budgets = []tables.TableBudget{
-		{ID: "customer-1-budget-from-file", MaxLimit: 999, ResetDuration: "1M"},
-	}
-	createConfigFile(t, tempDir, configData)
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-
-	var stored tables.TableBudget
-	require.NoError(t, config2.ConfigStore.DB().Where("id = ?", "customer-1-budget").First(&stored).Error,
-		"the budget the customer already had was deleted while a profile governed it")
-	require.NotNil(t, stored.CustomerID, "the stored budget was unlinked from the customer it belongs to")
-	assert.Equal(t, "customer-1", *stored.CustomerID)
-
-	var fromFile int64
-	require.NoError(t, config2.ConfigStore.DB().Model(&tables.TableBudget{}).
-		Where("id = ?", "customer-1-budget-from-file").Count(&fromFile).Error)
-	assert.Zero(t, fromFile, "config.json's budget was applied to a customer an access profile governs")
-}
-
-// The rate-limit rows are written before the customers that link them, so a governed customer's row
-// has to be known to be off-limits before the file's version of it is applied.
-func TestSQLite_Customer_GovernedByProfileKeepsItsStoredRateLimit(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-
-	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-	configData.Governance = &configstore.GovernanceConfig{
-		RateLimits: []tables.TableRateLimit{
-			{ID: "customer-1-rl", TokenMaxLimit: int64Ptr(1000), TokenResetDuration: stringPtr("1m")},
-		},
-		Customers: []tables.TableCustomer{
-			{ID: "customer-1", Name: "Test Customer", RateLimitID: stringPtr("customer-1-rl")},
-		},
-	}
-	createConfigFile(t, tempDir, configData)
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(func(_ context.Context, holderKind, holderID string) (string, error) {
-		if holderKind == governance.LegacyLimitHolderCustomer && holderID == "customer-1" {
-			return "Finance Cap", nil
-		}
-		return "", nil
-	})
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	// The file raises the cap on the row the governed customer links.
-	configData.Governance.RateLimits[0].TokenMaxLimit = int64Ptr(999999)
-	createConfigFile(t, tempDir, configData)
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-
-	var stored tables.TableRateLimit
-	require.NoError(t, config2.ConfigStore.DB().Where("id = ?", "customer-1-rl").First(&stored).Error)
-	require.NotNil(t, stored.TokenMaxLimit)
-	assert.EqualValues(t, 1000, *stored.TokenMaxLimit,
-		"config.json's rate limit was written onto the row a governed customer links")
-}
-
-// migratedTeamGuard answers the way the enterprise build does once team-1 has been migrated onto an
-// access profile, and nothing else is governed.
-func migratedTeamGuard(_ context.Context, holderKind, holderID string) (string, error) {
-	if holderKind == governance.LegacyLimitHolderTeam && holderID == "team-1" {
-		return "Engineering Baseline", nil
-	}
-	return "", nil
-}
-
 // teamBudgetConfig declares team-1 funded by a budget in governance.budgets, the shape a migration
 // leaves behind in a file nobody edited.
 func teamBudgetConfig(tempDir string, maxLimit float64) *ConfigData {
@@ -11044,129 +10933,10 @@ func countBudget(t *testing.T, config *Config, id string) (bool, float64) {
 	return budget.ID != "", budget.MaxLimit
 }
 
-// TestConfigStoreReadyHook_RunsBeforeGovernanceIsWritten: the hook gets the store LoadConfig opened,
-// before any governance row from the file exists, which is what lets a guard it installs govern the
-// reconcile that follows.
-func TestConfigStoreReadyHook_RunsBeforeGovernanceIsWritten(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 100))
-
-	calls := 0
-	teamsAtHook := int64(-1)
-	RegisterConfigStoreReadyHook(func(ctx context.Context, store configstore.ConfigStore) {
-		calls++
-		require.NoError(t, store.DB().Model(&tables.TableTeam{}).Count(&teamsAtHook).Error)
-	})
-	defer RegisterConfigStoreReadyHook(nil)
-
-	ctx := context.Background()
-	config, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config.Close(ctx)
-
-	assert.Equal(t, 1, calls)
-	assert.Zero(t, teamsAtHook, "the hook ran after the file's teams were written")
-}
-
-// TestSQLite_Team_MigratedToProfile_SplitDoesNotRecreateItsBudget: a migration deletes the team's
-// budget; a split-mode restart on the unchanged file must not bring it back on top of the profile.
-func TestSQLite_Team_MigratedToProfile_SplitDoesNotRecreateItsBudget(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 100))
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	exists, _ := countBudget(t, config1, "team-1-budget")
-	require.True(t, exists)
-	// What the enterprise migration does to the legacy budget.
-	require.NoError(t, config1.ConfigStore.DB().Where("id = ?", "team-1-budget").Delete(&tables.TableBudget{}).Error)
-	config1.Close(ctx)
-
-	RegisterConfigStoreReadyHook(func(context.Context, configstore.ConfigStore) {
-		governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	})
-	defer RegisterConfigStoreReadyHook(nil)
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-	exists, _ = countBudget(t, config2, "team-1-budget")
-	assert.False(t, exists, "the budget the migration replaced came back alongside the profile")
-}
-
-// TestSQLite_Team_MigratedToProfile_SplitSkipsAnEditedBudget: editing the old budget in the file does
-// not apply it to a team a profile governs.
-func TestSQLite_Team_MigratedToProfile_SplitSkipsAnEditedBudget(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 100))
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	defer governance.RegisterLegacyLimitGuard(nil)
-	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 999))
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-	_, limit := countBudget(t, config2, "team-1-budget")
-	assert.EqualValues(t, 100, limit, "the edited budget was applied to a team an access profile governs")
-}
-
-// TestSQLite_Team_MigratedToProfile_SplitRewriteSkipsItsInlineBudgets: a split-mode restart that
-// rewrites a governed team's entry - here a new inline budget id - saves the team without the inline
-// budgets, which the save would otherwise write as the team's own beside the profile.
-func TestSQLite_Team_MigratedToProfile_SplitRewriteSkipsItsInlineBudgets(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	teamWithInlineBudget := func(budgetID string) *ConfigData {
-		configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-		configData.Governance = &configstore.GovernanceConfig{
-			Teams: []tables.TableTeam{{ID: "team-1", Name: "Team One", Budgets: []tables.TableBudget{
-				{ID: budgetID, MaxLimit: 100, ResetDuration: "1M"},
-			}}},
-		}
-		return configData
-	}
-	createConfigFile(t, tempDir, teamWithInlineBudget("team-1-inline"))
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	exists, _ := countBudget(t, config1, "team-1-inline")
-	require.True(t, exists)
-	// What the enterprise migration does to the legacy budget.
-	require.NoError(t, config1.ConfigStore.DB().Where("id = ?", "team-1-inline").Delete(&tables.TableBudget{}).Error)
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	defer governance.RegisterLegacyLimitGuard(nil)
-	createConfigFile(t, tempDir, teamWithInlineBudget("team-1-inline-2"))
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-	for _, id := range []string{"team-1-inline", "team-1-inline-2"} {
-		exists, _ = countBudget(t, config2, id)
-		assert.False(t, exists, "inline budget %s was written beside the profile governing the team", id)
-	}
-	var team tables.TableTeam
-	require.NoError(t, config2.ConfigStore.DB().Where("id = ?", "team-1").First(&team).Error)
-	assert.NotEmpty(t, team.ConfigHash, "the rest of the entry still applies, hash and all")
-}
-
-// TestSQLite_UngovernedTeam_InlineLimitsApplyOnUpdate: when the file changes an ungoverned team's
+// TestSQLite_Team_InlineLimitsApplyOnUpdate: when the file changes a team's
 // inline budget and rate limit, the update writes them, as the first load did. Both are saved with
 // the team row, so the team save must keep saving those associations.
-func TestSQLite_UngovernedTeam_InlineLimitsApplyOnUpdate(t *testing.T) {
+func TestSQLite_Team_InlineLimitsApplyOnUpdate(t *testing.T) {
 	initTestLogger()
 	tempDir := createTempDir(t)
 	withLimits := func(suffix string) *ConfigData {
@@ -11197,17 +10967,16 @@ func TestSQLite_UngovernedTeam_InlineLimitsApplyOnUpdate(t *testing.T) {
 	assert.Equal(t, "team-rl-b", *team.RateLimitID, "the team's new inline rate limit was written and linked")
 }
 
-// governedKeyConfig declares team-1 owning key vk-1, which carries a budget in governance.budgets, a
-// rate limit in governance.rate_limits and a provider config of its own: the shape a file keeps after
-// an access profile is attached to the team.
-func governedKeyConfig(tempDir string) *ConfigData {
+// teamKeyConfig declares team-1 owning key vk-1, which carries a budget in governance.budgets, a
+// rate limit in governance.rate_limits and a provider config of its own.
+func teamKeyConfig(tempDir string) *ConfigData {
 	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
 	configData.Governance = &configstore.GovernanceConfig{
 		Teams: []tables.TableTeam{{ID: "team-1", Name: "Team One"}},
 		VirtualKeys: []tables.TableVirtualKey{{
 			ID:                "vk-1",
 			Name:              "k1",
-			Value:             *schemas.NewSecretVar("sk-bf-governed-key-1"),
+			Value:             *schemas.NewSecretVar("sk-bf-team-key-1"),
 			IsActive:          schemas.Ptr(true),
 			TeamID:            stringPtr("team-1"),
 			RateLimitID:       stringPtr("rl-vk-1"),
@@ -11226,9 +10995,9 @@ func governedKeyConfig(tempDir string) *ConfigData {
 	return configData
 }
 
-// governedKeyRows reads back what vk-1 holds of its own: its row, its budget and rate limit, and how
+// teamKeyRows reads back what vk-1 holds of its own: its row, its budget and rate limit, and how
 // many provider configs it has.
-func governedKeyRows(t *testing.T, config *Config) (vk tables.TableVirtualKey, budgetExists, rateLimitExists bool, providerConfigs int64) {
+func teamKeyRows(t *testing.T, config *Config) (vk tables.TableVirtualKey, budgetExists, rateLimitExists bool, providerConfigs int64) {
 	t.Helper()
 	db := config.ConfigStore.DB()
 	require.NoError(t, db.Where("id = ?", "vk-1").First(&vk).Error)
@@ -11237,116 +11006,6 @@ func governedKeyRows(t *testing.T, config *Config) (vk tables.TableVirtualKey, b
 	require.NoError(t, db.Model(&tables.TableRateLimit{}).Where("id = ?", "rl-vk-1").Count(&rateLimits).Error)
 	require.NoError(t, db.Model(&tables.TableVirtualKeyProviderConfig{}).Where("virtual_key_id = ?", "vk-1").Count(&providerConfigs).Error)
 	return vk, budgetExists, rateLimits > 0, providerConfigs
-}
-
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_SplitDoesNotRecreateItsLimits: attaching a profile to
-// the team adopts its keys, deleting what each key had of its own. A split-mode restart on the unchanged
-// file must not bring the budget and rate limit back: the key's entry is unchanged, so only those rows
-// would be re-added, by an id every node of a cluster then races to insert, and the losers refuse to
-// boot on the duplicate.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_SplitDoesNotRecreateItsLimits(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, governedKeyConfig(tempDir))
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	_, budgetExists, rateLimitExists, providerConfigs := governedKeyRows(t, config1)
-	require.True(t, budgetExists)
-	require.True(t, rateLimitExists)
-	require.EqualValues(t, 1, providerConfigs)
-	// What adopting the key into the team's profile does to the key's own limits.
-	adoptGovernedKey(t, config1, "rl-vk-1")
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-	vk, budgetExists, rateLimitExists, providerConfigs := governedKeyRows(t, config2)
-	assert.False(t, budgetExists, "the budget the profile replaced came back on the key")
-	assert.False(t, rateLimitExists, "the rate limit the profile replaced came back")
-	assert.Nil(t, vk.RateLimitID)
-	assert.Zero(t, keyTiers(t, config2, "vk-1"), "the tier the key's limits live on came back")
-	assert.Zero(t, providerConfigs, "the provider access the profile replaced came back")
-	assert.False(t, vk.AllowAllProviders)
-}
-
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_SplitCreatesItBare: a key the file adds under a team a
-// profile already governs is created with nothing of its own, the state an adopt leaves a key in, and
-// the rest of its entry still applies.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_SplitCreatesItBare(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, governedKeyConfig(tempDir))
-
-	RegisterConfigStoreReadyHook(func(context.Context, configstore.ConfigStore) {
-		governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	})
-	defer RegisterConfigStoreReadyHook(nil)
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	ctx := context.Background()
-	config, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config.Close(ctx)
-	vk, budgetExists, rateLimitExists, providerConfigs := governedKeyRows(t, config)
-	assert.Equal(t, "k1", vk.Name)
-	assert.NotEmpty(t, vk.ConfigHash, "the rest of the entry still applies, hash and all")
-	assert.False(t, budgetExists, "config.json's budget was applied to a key its owner's profile governs")
-	assert.False(t, rateLimitExists, "config.json's rate limit was applied to a key its owner's profile governs")
-	assert.Nil(t, vk.RateLimitID)
-	assert.Zero(t, providerConfigs)
-	assert.False(t, vk.AllowAllProviders)
-}
-
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_ConfigJSONAppliesItsLimits: under source_of_truth
-// config.json the file's limits are the desired state, and the enterprise reconcile that follows
-// removes the profile the file does not declare, so the key's own limits are written as usual.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_ConfigJSONAppliesItsLimits(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	configData := governedKeyConfig(tempDir)
-	configData.SourceOfTruth = SourceOfTruthConfigJSON
-	createConfigFile(t, tempDir, configData)
-
-	RegisterConfigStoreReadyHook(func(context.Context, configstore.ConfigStore) {
-		governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	})
-	defer RegisterConfigStoreReadyHook(nil)
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	ctx := context.Background()
-	config, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config.Close(ctx)
-	vk, budgetExists, rateLimitExists, providerConfigs := governedKeyRows(t, config)
-	assert.True(t, budgetExists)
-	assert.True(t, rateLimitExists)
-	tierRateLimit := keyTierRateLimit(t, config, "vk-1")
-	require.NotNil(t, tierRateLimit)
-	assert.Equal(t, "rl-vk-1", *tierRateLimit)
-	assert.EqualValues(t, 1, providerConfigs)
-	assert.True(t, vk.AllowAllProviders)
-}
-
-// adoptGovernedKey does to vk-1 what adopting it into its team's profile does: strips the provider
-// configs, the budget, the model configs and the rate limits the key had of its own.
-func adoptGovernedKey(t *testing.T, config *Config, rateLimitIDs ...string) {
-	t.Helper()
-	db := config.ConfigStore.DB()
-	require.NoError(t, db.Model(&tables.TableVirtualKey{}).Where("id = ?", "vk-1").
-		Updates(map[string]any{"rate_limit_id": nil, "allow_all_providers": false}).Error)
-	require.NoError(t, db.Where("virtual_key_id = ?", "vk-1").Delete(&tables.TableBudget{}).Error)
-	require.NoError(t, db.Where("id = ?", "vk-1-budget").Delete(&tables.TableBudget{}).Error)
-	require.NoError(t, db.Where("virtual_key_id = ?", "vk-1").Delete(&tables.TableVirtualKeyProviderConfig{}).Error)
-	require.NoError(t, db.Where("scope = ? AND scope_id = ?", tables.ModelConfigScopeVirtualKey, "vk-1").Delete(&tables.TableModelConfig{}).Error)
-	if len(rateLimitIDs) > 0 {
-		require.NoError(t, db.Where("id IN ?", rateLimitIDs).Delete(&tables.TableRateLimit{}).Error)
-	}
 }
 
 // keyTierRateLimit gives the rate limit the key's all-models tier carries, nil when it has no tier or
@@ -11372,15 +11031,6 @@ func keyTierRateLimitTier(t *testing.T, config *Config, vkID string) string {
 	return mc.ID
 }
 
-// keyTiers counts the model configs scoped to the key.
-func keyTiers(t *testing.T, config *Config, vkID string) int64 {
-	t.Helper()
-	var count int64
-	require.NoError(t, config.ConfigStore.DB().Model(&tables.TableModelConfig{}).
-		Where("scope = ? AND scope_id = ?", tables.ModelConfigScopeVirtualKey, vkID).Count(&count).Error)
-	return count
-}
-
 // rateLimitExists reports whether a rate limit row is stored.
 func rateLimitExists(t *testing.T, config *Config, id string) bool {
 	t.Helper()
@@ -11389,273 +11039,78 @@ func rateLimitExists(t *testing.T, config *Config, id string) bool {
 	return count > 0
 }
 
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_EditedEntryKeepsTheKeysOwnLink: a governed key whose
-// entry in config.json changes is saved with the rate limit it links in the store, never the file's.
-// After an adopt that is none, and the file's id names a row the adopt deleted: linked anyway, the save
-// failed the foreign key and stopped startup. Before an adopt the stored link is kept, and the file's
-// edit to that row is not applied.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_EditedEntryKeepsTheKeysOwnLink(t *testing.T) {
-	for _, adopted := range []bool{true, false} {
-		t.Run(fmt.Sprintf("adopted=%v", adopted), func(t *testing.T) {
-			log := &fatalRecordingLogger{}
-			SetLogger(log)
-			tempDir := createTempDir(t)
-			createConfigFile(t, tempDir, governedKeyConfig(tempDir))
-			ctx := context.Background()
-			config1, err := LoadConfig(ctx, tempDir)
-			require.NoError(t, err)
-			if adopted {
-				adoptGovernedKey(t, config1, "rl-vk-1")
-			}
-			config1.Close(ctx)
-
-			governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-			defer governance.RegisterLegacyLimitGuard(nil)
-			edited := governedKeyConfig(tempDir)
-			edited.Governance.VirtualKeys[0].Description = "edited"
-			edited.Governance.RateLimits[0].TokenMaxLimit = schemas.Ptr(int64(5))
-			createConfigFile(t, tempDir, edited)
-
-			config2, err := LoadConfig(ctx, tempDir)
-			require.NoError(t, err)
-			defer config2.Close(ctx)
-			require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-			vk, budgetExists, rateLimitExists, providerConfigs := governedKeyRows(t, config2)
-			assert.Equal(t, "edited", vk.Description, "the rest of the entry still applies")
-			assert.False(t, vk.AllowAllProviders)
-			if adopted {
-				assert.Nil(t, vk.RateLimitID, "the file's rate limit was linked to a key the profile governs")
-				assert.False(t, rateLimitExists, "the rate limit the profile replaced came back")
-				assert.False(t, budgetExists, "the budget the profile replaced came back")
-				assert.Zero(t, keyTiers(t, config2, "vk-1"), "the tier the key's limits live on came back")
-				assert.Zero(t, providerConfigs, "the provider access the profile replaced came back")
-				return
-			}
-			tierRateLimit := keyTierRateLimit(t, config2, "vk-1")
-			require.NotNil(t, tierRateLimit, "the link the key's tier has in the store is kept")
-			assert.Equal(t, "rl-vk-1", *tierRateLimit)
-			var rateLimit tables.TableRateLimit
-			require.NoError(t, config2.ConfigStore.DB().Where("id = ?", "rl-vk-1").First(&rateLimit).Error)
-			assert.EqualValues(t, 1000, *rateLimit.TokenMaxLimit, "config.json's edit was applied to a governed key's rate limit")
-		})
-	}
-}
-
-// TestSQLite_VirtualKey_RateLimitSharedWithAnotherKey: two keys may link one rate limit. Without a
-// profile both are linked as before. With team-1's profile governing vk-1, the row is still written,
-// since vk-2 is not governed and links it: held back, vk-2 was created pointing at a row that does not
-// exist, which failed the foreign key and stopped startup.
+// TestSQLite_VirtualKey_RateLimitSharedWithAnotherKey: two keys may link one rate limit, and both
+// tiers are linked to it.
 func TestSQLite_VirtualKey_RateLimitSharedWithAnotherKey(t *testing.T) {
-	for _, governed := range []bool{false, true} {
-		t.Run(fmt.Sprintf("team_governed=%v", governed), func(t *testing.T) {
-			log := &fatalRecordingLogger{}
-			SetLogger(log)
-			tempDir := createTempDir(t)
-			configData := governedKeyConfig(tempDir)
-			configData.Governance.VirtualKeys = append(configData.Governance.VirtualKeys, tables.TableVirtualKey{
-				ID: "vk-2", Name: "k2", Value: *schemas.NewSecretVar("sk-bf-governed-key-2"), IsActive: schemas.Ptr(true),
-				RateLimitID: stringPtr("rl-vk-1"),
-			})
-			createConfigFile(t, tempDir, configData)
-			if governed {
-				RegisterConfigStoreReadyHook(func(context.Context, configstore.ConfigStore) {
-					governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-				})
-				defer RegisterConfigStoreReadyHook(nil)
-				defer governance.RegisterLegacyLimitGuard(nil)
-			}
-
-			ctx := context.Background()
-			config, err := LoadConfig(ctx, tempDir)
-			require.NoError(t, err)
-			defer config.Close(ctx)
-			require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-			var vk2 tables.TableVirtualKey
-			require.NoError(t, config.ConfigStore.DB().Where("id = ?", "vk-2").First(&vk2).Error)
-			vk2TierRateLimit := keyTierRateLimit(t, config, "vk-2")
-			require.NotNil(t, vk2TierRateLimit, "the ungoverned key's tier lost the shared rate limit")
-			assert.Equal(t, "rl-vk-1", *vk2TierRateLimit)
-			assert.True(t, rateLimitExists(t, config, "rl-vk-1"))
-			vk1, _, _, _ := governedKeyRows(t, config)
-			if governed {
-				assert.Nil(t, vk1.RateLimitID, "the shared rate limit was linked to a key the profile governs")
-				assert.Zero(t, keyTiers(t, config, "vk-1"), "a tier was minted to hold a governed key's shared rate limit")
-			} else {
-				vk1TierRateLimit := keyTierRateLimit(t, config, "vk-1")
-				require.NotNil(t, vk1TierRateLimit)
-				assert.Equal(t, "rl-vk-1", *vk1TierRateLimit)
-			}
-		})
-	}
-}
-
-// TestSQLite_VirtualKey_ProviderConfigBudgetByID: governance.budgets may fund a key's provider config
-// by the id the file gives it. Without a profile the budget is written on that config as before. With
-// team-1's profile governing vk-1 the config is not written, so neither is its budget: written, it
-// named a provider config that does not exist, which failed the foreign key and stopped startup.
-func TestSQLite_VirtualKey_ProviderConfigBudgetByID(t *testing.T) {
-	for _, governed := range []bool{false, true} {
-		t.Run(fmt.Sprintf("team_governed=%v", governed), func(t *testing.T) {
-			log := &fatalRecordingLogger{}
-			SetLogger(log)
-			tempDir := createTempDir(t)
-			configData := governedKeyConfig(tempDir)
-			configData.Governance.VirtualKeys[0].ProviderConfigs[0].ID = 4242
-			configData.Governance.Budgets = append(configData.Governance.Budgets,
-				tables.TableBudget{ID: "pc-budget", MaxLimit: 2, ResetDuration: "1d", ProviderConfigID: schemas.Ptr(uint(4242))})
-			createConfigFile(t, tempDir, configData)
-			if governed {
-				RegisterConfigStoreReadyHook(func(context.Context, configstore.ConfigStore) {
-					governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-				})
-				defer RegisterConfigStoreReadyHook(nil)
-				defer governance.RegisterLegacyLimitGuard(nil)
-			}
-
-			ctx := context.Background()
-			config, err := LoadConfig(ctx, tempDir)
-			require.NoError(t, err)
-			defer config.Close(ctx)
-			require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-			budgetExists, _ := countBudget(t, config, "pc-budget")
-			_, _, _, providerConfigs := governedKeyRows(t, config)
-			if governed {
-				assert.False(t, budgetExists, "config.json's budget was applied to a governed key's provider config")
-				assert.Zero(t, providerConfigs)
-				return
-			}
-			assert.True(t, budgetExists)
-			assert.EqualValues(t, 1, providerConfigs)
-		})
-	}
-}
-
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_NestedRateLimitsNotRecreated: adopt also deletes the
-// rate limits a key's provider configs and model configs link. A split-mode restart on the unchanged
-// file must not re-add them, by an id every node of a cluster then races to insert - including when
-// they are all the key carries, so nothing else marks it as touched. Without a profile they are
-// written as before.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_NestedRateLimitsNotRecreated(t *testing.T) {
 	log := &fatalRecordingLogger{}
 	SetLogger(log)
 	tempDir := createTempDir(t)
-	configData := governedKeyConfig(tempDir)
-	configData.Governance.VirtualKeys[0].RateLimitID = nil
-	configData.Governance.VirtualKeys[0].ProviderConfigs[0].RateLimitID = stringPtr("pc-rl")
-	configData.Governance.Budgets = nil
-	configData.Governance.RateLimits = []tables.TableRateLimit{
-		{ID: "pc-rl", TokenMaxLimit: schemas.Ptr(int64(20)), TokenResetDuration: stringPtr("1h")},
-		{ID: "mc-rl", TokenMaxLimit: schemas.Ptr(int64(10)), TokenResetDuration: stringPtr("1h")},
-	}
-	configData.Governance.ModelConfigs = []tables.TableModelConfig{{
-		ID: "mc-vk-1", ModelName: tables.ModelConfigAllModels, Scope: tables.ModelConfigScopeVirtualKey,
-		ScopeID: stringPtr("vk-1"), RateLimitID: stringPtr("mc-rl"),
-	}}
+	configData := teamKeyConfig(tempDir)
+	configData.Governance.VirtualKeys = append(configData.Governance.VirtualKeys, tables.TableVirtualKey{
+		ID: "vk-2", Name: "k2", Value: *schemas.NewSecretVar("sk-bf-team-key-2"), IsActive: schemas.Ptr(true),
+		RateLimitID: stringPtr("rl-vk-1"),
+	})
 	createConfigFile(t, tempDir, configData)
 
 	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
+	config, err := LoadConfig(ctx, tempDir)
 	require.NoError(t, err)
-	require.Empty(t, log.fatals)
-	assert.True(t, rateLimitExists(t, config1, "pc-rl"), "without a profile the provider config's rate limit is written")
-	assert.True(t, rateLimitExists(t, config1, "mc-rl"), "without a profile the model config's rate limit is written")
-	adoptGovernedKey(t, config1, "pc-rl", "mc-rl")
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	defer governance.RegisterLegacyLimitGuard(nil)
-	for boot := 2; boot <= 3; boot++ {
-		config, err := LoadConfig(ctx, tempDir)
-		require.NoError(t, err)
-		require.Empty(t, log.fatals, "boot %d: the governance sync failed, which stops startup", boot)
-		assert.False(t, rateLimitExists(t, config, "pc-rl"), "boot %d: the provider config's rate limit the profile replaced came back", boot)
-		assert.False(t, rateLimitExists(t, config, "mc-rl"), "boot %d: the model config's rate limit the profile replaced came back", boot)
-		var modelConfigs int64
-		require.NoError(t, config.ConfigStore.DB().Model(&tables.TableModelConfig{}).Where("id = ?", "mc-vk-1").Count(&modelConfigs).Error)
-		assert.Zero(t, modelConfigs, "boot %d: the model config the profile replaced came back", boot)
-		config.Close(ctx)
-	}
+	defer config.Close(ctx)
+	require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
+	var vk2 tables.TableVirtualKey
+	require.NoError(t, config.ConfigStore.DB().Where("id = ?", "vk-2").First(&vk2).Error)
+	vk2TierRateLimit := keyTierRateLimit(t, config, "vk-2")
+	require.NotNil(t, vk2TierRateLimit, "the second key's tier lost the shared rate limit")
+	assert.Equal(t, "rl-vk-1", *vk2TierRateLimit)
+	assert.True(t, rateLimitExists(t, config, "rl-vk-1"))
+	vk1TierRateLimit := keyTierRateLimit(t, config, "vk-1")
+	require.NotNil(t, vk1TierRateLimit)
+	assert.Equal(t, "rl-vk-1", *vk1TierRateLimit)
 }
 
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_ModelConfigBudgetNotRecreated: governance.budgets may
-// fund a key's model config by model_config_id. Without a profile the budget is written on it as
-// before. Adopt deletes the model config and its budgets; a split-mode restart on the unchanged file
-// skips the model config, so it must skip the budget too: written, it named a model config that does
-// not exist, which failed the foreign key and stopped startup.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_ModelConfigBudgetNotRecreated(t *testing.T) {
+// TestSQLite_VirtualKey_ProviderConfigBudgetByID: governance.budgets may fund a key's provider config
+// by the id the file gives it, and the budget is written on that config.
+func TestSQLite_VirtualKey_ProviderConfigBudgetByID(t *testing.T) {
 	log := &fatalRecordingLogger{}
 	SetLogger(log)
 	tempDir := createTempDir(t)
-	declare := func(withBudget bool) *ConfigData {
-		configData := governedKeyConfig(tempDir)
-		configData.Governance.ModelConfigs = []tables.TableModelConfig{{
-			ID: "mc-vk-1", ModelName: tables.ModelConfigAllModels, Scope: tables.ModelConfigScopeVirtualKey, ScopeID: stringPtr("vk-1"),
-		}}
-		if withBudget {
-			configData.Governance.Budgets = append(configData.Governance.Budgets,
-				tables.TableBudget{ID: "mc-budget", MaxLimit: 4, ResetDuration: "1d", ModelConfigID: stringPtr("mc-vk-1")})
-		}
-		return configData
-	}
-	ctx := context.Background()
-	// Budgets are written before model configs, so the model config has to exist before a budget
-	// can name it.
-	createConfigFile(t, tempDir, declare(false))
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	config1.Close(ctx)
-	createConfigFile(t, tempDir, declare(true))
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	require.Empty(t, log.fatals)
-	budgetExists, _ := countBudget(t, config2, "mc-budget")
-	require.True(t, budgetExists, "without a profile the model config's budget is written")
-	require.NoError(t, config2.ConfigStore.DB().Where("model_config_id = ?", "mc-vk-1").Delete(&tables.TableBudget{}).Error)
-	adoptGovernedKey(t, config2, "rl-vk-1")
-	config2.Close(ctx)
+	configData := teamKeyConfig(tempDir)
+	configData.Governance.VirtualKeys[0].ProviderConfigs[0].ID = 4242
+	configData.Governance.Budgets = append(configData.Governance.Budgets,
+		tables.TableBudget{ID: "pc-budget", MaxLimit: 2, ResetDuration: "1d", ProviderConfigID: schemas.Ptr(uint(4242))})
+	createConfigFile(t, tempDir, configData)
 
-	governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	defer governance.RegisterLegacyLimitGuard(nil)
-	for boot := 3; boot <= 4; boot++ {
-		config, err := LoadConfig(ctx, tempDir)
-		require.NoError(t, err)
-		require.Empty(t, log.fatals, "boot %d: the governance sync failed, which stops startup", boot)
-		budgetExists, _ := countBudget(t, config, "mc-budget")
-		assert.False(t, budgetExists, "boot %d: the model config's budget the profile replaced came back", boot)
-		var modelConfigs int64
-		require.NoError(t, config.ConfigStore.DB().Model(&tables.TableModelConfig{}).Where("id = ?", "mc-vk-1").Count(&modelConfigs).Error)
-		assert.Zero(t, modelConfigs, "boot %d: the model config the profile replaced came back", boot)
-		config.Close(ctx)
-	}
+	ctx := context.Background()
+	config, err := LoadConfig(ctx, tempDir)
+	require.NoError(t, err)
+	defer config.Close(ctx)
+	require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
+	budgetExists, _ := countBudget(t, config, "pc-budget")
+	_, _, _, providerConfigs := teamKeyRows(t, config)
+	assert.True(t, budgetExists)
+	assert.EqualValues(t, 1, providerConfigs)
 }
 
-// TestSQLite_VirtualKey_OwnerMovedThroughAPI: whether a key is governed is decided by the owner it
-// will have once the reconcile is done. A key whose entry is unchanged is not saved, so it keeps the
-// owner the store has, and a move made through the API stands: moved out of team-1, which a profile
-// governs, the file's budget edit is applied as it is without a profile; moved into team-1, it is not.
-// A key whose entry changed is saved with config.json's owner, which is what decides then.
+// TestSQLite_VirtualKey_OwnerMovedThroughAPI: a key whose entry is unchanged is not saved, so it keeps
+// the owner the store has, and a move made through the API stands; the file's budget edit is applied
+// either way.
 func TestSQLite_VirtualKey_OwnerMovedThroughAPI(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		fileTeam      string
 		storedTeam    string
-		profile       bool
-		editEntry     bool
 		wantBudget    float64
 		wantTeamAfter string
 	}{
-		{name: "moved_out_of_governed_team", fileTeam: "team-1", storedTeam: "team-2", profile: true, wantBudget: 7, wantTeamAfter: "team-2"},
-		{name: "moved_out_of_governed_team_no_profile", fileTeam: "team-1", storedTeam: "team-2", wantBudget: 7, wantTeamAfter: "team-2"},
-		{name: "moved_into_governed_team", fileTeam: "team-2", storedTeam: "team-1", profile: true, wantBudget: 1, wantTeamAfter: "team-1"},
-		{name: "moved_into_governed_team_no_profile", fileTeam: "team-2", storedTeam: "team-1", wantBudget: 7, wantTeamAfter: "team-1"},
-		{name: "moved_into_governed_team_entry_edited", fileTeam: "team-2", storedTeam: "team-1", profile: true, editEntry: true, wantBudget: 7, wantTeamAfter: "team-2"},
+		{name: "moved_out_of_team_1", fileTeam: "team-1", storedTeam: "team-2", wantBudget: 7, wantTeamAfter: "team-2"},
+		{name: "moved_into_team_1", fileTeam: "team-2", storedTeam: "team-1", wantBudget: 7, wantTeamAfter: "team-1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			log := &fatalRecordingLogger{}
 			SetLogger(log)
 			tempDir := createTempDir(t)
 			declare := func(limit float64, description string) *ConfigData {
-				configData := governedKeyConfig(tempDir)
+				configData := teamKeyConfig(tempDir)
 				configData.Governance.Teams = append(configData.Governance.Teams, tables.TableTeam{ID: "team-2", Name: "Team Two"})
 				configData.Governance.VirtualKeys[0].TeamID = stringPtr(tc.fileTeam)
 				configData.Governance.VirtualKeys[0].Description = description
@@ -11669,20 +11124,12 @@ func TestSQLite_VirtualKey_OwnerMovedThroughAPI(t *testing.T) {
 			require.NoError(t, config1.ConfigStore.DB().Model(&tables.TableVirtualKey{}).Where("id = ?", "vk-1").Update("team_id", tc.storedTeam).Error)
 			config1.Close(ctx)
 
-			if tc.profile {
-				governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-				defer governance.RegisterLegacyLimitGuard(nil)
-			}
-			description := "v1"
-			if tc.editEntry {
-				description = "v2"
-			}
-			createConfigFile(t, tempDir, declare(7, description))
+			createConfigFile(t, tempDir, declare(7, "v1"))
 			config2, err := LoadConfig(ctx, tempDir)
 			require.NoError(t, err)
 			defer config2.Close(ctx)
 			require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-			vk, budgetExists, _, _ := governedKeyRows(t, config2)
+			vk, budgetExists, _, _ := teamKeyRows(t, config2)
 			require.True(t, budgetExists)
 			_, maxLimit := countBudget(t, config2, "vk-1-budget")
 			assert.Equal(t, tc.wantBudget, maxLimit)
@@ -11693,248 +11140,35 @@ func TestSQLite_VirtualKey_OwnerMovedThroughAPI(t *testing.T) {
 }
 
 // TestSQLite_VirtualKey_ProviderConfigBudgetByStoreAssignedID: a budget may name a key's provider
-// config by the id the store gave it, which the key's entry in config.json does not carry. Without a
-// profile it is written on that config as before. With team-1's profile governing vk-1 it is not,
-// even though the key's entry is unchanged and nothing else of the key's is being written.
+// config by the id the store gave it, which the key's entry in config.json does not carry, and it is
+// written on that config.
 func TestSQLite_VirtualKey_ProviderConfigBudgetByStoreAssignedID(t *testing.T) {
-	for _, governed := range []bool{false, true} {
-		t.Run(fmt.Sprintf("team_governed=%v", governed), func(t *testing.T) {
-			log := &fatalRecordingLogger{}
-			SetLogger(log)
-			tempDir := createTempDir(t)
-			createConfigFile(t, tempDir, governedKeyConfig(tempDir))
-			ctx := context.Background()
-			config1, err := LoadConfig(ctx, tempDir)
-			require.NoError(t, err)
-			var providerConfig tables.TableVirtualKeyProviderConfig
-			require.NoError(t, config1.ConfigStore.DB().Where("virtual_key_id = ?", "vk-1").First(&providerConfig).Error)
-			config1.Close(ctx)
-
-			configData := governedKeyConfig(tempDir)
-			configData.Governance.Budgets = append(configData.Governance.Budgets,
-				tables.TableBudget{ID: "pc-budget", MaxLimit: 2, ResetDuration: "1d", ProviderConfigID: schemas.Ptr(providerConfig.ID)})
-			createConfigFile(t, tempDir, configData)
-			if governed {
-				governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-				defer governance.RegisterLegacyLimitGuard(nil)
-			}
-			config2, err := LoadConfig(ctx, tempDir)
-			require.NoError(t, err)
-			defer config2.Close(ctx)
-			require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-			budgetExists, _ := countBudget(t, config2, "pc-budget")
-			assert.Equal(t, !governed, budgetExists, "budget on the provider config of a key whose owner holds a profile")
-		})
-	}
-}
-
-// TestSQLite_VirtualKey_OwnerGovernedByProfile_UnresolvedNewKeySkipsItsBudget: a new key whose secret
-// does not resolve is never created, so it has no stored owner; its owner is then its entry's in
-// config.json. Under team-1's profile its budget is skipped with it, rather than written for a key
-// that does not exist, which would fail the foreign key and stop startup.
-func TestSQLite_VirtualKey_OwnerGovernedByProfile_UnresolvedNewKeySkipsItsBudget(t *testing.T) {
 	log := &fatalRecordingLogger{}
 	SetLogger(log)
 	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, governedKeyConfig(tempDir))
-	// A SecretVar that does not resolve marshals empty, so the reference is written into the file directly.
-	configPath := filepath.Join(tempDir, "config.json")
-	raw, err := os.ReadFile(configPath)
-	require.NoError(t, err)
-	patched := strings.Replace(string(raw), `"sk-bf-governed-key-1"`, `"env.BIFROST_TEST_UNSET_GOVERNED_KEY_VALUE"`, 1)
-	require.NotEqual(t, string(raw), patched)
-	require.NoError(t, os.WriteFile(configPath, []byte(patched), 0644))
-	RegisterConfigStoreReadyHook(func(context.Context, configstore.ConfigStore) {
-		governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	})
-	defer RegisterConfigStoreReadyHook(nil)
-	defer governance.RegisterLegacyLimitGuard(nil)
-
-	ctx := context.Background()
-	config, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config.Close(ctx)
-	require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-	var keys int64
-	require.NoError(t, config.ConfigStore.DB().Model(&tables.TableVirtualKey{}).Where("id = ?", "vk-1").Count(&keys).Error)
-	assert.Zero(t, keys, "a key whose secret does not resolve is not created")
-	budgetExists, _ := countBudget(t, config, "vk-1-budget")
-	assert.False(t, budgetExists)
-}
-
-// TestSQLite_VirtualKey_OwnerGuardFails_EditedEntryLeftAsStored: when whether team-1's profile governs
-// vk-1 cannot be checked, the key's edited entry is not applied at all that boot - not its fields, its
-// allow_all_providers, its rate limit link, its provider access or its budget. Saving any of it would
-// guess at the key's access: forcing allow_all_providers off cut a key that relies on it off from every
-// provider outside its list. The stored hash still differs from the file's, so the next boot, with a
-// working lookup and no profile, applies the whole entry.
-func TestSQLite_VirtualKey_OwnerGuardFails_EditedEntryLeftAsStored(t *testing.T) {
-	log := &fatalRecordingLogger{}
-	SetLogger(log)
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, governedKeyConfig(tempDir))
+	createConfigFile(t, tempDir, teamKeyConfig(tempDir))
 	ctx := context.Background()
 	config1, err := LoadConfig(ctx, tempDir)
 	require.NoError(t, err)
-	before, _, _, _ := governedKeyRows(t, config1)
-	require.True(t, before.AllowAllProviders)
+	var providerConfig tables.TableVirtualKeyProviderConfig
+	require.NoError(t, config1.ConfigStore.DB().Where("virtual_key_id = ?", "vk-1").First(&providerConfig).Error)
 	config1.Close(ctx)
 
-	edited := governedKeyConfig(tempDir)
-	edited.Governance.VirtualKeys[0].Description = "edited"
-	edited.Governance.Budgets[0].MaxLimit = 9
-	createConfigFile(t, tempDir, edited)
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) {
-		return "", errors.New("guard unavailable")
-	})
-	defer governance.RegisterLegacyLimitGuard(nil)
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
-	vk, budgetExists, rateLimitExists, providerConfigs := governedKeyRows(t, config2)
-	assert.Empty(t, vk.Description, "the entry was applied although the key's governance is unknown")
-	assert.True(t, vk.AllowAllProviders, "allow_all_providers was turned off on a key whose governance is unknown")
-	if tierRateLimit := keyTierRateLimit(t, config2, "vk-1"); assert.NotNil(t, tierRateLimit) {
-		assert.Equal(t, "rl-vk-1", *tierRateLimit)
-	}
-	assert.True(t, rateLimitExists)
-	assert.EqualValues(t, 1, providerConfigs)
-	assert.True(t, budgetExists)
-	_, maxLimit := countBudget(t, config2, "vk-1-budget")
-	assert.EqualValues(t, 1, maxLimit, "the key's budget edit was applied although its governance is unknown")
-	assert.Equal(t, before.ConfigHash, vk.ConfigHash, "the stored hash must still differ from the file's so the next boot retries")
-	config2.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) { return "", nil })
-	config3, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config3.Close(ctx)
-	require.Empty(t, log.fatals)
-	vk, _, _, providerConfigs = governedKeyRows(t, config3)
-	assert.Equal(t, "edited", vk.Description, "the next boot retries the entry")
-	assert.True(t, vk.AllowAllProviders)
-	assert.EqualValues(t, 1, providerConfigs)
-	_, maxLimit = countBudget(t, config3, "vk-1-budget")
-	assert.EqualValues(t, 9, maxLimit)
-}
-
-// TestSQLite_Team_GuardLookupFails_SkipsItsLimitsAndBoots: a lookup that fails does not stop the
-// load. The team's limits are skipped this boot, as if a profile governed it, and the rest applies.
-func TestSQLite_Team_GuardLookupFails_SkipsItsLimitsAndBoots(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 100))
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) {
-		return "", errors.New("connection reset")
-	})
-	defer governance.RegisterLegacyLimitGuard(nil)
-	configData := teamBudgetConfig(tempDir, 999)
-	configData.Governance.Teams[0].Name = "Team One Renamed"
+	configData := teamKeyConfig(tempDir)
+	configData.Governance.Budgets = append(configData.Governance.Budgets,
+		tables.TableBudget{ID: "pc-budget", MaxLimit: 2, ResetDuration: "1d", ProviderConfigID: schemas.Ptr(providerConfig.ID)})
 	createConfigFile(t, tempDir, configData)
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err, "a failed lookup does not stop the load")
-	_, limit := countBudget(t, config2, "team-1-budget")
-	assert.EqualValues(t, 100, limit, "the budget is skipped while the answer is unknown")
-	var team tables.TableTeam
-	require.NoError(t, config2.ConfigStore.DB().Where("id = ?", "team-1").First(&team).Error)
-	assert.Equal(t, "Team One Renamed", team.Name, "the rest of the entry still applies")
-	assert.Empty(t, team.ConfigHash, "and no hash is stamped, so the next boot retries its limits")
-	config2.Close(ctx)
-
-	// The next boot, on the same file, can tell again: nothing governs the team, so its limits apply.
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) { return "", nil })
-	config3, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config3.Close(ctx)
-	_, limit = countBudget(t, config3, "team-1-budget")
-	assert.EqualValues(t, 999, limit, "the skipped budget is applied once the lookup answers")
-	require.NoError(t, config3.ConfigStore.DB().Where("id = ?", "team-1").First(&team).Error)
-	assert.NotEmpty(t, team.ConfigHash)
-}
-
-// flakyGuard answers the first lookup for each entity with first, and every later one with later. It
-// is how an entity looked up twice in one load could get two different answers.
-func flakyGuard(first, later func() (string, error)) governance.LegacyLimitGuard {
-	calls := map[string]int{}
-	return func(_ context.Context, holderKind, holderID string) (string, error) {
-		calls[holderKind+":"+holderID]++
-		if calls[holderKind+":"+holderID] == 1 {
-			return first()
-		}
-		return later()
-	}
-}
-
-// TestSQLite_Customer_InlineBudgetFollowsTheCustomersOwnLookup: a customer is looked up once, and its
-// inline budget follows that answer. A second lookup that failed would skip the budget after the
-// customer was saved with a hash covering it, and an unchanged file would never write it.
-func TestSQLite_Customer_InlineBudgetFollowsTheCustomersOwnLookup(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-	configData.Governance = &configstore.GovernanceConfig{
-		Customers: []tables.TableCustomer{{ID: "customer-1", Name: "Acme", Budgets: []tables.TableBudget{
-			{ID: "customer-1-budget", MaxLimit: 100, ResetDuration: "1M"},
-		}}},
-	}
-	createConfigFile(t, tempDir, configData)
-	defer governance.RegisterLegacyLimitGuard(nil)
-	ctx := context.Background()
-
-	governance.RegisterLegacyLimitGuard(flakyGuard(
-		func() (string, error) { return "", nil },
-		func() (string, error) { return "", errors.New("connection reset") },
-	))
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) { return "", nil })
 	config2, err := LoadConfig(ctx, tempDir)
 	require.NoError(t, err)
 	defer config2.Close(ctx)
-	exists, _ := countBudget(t, config2, "customer-1-budget")
-	assert.True(t, exists, "the budget of a customer nothing governs is written")
+	require.Empty(t, log.fatals, "the governance sync failed, which stops startup")
+	budgetExists, _ := countBudget(t, config2, "pc-budget")
+	assert.True(t, budgetExists, "budget on the provider config named by its store id")
 }
 
-// TestSQLite_Team_BudgetStaysSkippedWhileTheTeamsLookupFailed: when the lookup for a team fails, its
-// budgets are skipped for the boot even if a later lookup would have answered, the same as the team's
-// own limits; the next boot applies them.
-func TestSQLite_Team_BudgetStaysSkippedWhileTheTeamsLookupFailed(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 100))
-	defer governance.RegisterLegacyLimitGuard(nil)
-	ctx := context.Background()
-
-	governance.RegisterLegacyLimitGuard(flakyGuard(
-		func() (string, error) { return "", errors.New("connection reset") },
-		func() (string, error) { return "", nil },
-	))
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	exists, _ := countBudget(t, config1, "team-1-budget")
-	assert.False(t, exists, "the team's lookup failed, so its budget waits for one that answers")
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) { return "", nil })
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-	exists, _ = countBudget(t, config2, "team-1-budget")
-	assert.True(t, exists, "and the next boot applies it")
-}
-
-// TestSQLite_Team_NotMigrated_SplitAppliesAnEditedBudget: a team without a profile keeps using its own
-// budgets, so editing one in the file applies as it always has.
-func TestSQLite_Team_NotMigrated_SplitAppliesAnEditedBudget(t *testing.T) {
+// TestSQLite_Team_SplitAppliesAnEditedBudget: editing a team's budget in the file applies it on the
+// next boot.
+func TestSQLite_Team_SplitAppliesAnEditedBudget(t *testing.T) {
 	initTestLogger()
 	tempDir := createTempDir(t)
 	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 100))
@@ -11944,8 +11178,6 @@ func TestSQLite_Team_NotMigrated_SplitAppliesAnEditedBudget(t *testing.T) {
 	require.NoError(t, err)
 	config1.Close(ctx)
 
-	governance.RegisterLegacyLimitGuard(func(context.Context, string, string) (string, error) { return "", nil })
-	defer governance.RegisterLegacyLimitGuard(nil)
 	createConfigFile(t, tempDir, teamBudgetConfig(tempDir, 999))
 
 	config2, err := LoadConfig(ctx, tempDir)
@@ -11953,86 +11185,6 @@ func TestSQLite_Team_NotMigrated_SplitAppliesAnEditedBudget(t *testing.T) {
 	defer config2.Close(ctx)
 	_, limit := countBudget(t, config2, "team-1-budget")
 	assert.EqualValues(t, 999, limit)
-}
-
-// TestSQLite_Team_MigratedToProfile_SourceOfTruthAppliesTheFile: under source_of_truth config.json the
-// file's limits are applied even to a governed team; the enterprise reconcile then removes the profile.
-func TestSQLite_Team_MigratedToProfile_SourceOfTruthAppliesTheFile(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	configData := teamBudgetConfig(tempDir, 100)
-	configData.SourceOfTruth = SourceOfTruthConfigJSON
-	createConfigFile(t, tempDir, configData)
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	require.NoError(t, config1.ConfigStore.DB().Where("id = ?", "team-1-budget").Delete(&tables.TableBudget{}).Error)
-	config1.Close(ctx)
-
-	governance.RegisterLegacyLimitGuard(migratedTeamGuard)
-	defer governance.RegisterLegacyLimitGuard(nil)
-	configData = teamBudgetConfig(tempDir, 999)
-	configData.SourceOfTruth = SourceOfTruthConfigJSON
-	createConfigFile(t, tempDir, configData)
-
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config2.Close(ctx)
-	exists, limit := countBudget(t, config2, "team-1-budget")
-	assert.True(t, exists, "config.json is the source of truth, so its budget is applied")
-	assert.EqualValues(t, 999, limit)
-}
-
-// syncedIDs lists what GovernanceFileSync reports, as "team:id=name" and "customer:id=name".
-func syncedIDs(config *Config) []string {
-	var out []string
-	for _, team := range config.GovernanceFileSync.Teams {
-		out = append(out, "team:"+team.ID+"="+team.Name)
-	}
-	for _, customer := range config.GovernanceFileSync.Customers {
-		out = append(out, "customer:"+customer.ID+"="+customer.Name)
-	}
-	sort.Strings(out)
-	return out
-}
-
-// TestLoadConfig_GovernanceFileSyncReportsOnlyChangedEntries: the report names an entry when it is new
-// or its declaration changed, and nothing on an unchanged restart - which
-// is what lets a dashboard change to an unchanged entity stand. Under source_of_truth config.json it
-// names every entry.
-func TestLoadConfig_GovernanceFileSyncReportsOnlyChangedEntries(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-	configData.Governance = &configstore.GovernanceConfig{
-		Customers: []tables.TableCustomer{{ID: "customer-1", Name: "Acme"}},
-		Teams: []tables.TableTeam{
-			{ID: "team-1", Name: "Team One"},
-			{ID: "team-2", Name: "Team Two"},
-		},
-	}
-	createConfigFile(t, tempDir, configData)
-	ctx := context.Background()
-
-	load := func() []string {
-		t.Helper()
-		config, err := LoadConfig(ctx, tempDir)
-		require.NoError(t, err)
-		defer config.Close(ctx)
-		return syncedIDs(config)
-	}
-
-	assert.Equal(t, []string{"customer:customer-1=Acme", "team:team-1=Team One", "team:team-2=Team Two"}, load(), "first boot writes every entry")
-	assert.Empty(t, load(), "an unchanged file writes nothing")
-
-	configData.Governance.Teams[0].Name = "Team One Renamed"
-	createConfigFile(t, tempDir, configData)
-	assert.Equal(t, []string{"team:team-1=Team One Renamed"}, load(), "changing an entry's declaration changes only that entry")
-
-	configData.SourceOfTruth = SourceOfTruthConfigJSON
-	createConfigFile(t, tempDir, configData)
-	assert.Equal(t, []string{"customer:customer-1=Acme", "team:team-1=Team One Renamed", "team:team-2=Team Two"}, load(), "source of truth writes every entry")
 }
 
 // TestSQLite_Customer_HashMismatch_FileSync tests file sync when hash differs
@@ -13239,11 +12391,9 @@ func TestSQLite_SourceOfTruthConfigJSON_ModelConfigOwnedBudgetPruned(t *testing.
 	require.False(t, modelIDs["api-model"], "API model config should be pruned")
 }
 
-// TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardKeepsWhatItProtects: the budgets and rate limits
-// the registered guard claims - rows the enterprise build owns, such as an access profile's - survive
-// the prune, while every other row the file dropped goes. The guard is asked only about the rows the
-// prune would delete.
-func TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardKeepsWhatItProtects(t *testing.T) {
+// TestSQLite_SourceOfTruthConfigJSON_PrunesUndeclaredBudgetsAndRateLimits: under source_of_truth
+// config.json every budget and rate limit the file does not declare goes, and the declared ones stay.
+func TestSQLite_SourceOfTruthConfigJSON_PrunesUndeclaredBudgetsAndRateLimits(t *testing.T) {
 	initTestLogger()
 	tempDir := createTempDir(t)
 	tokenMax := int64(1000)
@@ -13258,20 +12408,13 @@ func TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardKeepsWhatItProtects(t *te
 	ctx := context.Background()
 	config1, err := LoadConfig(ctx, tempDir)
 	require.NoError(t, err)
-	for _, id := range []string{"guarded-budget", "stale-budget"} {
+	for _, id := range []string{"stale-budget", "other-stale-budget"} {
 		require.NoError(t, config1.ConfigStore.CreateBudget(ctx, &tables.TableBudget{ID: id, MaxLimit: 5, ResetDuration: "1M"}))
 	}
-	for _, id := range []string{"guarded-rl", "stale-rl"} {
+	for _, id := range []string{"stale-rl", "other-stale-rl"} {
 		require.NoError(t, config1.ConfigStore.CreateRateLimit(ctx, &tables.TableRateLimit{ID: id, TokenMaxLimit: &tokenMax, TokenResetDuration: &tokenDur}))
 	}
 	config1.Close(ctx)
-
-	var askedBudgets, askedRateLimits []string
-	RegisterGovernanceLimitPruneGuard(func(_ context.Context, _ configstore.ConfigStore, budgetIDs, rateLimitIDs []string) (map[string]bool, map[string]bool, error) {
-		askedBudgets, askedRateLimits = budgetIDs, rateLimitIDs
-		return map[string]bool{"guarded-budget": true}, map[string]bool{"guarded-rl": true}, nil
-	})
-	defer RegisterGovernanceLimitPruneGuard(nil)
 
 	configData.SourceOfTruth = SourceOfTruthConfigJSON
 	createConfigFile(t, tempDir, configData)
@@ -13279,8 +12422,6 @@ func TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardKeepsWhatItProtects(t *te
 	require.NoError(t, err)
 	defer config2.Close(ctx)
 
-	assert.ElementsMatch(t, []string{"guarded-budget", "stale-budget"}, askedBudgets)
-	assert.ElementsMatch(t, []string{"guarded-rl", "stale-rl"}, askedRateLimits)
 	gov, err := config2.ConfigStore.GetGovernanceConfig(ctx)
 	require.NoError(t, err)
 	var budgets, rateLimits []string
@@ -13290,8 +12431,8 @@ func TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardKeepsWhatItProtects(t *te
 	for _, rl := range gov.RateLimits {
 		rateLimits = append(rateLimits, rl.ID)
 	}
-	assert.ElementsMatch(t, []string{"file-budget", "guarded-budget"}, budgets)
-	assert.ElementsMatch(t, []string{"file-rl", "guarded-rl"}, rateLimits)
+	assert.ElementsMatch(t, []string{"file-budget"}, budgets)
+	assert.ElementsMatch(t, []string{"file-rl"}, rateLimits)
 }
 
 // fatalRecordingLogger is the silent test logger, except that it keeps each Fatal message: LoadConfig
@@ -13753,58 +12894,6 @@ func TestSQLite_ProviderConfigBudgetFromConfigLandsOnTheProviderTier(t *testing.
 	require.NotNil(t, budget.ModelConfigID, "the budget is still owned by the provider config")
 	assert.Equal(t, tier.ID, *budget.ModelConfigID)
 	assert.Nil(t, budget.ProviderConfigID)
-}
-
-// TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardFailureKeepsEveryCandidate: when the guard cannot
-// say which rows it owns, no budget or rate limit is pruned this boot rather than deleting one the
-// enterprise build still uses; the next boot prunes them once the guard answers.
-func TestSQLite_SourceOfTruthConfigJSON_LimitPruneGuardFailureKeepsEveryCandidate(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	tokenMax := int64(1000)
-	tokenDur := "1h"
-	configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-	configData.Governance = &configstore.GovernanceConfig{
-		Budgets:    []tables.TableBudget{{ID: "file-budget", MaxLimit: 100.0, ResetDuration: "1d"}},
-		RateLimits: []tables.TableRateLimit{{ID: "file-rl", TokenMaxLimit: &tokenMax, TokenResetDuration: &tokenDur}},
-	}
-	createConfigFile(t, tempDir, configData)
-
-	ctx := context.Background()
-	config1, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	require.NoError(t, config1.ConfigStore.CreateBudget(ctx, &tables.TableBudget{ID: "stale-budget", MaxLimit: 5, ResetDuration: "1M"}))
-	require.NoError(t, config1.ConfigStore.CreateRateLimit(ctx, &tables.TableRateLimit{ID: "stale-rl", TokenMaxLimit: &tokenMax, TokenResetDuration: &tokenDur}))
-	config1.Close(ctx)
-
-	RegisterGovernanceLimitPruneGuard(func(context.Context, configstore.ConfigStore, []string, []string) (map[string]bool, map[string]bool, error) {
-		return nil, nil, errors.New("connection reset")
-	})
-	defer RegisterGovernanceLimitPruneGuard(nil)
-
-	configData.SourceOfTruth = SourceOfTruthConfigJSON
-	createConfigFile(t, tempDir, configData)
-	config2, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	countRows := func(config *Config) (int, int) {
-		gov, err := config.ConfigStore.GetGovernanceConfig(ctx)
-		require.NoError(t, err)
-		return len(gov.Budgets), len(gov.RateLimits)
-	}
-	budgets, rateLimits := countRows(config2)
-	assert.Equal(t, 2, budgets, "nothing is pruned while the guard cannot answer")
-	assert.Equal(t, 2, rateLimits)
-	config2.Close(ctx)
-
-	RegisterGovernanceLimitPruneGuard(func(context.Context, configstore.ConfigStore, []string, []string) (map[string]bool, map[string]bool, error) {
-		return nil, nil, nil
-	})
-	config3, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer config3.Close(ctx)
-	budgets, rateLimits = countRows(config3)
-	assert.Equal(t, 1, budgets, "the next boot prunes them once the guard answers")
-	assert.Equal(t, 1, rateLimits)
 }
 
 // TestSQLite_SourceOfTruthConfigJSON_BulkEntityPruning verifies config.json SOT prunes DB-only rows across sections.
@@ -15748,11 +14837,6 @@ func TestGenerateVirtualKeyHash_ProviderConfigRateLimit(t *testing.T) {
 			}
 		})
 	}
-}
-
-// int64Ptr is a helper to create a pointer to an int64
-func int64Ptr(i int64) *int64 {
-	return &i
 }
 
 // TestKeyHashComparison_VertexConfigSyncScenarios tests full lifecycle for Vertex key configs
@@ -20197,55 +19281,6 @@ func TestSQLite_SourceOfTruthConfigJSON_PrunesTiersTheFileDeclaresNoLimitsFor(t 
 		"a tier the file declares no limits for survived the config.json prune")
 }
 
-// A key the prune guard holds back keeps its tiers, or its budgets go with them unasked.
-func TestSQLite_SourceOfTruthConfigJSON_KeepsTiersOfGuardedVirtualKeys(t *testing.T) {
-	initTestLogger()
-	tempDir := createTempDir(t)
-	declare := func(vks []tables.TableVirtualKey, budgets []tables.TableBudget) *ConfigData {
-		configData := makeConfigDataWithProvidersAndDir(nil, tempDir)
-		configData.SourceOfTruth = SourceOfTruthConfigJSON
-		configData.Governance = &configstore.GovernanceConfig{
-			ModelConfigs: []tables.TableModelConfig{}, Budgets: budgets, VirtualKeys: vks,
-		}
-		return configData
-	}
-	guarded := tables.TableVirtualKey{ID: "vk-guarded", Name: "vk-guarded", Value: *schemas.NewSecretVar("sk-bf-guarded"), IsActive: schemas.Ptr(true)}
-	ctx := context.Background()
-
-	createConfigFile(t, tempDir, declare([]tables.TableVirtualKey{guarded},
-		[]tables.TableBudget{{ID: "guarded-budget", MaxLimit: 10, ResetDuration: "1M", VirtualKeyID: schemas.Ptr("vk-guarded")}}))
-	first, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	first.Close(ctx)
-
-	// The file drops the key and everything it declared; the guard keeps the key.
-	RegisterVirtualKeyPruneGuard(func(context.Context, configstore.ConfigStore, []string) (map[string]bool, error) {
-		return map[string]bool{"vk-guarded": true}, nil
-	})
-	defer RegisterVirtualKeyPruneGuard(nil)
-	RegisterGovernanceLimitPruneGuard(func(_ context.Context, _ configstore.ConfigStore, budgetIDs, rateLimitIDs []string) (map[string]bool, map[string]bool, error) {
-		keep := map[string]bool{}
-		for _, id := range budgetIDs {
-			keep[id] = true
-		}
-		return keep, map[string]bool{}, nil
-	})
-	defer RegisterGovernanceLimitPruneGuard(nil)
-
-	createConfigFile(t, tempDir, declare(nil, nil))
-	second, err := LoadConfig(ctx, tempDir)
-	require.NoError(t, err)
-	defer second.Close(ctx)
-
-	budget, err := second.ConfigStore.GetBudget(ctx, "guarded-budget")
-	require.NoError(t, err, "the guarded key's budget went with its tier")
-	require.NotNil(t, budget.ModelConfigID)
-	var tiers int64
-	require.NoError(t, second.ConfigStore.DB().Model(&tables.TableModelConfig{}).
-		Where("scope_id = ?", "vk-guarded").Count(&tiers).Error)
-	assert.EqualValues(t, 1, tiers, "the guarded key's tier was pruned")
-}
-
 // Dropping a provider config from config.json deletes the tier holding its limits.
 func TestSQLite_ProviderConfigDroppedFromFileTakesItsTier(t *testing.T) {
 	initTestLogger()
@@ -21017,10 +20052,10 @@ func TestVirtualKeyLimitModelConfigsKeepsEveryTierWhenMappingUnknown(t *testing.
 	}}
 	configData.presentGovernanceSections = map[string]bool{"virtual_keys": true, "budgets": true}
 
-	known := virtualKeyLimitModelConfigs(stored, configData, nil, map[uint]string{}, true)
+	known := virtualKeyLimitModelConfigs(stored, configData, map[uint]string{}, true)
 	assert.Empty(t, known, "with the mapping known and nothing declared, the tiers are prunable")
 
-	unknown := virtualKeyLimitModelConfigs(stored, configData, nil, map[uint]string{}, false)
+	unknown := virtualKeyLimitModelConfigs(stored, configData, map[uint]string{}, false)
 	assert.Len(t, unknown, 2, "an unknown mapping must keep every tier")
 	assert.True(t, unknown["tier-key"] && unknown["tier-openai"])
 }
@@ -21568,29 +20603,4 @@ func getWeight(w *float64) float64 {
 		return 1.0
 	}
 	return *w
-}
-
-// RegisterVirtualKeyPruneGuard installs the guard consulted by
-// pruneGovernanceConfigToFile before deleting virtual keys. Must be called before
-// LoadConfig.
-func RegisterVirtualKeyPruneGuard(fn VirtualKeyPruneGuard) {
-	virtualKeyPruneGuardMu.Lock()
-	virtualKeyPruneGuard = fn
-	virtualKeyPruneGuardMu.Unlock()
-}
-
-// RegisterGovernanceLimitPruneGuard installs the guard consulted by pruneGovernanceConfigToFile
-// before deleting budgets and rate limits. Must be called before LoadConfig. Passing nil clears it.
-func RegisterGovernanceLimitPruneGuard(fn GovernanceLimitPruneGuard) {
-	governanceLimitPruneGuardMu.Lock()
-	governanceLimitPruneGuard = fn
-	governanceLimitPruneGuardMu.Unlock()
-}
-
-// RegisterConfigStoreReadyHook installs the hook LoadConfig calls once its config store is open.
-// Must be called before LoadConfig. Passing nil clears it.
-func RegisterConfigStoreReadyHook(fn ConfigStoreReadyHook) {
-	configStoreReadyHookMu.Lock()
-	configStoreReadyHook = fn
-	configStoreReadyHookMu.Unlock()
 }

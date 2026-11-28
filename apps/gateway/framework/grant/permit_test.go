@@ -255,8 +255,7 @@ func TestEachProviderPermit(t *testing.T) {
 	})
 }
 
-// A refusal names the permit kind in words rather than by identifier - "your team's access profile",
-// not "team_access_profile" - so every kind declared here is named here.
+// A refusal names the permit kind in words rather than by identifier - "virtual key", not "vk" - so every kind declared here is named here.
 //
 // The assertion that carries this is the underscore one: it fails as soon as a kind is added with an
 // underscored value and no case in PrettyString.

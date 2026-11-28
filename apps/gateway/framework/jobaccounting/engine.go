@@ -436,8 +436,8 @@ func buildAggregateLog(req JobRequest, settlement *Settlement, out *Outcome, now
 	//
 	// The display names come from SourceLog — the creating request's own log row —
 	// rather than from whoever is settling. Matching the two on virtual key was not
-	// enough to keep identities apart: an access profile hands one virtual key to
-	// many users, so two different people compared equal and the settling user's name
+	// enough to keep identities apart: one virtual key can be shared by several
+	// members, so two different people compared equal and the settling user's name
 	// landed on the creator's cost row. A job first seen at settlement has no
 	// create-time attribution to prefer, so it keeps using BaseLog.
 	if req.Job != nil && hasJobAttribution(req.Job) {
