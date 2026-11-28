@@ -76,6 +76,7 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - Switched off, not removed: speech, transcription, images, video, realtime, rerank, batch and files keep their code and routes; `plugins/credits` refuses them with a 403 until each is switched on.
 - English only. Spanish was removed.
 - The template's leftovers are gone: seven analytics vendors (PostHog stays), demo charts, demo blog posts, the chat demo.
+- Engine cleanup, second pass (owner, 2026-11-28): four leftovers of the removed admin UI are out of `apps/gateway`, each with its routes, store methods, tables and tests, and a migration that drops its tables from an older database: dashboard notifications, feature flags, the skills repository and the UI's login sessions (`apps/gateway/MODIFICATIONS.md`, "Features outside the product"). The management API now takes the admin username and password on every call (Basic, or Bearer of their base64 form): no session token, cookie or websocket ticket is accepted. The gateway database went from 47 tables to 40. Kept on purpose: the ClickHouse log store and the object-storage offload of large log payloads (both are for log volume at scale), the job queue (sidekiq: the expired-key cleanup and the routing suggestions), SQLite (the engine's tests run on it).
 
 ## What is next, in order
 
@@ -89,6 +90,7 @@ The mobile app and the browser extension of the template were removed on 2026-11
 ## Waiting on the owner
 
 - A domain, hosting for both deployments, a logo (the current mark is a placeholder).
+- Teams, business units and projects in the engine: the owner asked to remove them (2026-11-28). They are not a leftover like the four above: they are owner kinds in the engine's limits model (budgets, rate limits, access profiles and the identity of a request: `plugins/governance/store.go`, `framework/grant`, `framework/configstore/tables/{team,virtualkey,budget}.go`) and columns of the request log and its materialized views (`framework/logstore`), about 700 references in 45 files. The product uses customer and virtual key only (`packages/gateway-client`). Removing them means reducing the limits model to customer and virtual key, which is a planned change to the path that enforces customers' limits, with the governance and credits tests (race detector) at every step. Not started; needs a plan the owner approves.
 - The payment gateway. Stripe's availability to a Saudi-registered business is disputed between sources and Stripe does not route mada; the local options are Moyasar, Tap, HyperPay and PayTabs, all quoted on request.
 - The chargeback rule (proposal: suspend the organization's keys when a dispute opens; deduct the amount if it is lost).
 - Legal pages: the three under `packages/cms` are the template's text.
