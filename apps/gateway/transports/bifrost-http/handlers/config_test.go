@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -14,7 +15,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/stretchr/testify/assert"
@@ -209,14 +209,6 @@ func TestUpdateConfig_InferenceAuthSetup(t *testing.T) {
 				persisted, err = store.GetClientConfig(bgCtx())
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, persisted.EnforceAuthOnInference)
-				status := putConfigCtx("")
-				(&SessionHandler{configStore: store}).isAuthEnabled(status)
-				var reported struct {
-					Inference *bool `json:"inference_auth_enforced"`
-				}
-				require.NoError(t, json.Unmarshal(status.Response.Body(), &reported))
-				require.NotNil(t, reported.Inference)
-				assert.Equal(t, tt.want, *reported.Inference)
 			}
 			if tt.status != 200 {
 				auth, err := store.GetAuthConfig(bgCtx())
@@ -263,139 +255,10 @@ func TestUpdateConfig_FirstAdminAcceptsSetupTokenHeader(t *testing.T) {
 	}
 }
 
-// TestIsAuthEnabled_ReportsSetupLockState pins the fields the dashboard uses to choose the
-// setup screen: setup_required follows the gate's lock state, setup_token_configured whether
-// a token exists, and both stay false when the gate is not installed (enterprise).
-func TestIsAuthEnabled_ReportsSetupLockState(t *testing.T) {
-	SetLogger(&mockLogger{})
-	token := "s3cret"
-	enabled := &configstore.AuthConfig{AdminUserName: schemas.NewSecretVar("admin"), AdminPassword: schemas.NewSecretVar("stored"), IsEnabled: true}
-	for _, tt := range []struct {
-		name                     string
-		gate                     bool
-		token                    string
-		admin                    *configstore.AuthConfig
-		wantRequired, wantConfig bool
-	}{
-		{name: "no gate (enterprise)", gate: false, token: token},
-		{name: "locked with token", gate: true, token: token, wantRequired: true, wantConfig: true},
-		{name: "locked without token", gate: true, wantRequired: true},
-		{name: "auth enabled", gate: true, token: token, admin: enabled, wantConfig: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			store := newRealConfigStore(t)
-			if tt.admin != nil {
-				require.NoError(t, store.UpdateAuthConfig(bgCtx(), tt.admin))
-			}
-			h := &SessionHandler{configStore: store}
-			if tt.gate {
-				am := &AuthMiddleware{}
-				if tt.token != "" {
-					am.setupToken.Store(&tt.token)
-				}
-				am.UpdateAuthConfig(tt.admin)
-				h.SetSetupLock(am)
-			}
-			ctx := putConfigCtx("")
-			h.isAuthEnabled(ctx)
-			var reported struct {
-				SetupRequired        *bool `json:"setup_required"`
-				SetupTokenConfigured *bool `json:"setup_token_configured"`
-			}
-			require.NoError(t, json.Unmarshal(ctx.Response.Body(), &reported), string(ctx.Response.Body()))
-			require.NotNil(t, reported.SetupRequired)
-			require.NotNil(t, reported.SetupTokenConfigured)
-			assert.Equal(t, tt.wantRequired, *reported.SetupRequired)
-			assert.Equal(t, tt.wantConfig, *reported.SetupTokenConfigured)
-		})
-	}
-}
-
-// TestStartSetupSession_IssuesHttpOnlyCookie pins POST /api/session/setup: it trades a valid
-// setup token for an HttpOnly, SameSite=Strict cookie the gate accepts, refuses a wrong token,
-// and refuses outright when the setup lock is not active. Logout expires the cookie.
-func TestStartSetupSession_IssuesHttpOnlyCookie(t *testing.T) {
-	SetLogger(&mockLogger{})
-	token := "s3cret"
-	newLocked := func() (*SessionHandler, *AuthMiddleware) {
-		am := &AuthMiddleware{}
-		am.setupToken.Store(&token)
-		h := &SessionHandler{configStore: newRealConfigStore(t)}
-		h.SetSetupLock(am)
-		return h, am
-	}
-	post := func(h *SessionHandler, header string) *fasthttp.RequestCtx {
-		ctx := &fasthttp.RequestCtx{}
-		ctx.Request.Header.SetMethod("POST")
-		ctx.Request.SetRequestURI("/api/session/setup")
-		if header != "" {
-			ctx.Request.Header.Set(SetupTokenHeader, header)
-		}
-		h.startSetupSession(ctx)
-		return ctx
-	}
-
-	t.Run("valid token", func(t *testing.T) {
-		h, am := newLocked()
-		ctx := post(h, token)
-		require.Equal(t, 200, ctx.Response.StatusCode(), string(ctx.Response.Body()))
-		cookie := fasthttp.AcquireCookie()
-		defer fasthttp.ReleaseCookie(cookie)
-		cookie.SetKey(SetupSessionCookie)
-		require.True(t, ctx.Response.Header.Cookie(cookie), "Set-Cookie %s missing", SetupSessionCookie)
-		assert.True(t, cookie.HTTPOnly(), "setup session cookie must be HttpOnly")
-		assert.Equal(t, fasthttp.CookieSameSiteStrictMode, cookie.SameSite())
-		assert.Equal(t, "/", string(cookie.Path()))
-		assert.NotContains(t, string(cookie.Value()), token, "cookie must not carry the token")
-		assert.True(t, am.validSetupSession(string(cookie.Value()), time.Now()), "issued cookie must pass the gate")
-	})
-	t.Run("forwarded https sets Secure", func(t *testing.T) {
-		h, _ := newLocked()
-		ctx := &fasthttp.RequestCtx{}
-		ctx.Request.Header.SetMethod("POST")
-		ctx.Request.Header.Set(SetupTokenHeader, token)
-		ctx.Request.Header.Set("X-Forwarded-Proto", "https")
-		h.startSetupSession(ctx)
-		require.Equal(t, 200, ctx.Response.StatusCode())
-		cookie := fasthttp.AcquireCookie()
-		defer fasthttp.ReleaseCookie(cookie)
-		cookie.SetKey(SetupSessionCookie)
-		require.True(t, ctx.Response.Header.Cookie(cookie))
-		assert.True(t, cookie.Secure())
-	})
-	t.Run("wrong or missing token", func(t *testing.T) {
-		h, _ := newLocked()
-		for _, header := range []string{"nope", ""} {
-			ctx := post(h, header)
-			assert.Equal(t, 403, ctx.Response.StatusCode(), "header %q", header)
-			assert.Empty(t, ctx.Response.Header.PeekCookie(SetupSessionCookie))
-		}
-	})
-	t.Run("lock not active", func(t *testing.T) {
-		enterprise := &SessionHandler{configStore: newRealConfigStore(t)}
-		assert.Equal(t, 409, post(enterprise, token).Response.StatusCode(), "no gate installed")
-		h, am := newLocked()
-		am.UpdateAuthConfig(&configstore.AuthConfig{AdminUserName: schemas.NewSecretVar("admin"), AdminPassword: schemas.NewSecretVar("x"), IsEnabled: true})
-		assert.Equal(t, 409, post(h, token).Response.StatusCode(), "dashboard auth enabled")
-	})
-	t.Run("logout expires the cookie", func(t *testing.T) {
-		h, _ := newLocked()
-		ctx := &fasthttp.RequestCtx{}
-		ctx.Request.Header.SetMethod("POST")
-		h.logout(ctx)
-		cookie := fasthttp.AcquireCookie()
-		defer fasthttp.ReleaseCookie(cookie)
-		cookie.SetKey(SetupSessionCookie)
-		require.True(t, ctx.Response.Header.Cookie(cookie), "logout must clear %s", SetupSessionCookie)
-		assert.Empty(t, string(cookie.Value()))
-		assert.True(t, cookie.Expire().Before(time.Now()))
-	})
-}
-
-// TestUpdateConfig_SetupTokenFirstAdminCanLogIn pins the full first-admin path through the
-// OSS setup lock: an admin created by a setup-token-authenticated PUT (the security view's
-// payload shape) can then log in with exactly the credentials it was created with.
-func TestUpdateConfig_SetupTokenFirstAdminCanLogIn(t *testing.T) {
+// TestUpdateConfig_SetupTokenFirstAdminCanAuthenticate pins the full first-admin path through
+// the OSS setup lock: an admin created by a setup-token-authenticated PUT is then accepted by
+// the API's auth with exactly the credentials it was created with, and with no others.
+func TestUpdateConfig_SetupTokenFirstAdminCanAuthenticate(t *testing.T) {
 	SetLogger(&mockLogger{})
 	store := newRealConfigStore(t)
 	cfg := newTestConfig(store, false)
@@ -406,16 +269,27 @@ func TestUpdateConfig_SetupTokenFirstAdminCanLogIn(t *testing.T) {
 	h.updateConfig(ctx)
 	require.Equal(t, 200, ctx.Response.StatusCode(), string(ctx.Response.Body()))
 
+	am, err := InitAuthMiddleware(store, "")
+	require.NoError(t, err)
 	for _, tc := range []struct {
-		name, body string
-		status     int
+		name, credentials string
+		wantNext          bool
 	}{
-		{name: "same credentials", body: `{"username":"admin","password":"StrongPassword1!"}`, status: 200},
-		{name: "wrong password", body: `{"username":"admin","password":"StrongPassword1"}`, status: 401},
+		{name: "same credentials", credentials: "admin:StrongPassword1!", wantNext: true},
+		{name: "wrong password", credentials: "admin:StrongPassword1"},
+		{name: "wrong username", credentials: "root:StrongPassword1!"},
 	} {
-		login := putConfigCtx(tc.body)
-		(&SessionHandler{configStore: store}).login(login)
-		assert.Equal(t, tc.status, login.Response.StatusCode(), "%s: %s", tc.name, login.Response.Body())
+		for _, scheme := range []string{"Basic", "Bearer"} {
+			req := &fasthttp.RequestCtx{}
+			req.Request.SetRequestURI("/api/providers")
+			req.Request.Header.Set("Authorization", scheme+" "+base64.StdEncoding.EncodeToString([]byte(tc.credentials)))
+			nextCalled := false
+			am.APIMiddleware()(func(*fasthttp.RequestCtx) { nextCalled = true })(req)
+			assert.Equal(t, tc.wantNext, nextCalled, "%s (%s): status %d", tc.name, scheme, req.Response.StatusCode())
+			if !tc.wantNext {
+				assert.Equal(t, fasthttp.StatusUnauthorized, req.Response.StatusCode(), "%s (%s)", tc.name, scheme)
+			}
+		}
 	}
 }
 

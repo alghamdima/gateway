@@ -37,7 +37,6 @@ func setupEncryptionTestStore(t testing.TB) (*RDBConfigStore, *gorm.DB) {
 		&tables.TableProvider{},
 		&tables.TablePlugin{},
 		&tables.TableVirtualKey{},
-		&tables.SessionsTable{},
 		&tables.TableVectorStoreConfig{},
 		&tables.TableBudget{},
 		&tables.TableRateLimit{},
@@ -74,7 +73,6 @@ func TestEncryptPlaintextRows_EncryptsAllTables(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
 	ctx := context.Background()
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
 
 	// Insert plaintext rows across all tables (bypassing hooks)
 	insertPlaintextRow(t, db,
@@ -86,11 +84,6 @@ func TestEncryptPlaintextRows_EncryptsAllTables(t *testing.T) {
 		`INSERT INTO governance_virtual_keys (id, name, value, is_active, encryption_status, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, 'plain_text', ?, ?)`,
 		"vk-1", "test-vk", "vk-plaintext-value", true, now, now)
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO sessions (token, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'plain_text', ?, ?, ?)`,
-		"session-plaintext-token", future, now, now)
 
 	insertPlaintextRow(t, db,
 		`INSERT INTO config_providers (name, proxy_config_json, encryption_status, created_at, updated_at)
@@ -121,11 +114,6 @@ func TestEncryptPlaintextRows_EncryptsAllTables(t *testing.T) {
 	db.Table("governance_virtual_keys").Where("id = ?", "vk-1").Take(&vkRow)
 	assert.Equal(t, "encrypted", vkRow["encryption_status"])
 	assert.NotEqual(t, "vk-plaintext-value", vkRow["value"])
-
-	var sessionRow map[string]any
-	db.Table("sessions").Take(&sessionRow)
-	assert.Equal(t, "encrypted", sessionRow["encryption_status"])
-	assert.NotEqual(t, "session-plaintext-token", sessionRow["token"])
 
 	var providerRow map[string]any
 	db.Table("config_providers").Where("name = ?", "openai").Take(&providerRow)
@@ -225,39 +213,6 @@ func TestEncryptPlaintextRows_HandlesNullEncryptionStatus(t *testing.T) {
 // ============================================================================
 // Individual batch functions
 // ============================================================================
-
-func TestEncryptPlaintextSessions(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO sessions (token, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'plain_text', ?, ?, ?)`,
-		"session-token-1", future, now, now)
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO sessions (token, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'plain_text', ?, ?, ?)`,
-		"session-token-2", future, now, now)
-
-	count, err := store.encryptPlaintextSessions(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 2, count)
-
-	// Both should be decryptable via GORM
-	var sessions []tables.SessionsTable
-	require.NoError(t, db.Find(&sessions).Error)
-	assert.Len(t, sessions, 2)
-
-	tokens := map[string]bool{}
-	for _, s := range sessions {
-		tokens[s.Token] = true
-	}
-	assert.True(t, tokens["session-token-1"])
-	assert.True(t, tokens["session-token-2"])
-}
 
 func TestEncryptPlaintextPlugins(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
@@ -517,30 +472,6 @@ func TestEncryptPlaintextKeys_MultipleBatches(t *testing.T) {
 		require.NoError(t, db.Where("name = ?", fmt.Sprintf("paginated-key-%d", i)).First(&found).Error)
 		assert.Equal(t, fmt.Sprintf("sk-secret-%d", i), found.Value.GetValue())
 	}
-}
-
-func TestEncryptPlaintextSessions_MultipleBatches(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
-
-	// Insert 5 plaintext sessions
-	for i := range 5 {
-		insertPlaintextRow(t, db,
-			`INSERT INTO sessions (token, encryption_status, expires_at, created_at, updated_at)
-			 VALUES (?, 'plain_text', ?, ?, ?)`,
-			fmt.Sprintf("session-token-%d", i), future, now, now)
-	}
-
-	count, err := store.encryptPlaintextSessions(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 5, count)
-
-	// Verify all are encrypted
-	var encryptedCount int64
-	db.Table("sessions").Where("encryption_status = ?", "encrypted").Count(&encryptedCount)
-	assert.Equal(t, int64(5), encryptedCount)
 }
 
 // ============================================================================
@@ -1044,18 +975,12 @@ func TestEncryptPlaintextRows_EncryptionDisabled_Noop(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
 	ctx := context.Background()
 	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
 
 	// Insert plaintext rows across multiple tables
 	insertPlaintextRow(t, db,
 		`INSERT INTO config_keys (name, provider_id, provider, key_id, value, encryption_status, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, 'plain_text', ?, ?)`,
 		"disabled-key", 1, "openai", "dk-1", "sk-should-stay-plain", now, now)
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO sessions (token, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'plain_text', ?, ?, ?)`,
-		"session-should-stay-plain", future, now, now)
 
 	insertPlaintextRow(t, db,
 		`INSERT INTO governance_virtual_keys (id, name, value, is_active, encryption_status, created_at, updated_at)
@@ -1071,11 +996,6 @@ func TestEncryptPlaintextRows_EncryptionDisabled_Noop(t *testing.T) {
 	db.Table("config_keys").Where("name = ?", "disabled-key").Take(&keyRow)
 	assert.Equal(t, "plain_text", keyRow["encryption_status"])
 	assert.Equal(t, "sk-should-stay-plain", keyRow["value"])
-
-	var sessionRow map[string]any
-	db.Table("sessions").Take(&sessionRow)
-	assert.Equal(t, "plain_text", sessionRow["encryption_status"])
-	assert.Equal(t, "session-should-stay-plain", sessionRow["token"])
 
 	var vkRow map[string]any
 	db.Table("governance_virtual_keys").Where("id = ?", "vk-dis-1").Take(&vkRow)
@@ -1131,29 +1051,8 @@ func TestEncryptPlaintextRows_EmptyDatabase(t *testing.T) {
 // ============================================================================
 
 // ============================================================================
-// Hash computation during startup pass (sessions + virtual keys)
+// Hash computation during startup pass (virtual keys)
 // ============================================================================
-
-func TestEncryptPlaintextSessions_HashComputedDuringStartup(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	future := time.Now().Add(time.Hour).UTC().Format("2006-01-02 15:04:05")
-
-	insertPlaintextRow(t, db,
-		`INSERT INTO sessions (token, encryption_status, expires_at, created_at, updated_at)
-		 VALUES (?, 'plain_text', ?, ?, ?)`,
-		"hash-startup-token", future, now, now)
-
-	count, err := store.encryptPlaintextSessions(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	var raw map[string]any
-	db.Table("sessions").Take(&raw)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.Equal(t, encrypt.HashSHA256("hash-startup-token"), raw["token_hash"])
-}
 
 func TestEncryptPlaintextVirtualKeys_HashComputedDuringStartup(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
@@ -1182,28 +1081,6 @@ func TestEncryptPlaintextVirtualKeys_HashComputedDuringStartup(t *testing.T) {
 // ============================================================================
 // Already-encrypted rows skipped for non-key tables
 // ============================================================================
-
-func TestEncryptPlaintextRows_SkipsAlreadyEncryptedSessions(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-
-	session := &tables.SessionsTable{
-		Token:     "already-encrypted-session",
-		ExpiresAt: time.Now().Add(time.Hour),
-	}
-	require.NoError(t, db.Create(session).Error)
-
-	var rawBefore map[string]any
-	db.Table("sessions").Where("id = ?", session.ID).Take(&rawBefore)
-	encryptedBefore := rawBefore["token"]
-
-	err := store.EncryptPlaintextRows(ctx)
-	require.NoError(t, err)
-
-	var rawAfter map[string]any
-	db.Table("sessions").Where("id = ?", session.ID).Take(&rawAfter)
-	assert.Equal(t, encryptedBefore, rawAfter["token"])
-}
 
 func TestEncryptPlaintextRows_SkipsAlreadyEncryptedVirtualKeys(t *testing.T) {
 	store, db := setupEncryptionTestStore(t)
@@ -1371,57 +1248,6 @@ func TestMigrationAddVertexAWSWorkloadIdentityColumn_RollbackRefuses(t *testing.
 // Plaintext lookup fallbacks only match rows that are still plaintext
 // ============================================================================
 
-// Once a session is encrypted, only its plaintext token resolves it, through the hash. The
-// value stored in the token column is ciphertext and must not act as the token, for reads or
-// deletes. The legacy plaintext fallback keeps serving rows that are still plaintext.
-func TestGetSession_StoredCiphertextDoesNotResolve(t *testing.T) {
-	store, db := setupEncryptionTestStore(t)
-	ctx := context.Background()
-
-	session := &tables.SessionsTable{Token: "session-plain-token", ExpiresAt: time.Now().Add(time.Hour)}
-	require.NoError(t, db.Create(session).Error)
-	var raw map[string]any
-	db.Table("sessions").Where("id = ?", session.ID).Take(&raw)
-	ciphertext, _ := raw["token"].(string)
-	require.NotEmpty(t, ciphertext)
-	require.NotEqual(t, "session-plain-token", ciphertext, "the row stores ciphertext")
-
-	found, err := store.GetSession(ctx, "session-plain-token")
-	require.NoError(t, err)
-	require.NotNil(t, found, "the plaintext token resolves the session")
-	assert.Equal(t, "session-plain-token", found.Token)
-
-	found, err = store.GetSession(ctx, ciphertext)
-	require.NoError(t, err)
-	assert.Nil(t, found, "the at-rest ciphertext must not resolve the session")
-
-	require.NoError(t, store.DeleteSession(ctx, ciphertext))
-	var remaining int64
-	db.Table("sessions").Where("id = ?", session.ID).Count(&remaining)
-	assert.Equal(t, int64(1), remaining, "deleting by ciphertext removes nothing")
-
-	// A row still stored in plaintext is marked plain_text, or was written before the status
-	// column existed and carries NULL or an empty status. All three resolve by token and delete
-	// by token.
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
-	later := time.Now().UTC().Add(time.Hour).Format("2006-01-02 15:04:05")
-	for label, status := range legacyPlaintextStatuses {
-		token := "legacy-session-token-" + label
-		insertPlaintextRow(t, db,
-			`INSERT INTO sessions (token, expires_at, created_at, updated_at, encryption_status) VALUES (?, ?, ?, ?, ?)`,
-			token, later, now, now, status)
-		found, err = store.GetSession(ctx, token)
-		require.NoError(t, err)
-		require.NotNil(t, found, "a row still stored in plaintext (status %s) resolves by token", label)
-		assert.Equal(t, token, found.Token)
-
-		require.NoError(t, store.DeleteSession(ctx, token))
-		found, err = store.GetSession(ctx, token)
-		require.NoError(t, err)
-		assert.Nil(t, found, "the plaintext row (status %s) is deleted by its token", label)
-	}
-}
-
 // legacyPlaintextStatuses are the encryption_status values of a row whose sensitive columns are
 // still plaintext: marked so, or written before the column existed (NULL or empty).
 var legacyPlaintextStatuses = map[string]any{"plain_text": "plain_text", "null": nil, "empty": ""}
@@ -1459,15 +1285,14 @@ func TestFindVirtualKeyByValue_StoredCiphertextDoesNotResolve(t *testing.T) {
 }
 
 // BenchmarkCredentialLookupFallback measures the credential lookups on the auth path against an
-// encrypted SQLite store: a virtual key found by its hash (the common case), a value that matches
-// nothing and falls back to the legacy plaintext lookup, and a session token that does the same.
+// encrypted SQLite store: a virtual key found by its hash (the common case) and a value that matches
+// nothing and falls back to the legacy plaintext lookup.
 func BenchmarkCredentialLookupFallback(b *testing.B) {
 	store, db := setupEncryptionTestStore(b)
 	vk := &tables.TableVirtualKey{ID: "vk-bench", Name: "bench-vk", Value: *schemas.NewSecretVar("vk-bench-secret"), IsActive: bifrost.Ptr(true)}
 	if err := db.Create(vk).Error; err != nil {
 		b.Fatal(err)
 	}
-	ctx := context.Background()
 	b.Run("virtual_key_hit", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -1480,12 +1305,6 @@ func BenchmarkCredentialLookupFallback(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			_, _ = store.findVirtualKeyByValue(db, "vk-unknown-secret")
-		}
-	})
-	b.Run("session_miss", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			_, _ = store.GetSession(ctx, "unknown-session-token")
 		}
 	})
 }

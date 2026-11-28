@@ -736,36 +736,6 @@ func TestRecoveryMiddleware_TracingRecordsPanicAsError(t *testing.T) {
 	}
 }
 
-func TestIsInferenceWSEndpoint(t *testing.T) {
-	paths := []string{
-		"/v1/responses",
-		"/v1/realtime",
-		"/responses",
-		"/realtime",
-		"/openai/v1/responses",
-		"/openai/responses",
-		"/openai/openai/responses",
-		"/openai/v1/realtime",
-		"/openai/realtime",
-		"/openai/openai/realtime",
-		"/v1/audio/speech/stream",
-		"/elevenlabs/v1/text-to-dialogue/stream-input",
-	}
-
-	for _, path := range paths {
-		if !isInferenceWSEndpoint(path) {
-			t.Fatalf("expected inference websocket path %s to be recognized", path)
-		}
-	}
-
-	if isInferenceWSEndpoint("/api/ws") {
-		t.Fatal("dashboard websocket path should not be treated as inference websocket")
-	}
-	if isInferenceWSEndpoint("/openai/chat/completions") {
-		t.Fatal("non-websocket OpenAI path should not be treated as inference websocket")
-	}
-}
-
 func TestIsRealtimeTransportEndpoint(t *testing.T) {
 	paths := []string{
 		"/v1/realtime",
@@ -1232,12 +1202,6 @@ func TestAuthMiddleware_WhitelistedRoutes(t *testing.T) {
 	})
 
 	whitelistedRoutes := []string{
-		"/api/session/is-auth-enabled",
-		"/api/session/login",
-		// Logout is idempotent (clears the cookie, revokes the session if a
-		// token is present) and must never 401, or a repeat logout cascades
-		// into a redirect loop in the dashboard.
-		"/api/session/logout",
 		"/health",
 	}
 
@@ -1642,10 +1606,10 @@ func TestAPIMiddleware_BasicAdminCredentialsAreNotLocalAdmin(t *testing.T) {
 }
 
 // TestSetupLockMiddleware_PublicRoutesStayOpen pins that the setup screen can bootstrap:
-// health, version and is-auth-enabled answer without the setup token while locked.
+// health and version answer without the setup token while locked.
 func TestSetupLockMiddleware_PublicRoutesStayOpen(t *testing.T) {
 	SetLogger(&mockLogger{})
-	for _, path := range []string{"/health", "/api/version", "/api/session/is-auth-enabled"} {
+	for _, path := range []string{"/health", "/api/version"} {
 		am := newSetupLockedAuthMiddleware("s3cret", nil)
 		ctx := &fasthttp.RequestCtx{}
 		ctx.Request.SetRequestURI(path)
@@ -1656,7 +1620,7 @@ func TestSetupLockMiddleware_PublicRoutesStayOpen(t *testing.T) {
 }
 
 // TestSetupLockMiddleware_IgnoredOnceAuthEnabled pins that the setup token stops working
-// the moment dashboard auth is enabled; normal session auth applies.
+// the moment dashboard auth is enabled; the normal credential check applies.
 func TestSetupLockMiddleware_IgnoredOnceAuthEnabled(t *testing.T) {
 	SetLogger(&mockLogger{})
 	am := newSetupLockedAuthMiddleware("s3cret", &configstore.AuthConfig{
@@ -1698,85 +1662,6 @@ func TestSetupLockMiddleware_LiftsWhenAdminEnabled(t *testing.T) {
 	am.SetupLockMiddleware()(func(ctx *fasthttp.RequestCtx) { nextCalled = true })(ctx2)
 	if !nextCalled {
 		t.Error("gate should hand off to APIMiddleware once dashboard auth is enabled")
-	}
-}
-
-// TestSetupLockMiddleware_SetupSessionCookie pins the dashboard path: the HttpOnly cookie
-// from POST /api/session/setup stands in for the header (WebSocket upgrades included), and a
-// tampered, expired, or other-token cookie is refused.
-func TestSetupLockMiddleware_SetupSessionCookie(t *testing.T) {
-	SetLogger(&mockLogger{})
-	am := newSetupLockedAuthMiddleware("s3cret", nil)
-	now := time.Now()
-	valid, expires, err := am.IssueSetupSession(now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := expires.Sub(now); got != SetupSessionTTL {
-		t.Errorf("expiry = %v, want %v", got, SetupSessionTTL)
-	}
-	if strings.Contains(valid, "s3cret") {
-		t.Fatal("setup session cookie must not carry the setup token")
-	}
-	other := newSetupLockedAuthMiddleware("another-token", nil)
-	otherCookie, _, err := other.IssueSetupSession(now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expired, _, err := am.IssueSetupSession(now.Add(-SetupSessionTTL - time.Minute))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tampered := valid[:len(valid)-2] + "xx"
-	for _, tc := range []struct {
-		name, cookie, header string
-		websocket            bool
-		wantNext             bool
-		wantStatus           int
-	}{
-		{name: "valid cookie", cookie: valid, wantNext: true, wantStatus: fasthttp.StatusOK},
-		{name: "valid cookie on websocket upgrade", cookie: valid, websocket: true, wantNext: true, wantStatus: fasthttp.StatusOK},
-		{name: "tampered cookie", cookie: tampered, wantStatus: fasthttp.StatusUnauthorized},
-		{name: "expired cookie", cookie: expired, wantStatus: fasthttp.StatusUnauthorized},
-		{name: "cookie signed under another token", cookie: otherCookie, wantStatus: fasthttp.StatusUnauthorized},
-		{name: "garbage cookie", cookie: "v1.notanumber.zz.zz", wantStatus: fasthttp.StatusUnauthorized},
-		{name: "wrong header beats a valid cookie", cookie: valid, header: "nope", wantStatus: fasthttp.StatusForbidden},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := &fasthttp.RequestCtx{}
-			ctx.Request.SetRequestURI("/api/providers")
-			ctx.Request.Header.SetCookie(SetupSessionCookie, tc.cookie)
-			if tc.header != "" {
-				ctx.Request.Header.Set(SetupTokenHeader, tc.header)
-			}
-			if tc.websocket {
-				ctx.Request.Header.Set("Upgrade", "websocket")
-			}
-			if got := runOSSAPIChain(am, ctx); got != tc.wantNext {
-				t.Fatalf("next called = %v, want %v (status %d, body %s)", got, tc.wantNext, ctx.Response.StatusCode(), ctx.Response.Body())
-			}
-			if ctx.Response.StatusCode() != tc.wantStatus {
-				t.Errorf("status = %d, want %d", ctx.Response.StatusCode(), tc.wantStatus)
-			}
-			if tc.wantNext {
-				if bypassed, _ := ctx.UserValue(schemas.BifrostContextKeyAuthBypassed).(bool); bypassed {
-					t.Error("cookie-authenticated request must not be marked as an auth bypass")
-				}
-			}
-		})
-	}
-
-	// Once dashboard auth is on, the cookie is no credential: APIMiddleware wants a session.
-	am.UpdateAuthConfig(&configstore.AuthConfig{
-		AdminUserName: schemas.NewSecretVar("admin"),
-		AdminPassword: schemas.NewSecretVar("hashedpassword"),
-		IsEnabled:     true,
-	})
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.SetRequestURI("/api/providers")
-	ctx.Request.Header.SetCookie(SetupSessionCookie, valid)
-	if runOSSAPIChain(am, ctx) || ctx.Response.StatusCode() != fasthttp.StatusUnauthorized {
-		t.Errorf("setup session cookie must not authenticate once dashboard auth is enabled, got %d", ctx.Response.StatusCode())
 	}
 }
 
@@ -5175,7 +5060,7 @@ func TestSecurityHeadersMiddleware_APINoStore(t *testing.T) {
 		handlerSets string
 		want        string
 	}{
-		{name: "api path gets no-store", path: "/api/session/is-auth-enabled", want: "no-store"},
+		{name: "api path gets no-store", path: "/api/version", want: "no-store"},
 		{name: "api path keeps handler policy", path: "/api/branding/logo", handlerSets: "private, max-age=86400", want: "private, max-age=86400"},
 		{name: "non-api path untouched", path: "/ui/assets/app.js", want: ""},
 		{name: "non-api path keeps handler policy", path: "/ui/assets/app.js", handlerSets: "public, max-age=3600", want: "public, max-age=3600"},
@@ -5389,7 +5274,7 @@ func TestTracingMiddleware_RootSpanDropsQueryAndNormalizes(t *testing.T) {
 func TestAuthMiddleware_ConfiguredSetupToken_OutlivesFirstAdmin(t *testing.T) {
 	SetLogger(&mockLogger{})
 	const token = "test-setup-token"
-	am, err := InitAuthMiddleware(newRealConfigStore(t), nil, token)
+	am, err := InitAuthMiddleware(newRealConfigStore(t), token)
 	if err != nil {
 		t.Fatalf("InitAuthMiddleware: %v", err)
 	}
@@ -5418,7 +5303,7 @@ func TestAuthMiddleware_ConfiguredSetupToken_OutlivesFirstAdmin(t *testing.T) {
 		t.Error("an admin account must not make every token match the configured one")
 	}
 
-	none, err := InitAuthMiddleware(newRealConfigStore(t), nil, "")
+	none, err := InitAuthMiddleware(newRealConfigStore(t), "")
 	if err != nil {
 		t.Fatalf("InitAuthMiddleware: %v", err)
 	}
@@ -6104,17 +5989,17 @@ func TestServerRootHandler_BasePathRouting(t *testing.T) {
 	var hitPath string
 	record := func(ctx *fasthttp.RequestCtx) { hitPath = string(ctx.Request.URI().PathOriginal()) }
 	r.GET("/health", record)
-	r.GET("/api/session/is-auth-enabled", record)
+	r.GET("/api/version", record)
 	r.GET("/{filepath:*}", func(ctx *fasthttp.RequestCtx) { hitPath = "ui:" + string(ctx.Path()) })
 
 	handler := ServerRootHandler(newRecoveryTestCors(), basePathTestConfig("/bifrost"), r.Handler)
 	for uri, want := range map[string]string{
-		"/bifrost/api/session/is-auth-enabled": "/api/session/is-auth-enabled",
-		"/api/session/is-auth-enabled":         "/api/session/is-auth-enabled",
-		"/bifrost/health":                      "/health",
-		"/health":                              "/health",
-		"/bifrost/workspace/logs":              "ui:/workspace/logs",
-		"/bifrost/login":                       "ui:/login",
+		"/bifrost/api/version":    "/api/version",
+		"/api/version":            "/api/version",
+		"/bifrost/health":         "/health",
+		"/health":                 "/health",
+		"/bifrost/workspace/logs": "ui:/workspace/logs",
+		"/bifrost/login":          "ui:/login",
 		// The root chain strips the prefix exactly once.
 		"/bifrost/bifrost/workspace": "ui:/bifrost/workspace",
 	} {
@@ -6134,7 +6019,7 @@ func TestServerRootHandler_BasePathRouting(t *testing.T) {
 
 	// API responses under the prefix still get the /api/ no-store header.
 	ctx = &fasthttp.RequestCtx{}
-	ctx.Request.SetRequestURI("/bifrost/api/session/is-auth-enabled")
+	ctx.Request.SetRequestURI("/bifrost/api/version")
 	ctx.Request.Header.SetMethod("GET")
 	handler(ctx)
 	assert.Equal(t, "no-store", string(ctx.Response.Header.Peek("Cache-Control")))

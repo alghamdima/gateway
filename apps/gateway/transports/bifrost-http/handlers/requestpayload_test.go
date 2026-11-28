@@ -14,34 +14,10 @@ import (
 	"github.com/maximhq/bifrost/core/providers/openai"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
-	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/valyala/fasthttp"
 )
-
-type loginDecodeConfigStore struct {
-	configstore.ConfigStore
-}
-
-func TestSessionLoginInvalidPayloadDoesNotExposeDecoderDetails(t *testing.T) {
-	h := &SessionHandler{configStore: &loginDecodeConfigStore{}}
-	ctx := &fasthttp.RequestCtx{}
-	ctx.Request.SetBodyString(`{"username":1234,"password":"Suresh"}`)
-
-	h.login(ctx)
-
-	body := string(ctx.Response.Body())
-	if ctx.Response.StatusCode() != fasthttp.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body=%s", ctx.Response.StatusCode(), fasthttp.StatusBadRequest, body)
-	}
-	if !strings.Contains(body, "Invalid request payload") {
-		t.Fatalf("body = %s, want generic invalid payload message", body)
-	}
-	if strings.Contains(body, "cannot unmarshal") || strings.Contains(body, "username") || strings.Contains(body, "Go struct field") {
-		t.Fatalf("body exposes decoder internals: %s", body)
-	}
-}
 
 func TestPrepareRequestInvalidPayloadDoesNotExposeDecoderDetails(t *testing.T) {
 	ctx := &fasthttp.RequestCtx{}

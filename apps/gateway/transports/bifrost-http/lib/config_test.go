@@ -571,7 +571,6 @@ type MockConfigStore struct {
 	governanceItemsUpdated struct {
 		budgets []tables.TableBudget
 	}
-	flushSessionsCalled bool
 }
 
 // NewMockConfigStore creates a new mock config store
@@ -1109,19 +1108,6 @@ func (m *MockConfigStore) UpdateStatus(ctx context.Context, provider schemas.Mod
 	return nil
 }
 
-// Session
-func (m *MockConfigStore) GetSession(ctx context.Context, token string) (*tables.SessionsTable, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) CreateSession(ctx context.Context, session *tables.SessionsTable) error {
-	return nil
-}
-
-func (m *MockConfigStore) DeleteSession(ctx context.Context, token string) error {
-	return nil
-}
-
 // Model pricing
 func (m *MockConfigStore) GetModelPrices(ctx context.Context) ([]tables.TableModelPricing, error) {
 	return nil, nil
@@ -1320,12 +1306,6 @@ func (m *MockConfigStore) CleanupExpiredLockByKey(ctx context.Context, lockKey s
 // Key management
 func (m *MockConfigStore) GetKeysByProvider(ctx context.Context, provider string) ([]tables.TableKey, error) {
 	return nil, nil
-}
-
-// Sessions
-func (m *MockConfigStore) FlushSessions(ctx context.Context) error {
-	m.flushSessionsCalled = true
-	return nil
 }
 
 // Plugins
@@ -18059,9 +18039,6 @@ func TestLoadAuthConfigFromFile_PasswordHashing(t *testing.T) {
 
 		loadAuthConfig(ctx, config, configData)
 
-		// Verify sessions were flushed because password changed
-		require.True(t, mockStore.flushSessionsCalled, "sessions should be flushed when password changes")
-
 		// Verify the new password was hashed and stored
 		storedAuth, err := mockStore.GetAuthConfig(ctx)
 		require.NoError(t, err)
@@ -18094,8 +18071,6 @@ func TestLoadAuthConfigFromFile_PasswordHashing(t *testing.T) {
 
 		loadAuthConfig(ctx, config, configData)
 
-		// Verify sessions were NOT flushed because password did not change
-		require.False(t, mockStore.flushSessionsCalled, "sessions should not be flushed when password matches")
 	})
 }
 

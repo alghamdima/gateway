@@ -3,7 +3,6 @@ package tables
 import (
 	"os"
 	"testing"
-	"time"
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -35,7 +34,6 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&TableProvider{},
 		&TablePlugin{},
 		&TableVirtualKey{},
-		&SessionsTable{},
 		&TableVectorStoreConfig{},
 	)
 	require.NoError(t, err)
@@ -612,47 +610,6 @@ func TestTableVirtualKey_HashComputedBeforeEncryption(t *testing.T) {
 }
 
 // ============================================================================
-// SessionsTable encryption tests
-// ============================================================================
-
-func TestSessionsTable_EncryptDecrypt(t *testing.T) {
-	db := setupTestDB(t)
-
-	session := &SessionsTable{
-		Token:     "session-secret-token-abc",
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-	}
-
-	require.NoError(t, db.Create(session).Error)
-
-	raw := rawRow(t, db, "sessions", session.ID)
-	assert.Equal(t, "encrypted", raw["encryption_status"])
-	assert.NotEqual(t, "session-secret-token-abc", raw["token"])
-
-	// Verify hash was computed from plaintext
-	expectedHash := encrypt.HashSHA256("session-secret-token-abc")
-	assert.Equal(t, expectedHash, raw["token_hash"])
-
-	var found SessionsTable
-	require.NoError(t, db.First(&found, session.ID).Error)
-	assert.Equal(t, "session-secret-token-abc", found.Token)
-}
-
-func TestSessionsTable_HashComputedBeforeEncryption(t *testing.T) {
-	db := setupTestDB(t)
-
-	session := &SessionsTable{
-		Token:     "hash-test-token",
-		ExpiresAt: time.Now().Add(time.Hour),
-	}
-
-	require.NoError(t, db.Create(session).Error)
-
-	raw := rawRow(t, db, "sessions", session.ID)
-	assert.Equal(t, encrypt.HashSHA256("hash-test-token"), raw["token_hash"])
-}
-
-// ============================================================================
 // TableOauthConfig encryption tests
 // ============================================================================
 
@@ -737,30 +694,6 @@ func TestTableKey_UpdatePreservesDecryption(t *testing.T) {
 	raw := rawRow(t, db, "config_keys", key.ID)
 	assert.Equal(t, "encrypted", raw["encryption_status"])
 	assert.NotEqual(t, "updated-key", raw["value"])
-}
-
-func TestSessionsTable_UpdatePreservesDecryption(t *testing.T) {
-	db := setupTestDB(t)
-
-	session := &SessionsTable{
-		Token:     "original-token",
-		ExpiresAt: time.Now().Add(time.Hour),
-	}
-	require.NoError(t, db.Create(session).Error)
-
-	var found SessionsTable
-	require.NoError(t, db.First(&found, session.ID).Error)
-	assert.Equal(t, "original-token", found.Token)
-
-	found.Token = "updated-token"
-	require.NoError(t, db.Save(&found).Error)
-
-	var found2 SessionsTable
-	require.NoError(t, db.First(&found2, session.ID).Error)
-	assert.Equal(t, "updated-token", found2.Token)
-
-	raw := rawRow(t, db, "sessions", session.ID)
-	assert.Equal(t, encrypt.HashSHA256("updated-token"), raw["token_hash"])
 }
 
 // ============================================================================
@@ -1234,30 +1167,6 @@ func TestTableKey_FindMultipleDecryptsAll(t *testing.T) {
 	}
 }
 
-func TestSessionsTable_FindMultipleDecryptsAll(t *testing.T) {
-	db := setupTestDB(t)
-
-	for _, tok := range []string{"token-1", "token-2", "token-3"} {
-		session := &SessionsTable{
-			Token:     tok,
-			ExpiresAt: time.Now().Add(time.Hour),
-		}
-		require.NoError(t, db.Create(session).Error)
-	}
-
-	var sessions []SessionsTable
-	require.NoError(t, db.Find(&sessions).Error)
-	assert.Len(t, sessions, 3)
-
-	tokens := map[string]bool{}
-	for _, s := range sessions {
-		tokens[s.Token] = true
-	}
-	assert.True(t, tokens["token-1"])
-	assert.True(t, tokens["token-2"])
-	assert.True(t, tokens["token-3"])
-}
-
 // ============================================================================
 // Key with all provider configs simultaneously (complex round-trip)
 // ============================================================================
@@ -1435,29 +1344,6 @@ func TestTableVirtualKey_EncryptionDisabled_StoresPlaintext(t *testing.T) {
 	assert.Equal(t, "vk-plaintext-value", found.Value.GetValue())
 }
 
-func TestSessionsTable_EncryptionDisabled_StoresPlaintext(t *testing.T) {
-	disableEncryption(t)
-	db := setupTestDB(t)
-
-	session := &SessionsTable{
-		Token:     "session-plaintext-token",
-		ExpiresAt: time.Now().Add(time.Hour),
-	}
-
-	require.NoError(t, db.Create(session).Error)
-
-	// Raw DB should have plaintext token — hash should still be computed
-	raw := rawRow(t, db, "sessions", session.ID)
-	assert.Equal(t, "plain_text", raw["encryption_status"])
-	assert.Equal(t, "session-plaintext-token", raw["token"])
-	assert.NotEmpty(t, raw["token_hash"], "hash should still be computed even without encryption")
-
-	// GORM read should return same plaintext
-	var found SessionsTable
-	require.NoError(t, db.First(&found, session.ID).Error)
-	assert.Equal(t, "session-plaintext-token", found.Token)
-}
-
 func TestTableProvider_EncryptionDisabled_StoresPlaintext(t *testing.T) {
 	disableEncryption(t)
 	db := setupTestDB(t)
@@ -1598,7 +1484,6 @@ func trySetupPostgresDB(t *testing.T) *gorm.DB {
 		&TableKey{},
 		&TablePlugin{},
 		&TableVirtualKey{},
-		&SessionsTable{},
 		&TableVectorStoreConfig{},
 	)
 	if err != nil {
@@ -1612,7 +1497,6 @@ func trySetupPostgresDB(t *testing.T) *gorm.DB {
 		db.Exec("DELETE FROM config_mcp_clients")
 		db.Exec("DELETE FROM config_plugins")
 		db.Exec("DELETE FROM governance_virtual_keys")
-		db.Exec("DELETE FROM sessions")
 		db.Exec("DELETE FROM oauth_configs")
 		db.Exec("DELETE FROM oauth_tokens")
 		db.Exec("DELETE FROM config_vector_store")

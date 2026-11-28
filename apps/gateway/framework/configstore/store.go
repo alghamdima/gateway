@@ -328,12 +328,6 @@ type ConfigStore interface {
 	SetRestartRequiredConfig(ctx context.Context, config *tables.RestartRequiredConfig) error
 	ClearRestartRequiredConfig(ctx context.Context) error
 
-	// Session CRUD
-	GetSession(ctx context.Context, token string) (*tables.SessionsTable, error)
-	CreateSession(ctx context.Context, session *tables.SessionsTable) error
-	DeleteSession(ctx context.Context, token string) error
-	FlushSessions(ctx context.Context) error
-
 	// Model pricing CRUD
 	GetModelPrices(ctx context.Context) ([]tables.TableModelPricing, error)
 	UpsertModelPrices(ctx context.Context, pricing *tables.TableModelPricing, tx ...*gorm.DB) error

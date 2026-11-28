@@ -21,7 +21,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
-	"github.com/maximhq/bifrost/framework/encrypt"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	dynamicPlugins "github.com/maximhq/bifrost/framework/plugins"
@@ -198,7 +197,6 @@ type BifrostHTTPServer struct {
 	setupLockInstalled bool // OSS setup-lock gate guards /api (see AuthMiddleware.SetupLockMiddleware); never set on enterprise
 	CORSMiddleware     *handlers.CorsMiddleware
 	TracingMiddleware  *handlers.TracingMiddleware
-	WSTicketStore      *handlers.WSTicketStore
 	// ExternalQuotaBudgetResolver supplies budgets/usage for VKs whose
 	// authoritative usage is tracked outside their own budget rows (enterprise
 	// access-profile-managed VKs). Optional; wired at server init when available,
@@ -2179,19 +2177,12 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	providerHandler := handlers.NewProviderHandler(callbacks, s.Config, s.Client)
 	configHandler := handlers.NewConfigHandler(callbacks, s.Config)
 	pluginsHandler := handlers.NewPluginsHandler(callbacks, s.Config.ConfigStore)
-	sessionHandler := handlers.NewSessionHandler(s.Config.ConfigStore, s.WSTicketStore)
-	if s.setupLockInstalled && s.AuthMiddleware != nil {
-		sessionHandler.SetSetupLock(s.AuthMiddleware)
-	}
 	// Going ahead with API handlers
 	healthHandler.RegisterRoutes(s.Router, middlewares...)
 	providerHandler.RegisterRoutes(s.Router, middlewares...)
 	configHandler.RegisterRoutes(s.Router, middlewares...)
 	if pluginsHandler != nil {
 		pluginsHandler.RegisterRoutes(s.Router, middlewares...)
-	}
-	if sessionHandler != nil {
-		sessionHandler.RegisterRoutes(s.Router, middlewares...)
 	}
 	cacheHandler.RegisterRoutes(s.Router, middlewares...)
 	if governanceHandler != nil {
@@ -2553,14 +2544,8 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		// let it through.
 		apiMiddlewares = append(apiMiddlewares, handlers.AuthBypassedMiddleware(s.Config.ClientConfig.AllowedOrigins, s.Config.ClientConfig.WhitelistedRoutes))
 	} else {
-		// Use a signed (stateless) ticket store when an encryption key is configured
-		// so tickets are verifiable across nodes; otherwise fall back to in-memory.
-		// NewSignedWSTicketStore handles empty key by degrading to in-memory mode.
-		s.WSTicketStore = handlers.NewSignedWSTicketStore(encrypt.Key())
-		s.AuthMiddleware, err = handlers.InitAuthMiddleware(s.Config.ConfigStore, s.WSTicketStore, s.Config.SetupToken)
+		s.AuthMiddleware, err = handlers.InitAuthMiddleware(s.Config.ConfigStore, s.Config.SetupToken)
 		if err != nil {
-			s.WSTicketStore.Stop()
-			s.WSTicketStore = nil
 			return fmt.Errorf("failed to initialize auth middleware: %v", err)
 		}
 		if ctx.Value(schemas.BifrostContextKeyIsEnterprise) == nil {
@@ -2609,10 +2594,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	// spare capacity (AuthBypassedMiddleware, without a config store).
 	err = s.RegisterAPIRoutes(s.Ctx, s, apiMiddlewares...)
 	if err != nil {
-		if s.WSTicketStore != nil {
-			s.WSTicketStore.Stop()
-			s.WSTicketStore = nil
-		}
 		return fmt.Errorf("failed to initialize routes: %v", err)
 	}
 	// Registering inference routes
@@ -2649,10 +2630,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 
 	err = s.RegisterInferenceRoutes(s.Ctx, inferenceMiddlewares...)
 	if err != nil {
-		if s.WSTicketStore != nil {
-			s.WSTicketStore.Stop()
-			s.WSTicketStore = nil
-		}
 		return fmt.Errorf("failed to initialize inference routes: %v", err)
 	}
 	// Serve a minimal robots.txt so crawlers/CLI tools (e.g. Claude Code) don't
@@ -2760,10 +2737,6 @@ func (s *BifrostHTTPServer) Start() error {
 			if s.AsyncJobCleaner != nil {
 				logger.Info("stopping async job cleaner...")
 				s.AsyncJobCleaner.StopCleanupRoutine()
-			}
-			if s.WSTicketStore != nil {
-				logger.Info("stopping ws ticket store...")
-				s.WSTicketStore.Stop()
 			}
 			if s.GovernanceHandler != nil {
 				s.GovernanceHandler.StopExpiryCleanupScheduler()

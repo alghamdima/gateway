@@ -121,13 +121,6 @@ func (s *RDBConfigStore) EncryptPlaintextRows(ctx context.Context) error {
 	}
 	totalEncrypted += count
 
-	// sessions
-	count, err = s.encryptPlaintextSessions(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt sessions: %w", err)
-	}
-	totalEncrypted += count
-
 	// config_providers (proxy config)
 	count, err = s.encryptPlaintextProviderProxies(ctx)
 	if err != nil {
@@ -212,38 +205,6 @@ func (s *RDBConfigStore) encryptPlaintextVirtualKeys(ctx context.Context) (int, 
 		cursor = ids[len(ids)-1]
 		n, err := encryptClaimedRows(ctx, s, ids, "(encryption_status = ? OR encryption_status IS NULL OR encryption_status = '') AND value != '' AND id = ?",
 			func(r *tables.TableVirtualKey) string { return r.EncryptionStatus })
-		count += n
-		if err != nil {
-			return count, err
-		}
-	}
-	return count, nil
-}
-
-// encryptPlaintextSessions finds all sessions rows with plaintext encryption status and
-// re-saves them one row per transaction. The SessionsTable.BeforeSave hook handles encryption.
-func (s *RDBConfigStore) encryptPlaintextSessions(ctx context.Context) (int, error) {
-	var count int
-	var cursor int
-	for {
-		// Read ids only. Loading whole rows here would run SecretVar.Scan on
-		// every secret column, and a stored vault ref resolves over the
-		// network — work the claim below would then repeat.
-		var ids []int
-		if err := s.DB().WithContext(ctx).
-			Model(&tables.SessionsTable{}).
-			Where("(encryption_status = ? OR encryption_status IS NULL OR encryption_status = '') AND token != '' AND id > ?", encryptionStatusPlainText, cursor).
-			Order("id").
-			Limit(encryptionBatchSize).
-			Pluck("id", &ids).Error; err != nil {
-			return count, err
-		}
-		if len(ids) == 0 {
-			break
-		}
-		cursor = ids[len(ids)-1]
-		n, err := encryptClaimedRows(ctx, s, ids, "(encryption_status = ? OR encryption_status IS NULL OR encryption_status = '') AND token != '' AND id = ?",
-			func(r *tables.SessionsTable) string { return r.EncryptionStatus })
 		count += n
 		if err != nil {
 			return count, err

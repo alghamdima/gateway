@@ -4403,12 +4403,6 @@ func loadAuthConfig(ctx context.Context, config *Config, configData *ConfigData)
 			}
 			return nil
 		}
-		if !passwordMatch {
-			// Here we nuke all sessions
-			if err := config.ConfigStore.FlushSessions(ctx); err != nil {
-				return fmt.Errorf("failed to flush sessions: %w", err)
-			}
-		}
 	}
 	// Hash password if it is plaintext (not already a PBKDF2 or bcrypt hash)
 	hashedPassword := filePassword

@@ -818,28 +818,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	if payload.AuthConfig != nil {
 		authConfig := existingAuthConfig
 
-		// Check if auth config has changed
-		authChanged := false
-		if authConfig == nil {
-			// No existing config, any enabled state is a change
-			if payload.AuthConfig.IsEnabled {
-				authChanged = true
-			}
-		} else {
-			// Compare with existing config using value comparison (not pointer comparison)
-			// Password is considered changed when it was intentionally submitted —
-			// ShouldPreserveStored() returns false for both plain values and secret refs.
-			passwordChanged := payload.AuthConfig.AdminPassword != nil &&
-				!payload.AuthConfig.AdminPassword.ShouldPreserveStored()
-			usernameChanged := payload.AuthConfig.AdminUserName != nil &&
-				!payload.AuthConfig.AdminUserName.Equals(authConfig.AdminUserName)
-			if payload.AuthConfig.IsEnabled != authConfig.IsEnabled ||
-				usernameChanged ||
-				passwordChanged {
-				authChanged = true
-			}
-		}
-
 		if payload.AuthConfig.IsEnabled {
 			// Initialize nil pointers to empty SecretVar to prevent nil-pointer dereference
 			if payload.AuthConfig.AdminUserName == nil {
@@ -940,14 +918,6 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 			}
 		}
 
-		// Flush all existing sessions if auth details have been changed
-		if authChanged {
-			if err := h.store.ConfigStore.FlushSessions(ctx); err != nil {
-				logger.Warn("updated auth config but failed to flush existing sessions, please restart the server: %v", err)
-				SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("updated auth config but failed to flush existing sessions, please restart the server: %v", err))
-				return
-			}
-		}
 		// Note: AuthMiddleware is updated via ServerCallbacks.UpdateAuthConfig (handled by BifrostHTTPServer)
 	}
 

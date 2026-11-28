@@ -750,7 +750,6 @@ func TestTriggerMigrations_FreshDB(t *testing.T) {
 		&tables.TablePlugin{},
 		&tables.TableCustomer{},
 		&tables.TableTeam{},
-		&tables.SessionsTable{},
 		&tables.TableModelPricing{},
 		&tables.TableGovernanceConfig{},
 		&tables.TableClientConfig{},
@@ -1047,10 +1046,6 @@ func setupPreEncryptionDB(t *testing.T) *gorm.DB {
 	// Run the initial migration to create core tables
 	err = migrationInit(ctx, db, testMigrationLogger)
 	require.NoError(t, err)
-	// Sessions table is created by a later migration, but required by the
-	// encryption columns migration.
-	err = migrationAddSessionsTable(ctx, db, testMigrationLogger)
-	require.NoError(t, err)
 
 	return db
 }
@@ -1079,18 +1074,13 @@ func TestMigrationAddEncryptionColumns(t *testing.T) {
 		"vk-enc-1", "enc-vk", "vk-value", now, now).Error
 	require.NoError(t, err)
 
-	err = db.Exec(`INSERT INTO sessions (token, created_at, updated_at, expires_at)
-		VALUES (?, ?, ?, ?)`,
-		"sess-token", now, now, now).Error
-	require.NoError(t, err)
-
 	// Run the encryption columns migration
 	err = migrationAddEncryptionColumns(ctx, db, testMigrationLogger)
 	require.NoError(t, err)
 
-	// Verify encryption_status column exists and is backfilled on all 6 tables
+	// Verify encryption_status column exists and is backfilled on all 5 tables
 	encTables := []string{
-		"config_keys", "governance_virtual_keys", "sessions",
+		"config_keys", "governance_virtual_keys",
 		"config_providers", "config_vector_store", "config_plugins",
 	}
 	for _, table := range encTables {
@@ -1125,12 +1115,6 @@ func TestMigrationAddEncryptionColumns(t *testing.T) {
 	err = db.Table("governance_virtual_keys").Select("value_hash").Where("id = ?", "vk-enc-1").Scan(&rawHash).Error
 	require.NoError(t, err)
 	assert.Nil(t, rawHash, "value_hash should be NULL, not empty string")
-
-	// Verify token_hash on sessions is NULL
-	var tokenHash *string
-	err = db.Table("sessions").Select("token_hash").Where("token = ?", "sess-token").Scan(&tokenHash).Error
-	require.NoError(t, err)
-	assert.Nil(t, tokenHash, "token_hash should be NULL, not empty string")
 
 	// Idempotency: running again should not error
 	err = migrationAddEncryptionColumns(ctx, db, testMigrationLogger)

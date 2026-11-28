@@ -293,7 +293,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_framework_configs_table"}, run: migrationAddFrameworkConfigsTable},
 	{IDs: []string{"update_plugins_table_for_custom_plugins"}, run: migrationAddPluginPathColumn},
 	{IDs: []string{"add_provider_config_budget_rate_limit"}, run: migrationAddProviderConfigBudgetRateLimit},
-	{IDs: []string{"add_sessions_table"}, run: migrationAddSessionsTable},
 	{IDs: []string{"add_disable_content_logging_column"}, run: migrationAddDisableContentLoggingColumn},
 	{IDs: []string{"add_vertex_project_number_column"}, run: migrationAddVertexProjectNumberColumn},
 	{IDs: []string{"add_vertex_deployments_json_column"}, run: migrationAddVertexDeploymentsJSONColumn},
@@ -494,6 +493,27 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_client_config_entity_access_profile_mode_column"}, run: migrationAddClientConfigEntityAccessProfileModeColumn},
 	{IDs: []string{"drop_notifications_and_feature_flags_tables"}, run: migrationDropNotificationsAndFeatureFlagsTables},
 	{IDs: []string{"drop_skills_repository"}, run: migrationDropSkillsRepository},
+	{IDs: []string{"drop_sessions_table"}, run: migrationDropSessionsTable},
+}
+
+// migrationDropSessionsTable drops the table of the admin UI's login sessions, taken out of the
+// product on 2026-11-28 (MODIFICATIONS.md, "Features outside the product"): the management API
+// is called with the admin credentials on every request. The table's own migration is gone, so
+// a new database never creates it; this removes it from a database created before that. Nothing
+// is restored on rollback: the code that read it is gone.
+func migrationDropSessionsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "drop_sessions_table"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			if err := tx.WithContext(ctx).Migrator().DropTable("sessions"); err != nil {
+				return fmt.Errorf("drop table sessions: %w", err)
+			}
+			return nil
+		},
+	})
 }
 
 // migrationDropSkillsRepository drops what the skills repository kept, a feature taken out of the
@@ -2119,41 +2139,6 @@ func migrationAddPluginPathColumn(ctx context.Context, db *gorm.DB, logger schem
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while running plugin path migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddSessionsTable adds the sessions table
-func migrationAddSessionsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_sessions_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasTable(&tables.SessionsTable{}) {
-				logger.Info("[configstore] %s: creating table SessionsTable", migrationName)
-				if err := migrator.CreateTable(&tables.SessionsTable{}); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			logger.Info("[configstore] %s: dropping table SessionsTable", migrationName)
-			if err := migrator.DropTable(&tables.SessionsTable{}); err != nil {
-				return err
-			}
-			return nil
-		},
-	}})
-	err := m.Migrate()
-	if err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
 	}
 	return nil
 }
@@ -4865,7 +4850,7 @@ func migrationReconcilePricingOverridesTable(ctx context.Context, db *gorm.DB, l
 	return nil
 }
 
-// migrationAddEncryptionColumns adds the encryption_status column to the config_keys, governance_virtual_keys, sessions, config_providers, config_vector_store, and config_plugins tables
+// migrationAddEncryptionColumns adds the encryption_status column to the config_keys, governance_virtual_keys, config_providers, config_vector_store, and config_plugins tables
 func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
 	migrationName := "add_encryption_columns"
 	logger.Info("[configstore] starting migration %s", migrationName)
@@ -4883,7 +4868,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 			targets := []encryptionTable{
 				{&tables.TableKey{}, []string{"encryption_status"}},
 				{&tables.TableVirtualKey{}, []string{"encryption_status", "value_hash"}},
-				{&tables.SessionsTable{}, []string{"encryption_status", "token_hash"}},
 				{&tables.TableProvider{}, []string{"encryption_status"}},
 				{&tables.TableVectorStoreConfig{}, []string{"encryption_status"}},
 				{&tables.TablePlugin{}, []string{"encryption_status"}},
@@ -4901,7 +4885,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 			backfillTables := []string{
 				"config_keys",
 				"governance_virtual_keys",
-				"sessions",
 				"config_providers",
 				"config_vector_store",
 				"config_plugins",
@@ -4927,16 +4910,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 				return fmt.Errorf("failed to initialize value_hash: %w", err)
 			}
 
-			// Backfill token_hash for existing sessions
-			// Use NULL instead of '' to avoid unique constraint violations
-			if err := tx.Exec(`
-				UPDATE sessions
-				SET token_hash = NULL
-				WHERE token_hash IS NULL OR token_hash = ''
-			`).Error; err != nil {
-				return fmt.Errorf("failed to initialize token_hash: %w", err)
-			}
-
 			return nil
 		},
 		Rollback: func(tx *gorm.DB) error {
@@ -4950,7 +4923,6 @@ func migrationAddEncryptionColumns(ctx context.Context, db *gorm.DB, logger sche
 			drops := []dropInfo{
 				{&tables.TableKey{}, []string{"encryption_status"}},
 				{&tables.TableVirtualKey{}, []string{"encryption_status", "value_hash"}},
-				{&tables.SessionsTable{}, []string{"encryption_status", "token_hash"}},
 				{&tables.TableProvider{}, []string{"encryption_status"}},
 				{&tables.TableVectorStoreConfig{}, []string{"encryption_status"}},
 				{&tables.TablePlugin{}, []string{"encryption_status"}},
@@ -5059,8 +5031,6 @@ func migrationWidenEncryptedVarcharColumns(ctx context.Context, db *gorm.DB, log
 				"ALTER TABLE config_keys ALTER COLUMN vertex_region TYPE TEXT",
 				"ALTER TABLE config_keys ALTER COLUMN bedrock_access_key TYPE TEXT",
 				"ALTER TABLE config_keys ALTER COLUMN bedrock_region TYPE TEXT",
-				// sessions table
-				"ALTER TABLE sessions ALTER COLUMN token TYPE TEXT",
 				// governance_virtual_keys table
 				"ALTER TABLE governance_virtual_keys ALTER COLUMN value TYPE TEXT",
 			}
@@ -10723,7 +10693,6 @@ type hashIndexSpec struct {
 // addColumnIfNotExists, which adds the column but never builds its tag index.
 var hashIndexSpecs = []hashIndexSpec{
 	{table: "governance_virtual_keys", column: "value_hash", unique: "idx_virtual_key_value_hash"},
-	{table: "sessions", column: "token_hash", unique: "idx_session_token_hash"},
 }
 
 // hashIndexExists reports whether index name exists and is usable on table.
@@ -10754,8 +10723,7 @@ var hashNormalizeBatchSize = 10000
 // walking the primary key in batches of hashNormalizeBatchSize so no single
 // statement locks every matching row. Each batch updates one id range and
 // commits on its own (the migration runs without a transaction). The cursor
-// keeps the id's own type, since the tables it runs on key by string (virtual
-// keys) and by integer (sessions). Identifiers are migration constants.
+// keeps the id's own type. Identifiers are migration constants.
 func normalizeEmptyHashes(tx *gorm.DB, table, column string) error {
 	var cursor any
 	for {
@@ -10850,12 +10818,13 @@ func ensureHashIndex(tx *gorm.DB, logger schemas.Logger, spec hashIndexSpec) err
 	return ensureIndexConcurrently(tx, spec.table, nonUnique, spec.column, false)
 }
 
-// migrationAddValueHashAndTokenHashIndexes builds the lookup indexes that the
-// struct tags declare on governance_virtual_keys.value_hash and
-// sessions.token_hash. Upgraded databases got both columns from
+// migrationAddValueHashAndTokenHashIndexes builds the lookup index that the
+// struct tags declare on governance_virtual_keys.value_hash (it also covered the
+// sessions table until sessions were removed; the migration keeps its name because
+// databases have recorded it). Upgraded databases got the column from
 // migrationAddEncryptionColumns, whose addColumnIfNotExists never builds tag
-// indexes, so every VK auth by hash and every session lookup scanned the whole
-// table. Both indexes are UNIQUE, matching fresh installs; if existing duplicate
+// indexes, so every VK auth by hash scanned the whole
+// table. The index is UNIQUE, matching fresh installs; if existing duplicate
 // hashes make that impossible, a non-unique *_nonunique index is built instead and
 // a warning is logged, so a data problem never blocks startup. Built concurrently.
 func migrationAddValueHashAndTokenHashIndexes(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {

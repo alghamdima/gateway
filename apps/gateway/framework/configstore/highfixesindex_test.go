@@ -75,13 +75,12 @@ func freshSQLiteDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// createHashTables creates minimal pre-tag versions of governance_virtual_keys and
-// sessions, the shape an upgraded database has after migrationAddEncryptionColumns
-// added the hash columns without their indexes.
+// createHashTables creates a minimal pre-tag version of governance_virtual_keys, the shape
+// an upgraded database has after migrationAddEncryptionColumns added the hash column
+// without its index.
 func createHashTables(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	require.NoError(t, db.Exec(`CREATE TABLE governance_virtual_keys (id VARCHAR(255) PRIMARY KEY, value_hash VARCHAR(64))`).Error)
-	require.NoError(t, db.Exec(`CREATE TABLE sessions (id INTEGER PRIMARY KEY, token_hash VARCHAR(64))`).Error)
 }
 
 // runHashIndexMigration runs migrationAddValueHashAndTokenHashIndexes once.
@@ -90,7 +89,7 @@ func runHashIndexMigration(ctx context.Context, db *gorm.DB) error {
 }
 
 // TestHighFixHashIndexesBuildUnique pins H1: an upgraded database without the tag
-// indexes gets UNIQUE idx_virtual_key_value_hash and idx_session_token_hash. Many
+// index gets UNIQUE idx_virtual_key_value_hash. Many
 // NULL and empty-string hashes must not block the unique build, and the migration re-runs cleanly.
 func TestHighFixHashIndexesBuildUnique(t *testing.T) {
 	for _, ndb := range indexMigrationDBs(t) {
@@ -99,21 +98,15 @@ func TestHighFixHashIndexesBuildUnique(t *testing.T) {
 			createHashTables(t, db)
 			require.NoError(t, db.Exec(`INSERT INTO governance_virtual_keys (id, value_hash) VALUES
 				('vk-1', 'h1'), ('vk-2', 'h2'), ('vk-3', NULL), ('vk-4', NULL), ('vk-5', ''), ('vk-6', '')`).Error)
-			require.NoError(t, db.Exec(`INSERT INTO sessions (id, token_hash) VALUES
-				(1, 't1'), (2, 't2'), (3, NULL), (4, ''), (5, '')`).Error)
 
 			runIndexMigrationTwice(t, db, "add_value_hash_and_token_hash_indexes", runHashIndexMigration,
 				"governance_virtual_keys", "idx_virtual_key_value_hash")
 			require.True(t, indexIsUnique(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
-			require.True(t, indexExists(t, db, "sessions", "idx_session_token_hash"))
-			require.True(t, indexIsUnique(t, db, "sessions", "idx_session_token_hash"))
 			require.False(t, indexExists(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash_nonunique"))
 
 			// '' hashes are normalized to NULL, the value the encryption migration uses.
 			var empties int64
 			require.NoError(t, db.Raw("SELECT COUNT(*) FROM governance_virtual_keys WHERE value_hash = ''").Scan(&empties).Error)
-			require.Zero(t, empties)
-			require.NoError(t, db.Raw("SELECT COUNT(*) FROM sessions WHERE token_hash = ''").Scan(&empties).Error)
 			require.Zero(t, empties)
 		})
 	}
@@ -129,14 +122,11 @@ func TestHighFixHashIndexesFallBackOnDuplicates(t *testing.T) {
 			createHashTables(t, db)
 			require.NoError(t, db.Exec(`INSERT INTO governance_virtual_keys (id, value_hash) VALUES
 				('vk-1', 'dup'), ('vk-2', 'dup'), ('vk-3', 'h3')`).Error)
-			require.NoError(t, db.Exec(`INSERT INTO sessions (id, token_hash) VALUES (1, 'td'), (2, 'td'), (3, 'td'), (4, 't4')`).Error)
 
 			require.NoError(t, runHashIndexMigration(context.Background(), db))
 			require.False(t, indexExists(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
 			require.True(t, indexExists(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash_nonunique"))
 			require.False(t, indexIsUnique(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash_nonunique"))
-			require.False(t, indexExists(t, db, "sessions", "idx_session_token_hash"))
-			require.True(t, indexExists(t, db, "sessions", "idx_session_token_hash_nonunique"))
 
 			// Re-running is safe.
 			require.NoError(t, db.Exec("DELETE FROM migrations WHERE id = ?", "add_value_hash_and_token_hash_indexes").Error)
@@ -230,13 +220,11 @@ func TestHighFixTagsBuildIndexes(t *testing.T) {
 	db := freshSQLiteDB(t)
 	mg := db.Migrator()
 	require.NoError(t, mg.CreateTable(&tables.TableVirtualKey{}))
-	require.NoError(t, mg.CreateTable(&tables.SessionsTable{}))
 	require.NoError(t, mg.CreateTable(&tables.TableVirtualKeyProviderConfig{}))
 	require.NoError(t, mg.CreateTable(&tables.TableVirtualKeyProviderConfigKey{}))
 	require.NoError(t, mg.CreateTable(&tables.TableProviderJob{}))
 
 	require.True(t, indexIsUnique(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
-	require.True(t, indexIsUnique(t, db, "sessions", "idx_session_token_hash"))
 
 	require.Equal(t, []string{"provider"}, indexColumns(t, db, "idx_vk_provider_configs_provider"))
 	require.Equal(t, []string{"table_key_id"}, indexColumns(t, db, "idx_vkpc_keys_table_key_id"))
@@ -254,8 +242,8 @@ func TestHighFixTagsBuildIndexes(t *testing.T) {
 // TestHighFixHashNormalizationIsBatched pins that normalizing empty hashes to
 // NULL runs in bounded, separately committed batches rather than one UPDATE over
 // the whole table, which would hold row locks on every matching row at once on
-// a large sessions table. Five empty hashes with a batch size of two need at
-// least three statements per table, and none may be left afterwards.
+// a large table. Five empty hashes with a batch size of two need at
+// least three statements, and none may be left afterwards.
 func TestHighFixHashNormalizationIsBatched(t *testing.T) {
 	restore := hashNormalizeBatchSize
 	hashNormalizeBatchSize = 2
@@ -266,28 +254,21 @@ func TestHighFixHashNormalizationIsBatched(t *testing.T) {
 			createHashTables(t, db)
 			require.NoError(t, db.Exec(`INSERT INTO governance_virtual_keys (id, value_hash) VALUES
 				('vk-1', ''), ('vk-2', ''), ('vk-3', 'h3'), ('vk-4', ''), ('vk-5', ''), ('vk-6', '')`).Error)
-			require.NoError(t, db.Exec(`INSERT INTO sessions (id, token_hash) VALUES
-				(1, ''), (2, ''), (3, 't3'), (4, ''), (5, ''), (6, '')`).Error)
 
 			updates := map[string]int{}
 			name := "test:count-hash-normalize:" + t.Name()
 			require.NoError(t, db.Callback().Raw().After("gorm:raw").Register(name, func(tx *gorm.DB) {
 				sql := tx.Statement.SQL.String()
-				for _, col := range []string{"value_hash", "token_hash"} {
-					if strings.HasPrefix(sql, "UPDATE") && strings.Contains(sql, "SET "+col+" = NULL") {
-						updates[col]++
-					}
+				if strings.HasPrefix(sql, "UPDATE") && strings.Contains(sql, "SET value_hash = NULL") {
+					updates["value_hash"]++
 				}
 			}))
 			t.Cleanup(func() { _ = db.Callback().Raw().Remove(name) })
 
 			require.NoError(t, runHashIndexMigration(context.Background(), db))
 			require.GreaterOrEqual(t, updates["value_hash"], 3, "empty value hashes must be normalized in bounded batches")
-			require.GreaterOrEqual(t, updates["token_hash"], 3, "empty token hashes must be normalized in bounded batches")
 			var empties int64
 			require.NoError(t, db.Raw("SELECT COUNT(*) FROM governance_virtual_keys WHERE value_hash = ''").Scan(&empties).Error)
-			require.Zero(t, empties)
-			require.NoError(t, db.Raw("SELECT COUNT(*) FROM sessions WHERE token_hash = ''").Scan(&empties).Error)
 			require.Zero(t, empties)
 			require.True(t, indexIsUnique(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
 		})
@@ -300,7 +281,7 @@ func TestHighFixHashNormalizationIsBatched(t *testing.T) {
 // cannot tell whether the migration or the tags created them.
 func TestHighFixHashIndexRollbackRefuses(t *testing.T) {
 	db := freshSQLiteDB(t)
-	require.NoError(t, db.Migrator().CreateTable(&tables.TableVirtualKey{}, &tables.SessionsTable{}))
+	require.NoError(t, db.Migrator().CreateTable(&tables.TableVirtualKey{}))
 	require.True(t, indexExists(t, db, "governance_virtual_keys", "idx_virtual_key_value_hash"))
 
 	err := valueHashAndTokenHashIndexesMigration(context.Background(), "add_value_hash_and_token_hash_indexes", testMigrationLogger).Rollback(db)

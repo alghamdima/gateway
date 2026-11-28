@@ -6211,58 +6211,6 @@ func (s *RDBConfigStore) ClearRestartRequiredConfig(ctx context.Context) error {
 	}).Error
 }
 
-// GetSession retrieves a session from the database.
-func (s *RDBConfigStore) GetSession(ctx context.Context, token string) (*tables.SessionsTable, error) {
-	var session tables.SessionsTable
-	tokenHash := encrypt.HashSHA256(token)
-	err := s.DB().WithContext(ctx).First(&session, "token_hash = ?", tokenHash).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Fall back to plaintext lookup for rows written before the hash existed. Only rows
-			// still stored in plaintext qualify: an encrypted row's token column holds
-			// ciphertext, which is not the token and must not resolve the session.
-			if err := s.DB().WithContext(ctx).Where(plaintextRowPredicate).First(&session, "token = ?", token).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return nil, nil
-				}
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
-	}
-	return &session, nil
-}
-
-// CreateSession creates a new session in the database.
-func (s *RDBConfigStore) CreateSession(ctx context.Context, session *tables.SessionsTable) error {
-	return s.DB().WithContext(ctx).Create(session).Error
-}
-
-// DeleteSession deletes a session from the database.
-func (s *RDBConfigStore) DeleteSession(ctx context.Context, token string) error {
-	tokenHash := encrypt.HashSHA256(token)
-	var session tables.SessionsTable
-	if err := s.DB().WithContext(ctx).First(&session, "token_hash = ?", tokenHash).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Fall back to plaintext lookup for rows written before the hash existed, and only for
-			// rows still stored in plaintext (see GetSession).
-			return s.DB().WithContext(ctx).Where(plaintextRowPredicate).Delete(&tables.SessionsTable{}, "token = ?", token).Error
-		}
-		return err
-	}
-	result := s.DB().WithContext(ctx).Delete(&session)
-	if result.Error != nil {
-		return result.Error
-	}
-	return nil
-}
-
-// FlushSessions flushes all sessions from the database.
-func (s *RDBConfigStore) FlushSessions(ctx context.Context) error {
-	return s.DB().WithContext(ctx).Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&tables.SessionsTable{}).Error
-}
-
 // ExecuteTransaction executes a transaction.
 func (s *RDBConfigStore) ExecuteTransaction(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	return s.DB().WithContext(ctx).Transaction(fn)

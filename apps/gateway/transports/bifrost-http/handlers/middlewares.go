@@ -3,19 +3,14 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
 	"runtime/debug"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1632,38 +1627,6 @@ func fasthttpResponseToHTTPResponse(ctx *fasthttp.RequestCtx, resp *schemas.HTTP
 	}
 }
 
-// validateSession checks if a session token is valid
-func validateSession(_ *fasthttp.RequestCtx, store configstore.ConfigStore, token string) bool {
-	session, err := store.GetSession(context.Background(), token)
-	if err != nil || session == nil {
-		return false
-	}
-	if session.ExpiresAt.Before(time.Now()) {
-		return false
-	}
-	return true
-}
-
-// isInferenceWSEndpoint returns true for WebSocket endpoints that should use
-// standard inference auth (Bearer/Basic/VK) rather than dashboard session tokens.
-func isInferenceWSEndpoint(path string) bool {
-	for strings.HasPrefix(path, "/openai/") {
-		path = strings.TrimPrefix(path, "/openai")
-	}
-
-	switch path {
-	case "/v1/responses",
-		"/responses",
-		"/v1/realtime",
-		"/realtime",
-		"/v1/audio/speech/stream",
-		elevenlabsDialoguePath:
-		return true
-	default:
-		return false
-	}
-}
-
 func buildRealtimeTransportPathSet() map[string]struct{} {
 	paths := map[string]struct{}{}
 	for _, path := range integrations.OpenAIRealtimePaths("") {
@@ -1732,7 +1695,6 @@ type AuthMiddleware struct {
 	whitelistedRoutes atomic.Pointer[[]string]
 	allowedOrigins    atomic.Pointer[[]string] // client_config.allowed_origins; read while auth is disabled
 	authConfig        atomic.Pointer[configstore.AuthConfig]
-	wsTicketStore     *WSTicketStore
 	// bootstrapToken gates creation of the very first admin account. It is sourced
 	// from operator config (config.json setup_token or the BIFROST_SETUP_TOKEN env
 	// var) — never generated in-memory — so every node in a multi-node deployment
@@ -1749,7 +1711,7 @@ type AuthMiddleware struct {
 // InitAuthMiddleware initializes the auth middleware. configuredSetupToken is the operator-
 // provisioned bootstrap token resolved from config.json/env (see
 // lib.resolveSetupToken); pass "" when the operator hasn't configured one.
-func InitAuthMiddleware(store configstore.ConfigStore, wsTicketStore *WSTicketStore, configuredSetupToken string) (*AuthMiddleware, error) {
+func InitAuthMiddleware(store configstore.ConfigStore, configuredSetupToken string) (*AuthMiddleware, error) {
 	if store == nil {
 		return nil, fmt.Errorf("store is not present")
 	}
@@ -1758,9 +1720,8 @@ func InitAuthMiddleware(store configstore.ConfigStore, wsTicketStore *WSTicketSt
 		return nil, fmt.Errorf("failed to get auth config from store: %v", err)
 	}
 	am := &AuthMiddleware{
-		store:         store,
-		authConfig:    atomic.Pointer[configstore.AuthConfig]{},
-		wsTicketStore: wsTicketStore,
+		store:      store,
+		authConfig: atomic.Pointer[configstore.AuthConfig]{},
 	}
 
 	am.authConfig.Store(authConfig)
@@ -1998,11 +1959,6 @@ func (m *AuthMiddleware) InferenceMiddleware() schemas.BifrostHTTPMiddleware {
 
 // apiSystemWhitelistedRoutes are exact API paths that never require a credential.
 var apiSystemWhitelistedRoutes = []string{
-	"/api/session/is-auth-enabled",
-	"/api/session/login",
-	// Idempotent: the handler clears the cookie and returns 200 whether or
-	// not a session token is present, so a repeat logout must not 401 here.
-	"/api/session/logout",
 	"/health",
 	"/login",
 	"/favicon.ico",
@@ -2051,14 +2007,10 @@ func isAPIRouteWhitelistedAmong(url string, configuredRoutes []string) bool {
 	}) != -1
 }
 
-// APIMiddleware is for API requests if authConfig is set, it will verify authentication based on the request type.
-// Three authentication methods are supported:
-//   - Basic auth: Uses username + password validation (no session tracking). Used for inference API calls.
-//   - Bearer token: Uses session validation via validateSession(). Used for dashboard calls.
-//   - WebSocket: Uses session validation via validateSession() with token from query parameters.
-//
-// Basic auth may be acceptable for limited use cases, while Bearer and WebSocket flows provide
-// session-based authentication suitable for production environments.
+// APIMiddleware is for API requests: if authConfig is set, the caller must send the admin
+// username and password, either as Basic auth or as a Bearer token holding their base64
+// "username:password" form. There are no sessions and no cookies: the admin UI that used them
+// is gone, and the control plane sends the credentials on every call.
 func (m *AuthMiddleware) APIMiddleware() schemas.BifrostHTTPMiddleware {
 	return m.middleware(func(authConfig *configstore.AuthConfig, url string) bool {
 		return m.isAPIRouteWhitelisted(url)
@@ -2068,70 +2020,6 @@ func (m *AuthMiddleware) APIMiddleware() schemas.BifrostHTTPMiddleware {
 // SetupTokenHeader carries the operator-configured setup token (config.json setup_token
 // or BIFROST_SETUP_TOKEN) on API calls made while dashboard auth is not active.
 const SetupTokenHeader = "X-Bifrost-Setup-Token"
-
-// SetupSessionCookie is the HttpOnly cookie the dashboard holds in place of the setup
-// token. POST /api/session/setup trades the token for it once; the browser then sends it on
-// every call (including reloads and WebSocket upgrades) and no script can read it.
-const SetupSessionCookie = "bifrost_setup_session"
-
-// SetupSessionTTL bounds how long a setup session cookie stays valid.
-const SetupSessionTTL = 12 * time.Hour
-
-const setupSessionVersion = "v1"
-
-// setupSessionKey derives the HMAC key for setup session cookies from the configured setup
-// token. Every node configured with the same token verifies the same cookies, and changing
-// the token invalidates every cookie issued under the old one.
-func setupSessionKey(token string) []byte {
-	sum := sha256.Sum256([]byte("bifrost-setup-session:" + token))
-	return sum[:]
-}
-
-func signSetupSession(key []byte, payload string) string {
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(payload))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-}
-
-// IssueSetupSession mints a setup session cookie value: "v1.<expiry>.<nonce>.<hmac>". It
-// carries no part of the token, only an expiry and a random nonce, signed with a key
-// derived from the token. It fails when no setup token is configured.
-func (m *AuthMiddleware) IssueSetupSession(now time.Time) (string, time.Time, error) {
-	current := m.setupToken.Load()
-	if current == nil {
-		return "", time.Time{}, fmt.Errorf("no setup token is configured")
-	}
-	nonce := make([]byte, 16)
-	if _, err := rand.Read(nonce); err != nil {
-		return "", time.Time{}, err
-	}
-	expires := now.Add(SetupSessionTTL)
-	payload := fmt.Sprintf("%s.%d.%s", setupSessionVersion, expires.Unix(), hex.EncodeToString(nonce))
-	return payload + "." + signSetupSession(setupSessionKey(*current), payload), expires, nil
-}
-
-// validSetupSession reports whether value is an unexpired setup session cookie signed under
-// the currently configured setup token.
-func (m *AuthMiddleware) validSetupSession(value string, now time.Time) bool {
-	current := m.setupToken.Load()
-	if current == nil || value == "" {
-		return false
-	}
-	idx := strings.LastIndexByte(value, '.')
-	if idx <= 0 {
-		return false
-	}
-	payload, sig := value[:idx], value[idx+1:]
-	parts := strings.Split(payload, ".")
-	if len(parts) != 3 || parts[0] != setupSessionVersion {
-		return false
-	}
-	expiry, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil || !now.Before(time.Unix(expiry, 0)) {
-		return false
-	}
-	return hmac.Equal([]byte(sig), []byte(signSetupSession(setupSessionKey(*current), payload)))
-}
 
 // IsDashboardAuthActive reports whether an admin account exists and dashboard auth is on.
 func (m *AuthMiddleware) IsDashboardAuthActive() bool {
@@ -2146,9 +2034,9 @@ func (m *AuthMiddleware) HasSetupToken() bool {
 
 // SetupLockMiddleware locks the OSS admin API while dashboard auth is not active (no admin
 // account, or an admin account with auth disabled). In that state every non-public /api call
-// must carry the operator's setup token in SetupTokenHeader, or the setup session cookie the
-// dashboard got for it (POST /api/session/setup); with either, the request runs as the admin. Once dashboard auth is enabled this middleware is a no-op and APIMiddleware's normal
-// session/Basic auth applies, so the setup token stops working.
+// must carry the operator's setup token in SetupTokenHeader; with it, the request runs as the
+// admin. Once dashboard auth is enabled this middleware is a no-op and APIMiddleware's
+// credential check applies, so the setup token stops working.
 //
 // It must run before APIMiddleware, whose auth-off branch lets every request through. It is
 // registered by the OSS server only: enterprise builds its own chain around APIMiddleware and
@@ -2162,9 +2050,8 @@ func (m *AuthMiddleware) SetupLockMiddleware() schemas.BifrostHTTPMiddleware {
 			logger.Warn("Dashboard auth is disabled for this Bifrost instance.")
 		}
 		if m.HasSetupToken() {
-			logger.Warn("The /api surface is locked until dashboard auth is enabled. Open")
-			logger.Warn("the dashboard and enter the setup token, or send it in the")
-			logger.Warn("%s header.", SetupTokenHeader)
+			logger.Warn("The /api surface is locked until dashboard auth is enabled. Send")
+			logger.Warn("the setup token in the %s header.", SetupTokenHeader)
 		} else {
 			logger.Warn("The /api surface is locked and no setup token is configured. Set")
 			logger.Warn("setup_token in config.json (or the BIFROST_SETUP_TOKEN environment")
@@ -2191,20 +2078,11 @@ func (m *AuthMiddleware) SetupLockMiddleware() schemas.BifrostHTTPMiddleware {
 				SendError(ctx, fasthttp.StatusForbidden, "dashboard auth is not configured and no setup token is set; set setup_token in config.json (or the BIFROST_SETUP_TOKEN env var) and restart Bifrost")
 				return
 			}
-			// An explicit header wins: API clients send it, and a wrong one is a 403 even if
-			// a setup session cookie is also present.
 			if token := string(ctx.Request.Header.Peek(SetupTokenHeader)); token != "" {
 				if !m.CheckConfiguredSetupToken(token) {
 					SendError(ctx, fasthttp.StatusForbidden, "invalid setup token")
 					return
 				}
-				ctx.SetUserValue(schemas.BifrostContextKeySetupTokenAuthenticated, true)
-				next(ctx)
-				return
-			}
-			// The dashboard holds an HttpOnly setup session cookie instead of the token.
-			// Browsers send it on WebSocket upgrades too, so no ticket is needed.
-			if m.validSetupSession(string(ctx.Request.Header.Cookie(SetupSessionCookie)), time.Now()) {
 				ctx.SetUserValue(schemas.BifrostContextKeySetupTokenAuthenticated, true)
 				next(ctx)
 				return
@@ -2235,7 +2113,6 @@ func (m *AuthMiddleware) middleware(shouldSkip func(*configstore.AuthConfig, str
 				if !allowVirtualKeyAuth && !shouldSkip(authConfig, url) && m.refuseCrossOriginWhileAuthDisabled(ctx) {
 					return
 				}
-				ctx.SetUserValue(schemas.BifrostContextKeySessionToken, "")
 				// Mark as local admin so downstream RBAC bypasses cleanly when
 				// auth is fully disabled; otherwise RBAC 401s and the UI enters
 				// a logout/login redirect loop.
@@ -2284,57 +2161,6 @@ func (m *AuthMiddleware) middleware(shouldSkip func(*configstore.AuthConfig, str
 			// Get the authorization header
 			authorization := string(ctx.Request.Header.Peek("Authorization"))
 			if authorization == "" {
-				if string(ctx.Request.Header.Peek("Upgrade")) == "websocket" {
-					path := url
-					if isInferenceWSEndpoint(path) {
-						// Inference WS endpoints (/v1/responses, /v1/realtime) use the same
-						// auth as HTTP inference: Bearer/Basic headers or governance VK validation.
-						// If no Authorization header, fall through to return 401 below
-						// (or the shouldSkip check above already passed them through).
-					} else {
-						// Prefer short-lived ticket-based auth (from POST /api/session/ws-ticket)
-						ticket := string(ctx.Request.URI().QueryArgs().Peek("ticket"))
-						if ticket != "" && m.wsTicketStore != nil {
-							sessionToken := m.wsTicketStore.Consume(ticket)
-							if sessionToken != "" && validateSession(ctx, m.store, sessionToken) {
-								ctx.SetUserValue(schemas.BifrostContextKeySessionToken, sessionToken)
-								next(ctx)
-								return
-							}
-							SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-							return
-						}
-						// Fallback: legacy ?token= param (for backward compatibility)
-						token := string(ctx.Request.URI().QueryArgs().Peek("token"))
-						if token != "" {
-							if validateSession(ctx, m.store, token) {
-								ctx.SetUserValue(schemas.BifrostContextKeySessionToken, token)
-								next(ctx)
-								return
-							}
-							SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-							return
-						}
-						// Fallback: cookie-based WS auth
-						cookieToken := string(ctx.Request.Header.Cookie("token"))
-						if cookieToken != "" && validateSession(ctx, m.store, cookieToken) {
-							ctx.SetUserValue(schemas.BifrostContextKeySessionToken, cookieToken)
-							next(ctx)
-							return
-						}
-						SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-						return
-					}
-				}
-				// Cookie-based auth fallback: if no Authorization header, check for the HTTPOnly session cookie.
-				// This supports the dashboard which relies on cookies instead of localStorage tokens.
-				cookieToken := string(ctx.Request.Header.Cookie("token"))
-				if cookieToken != "" && validateSession(ctx, m.store, cookieToken) {
-					ctx.SetUserValue(schemas.BifrostContextKeySessionToken, cookieToken)
-					ctx.SetUserValue(schemas.IsLocalAdminContextKey, true)
-					next(ctx)
-					return
-				}
 				SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
 				return
 			}
@@ -2377,56 +2203,42 @@ func (m *AuthMiddleware) middleware(shouldSkip func(*configstore.AuthConfig, str
 					return
 				}
 				// Basic authenticates the caller but does not mark the local admin: admin-only
-				// handlers need a session or the Bearer-encoded credentials.
+				// handlers need the Bearer-encoded credentials.
 				next(ctx)
 				return
 			}
-			// Checking bearer auth for dashboard calls
+			// Bearer carries the base64 of username:password, as Basic does.
 			if scheme == "Bearer" {
-				// We are checking for API keys first; it it seems like a valid Bifrost API key
-
-				// Verify the session
-				if !validateSession(ctx, m.store, token) {
-					// Here we will check if its the base64 of username:password
-					// This is for backward compatibility with the old auth system
-					decodedBytes, err := base64.StdEncoding.DecodeString(token)
-					if err != nil {
-						SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-						return
-					}
-					username, password, ok := strings.Cut(string(decodedBytes), ":")
-					if !ok {
-						SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-						return
-					}
-					// Verify the username and password
-					if authConfig.AdminUserName == nil || username != authConfig.AdminUserName.GetValue() {
-						SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-						return
-					}
-					if authConfig.AdminPassword == nil {
-						SendError(ctx, fasthttp.StatusInternalServerError, "Authentication not properly configured")
-						return
-					}
-					compare, err := encrypt.CompareHash(authConfig.AdminPassword.GetValue(), password)
-					if err != nil {
-						SendError(ctx, fasthttp.StatusInternalServerError, "Internal Server Error")
-						return
-					}
-					if !compare {
-						SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
-						return
-					}
-					// Mark as local admin for RBAC bypass
-					ctx.SetUserValue(schemas.IsLocalAdminContextKey, true)
-					// Continue with the next handler
-					next(ctx)
+				decodedBytes, err := base64.StdEncoding.DecodeString(token)
+				if err != nil {
+					SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
 					return
 				}
-				// setting up session in the request
-				ctx.SetUserValue(schemas.BifrostContextKeySessionToken, token)
+				username, password, ok := strings.Cut(string(decodedBytes), ":")
+				if !ok {
+					SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				// Verify the username and password
+				if authConfig.AdminUserName == nil || username != authConfig.AdminUserName.GetValue() {
+					SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				if authConfig.AdminPassword == nil {
+					SendError(ctx, fasthttp.StatusInternalServerError, "Authentication not properly configured")
+					return
+				}
+				compare, err := encrypt.CompareHash(authConfig.AdminPassword.GetValue(), password)
+				if err != nil {
+					SendError(ctx, fasthttp.StatusInternalServerError, "Internal Server Error")
+					return
+				}
+				if !compare {
+					SendError(ctx, fasthttp.StatusUnauthorized, "Unauthorized")
+					return
+				}
+				// Mark as local admin for RBAC bypass
 				ctx.SetUserValue(schemas.IsLocalAdminContextKey, true)
-				// Continue with the next handler
 				next(ctx)
 				return
 			}
