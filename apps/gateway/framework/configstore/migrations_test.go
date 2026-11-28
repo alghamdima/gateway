@@ -755,7 +755,6 @@ func TestTriggerMigrations_FreshDB(t *testing.T) {
 		&tables.TableGovernanceConfig{},
 		&tables.TableClientConfig{},
 		&tables.TableVirtualKeyProviderConfig{},
-		&tables.TableNotification{},
 	}
 
 	migrator := db.Migrator()

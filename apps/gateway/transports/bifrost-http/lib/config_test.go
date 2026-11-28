@@ -352,7 +352,6 @@ import (
 	"github.com/maximhq/bifrost/framework/configstore/tables"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/encrypt"
-	"github.com/maximhq/bifrost/framework/featureflags"
 	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/framework/objectstore"
@@ -1002,15 +1001,6 @@ func (m *MockConfigStore) GetFrameworkConfig(ctx context.Context) (*tables.Table
 }
 
 // Feature flags
-func (m *MockConfigStore) ListFeatureFlags(ctx context.Context) ([]tables.TableFeatureFlag, error) {
-	return nil, nil
-}
-
-func (m *MockConfigStore) UpsertFeatureFlag(ctx context.Context, id string, enabled bool, updatedAt int64) error {
-	return nil
-}
-
-// Vector store config
 func (m *MockConfigStore) UpdateVectorStoreConfig(ctx context.Context, config *vectorstore.Config) error {
 	m.vectorConfig = config
 	return nil
@@ -19715,28 +19705,6 @@ func TestReconcileProviderKeys_AnthropicWorkloadIdentity(t *testing.T) {
 	require.Len(t, merged, 1)
 	require.NotNil(t, merged[0].AnthropicKeyConfig.WorkloadIdentity.WorkspaceID, "an edited block must replace the stored key")
 	require.NotEqual(t, syncedHash, merged[0].ConfigHash)
-}
-
-// The phrase suggestions dashboard ships behind a flag that is off in both
-// builds, so a few deployments can try the suggestion APIs first; either build
-// can turn it on.
-func TestRegisterFeatureFlags_PhraseSuggestionsOffByDefault(t *testing.T) {
-	require.NoError(t, registerFeatureFlags(context.Background()))
-
-	def, ok := featureflags.LookupDef(FeatureFlagPhraseSuggestions)
-	require.True(t, ok, "phrase-suggestions flag must be registered")
-	require.False(t, def.DefaultFor(false), "off by default in OSS")
-	require.False(t, def.DefaultFor(true), "off by default in enterprise")
-	require.False(t, def.EnterpriseOnly, "OSS can turn it on")
-
-	for _, isEnterprise := range []bool{false, true} {
-		store, err := featureflags.New(featureflags.Config{IsEnterprise: isEnterprise})
-		require.NoError(t, err)
-		require.False(t, store.IsEnabled(FeatureFlagPhraseSuggestions), "enterprise=%v", isEnterprise)
-		_, err = store.Set(context.Background(), FeatureFlagPhraseSuggestions, true)
-		require.NoError(t, err)
-		require.True(t, store.IsEnabled(FeatureFlagPhraseSuggestions), "enterprise=%v: an operator can turn it on", isEnterprise)
-	}
 }
 
 // governanceWithRoutingFallbacks decodes routing rules the way config.json is read, so each

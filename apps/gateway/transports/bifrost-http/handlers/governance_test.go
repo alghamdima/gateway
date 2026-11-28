@@ -5190,23 +5190,18 @@ func (m *expiryCleanupTestManager) RemoveVirtualKey(_ context.Context, id string
 	return nil
 }
 
-func newExpiryCleanupHandler(now time.Time, keys ...*configstoreTables.TableVirtualKey) (*GovernanceHandler, *expiryCleanupTestStore, *expiryCleanupTestManager, *[]schemas.NotificationInput) {
+func newExpiryCleanupHandler(now time.Time, keys ...*configstoreTables.TableVirtualKey) (*GovernanceHandler, *expiryCleanupTestStore, *expiryCleanupTestManager) {
 	store := &expiryCleanupTestStore{keys: map[string]*configstoreTables.TableVirtualKey{}}
 	for _, vk := range keys {
 		store.keys[vk.ID] = vk
 	}
 	manager := &expiryCleanupTestManager{}
-	published := &[]schemas.NotificationInput{}
 	h := &GovernanceHandler{
 		configStore:       store,
 		governanceManager: manager,
 		now:               func() time.Time { return now },
-		notify: func(_ context.Context, input schemas.NotificationInput) (*schemas.Notification, error) {
-			*published = append(*published, input)
-			return &schemas.Notification{}, nil
-		},
 	}
-	return h, store, manager, published
+	return h, store, manager
 }
 
 func TestVKExpiryCleanupJobID_OnePerUTCDay(t *testing.T) {
@@ -5220,13 +5215,13 @@ func TestVKExpiryCleanupJobID_OnePerUTCDay(t *testing.T) {
 	assert.Equal(t, vkExpiryCleanupJobID(morning), vkExpiryCleanupJobID(morning.In(ist)))
 }
 
-func TestRunVKExpiryCleanupJob_DeletesFlaggedExpiredKeysAndNotifiesOnce(t *testing.T) {
+func TestRunVKExpiryCleanupJob_DeletesFlaggedExpiredKeys(t *testing.T) {
 	SetLogger(&mockLogger{})
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)
 	future := now.Add(time.Hour)
 	inactive := false
-	h, store, manager, published := newExpiryCleanupHandler(now,
+	h, store, manager := newExpiryCleanupHandler(now,
 		&configstoreTables.TableVirtualKey{ID: "vk-a", Name: "alpha", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
 		&configstoreTables.TableVirtualKey{ID: "vk-b", Name: "beta", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true), IsActive: &inactive},
 		&configstoreTables.TableVirtualKey{ID: "vk-c", Name: "gamma", ExpiresAt: &past},
@@ -5250,21 +5245,13 @@ func TestRunVKExpiryCleanupJob_DeletesFlaggedExpiredKeysAndNotifiesOnce(t *testi
 	assert.Empty(t, final.Failed)
 	assert.ElementsMatch(t, []string{"vk-a", "vk-b"}, final.HandledIDs)
 
-	require.Len(t, *published, 1)
-	n := (*published)[0]
-	assert.Equal(t, schemas.NotificationSeveritySuccess, n.Severity)
-	assert.Equal(t, schemas.NotificationAudienceAll, n.Audience)
-	assert.Equal(t, "Expired virtual keys deleted", n.Title)
-	assert.Equal(t, "Deleted 2 expired virtual keys.", n.Message)
-	assert.Equal(t, vkExpiryCleanupActionPath, n.ActionPath)
-	assert.NotEmpty(t, n.ActionLabel)
 }
 
 func TestRunVKExpiryCleanupJob_NothingToDeleteStaysSilent(t *testing.T) {
 	SetLogger(&mockLogger{})
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)
-	h, store, manager, published := newExpiryCleanupHandler(now,
+	h, store, manager := newExpiryCleanupHandler(now,
 		&configstoreTables.TableVirtualKey{ID: "vk-unflagged", Name: "unflagged", ExpiresAt: &past},
 	)
 
@@ -5272,7 +5259,6 @@ func TestRunVKExpiryCleanupJob_NothingToDeleteStaysSilent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, store.deleted)
 	assert.Empty(t, manager.removed)
-	assert.Empty(t, *published, "no notification when nothing was deleted")
 }
 
 func TestRunVKExpiryCleanupJob_SkipsKeysChangedSinceScan(t *testing.T) {
@@ -5280,7 +5266,7 @@ func TestRunVKExpiryCleanupJob_SkipsKeysChangedSinceScan(t *testing.T) {
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)
 	future := now.Add(time.Hour)
-	h, store, manager, published := newExpiryCleanupHandler(now,
+	h, store, manager := newExpiryCleanupHandler(now,
 		&configstoreTables.TableVirtualKey{ID: "vk-extended", Name: "extended", ExpiresAt: &future, DeleteAfterExpire: schemas.Ptr(true)},
 		&configstoreTables.TableVirtualKey{ID: "vk-unflagged", Name: "unflagged", ExpiresAt: &past},
 	)
@@ -5295,7 +5281,6 @@ func TestRunVKExpiryCleanupJob_SkipsKeysChangedSinceScan(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, store.deleted)
 	assert.Empty(t, manager.removed)
-	assert.Empty(t, *published)
 }
 
 func TestRunVKExpiryCleanupJob_UpdateCommittedAfterRecheckKeepsKey(t *testing.T) {
@@ -5303,7 +5288,7 @@ func TestRunVKExpiryCleanupJob_UpdateCommittedAfterRecheckKeepsKey(t *testing.T)
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)
 	// The operator cleared the flag; the commit landed after the job's own read.
-	h, store, manager, published := newExpiryCleanupHandler(now,
+	h, store, manager := newExpiryCleanupHandler(now,
 		&configstoreTables.TableVirtualKey{ID: "vk-kept", Name: "kept", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(false)},
 	)
 	store.scanOverride = []configstoreTables.TableVirtualKey{
@@ -5317,7 +5302,6 @@ func TestRunVKExpiryCleanupJob_UpdateCommittedAfterRecheckKeepsKey(t *testing.T)
 	require.NoError(t, err)
 	assert.Empty(t, store.deleted, "eligibility must be decided under the delete's row lock")
 	assert.Empty(t, manager.removed)
-	assert.Empty(t, *published)
 	var final vkExpiryCleanupMeta
 	require.NoError(t, json.Unmarshal([]byte(meta), &final))
 	assert.Empty(t, final.Deleted)
@@ -5327,7 +5311,7 @@ func TestRunVKExpiryCleanupJob_CheckpointErrorFailsJobWithProgress(t *testing.T)
 	SetLogger(&mockLogger{})
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)
-	h, store, _, published := newExpiryCleanupHandler(now,
+	h, store, _ := newExpiryCleanupHandler(now,
 		&configstoreTables.TableVirtualKey{ID: "vk-a", Name: "alpha", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
 		&configstoreTables.TableVirtualKey{ID: "vk-b", Name: "beta", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
 	)
@@ -5336,7 +5320,6 @@ func TestRunVKExpiryCleanupJob_CheckpointErrorFailsJobWithProgress(t *testing.T)
 	meta, err := h.runVKExpiryCleanupJob(context.Background(), configstoreTables.TableSidekiqJob{}, func(string) error { return checkpointErr })
 	require.ErrorIs(t, err, checkpointErr, "a failed checkpoint must fail the job so sidekiq persists the metadata")
 	assert.Equal(t, []string{"vk-a"}, store.deleted, "no further keys after a failed checkpoint")
-	assert.Empty(t, *published)
 	// The returned metadata carries the deletion the checkpoint failed to persist.
 	var final vkExpiryCleanupMeta
 	require.NoError(t, json.Unmarshal([]byte(meta), &final))
@@ -5348,7 +5331,7 @@ func TestRunVKExpiryCleanupJob_ResumesWithoutRepeatingHandledKeys(t *testing.T) 
 	SetLogger(&mockLogger{})
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Hour)
-	h, store, manager, published := newExpiryCleanupHandler(now,
+	h, store, manager := newExpiryCleanupHandler(now,
 		&configstoreTables.TableVirtualKey{ID: "vk-done", Name: "done", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
 		&configstoreTables.TableVirtualKey{ID: "vk-todo", Name: "todo", ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
 	)
@@ -5365,25 +5348,16 @@ func TestRunVKExpiryCleanupJob_ResumesWithoutRepeatingHandledKeys(t *testing.T) 
 	var final vkExpiryCleanupMeta
 	require.NoError(t, json.Unmarshal([]byte(meta), &final))
 	assert.Equal(t, []string{"done", "todo"}, final.Deleted)
-	require.Len(t, *published, 1)
-	assert.Contains(t, (*published)[0].Message, "Deleted 2 expired virtual keys")
 }
 
 func TestRunVKExpiryCleanupJob_ListErrorFailsJob(t *testing.T) {
 	SetLogger(&mockLogger{})
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
-	h, store, _, published := newExpiryCleanupHandler(now)
+	h, store, _ := newExpiryCleanupHandler(now)
 	store.listErr = errors.New("db down")
 
 	_, err := h.runVKExpiryCleanupJob(context.Background(), configstoreTables.TableSidekiqJob{}, func(string) error { return nil })
 	require.Error(t, err)
-	assert.Empty(t, *published)
-}
-
-func TestVKExpiryCleanupNotification_CountsOnly(t *testing.T) {
-	n := vkExpiryCleanupNotification(vkExpiryCleanupMeta{Deleted: []string{"alpha"}, Failed: []string{"stuck", "jammed"}})
-	assert.Equal(t, schemas.NotificationSeverityWarning, n.Severity)
-	assert.Equal(t, "Deleted 1 expired virtual key. 2 could not be deleted.", n.Message)
 }
 
 func TestVirtualKeyDeleteAfterExpire_APIValidation(t *testing.T) {
@@ -5490,33 +5464,30 @@ func TestRunVKExpiryCleanupJob_ClientDefaultAppliesToUnsetKeys(t *testing.T) {
 	}
 
 	// Client default on: unset keys go, explicit false stays.
-	h, store, manager, published := newExpiryCleanupHandler(now, keys()...)
+	h, store, manager := newExpiryCleanupHandler(now, keys()...)
 	store.deleteExpiredByDefault = true
 	_, err := h.runVKExpiryCleanupJob(context.Background(), configstoreTables.TableSidekiqJob{}, func(string) error { return nil })
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"vk-unset", "vk-opt-in"}, store.deleted)
 	assert.ElementsMatch(t, []string{"vk-unset", "vk-opt-in"}, manager.removed)
-	require.Len(t, *published, 1)
 
 	// Client default off: only explicit true goes.
-	h, store, manager, published = newExpiryCleanupHandler(now, keys()...)
+	h, store, manager = newExpiryCleanupHandler(now, keys()...)
 	_, err = h.runVKExpiryCleanupJob(context.Background(), configstoreTables.TableSidekiqJob{}, func(string) error { return nil })
 	require.NoError(t, err)
 	assert.Equal(t, []string{"vk-opt-in"}, store.deleted)
 	assert.Equal(t, []string{"vk-opt-in"}, manager.removed)
-	require.Len(t, *published, 1)
 }
 
 func TestRunVKExpiryCleanupJob_ClientConfigErrorFailsJob(t *testing.T) {
 	SetLogger(&mockLogger{})
 	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
-	h, store, _, published := newExpiryCleanupHandler(now)
+	h, store, _ := newExpiryCleanupHandler(now)
 	store.clientConfigErr = errors.New("db down")
 
 	_, err := h.runVKExpiryCleanupJob(context.Background(), configstoreTables.TableSidekiqJob{}, func(string) error { return nil })
 	require.Error(t, err)
 	assert.Empty(t, store.deleted)
-	assert.Empty(t, *published)
 }
 
 // TestVirtualKeyMetadataRoundTrip drives the handlers end to end: create stores metadata, an

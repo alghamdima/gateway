@@ -268,9 +268,8 @@ type GovernanceHandler struct {
 	// virtualKeyBusinessUnitResolver, when non-nil, names each VK's owning business unit.
 	// Injected at construction; nil on OSS builds, which have no business unit table.
 	virtualKeyBusinessUnitResolver VirtualKeyBusinessUnitResolver
-	// sidekiq and notify back the daily expired-key cleanup job; see virtualkeyexpiry.go.
+	// sidekiq backs the daily expired-key cleanup job; see virtualkeyexpiry.go.
 	sidekiq           *sidekiq.Runner
-	notify            schemas.NotificationPublisher
 	expiryCleanupStop context.CancelFunc
 	// now is the clock, overridden in tests.
 	now func() time.Time

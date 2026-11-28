@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/sidekiq"
@@ -22,7 +21,6 @@ const (
 	vkExpiryCleanupStartupDelay = 30 * time.Second
 	vkExpiryCleanupTickInterval = time.Hour
 	vkExpiryCleanupTickJitter   = 5 * time.Minute
-	vkExpiryCleanupActionPath   = "/workspace/virtual-keys"
 )
 
 // vkExpiryCleanupJobID derives the job ID from the UTC day so every node enqueues
@@ -41,12 +39,10 @@ type vkExpiryCleanupMeta struct {
 	HandledIDs []string `json:"handled_ids,omitempty"`
 }
 
-// SetExpiryCleanupBackend wires the sidekiq runner and notification publisher and
-// registers the cleanup handler. Call before the dispatcher starts: Enqueue rejects
+// SetExpiryCleanupBackend wires the sidekiq runner and registers the cleanup handler. Call before the dispatcher starts: Enqueue rejects
 // a kind with no handler, and any node may claim the job.
-func (h *GovernanceHandler) SetExpiryCleanupBackend(runner *sidekiq.Runner, notify schemas.NotificationPublisher) {
+func (h *GovernanceHandler) SetExpiryCleanupBackend(runner *sidekiq.Runner) {
 	h.sidekiq = runner
-	h.notify = notify
 	if runner != nil {
 		runner.Register(VKExpiryCleanupJobKind, h.runVKExpiryCleanupJob)
 	}
@@ -124,7 +120,7 @@ func (h *GovernanceHandler) enqueueExpiryCleanup(ctx context.Context) {
 // runVKExpiryCleanupJob deletes every expired key whose effective delete_after_expire is
 // true (the key's own flag, or the client default when the key has none),
 // checkpointing after each one so a re-claimed job never handles a key twice, and
-// posts one notification when at least one key was removed.
+// The outcome (deleted, failed) is the job's metadata.
 func (h *GovernanceHandler) runVKExpiryCleanupJob(ctx context.Context, job configstoreTables.TableSidekiqJob, progress sidekiq.ProgressFunc) (string, error) {
 	var meta vkExpiryCleanupMeta
 	if job.Metadata != "" {
@@ -193,9 +189,6 @@ func (h *GovernanceHandler) runVKExpiryCleanupJob(ctx context.Context, job confi
 			return marshalVKExpiryCleanupMeta(meta), err
 		}
 	}
-	if len(meta.Deleted) > 0 {
-		h.publishExpiryCleanupNotification(ctx, meta)
-	}
 	return marshalVKExpiryCleanupMeta(meta), nil
 }
 
@@ -217,42 +210,4 @@ func marshalVKExpiryCleanupMeta(meta vkExpiryCleanupMeta) string {
 		return "{}"
 	}
 	return string(encoded)
-}
-
-// publishExpiryCleanupNotification posts the job's outcome to the notification bar.
-// Publish errors are logged, never returned: the deletions already happened.
-func (h *GovernanceHandler) publishExpiryCleanupNotification(ctx context.Context, meta vkExpiryCleanupMeta) {
-	if h.notify == nil {
-		return
-	}
-	if _, err := h.notify(ctx, vkExpiryCleanupNotification(meta)); err != nil {
-		logger.Warn("vk expiry cleanup: failed to publish notification: %v", err)
-	}
-}
-
-// vkExpiryCleanupNotification builds the notification for a run that deleted at least one key.
-// It carries counts only; the names stay in the job metadata.
-func vkExpiryCleanupNotification(meta vkExpiryCleanupMeta) schemas.NotificationInput {
-	severity := schemas.NotificationSeveritySuccess
-	message := fmt.Sprintf("Deleted %d expired virtual key%s.", len(meta.Deleted), pluralSuffix(len(meta.Deleted)))
-	if len(meta.Failed) > 0 {
-		severity = schemas.NotificationSeverityWarning
-		message += fmt.Sprintf(" %d could not be deleted.", len(meta.Failed))
-	}
-	return schemas.NotificationInput{
-		Audience:    schemas.NotificationAudienceAll,
-		Severity:    severity,
-		Title:       "Expired virtual keys deleted",
-		Message:     message,
-		ActionLabel: "View virtual keys",
-		ActionPath:  vkExpiryCleanupActionPath,
-	}
-}
-
-// pluralSuffix returns "s" for any count other than one.
-func pluralSuffix(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
 }

@@ -188,7 +188,6 @@ type BifrostHTTPServer struct {
 	unsubscribeCaptureDeletes func()
 
 	WebSocketHandler     *handlers.WebSocketHandler
-	NotificationService  *handlers.NotificationService
 	devPprofHandler      *handlers.DevPprofHandler
 	skillsServingHandler *handlers.SkillsServingHandler
 	IntegrationHandler   *handlers.IntegrationHandler
@@ -2105,19 +2104,6 @@ func (s *BifrostHTTPServer) RegisterInferenceRoutes(ctx context.Context, middlew
 	return nil
 }
 
-// notificationPublisher returns a publisher that reads s.Config.NotificationPublisher at
-// call time, so a handler registered before the notification service exists (RegisterAPIRoutes
-// without Bootstrap) still reaches it. Publishing is a no-op while none is set.
-func (s *BifrostHTTPServer) notificationPublisher() schemas.NotificationPublisher {
-	return func(ctx context.Context, input schemas.NotificationInput) (*schemas.Notification, error) {
-		publish := s.Config.NotificationPublisher
-		if publish == nil {
-			return nil, nil
-		}
-		return publish(ctx, input)
-	}
-}
-
 // RegisterAPIRoutes initializes the routes for the Bifrost HTTP server.
 func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks ServerCallbacks, middlewares ...schemas.BifrostHTTPMiddleware) error {
 	var err error
@@ -2152,7 +2138,7 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 		// Register the expired-key cleanup job before the dispatcher starts, since
 		// any node may claim it.
 		if s.SidekiqRunner != nil && s.Config != nil && s.Config.ConfigStore != nil {
-			governanceHandler.SetExpiryCleanupBackend(s.SidekiqRunner, s.notificationPublisher())
+			governanceHandler.SetExpiryCleanupBackend(s.SidekiqRunner)
 		}
 		s.GovernanceHandler = governanceHandler
 	}
@@ -2184,11 +2170,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	if s.WebSocketHandler == nil {
 		s.WebSocketHandler = handlers.NewWebSocketHandler(s.Ctx, s.Config.ClientConfig.AllowedOrigins)
 	}
-	if s.NotificationService == nil {
-		s.NotificationService = handlers.NewNotificationService(s.Config.ConfigStore, s.WebSocketHandler)
-		s.Config.NotificationPublisher = s.NotificationService.Publish
-		s.NotificationService.Start(s.Ctx)
-	}
 	s.subscribeCaptureDeletes(loggerPlugin)
 	// Start WebSocket heartbeat
 	s.WebSocketHandler.StartHeartbeat()
@@ -2203,7 +2184,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	if s.setupLockInstalled && s.AuthMiddleware != nil {
 		sessionHandler.SetSetupLock(s.AuthMiddleware)
 	}
-	featureFlagsHandler := handlers.NewFeatureFlagsHandler(s.Config.FeatureFlags, s.Config.ConfigStore)
 	// Going ahead with API handlers
 	healthHandler.RegisterRoutes(s.Router, middlewares...)
 	providerHandler.RegisterRoutes(s.Router, middlewares...)
@@ -2224,9 +2204,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	}
 	s.skillsServingHandler = skillsServingHandler
 	cacheHandler.RegisterRoutes(s.Router, middlewares...)
-	if featureFlagsHandler != nil {
-		featureFlagsHandler.RegisterRoutes(s.Router, middlewares...)
-	}
 	if governanceHandler != nil {
 		var overrides handlers.GovernanceRouteOverrides
 		if provider, ok := callbacks.(GovernanceRouteOverridesProvider); ok {
@@ -2242,9 +2219,6 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	}
 	if s.WebSocketHandler != nil {
 		s.WebSocketHandler.RegisterRoutes(s.Router, middlewares...)
-	}
-	if s.NotificationService != nil {
-		s.NotificationService.RegisterRoutes(s.Router, middlewares...)
 	}
 	if s.Config.ConfigStore != nil && s.SidekiqRunner != nil {
 		handlers.NewSidekiqHandler(s.Config.ConfigStore, s.SidekiqRunner).RegisterRoutes(s.Router, middlewares...)
@@ -2492,9 +2466,6 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	// Log callbacks are registered later in RegisterAPIRoutes when logging plugin is available.
 	s.WebSocketHandler = handlers.NewWebSocketHandler(s.Ctx, s.Config.ClientConfig.AllowedOrigins)
 	s.Config.EventBroadcaster = s.WebSocketHandler.BroadcastEvent
-	s.NotificationService = handlers.NewNotificationService(s.Config.ConfigStore, s.WebSocketHandler)
-	s.Config.NotificationPublisher = s.NotificationService.Publish
-	s.NotificationService.Start(s.Ctx)
 	// Initializing plugin loader. Allowlist entries are validated now - a malformed entry
 	// fails server startup rather than silently no-oping, since this is security-relaxing
 	// config for SSRF protection on custom plugin downloads.

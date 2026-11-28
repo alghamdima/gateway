@@ -1441,24 +1441,6 @@ func TestGetConfiguredProviderNamesIsSafeAgainstConcurrentProviderEdits(t *testi
 	writers.Wait()
 }
 
-func TestNotificationPublisher_ResolvesPublisherSetAfterRegistration(t *testing.T) {
-	s := &BifrostHTTPServer{Config: &lib.Config{}}
-	// Captured while the notification service does not exist yet, as RegisterAPIRoutes
-	// does when Bootstrap has not run.
-	publish := s.notificationPublisher()
-	require.NotNil(t, publish, "a handler registered early must still reach the publisher set later")
-
-	var got []schemas.NotificationInput
-	s.Config.NotificationPublisher = func(_ context.Context, input schemas.NotificationInput) (*schemas.Notification, error) {
-		got = append(got, input)
-		return &schemas.Notification{}, nil
-	}
-	_, err := publish(context.Background(), schemas.NotificationInput{Title: "late"})
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	assert.Equal(t, "late", got[0].Title)
-}
-
 // TestReloadProxyConfigUpdatesHTTPClientFactory pins that saving the global proxy reaches
 // the factory behind skills and plugin downloads, not only provider inference.
 func TestReloadProxyConfigUpdatesHTTPClientFactory(t *testing.T) {

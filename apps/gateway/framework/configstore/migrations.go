@@ -379,7 +379,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"drop_legacy_calendar_aligned_columns"}, run: migrationDropLegacyCalendarAlignedColumns},
 	{IDs: []string{"add_vk_access_profile_id_column"}, run: migrationAddVKAccessProfileIDColumn},
 	{IDs: []string{"drop_vk_access_profile_id_column"}, run: migrationDropVKAccessProfileIDColumn},
-	{IDs: []string{"add_feature_flags_table"}, run: migrationAddFeatureFlagsTable},
 	{IDs: []string{"add_framework_config_hash_column"}, run: migrationAddFrameworkConfigHashColumn},
 	{IDs: []string{"add_model_parameters_url_column"}, run: migrationAddModelParametersURLColumn},
 	{IDs: []string{"add_client_config_metadata_json_column"}, run: migrationAddClientConfigMetadataColumn},
@@ -427,7 +426,6 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_bedrock_endpoints_columns"}, run: migrationAddBedrockEndpointsColumns},
 	{IDs: []string{"add_cost_per_request_pricing_column"}, run: migrationAddCostPerRequestPricingColumn},
 	{IDs: []string{"backfill_default_complexity_exemplars_v2"}, run: migrationBackfillDefaultComplexityExemplars},
-	{IDs: []string{"add_notifications_table"}, run: migrationAddNotificationsTable},
 	{IDs: []string{"add_batch_jobs_table"}, run: migrationAddBatchJobsTable},
 	{IDs: []string{"add_image_megapixel_tier_pricing_columns"}, run: migrationAddImageMegapixelTierPricingColumns},
 	{IDs: []string{"add_input_cost_per_query_column"}, run: migrationAddInputCostPerQueryColumn},
@@ -496,6 +494,29 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_model_router_targets_and_routing"}, run: migrationAddModelRouterTargetsAndRouting},
 	{IDs: []string{"add_model_router_suggestions_tier_columns"}, run: migrationAddModelRouterSuggestionTierColumns},
 	{IDs: []string{"add_client_config_entity_access_profile_mode_column"}, run: migrationAddClientConfigEntityAccessProfileModeColumn},
+	{IDs: []string{"drop_notifications_and_feature_flags_tables"}, run: migrationDropNotificationsAndFeatureFlagsTables},
+}
+
+// migrationDropNotificationsAndFeatureFlagsTables drops the tables of two features taken out of
+// the product on 2026-11-28 (MODIFICATIONS.md, "Features outside the product"): the dashboard
+// notifications and the feature flags, both of which served the admin UI this gateway no longer
+// has. Their own migrations are gone, so a new database never creates them; this removes them from
+// a database created before that. Nothing is restored on rollback: the code that read them is gone.
+func migrationDropNotificationsAndFeatureFlagsTables(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "drop_notifications_and_feature_flags_tables"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			for _, table := range []string{"notifications", "feature_flags"} {
+				if err := tx.WithContext(ctx).Migrator().DropTable(table); err != nil {
+					return fmt.Errorf("drop table %s: %w", table, err)
+				}
+			}
+			return nil
+		},
+	})
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -831,21 +852,6 @@ func providerObjectsObjectIDIndexMigration(ctx context.Context, migrationName st
 	}
 }
 
-func migrationAddNotificationsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_notifications_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	return RunSingleMigration(ctx, nil, db, logger, &migrator.Migration{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			return tx.WithContext(ctx).AutoMigrate(&tables.TableNotification{})
-		},
-		Rollback: func(tx *gorm.DB) error {
-			return tx.WithContext(ctx).Migrator().DropTable(&tables.TableNotification{})
-		},
-	})
-}
-
 // migrationAddDatasheetOverridesTable creates governance_datasheet_overrides,
 // the user edit layer the datasheet sync re-applies after every refresh.
 func migrationAddDatasheetOverridesTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -1155,32 +1161,6 @@ func migrationAddClientConfigMetadataColumn(ctx context.Context, db *gorm.DB, lo
 			tx = tx.WithContext(ctx)
 			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "metadata_json"); err != nil {
 				return err
-			}
-			return nil
-		},
-	}})
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error while running db migration: %s", err.Error())
-	}
-	return nil
-}
-
-// migrationAddFeatureFlagsTable creates the feature_flags table holding
-// user-toggled overrides for the in-memory featureflags registry.
-func migrationAddFeatureFlagsTable(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_feature_flags_table"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			migrator := tx.Migrator()
-			if !migrator.HasTable(&tables.TableFeatureFlag{}) {
-				logger.Info("[configstore] %s: creating table TableFeatureFlag", migrationName)
-				if err := migrator.CreateTable(&tables.TableFeatureFlag{}); err != nil {
-					return err
-				}
 			}
 			return nil
 		},
