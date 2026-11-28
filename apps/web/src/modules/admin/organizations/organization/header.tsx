@@ -45,7 +45,7 @@ export const OrganizationHeader = ({ id }: OrganizationHeaderProps) => {
 
           <div className="flex items-center gap-2">
             <DashboardHeaderDescription>
-              /{organization?.slug}
+              {organization?.personalOwnerEmail ?? `/${organization?.slug}`}
             </DashboardHeaderDescription>
           </div>
         </div>

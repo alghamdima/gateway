@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import { auth } from "@workspace/auth/server";
+import { auth, getPersonalAccount } from "@workspace/auth/server";
 import { ExecutionSide, Platform } from "@workspace/shared/constants";
 import { logger } from "@workspace/shared/logger";
 
@@ -38,6 +38,12 @@ export const getOrganization = cache(
     }
   },
 );
+
+/** The signed-in user's personal account (ADR 0020), or null when signed out. */
+export const getPersonalAccountForSession = cache(async () => {
+  const session = await getSession();
+  return session?.user ? getPersonalAccount(session.user.id) : null;
+});
 
 export const getInvitation = cache(async ({ id }: { id: string }) => {
   try {

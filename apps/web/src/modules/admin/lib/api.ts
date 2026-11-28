@@ -238,6 +238,26 @@ const queries = {
         queryFn: () => handle(api.admin["key-settings"].changes.$get)(),
       }),
   },
+  accountSettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "account-settings"],
+        queryFn: () => handle(api.admin["account-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "account-settings", "changes"],
+        queryFn: () => handle(api.admin["account-settings"].changes.$get)(),
+      }),
+    getUserLimit: (userId: string) =>
+      queryOptions({
+        queryKey: [KEY, "account-settings", "users", userId],
+        queryFn: () =>
+          handle(api.admin["account-settings"].users[":userId"].$get)({
+            param: { userId },
+          }),
+      }),
+  },
   payments: {
     get: () =>
       queryOptions({
@@ -428,6 +448,29 @@ const mutations = {
           (typeof api.admin)["key-settings"]["$put"]
         >["json"],
       ) => handle(api.admin["key-settings"].$put)({ json }),
+    }),
+  },
+  accountSettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "account-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["account-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["account-settings"].$put)({ json }),
+    }),
+    setUserLimit: mutationOptions({
+      mutationKey: [KEY, "account-settings", "users", "update"],
+      mutationFn: ({
+        userId,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin)["account-settings"]["users"][":userId"]["$put"]
+      >["json"] & { userId: string }) =>
+        handle(api.admin["account-settings"].users[":userId"].$put)({
+          param: { userId },
+          json,
+        }),
     }),
   },
   payments: {

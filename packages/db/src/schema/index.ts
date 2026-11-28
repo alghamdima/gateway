@@ -9,3 +9,4 @@ export * from "./limits";
 export * from "./providers";
 export * from "./promo-codes";
 export * from "./model-prices";
+export * from "./personal-accounts";

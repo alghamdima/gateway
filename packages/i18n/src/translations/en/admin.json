@@ -821,5 +821,33 @@
         "limitPresetsMicroSar": "Quick picks"
       }
     }
+  },
+  "accountSettings": {
+    "header": {
+      "title": "Account limits",
+      "description": "How many organizations one user may own."
+    },
+    "saved": "Limit saved.",
+    "limit": {
+      "title": "Organizations per user",
+      "description": "The most organizations one user may own. A personal account is not counted, and neither are organizations they are only a member of.",
+      "label": "Organizations a user may own",
+      "general": "General limit",
+      "invalid": "Enter a whole number from 0 to 1,000.",
+      "help": "Applies to everyone without a limit of their own. Nobody loses an organization they already own: the limit is checked when one is created. To allow one customer more, open the user and set their own limit."
+    },
+    "changes": {
+      "title": "History",
+      "description": "Every change to the general limit.",
+      "empty": "No changes yet."
+    },
+    "user": {
+      "title": "Organization limit",
+      "owned": "Organizations owned",
+      "effective": "May own",
+      "own": "Own limit",
+      "saved": "The user's limit was saved.",
+      "help": "Set a number to allow this user more or fewer organizations than the general limit. Leave it empty to follow the general limit."
+    }
   }
 }

@@ -34,6 +34,7 @@ import { authClient } from "~/lib/auth/client";
 import { billing } from "~/modules/billing/lib/api";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { CreateOrganizationModal } from "~/modules/organization/create-organization";
+import { organization as organizationApi } from "~/modules/organization/lib/api";
 
 import { useActiveOrganization } from "./hooks/use-active-organization";
 
@@ -51,10 +52,23 @@ export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
   const [open, setOpen] = useState(false);
   const [createOrganizationOpen, setCreateOrganizationOpen] = useState(false);
 
-  const { data: organizations } = authClient.useListOrganizations();
-  const { activeOrganization } = useActiveOrganization();
+  const { data: memberships } = authClient.useListOrganizations();
+  const { activeOrganization: activeAccount } = useActiveOrganization();
 
-  const referenceId = activeOrganization?.id ?? user.id;
+  // The personal account is stored as an organization (ADR 0020) but is never
+  // shown as one: it is "Personal", first in the list, and the rest are the
+  // user's organizations.
+  const { data: personal } = useQuery(organizationApi.queries.personal());
+  const organizations = memberships?.filter(
+    (membership) => membership.id !== personal?.id,
+  );
+  const activeOrganization =
+    activeAccount && activeAccount.id !== personal?.id ? activeAccount : null;
+  const personalHref = personal
+    ? pathsConfig.dashboard.organization(personal.slug).index
+    : pathsConfig.dashboard.user.index;
+
+  const referenceId = activeAccount?.id ?? user.id;
   const summary = useQuery(billing.queries.summary.get(referenceId));
   const activePlan = getActivePlan(summary.data);
 
@@ -132,10 +146,10 @@ export const AccountSwitcher = memo<AccountSwitcherProps>(({ user }) => {
                     className="p-2"
                     onSelect={() => {
                       setOpen(false);
-                      router.replace(pathsConfig.dashboard.user.index);
+                      router.replace(personalHref);
                     }}
                   >
-                    <TurboLink href={pathsConfig.dashboard.user.index}>
+                    <TurboLink href={personalHref}>
                       <Avatar className="size-6">
                         <AvatarImage
                           src={user.image ?? undefined}

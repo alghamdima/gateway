@@ -14,6 +14,7 @@ import { authClient } from "~/lib/auth/client";
 import {
   getMemberByUserId,
   getOrganization,
+  getPersonalAccountForSession,
   getSession,
 } from "~/lib/auth/server";
 import { getQueryClient } from "~/lib/query/server";
@@ -29,9 +30,12 @@ import type { Menu } from "~/modules/common/layout/dashboard/sidebar/types";
 const menu = ({
   slug,
   member,
+  isPersonal,
 }: {
   slug: string;
   member: Member | null;
+  /** The user's personal account (ADR 0020): no members, no organization settings. */
+  isPersonal: boolean;
 }): Menu => [
   {
     label: "platform",
@@ -72,48 +76,68 @@ const menu = ({
         : []),
     ],
   },
-  {
-    label: "organization",
-    items: [
-      {
-        title: "settings",
-        href: pathsConfig.dashboard.organization(slug).settings.index,
-        icon: <Icons.Settings />,
-        menu: [
-          {
-            items: [
-              {
-                title: "general",
-                href: pathsConfig.dashboard.organization(slug).settings.index,
-                icon: <Icons.Settings />,
-              },
-              ...(authClient.organization.checkRolePermission({
-                permissions: {
-                  billing: ["read"],
-                },
-                role: toMemberRole(member?.role),
-              })
-                ? [
-                    {
-                      title: "billing",
-                      href: pathsConfig.dashboard.organization(slug).settings
-                        .billing,
-                      icon: <Icons.CreditCard />,
-                    },
-                  ]
-                : []),
-            ],
-          },
-        ],
-      },
-      {
-        title: "members",
-        href: pathsConfig.dashboard.organization(slug).members,
-        icon: <Icons.UsersRound />,
-      },
-    ],
-  },
+  isPersonal ? accountGroup : organizationGroup({ slug, member }),
 ];
+
+// in a personal account the settings are the user's own
+const accountGroup: Menu[number] = {
+  label: "account",
+  items: [
+    {
+      title: "settings",
+      href: pathsConfig.dashboard.user.settings.index,
+      icon: <Icons.Settings />,
+    },
+  ],
+};
+
+const organizationGroup = ({
+  slug,
+  member,
+}: {
+  slug: string;
+  member: Member | null;
+}): Menu[number] => ({
+  label: "organization",
+  items: [
+    {
+      title: "settings",
+      href: pathsConfig.dashboard.organization(slug).settings.index,
+      icon: <Icons.Settings />,
+      menu: [
+        {
+          items: [
+            {
+              title: "general",
+              href: pathsConfig.dashboard.organization(slug).settings.index,
+              icon: <Icons.Settings />,
+            },
+            ...(authClient.organization.checkRolePermission({
+              permissions: {
+                billing: ["read"],
+              },
+              role: toMemberRole(member?.role),
+            })
+              ? [
+                  {
+                    title: "billing",
+                    href: pathsConfig.dashboard.organization(slug).settings
+                      .billing,
+                    icon: <Icons.CreditCard />,
+                  },
+                ]
+              : []),
+          ],
+        },
+      ],
+    },
+    {
+      title: "members",
+      href: pathsConfig.dashboard.organization(slug).members,
+      icon: <Icons.UsersRound />,
+    },
+  ],
+});
 
 export default function DashboardLayout({
   children,
@@ -157,8 +181,10 @@ async function getWorkspace(params: Promise<{ organization: string }>) {
     return redirect(pathsConfig.dashboard.user.index);
   }
 
+  const personal = await getPersonalAccountForSession();
   const items = menu({
     slug: organizationSlug,
+    isPersonal: personal?.id === activeOrganization.id,
     member: await getMemberByUserId({
       organizationId: activeOrganization.id,
       userId: user.id,

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import {
   Tabs,
@@ -7,7 +7,11 @@ import {
   TabsTrigger,
 } from "@workspace/ui-web/tabs";
 
-import { getOrganization } from "~/lib/auth/server";
+import { pathsConfig } from "~/config/paths";
+import {
+  getOrganization,
+  getPersonalAccountForSession,
+} from "~/lib/auth/server";
 import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { InvitationsDataTable } from "~/modules/organization/invitations/data-table/invitations-data-table";
@@ -29,6 +33,11 @@ export default async function MembersPage({
 
   if (!activeOrganization) {
     return notFound();
+  }
+
+  // a personal account has no members and no organization settings (ADR 0020)
+  if ((await getPersonalAccountForSession())?.id === activeOrganization.id) {
+    return redirect(pathsConfig.dashboard.organization(organization).index);
   }
 
   const { t } = await getTranslation({ ns: "organization" });

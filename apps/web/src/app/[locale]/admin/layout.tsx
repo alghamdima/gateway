@@ -53,6 +53,11 @@ const menu = [
         icon: <Icons.Key />,
       },
       {
+        title: "accountSettings",
+        href: pathsConfig.admin.accountSettings.index,
+        icon: <Icons.UsersRound />,
+      },
+      {
         title: "modelPrices",
         href: pathsConfig.admin.modelPrices.index,
         icon: <Icons.ChartNoAxesGantt />,

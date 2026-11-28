@@ -222,6 +222,8 @@ export const getOrganizationsResponseSchema = z.object({
       slug: z.string().nullish(),
       logo: z.string().nullish(),
       createdAt: z.coerce.date(),
+      // set only for a personal account (ADR 0020): whose it is
+      personalOwnerEmail: z.string().nullish(),
       members: z.number(),
     }),
   ),
@@ -242,6 +244,7 @@ export const getOrganizationResponseSchema = z
     slug: z.string().nullish(),
     logo: z.string().nullish(),
     createdAt: z.coerce.date(),
+    personalOwnerEmail: z.string().nullish(),
   })
   .nullable();
 

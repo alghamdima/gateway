@@ -1,8 +1,10 @@
+import { refuseIfPersonal } from "../../lib/personal";
 import { syncSubscriptionSeats } from "../../lib/server";
 import { OrganizationHooks } from "./types";
 
 export const { beforeAddMember, afterAddMember, afterAcceptInvitation } = {
-  beforeAddMember: async () => {
+  beforeAddMember: async ({ organization }) => {
+    await refuseIfPersonal(organization.id);
     /**
      * Here you can enforce any business logic before adding a member to the organization.
      * For example, for one-time per-seat purchase you can check if the organization has any

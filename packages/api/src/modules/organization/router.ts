@@ -5,6 +5,7 @@ import { MemberRole } from "@workspace/auth";
 import {
   canLeaveOrganization,
   getOrganizationsBlockingAccountDeletion,
+  getPersonalAccount,
 } from "@workspace/auth/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
@@ -48,6 +49,10 @@ export const organizationRouter = new Hono()
     c.json(
       await getOrganizationsBlockingAccountDeletion({ userId: c.var.user.id }),
     ),
+  )
+  // the user's personal account (ADR 0020): which of their accounts it is
+  .get("/personal", async (c) =>
+    c.json(await getPersonalAccount(c.var.user.id)),
   )
   .get("/:id", async (c) => {
     const id = c.req.param("id");

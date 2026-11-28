@@ -16,6 +16,13 @@ import type { InferRequestType } from "hono/client";
 const KEY = "organization";
 
 const queries = {
+  /** The user's personal account (ADR 0020): its organization id and slug. */
+  personal: () =>
+    queryOptions({
+      queryKey: [KEY, "personal"],
+      queryFn: () => handle(api.organizations.personal.$get)(),
+      staleTime: Infinity,
+    }),
   get: (params: { slug: string } | { id: string }) =>
     queryOptions({
       queryKey: [KEY, params],

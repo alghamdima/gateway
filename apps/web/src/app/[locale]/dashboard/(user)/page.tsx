@@ -1,17 +1,18 @@
-import { getMetadata } from "~/lib/metadata";
-import { UserOrganizationInvitationsBanner } from "~/modules/organization/invitations/user/user-organization-invitations";
-import { OrganizationPicker } from "~/modules/organization/organization-picker";
+import { redirect } from "next/navigation";
 
-export const generateMetadata = getMetadata({
-  title: "common:home",
-  description: "dashboard:user.home.description",
-});
+import { pathsConfig } from "~/config/paths";
+import { getPersonalAccountForSession } from "~/lib/auth/server";
 
-export default function UserPage() {
-  return (
-    <>
-      <UserOrganizationInvitationsBanner />
-      <OrganizationPicker />
-    </>
+/**
+ * The dashboard opens the user's personal account (ADR 0020); the account
+ * switcher leads from there to their organizations.
+ */
+export default async function UserPage() {
+  const personal = await getPersonalAccountForSession();
+
+  return redirect(
+    personal
+      ? pathsConfig.dashboard.organization(personal.slug).index
+      : pathsConfig.auth.login,
   );
 }

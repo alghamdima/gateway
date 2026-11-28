@@ -140,6 +140,25 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "keys.defaults", target: "key-settings" },
   },
 
+  // how many organizations a user may own, for everyone and for one user (ADR 0020)
+  {
+    method: "GET",
+    path: /^\/account-settings(\/changes|\/users\/[^/]+)?$/,
+    needs: { organizations: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: /^\/account-settings$/,
+    needs: { organizations: ["update"] },
+    audit: { action: "accounts.settings", target: "account-settings" },
+  },
+  {
+    method: "PUT",
+    path: /^\/account-settings\/users\/[^/]+$/,
+    needs: { organizations: ["update"] },
+    audit: { action: "accounts.organization-limit", target: "user" },
+  },
+
   // the model price table (ADMIN-09, ADR 0018): the same permission as the other prices
   {
     method: "GET",
@@ -349,7 +368,9 @@ export const auditTarget = (path: string) => {
   if (
     segments[0] === "pricing" ||
     segments[0] === "payments" ||
-    segments[0] === "key-settings"
+    segments[0] === "key-settings" ||
+    // /account-settings/users/u1 is about user u1
+    segments[0] === "account-settings"
   ) {
     return segments.at(-1);
   }

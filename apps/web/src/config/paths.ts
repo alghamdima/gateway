@@ -28,6 +28,9 @@ const pathsConfig = {
     keySettings: {
       index: `${ADMIN_PREFIX}/key-settings`,
     },
+    accountSettings: {
+      index: `${ADMIN_PREFIX}/account-settings`,
+    },
     modelPrices: {
       index: `${ADMIN_PREFIX}/model-prices`,
     },

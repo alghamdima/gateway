@@ -415,3 +415,4 @@ export type Permissions = NonNullable<
 export * from "./hooks";
 export * from "./lib/server";
 export * from "./lib/audit";
+export * from "./lib/personal";

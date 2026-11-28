@@ -12,6 +12,7 @@ import { UserHeader } from "~/modules/admin/users/user/header";
 import { InvitationsDataTable } from "~/modules/admin/users/user/invitations/data-table/invitations-data-table";
 import { MembershipsDataTable } from "~/modules/admin/users/user/memberships/data-table/memberships-data-table";
 import { OrdersDataTable } from "~/modules/admin/users/user/orders/data-table/orders-data-table";
+import { UserOrganizationLimit } from "~/modules/admin/users/user/organization-limit";
 import { SessionsList } from "~/modules/admin/users/user/sessions/sessions-list";
 import { SubscriptionsDataTable } from "~/modules/admin/users/user/subscriptions/data-table/subscriptions-data-table";
 
@@ -37,7 +38,7 @@ export default async function UserPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { t } = await getTranslation({ ns: "common" });
+  const { t } = await getTranslation({ ns: ["common", "admin"] });
   const { id } = await params;
   const user = await getUser({ id });
 
@@ -64,6 +65,10 @@ export default async function UserPage({
     {
       label: t("memberships"),
       component: <MembershipsDataTable userId={id} />,
+    },
+    {
+      label: t("admin:accountSettings.user.title"),
+      component: <UserOrganizationLimit userId={id} />,
     },
     {
       label: t("invitations"),
