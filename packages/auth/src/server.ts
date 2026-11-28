@@ -31,6 +31,7 @@ import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 import { hooks } from "./hooks";
+import { prepareAccountDeletion } from "./hooks/user/delete";
 import { AUTH_ADMIN_ACTIONS, clientIp, recordStaffAction } from "./lib/audit";
 import { syncSubscriptionSeats } from "./lib/server";
 import { getUrl, trustedOrigins } from "./lib/utils";
@@ -109,6 +110,10 @@ export const auth = betterAuth({
   user: {
     deleteUser: {
       enabled: true,
+      // before Better Auth deletes the sessions and sign-in accounts
+      beforeDelete: async (user) => {
+        await prepareAccountDeletion(user.id);
+      },
       sendDeleteAccountVerification: async ({ user, url }, request) =>
         sendEmail({
           to: user.email,
@@ -195,6 +200,15 @@ export const auth = betterAuth({
       // Staff act on every customer's account and money (ADR 0011): their
       // admin actions need two-factor authentication turned on. Stopping an
       // impersonation runs as the customer, who is not staff, so it passes.
+      // a staff member removing a user: the same checks, before anything is
+      // deleted (see prepareAccountDeletion)
+      if (ctx.path === "/admin/remove-user") {
+        const userId: unknown = ctx.body?.userId;
+        if (typeof userId === "string") {
+          await prepareAccountDeletion(userId);
+        }
+      }
+
       if (ctx.path.startsWith("/admin/")) {
         const session = await getSessionFromCtx(ctx);
         // the hook context types the user loosely; read the two fields we need

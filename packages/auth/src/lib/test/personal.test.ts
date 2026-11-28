@@ -147,6 +147,10 @@ describe.skipIf(!adminUrl)("personal accounts (ADR 0020)", () => {
     expect(blocking.map((organization) => organization.id)).toEqual([
       "org_sole",
     ]);
+    // refused before anything is deleted: Better Auth removes the sign-in
+    // accounts before the user row's own hook runs
+    const { prepareAccountDeletion } = await import("../../hooks/user/delete");
+    await expect(prepareAccountDeletion(userId)).rejects.toThrow(/sole owner/);
   });
 
   describe("the limit on organizations owned", () => {
