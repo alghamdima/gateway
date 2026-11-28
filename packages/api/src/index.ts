@@ -16,6 +16,7 @@ import { billingRouter } from "./modules/billing/router";
 import { creditsRouter } from "./modules/credits/router";
 import { dataPolicyRouter } from "./modules/data-policy/router";
 import { keysRouter } from "./modules/keys/router";
+import { onboardingRouter } from "./modules/onboarding/router";
 import { organizationRouter } from "./modules/organization/router";
 import { promoCodesRouter } from "./modules/promo-codes/router";
 import { internalRouter } from "./modules/reconciliation/router";
@@ -56,6 +57,7 @@ const appRouter = new Hono()
   .route("/data-policy", dataPolicyRouter)
   .route("/internal", internalRouter)
   .route("/keys", keysRouter)
+  .route("/onboarding", onboardingRouter)
   .route("/organizations", organizationRouter)
   .route("/promo-codes", promoCodesRouter)
   .route("/user", userRouter)

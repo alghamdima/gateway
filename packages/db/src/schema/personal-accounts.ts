@@ -12,22 +12,43 @@ import {
 
 import { organization, user } from "./auth";
 
+export const ACCOUNT_TYPES = ["individual", "organization"] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
+
 /**
  * A user's personal account (ADR 0020): one per user, stored as an
  * organization row so credits, keys and the gateway treat it as any other
  * account. This table is what marks that organization as personal: it is
  * closed to other people and goes when the user's account is deleted.
  */
-export const personalAccount = pgTable("personal_account", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  organizationId: text("organization_id")
-    .notNull()
-    .unique()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const personalAccount = pgTable(
+  "personal_account",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .unique()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    /**
+     * Onboarding (ONB-03): when the user finished the welcome wizard, or joined
+     * by invitation and skipped it; null: the wizard is still to be shown.
+     */
+    onboardedAt: timestamp("onboarded_at"),
+    /** What they said they will use the product as; they can use both either way. */
+    accountType: text("account_type").$type<AccountType>(),
+    /** The starter key the wizard minted (ONB-08), so a reload does not mint another. */
+    starterKeyId: text("starter_key_id"),
+  },
+  (t) => [
+    check(
+      "personal_account_account_type",
+      sql`${t.accountType} is null or ${t.accountType} in (${sql.raw(ACCOUNT_TYPES.map((type) => `'${type}'`).join(", "))})`,
+    ),
+  ],
+);
 
 /** A ceiling against a typo; nobody owns this many organizations. */
 export const MAX_OWNED_ORGANIZATIONS_CEILING = 1000;

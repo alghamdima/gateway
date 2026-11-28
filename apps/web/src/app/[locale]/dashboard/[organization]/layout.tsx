@@ -182,6 +182,10 @@ async function getWorkspace(params: Promise<{ organization: string }>) {
   }
 
   const personal = await getPersonalAccountForSession();
+  // a new user is welcomed first (ONB-03), whichever account they open
+  if (personal && !personal.onboardedAt) {
+    return redirect(pathsConfig.onboarding);
+  }
   const items = menu({
     slug: organizationSlug,
     isPersonal: personal?.id === activeOrganization.id,

@@ -277,5 +277,82 @@
   "promoCodes": "Promo codes",
   "modelPrices": "Model prices",
   "keySettings": "Key defaults",
-  "accountSettings": "Account limits"
+  "accountSettings": "Account limits",
+  "onboarding": {
+    "next": "Next",
+    "finish": "Go to dashboard",
+    "progress": "Step {{current}} of {{total}}",
+    "error": {
+      "completed": "You have already finished the welcome steps.",
+      "starterKeyExists": "Your starter key was already created. Its value is shown only once: create a new key on the API keys page.",
+      "notOwner": "You can only start in your own account or an organization you own."
+    },
+    "welcome": {
+      "title": "Welcome to Lemru",
+      "description": "One API for many AI models, with your data where you allow it.",
+      "tiles": {
+        "access": {
+          "title": "One API key",
+          "description": "Reach every model in the catalog with one key, in the OpenAI request format."
+        },
+        "policy": {
+          "title": "Your data policy",
+          "description": "Choose the regions, the retention and whether providers may train on your requests."
+        },
+        "prepaid": {
+          "title": "Prepaid in riyals",
+          "description": "No subscription. Add credit and pay only for the tokens you use."
+        }
+      },
+      "question": "How will you be using Lemru?",
+      "changeLater": "You can change this later: you keep a personal account and can create or join organizations at any time.",
+      "individual": {
+        "title": "Individual",
+        "description": "Build side projects, explore models and prototype ideas."
+      },
+      "organization": {
+        "title": "Organization",
+        "description": "Work with your team and manage keys, credit and usage in one place."
+      },
+      "locked": "Your starter key has been created in this account. You can create or join organizations from the dashboard at any time."
+    },
+    "organization": {
+      "title": "Set up your organization",
+      "description": "It gets its own credit, API keys and data policy, separate from your personal account.",
+      "name": {
+        "label": "Organization name",
+        "placeholder": "Acme Inc.",
+        "invalid": "Enter the organization's name.",
+        "created": "The organization is created. You can rename it later in its settings."
+      },
+      "invite": {
+        "label": "Invite team members",
+        "description": "Optional. Each person gets an email with a link to join.",
+        "email": "Email of team member {{number}}",
+        "placeholder": "name@company.com",
+        "add": "Add another",
+        "invalid": "One of the email addresses is not valid.",
+        "failed": "These invitations could not be sent: {{emails}}. Send them again from Members."
+      }
+    },
+    "ready": {
+      "title": "Your account is ready",
+      "titleOrganization": "Your organization is ready",
+      "description": "Your API keys, usage and credit are in one place. Here is a first key so you can start making requests.",
+      "key": {
+        "label": "Your API key",
+        "copy": "Copy the API key",
+        "once": "This is the only time the full key is shown. You can create a new one at any time.",
+        "limit": "It can spend up to {{amount}}, in case it leaks.",
+        "expires": "It expires on {{date}}.",
+        "unavailable": "A starter key could not be created right now. You can create one on the API keys page."
+      },
+      "request": {
+        "label": "Make your first request",
+        "copy": "Copy the code",
+        "note": "Requests are paid from your prepaid credit: add credit on the Credits page before the first one."
+      }
+    },
+    "back": "Back"
+  }
 }

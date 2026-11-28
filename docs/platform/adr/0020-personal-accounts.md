@@ -1,6 +1,6 @@
 # ADR 0020: Personal accounts beside organizations
 
-Status: **accepted** (owner, 2026-11-28). All five phases are approved (answers below). Phases 1 to 4 are on staging; 5 (onboarding) is not started.
+Status: **accepted** (owner, 2026-11-28). All five phases are approved (answers below). All five phases are on staging.
 
 ## Context
 
@@ -70,7 +70,7 @@ All five phases are approved.
 | 2 Context switcher and routing | done 2026-11-28, on staging; checked in a browser on the production build with a new sign-up: `/dashboard` opens Personal, keys, credits, activity and data policy load, members and settings lead back to home                                                                                                                                                                                                                                                                                                                                                 |
 | 3 Organization limit           | done 2026-11-28, on staging (migration 0043): 5 for everyone in `account_settings`, one user's own limit in `user_organization_limit`, both set in the admin and audited. Checked in a browser as a customer: the sixth organization is refused with the reason. The two admin screens are not checked in a browser yet (staff sign-in needs the owner's second factor)                                                                                                                                                                                         |
 | 4 Credit transfer              | done 2026-11-28, on staging (migration 0044). `modules/credits/transfer.ts`; 20 tests on real Postgres (lots, expiry kept, bought credit only, held and refunding credit left, idempotency, two at once, both waits, the attempt limit, the reconciliation check); the API suite with the gateway binary: 932 pass, 0 skipped. Checked in a browser: the new-member wait, a wrong code, a move of SAR 5, the organization's side, the wait between transfers, the two staff settings. The Go credits plugin was not changed and its own race tests were not run |
-| 5 Onboarding wizard            | approved, not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 5 Onboarding wizard            | done 2026-11-28, on staging (migration 0045). `/onboarding`, `modules/onboarding`: welcome with individual or organization, the organization's name and first invitations, a starter key shown once and a first request in cURL, TypeScript and Python. A new user is sent to it from any dashboard page; existing users and anyone who accepts an invitation are not. Checked in a browser on both paths. Open: the address in the snippet does not serve chat completions from outside yet (the owner has not decided on opening the public API route)        |
 
 ## How the transfer is built
 

@@ -1,4 +1,4 @@
-import { refuseIfPersonal } from "../../lib/personal";
+import { completeOnboarding, refuseIfPersonal } from "../../lib/personal";
 import { syncSubscriptionSeats } from "../../lib/server";
 import { OrganizationHooks } from "./types";
 
@@ -14,7 +14,10 @@ export const { beforeAddMember, afterAddMember, afterAcceptInvitation } = {
   afterAddMember: async ({ organization }) => {
     await syncSubscriptionSeats(organization.id);
   },
-  afterAcceptInvitation: async ({ organization }) => {
+  afterAcceptInvitation: async ({ organization, user }) => {
+    // someone who joins by invitation is there for the organization and is
+    // not shown the welcome wizard (ONB-13)
+    await completeOnboarding(user.id, "organization");
     await syncSubscriptionSeats(organization.id);
   },
 } satisfies OrganizationHooks;

@@ -1,7 +1,7 @@
 import { APIError } from "better-auth/api";
 import { randomUUID } from "node:crypto";
 
-import { and, count, eq, sql } from "@workspace/db";
+import { and, count, eq, isNull, sql } from "@workspace/db";
 import {
   accountSettings,
   member,
@@ -12,6 +12,8 @@ import {
 import { db } from "@workspace/db/server";
 
 import { MemberRole } from "../types";
+
+import type { AccountType } from "@workspace/db/schema";
 
 /**
  * Personal accounts (ADR 0020). A personal account is an organization row
@@ -77,8 +79,17 @@ export const getPersonalOrganizationId = async (userId: string) =>
 export const getPersonalAccount = async (userId: string) => {
   const organizationId = await createPersonalAccount(userId);
   const [row] = await db
-    .select({ id: organization.id, slug: organization.slug })
+    .select({
+      id: organization.id,
+      slug: organization.slug,
+      // null: the welcome wizard is still to be shown (ONB-03)
+      onboardedAt: personalAccount.onboardedAt,
+    })
     .from(organization)
+    .innerJoin(
+      personalAccount,
+      eq(personalAccount.organizationId, organization.id),
+    )
     .where(eq(organization.id, organizationId));
   if (!row) {
     throw new Error("The personal account has no organization row");
@@ -154,4 +165,25 @@ export const refuseOverOrganizationLimit = async (userId: string) => {
       message: organizationLimitMessage(limit),
     });
   }
+};
+
+/**
+ * Ends the user's onboarding (ONB-03): the wizard was finished, or they
+ * joined an organization by invitation and skip it (ONB-13). Does nothing
+ * when it has ended already, so the first answer stays.
+ */
+export const completeOnboarding = async (
+  userId: string,
+  accountType: AccountType,
+) => {
+  await createPersonalAccount(userId);
+  await db
+    .update(personalAccount)
+    .set({ onboardedAt: new Date(), accountType })
+    .where(
+      and(
+        eq(personalAccount.userId, userId),
+        isNull(personalAccount.onboardedAt),
+      ),
+    );
 };
