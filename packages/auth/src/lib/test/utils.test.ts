@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemberRole, UserRole } from "../../types";
 import {
@@ -34,6 +34,20 @@ describe("getUrl", () => {
     expect(url.searchParams.get("foo")).toBe("bar");
     expect(url.searchParams.get("baz")).toBe("qux");
     expect(url.origin).toBe("http://localhost:3000");
+  });
+
+  it("should trust the app's public address behind a reverse proxy", () => {
+    vi.stubEnv("URL", "https://app.example.com");
+    // what the server sees behind the proxy
+    const request = new Request(
+      "https://localhost:3000/api/auth/organization/invite-member",
+      { headers: { "x-url": "https://app.example.com/auth/join" } },
+    );
+
+    const url = getUrl({ request });
+
+    expect(url.toString()).toBe("https://app.example.com/auth/join");
+    vi.unstubAllEnvs();
   });
 
   it("should ignore untrusted x-url and fall back to request url", () => {

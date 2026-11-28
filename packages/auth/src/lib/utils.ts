@@ -19,6 +19,14 @@ export const trustedOrigins = [
     : []),
 ];
 
+// The app's public address. Behind the reverse proxy a request's own URL is
+// the internal one (localhost), so the public origin has to be named here, or
+// links in emails (an invitation) point at the internal address.
+const ownOrigins = () => {
+  const origin = process.env.URL ? getOrigin(process.env.URL) : null;
+  return origin ? [origin] : [];
+};
+
 const isTrustedOrigin = (candidate: string, request?: Request) => {
   try {
     const _url = new URL(candidate);
@@ -28,6 +36,7 @@ const isTrustedOrigin = (candidate: string, request?: Request) => {
 
   const origins = [
     ...trustedOrigins,
+    ...ownOrigins(),
     ...(request?.url ? [new URL(request.url).origin] : []),
   ];
 
