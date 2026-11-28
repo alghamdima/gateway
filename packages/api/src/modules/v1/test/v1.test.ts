@@ -55,6 +55,9 @@ const gatewayWith = (models: GatewayModel[]): GatewayClient => ({
   listProviderKeys: async () => [],
   setVirtualKeyAccess: async () => {},
   getCustomerCosts: async () => [],
+  getEndpointStats: async () => {
+    throw new Error("not used");
+  },
   getGenerationSummary: async () => {
     throw new Error("not used");
   },

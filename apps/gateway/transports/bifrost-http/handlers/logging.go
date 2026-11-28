@@ -363,6 +363,7 @@ func (h *LoggingHandler) RegisterRoutes(r *router.Router, middlewares ...schemas
 	// Lemru: generation counts, refusals and timings per customer, and one request's attempts (generations.go)
 	r.GET("/api/logs/generations/summary", lib.ChainMiddlewares(h.getGenerationSummary, middlewares...))
 	r.GET("/api/logs/generations/{id}/attempts", lib.ChainMiddlewares(h.getGenerationAttempts, middlewares...))
+	r.GET("/api/logs/endpoints/hourly", lib.ChainMiddlewares(h.getEndpointStats, middlewares...))
 	r.GET("/api/logs/stats", lib.ChainMiddlewares(h.withHiddenRequestTypes(h.getLogsStats), middlewares...))
 	r.GET("/api/logs/histogram", lib.ChainMiddlewares(h.withHiddenRequestTypes(h.getLogsHistogram), middlewares...))
 	r.GET("/api/logs/histogram/tokens", lib.ChainMiddlewares(h.withHiddenRequestTypes(h.getLogsTokenHistogram), middlewares...))

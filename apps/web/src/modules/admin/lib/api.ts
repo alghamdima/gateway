@@ -238,6 +238,18 @@ const queries = {
         queryFn: () => handle(api.admin["key-settings"].changes.$get)(),
       }),
   },
+  catalogSettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "catalog-settings"],
+        queryFn: () => handle(api.admin["catalog-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "catalog-settings", "changes"],
+        queryFn: () => handle(api.admin["catalog-settings"].changes.$get)(),
+      }),
+  },
   accountSettings: {
     get: () =>
       queryOptions({
@@ -448,6 +460,16 @@ const mutations = {
           (typeof api.admin)["key-settings"]["$put"]
         >["json"],
       ) => handle(api.admin["key-settings"].$put)({ json }),
+    }),
+  },
+  catalogSettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "catalog-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["catalog-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["catalog-settings"].$put)({ json }),
     }),
   },
   accountSettings: {

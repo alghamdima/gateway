@@ -16,6 +16,9 @@ const gatewayWithLogs = (
   logs: GatewayLog[],
   options: { isDown?: boolean; attempts?: GatewayAttempt[] } = {},
 ): GatewayClient => ({
+  getEndpointStats: async () => {
+    throw new Error("not used");
+  },
   getGenerationSummary: async () => {
     throw new Error("not used");
   },

@@ -31,6 +31,9 @@ const pathsConfig = {
     accountSettings: {
       index: `${ADMIN_PREFIX}/account-settings`,
     },
+    catalogSettings: {
+      index: `${ADMIN_PREFIX}/catalog-settings`,
+    },
     modelPrices: {
       index: `${ADMIN_PREFIX}/model-prices`,
     },

@@ -123,6 +123,9 @@ export const fakeGateway = () => {
     listProviderKeys: async () => [],
     setVirtualKeyAccess: async () => {},
     getCustomerCosts: async () => [],
+    getEndpointStats: async () => {
+      throw new Error("not used");
+    },
     getGenerationSummary: async () => {
       throw new Error("not used");
     },

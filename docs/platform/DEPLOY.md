@@ -63,15 +63,16 @@ Build the web app through turbo, not `pnpm --filter web build` alone. The CMS pa
 
 `/usr/local/bin/lemru-job <name>` POSTs to `http://localhost:3000/api/internal/<name>`. It sends the bearer `CRON_SECRET`, read from `.env.local` and passed on stdin, so it never appears in `ps`.
 
-| Timer                     | When            |
-| ------------------------- | --------------- |
-| `model-prices`            | every minute    |
-| `data-policy`             | every 5 minutes |
-| `low-balance`             | hourly, :00     |
-| `credit-expiry`           | hourly, :07     |
-| `key-lifetime`            | hourly, :12     |
-| `reconciliation`          | daily 00:30 UTC |
-| `model-price-suggestions` | daily 01:30 UTC |
+| Timer                     | When                    |
+| ------------------------- | ----------------------- |
+| `model-prices`            | every minute            |
+| `data-policy`             | every 5 minutes         |
+| `endpoint-stats`          | every 5 minutes, at :02 |
+| `low-balance`             | hourly, :00             |
+| `credit-expiry`           | hourly, :07             |
+| `key-lifetime`            | hourly, :12             |
+| `reconciliation`          | daily 00:30 UTC         |
+| `model-price-suggestions` | daily 01:30 UTC         |
 
 Run one by hand with `lemru-job reconciliation`. Each job ran once by hand on 2026-11-27 and answered 200 (the reconciliation returned `status: ok`).
 

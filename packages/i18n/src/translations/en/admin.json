@@ -869,5 +869,35 @@
         "help": "How long an organization waits after receiving a transfer before it can receive the next. 0: no wait."
       }
     }
+  },
+  "catalogSettings": {
+    "header": {
+      "title": "Catalog figures",
+      "description": "What a model page's figures need before they are shown, and whether traffic volume is public."
+    },
+    "saved": "Saved.",
+    "minCalls": {
+      "title": "Least data for a figure",
+      "description": "A latency, throughput, uptime or price-paid figure is shown on a model page only when at least this many answered requests are behind it. Below it the page says there is not enough data.",
+      "label": "Answered requests needed",
+      "invalid": "Enter a whole number from 1 to 1,000,000.",
+      "help": "A figure from a handful of requests misleads: one slow request would read as a slow model. Raise it as traffic grows."
+    },
+    "traffic": {
+      "title": "Traffic volume",
+      "description": "Whether visitors see how many tokens each model served per day and each endpoint's share of them. It shows how much the platform is used.",
+      "label": "Show traffic volume on model pages"
+    },
+    "changes": {
+      "title": "History",
+      "description": "Every change to these settings.",
+      "empty": "No changes yet.",
+      "fields": {
+        "minCallsForStats": "Answered requests needed",
+        "isTrafficPublic": "Traffic volume"
+      },
+      "public": "shown",
+      "hidden": "hidden"
+    }
   }
 }

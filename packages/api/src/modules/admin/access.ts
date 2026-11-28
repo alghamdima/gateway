@@ -159,6 +159,19 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "accounts.organization-limit", target: "user" },
   },
 
+  // what the catalog's figures need before they are shown, and whether traffic is public (CAT-11)
+  {
+    method: "GET",
+    path: /^\/catalog-settings(\/changes)?$/,
+    needs: { pricing: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: /^\/catalog-settings$/,
+    needs: { pricing: ["update"] },
+    audit: { action: "catalog.settings", target: "catalog-settings" },
+  },
+
   // the model price table (ADMIN-09, ADR 0018): the same permission as the other prices
   {
     method: "GET",
@@ -370,7 +383,8 @@ export const auditTarget = (path: string) => {
     segments[0] === "payments" ||
     segments[0] === "key-settings" ||
     // /account-settings/users/u1 is about user u1
-    segments[0] === "account-settings"
+    segments[0] === "account-settings" ||
+    segments[0] === "catalog-settings"
   ) {
     return segments.at(-1);
   }

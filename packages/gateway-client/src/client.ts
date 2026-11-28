@@ -137,6 +137,46 @@ export interface GatewayLatencySummary {
 }
 
 /**
+ * One endpoint's attempts in one UTC hour, as the gateway counted them from
+ * its log (`GET /api/logs/endpoints/hourly`). An endpoint is the provider, the
+ * model, the provider key that carried the call and the service tier.
+ */
+export interface GatewayEndpointHour {
+  /** The start of the hour, RFC 3339, UTC. */
+  hour: string;
+  provider: string;
+  model: string;
+  /** "" for a keyless provider. */
+  key_id: string;
+  /** "" when the provider reported none. */
+  service_tier: string;
+  /** Calls that reached the provider and ended. */
+  attempts: number;
+  succeeded: number;
+  streamed: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
+  cached_read_tokens: number;
+  input_cost_usd: number;
+  output_cost_usd: number;
+  cost_usd: number;
+  /** Histograms over the answered calls: one count per bucket. */
+  latency_ms: number[];
+  time_to_first_token_ms: number[];
+  throughput_tokens_per_second: number[];
+}
+
+/** Every endpoint's hours in a window, with the upper bounds of the histogram buckets. */
+export interface GatewayEndpointStats {
+  bounds: {
+    latency_ms: number[];
+    throughput_tokens_per_second: number[];
+  };
+  hours: GatewayEndpointHour[];
+}
+
+/**
  * One gateway customer's requests over a window (the gateway's
  * GET /api/logs/generations/summary, ours): generations counted once each,
  * refusals apart by reason, timings of the successful generations.
@@ -680,6 +720,29 @@ export const createGatewayClient = ({
         throw new GatewayError("The gateway returned no summary.", 502);
       }
       return summary;
+    },
+
+    /**
+     * Every endpoint's attempts in [from, to) by UTC hour. Both must be on the
+     * hour, so no hour comes back in part; at most 31 days apart.
+     */
+    getEndpointStats: async (
+      from: Date,
+      to: Date,
+    ): Promise<GatewayEndpointStats> => {
+      const query = new URLSearchParams({
+        start_time: from.toISOString(),
+        end_time: to.toISOString(),
+      });
+      const stats = await call<GatewayEndpointStats>(
+        "GET",
+        `/api/logs/endpoints/hourly?${query.toString()}`,
+        undefined,
+      );
+      if (!stats) {
+        throw new GatewayError("The gateway returned no statistics.", 502);
+      }
+      return { bounds: stats.bounds, hours: stats.hours ?? [] };
     },
 
     /** A request's attempts, first then fallbacks; empty once its log has expired. */

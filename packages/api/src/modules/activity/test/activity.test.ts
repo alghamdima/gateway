@@ -14,6 +14,9 @@ const gatewayWithSummary = (
   calls: { from: Date; to: Date }[] = [],
 ): GatewayClient =>
   ({
+    getEndpointStats: async () => {
+      throw new Error("not used");
+    },
     getGenerationSummary: async (id: string, from: Date, to: Date) => {
       calls.push({ from, to });
       if (summary === "down") {

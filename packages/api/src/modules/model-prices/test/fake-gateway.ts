@@ -50,6 +50,7 @@ export const fakeGateway = (): FakeGateway => {
       getLog: notUsed,
       searchRequests: notUsed,
       getCustomerCosts: notUsed,
+      getEndpointStats: notUsed,
       getGenerationSummary: notUsed,
       getAttempts: notUsed,
       listModels: async () => state.models,

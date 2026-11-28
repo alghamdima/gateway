@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
+import { runEndpointStatsJob } from "../catalog/stats-job";
 import { runCreditExpiryJob } from "../credits/expiry";
 import { checkLowBalances } from "../credits/low-balance";
 import { applyPendingPolicies } from "../data-policy/policy";
@@ -86,6 +87,13 @@ const keyLifetime = async (c: Context) => {
   return c.json(await runKeyLifetimeJob());
 };
 
+const endpointStats = async (c: Context) => {
+  if (!isAuthorized(c.req.header("authorization"))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return c.json(await runEndpointStatsJob());
+};
+
 /**
  * /api/internal: jobs a scheduler calls with `Authorization: Bearer
  * <CRON_SECRET>`. Without CRON_SECRET set, every call is refused. GET is
@@ -105,6 +113,9 @@ const keyLifetime = async (c: Context) => {
  * - /key-lifetime: hourly; cuts keys that would outlive the maximum key
  *   lifetime, in the gateway and the database, finishing what a failure left
  *   when staff shortened it (ADMIN-12), idempotently
+ * - /endpoint-stats: every five minutes; copies what each endpoint did, hour
+ *   by hour, from the gateway's log into the catalog's statistics, replacing
+ *   whole hours (CAT-11, CAT-12)
  */
 export const internalRouter = new Hono()
   .get("/reconciliation", reconcileYesterday)
@@ -120,4 +131,6 @@ export const internalRouter = new Hono()
   .get("/credit-expiry", creditExpiry)
   .post("/credit-expiry", creditExpiry)
   .get("/key-lifetime", keyLifetime)
-  .post("/key-lifetime", keyLifetime);
+  .post("/key-lifetime", keyLifetime)
+  .get("/endpoint-stats", endpointStats)
+  .post("/endpoint-stats", endpointStats);

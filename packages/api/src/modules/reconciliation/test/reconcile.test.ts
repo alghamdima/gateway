@@ -77,6 +77,9 @@ const gatewayReporting = (
   refreshProviderModels: async () => {},
   listProviderKeys: async () => [],
   setVirtualKeyAccess: async () => {},
+  getEndpointStats: async () => {
+    throw new Error("not used");
+  },
   getGenerationSummary: async () => {
     throw new Error("not used");
   },

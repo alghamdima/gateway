@@ -39,6 +39,9 @@ const fakeGateway = () => {
     deleteVirtualKey: async () => {},
     listModels: async () => [],
     getCustomerCosts: async () => [],
+    getEndpointStats: async () => {
+      throw new Error("not used");
+    },
     getGenerationSummary: async () => {
       throw new Error("not used");
     },

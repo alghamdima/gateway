@@ -278,6 +278,7 @@
   "modelPrices": "Model prices",
   "keySettings": "Key defaults",
   "accountSettings": "Account limits",
+  "catalogSettings": "Catalog figures",
   "onboarding": {
     "next": "Next",
     "finish": "Go to dashboard",
