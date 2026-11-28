@@ -1,0 +1,4741 @@
+package configstore
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/configstore/tables"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+// setupRDBTestStore creates an in-memory SQLite database and returns an RDBConfigStore for testing
+func setupRDBTestStore(t *testing.T) *RDBConfigStore {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err, "Failed to create test database")
+
+	// Run migrations for all tables
+	err = db.AutoMigrate(
+		&tables.TableProvider{},
+		&tables.TableKey{},
+		&tables.TableBudget{},
+		&tables.TableRateLimit{},
+		&tables.TableModelConfig{},
+		&tables.TableRoutingRule{},
+		&tables.TableRoutingTarget{},
+		&tables.TablePricingOverride{},
+		&tables.TableDatasheetOverride{},
+		&tables.TableVirtualKey{},
+		&tables.TableVirtualKeyProviderConfig{},
+		&tables.TableVirtualKeyProviderConfigKey{},
+		&tables.TableModelConfig{},
+		&tables.TableCustomer{},
+		&tables.TableTeam{},
+		&tables.TableClientConfig{},
+		&tables.TableGovernanceConfig{},
+		&tables.TableModelRouter{},
+		&tables.TableModelRouterTarget{},
+		&tables.TablePlugin{},
+	)
+	require.NoError(t, err, "Failed to migrate test database")
+
+	// Setup join table
+	err = db.SetupJoinTable(&tables.TableVirtualKeyProviderConfig{}, "Keys", &tables.TableVirtualKeyProviderConfigKey{})
+	require.NoError(t, err, "Failed to setup join table")
+
+	s := &RDBConfigStore{logger: nil}
+	s.db.Store(db)
+	s.migrateOnFreshFn = func(ctx context.Context, fn func(context.Context, *gorm.DB) error) error {
+		return fn(ctx, s.DB())
+	}
+	s.refreshPoolFn = func(ctx context.Context) error { return nil }
+	return s
+}
+
+func testComplexityAnalyzerConfig() *ComplexityAnalyzerConfig {
+	return &ComplexityAnalyzerConfig{
+		TierBoundaries: ComplexityTierBoundaries{
+			SimpleMedium:  0.10,
+			MediumComplex: 0.30,
+		},
+		Keywords: ComplexityEditableKeywordConfig{
+			SimpleKeywords:  []string{"hello"},
+			MediumKeywords:  []string{" Function ", "api", "API", "latency"},
+			ComplexKeywords: []string{"tradeoffs"},
+		},
+	}
+}
+
+func TestRDBConfigStore_UpsertModelPricesSyncsIsDeprecated(t *testing.T) {
+	store := setupRDBTestStore(t)
+	require.NoError(t, store.DB().AutoMigrate(&tables.TableModelPricing{}))
+	ctx := context.Background()
+
+	require.NoError(t, store.UpsertModelPrices(ctx, &tables.TableModelPricing{
+		Model:        "deprecated-model",
+		Provider:     "openai",
+		Mode:         "chat",
+		IsDeprecated: true,
+	}))
+
+	prices, err := store.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, prices, 1)
+	assert.True(t, prices[0].IsDeprecated)
+
+	require.NoError(t, store.UpsertModelPrices(ctx, &tables.TableModelPricing{
+		Model:        "deprecated-model",
+		Provider:     "openai",
+		Mode:         "chat",
+		IsDeprecated: false,
+	}))
+
+	prices, err = store.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, prices, 1)
+	assert.False(t, prices[0].IsDeprecated)
+}
+
+func TestRDBConfigStore_ComplexityAnalyzerConfigRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	cfg := testComplexityAnalyzerConfig()
+	cfg.ConfigHashes = ComplexityAnalyzerConfigHashes{
+		TierBoundaries:  "tier-hash-1",
+		SimpleKeywords:  "simple-hash-1",
+		MediumKeywords:  "medium-hash-1",
+		ComplexKeywords: "complex-hash-1",
+	}
+	require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, cfg))
+
+	got, err := store.GetComplexityAnalyzerConfig(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, ComplexityTierBoundaries{
+		SimpleMedium:  0.10,
+		MediumComplex: 0.30,
+	}, got.TierBoundaries)
+	assert.Equal(t, []string{"api", "function", "latency"}, got.Keywords.MediumKeywords)
+	assert.Equal(t, cfg.ConfigHashes, got.ConfigHashes)
+}
+
+// TestRDBConfigStore_GetComplexityAnalyzerConfigMarksUnreadableRows pins that a
+// stored config this version cannot run is reported as unreadable rather than as
+// a plain error. The API handler degrades to defaults on that distinction and
+// still fails on anything else, so losing it here turns a recoverable page into
+// a 500 without any test noticing.
+func TestRDBConfigStore_GetComplexityAnalyzerConfigMarksUnreadableRows(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("analyzer row", func(t *testing.T) {
+		store := setupRDBTestStore(t)
+		require.NoError(t, store.UpdateConfig(ctx, &tables.TableGovernanceConfig{
+			Key:   tables.ConfigComplexityAnalyzerConfigKey,
+			Value: `{"tier_boundaries":{"simple_medium":0.9,"medium_complex":0.1}}`,
+		}))
+
+		_, err := store.GetComplexityAnalyzerConfig(ctx)
+		require.ErrorIs(t, err, ErrConfigUnreadable)
+	})
+
+	t.Run("semantic row", func(t *testing.T) {
+		store := setupRDBTestStore(t)
+		require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, testComplexityAnalyzerConfig()))
+		require.NoError(t, store.UpdateConfig(ctx, &tables.TableGovernanceConfig{
+			Key:   tables.ConfigComplexitySemanticConfigKey,
+			Value: `{"keywords":`,
+		}))
+
+		_, err := store.GetComplexityAnalyzerConfig(ctx)
+		require.ErrorIs(t, err, ErrConfigUnreadable)
+	})
+
+	t.Run("rows that do not combine into a runnable config", func(t *testing.T) {
+		store := setupRDBTestStore(t)
+		require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, testComplexityAnalyzerConfig()))
+		// Each row is well formed on its own; the pair is not, because one
+		// phrase claims two tiers. The semantic block has to be present for the
+		// phrase rules to apply at all — without a classifier to embed them,
+		// the lists are just unused strings.
+		require.NoError(t, store.UpdateConfig(ctx, &tables.TableGovernanceConfig{
+			Key: tables.ConfigComplexitySemanticConfigKey,
+			Value: `{"semantic":{"provider":"openai","embedding_model":"text-embedding-3-small"},` +
+				`"keywords":{"simple_keywords":["shared phrase"],` +
+				`"medium_keywords":["shared phrase"],"complex_keywords":["complex"]}}`,
+		}))
+
+		_, err := store.GetComplexityAnalyzerConfig(ctx)
+		require.ErrorIs(t, err, ErrConfigUnreadable)
+	})
+
+	t.Run("stored semantic config exceeds phrase limit", func(t *testing.T) {
+		store := setupRDBTestStore(t)
+		base := testComplexityAnalyzerConfig()
+		require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, base))
+
+		oversized := *base
+		oversized.Semantic = &ComplexitySemanticConfig{
+			Provider:       "openai",
+			EmbeddingModel: "text-embedding-3-small",
+		}
+		oversized.Keywords.SimpleKeywords = make([]string, MaxComplexitySemanticPhrases-1)
+		for index := range oversized.Keywords.SimpleKeywords {
+			oversized.Keywords.SimpleKeywords[index] = fmt.Sprintf("simple-%d", index)
+		}
+		oversized.Keywords.MediumKeywords = []string{"medium"}
+		oversized.Keywords.ComplexKeywords = []string{"complex"}
+		semanticRaw, err := encodeComplexitySemanticConfigRow(oversized)
+		require.NoError(t, err)
+		require.NoError(t, store.UpdateConfig(ctx, &tables.TableGovernanceConfig{
+			Key:   tables.ConfigComplexitySemanticConfigKey,
+			Value: string(semanticRaw),
+		}))
+
+		_, err = store.GetComplexityAnalyzerConfig(ctx)
+		require.ErrorIs(t, err, ErrConfigUnreadable)
+		require.ErrorContains(t, err, "contains 751 phrases")
+	})
+}
+
+func TestRDBConfigStore_GetComplexityAnalyzerConfigMissingReturnsNil(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	got, err := store.GetComplexityAnalyzerConfig(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
+func TestRDBConfigStore_UpdateComplexityAnalyzerConfigPreservesExistingHashesOnRuntimeUpdate(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	fileConfig := testComplexityAnalyzerConfig()
+	fileConfig.ConfigHashes = ComplexityAnalyzerConfigHashes{
+		TierBoundaries:  "tier-hash-1",
+		SimpleKeywords:  "simple-hash-1",
+		MediumKeywords:  "medium-hash-1",
+		ComplexKeywords: "complex-hash-1",
+	}
+	require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, fileConfig))
+
+	runtimeConfig := testComplexityAnalyzerConfig()
+	runtimeConfig.TierBoundaries.SimpleMedium = 0.12
+	runtimeConfig.ConfigHashes = ComplexityAnalyzerConfigHashes{}
+	require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, runtimeConfig))
+
+	got, err := store.GetComplexityAnalyzerConfig(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, 0.12, got.TierBoundaries.SimpleMedium)
+	assert.Equal(t, fileConfig.ConfigHashes, got.ConfigHashes)
+}
+
+func TestGenerateComplexityAnalyzerConfigHashesCanonicalizesKeywords(t *testing.T) {
+	left := testComplexityAnalyzerConfig()
+	right := testComplexityAnalyzerConfig()
+	right.Keywords.MediumKeywords = []string{"api", "function", "latency"}
+	left.ConfigHashes = ComplexityAnalyzerConfigHashes{MediumKeywords: "stored-medium-hash-a"}
+	right.ConfigHashes = ComplexityAnalyzerConfigHashes{MediumKeywords: "stored-medium-hash-b"}
+
+	leftHashes, err := GenerateComplexityAnalyzerConfigHashes(left)
+	require.NoError(t, err)
+	rightHashes, err := GenerateComplexityAnalyzerConfigHashes(right)
+	require.NoError(t, err)
+
+	assert.Equal(t, leftHashes, rightHashes)
+}
+
+func TestMergeComplexityAnalyzerConfigAddsKeywordsAndOverlaysBoundaries(t *testing.T) {
+	base := testComplexityAnalyzerConfig()
+	file := testComplexityAnalyzerConfig()
+	file.TierBoundaries = ComplexityTierBoundaries{
+		SimpleMedium:  0.20,
+		MediumComplex: 0.40,
+	}
+	file.Keywords.MediumKeywords = []string{"GraphQL", "api", "latency", "kubernetes"}
+	file.Keywords.ComplexKeywords = []string{"tradeoffs", "step by step"}
+	file.Keywords.SimpleKeywords = []string{"hello", "thanks"}
+
+	merged, err := MergeComplexityAnalyzerConfig(base, file)
+	require.NoError(t, err)
+	require.NotNil(t, merged)
+
+	assert.Equal(t, file.TierBoundaries, merged.TierBoundaries)
+	assert.Equal(t, []string{"api", "function", "graphql", "kubernetes", "latency"}, merged.Keywords.MediumKeywords)
+	assert.Equal(t, []string{"step by step", "tradeoffs"}, merged.Keywords.ComplexKeywords)
+	assert.Equal(t, []string{"hello", "thanks"}, merged.Keywords.SimpleKeywords)
+}
+
+func TestMergeComplexityAnalyzerConfigByHashesOnlyAppliesChangedSections(t *testing.T) {
+	base := testComplexityAnalyzerConfig()
+	base.ConfigHashes = ComplexityAnalyzerConfigHashes{
+		TierBoundaries:  "tier-hash-1",
+		SimpleKeywords:  "simple-hash-1",
+		MediumKeywords:  "medium-hash-1",
+		ComplexKeywords: "complex-hash-1",
+	}
+	base.TierBoundaries.SimpleMedium = 0.12
+	base.Keywords.MediumKeywords = []string{"ui-medium"}
+	base.Keywords.ComplexKeywords = []string{"ui-complex"}
+
+	file := testComplexityAnalyzerConfig()
+	file.ConfigHashes = base.ConfigHashes
+	file.ConfigHashes.MediumKeywords = "medium-hash-2"
+	file.TierBoundaries.SimpleMedium = 0.20
+	file.Keywords.MediumKeywords = []string{"file-medium"}
+	file.Keywords.ComplexKeywords = []string{"file-complex"}
+
+	merged, err := MergeComplexityAnalyzerConfigByHashes(base, file)
+	require.NoError(t, err)
+	require.NotNil(t, merged)
+
+	assert.Equal(t, 0.12, merged.TierBoundaries.SimpleMedium)
+	assert.Equal(t, []string{"file-medium", "ui-medium"}, merged.Keywords.MediumKeywords)
+	assert.Equal(t, []string{"ui-complex"}, merged.Keywords.ComplexKeywords)
+	assert.Equal(t, "medium-hash-2", merged.ConfigHashes.MediumKeywords)
+	assert.Equal(t, "complex-hash-1", merged.ConfigHashes.ComplexKeywords)
+}
+
+func TestRDBConfigStore_GetGovernanceConfigIncludesComplexityAnalyzerConfig(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	cfg := testComplexityAnalyzerConfig()
+	cfg.ConfigHashes = ComplexityAnalyzerConfigHashes{
+		TierBoundaries:  "tier-hash-2",
+		SimpleKeywords:  "simple-hash-2",
+		MediumKeywords:  "medium-hash-2",
+		ComplexKeywords: "complex-hash-2",
+	}
+	require.NoError(t, store.UpdateComplexityAnalyzerConfig(ctx, cfg))
+
+	governanceConfig, err := store.GetGovernanceConfig(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, governanceConfig)
+	require.NotNil(t, governanceConfig.ComplexityAnalyzerConfig)
+	assert.Equal(t, 0.30, governanceConfig.ComplexityAnalyzerConfig.TierBoundaries.MediumComplex)
+	assert.Equal(t, cfg.ConfigHashes, governanceConfig.ComplexityAnalyzerConfig.ConfigHashes)
+}
+
+func TestRDBConfigStore_UpdateComplexityAnalyzerConfigRejectsInvalidConfig(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		mutate func(*ComplexityAnalyzerConfig)
+	}{
+		{
+			name: "simple medium below minimum",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.TierBoundaries.SimpleMedium = -0.1
+			},
+		},
+		{
+			name: "simple medium at minimum",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.TierBoundaries.SimpleMedium = 0
+			},
+		},
+		{
+			name: "medium complex at minimum",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.TierBoundaries.MediumComplex = 0
+			},
+		},
+		{
+			name: "medium complex at maximum",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.TierBoundaries.MediumComplex = 1.0
+			},
+		},
+		{
+			name: "boundaries out of order",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.TierBoundaries.MediumComplex = cfg.TierBoundaries.SimpleMedium - 0.05
+			},
+		},
+		{
+			name: "boundaries equal",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.TierBoundaries.MediumComplex = cfg.TierBoundaries.SimpleMedium
+			},
+		},
+		{
+			name: "empty medium keywords",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.Keywords.MediumKeywords = nil
+			},
+		},
+		{
+			name: "empty complex keywords",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.Keywords.ComplexKeywords = nil
+			},
+		},
+		{
+			name: "empty simple keywords",
+			mutate: func(cfg *ComplexityAnalyzerConfig) {
+				cfg.Keywords.SimpleKeywords = nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			invalid := testComplexityAnalyzerConfig()
+			tt.mutate(invalid)
+
+			err := store.UpdateComplexityAnalyzerConfig(ctx, invalid)
+			require.Error(t, err)
+		})
+	}
+}
+
+// =============================================================================
+// Provider and Key Tests
+// =============================================================================
+
+func TestUpdateProvidersConfig_CreateNew(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{
+					ID:     "key-uuid-1",
+					Name:   "openai-primary",
+					Value:  *schemas.NewSecretVar("sk-test-key"),
+					Weight: 1.0,
+				},
+			},
+		},
+	}
+
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	// Verify provider was created
+	result, err := store.GetProvidersConfig(ctx)
+	require.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Contains(t, result, schemas.ModelProvider("openai"))
+	assert.Len(t, result["openai"].Keys, 1)
+	assert.Equal(t, "openai-primary", result["openai"].Keys[0].Name)
+}
+
+func TestUpdateProvidersConfig_UpdateExistingByKeyID(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create initial provider with key
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{
+					ID:     "key-uuid-1",
+					Name:   "openai-primary",
+					Value:  *schemas.NewSecretVar("sk-test-key-v1"),
+					Weight: 1.0,
+				},
+			},
+		},
+	}
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	// Update with same KeyID but different value
+	providers["openai"] = ProviderConfig{
+		Keys: []schemas.Key{
+			{
+				ID:     "key-uuid-1", // Same KeyID
+				Name:   "openai-primary",
+				Value:  *schemas.NewSecretVar("sk-test-key-v2"), // Updated value
+				Weight: 2.0,
+			},
+		},
+	}
+	err = store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	// Verify key was updated, not duplicated
+	result, err := store.GetProvidersConfig(ctx)
+	require.NoError(t, err)
+	assert.Len(t, result["openai"].Keys, 1)
+	assert.Equal(t, "sk-test-key-v2", result["openai"].Keys[0].Value.Val)
+}
+
+func TestUpdateProvidersConfig_UpdateExistingByName_FallbackFix(t *testing.T) {
+	// This test verifies the fix for the unique constraint violation issue
+	// when a new UUID is generated for a key that already exists by name
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create initial provider with key
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{
+					ID:     "original-uuid",
+					Name:   "openai-primary",
+					Value:  *schemas.NewSecretVar("sk-test-key-v1"),
+					Weight: 1.0,
+				},
+			},
+		},
+	}
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	// Simulate config reload with NEW UUID (as happens when loading from config file)
+	providers["openai"] = ProviderConfig{
+		Keys: []schemas.Key{
+			{
+				ID:     "new-uuid-from-config-reload", // Different UUID!
+				Name:   "openai-primary",              // Same name
+				Value:  *schemas.NewSecretVar("sk-test-key-v2"),
+				Weight: 1.5,
+			},
+		},
+	}
+	err = store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err, "Should not fail with unique constraint violation")
+
+	// Verify key was updated (not duplicated) and original KeyID preserved
+	result, err := store.GetProvidersConfig(ctx)
+	require.NoError(t, err)
+	assert.Len(t, result["openai"].Keys, 1, "Should have exactly one key, not duplicated")
+	assert.Equal(t, "sk-test-key-v2", result["openai"].Keys[0].Value.Val, "Value should be updated")
+	assert.Equal(t, "original-uuid", result["openai"].Keys[0].ID, "Original KeyID should be preserved")
+}
+
+// TestUpdateProvidersConfig_EnabledFromFileIsPersisted verifies that an explicit enabled
+// value on an existing key is written to the store, while a key that leaves enabled unset
+// keeps the stored value (for example a toggle made in the UI).
+func TestUpdateProvidersConfig_EnabledFromFileIsPersisted(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	enabledFalse := false
+
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{ID: "key-a", Name: "key-a", Value: *schemas.NewSecretVar("sk-a"), Weight: 1.0},
+				{ID: "key-b", Name: "key-b", Value: *schemas.NewSecretVar("sk-b"), Weight: 1.0},
+			},
+		},
+	}
+	require.NoError(t, store.UpdateProvidersConfig(ctx, providers))
+
+	// key-b is disabled outside the file, as the UI toggle does
+	keyB, err := store.GetProviderKey(ctx, "openai", "key-b")
+	require.NoError(t, err)
+	keyB.Enabled = &enabledFalse
+	require.NoError(t, store.UpdateProviderKey(ctx, "openai", "key-b", *keyB))
+
+	// The file now disables key-a and still leaves enabled unset on key-b
+	providers["openai"] = ProviderConfig{
+		Keys: []schemas.Key{
+			{ID: "key-a", Name: "key-a", Value: *schemas.NewSecretVar("sk-a"), Weight: 1.0, Enabled: &enabledFalse},
+			{ID: "key-b", Name: "key-b", Value: *schemas.NewSecretVar("sk-b"), Weight: 1.0},
+		},
+	}
+	require.NoError(t, store.UpdateProvidersConfig(ctx, providers))
+
+	result, err := store.GetProvidersConfig(ctx)
+	require.NoError(t, err)
+	enabledByName := map[string]bool{}
+	for _, key := range result["openai"].Keys {
+		require.NotNil(t, key.Enabled)
+		enabledByName[key.Name] = *key.Enabled
+	}
+	assert.False(t, enabledByName["key-a"], "explicit enabled=false from the file should be stored")
+	assert.False(t, enabledByName["key-b"], "unset enabled should keep the stored value")
+}
+
+func TestUpdateProvidersConfig_MultipleKeys(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{ID: "key-1", Name: "openai-primary", Value: *schemas.NewSecretVar("sk-key-1"), Weight: 1.0},
+				{ID: "key-2", Name: "openai-secondary", Value: *schemas.NewSecretVar("sk-key-2"), Weight: 0.5},
+			},
+		},
+		"anthropic": {
+			Keys: []schemas.Key{
+				{ID: "key-3", Name: "anthropic-main", Value: *schemas.NewSecretVar("sk-key-3"), Weight: 1.0},
+			},
+		},
+	}
+
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	result, err := store.GetProvidersConfig(ctx)
+	require.NoError(t, err)
+	assert.Len(t, result, 2)
+	assert.Len(t, result["openai"].Keys, 2)
+	assert.Len(t, result["anthropic"].Keys, 1)
+}
+
+func TestProviderKeyCRUD(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.UpdateProvidersConfig(ctx, map[schemas.ModelProvider]ProviderConfig{
+		"openai": {},
+	})
+	require.NoError(t, err)
+
+	keys, err := store.GetProviderKeys(ctx, "openai")
+	require.NoError(t, err)
+	assert.Empty(t, keys)
+
+	key := schemas.Key{
+		ID:     "key-uuid-1",
+		Name:   "openai-primary",
+		Value:  *schemas.NewSecretVar("sk-test-key-v1"),
+		Weight: 1.0,
+	}
+
+	err = store.CreateProviderKey(ctx, "openai", key)
+	require.NoError(t, err)
+
+	keys, err = store.GetProviderKeys(ctx, "openai")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, "openai-primary", keys[0].Name)
+
+	storedKey, err := store.GetProviderKey(ctx, "openai", key.ID)
+	require.NoError(t, err)
+	require.NotNil(t, storedKey)
+	assert.Equal(t, "sk-test-key-v1", storedKey.Value.Val)
+
+	key.Value = *schemas.NewSecretVar("sk-test-key-v2")
+	key.Weight = 2.0
+
+	err = store.UpdateProviderKey(ctx, "openai", key.ID, key)
+	require.NoError(t, err)
+
+	storedKey, err = store.GetProviderKey(ctx, "openai", key.ID)
+	require.NoError(t, err)
+	require.NotNil(t, storedKey)
+	assert.Equal(t, "sk-test-key-v2", storedKey.Value.Val)
+	assert.Equal(t, 2.0, storedKey.Weight)
+
+	err = store.DeleteProviderKey(ctx, "openai", key.ID)
+	require.NoError(t, err)
+
+	keys, err = store.GetProviderKeys(ctx, "openai")
+	require.NoError(t, err)
+	assert.Empty(t, keys)
+}
+
+func TestProviderKeyCRUD_ProviderMustExist(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	key := schemas.Key{
+		ID:     "key-uuid-1",
+		Name:   "openai-primary",
+		Value:  *schemas.NewSecretVar("sk-test-key-v1"),
+		Weight: 1.0,
+	}
+
+	err := store.CreateProviderKey(ctx, "openai", key)
+	require.ErrorIs(t, err, ErrNotFound)
+
+	_, err = store.GetProviderKeys(ctx, "openai")
+	require.ErrorIs(t, err, ErrNotFound)
+
+	_, err = store.GetProviderKey(ctx, "openai", key.ID)
+	require.ErrorIs(t, err, ErrNotFound)
+
+	err = store.UpdateProviderKey(ctx, "openai", key.ID, key)
+	require.ErrorIs(t, err, ErrNotFound)
+
+	err = store.DeleteProviderKey(ctx, "openai", key.ID)
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+// =============================================================================
+// Budget Tests
+// =============================================================================
+
+func TestCreateBudget(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	budget := &tables.TableBudget{
+		ID:            "budget-test",
+		MaxLimit:      100.0,
+		ResetDuration: "1M",
+	}
+
+	err := store.CreateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Verify budget was created
+	result, err := store.GetBudget(ctx, "budget-test")
+	require.NoError(t, err)
+	assert.Equal(t, "budget-test", result.ID)
+	assert.Equal(t, 100.0, result.MaxLimit)
+	assert.Equal(t, "1M", result.ResetDuration)
+}
+
+func TestCreateBudget_InvalidDuration(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	budget := &tables.TableBudget{
+		ID:            "budget-invalid",
+		MaxLimit:      100.0,
+		ResetDuration: "invalid",
+	}
+
+	err := store.CreateBudget(ctx, budget)
+	assert.Error(t, err, "Should fail with invalid duration")
+}
+
+func TestCreateBudget_NegativeLimit(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	budget := &tables.TableBudget{
+		ID:            "budget-negative",
+		MaxLimit:      -50.0,
+		ResetDuration: "1h",
+	}
+
+	err := store.CreateBudget(ctx, budget)
+	assert.Error(t, err, "Should fail with negative max limit")
+}
+
+func TestUpdateBudget(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create budget
+	budget := &tables.TableBudget{
+		ID:            "budget-update",
+		MaxLimit:      100.0,
+		ResetDuration: "1h",
+	}
+	err := store.CreateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Update budget
+	budget.MaxLimit = 200.0
+	err = store.UpdateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Verify update
+	result, err := store.GetBudget(ctx, "budget-update")
+	require.NoError(t, err)
+	assert.Equal(t, 200.0, result.MaxLimit)
+}
+
+// TestUpdateBudgetPreservesRuntimeCounters verifies a configuration-shaped update
+// cannot clobber the runtime-owned counters.
+//
+// CurrentUsage and LastReset are advanced by the governance dump path, never by
+// config.json, which is why GenerateBudgetHash deliberately excludes them. A
+// source_of_truth=config.json startup force-sync replays the file row through
+// UpdateBudget with those fields at their Go zero values, so UpdateBudget must
+// carry the persisted values forward the same way it already does for the
+// override grant and the owner FKs.
+func TestUpdateBudgetPreservesRuntimeCounters(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	lastReset := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
+	require.NoError(t, store.CreateBudget(ctx, &tables.TableBudget{
+		ID:            "budget-runtime-counters",
+		MaxLimit:      100.0,
+		ResetDuration: "1h",
+		CurrentUsage:  42.5,
+		LastReset:     lastReset,
+	}))
+
+	// The shape config.json produces: configuration-owned fields only, with the
+	// runtime counters absent and therefore zero.
+	require.NoError(t, store.UpdateBudget(ctx, &tables.TableBudget{
+		ID:            "budget-runtime-counters",
+		MaxLimit:      200.0,
+		ResetDuration: "1h",
+	}))
+
+	result, err := store.GetBudget(ctx, "budget-runtime-counters")
+	require.NoError(t, err)
+	assert.Equal(t, 200.0, result.MaxLimit, "configuration-owned max_limit must follow the file")
+	assert.Equal(t, "1h", result.ResetDuration, "configuration-owned reset_duration must follow the file")
+	assert.Equal(t, 42.5, result.CurrentUsage, "runtime-owned current_usage must survive a config-shaped update")
+	assert.True(t, result.LastReset.Equal(lastReset),
+		"runtime-owned last_reset must survive a config-shaped update: got %s, want %s",
+		result.LastReset.UTC(), lastReset)
+}
+
+// TestCreateBudgetWithOverride verifies finite and permanent override state round-trips through the config store.
+func TestCreateBudgetWithOverride(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	// A finite grant must carry its anchor and total, which is what the remaining
+	// count is derived from. A cycles override without them is rejected by
+	// validation rather than persisted as a lifecycle-less override.
+	grantAnchor := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	tests := []*tables.TableBudget{
+		{
+			ID:                      "budget-override-cycles",
+			MaxLimit:                100,
+			ResetDuration:           "1h",
+			LastReset:               grantAnchor,
+			OverrideAmount:          25,
+			OverrideMode:            tables.BudgetOverrideModeCycles,
+			OverrideCyclesRemaining: 4,
+			OverrideCyclesTotal:     4,
+			OverrideAnchorReset:     &grantAnchor,
+		},
+		{
+			ID:             "budget-override-forever",
+			MaxLimit:       200,
+			ResetDuration:  "1d",
+			OverrideAmount: 50,
+			OverrideMode:   tables.BudgetOverrideModeForever,
+		},
+	}
+
+	for _, budget := range tests {
+		require.NoError(t, store.CreateBudget(ctx, budget))
+		got, err := store.GetBudget(ctx, budget.ID)
+		require.NoError(t, err)
+		assert.Equal(t, budget.OverrideAmount, got.OverrideAmount)
+		assert.Equal(t, budget.OverrideMode, got.OverrideMode)
+		assert.Equal(t, budget.OverrideCyclesRemaining, got.OverrideCyclesRemaining)
+		assert.Equal(t, budget.OverrideCyclesTotal, got.OverrideCyclesTotal)
+		if budget.OverrideAnchorReset == nil {
+			assert.Nil(t, got.OverrideAnchorReset)
+			continue
+		}
+		require.NotNil(t, got.OverrideAnchorReset)
+		assert.True(t, got.OverrideAnchorReset.Equal(*budget.OverrideAnchorReset),
+			"grant anchor did not round-trip: got %s, want %s", got.OverrideAnchorReset.UTC(), budget.OverrideAnchorReset.UTC())
+	}
+}
+
+// TestUpdateBudgetOverridePreservesBudgetState verifies the partial update cannot clobber usage or base configuration.
+func TestUpdateBudgetOverridePreservesBudgetState(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	budget := &tables.TableBudget{
+		ID:            "budget-override-partial-update",
+		MaxLimit:      100,
+		ResetDuration: "1d",
+		CurrentUsage:  40,
+	}
+	require.NoError(t, store.CreateBudget(ctx, budget))
+
+	updated, err := store.UpdateBudgetOverride(ctx, budget.ID, 25, tables.BudgetOverrideModeCycles, 4, false)
+	require.NoError(t, err)
+	assert.Equal(t, 100.0, updated.MaxLimit)
+	assert.Equal(t, "1d", updated.ResetDuration)
+	assert.Equal(t, 40.0, updated.CurrentUsage)
+	assert.Equal(t, 25.0, updated.OverrideAmount)
+	assert.Equal(t, tables.BudgetOverrideModeCycles, updated.OverrideMode)
+	assert.Equal(t, 4, updated.OverrideCyclesRemaining)
+	assert.Equal(t, 4, updated.OverrideCyclesTotal)
+	require.NotNil(t, updated.OverrideAnchorReset, "a finite grant must be anchored so its remaining count can be derived")
+
+	cleared, err := store.UpdateBudgetOverride(ctx, budget.ID, 0, "", 0, false)
+	require.NoError(t, err)
+	assert.Equal(t, 100.0, cleared.MaxLimit)
+	assert.Equal(t, 40.0, cleared.CurrentUsage)
+	assert.Zero(t, cleared.OverrideAmount)
+	assert.Empty(t, cleared.OverrideMode)
+	assert.Zero(t, cleared.OverrideCyclesRemaining)
+	assert.Zero(t, cleared.OverrideCyclesTotal)
+	assert.Nil(t, cleared.OverrideAnchorReset, "clearing must drop the grant so it cannot be re-derived")
+}
+
+// TestUpdateBudgetOverrideAnchorsAtCurrentWindow verifies a rolling grant is
+// anchored on the budget's CreatedAt lattice, so every node derives the same
+// remaining count from it.
+func TestUpdateBudgetOverrideAnchorsAtCurrentWindow(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	created := time.Now().UTC().Add(-10 * time.Hour).Truncate(time.Second)
+	budget := &tables.TableBudget{
+		ID:            "budget-override-rolling-anchor",
+		MaxLimit:      100,
+		ResetDuration: "1h",
+		CreatedAt:     created,
+		LastReset:     created,
+	}
+	require.NoError(t, store.CreateBudget(ctx, budget))
+
+	updated, err := store.UpdateBudgetOverride(ctx, budget.ID, 25, tables.BudgetOverrideModeCycles, 2, false)
+	require.NoError(t, err)
+	require.NotNil(t, updated.OverrideAnchorReset)
+
+	// The anchor must be a lattice point: an exact number of windows past the
+	// budget's creation instant, not the wall clock at grant time.
+	offset := updated.OverrideAnchorReset.Sub(updated.CreatedAt)
+	assert.Zero(t, offset%time.Hour,
+		"grant anchor is not lattice aligned: %s past CreatedAt is not a whole number of 1h windows", offset)
+}
+
+// TestUpdateBudgetOverrideAnchorsAtCalendarPeriodStart verifies a calendar-aligned
+// grant is anchored on the calendar boundary rather than the rolling lattice.
+func TestUpdateBudgetOverrideAnchorsAtCalendarPeriodStart(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	created := time.Now().UTC().AddDate(0, 0, -10).Truncate(time.Second)
+	budget := &tables.TableBudget{
+		ID:            "budget-override-calendar-anchor",
+		MaxLimit:      100,
+		ResetDuration: "1d",
+		CreatedAt:     created,
+		LastReset:     created,
+	}
+	require.NoError(t, store.CreateBudget(ctx, budget))
+
+	updated, err := store.UpdateBudgetOverride(ctx, budget.ID, 25, tables.BudgetOverrideModeCycles, 2, true)
+	require.NoError(t, err)
+	require.NotNil(t, updated.OverrideAnchorReset)
+
+	wantAnchor := tables.GetCalendarPeriodStart("1d", time.Now(), tables.QuarterStartNotApplicable)
+	assert.True(t, updated.OverrideAnchorReset.Equal(wantAnchor),
+		"calendar-aligned grant anchor should be midnight UTC today: got %s, want %s",
+		updated.OverrideAnchorReset.UTC(), wantAnchor.UTC())
+}
+
+func TestGetBudgets(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create multiple budgets
+	budgets := []*tables.TableBudget{
+		{ID: "budget-1", MaxLimit: 100.0, ResetDuration: "1h"},
+		{ID: "budget-2", MaxLimit: 200.0, ResetDuration: "1d"},
+		{ID: "budget-3", MaxLimit: 300.0, ResetDuration: "1M"},
+	}
+
+	for _, b := range budgets {
+		err := store.CreateBudget(ctx, b)
+		require.NoError(t, err)
+	}
+
+	result, err := store.GetBudgets(ctx)
+	require.NoError(t, err)
+	assert.Len(t, result, 3)
+}
+
+// =============================================================================
+// Rate Limit Tests
+// =============================================================================
+
+func TestCreateRateLimit(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	tokenMax := int64(100000)
+	requestMax := int64(1000)
+	tokenDuration := "1h"
+	requestDuration := "1h"
+
+	rateLimit := &tables.TableRateLimit{
+		ID:                   "rate-limit-test",
+		TokenMaxLimit:        &tokenMax,
+		TokenResetDuration:   &tokenDuration,
+		RequestMaxLimit:      &requestMax,
+		RequestResetDuration: &requestDuration,
+	}
+
+	err := store.CreateRateLimit(ctx, rateLimit)
+	require.NoError(t, err)
+
+	result, err := store.GetRateLimit(ctx, "rate-limit-test")
+	require.NoError(t, err)
+	assert.Equal(t, "rate-limit-test", result.ID)
+	assert.Equal(t, int64(100000), *result.TokenMaxLimit)
+	assert.Equal(t, int64(1000), *result.RequestMaxLimit)
+}
+
+func TestCreateRateLimit_InvalidDuration(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	tokenMax := int64(100000)
+	invalidDuration := "invalid"
+
+	rateLimit := &tables.TableRateLimit{
+		ID:                 "rate-limit-invalid",
+		TokenMaxLimit:      &tokenMax,
+		TokenResetDuration: &invalidDuration,
+	}
+
+	err := store.CreateRateLimit(ctx, rateLimit)
+	assert.Error(t, err, "Should fail with invalid duration")
+}
+
+func TestCreateRateLimit_MissingDuration(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	tokenMax := int64(100000)
+
+	rateLimit := &tables.TableRateLimit{
+		ID:            "rate-limit-missing",
+		TokenMaxLimit: &tokenMax,
+		// Missing TokenResetDuration
+	}
+
+	err := store.CreateRateLimit(ctx, rateLimit)
+	assert.Error(t, err, "Should fail when max limit set without duration")
+}
+
+func TestUpdateRateLimit(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	tokenMax := int64(100000)
+	tokenDuration := "1h"
+
+	rateLimit := &tables.TableRateLimit{
+		ID:                 "rate-limit-update",
+		TokenMaxLimit:      &tokenMax,
+		TokenResetDuration: &tokenDuration,
+	}
+	err := store.CreateRateLimit(ctx, rateLimit)
+	require.NoError(t, err)
+
+	// Update
+	newMax := int64(200000)
+	rateLimit.TokenMaxLimit = &newMax
+	err = store.UpdateRateLimit(ctx, rateLimit)
+	require.NoError(t, err)
+
+	result, err := store.GetRateLimit(ctx, "rate-limit-update")
+	require.NoError(t, err)
+	assert.Equal(t, int64(200000), *result.TokenMaxLimit)
+}
+
+// TestUpdateRateLimitPreservesRuntimeCounters is the rate-limit counterpart of
+// TestUpdateBudgetPreservesRuntimeCounters: the same startup force-sync replays
+// the file-shaped rate limit, and the token/request counters are runtime-owned
+// for the same reason (GenerateRateLimitHash excludes them).
+func TestUpdateRateLimitPreservesRuntimeCounters(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	tokenMax := int64(100000)
+	tokenDuration := "1h"
+	requestMax := int64(500)
+	requestDuration := "1h"
+	tokenLastReset := time.Date(2026, time.August, 1, 0, 0, 0, 0, time.UTC)
+	requestLastReset := time.Date(2026, time.August, 1, 0, 30, 0, 0, time.UTC)
+
+	require.NoError(t, store.CreateRateLimit(ctx, &tables.TableRateLimit{
+		ID:                   "rate-limit-runtime-counters",
+		TokenMaxLimit:        &tokenMax,
+		TokenResetDuration:   &tokenDuration,
+		TokenCurrentUsage:    1234,
+		TokenLastReset:       tokenLastReset,
+		RequestMaxLimit:      &requestMax,
+		RequestResetDuration: &requestDuration,
+		RequestCurrentUsage:  56,
+		RequestLastReset:     requestLastReset,
+	}))
+
+	newTokenMax := int64(200000)
+	require.NoError(t, store.UpdateRateLimit(ctx, &tables.TableRateLimit{
+		ID:                   "rate-limit-runtime-counters",
+		TokenMaxLimit:        &newTokenMax,
+		TokenResetDuration:   &tokenDuration,
+		RequestMaxLimit:      &requestMax,
+		RequestResetDuration: &requestDuration,
+	}))
+
+	result, err := store.GetRateLimit(ctx, "rate-limit-runtime-counters")
+	require.NoError(t, err)
+	require.NotNil(t, result.TokenMaxLimit)
+	assert.Equal(t, int64(200000), *result.TokenMaxLimit, "configuration-owned token_max_limit must follow the file")
+	assert.Equal(t, int64(1234), result.TokenCurrentUsage, "runtime-owned token_current_usage must survive a config-shaped update")
+	assert.Equal(t, int64(56), result.RequestCurrentUsage, "runtime-owned request_current_usage must survive a config-shaped update")
+	assert.True(t, result.TokenLastReset.Equal(tokenLastReset),
+		"runtime-owned token_last_reset must survive a config-shaped update: got %s, want %s",
+		result.TokenLastReset.UTC(), tokenLastReset)
+	assert.True(t, result.RequestLastReset.Equal(requestLastReset),
+		"runtime-owned request_last_reset must survive a config-shaped update: got %s, want %s",
+		result.RequestLastReset.UTC(), requestLastReset)
+}
+
+// =============================================================================
+// Virtual Key Tests
+// =============================================================================
+
+// TestGetVirtualKeysPaginated_AssignmentFilters covers how the customer / team /
+// user filters compose. A virtual key is assigned to at most one of the three, so
+// supplying several ORs them rather than narrowing to nothing.
+//
+// UserID is unresolvable in the OSS build — the VK↔user link lives in an
+// enterprise-only table — so it contributes a never-true disjunct here: a
+// user-only filter matches nothing instead of silently returning every key. It
+// deliberately does NOT suppress a customer/team disjunct supplied alongside it;
+// those are still resolvable, and dropping them would diverge from the enterprise
+// store, which returns exactly that union.
+func TestGetVirtualKeysPaginated_AssignmentFilters(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.CreateCustomer(ctx, &tables.TableCustomer{ID: "cust-1", Name: "Customer One"}))
+	require.NoError(t, store.CreateTeam(ctx, &tables.TableTeam{ID: "team-1", Name: "Team One"}))
+
+	custID, teamID := "cust-1", "team-1"
+	seed := []*tables.TableVirtualKey{
+		{ID: "vk-cust", Name: "Customer Key", Value: *schemas.NewSecretVar("vk-cust-val"), IsActive: schemas.Ptr(true), CustomerID: &custID},
+		{ID: "vk-team", Name: "Team Key", Value: *schemas.NewSecretVar("vk-team-val"), IsActive: schemas.Ptr(true), TeamID: &teamID},
+		{ID: "vk-none", Name: "Unassigned Key", Value: *schemas.NewSecretVar("vk-none-val"), IsActive: schemas.Ptr(true)},
+	}
+	for _, vk := range seed {
+		require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	}
+
+	tests := []struct {
+		name    string
+		params  VirtualKeyQueryParams
+		wantIDs []string
+	}{
+		{
+			name:    "no filters returns every key",
+			params:  VirtualKeyQueryParams{},
+			wantIDs: []string{"vk-cust", "vk-none", "vk-team"},
+		},
+		{
+			name:    "customer only",
+			params:  VirtualKeyQueryParams{CustomerID: "cust-1"},
+			wantIDs: []string{"vk-cust"},
+		},
+		{
+			name:    "team only",
+			params:  VirtualKeyQueryParams{TeamID: "team-1"},
+			wantIDs: []string{"vk-team"},
+		},
+		{
+			name:    "customer or team",
+			params:  VirtualKeyQueryParams{CustomerID: "cust-1", TeamID: "team-1"},
+			wantIDs: []string{"vk-cust", "vk-team"},
+		},
+		{
+			// Fail closed: OSS cannot resolve the assignment, so it matches nothing
+			// rather than falling through to an unfiltered list.
+			name:    "user only matches nothing in OSS",
+			params:  VirtualKeyQueryParams{UserID: "user-1"},
+			wantIDs: nil,
+		},
+		{
+			name:    "user plus customer keeps the resolvable customer disjunct",
+			params:  VirtualKeyQueryParams{UserID: "user-1", CustomerID: "cust-1"},
+			wantIDs: []string{"vk-cust"},
+		},
+		{
+			name:    "user plus team keeps the resolvable team disjunct",
+			params:  VirtualKeyQueryParams{UserID: "user-1", TeamID: "team-1"},
+			wantIDs: []string{"vk-team"},
+		},
+		{
+			name:    "user plus customer and team keeps both resolvable disjuncts",
+			params:  VirtualKeyQueryParams{UserID: "user-1", CustomerID: "cust-1", TeamID: "team-1"},
+			wantIDs: []string{"vk-cust", "vk-team"},
+		},
+		{
+			name:    "user filter never widens a non-matching search",
+			params:  VirtualKeyQueryParams{UserID: "user-1", Search: "Unassigned"},
+			wantIDs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vks, totalCount, err := store.GetVirtualKeysPaginated(ctx, tt.params)
+			require.NoError(t, err)
+
+			gotIDs := make([]string, 0, len(vks))
+			for _, vk := range vks {
+				gotIDs = append(gotIDs, vk.ID)
+			}
+			sort.Strings(gotIDs)
+			assert.Equal(t, tt.wantIDs, nonEmptyIDs(gotIDs))
+			// The count drives pagination, so it must agree with the page contents.
+			assert.Equal(t, int64(len(tt.wantIDs)), totalCount)
+		})
+	}
+}
+
+// TestGetVirtualKeysPaginated_Search covers the fields a search term matches. The
+// search box is the only free-text affordance on the virtual keys page, so it
+// matches everything the "Assigned To" column can display - the key's own name,
+// its team, and its customer - rather than the name alone. (The assigned user is
+// the enterprise store's addition; the link table does not exist here.)
+func TestGetVirtualKeysPaginated_Search(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.CreateCustomer(ctx, &tables.TableCustomer{ID: "cust-1", Name: "Acme Corp"}))
+	require.NoError(t, store.CreateTeam(ctx, &tables.TableTeam{ID: "team-1", Name: "Platform Squad"}))
+
+	custID, teamID := "cust-1", "team-1"
+	seed := []*tables.TableVirtualKey{
+		{ID: "vk-cust", Name: "billing key", Value: *schemas.NewSecretVar("vk-cust-val"), IsActive: schemas.Ptr(true), CustomerID: &custID},
+		{ID: "vk-team", Name: "ingest key", Value: *schemas.NewSecretVar("vk-team-val"), IsActive: schemas.Ptr(true), TeamID: &teamID},
+		{ID: "vk-none", Name: "Platform scratch", Value: *schemas.NewSecretVar("vk-none-val"), IsActive: schemas.Ptr(true)},
+	}
+	for _, vk := range seed {
+		require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	}
+
+	tests := []struct {
+		name    string
+		search  string
+		wantIDs []string
+	}{
+		{name: "matches the key name", search: "billing", wantIDs: []string{"vk-cust"}},
+		{name: "matches the key name case-insensitively", search: "BILLING", wantIDs: []string{"vk-cust"}},
+		{name: "matches the customer name", search: "acme", wantIDs: []string{"vk-cust"}},
+		{name: "matches the team name", search: "squad", wantIDs: []string{"vk-team"}},
+		{
+			// One term can hit a key by its own name and another by its team, and
+			// both belong in the results.
+			name:    "unions matches across fields",
+			search:  "platform",
+			wantIDs: []string{"vk-none", "vk-team"},
+		},
+		{name: "matches nothing when no field contains the term", search: "nonexistent", wantIDs: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vks, totalCount, err := store.GetVirtualKeysPaginated(ctx, VirtualKeyQueryParams{Search: tt.search})
+			require.NoError(t, err)
+
+			gotIDs := make([]string, 0, len(vks))
+			for _, vk := range vks {
+				gotIDs = append(gotIDs, vk.ID)
+			}
+			sort.Strings(gotIDs)
+			assert.Equal(t, tt.wantIDs, nonEmptyIDs(gotIDs))
+			assert.Equal(t, int64(len(tt.wantIDs)), totalCount)
+		})
+	}
+}
+
+// A search must not widen an assignment filter: the two narrow together.
+func TestGetVirtualKeysPaginated_SearchWithAssignmentFilter(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.CreateTeam(ctx, &tables.TableTeam{ID: "team-1", Name: "Platform Squad"}))
+	teamID := "team-1"
+	require.NoError(t, store.CreateVirtualKey(ctx, &tables.TableVirtualKey{
+		ID: "vk-team", Name: "ingest key", Value: *schemas.NewSecretVar("vk-team-val"), IsActive: schemas.Ptr(true), TeamID: &teamID,
+	}))
+	require.NoError(t, store.CreateVirtualKey(ctx, &tables.TableVirtualKey{
+		ID: "vk-none", Name: "ingest scratch", Value: *schemas.NewSecretVar("vk-none-val"), IsActive: schemas.Ptr(true),
+	}))
+
+	vks, totalCount, err := store.GetVirtualKeysPaginated(ctx, VirtualKeyQueryParams{Search: "ingest", TeamID: "team-1"})
+	require.NoError(t, err)
+	require.Len(t, vks, 1)
+	assert.Equal(t, "vk-team", vks[0].ID)
+	assert.Equal(t, int64(1), totalCount)
+}
+
+// nonEmptyIDs normalizes an empty slice to nil so table cases can express
+// "matches nothing" as a nil wantIDs.
+func nonEmptyIDs(ids []string) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	return ids
+}
+
+func TestCreateVirtualKey(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-test",
+		Name:     "Test Virtual Key",
+		Value:    *schemas.NewSecretVar("vk-test-value-123"),
+		IsActive: schemas.Ptr(true),
+	}
+
+	err := store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	result, err := store.GetVirtualKey(ctx, "vk-test")
+	require.NoError(t, err)
+	assert.Equal(t, "vk-test", result.ID)
+	assert.Equal(t, "Test Virtual Key", result.Name)
+	assert.Equal(t, "vk-test-value-123", result.Value.Val)
+	assert.True(t, result.IsActiveValue())
+}
+
+func TestCreateVirtualKey_WithBudgetAndRateLimit(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create budget first
+	budget := &tables.TableBudget{
+		ID:            "budget-for-vk",
+		MaxLimit:      100.0,
+		ResetDuration: "1M",
+	}
+	err := store.CreateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Create rate limit
+	tokenMax := int64(100000)
+	tokenDuration := "1h"
+	rateLimit := &tables.TableRateLimit{
+		ID:                 "rate-limit-for-vk",
+		TokenMaxLimit:      &tokenMax,
+		TokenResetDuration: &tokenDuration,
+	}
+	err = store.CreateRateLimit(ctx, rateLimit)
+	require.NoError(t, err)
+
+	// Create virtual key with references
+	rateLimitID := "rate-limit-for-vk"
+	vkID := "vk-with-refs"
+	vk := &tables.TableVirtualKey{
+		ID:          vkID,
+		Name:        "VK With References",
+		Value:       *schemas.NewSecretVar("vk-refs-value"),
+		IsActive:    schemas.Ptr(true),
+		RateLimitID: &rateLimitID,
+	}
+
+	err = store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	// Link the existing budget to the VK via FK
+	budget.VirtualKeyID = &vkID
+	err = store.UpdateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	result, err := store.GetVirtualKey(ctx, "vk-with-refs")
+	require.NoError(t, err)
+	assert.Len(t, result.Budgets, 1)
+	assert.Equal(t, "budget-for-vk", result.Budgets[0].ID)
+	assert.NotNil(t, result.RateLimitID)
+	assert.Equal(t, "rate-limit-for-vk", *result.RateLimitID)
+}
+
+func TestCreateVirtualKey_DuplicateName(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk1 := &tables.TableVirtualKey{
+		ID:       "vk-1",
+		Name:     "Same Name",
+		Value:    *schemas.NewSecretVar("vk-value-1"),
+		IsActive: schemas.Ptr(true),
+	}
+	err := store.CreateVirtualKey(ctx, vk1)
+	require.NoError(t, err)
+
+	vk2 := &tables.TableVirtualKey{
+		ID:       "vk-2",
+		Name:     "Same Name", // Duplicate name
+		Value:    *schemas.NewSecretVar("vk-value-2"),
+		IsActive: schemas.Ptr(true),
+	}
+	err = store.CreateVirtualKey(ctx, vk2)
+	assert.Error(t, err, "Should fail with duplicate name")
+}
+
+func TestGetVirtualKeyByValue(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-lookup",
+		Name:     "Lookup Key",
+		Value:    *schemas.NewSecretVar("vk-unique-value-xyz"),
+		IsActive: schemas.Ptr(true),
+	}
+	err := store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	result, err := store.GetVirtualKeyByValue(ctx, "vk-unique-value-xyz")
+	require.NoError(t, err)
+	assert.Equal(t, "vk-lookup", result.ID)
+}
+
+func TestUpdateVirtualKey(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-update",
+		Name:     "Original Name",
+		Value:    *schemas.NewSecretVar("vk-update-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err := store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	// Update
+	vk.Name = "Updated Name"
+	vk.IsActive = schemas.Ptr(false)
+	err = store.UpdateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	result, err := store.GetVirtualKey(ctx, "vk-update")
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Name", result.Name)
+	assert.False(t, result.IsActiveValue())
+
+	// Content logging is tri-state and every state must survive an update: the update path names
+	// its columns explicitly, so a column left off that list is silently never written.
+	vk.DisableContentLogging = new(true)
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	result, err = store.GetVirtualKey(ctx, "vk-update")
+	require.NoError(t, err)
+	require.NotNil(t, result.DisableContentLogging, "forcing content off must persist")
+	assert.True(t, *result.DisableContentLogging)
+
+	vk.DisableContentLogging = new(false)
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	result, err = store.GetVirtualKey(ctx, "vk-update")
+	require.NoError(t, err)
+	require.NotNil(t, result.DisableContentLogging, "forcing content on must persist")
+	assert.False(t, *result.DisableContentLogging)
+
+	vk.DisableContentLogging = nil
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	result, err = store.GetVirtualKey(ctx, "vk-update")
+	require.NoError(t, err)
+	assert.Nil(t, result.DisableContentLogging, "clearing the override must write NULL, back to inherit")
+}
+
+// TestVirtualKeyMetadata_PersistsThroughCreateAndUpdate pins the metadata round trip: create
+// stores it, update replaces it (the update path names its columns, so a missing "metadata" would
+// silently drop the change), an empty map clears it to NULL, and invalid metadata is refused.
+func TestVirtualKeyMetadata_PersistsThroughCreateAndUpdate(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-metadata",
+		Name:     "Metadata",
+		Value:    *schemas.NewSecretVar("vk-metadata-value"),
+		Metadata: map[string]string{"cost_center": "cc-42", "owner": "team-a@example.com"},
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	result, err := store.GetVirtualKey(ctx, vk.ID)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"cost_center": "cc-42", "owner": "team-a@example.com"}, result.Metadata)
+
+	vk.Metadata = map[string]string{"cost_center": "cc-7"}
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	result, err = store.GetVirtualKey(ctx, vk.ID)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"cost_center": "cc-7"}, result.Metadata, "an update must replace the metadata")
+
+	// An update that does not set metadata (nil), such as a config.json sync of an entry without a
+	// metadata field, keeps what is stored; only an explicit empty map clears it.
+	vk.Metadata = nil
+	vk.Description = "edited elsewhere"
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	result, err = store.GetVirtualKey(ctx, vk.ID)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"cost_center": "cc-7"}, result.Metadata, "a nil metadata must keep the stored value")
+	assert.Equal(t, "edited elsewhere", result.Description)
+
+	vk.Metadata = map[string]string{}
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	var raw *string
+	require.NoError(t, store.DB().Table("governance_virtual_keys").Select("metadata").Where("id = ?", vk.ID).Scan(&raw).Error)
+	assert.Nil(t, raw, "clearing the metadata must write NULL, not an empty object")
+	result, err = store.GetVirtualKey(ctx, vk.ID)
+	require.NoError(t, err)
+	assert.Empty(t, result.Metadata)
+
+	vk.Metadata = map[string]string{"bad key": "x"}
+	require.ErrorContains(t, store.UpdateVirtualKey(ctx, vk), "invalid metadata key")
+	bad := &tables.TableVirtualKey{ID: "vk-metadata-bad", Name: "Bad", Value: *schemas.NewSecretVar("vk-metadata-bad-value"), Metadata: map[string]string{"bifrost_alb_provider": "x"}}
+	require.ErrorContains(t, store.CreateVirtualKey(ctx, bad), "reserved")
+}
+
+func TestUpdateVirtualKey_PreservesRotationStateOnPlainUpdate(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-grace",
+		Name:     "Grace Key",
+		Value:    *schemas.NewSecretVar("vk-old-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	// Rotation: RotatedAt set makes the grace-period fields authoritative.
+	now := time.Now().UTC()
+	exp := now.Add(5 * time.Minute)
+	vk.Value = *schemas.NewSecretVar("vk-new-value")
+	vk.PreviousValue = *schemas.NewSecretVar("vk-old-value")
+	vk.PreviousValueExpiresAt = &exp
+	vk.RotatedAt = &now
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+
+	stored, err := store.GetVirtualKey(ctx, "vk-grace")
+	require.NoError(t, err)
+	assert.Equal(t, "vk-new-value", stored.Value.GetValue())
+	assert.Equal(t, "vk-old-value", stored.PreviousValue.GetValue())
+	assert.NotEmpty(t, stored.PreviousValueHash)
+	require.NotNil(t, stored.PreviousValueExpiresAt)
+	require.NotNil(t, stored.RotatedAt)
+	assert.True(t, stored.HasActivePreviousValue(now))
+
+	// Plain update (RotatedAt nil) must not wipe the in-flight grace window.
+	plain := &tables.TableVirtualKey{
+		ID:       "vk-grace",
+		Name:     "Grace Key Renamed",
+		Value:    *schemas.NewSecretVar("vk-new-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.UpdateVirtualKey(ctx, plain))
+
+	stored, err = store.GetVirtualKey(ctx, "vk-grace")
+	require.NoError(t, err)
+	assert.Equal(t, "Grace Key Renamed", stored.Name)
+	assert.Equal(t, "vk-old-value", stored.PreviousValue.GetValue())
+	require.NotNil(t, stored.PreviousValueExpiresAt)
+	require.NotNil(t, stored.RotatedAt)
+}
+
+func TestUpdateVirtualKey_RotationWithoutCooldownClearsPreviousValue(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-nograce",
+		Name:     "No Grace Key",
+		Value:    *schemas.NewSecretVar("vk-first-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	// First rotation with a grace window.
+	now := time.Now().UTC()
+	exp := now.Add(5 * time.Minute)
+	vk.Value = *schemas.NewSecretVar("vk-second-value")
+	vk.PreviousValue = *schemas.NewSecretVar("vk-first-value")
+	vk.PreviousValueExpiresAt = &exp
+	vk.RotatedAt = &now
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+
+	// Second rotation with cooldown disabled clears the grace state.
+	later := now.Add(time.Minute)
+	second := &tables.TableVirtualKey{
+		ID:        "vk-nograce",
+		Name:      "No Grace Key",
+		Value:     *schemas.NewSecretVar("vk-third-value"),
+		IsActive:  schemas.Ptr(true),
+		RotatedAt: &later,
+	}
+	second.ClearPreviousValue()
+	require.NoError(t, store.UpdateVirtualKey(ctx, second))
+
+	stored, err := store.GetVirtualKey(ctx, "vk-nograce")
+	require.NoError(t, err)
+	assert.Equal(t, "vk-third-value", stored.Value.GetValue())
+	assert.False(t, stored.PreviousValue.IsSet())
+	assert.Empty(t, stored.PreviousValueHash)
+	assert.Nil(t, stored.PreviousValueExpiresAt)
+	assert.False(t, stored.HasActivePreviousValue(later))
+}
+
+func TestUpdateVirtualKey_UnresolvablePreviousValueRejected(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-badprev",
+		Name:     "Bad Prev Key",
+		Value:    *schemas.NewSecretVar("vk-current-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	// A set-but-unresolvable PreviousValue must fail the save, mirroring the
+	// Value validation: persisting it would leave an empty hash that
+	// grace-period authentication can never match.
+	now := time.Now().UTC()
+	exp := now.Add(5 * time.Minute)
+	vk.Value = *schemas.NewSecretVar("vk-rotated-value")
+	vk.PreviousValue = *schemas.NewSecretVar("env.BIFROST_TEST_UNSET_PREVIOUS_VALUE")
+	vk.PreviousValueExpiresAt = &exp
+	vk.RotatedAt = &now
+	err := store.UpdateVirtualKey(ctx, vk)
+	require.Error(t, err, "unresolvable previous value must not persist")
+	assert.Contains(t, err.Error(), "could not be resolved")
+}
+
+func TestVirtualKeyHasActivePreviousValue(t *testing.T) {
+	now := time.Now().UTC()
+	past := now.Add(-time.Minute)
+	future := now.Add(time.Minute)
+
+	vk := &tables.TableVirtualKey{}
+	assert.False(t, vk.HasActivePreviousValue(now), "no previous value")
+
+	vk.PreviousValue = *schemas.NewSecretVar("vk-prev")
+	assert.False(t, vk.HasActivePreviousValue(now), "no expiry set")
+
+	vk.PreviousValueExpiresAt = &future
+	assert.True(t, vk.HasActivePreviousValue(now), "inside grace window")
+	assert.False(t, vk.HasActivePreviousValue(future), "now == expiry is expired")
+
+	vk.PreviousValueExpiresAt = &past
+	assert.False(t, vk.HasActivePreviousValue(now), "past expiry")
+}
+
+// rotateTestVirtualKey simulates a value rotation with a grace window the way
+// rotateVirtualKeyByID does: new current value, old value retired with an expiry.
+// oldValue must be the plaintext the key was created with: the struct's Value is
+// encrypted in place by BeforeSave, so it cannot be read back after create.
+func rotateTestVirtualKey(t *testing.T, store *RDBConfigStore, vk *tables.TableVirtualKey, oldValue, newValue string, expiresAt time.Time) {
+	t.Helper()
+	now := time.Now().UTC()
+	vk.Value = *schemas.NewSecretVar(newValue)
+	vk.PreviousValue = *schemas.NewSecretVar(oldValue)
+	vk.PreviousValueExpiresAt = &expiresAt
+	vk.RotatedAt = &now
+	require.NoError(t, store.UpdateVirtualKey(context.Background(), vk))
+}
+
+func TestGetVirtualKeyByValue_GraceValueWithinWindow(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-grace-lookup",
+		Name:     "Grace Lookup Key",
+		Value:    *schemas.NewSecretVar("vk-grace-old-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	rotateTestVirtualKey(t, store, vk, "vk-grace-old-value", "vk-grace-new-value", time.Now().UTC().Add(5*time.Minute))
+
+	byOld, err := store.GetVirtualKeyByValue(ctx, "vk-grace-old-value")
+	require.NoError(t, err, "grace value inside the window must resolve")
+	assert.Equal(t, "vk-grace-lookup", byOld.ID)
+
+	byNew, err := store.GetVirtualKeyByValue(ctx, "vk-grace-new-value")
+	require.NoError(t, err, "current value must keep resolving")
+	assert.Equal(t, "vk-grace-lookup", byNew.ID)
+}
+
+func TestGetVirtualKeyByValue_GraceValueExpired(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-grace-expired",
+		Name:     "Expired Grace Key",
+		Value:    *schemas.NewSecretVar("vk-expired-old-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	rotateTestVirtualKey(t, store, vk, "vk-expired-old-value", "vk-expired-new-value", time.Now().UTC().Add(-time.Minute))
+
+	_, err := store.GetVirtualKeyByValue(ctx, "vk-expired-old-value")
+	require.ErrorIs(t, err, ErrNotFound, "expired grace value must not resolve")
+
+	byNew, err := store.GetVirtualKeyByValue(ctx, "vk-expired-new-value")
+	require.NoError(t, err)
+	assert.Equal(t, "vk-grace-expired", byNew.ID)
+}
+
+func TestGetVirtualKeyByValue_UnknownValueStillNotFound(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-known",
+		Name:     "Known Key",
+		Value:    *schemas.NewSecretVar("vk-known-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	_, err := store.GetVirtualKeyByValue(ctx, "vk-never-issued")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestGetVirtualKeyByValue_CurrentValueWinsOverOtherVKsGraceValue(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// VK-A rotates away from the shared value; the value stays alive in A's
+	// grace window.
+	vkA := &tables.TableVirtualKey{
+		ID:       "vk-shared-a",
+		Name:     "Shared A",
+		Value:    *schemas.NewSecretVar("vk-shared-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vkA))
+	rotateTestVirtualKey(t, store, vkA, "vk-shared-value", "vk-shared-a-new", time.Now().UTC().Add(5*time.Minute))
+
+	// VK-B claims the same value as its current value (the previous-value hash
+	// index is intentionally non-unique, so this is legal).
+	vkB := &tables.TableVirtualKey{
+		ID:       "vk-shared-b",
+		Name:     "Shared B",
+		Value:    *schemas.NewSecretVar("vk-shared-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vkB))
+
+	got, err := store.GetVirtualKeyByValue(ctx, "vk-shared-value")
+	require.NoError(t, err)
+	assert.Equal(t, "vk-shared-b", got.ID, "a live current value must beat another VK's grace value")
+}
+
+// TestGetVirtualKeyByValue_ZeroCooldownRotationRevokesActiveGraceValue covers
+// the revocation path: a VK carrying a live grace value is rotated again while
+// the cooldown is disabled, so both retired values must stop resolving at once.
+// Without the clear, the stale previous_value_hash row would keep authenticating
+// until its original expiry.
+func TestGetVirtualKeyByValue_ZeroCooldownRotationRevokesActiveGraceValue(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-revoke-now",
+		Name:     "Revoke Now Key",
+		Value:    *schemas.NewSecretVar("vk-revoke-first"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	// First rotation with a long cooldown: the first value is live in its window.
+	rotateTestVirtualKey(t, store, vk, "vk-revoke-first", "vk-revoke-second", time.Now().UTC().Add(30*time.Minute))
+	found, err := store.GetVirtualKeyByValue(ctx, "vk-revoke-first")
+	require.NoError(t, err, "grace value must resolve before the zero-cooldown rotation")
+	assert.Equal(t, "vk-revoke-now", found.ID)
+
+	// Second rotation with the cooldown disabled: mirrors rotateVirtualKeyByID's
+	// else-branch, which calls ClearPreviousValue instead of retiring the value.
+	now := time.Now().UTC()
+	second := &tables.TableVirtualKey{
+		ID:        "vk-revoke-now",
+		Name:      "Revoke Now Key",
+		Value:     *schemas.NewSecretVar("vk-revoke-third"),
+		IsActive:  schemas.Ptr(true),
+		RotatedAt: &now,
+	}
+	second.ClearPreviousValue()
+	require.NoError(t, store.UpdateVirtualKey(ctx, second))
+
+	_, err = store.GetVirtualKeyByValue(ctx, "vk-revoke-first")
+	require.ErrorIs(t, err, ErrNotFound, "the older retired value must be revoked immediately")
+	_, err = store.GetVirtualKeyByValue(ctx, "vk-revoke-second")
+	require.ErrorIs(t, err, ErrNotFound, "the just-retired value must be revoked immediately")
+
+	current, err := store.GetVirtualKeyByValue(ctx, "vk-revoke-third")
+	require.NoError(t, err, "the current value must keep working")
+	assert.Equal(t, "vk-revoke-now", current.ID)
+
+	stored, err := store.GetVirtualKey(ctx, "vk-revoke-now")
+	require.NoError(t, err)
+	assert.Empty(t, stored.PreviousValueHash, "the retired hash must not linger in the row")
+	assert.Nil(t, stored.PreviousValueExpiresAt)
+}
+
+func TestGetVirtualKeyQuotaByValue_GraceValueWithinWindow(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-quota-grace",
+		Name:     "Quota Grace Key",
+		Value:    *schemas.NewSecretVar("vk-quota-old-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	require.NoError(t, store.CreateBudget(ctx, &tables.TableBudget{
+		ID:            "budget-quota-grace",
+		MaxLimit:      10,
+		ResetDuration: "1h",
+		VirtualKeyID:  schemas.Ptr("vk-quota-grace"),
+	}))
+	rotateTestVirtualKey(t, store, vk, "vk-quota-old-value", "vk-quota-new-value", time.Now().UTC().Add(5*time.Minute))
+
+	got, err := store.GetVirtualKeyQuotaByValue(ctx, "vk-quota-old-value")
+	require.NoError(t, err, "grace value inside the window must resolve quota")
+	assert.Equal(t, "vk-quota-grace", got.ID)
+	require.Len(t, got.Budgets, 1, "budgets must be preloaded for grace lookups")
+	assert.Equal(t, "budget-quota-grace", got.Budgets[0].ID)
+}
+
+func TestGetVirtualKeyQuotaByValue_GraceValueExpired(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-quota-expired",
+		Name:     "Quota Expired Key",
+		Value:    *schemas.NewSecretVar("vk-quota-exp-old"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	rotateTestVirtualKey(t, store, vk, "vk-quota-exp-old", "vk-quota-exp-new", time.Now().UTC().Add(-time.Minute))
+
+	_, err := store.GetVirtualKeyQuotaByValue(ctx, "vk-quota-exp-old")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestDeleteVirtualKey(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-delete",
+		Name:     "Delete Me",
+		Value:    *schemas.NewSecretVar("vk-delete-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err := store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	err = store.DeleteVirtualKey(ctx, "vk-delete")
+	require.NoError(t, err)
+
+	_, err = store.GetVirtualKey(ctx, "vk-delete")
+	assert.Error(t, err, "Should not find deleted virtual key")
+}
+
+func TestDeleteVirtualKey_CleansUpScopedModelConfigs(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-scoped",
+		Name:     "Scoped VK",
+		Value:    *schemas.NewSecretVar("vk-scoped-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	budget := &tables.TableBudget{ID: "b-scoped", MaxLimit: 100, ResetDuration: "1h"}
+	require.NoError(t, store.CreateBudget(ctx, budget))
+	rateLimit := &tables.TableRateLimit{
+		ID:                 "rl-scoped",
+		TokenMaxLimit:      schemas.Ptr(int64(1000)),
+		TokenResetDuration: schemas.Ptr("1h"),
+	}
+	require.NoError(t, store.CreateRateLimit(ctx, rateLimit))
+
+	mc := &tables.TableModelConfig{
+		ID:          "mc-scoped",
+		ModelName:   "gpt-4",
+		Scope:       tables.ModelConfigScopeVirtualKey,
+		ScopeID:     schemas.Ptr(vk.ID),
+		BudgetID:    &budget.ID,
+		RateLimitID: &rateLimit.ID,
+	}
+	require.NoError(t, store.CreateModelConfig(ctx, mc))
+
+	// Sanity: the scoped config exists before deletion.
+	_, err := store.GetModelConfigByID(ctx, "mc-scoped")
+	require.NoError(t, err)
+
+	// Deleting the VK must cascade-clean its scoped model config and owned budget/rate-limit.
+	require.NoError(t, store.DeleteVirtualKey(ctx, vk.ID))
+
+	_, err = store.GetModelConfigByID(ctx, "mc-scoped")
+	assert.Error(t, err, "scoped model config should be deleted with the VK")
+
+	var budgetCount int64
+	require.NoError(t, store.DB().Model(&tables.TableBudget{}).Where("id = ?", "b-scoped").Count(&budgetCount).Error)
+	assert.Equal(t, int64(0), budgetCount, "owned budget should be deleted")
+
+	var rlCount int64
+	require.NoError(t, store.DB().Model(&tables.TableRateLimit{}).Where("id = ?", "rl-scoped").Count(&rlCount).Error)
+	assert.Equal(t, int64(0), rlCount, "owned rate limit should be deleted")
+}
+
+// TestDeleteVirtualKey_CleansUpMultiBudgetScopedModelConfigs is a regression test for a
+// leak where DeleteVirtualKey cleaned only the legacy single BudgetID column and ignored
+// the modern multi-budget rows owned via TableBudget.ModelConfigID. Those budgets carry no
+// virtual_key_id, so the VK's own budget sweep didn't catch them either — they orphaned.
+func TestDeleteVirtualKey_CleansUpMultiBudgetScopedModelConfigs(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-multibudget",
+		Name:     "MultiBudget VK",
+		Value:    *schemas.NewSecretVar("vk-multibudget-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	rateLimit := &tables.TableRateLimit{
+		ID:                 "rl-mb",
+		TokenMaxLimit:      schemas.Ptr(int64(1000)),
+		TokenResetDuration: schemas.Ptr("1h"),
+	}
+	require.NoError(t, store.CreateRateLimit(ctx, rateLimit))
+
+	mc := &tables.TableModelConfig{
+		ID:          "mc-multibudget",
+		ModelName:   "gpt-4",
+		Scope:       tables.ModelConfigScopeVirtualKey,
+		ScopeID:     schemas.Ptr(vk.ID),
+		RateLimitID: &rateLimit.ID,
+	}
+	require.NoError(t, store.CreateModelConfig(ctx, mc))
+
+	// Modern budgets are owned via ModelConfigID (no virtual_key_id), mirroring how the
+	// governance handler creates them.
+	mbBudgetIDs := []string{"b-mb-1", "b-mb-2"}
+	for _, id := range mbBudgetIDs {
+		require.NoError(t, store.CreateBudget(ctx, &tables.TableBudget{
+			ID:            id,
+			MaxLimit:      100,
+			ResetDuration: "1h",
+			ModelConfigID: &mc.ID,
+		}))
+	}
+
+	require.NoError(t, store.DeleteVirtualKey(ctx, vk.ID))
+
+	_, err := store.GetModelConfigByID(ctx, "mc-multibudget")
+	assert.Error(t, err, "scoped model config should be deleted with the VK")
+
+	for _, id := range mbBudgetIDs {
+		var count int64
+		require.NoError(t, store.DB().Model(&tables.TableBudget{}).Where("id = ?", id).Count(&count).Error)
+		assert.Equal(t, int64(0), count, "modern model-config budget %s should be deleted, not orphaned", id)
+	}
+
+	var rlCount int64
+	require.NoError(t, store.DB().Model(&tables.TableRateLimit{}).Where("id = ?", "rl-mb").Count(&rlCount).Error)
+	assert.Equal(t, int64(0), rlCount, "owned rate limit should be deleted")
+}
+
+// TestCreateModelConfig_RejectsMissingScopeOwner verifies the scope-owner lock in
+// CreateModelConfig: a virtual_key-scoped config whose scope_id points at a non-existent
+// VK is rejected (ErrNotFound) rather than created as an orphan. This is the guard that
+// closes the CreateModelConfig↔DeleteVirtualKey race.
+func TestCreateModelConfig_RejectsMissingScopeOwner(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	mc := &tables.TableModelConfig{
+		ID:        "mc-orphan",
+		ModelName: "gpt-4",
+		Scope:     tables.ModelConfigScopeVirtualKey,
+		ScopeID:   schemas.Ptr("vk-does-not-exist"),
+	}
+	err := store.CreateModelConfig(ctx, mc)
+	assert.ErrorIs(t, err, ErrNotFound, "creating a VK-scoped config for a missing VK should be rejected")
+
+	_, getErr := store.GetModelConfigByID(ctx, "mc-orphan")
+	assert.Error(t, getErr, "rejected config must not have been persisted")
+}
+
+func TestDeleteProvider_CleansUpProviderModelConfigs(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	now := time.Now()
+	require.NoError(t, store.DB().Create(&tables.TableProvider{Name: "openai", CreatedAt: now, UpdatedAt: now}).Error)
+	require.NoError(t, store.DB().Create(&tables.TableBudget{ID: "pb", MaxLimit: 100, ResetDuration: "1M", LastReset: now, CreatedAt: now, UpdatedAt: now}).Error)
+	require.NoError(t, store.DB().Create(&tables.TableRateLimit{ID: "prl", TokenMaxLimit: schemas.Ptr(int64(1000)), TokenResetDuration: schemas.Ptr("1h"), TokenLastReset: now, RequestLastReset: now, CreatedAt: now, UpdatedAt: now}).Error)
+
+	providerName := "openai"
+	mc := &tables.TableModelConfig{
+		ID:          "mc-wildcard",
+		ModelName:   tables.ModelConfigAllModels,
+		Provider:    &providerName,
+		Scope:       tables.ModelConfigScopeGlobal,
+		BudgetID:    schemas.Ptr("pb"),
+		RateLimitID: schemas.Ptr("prl"),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	require.NoError(t, store.CreateModelConfig(ctx, mc))
+
+	require.NoError(t, store.DeleteProvider(ctx, schemas.ModelProvider("openai")))
+
+	// The provider's wildcard model config and its owned budget/rate-limit are cleaned up.
+	_, err := store.GetModelConfigByID(ctx, "mc-wildcard")
+	assert.Error(t, err, "provider-scoped model config should be deleted with the provider")
+	for _, q := range []struct {
+		model any
+		id    string
+		label string
+	}{
+		{&tables.TableBudget{}, "pb", "budget"},
+		{&tables.TableRateLimit{}, "prl", "rate limit"},
+	} {
+		var count int64
+		require.NoError(t, store.DB().Model(q.model).Where("id = ?", q.id).Count(&count).Error)
+		assert.Equal(t, int64(0), count, "owned "+q.label+" should be deleted")
+	}
+}
+
+// =============================================================================
+// Virtual Key Provider Config Tests
+// =============================================================================
+
+func TestCreateVirtualKeyProviderConfig(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create virtual key first
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-for-pc",
+		Name:     "VK For Provider Config",
+		Value:    *schemas.NewSecretVar("vk-pc-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err := store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	// Create provider config
+	weight := 1.0
+	pc := &tables.TableVirtualKeyProviderConfig{
+		VirtualKeyID: "vk-for-pc",
+		Provider:     "openai",
+		Weight:       &weight,
+	}
+
+	err = store.CreateVirtualKeyProviderConfig(ctx, pc)
+	require.NoError(t, err)
+
+	// Verify
+	configs, err := store.GetVirtualKeyProviderConfigs(ctx, "vk-for-pc")
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+	assert.Equal(t, "openai", configs[0].Provider)
+}
+
+func TestCreateVirtualKeyProviderConfig_WithKeys(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create provider with keys first
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{ID: "key-for-pc", Name: "openai-pc-key", Value: *schemas.NewSecretVar("sk-test"), Weight: 1.0},
+			},
+		},
+	}
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	// Create virtual key
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-with-keys",
+		Name:     "VK With Keys",
+		Value:    *schemas.NewSecretVar("vk-keys-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err = store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	// Create provider config with key reference
+	weight := 1.0
+	pc := &tables.TableVirtualKeyProviderConfig{
+		VirtualKeyID: "vk-with-keys",
+		Provider:     "openai",
+		Weight:       &weight,
+		Keys: []tables.TableKey{
+			{Name: "openai-pc-key"}, // Reference by name
+		},
+	}
+
+	err = store.CreateVirtualKeyProviderConfig(ctx, pc)
+	require.NoError(t, err)
+
+	// Verify keys are associated
+	configs, err := store.GetVirtualKeyProviderConfigs(ctx, "vk-with-keys")
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+
+	// Load with keys
+	var configWithKeys tables.TableVirtualKeyProviderConfig
+	err = store.DB().Preload("Keys").First(&configWithKeys, "id = ?", configs[0].ID).Error
+	require.NoError(t, err)
+	assert.Len(t, configWithKeys.Keys, 1)
+}
+
+// TestReplaceVirtualKeyProviderConfigsPreservesParity verifies bulk replacement keeps nested ownership and key associations.
+func TestReplaceVirtualKeyProviderConfigsPreservesParity(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, store.UpdateProvidersConfig(ctx, map[schemas.ModelProvider]ProviderConfig{
+		"openai": {Keys: []schemas.Key{{ID: "replacement-key", Name: "replacement-key", Value: *schemas.NewSecretVar("secret"), Weight: 1}}},
+	}))
+	vk := &tables.TableVirtualKey{ID: "vk-replace-pcs", Name: "replace", Value: *schemas.NewSecretVar("vk-replace"), IsActive: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	oldRateLimit := &tables.TableRateLimit{ID: "old-pc-rate-limit"}
+	require.NoError(t, store.CreateRateLimit(ctx, oldRateLimit))
+	old := &tables.TableVirtualKeyProviderConfig{VirtualKeyID: vk.ID, Provider: "anthropic", RateLimitID: &oldRateLimit.ID, RateLimit: oldRateLimit, Budgets: []tables.TableBudget{{ID: "old-pc-budget", MaxLimit: 1, ResetDuration: "1h"}}}
+	require.NoError(t, store.CreateVirtualKeyProviderConfig(ctx, old))
+
+	newRateLimit := &tables.TableRateLimit{ID: "new-pc-rate-limit"}
+	tx := store.DB().WithContext(ctx).Begin()
+	require.NoError(t, tx.Error)
+	err := store.ReplaceVirtualKeyProviderConfigs(ctx, vk.ID, []tables.TableVirtualKeyProviderConfig{{
+		Provider: "openai", Keys: []tables.TableKey{{KeyID: "replacement-key"}},
+		Budgets: []tables.TableBudget{{ID: "new-pc-budget", MaxLimit: 10, ResetDuration: "1d"}}, RateLimitID: &newRateLimit.ID, RateLimit: newRateLimit,
+	}}, tx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit().Error)
+
+	var configs []tables.TableVirtualKeyProviderConfig
+	require.NoError(t, store.DB().Preload("Keys").Preload("Budgets").Preload("RateLimit").Where("virtual_key_id = ?", vk.ID).Find(&configs).Error)
+	require.Len(t, configs, 1)
+	require.Equal(t, "openai", configs[0].Provider)
+	require.Len(t, configs[0].Keys, 1)
+	require.Equal(t, "replacement-key", configs[0].Keys[0].KeyID)
+	require.Len(t, configs[0].Budgets, 1)
+	require.Equal(t, "new-pc-budget", configs[0].Budgets[0].ID)
+	require.NotNil(t, configs[0].RateLimit)
+	require.Equal(t, newRateLimit.ID, configs[0].RateLimit.ID)
+	for _, id := range []string{"old-pc-budget", "old-pc-rate-limit"} {
+		var count int64
+		table := (&tables.TableBudget{}).TableName()
+		if id == "old-pc-rate-limit" {
+			table = (&tables.TableRateLimit{}).TableName()
+		}
+		require.NoError(t, store.DB().Table(table).Where("id = ?", id).Count(&count).Error)
+		require.Zero(t, count)
+	}
+}
+
+// TestReplaceVirtualKeyProviderConfigsRollsBackOnUnresolvedKey verifies replacement remains atomic on resolution failure.
+func TestReplaceVirtualKeyProviderConfigsRollsBackOnUnresolvedKey(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	vk := &tables.TableVirtualKey{ID: "vk-replace-rollback", Name: "rollback", Value: *schemas.NewSecretVar("vk-rollback"), IsActive: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	require.NoError(t, store.CreateVirtualKeyProviderConfig(ctx, &tables.TableVirtualKeyProviderConfig{VirtualKeyID: vk.ID, Provider: "anthropic"}))
+
+	tx := store.DB().WithContext(ctx).Begin()
+	require.NoError(t, tx.Error)
+	err := store.ReplaceVirtualKeyProviderConfigs(ctx, vk.ID, []tables.TableVirtualKeyProviderConfig{{Provider: "openai", Keys: []tables.TableKey{{KeyID: "missing"}}}}, tx)
+	require.Error(t, err)
+	require.NoError(t, tx.Rollback().Error)
+	configs, listErr := store.GetVirtualKeyProviderConfigs(ctx, vk.ID)
+	require.NoError(t, listErr)
+	require.Len(t, configs, 1)
+	require.Equal(t, "anthropic", configs[0].Provider)
+}
+
+// TestReplaceVirtualKeyProviderConfigsResolvesKeysByName verifies bulk replacement
+// accepts the config-file reference forms that CreateVirtualKeyProviderConfig
+// accepts: a name with no KeyID, and a KeyID that misses but carries a usable name.
+func TestReplaceVirtualKeyProviderConfigsResolvesKeysByName(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, store.UpdateProvidersConfig(ctx, map[schemas.ModelProvider]ProviderConfig{
+		"openai":    {Keys: []schemas.Key{{ID: "openai-key-id", Name: "openai-name", Value: *schemas.NewSecretVar("s1"), Weight: 1}}},
+		"anthropic": {Keys: []schemas.Key{{ID: "anthropic-key-id", Name: "anthropic-name", Value: *schemas.NewSecretVar("s2"), Weight: 1}}},
+	}))
+	vk := &tables.TableVirtualKey{ID: "vk-replace-by-name", Name: "by-name", Value: *schemas.NewSecretVar("vk-by-name"), IsActive: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	tx := store.DB().WithContext(ctx).Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, store.ReplaceVirtualKeyProviderConfigs(ctx, vk.ID, []tables.TableVirtualKeyProviderConfig{
+		// Name only, no KeyID — the config-file form.
+		{Provider: "openai", Keys: []tables.TableKey{{Name: "openai-name"}}},
+		// KeyID that does not resolve, but the name does — the fallback path.
+		{Provider: "anthropic", Keys: []tables.TableKey{{KeyID: "stale-id", Name: "anthropic-name"}}},
+	}, tx))
+	require.NoError(t, tx.Commit().Error)
+
+	var configs []tables.TableVirtualKeyProviderConfig
+	require.NoError(t, store.DB().Preload("Keys").Where("virtual_key_id = ?", vk.ID).Order("provider").Find(&configs).Error)
+	require.Len(t, configs, 2)
+	// Resolution is scoped per provider, so each config must land on its own
+	// provider's key rather than whichever row happened to match the name first.
+	require.Equal(t, "anthropic", configs[0].Provider)
+	require.Len(t, configs[0].Keys, 1)
+	require.Equal(t, "anthropic-key-id", configs[0].Keys[0].KeyID)
+	require.Equal(t, "openai", configs[1].Provider)
+	require.Len(t, configs[1].Keys, 1)
+	require.Equal(t, "openai-key-id", configs[1].Keys[0].KeyID)
+}
+
+// TestReplaceVirtualKeyProviderConfigsReportsEveryUnresolvedKey verifies a blank
+// reference is aggregated with the others rather than short-circuiting the scan.
+func TestReplaceVirtualKeyProviderConfigsReportsEveryUnresolvedKey(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	vk := &tables.TableVirtualKey{ID: "vk-replace-unresolved", Name: "unresolved", Value: *schemas.NewSecretVar("vk-unresolved"), IsActive: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	tx := store.DB().WithContext(ctx).Begin()
+	require.NoError(t, tx.Error)
+	err := store.ReplaceVirtualKeyProviderConfigs(ctx, vk.ID, []tables.TableVirtualKeyProviderConfig{
+		{Provider: "openai", Keys: []tables.TableKey{{}, {KeyID: "missing-id"}, {Name: "missing-name"}}},
+	}, tx)
+	require.NoError(t, tx.Rollback().Error)
+	var unresolvedErr *ErrUnresolvedKeys
+	require.ErrorAs(t, err, &unresolvedErr)
+	require.ElementsMatch(t, []string{"key[0]", "key_id=missing-id", "name=missing-name"}, unresolvedErr.Identifiers)
+}
+
+// TestReplaceVirtualKeyProviderConfigsChunksInserts verifies replacement crosses both bounded insert sizes.
+func TestReplaceVirtualKeyProviderConfigsChunksInserts(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	vk := &tables.TableVirtualKey{ID: "vk-replace-chunks", Name: "chunks", Value: *schemas.NewSecretVar("vk-chunks"), IsActive: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	configs := make([]tables.TableVirtualKeyProviderConfig, 101)
+	for i := range configs {
+		configs[i] = tables.TableVirtualKeyProviderConfig{Provider: fmt.Sprintf("provider-%03d", i)}
+	}
+	createStatements := 0
+	callbackName := "test:count-provider-config-inserts"
+	require.NoError(t, store.DB().Callback().Create().After("gorm:create").Register(callbackName, func(db *gorm.DB) {
+		if db.Statement.Table == (&tables.TableVirtualKeyProviderConfig{}).TableName() {
+			createStatements++
+		}
+	}))
+	t.Cleanup(func() { _ = store.DB().Callback().Create().Remove(callbackName) })
+	tx := store.DB().WithContext(ctx).Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, store.ReplaceVirtualKeyProviderConfigs(ctx, vk.ID, configs, tx))
+	require.NoError(t, tx.Commit().Error)
+	var count int64
+	require.NoError(t, store.DB().Model(&tables.TableVirtualKeyProviderConfig{}).Where("virtual_key_id = ?", vk.ID).Count(&count).Error)
+	require.Equal(t, int64(101), count)
+	require.Equal(t, 2, createStatements, "101 configs should use two bounded insert statements instead of 101 row inserts")
+}
+
+func TestCreateVirtualKeyProviderConfig_UnresolvedKeys(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create virtual key
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-unresolved",
+		Name:     "VK Unresolved",
+		Value:    *schemas.NewSecretVar("vk-unresolved-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err := store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	// Try to create provider config with non-existent key
+	weight := 1.0
+	pc := &tables.TableVirtualKeyProviderConfig{
+		VirtualKeyID: "vk-unresolved",
+		Provider:     "openai",
+		Weight:       &weight,
+		Keys: []tables.TableKey{
+			{Name: "non-existent-key"},
+		},
+	}
+
+	err = store.CreateVirtualKeyProviderConfig(ctx, pc)
+	assert.Error(t, err, "Should fail with unresolved keys")
+
+	var unresolvedErr *ErrUnresolvedKeys
+	assert.ErrorAs(t, err, &unresolvedErr, "Should be ErrUnresolvedKeys")
+}
+
+func TestUpdateProvider_RemovesStaleVirtualKeyProviderConfigKeyAssociations(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{ID: "key-a", Name: "openai-key-a", Value: *schemas.NewSecretVar("sk-a"), Weight: 1.0},
+				{ID: "key-b", Name: "openai-key-b", Value: *schemas.NewSecretVar("sk-b"), Weight: 1.0},
+			},
+		},
+	}
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-update-provider-cleanup",
+		Name:     "VK Update Provider Cleanup",
+		Value:    *schemas.NewSecretVar("vk-update-provider-cleanup-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err = store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	weight := 1.0
+	pc := &tables.TableVirtualKeyProviderConfig{
+		VirtualKeyID: "vk-update-provider-cleanup",
+		Provider:     "openai",
+		Weight:       &weight,
+		Keys: []tables.TableKey{
+			{Name: "openai-key-b"},
+		},
+	}
+	err = store.CreateVirtualKeyProviderConfig(ctx, pc)
+	require.NoError(t, err)
+
+	updatedProviderConfig := ProviderConfig{
+		Keys: []schemas.Key{
+			{ID: "key-a", Name: "openai-key-a", Value: *schemas.NewSecretVar("sk-a"), Weight: 1.0},
+		},
+	}
+	err = store.UpdateProvider(ctx, "openai", updatedProviderConfig)
+	require.NoError(t, err)
+
+	result, err := store.GetVirtualKey(ctx, "vk-update-provider-cleanup")
+	require.NoError(t, err)
+	require.Len(t, result.ProviderConfigs, 1)
+	assert.Equal(t, "openai", result.ProviderConfigs[0].Provider)
+	assert.False(t, result.ProviderConfigs[0].AllowAllKeys)
+	assert.Empty(t, result.ProviderConfigs[0].Keys)
+}
+
+func TestDeleteProvider_RemovesVirtualKeyProviderConfigs(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{{ID: "key-delete", Name: "openai-key-delete", Value: *schemas.NewSecretVar("sk-delete"), Weight: 1.0}},
+		},
+	}
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	vk := &tables.TableVirtualKey{
+		ID:       "vk-delete-provider-cleanup",
+		Name:     "VK Delete Provider Cleanup",
+		Value:    *schemas.NewSecretVar("vk-delete-provider-cleanup-value"),
+		IsActive: schemas.Ptr(true),
+	}
+	err = store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	weight := 1.0
+	pc := &tables.TableVirtualKeyProviderConfig{
+		VirtualKeyID: "vk-delete-provider-cleanup",
+		Provider:     "openai",
+		Weight:       &weight,
+	}
+	err = store.CreateVirtualKeyProviderConfig(ctx, pc)
+	require.NoError(t, err)
+
+	err = store.DeleteProvider(ctx, "openai")
+	require.NoError(t, err)
+
+	result, err := store.GetVirtualKey(ctx, "vk-delete-provider-cleanup")
+	require.NoError(t, err)
+	assert.Empty(t, result.ProviderConfigs)
+}
+
+// =============================================================================
+// Client Config Tests
+// =============================================================================
+
+func TestUpdateClientConfig(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	config := &ClientConfig{
+		EnableLogging:        new(true),
+		InitialPoolSize:      100,
+		LogRetentionDays:     30,
+		MaxRequestBodySizeMB: 50,
+	}
+
+	err := store.UpdateClientConfig(ctx, config)
+	require.NoError(t, err)
+
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.True(t, result.EnableLogging != nil && *result.EnableLogging)
+	assert.Equal(t, 100, result.InitialPoolSize)
+}
+
+func TestUpdateClientConfig_VKRotationCooldownRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.UpdateClientConfig(ctx, &ClientConfig{
+		EnableLogging:        new(true),
+		InitialPoolSize:      100,
+		LogRetentionDays:     30,
+		MaxRequestBodySizeMB: 50,
+		VKRotationCooldown:   schemas.Duration(5 * time.Minute),
+	})
+	require.NoError(t, err)
+
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 5*time.Minute, result.VKRotationCooldown.D())
+}
+
+func TestUpdateClientConfig_EnforceVKObjectOwnershipRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// config.json without the field enforces ownership.
+	var fromJSON ClientConfig
+	require.NoError(t, json.Unmarshal([]byte(`{"initial_pool_size":100}`), &fromJSON))
+	assert.True(t, fromJSON.EnforceVKObjectOwnership, "an omitted field keeps ownership enforced")
+	require.NoError(t, json.Unmarshal([]byte(`{"enforce_vk_object_ownership":false}`), &fromJSON))
+	assert.False(t, fromJSON.EnforceVKObjectOwnership, "an explicit false turns it off")
+
+	on := ClientConfig{EnableLogging: new(true), InitialPoolSize: 100, LogRetentionDays: 30, MaxRequestBodySizeMB: 50, EnforceVKObjectOwnership: true}
+	require.NoError(t, store.UpdateClientConfig(ctx, &on))
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.True(t, result.EnforceVKObjectOwnership)
+
+	// The column defaults to true, so the write must force an explicit false through.
+	off := on
+	off.EnforceVKObjectOwnership = false
+	require.NoError(t, store.UpdateClientConfig(ctx, &off))
+	result, err = store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.False(t, result.EnforceVKObjectOwnership, "an explicit false survives the delete-and-create write")
+
+	// Only the opt-out is hashed, so configs written before the field existed keep their hash.
+	onHash, err := on.GenerateClientConfigHash()
+	require.NoError(t, err)
+	offHash, err := off.GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.NotEqual(t, onHash, offHash)
+}
+
+func TestUpdateClientConfig_ExtraFieldsPlacementRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Unset reads back as the column default, so existing installs keep extra_fields in the body.
+	base := ClientConfig{EnableLogging: new(true), InitialPoolSize: 100, LogRetentionDays: 30, MaxRequestBodySizeMB: 50, EnforceVKObjectOwnership: true}
+	require.NoError(t, store.UpdateClientConfig(ctx, &base))
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, tables.ExtraFieldsPlacementBody, result.ExtraFieldsPlacement)
+
+	headers := base
+	headers.ExtraFieldsPlacement = tables.ExtraFieldsPlacementHeaders
+	require.NoError(t, store.UpdateClientConfig(ctx, &headers))
+	result, err = store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, tables.ExtraFieldsPlacementHeaders, result.ExtraFieldsPlacement)
+
+	// Only the non-default value is hashed, so configs written before the field existed keep their hash.
+	baseHash, err := base.GenerateClientConfigHash()
+	require.NoError(t, err)
+	body := base
+	body.ExtraFieldsPlacement = tables.ExtraFieldsPlacementBody
+	bodyHash, err := body.GenerateClientConfigHash()
+	require.NoError(t, err)
+	headersHash, err := headers.GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.Equal(t, baseHash, bodyHash)
+	assert.NotEqual(t, baseHash, headersHash)
+}
+
+func TestUpdateClientConfig_UsageEstimationTokenizersRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.UpdateClientConfig(ctx, &ClientConfig{
+		EnableLogging:             new(true),
+		InitialPoolSize:           100,
+		LogRetentionDays:          30,
+		MaxRequestBodySizeMB:      50,
+		UsageEstimationTokenizers: []string{"anthropic", "llama3"},
+	})
+	require.NoError(t, err)
+
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic", "llama3"}, result.UsageEstimationTokenizers)
+}
+
+// The upgrade path: a database whose config_client predates usage_estimation_tokenizers_json
+// already holds a row. The migration must add the column without touching that row, the row
+// must still read (with no tokenizer families), and running the step again must be a no-op.
+func TestMigrationAddUsageEstimationTokenizersJSONColumn_ExistingRow(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	db := store.DB()
+	const column = "usage_estimation_tokenizers_json"
+
+	require.NoError(t, store.UpdateClientConfig(ctx, &ClientConfig{
+		EnableLogging:        new(true),
+		InitialPoolSize:      137,
+		LogRetentionDays:     45,
+		MaxRequestBodySizeMB: 50,
+	}))
+	// Return the table to its shape before this migration.
+	require.NoError(t, db.Exec("ALTER TABLE config_client DROP COLUMN "+column).Error)
+	require.False(t, db.Migrator().HasColumn(&tables.TableClientConfig{}, column), "precondition: the old table has no tokenizer column")
+
+	require.NoError(t, migrationAddUsageEstimationTokenizersJSONColumn(ctx, db, testMigrationLogger))
+	require.True(t, db.Migrator().HasColumn(&tables.TableClientConfig{}, column))
+
+	existing, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, existing, "the pre-migration row is still readable")
+	assert.Equal(t, 137, existing.InitialPoolSize, "the row's other settings survive the migration")
+	assert.Equal(t, 45, existing.LogRetentionDays)
+	assert.Empty(t, existing.UsageEstimationTokenizers, "an upgraded row estimates with the base encodings")
+
+	existing.UsageEstimationTokenizers = []string{"anthropic", "llama3"}
+	require.NoError(t, store.UpdateClientConfig(ctx, existing))
+	saved, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic", "llama3"}, saved.UsageEstimationTokenizers, "the new column stores a list")
+
+	require.NoError(t, migrationAddUsageEstimationTokenizersJSONColumn(ctx, db, testMigrationLogger), "a second run is a no-op")
+	again, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"anthropic", "llama3"}, again.UsageEstimationTokenizers, "a second run leaves the stored list")
+}
+
+func TestGenerateClientConfigHash_UsageEstimationTokenizers(t *testing.T) {
+	hash := func(families []string) string {
+		h, err := (&ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, UsageEstimationTokenizers: families}).GenerateClientConfigHash()
+		require.NoError(t, err)
+		return h
+	}
+	baseHash, err := (&ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30}).GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.Equal(t, baseHash, hash(nil), "unset tokenizers must not change existing hashes")
+	assert.NotEqual(t, baseHash, hash([]string{"anthropic"}))
+	assert.NotEqual(t, hash([]string{"anthropic"}), hash([]string{"llama3"}))
+	assert.Equal(t, hash([]string{"anthropic", "llama3"}), hash([]string{"llama3", "anthropic"}), "order must not change the hash")
+}
+
+func TestUpdateClientConfig_CompatAzureDeepseekRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	base := func(azureDeepseek bool) *ClientConfig {
+		return &ClientConfig{
+			EnableLogging:        new(true),
+			InitialPoolSize:      100,
+			LogRetentionDays:     30,
+			MaxRequestBodySizeMB: 50,
+			Compat:               CompatConfig{AzureDeepseek: azureDeepseek},
+		}
+	}
+
+	require.NoError(t, store.UpdateClientConfig(ctx, base(false)))
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.False(t, result.Compat.AzureDeepseek, "disabling the toggle must persist")
+
+	require.NoError(t, store.UpdateClientConfig(ctx, base(true)))
+	result, err = store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.True(t, result.Compat.AzureDeepseek, "re-enabling the toggle must persist")
+}
+
+func TestUpdateClientConfig_CompatForceReasoningOnlyModelsToResponsesRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	base := func(enabled bool) *ClientConfig {
+		return &ClientConfig{
+			EnableLogging:        new(true),
+			InitialPoolSize:      100,
+			LogRetentionDays:     30,
+			MaxRequestBodySizeMB: 50,
+			Compat:               CompatConfig{ForceReasoningOnlyModelsToResponses: enabled},
+		}
+	}
+
+	require.NoError(t, store.UpdateClientConfig(ctx, base(false)))
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.False(t, result.Compat.ForceReasoningOnlyModelsToResponses, "disabling the toggle must persist")
+
+	require.NoError(t, store.UpdateClientConfig(ctx, base(true)))
+	result, err = store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.True(t, result.Compat.ForceReasoningOnlyModelsToResponses, "re-enabling the toggle must persist")
+}
+
+func TestGenerateClientConfigHash_CompatForceReasoningOnlyModelsToResponses(t *testing.T) {
+	on := &ClientConfig{InitialPoolSize: 100, Compat: CompatConfig{ForceReasoningOnlyModelsToResponses: true}}
+	off := &ClientConfig{InitialPoolSize: 100}
+	onHash, err := on.GenerateClientConfigHash()
+	require.NoError(t, err)
+	offHash, err := off.GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.NotEqual(t, onHash, offHash, "toggling force_reasoning_only_models_to_responses must change the hash")
+}
+
+func TestGenerateClientConfigHash_VKRotationCooldown(t *testing.T) {
+	base := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30}
+	baseHash, err := base.GenerateClientConfigHash()
+	require.NoError(t, err)
+
+	// Zero cooldown must not change the hash: existing deployments see no
+	// config drift after upgrade.
+	zero := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, VKRotationCooldown: 0}
+	zeroHash, err := zero.GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.Equal(t, baseHash, zeroHash)
+
+	// A non-zero cooldown is a meaningful config change.
+	withCooldown := &ClientConfig{InitialPoolSize: 100, LogRetentionDays: 30, VKRotationCooldown: schemas.Duration(5 * time.Minute)}
+	cooldownHash, err := withCooldown.GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.NotEqual(t, baseHash, cooldownHash)
+}
+
+func TestClientConfigVKRotationCooldown_UnmarshalDurationString(t *testing.T) {
+	var cfg ClientConfig
+	require.NoError(t, json.Unmarshal([]byte(`{"vk_rotation_cooldown": "5m"}`), &cfg))
+	assert.Equal(t, 5*time.Minute, cfg.VKRotationCooldown.D())
+
+	var cfgInt ClientConfig
+	require.NoError(t, json.Unmarshal([]byte(`{"vk_rotation_cooldown": 300000000000}`), &cfgInt))
+	assert.Equal(t, 5*time.Minute, cfgInt.VKRotationCooldown.D())
+
+	var cfgAbsent ClientConfig
+	require.NoError(t, json.Unmarshal([]byte(`{}`), &cfgAbsent))
+	assert.Equal(t, time.Duration(0), cfgAbsent.VKRotationCooldown.D())
+}
+
+func TestUpdateClientConfig_PreservesMetadataAcrossSync(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.UpdateClientConfig(ctx, &ClientConfig{EnableLogging: new(true), LogRetentionDays: 30}))
+	require.NoError(t, store.UpdateClientMetadata(ctx, map[string]any{"onboarding_dismissed": true, "onboarding_skipped": []any{"scim"}}))
+
+	require.NoError(t, store.UpdateClientConfig(ctx, &ClientConfig{EnableLogging: new(false), LogRetentionDays: 7}))
+
+	metadata, err := store.GetClientMetadata(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, true, metadata["onboarding_dismissed"])
+	assert.Equal(t, []any{"scim"}, metadata["onboarding_skipped"])
+	cfg, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 7, cfg.LogRetentionDays)
+}
+
+func TestUpdateClientMetadata(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.UpdateClientConfig(ctx, &ClientConfig{
+		EnableLogging:        new(true),
+		InitialPoolSize:      100,
+		LogRetentionDays:     30,
+		MaxRequestBodySizeMB: 50,
+	})
+	require.NoError(t, err)
+
+	err = store.UpdateClientMetadata(ctx, map[string]any{
+		"onboarding_dismissed": true,
+		"theme":                "dark",
+	})
+	require.NoError(t, err)
+
+	err = store.UpdateClientMetadata(ctx, map[string]any{
+		"theme": "light",
+		"stale": nil,
+	})
+	require.NoError(t, err)
+
+	metadata, err := store.GetClientMetadata(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, true, metadata["onboarding_dismissed"])
+	assert.Equal(t, "light", metadata["theme"])
+	assert.NotContains(t, metadata, "stale")
+
+	err = store.UpdateClientMetadata(ctx, map[string]any{"theme": nil})
+	require.NoError(t, err)
+
+	metadata, err = store.GetClientMetadata(ctx)
+	require.NoError(t, err)
+	assert.NotContains(t, metadata, "theme")
+	assert.Equal(t, true, metadata["onboarding_dismissed"])
+
+	// Nested objects must be merged recursively (RFC 7386), not replaced
+	// wholesale, so sibling keys survive a partial nested patch.
+	err = store.UpdateClientMetadata(ctx, map[string]any{
+		"onboarding": map[string]any{"dismissed": true, "step": "a"},
+	})
+	require.NoError(t, err)
+
+	err = store.UpdateClientMetadata(ctx, map[string]any{
+		"onboarding": map[string]any{"step": "b"},
+	})
+	require.NoError(t, err)
+
+	metadata, err = store.GetClientMetadata(ctx)
+	require.NoError(t, err)
+	onboarding, ok := metadata["onboarding"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, true, onboarding["dismissed"], "sibling key must survive nested patch")
+	assert.Equal(t, "b", onboarding["step"])
+
+	// A nil nested value deletes just that nested key.
+	err = store.UpdateClientMetadata(ctx, map[string]any{
+		"onboarding": map[string]any{"dismissed": nil},
+	})
+	require.NoError(t, err)
+
+	metadata, err = store.GetClientMetadata(ctx)
+	require.NoError(t, err)
+	onboarding, ok = metadata["onboarding"].(map[string]any)
+	require.True(t, ok)
+	assert.NotContains(t, onboarding, "dismissed")
+	assert.Equal(t, "b", onboarding["step"])
+}
+
+func TestUpdateClientMetadataRequiresClientConfig(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.UpdateClientMetadata(ctx, map[string]any{"onboarding_dismissed": true})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNotFound)
+
+	var count int64
+	err = store.DB().WithContext(ctx).Model(&tables.TableClientConfig{}).Count(&count).Error
+	require.NoError(t, err)
+	assert.Zero(t, count)
+}
+
+func TestUpdateClientConfigPreservesMetadata(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.UpdateClientConfig(ctx, &ClientConfig{
+		EnableLogging:        new(true),
+		InitialPoolSize:      100,
+		LogRetentionDays:     30,
+		MaxRequestBodySizeMB: 50,
+	})
+	require.NoError(t, err)
+
+	err = store.UpdateClientMetadata(ctx, map[string]any{"onboarding_dismissed": true})
+	require.NoError(t, err)
+
+	err = store.UpdateClientConfig(ctx, &ClientConfig{
+		EnableLogging:        new(true),
+		InitialPoolSize:      200,
+		LogRetentionDays:     60,
+		MaxRequestBodySizeMB: 100,
+	})
+	require.NoError(t, err)
+
+	config, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 200, config.InitialPoolSize)
+
+	metadata, err := store.GetClientMetadata(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, true, metadata["onboarding_dismissed"])
+}
+
+// =============================================================================
+// Transaction Tests
+// =============================================================================
+
+func TestExecuteTransaction_Success(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.ExecuteTransaction(ctx, func(tx *gorm.DB) error {
+		// Create budget in transaction
+		budget := &tables.TableBudget{
+			ID:            "tx-budget",
+			MaxLimit:      100.0,
+			ResetDuration: "1h",
+		}
+		return tx.Create(budget).Error
+	})
+	require.NoError(t, err)
+
+	// Verify budget was created
+	result, err := store.GetBudget(ctx, "tx-budget")
+	require.NoError(t, err)
+	assert.Equal(t, "tx-budget", result.ID)
+}
+
+func TestExecuteTransaction_Rollback(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.ExecuteTransaction(ctx, func(tx *gorm.DB) error {
+		// Create budget
+		budget := &tables.TableBudget{
+			ID:            "tx-rollback-budget",
+			MaxLimit:      100.0,
+			ResetDuration: "1h",
+		}
+		if err := tx.Create(budget).Error; err != nil {
+			return err
+		}
+
+		// Force error to trigger rollback
+		return assert.AnError
+	})
+	assert.Error(t, err)
+
+	// Verify budget was NOT created (rolled back)
+	_, err = store.GetBudget(ctx, "tx-rollback-budget")
+	assert.Error(t, err, "Budget should not exist after rollback")
+}
+
+// =============================================================================
+// Customer and Team Tests
+// =============================================================================
+
+func TestCreateCustomer(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	customer := &tables.TableCustomer{
+		ID:   "customer-test",
+		Name: "Test Customer",
+	}
+
+	err := store.CreateCustomer(ctx, customer)
+	require.NoError(t, err)
+
+	result, err := store.GetCustomer(ctx, "customer-test")
+	require.NoError(t, err)
+	assert.Equal(t, "Test Customer", result.Name)
+}
+
+// TestUpdateCustomerLeavesChildRowsAlone checks that saving a customer read earlier does not pull a
+// team that has since moved to another customer back onto it.
+func TestUpdateCustomerLeavesChildRowsAlone(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	for _, id := range []string{"cust-a", "cust-b"} {
+		require.NoError(t, store.CreateCustomer(ctx, &tables.TableCustomer{ID: id, Name: id}))
+	}
+	a := "cust-a"
+	require.NoError(t, store.CreateTeam(ctx, &tables.TableTeam{ID: "team-1", Name: "team-1", CustomerID: &a}))
+
+	customer, err := store.GetCustomer(ctx, "cust-a")
+	require.NoError(t, err)
+	require.Len(t, customer.Teams, 1)
+
+	team, err := store.GetTeam(ctx, "team-1")
+	require.NoError(t, err)
+	b := "cust-b"
+	team.CustomerID = &b
+	require.NoError(t, store.UpdateTeam(ctx, team))
+
+	customer.Name = "cust-a renamed"
+	require.NoError(t, store.UpdateCustomer(ctx, customer))
+
+	team, err = store.GetTeam(ctx, "team-1")
+	require.NoError(t, err)
+	require.NotNil(t, team.CustomerID)
+	assert.Equal(t, "cust-b", *team.CustomerID)
+
+	renamed, err := store.GetCustomer(ctx, "cust-a")
+	require.NoError(t, err)
+	assert.Equal(t, "cust-a renamed", renamed.Name)
+}
+
+// TestUpdateTeamChangesAndClearsCustomer checks that a team read with its customer preloaded can be
+// moved to another customer and detached, as the team update handler does.
+func TestUpdateTeamChangesAndClearsCustomer(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	for _, id := range []string{"cust-a", "cust-b"} {
+		require.NoError(t, store.CreateCustomer(ctx, &tables.TableCustomer{ID: id, Name: id}))
+	}
+	a := "cust-a"
+	require.NoError(t, store.CreateTeam(ctx, &tables.TableTeam{ID: "team-1", Name: "team-1", CustomerID: &a}))
+
+	team, err := store.GetTeam(ctx, "team-1")
+	require.NoError(t, err)
+	require.NotNil(t, team.Customer, "GetTeam preloads the customer")
+	b := "cust-b"
+	team.CustomerID = &b
+	require.NoError(t, store.UpdateTeam(ctx, team))
+
+	team, err = store.GetTeam(ctx, "team-1")
+	require.NoError(t, err)
+	require.NotNil(t, team.CustomerID)
+	assert.Equal(t, "cust-b", *team.CustomerID)
+
+	team.CustomerID = nil
+	require.NoError(t, store.UpdateTeam(ctx, team))
+	team, err = store.GetTeam(ctx, "team-1")
+	require.NoError(t, err)
+	assert.Nil(t, team.CustomerID)
+}
+
+func TestCreateTeam(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create customer first
+	customer := &tables.TableCustomer{
+		ID:   "customer-for-team",
+		Name: "Customer For Team",
+	}
+	err := store.CreateCustomer(ctx, customer)
+	require.NoError(t, err)
+
+	// Create team
+	customerID := "customer-for-team"
+	team := &tables.TableTeam{
+		ID:         "team-test",
+		Name:       "Test Team",
+		CustomerID: &customerID,
+	}
+
+	err = store.CreateTeam(ctx, team)
+	require.NoError(t, err)
+
+	result, err := store.GetTeam(ctx, "team-test")
+	require.NoError(t, err)
+	assert.Equal(t, "Test Team", result.Name)
+	assert.Equal(t, "customer-for-team", *result.CustomerID)
+}
+
+// =============================================================================
+// Ping and Health Tests
+// =============================================================================
+
+func TestPing(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	err := store.Ping(ctx)
+	assert.NoError(t, err)
+}
+
+// =============================================================================
+// Error Handling Tests
+// =============================================================================
+
+func TestGetBudget_NotFound(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	_, err := store.GetBudget(ctx, "non-existent-budget")
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestGetVirtualKey_NotFound(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	_, err := store.GetVirtualKey(ctx, "non-existent-vk")
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+func TestGetRateLimit_NotFound(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	_, err := store.GetRateLimit(ctx, "non-existent-rate-limit")
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+// =============================================================================
+// Plugin Tests
+// =============================================================================
+
+func TestCreateAndGetPlugin(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	plugin := &tables.TablePlugin{
+		Name:    "test-plugin",
+		Enabled: true,
+	}
+
+	err := store.CreatePlugin(ctx, plugin)
+	require.NoError(t, err)
+
+	result, err := store.GetPlugin(ctx, "test-plugin")
+	require.NoError(t, err)
+	assert.Equal(t, "test-plugin", result.Name)
+	assert.True(t, result.Enabled)
+}
+
+func TestUpsertPlugin(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create plugin
+	plugin := &tables.TablePlugin{
+		Name:    "upsert-plugin",
+		Enabled: true,
+	}
+	err := store.UpsertPlugin(ctx, plugin)
+	require.NoError(t, err)
+
+	// Upsert with update
+	plugin.Enabled = false
+	err = store.UpsertPlugin(ctx, plugin)
+	require.NoError(t, err)
+
+	result, err := store.GetPlugin(ctx, "upsert-plugin")
+	require.NoError(t, err)
+	assert.False(t, result.Enabled)
+}
+
+// TestUpdatePluginPreservesPlacementAndOrder verifies that a UI/API edit, which sends neither
+// field because the UI has no control over them, does not clear the stored placement/order.
+func TestUpdatePluginPreservesPlacementAndOrder(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	preBuiltin := schemas.PluginPlacementPreBuiltin
+	order7 := 7
+	require.NoError(t, store.CreatePlugin(ctx, &tables.TablePlugin{
+		Name: "ordering-plugin", Enabled: true, Placement: &preBuiltin, Order: &order7,
+		Config: map[string]any{"setting": "old"},
+	}))
+
+	require.NoError(t, store.UpdatePlugin(ctx, &tables.TablePlugin{
+		Name: "ordering-plugin", Enabled: true, Config: map[string]any{"setting": "new"},
+	}))
+
+	result, err := store.GetPlugin(ctx, "ordering-plugin")
+	require.NoError(t, err)
+	require.NotNil(t, result.Placement)
+	assert.Equal(t, preBuiltin, *result.Placement)
+	require.NotNil(t, result.Order)
+	assert.Equal(t, 7, *result.Order)
+	assert.Equal(t, map[string]any{"setting": "new"}, result.Config, "the edit itself must still apply")
+}
+
+// TestUpdatePluginPreservesSyncState verifies that a UI/API edit, which sets neither field,
+// keeps the stored config hash and version. Clearing either makes the next startup read
+// config.json as changed and revert the edit.
+func TestUpdatePluginPreservesSyncState(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.CreatePlugin(ctx, &tables.TablePlugin{
+		Name:       "sync-state-plugin",
+		Enabled:    true,
+		Version:    3,
+		ConfigHash: "hash-from-last-file-sync",
+		Config:     map[string]any{"setting": "file-value"},
+	}))
+
+	// A UI/API edit: only the fields the form knows about.
+	require.NoError(t, store.UpdatePlugin(ctx, &tables.TablePlugin{
+		Name:    "sync-state-plugin",
+		Enabled: true,
+		Config:  map[string]any{"setting": "ui-value"},
+	}))
+
+	result, err := store.GetPlugin(ctx, "sync-state-plugin")
+	require.NoError(t, err)
+	assert.Equal(t, "hash-from-last-file-sync", result.ConfigHash)
+	assert.Equal(t, int16(3), result.Version)
+	assert.Equal(t, map[string]any{"setting": "ui-value"}, result.Config)
+}
+
+// =============================================================================
+// Integration Test: Full Virtual Key with Provider Config Flow
+// =============================================================================
+
+func TestFullVirtualKeyFlow(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Step 1: Create provider with keys
+	providers := map[schemas.ModelProvider]ProviderConfig{
+		"openai": {
+			Keys: []schemas.Key{
+				{ID: "key-1", Name: "openai-main", Value: *schemas.NewSecretVar("sk-main"), Weight: 1.0},
+				{ID: "key-2", Name: "openai-backup", Value: *schemas.NewSecretVar("sk-backup"), Weight: 0.5},
+			},
+		},
+	}
+	err := store.UpdateProvidersConfig(ctx, providers)
+	require.NoError(t, err)
+
+	// Step 2: Create budget
+	budget := &tables.TableBudget{
+		ID:            "integration-budget",
+		MaxLimit:      500.0,
+		ResetDuration: "1M",
+	}
+	err = store.CreateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Step 3: Create rate limit
+	tokenMax := int64(1000000)
+	tokenDuration := "1d"
+	rateLimit := &tables.TableRateLimit{
+		ID:                 "integration-rate-limit",
+		TokenMaxLimit:      &tokenMax,
+		TokenResetDuration: &tokenDuration,
+	}
+	err = store.CreateRateLimit(ctx, rateLimit)
+	require.NoError(t, err)
+
+	// Step 4: Create virtual key
+	rateLimitID := "integration-rate-limit"
+	integrationVKID := "integration-vk"
+	vk := &tables.TableVirtualKey{
+		ID:          integrationVKID,
+		Name:        "Integration Virtual Key",
+		Value:       *schemas.NewSecretVar("vk-integration-xyz"),
+		IsActive:    schemas.Ptr(true),
+		RateLimitID: &rateLimitID,
+	}
+	err = store.CreateVirtualKey(ctx, vk)
+	require.NoError(t, err)
+
+	// Link the existing budget to the VK via FK
+	budget.VirtualKeyID = &integrationVKID
+	err = store.UpdateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Step 5: Create provider config with key reference
+	weight := 1.0
+	pc := &tables.TableVirtualKeyProviderConfig{
+		VirtualKeyID: "integration-vk",
+		Provider:     "openai",
+		Weight:       &weight,
+		Keys: []tables.TableKey{
+			{Name: "openai-main"},
+		},
+	}
+	err = store.CreateVirtualKeyProviderConfig(ctx, pc)
+	require.NoError(t, err)
+
+	// Step 6: Verify complete setup
+	result, err := store.GetVirtualKey(ctx, "integration-vk")
+	require.NoError(t, err)
+	assert.Equal(t, "Integration Virtual Key", result.Name)
+	assert.Len(t, result.Budgets, 1)
+	assert.NotNil(t, result.RateLimitID)
+
+	configs, err := store.GetVirtualKeyProviderConfigs(ctx, "integration-vk")
+	require.NoError(t, err)
+	assert.Len(t, configs, 1)
+	assert.Equal(t, "openai", configs[0].Provider)
+}
+
+// TestGetVirtualKeysUsesInternalPagination verifies that the unpaginated
+// virtual-key API still returns every row when the result spans multiple
+// internal preload pages.
+func TestGetVirtualKeysUsesInternalPagination(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	totalVirtualKeys := virtualKeyInternalPageSize + 5
+	createdAt := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < totalVirtualKeys; i++ {
+		vk := &tables.TableVirtualKey{
+			ID:        fmt.Sprintf("vk-page-%04d", i),
+			Name:      fmt.Sprintf("Virtual Key %04d", i),
+			Value:     *schemas.NewSecretVar(fmt.Sprintf("vk-value-%04d", i)),
+			IsActive:  schemas.Ptr(true),
+			CreatedAt: createdAt,
+			UpdatedAt: createdAt,
+		}
+		require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	}
+
+	virtualKeys, err := store.GetVirtualKeys(ctx)
+	require.NoError(t, err)
+	require.Len(t, virtualKeys, totalVirtualKeys)
+	require.Equal(t, "vk-page-0000", virtualKeys[0].ID)
+	require.Equal(t, fmt.Sprintf("vk-page-%04d", totalVirtualKeys-1), virtualKeys[len(virtualKeys)-1].ID)
+}
+
+// =============================================================================
+// Helper function tests
+// =============================================================================
+
+func TestGetWeight(t *testing.T) {
+	// Test nil weight returns default
+	assert.Equal(t, 1.0, getWeight(nil))
+
+	// Test explicit weight
+	w := 2.5
+	assert.Equal(t, 2.5, getWeight(&w))
+
+	// Test zero weight
+	zero := 0.0
+	assert.Equal(t, 0.0, getWeight(&zero))
+}
+
+// =============================================================================
+// Concurrent Access Tests
+// =============================================================================
+
+func TestMultipleBudgetUpdates(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	// Create initial budget
+	budget := &tables.TableBudget{
+		ID:            "multi-update-budget",
+		MaxLimit:      100.0,
+		ResetDuration: "1h",
+		CurrentUsage:  0,
+	}
+	err := store.CreateBudget(ctx, budget)
+	require.NoError(t, err)
+
+	// Simulate multiple sequential updates
+	for i := 0; i < 10; i++ {
+		b := &tables.TableBudget{
+			ID:            "multi-update-budget",
+			MaxLimit:      100.0 + float64(i),
+			ResetDuration: "1h",
+		}
+		err := store.UpdateBudget(ctx, b)
+		require.NoError(t, err)
+	}
+
+	// Verify budget exists and has the last value
+	result, err := store.GetBudget(ctx, "multi-update-budget")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 109.0, result.MaxLimit) // 100 + 9
+}
+
+// =============================================================================
+// Duration Validation Tests (for budgets and rate limits)
+// =============================================================================
+
+func TestBudgetDurationFormats(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	validDurations := []string{"30s", "5m", "1h", "1d", "1w", "1M", "1Y"}
+
+	for i, duration := range validDurations {
+		budget := &tables.TableBudget{
+			ID:            "budget-duration-" + string(rune('a'+i)),
+			MaxLimit:      100.0,
+			ResetDuration: duration,
+		}
+		err := store.CreateBudget(ctx, budget)
+		assert.NoError(t, err, "Duration %s should be valid", duration)
+	}
+}
+
+func TestRateLimitDurationFormats(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	validDurations := []string{"30s", "5m", "1h", "1d", "1w", "1M", "1Y"}
+
+	for i, duration := range validDurations {
+		tokenMax := int64(1000)
+		rateLimit := &tables.TableRateLimit{
+			ID:                 "rate-limit-duration-" + string(rune('a'+i)),
+			TokenMaxLimit:      &tokenMax,
+			TokenResetDuration: &duration,
+		}
+		err := store.CreateRateLimit(ctx, rateLimit)
+		assert.NoError(t, err, "Duration %s should be valid", duration)
+	}
+}
+
+// TestUpsertModelPricesBatch_SQLite guards the pricing-sync write path on
+// SQLite. Batching these rows into a multi-row INSERT makes GORM emit the
+// DEFAULT keyword for the table's many default:null columns, which SQLite
+// rejects ("near \"DEFAULT\": syntax error"), so UpsertModelPricesBatch must
+// fall back to per-row writes on SQLite. The rows below intentionally leave
+// cost columns nil to exercise exactly that case.
+func TestUpsertModelPricesBatch_SQLite(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{
+		{Model: "google/gemini-2.5-flash", Provider: "vertex", Mode: "chat", InputCostPerToken: cost(0.000001)},
+		{Model: "openai/gpt-4o", Provider: "openai", Mode: "chat"}, // all costs nil
+		{Model: "anthropic/claude-3", Provider: "anthropic", Mode: "chat", OutputCostPerToken: cost(0.000015)},
+	}
+
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	assert.Len(t, got, 3)
+
+	// Re-upsert with a changed cost to exercise the ON CONFLICT update path.
+	pricing[1].InputCostPerToken = cost(0.000005)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err = s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	assert.Len(t, got, 3) // upsert, not duplicate insert
+
+	var updated *tables.TableModelPricing
+	for i := range got {
+		if got[i].Model == "openai/gpt-4o" {
+			updated = &got[i]
+		}
+	}
+	require.NotNil(t, updated)
+	require.NotNil(t, updated.InputCostPerToken)
+	assert.InDelta(t, 0.000005, *updated.InputCostPerToken, 1e-9)
+}
+
+func TestUpsertModelPricesBatch_WebSearchCostPerRequest_SurvivesResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{{Model: "claude-haiku-4-5", Provider: "anthropic", Mode: "chat", WebSearchCostPerRequest: cost(0.01)}}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+	pricing[0].WebSearchCostPerRequest = cost(0.02)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.NotNil(t, got[0].WebSearchCostPerRequest)
+	assert.InDelta(t, 0.02, *got[0].WebSearchCostPerRequest, 1e-9)
+}
+
+func TestUpsertModelPricesBatch_MegapixelImageTierColumns_SurviveResync(t *testing.T) {
+	// Regression test for pricingSyncUpdateColumns: a column present on
+	// TableModelPricing but missing from that explicit update-column list
+	// would insert fine on the first sync (Create writes every column) but
+	// silently revert to null on the second sync (ON CONFLICT DO UPDATE only
+	// touches listed columns).
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{
+		{
+			Model:                               "prunaai/p-image-upscale",
+			Provider:                            "replicate",
+			Mode:                                "image_generation",
+			OutputCostPerImage:                  cost(0.005),
+			OutputCostPerImageAbove4Megapixels:  cost(0.01),
+			OutputCostPerImageAbove8Megapixels:  cost(0.02),
+			OutputCostPerImageAbove16Megapixels: cost(0.04),
+			OutputCostPerImageAbove32Megapixels: cost(0.06),
+			OutputCostPerImageAbove64Megapixels: cost(0.12),
+		},
+	}
+
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	// Re-upsert the same row (simulating the next scheduled datasheet sync)
+	// with a changed tier value to exercise the ON CONFLICT update path.
+	pricing[0].OutputCostPerImageAbove16Megapixels = cost(0.05)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+
+	row := got[0]
+	require.NotNil(t, row.OutputCostPerImageAbove4Megapixels)
+	require.NotNil(t, row.OutputCostPerImageAbove8Megapixels)
+	require.NotNil(t, row.OutputCostPerImageAbove16Megapixels)
+	require.NotNil(t, row.OutputCostPerImageAbove32Megapixels)
+	require.NotNil(t, row.OutputCostPerImageAbove64Megapixels)
+	assert.InDelta(t, 0.01, *row.OutputCostPerImageAbove4Megapixels, 1e-9)
+	assert.InDelta(t, 0.02, *row.OutputCostPerImageAbove8Megapixels, 1e-9)
+	assert.InDelta(t, 0.05, *row.OutputCostPerImageAbove16Megapixels, 1e-9) // survived resync with the updated value
+	assert.InDelta(t, 0.06, *row.OutputCostPerImageAbove32Megapixels, 1e-9)
+	assert.InDelta(t, 0.12, *row.OutputCostPerImageAbove64Megapixels, 1e-9)
+}
+
+func TestUpsertModelPricesBatch_TimeOfDayColumns_SurviveResync(t *testing.T) {
+	// Same pricingSyncUpdateColumns regression as the megapixel test above, for
+	// the peak/off-peak columns. peak_hours additionally exercises the
+	// serializer:json round-trip, which the plain *float64 columns do not.
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{
+		{
+			Model:                 "deepseek-v4-flash",
+			Provider:              "deepseek",
+			Mode:                  "chat",
+			InputCostPerToken:     cost(0.00000044),
+			OutputCostPerToken:    cost(0.00000132),
+			OffPeakCostMultiplier: cost(0.5),
+			PeakHours: &tables.PeakHoursSchedule{
+				Timezone: "UTC",
+				Windows: []tables.PeakHoursWindow{
+					{Days: []int{1, 2, 3, 4, 5}, Start: "01:00", End: "04:00"},
+					{Days: []int{1, 2, 3, 4, 5}, Start: "06:00", End: "10:00"},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	// Re-upsert the same row (the next scheduled datasheet sync) with BOTH
+	// columns changed, to exercise the ON CONFLICT update path. peak_hours has
+	// to change too: leaving it identical would let the row keep the value the
+	// first insert wrote, so the assertions below would still pass even if
+	// peak_hours were missing from pricingSyncUpdateColumns, which is the exact
+	// regression this test exists to catch.
+	pricing[0].OffPeakCostMultiplier = cost(0.6)
+	pricing[0].PeakHours = &tables.PeakHoursSchedule{
+		Timezone: "Asia/Shanghai",
+		Windows: []tables.PeakHoursWindow{
+			{Days: []int{1, 2, 3, 4, 5}, Start: "02:00", End: "05:00"},
+		},
+	}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+
+	row := got[0]
+	require.NotNil(t, row.OffPeakCostMultiplier)
+	assert.InDelta(t, 0.6, *row.OffPeakCostMultiplier, 1e-9) // survived resync with the updated value
+
+	// Every field below differs from the first insert, so a peak_hours column
+	// that never got updated fails here rather than passing by coincidence.
+	require.NotNil(t, row.PeakHours)
+	assert.Equal(t, "Asia/Shanghai", row.PeakHours.Timezone)
+	require.Len(t, row.PeakHours.Windows, 1)
+	assert.Equal(t, []int{1, 2, 3, 4, 5}, row.PeakHours.Windows[0].Days)
+	assert.Equal(t, "02:00", row.PeakHours.Windows[0].Start)
+	assert.Equal(t, "05:00", row.PeakHours.Windows[0].End)
+}
+
+// TestUpsertModelPricesBatch_DecisionRateColumns_SurviveResync is the same
+// pricingSyncUpdateColumns regression for the decision rate columns: both
+// values change on the second upsert so a column missing from the list fails
+// here instead of keeping its first value.
+// TestUpsertModelPricesBatch_VoiceLiveColumns_SurviveResync pins the Azure Voice Live rates in
+// pricingSyncUpdateColumns: the next datasheet sync must update them, not keep the first values.
+func TestUpsertModelPricesBatch_VoiceLiveColumns_SurviveResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{{
+		Model:                            "gpt-realtime",
+		Provider:                         "azure",
+		Mode:                             "responses",
+		InputCostPerTokenVoiceLive:       cost(0.000004),
+		OutputCostPerTokenVoiceLive:      cost(0.000016),
+		CacheReadInputTokenCostVoiceLive: cost(0.0000004),
+		InputCostPerAudioTokenVoiceLive:  cost(0.000032),
+		OutputCostPerAudioTokenVoiceLive: cost(0.000064),
+		InputCostPerStandardSpeechAudioTokenVoiceLive:  cost(0.000017),
+		OutputCostPerStandardSpeechAudioTokenVoiceLive: cost(0.000031),
+		InputCostPerCustomSpeechAudioTokenVoiceLive:    cost(0.00004),
+		OutputCostPerCustomSpeechAudioTokenVoiceLive:   cost(0.000055),
+	}}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+	pricing[0].InputCostPerTokenVoiceLive = cost(0.00000066)
+	pricing[0].OutputCostPerTokenVoiceLive = cost(0.00000264)
+	pricing[0].CacheReadInputTokenCostVoiceLive = cost(0.00000033)
+	pricing[0].InputCostPerAudioTokenVoiceLive = cost(0.000011)
+	pricing[0].OutputCostPerAudioTokenVoiceLive = cost(0.000022)
+	pricing[0].InputCostPerStandardSpeechAudioTokenVoiceLive = cost(0.000015)
+	pricing[0].OutputCostPerStandardSpeechAudioTokenVoiceLive = cost(0.000026)
+	pricing[0].InputCostPerCustomSpeechAudioTokenVoiceLive = cost(0.000039)
+	pricing[0].OutputCostPerCustomSpeechAudioTokenVoiceLive = cost(0.00005)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	row := got[0]
+	require.NotNil(t, row.InputCostPerTokenVoiceLive)
+	require.NotNil(t, row.OutputCostPerTokenVoiceLive)
+	require.NotNil(t, row.CacheReadInputTokenCostVoiceLive)
+	require.NotNil(t, row.InputCostPerAudioTokenVoiceLive)
+	require.NotNil(t, row.OutputCostPerAudioTokenVoiceLive)
+	require.NotNil(t, row.InputCostPerStandardSpeechAudioTokenVoiceLive)
+	require.NotNil(t, row.OutputCostPerStandardSpeechAudioTokenVoiceLive)
+	require.NotNil(t, row.InputCostPerCustomSpeechAudioTokenVoiceLive)
+	require.NotNil(t, row.OutputCostPerCustomSpeechAudioTokenVoiceLive)
+	assert.InDelta(t, 0.00000066, *row.InputCostPerTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.00000264, *row.OutputCostPerTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.00000033, *row.CacheReadInputTokenCostVoiceLive, 1e-12)
+	assert.InDelta(t, 0.000011, *row.InputCostPerAudioTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.000022, *row.OutputCostPerAudioTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.000015, *row.InputCostPerStandardSpeechAudioTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.000026, *row.OutputCostPerStandardSpeechAudioTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.000039, *row.InputCostPerCustomSpeechAudioTokenVoiceLive, 1e-12)
+	assert.InDelta(t, 0.00005, *row.OutputCostPerCustomSpeechAudioTokenVoiceLive, 1e-12)
+}
+
+func TestUpsertModelPricesBatch_DecisionRateColumns_SurviveResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{{
+		Model:                       "gpt-6-luna",
+		Provider:                    "openai",
+		Mode:                        "chat",
+		InputCostPerToken:           cost(0.000002),
+		OutputCostPerToken:          cost(0.000008),
+		InputCostPerTokenDecisions:  cost(0.0000001),
+		OutputCostPerTokenDecisions: cost(0.0000003),
+	}}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	pricing[0].InputCostPerTokenDecisions = cost(0.0000002)
+	pricing[0].OutputCostPerTokenDecisions = cost(0.0000004)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+
+	row := got[0]
+	require.NotNil(t, row.InputCostPerTokenDecisions, "input_cost_per_token_decisions missing from pricingSyncUpdateColumns")
+	require.NotNil(t, row.OutputCostPerTokenDecisions, "output_cost_per_token_decisions missing from pricingSyncUpdateColumns")
+	assert.InDelta(t, 0.0000002, *row.InputCostPerTokenDecisions, 1e-12)
+	assert.InDelta(t, 0.0000004, *row.OutputCostPerTokenDecisions, 1e-12)
+}
+
+func TestUpsertModelParametersBatch_SQLite(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelParameters{}))
+
+	ctx := context.Background()
+	params := []tables.TableModelParameters{
+		{Model: "model-a", Data: `{"max_output_tokens":100}`},
+		{Model: "model-b", Data: `{"max_output_tokens":200}`},
+		{Model: "model-c", Data: `{"max_output_tokens":300}`},
+	}
+
+	require.NoError(t, s.UpsertModelParametersBatch(ctx, params))
+
+	got, err := s.GetModelParameters(ctx)
+	require.NoError(t, err)
+	assert.Len(t, got, 3)
+
+	params[1].Data = `{"max_output_tokens":250}`
+	require.NoError(t, s.UpsertModelParametersBatch(ctx, params))
+
+	updated, err := s.GetModelParametersByModel(ctx, "model-b")
+	require.NoError(t, err)
+	assert.Equal(t, `{"max_output_tokens":250}`, updated.Data)
+
+	require.NoError(t, s.UpsertModelParametersBatch(ctx, []tables.TableModelParameters{
+		{Model: "model-b", Data: `{"max_output_tokens":260}`},
+		{Model: "model-b", Data: `{"max_output_tokens":270}`},
+	}))
+	updated, err = s.GetModelParametersByModel(ctx, "model-b")
+	require.NoError(t, err)
+	assert.Equal(t, `{"max_output_tokens":270}`, updated.Data)
+
+	got, err = s.GetModelParameters(ctx)
+	require.NoError(t, err)
+	assert.Len(t, got, 3)
+}
+
+// TestRDBConfigStore_SyncRoutingRules covers the batch path used by config-file reloads.
+// It defers the unique-priority-per-scope check to the final state, so a valid permutation
+// (e.g. swapping two priorities) succeeds despite a transient intermediate collision, while a
+// genuine end-state duplicate still errors and a missing update target returns ErrNotFound.
+func TestRDBConfigStore_SyncRoutingRules(t *testing.T) {
+	ctx := context.Background()
+
+	rule := func(id string, priority int) tables.TableRoutingRule {
+		return *routingRuleFixture(id, priority, "openai")
+	}
+
+	tests := []struct {
+		name       string
+		toAdd      []tables.TableRoutingRule
+		toUpdate   []tables.TableRoutingRule
+		wantErrIs  error
+		wantErrSub string
+		wantFinal  map[string]int // expected priority per rule ID after the call
+	}{
+		{
+			name:      "valid priority swap succeeds",
+			toUpdate:  []tables.TableRoutingRule{rule("rule-a", 1), rule("rule-b", 0)},
+			wantFinal: map[string]int{"rule-a": 1, "rule-b": 0},
+		},
+		{
+			name:      "batch add plus swap succeeds",
+			toAdd:     []tables.TableRoutingRule{rule("rule-c", 2)},
+			toUpdate:  []tables.TableRoutingRule{rule("rule-a", 1), rule("rule-b", 0)},
+			wantFinal: map[string]int{"rule-a": 1, "rule-b": 0, "rule-c": 2},
+		},
+		{
+			name:       "final-state duplicate priority fails and rolls back",
+			toUpdate:   []tables.TableRoutingRule{rule("rule-a", 1), rule("rule-b", 1)},
+			wantErrSub: "already exists",
+			wantFinal:  map[string]int{"rule-a": 0, "rule-b": 1}, // unchanged (rolled back)
+		},
+		{
+			name:      "missing update ID returns ErrNotFound",
+			toUpdate:  []tables.TableRoutingRule{rule("rule-missing", 5)},
+			wantErrIs: ErrNotFound,
+			wantFinal: map[string]int{"rule-a": 0, "rule-b": 1}, // unchanged
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			store := setupRDBTestStore(t)
+			require.NoError(t, store.CreateRoutingRule(ctx, routingRuleFixture("rule-a", 0, "openai")))
+			require.NoError(t, store.CreateRoutingRule(ctx, routingRuleFixture("rule-b", 1, "openai")))
+
+			err := store.SyncRoutingRules(ctx, tc.toAdd, tc.toUpdate)
+			switch {
+			case tc.wantErrIs != nil:
+				require.ErrorIs(t, err, tc.wantErrIs)
+			case tc.wantErrSub != "":
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.wantErrSub)
+			default:
+				require.NoError(t, err)
+			}
+
+			for id, want := range tc.wantFinal {
+				got, getErr := store.GetRoutingRule(ctx, id)
+				require.NoError(t, getErr)
+				require.Equalf(t, want, got.Priority, "priority for %s", id)
+			}
+		})
+	}
+}
+
+// TestRDBConfigStore_RoutingRuleUpdateOmittedEnabled pins the update path for a rule whose
+// enabled field is omitted, as every config.json rule without "enabled" is. Save writes every
+// column, so a nil Enabled used to write NULL into the NOT NULL column and fail startup.
+func TestRDBConfigStore_RoutingRuleUpdateOmittedEnabled(t *testing.T) {
+	ctx := context.Background()
+
+	updaters := map[string]func(store *RDBConfigStore, rule *tables.TableRoutingRule) error{
+		"SyncRoutingRules": func(store *RDBConfigStore, rule *tables.TableRoutingRule) error {
+			return store.SyncRoutingRules(ctx, nil, []tables.TableRoutingRule{*rule})
+		},
+		"UpdateRoutingRule": func(store *RDBConfigStore, rule *tables.TableRoutingRule) error {
+			return store.UpdateRoutingRule(ctx, rule)
+		},
+	}
+
+	for name, update := range updaters {
+		for _, stored := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/stored=%t", name, stored), func(t *testing.T) {
+				store := setupRDBTestStore(t)
+				created := routingRuleFixture("rule-a", 0, "openai")
+				created.Enabled = new(stored)
+				require.NoError(t, store.CreateRoutingRule(ctx, created))
+
+				incoming := routingRuleFixture("rule-a", 0, "openai")
+				incoming.Enabled = nil
+				require.NoError(t, update(store, incoming))
+
+				got, err := store.GetRoutingRule(ctx, "rule-a")
+				require.NoError(t, err)
+				require.NotNil(t, got.Enabled)
+				require.Equal(t, stored, *got.Enabled, "omitted enabled must keep the stored value")
+			})
+		}
+	}
+}
+
+// TestUpsertModelPricesBatch_InputCostPerQuerySurvivesResync guards the ON CONFLICT DO UPDATE
+// column list. Create() writes every column, so a first sync looks correct even when a field is
+// missing from pricingSyncUpdateColumns - the value only disappears on the next resync of an
+// existing row, which is 24h later in production.
+func TestUpsertModelPricesBatch_InputCostPerQuerySurvivesResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	row := tables.TableModelPricing{Model: "rerank-v3.5", Provider: "cohere", Mode: "rerank"}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	row.InputCostPerQuery = cost(0.002)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	var found *tables.TableModelPricing
+	for i := range got {
+		if got[i].Model == "rerank-v3.5" {
+			found = &got[i]
+			break
+		}
+	}
+	require.NotNil(t, found)
+	require.NotNil(t, found.InputCostPerQuery, "input_cost_per_query missing from pricingSyncUpdateColumns")
+	assert.Equal(t, 0.002, *found.InputCostPerQuery)
+}
+
+// TestUpsertModelPricesBatch_SizeQualityImageColumnsSurviveResync pins the
+// ON CONFLICT DO UPDATE path: a column missing from pricingSyncUpdateColumns is
+// written on the initial Create but silently dropped on every later sync of an
+// existing row.
+func TestUpsertModelPricesBatch_SizeQualityImageColumnsSurviveResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	// First sync: the row exists with none of the new rates set.
+	row := tables.TableModelPricing{Model: "gpt-image-1", Provider: "openai", Mode: "image_generation"}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	// Second sync of the same row now carries them, exercising the update path.
+	row.OutputCostPerImageAbove1024x1536Pixels = cost(0.001)
+	row.OutputCostPerImageAbove1536x1024Pixels = cost(0.002)
+	row.OutputCostPerImageAbove1024x1024PixelsLowQuality = cost(0.003)
+	row.OutputCostPerImageAbove1024x1536PixelsLowQuality = cost(0.004)
+	row.OutputCostPerImageAbove1536x1024PixelsLowQuality = cost(0.005)
+	row.OutputCostPerImageAbove1024x1024PixelsMediumQuality = cost(0.006)
+	row.OutputCostPerImageAbove1024x1536PixelsMediumQuality = cost(0.007)
+	row.OutputCostPerImageAbove1536x1024PixelsMediumQuality = cost(0.008)
+	row.OutputCostPerImageAbove1024x1024PixelsHighQuality = cost(0.009)
+	row.OutputCostPerImageAbove1024x1536PixelsHighQuality = cost(0.010)
+	row.OutputCostPerImageAbove1536x1024PixelsHighQuality = cost(0.011)
+	row.OutputCostPerImageAbove1024x1024PixelsStandardQuality = cost(0.012)
+	row.OutputCostPerImageAbove1024x1536PixelsStandardQuality = cost(0.013)
+	row.OutputCostPerImageAbove1536x1024PixelsStandardQuality = cost(0.014)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	updated := got[0]
+
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1536Pixels, "OutputCostPerImageAbove1024x1536Pixels was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.001, *updated.OutputCostPerImageAbove1024x1536Pixels, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1536x1024Pixels, "OutputCostPerImageAbove1536x1024Pixels was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.002, *updated.OutputCostPerImageAbove1536x1024Pixels, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1024PixelsLowQuality, "OutputCostPerImageAbove1024x1024PixelsLowQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.003, *updated.OutputCostPerImageAbove1024x1024PixelsLowQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1536PixelsLowQuality, "OutputCostPerImageAbove1024x1536PixelsLowQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.004, *updated.OutputCostPerImageAbove1024x1536PixelsLowQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1536x1024PixelsLowQuality, "OutputCostPerImageAbove1536x1024PixelsLowQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.005, *updated.OutputCostPerImageAbove1536x1024PixelsLowQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1024PixelsMediumQuality, "OutputCostPerImageAbove1024x1024PixelsMediumQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.006, *updated.OutputCostPerImageAbove1024x1024PixelsMediumQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1536PixelsMediumQuality, "OutputCostPerImageAbove1024x1536PixelsMediumQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.007, *updated.OutputCostPerImageAbove1024x1536PixelsMediumQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1536x1024PixelsMediumQuality, "OutputCostPerImageAbove1536x1024PixelsMediumQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.008, *updated.OutputCostPerImageAbove1536x1024PixelsMediumQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1024PixelsHighQuality, "OutputCostPerImageAbove1024x1024PixelsHighQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.009, *updated.OutputCostPerImageAbove1024x1024PixelsHighQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1536PixelsHighQuality, "OutputCostPerImageAbove1024x1536PixelsHighQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.010, *updated.OutputCostPerImageAbove1024x1536PixelsHighQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1536x1024PixelsHighQuality, "OutputCostPerImageAbove1536x1024PixelsHighQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.011, *updated.OutputCostPerImageAbove1536x1024PixelsHighQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1024PixelsStandardQuality, "OutputCostPerImageAbove1024x1024PixelsStandardQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.012, *updated.OutputCostPerImageAbove1024x1024PixelsStandardQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1024x1536PixelsStandardQuality, "OutputCostPerImageAbove1024x1536PixelsStandardQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.013, *updated.OutputCostPerImageAbove1024x1536PixelsStandardQuality, 1e-9)
+	require.NotNil(t, updated.OutputCostPerImageAbove1536x1024PixelsStandardQuality, "OutputCostPerImageAbove1536x1024PixelsStandardQuality was dropped by the ON CONFLICT update (missing from pricingSyncUpdateColumns)")
+	assert.InDelta(t, 0.014, *updated.OutputCostPerImageAbove1536x1024PixelsStandardQuality, 1e-9)
+}
+
+// TestRDBConfigStore_RoutingRuleCreatedAtSurvivesUpdate guards created_at against GORM's Save,
+// which selects every column: rules arriving from a config.json reload carry no created_at, so
+// without an explicit carry-forward the original insert timestamp is overwritten with the zero
+// time. Both the batch (SyncRoutingRules) and single (UpdateRoutingRule) paths are covered.
+func TestRDBConfigStore_RoutingRuleCreatedAtSurvivesUpdate(t *testing.T) {
+	ctx := context.Background()
+
+	assertCreatedAt := func(t *testing.T, store *RDBConfigStore, id string, want time.Time) {
+		t.Helper()
+		got, err := store.GetRoutingRule(ctx, id)
+		require.NoError(t, err)
+		require.False(t, got.CreatedAt.IsZero(), "created_at must not be zeroed by an update")
+		require.Equal(t, want, got.CreatedAt, "created_at must be preserved")
+	}
+
+	t.Run("SyncRoutingRules preserves created_at", func(t *testing.T) {
+		store := setupRDBTestStore(t)
+		require.NoError(t, store.CreateRoutingRule(ctx, routingRuleFixture("rule-a", 0, "openai")))
+		created, err := store.GetRoutingRule(ctx, "rule-a")
+		require.NoError(t, err)
+		require.False(t, created.CreatedAt.IsZero())
+
+		// Shape of a config-file rule: no created_at, changed payload.
+		fileRule := routingRuleFixture("rule-a", 3, "anthropic")
+		fileRule.Description = "edited in config.json"
+		require.NoError(t, store.SyncRoutingRules(ctx, nil, []tables.TableRoutingRule{*fileRule}))
+
+		assertCreatedAt(t, store, "rule-a", created.CreatedAt)
+	})
+
+	t.Run("UpdateRoutingRule preserves created_at", func(t *testing.T) {
+		store := setupRDBTestStore(t)
+		require.NoError(t, store.CreateRoutingRule(ctx, routingRuleFixture("rule-a", 0, "openai")))
+		created, err := store.GetRoutingRule(ctx, "rule-a")
+		require.NoError(t, err)
+		require.False(t, created.CreatedAt.IsZero())
+
+		partial := routingRuleFixture("rule-a", 3, "anthropic")
+		partial.Description = "updated without reading the row first"
+		require.NoError(t, store.UpdateRoutingRule(ctx, partial))
+
+		assertCreatedAt(t, store, "rule-a", created.CreatedAt)
+	})
+}
+
+// TestRDBConfigStore_RoutingRuleDuplicatePriority pins the conflict two rules sharing a priority in
+// one scope raise on create and update: it is ErrAlreadyExists, so the API answers 409 rather than
+// 500, and its message names the scope ID rather than the address of the pointer that holds it.
+func TestRDBConfigStore_RoutingRuleDuplicatePriority(t *testing.T) {
+	ctx := context.Background()
+	store := setupRDBTestStore(t)
+	scoped := func(id string, priority int, scopeID string) *tables.TableRoutingRule {
+		rule := routingRuleFixture(id, priority, "openai")
+		rule.Scope = "virtual_key"
+		rule.ScopeID = &scopeID
+		return rule
+	}
+
+	require.NoError(t, store.CreateRoutingRule(ctx, routingRuleFixture("global-a", 5, "openai")))
+	err := store.CreateRoutingRule(ctx, routingRuleFixture("global-b", 5, "openai"))
+	require.ErrorIs(t, err, ErrAlreadyExists)
+	require.ErrorIs(t, err, ErrRoutingRulePriorityTaken, "a priority conflict is told apart from other conflicts")
+	require.Contains(t, err.Error(), "priority 5")
+	require.Contains(t, err.Error(), "scope 'global'")
+
+	require.NoError(t, store.CreateRoutingRule(ctx, scoped("vk-a", 7, "vk-1")))
+	err = store.CreateRoutingRule(ctx, scoped("vk-b", 7, "vk-1"))
+	require.ErrorIs(t, err, ErrAlreadyExists)
+	require.Contains(t, err.Error(), "'vk-1'")
+	require.NotContains(t, err.Error(), "0x", "the scope ID must be printed, not its pointer")
+
+	// The same priority in another scope, or under another scope ID, is no conflict.
+	require.NoError(t, store.CreateRoutingRule(ctx, scoped("vk-c", 5, "vk-1")))
+	require.NoError(t, store.CreateRoutingRule(ctx, scoped("vk-d", 7, "vk-2")))
+
+	require.NoError(t, store.CreateRoutingRule(ctx, routingRuleFixture("global-c", 8, "openai")))
+	err = store.UpdateRoutingRule(ctx, routingRuleFixture("global-c", 5, "openai"))
+	require.ErrorIs(t, err, ErrAlreadyExists)
+	err = store.UpdateRoutingRule(ctx, scoped("vk-d", 7, "vk-1"))
+	require.ErrorIs(t, err, ErrAlreadyExists)
+	require.Contains(t, err.Error(), "'vk-1'")
+	require.NotContains(t, err.Error(), "0x", "the scope ID must be printed, not its pointer")
+}
+
+// TestRDBConfigStore_RoutingTargetTTFTTimeoutRoundTrip pins a target's
+// ttft_timeout_ms through create, read, update and clearing it back to nil.
+func TestRDBConfigStore_RoutingTargetTTFTTimeoutRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	store := setupRDBTestStore(t)
+
+	rule := routingRuleFixture("rule-ttft", 0, "openai")
+	require.NotEmpty(t, rule.Targets)
+	rule.Targets[0].TTFTTimeoutMs = new(1500)
+	require.NoError(t, store.CreateRoutingRule(ctx, rule))
+	got, err := store.GetRoutingRule(ctx, "rule-ttft")
+	require.NoError(t, err)
+	require.NotEmpty(t, got.Targets)
+	require.NotNil(t, got.Targets[0].TTFTTimeoutMs)
+	require.Equal(t, 1500, *got.Targets[0].TTFTTimeoutMs)
+
+	got.Targets[0].TTFTTimeoutMs = new(800)
+	require.NoError(t, store.UpdateRoutingRule(ctx, got))
+	got, err = store.GetRoutingRule(ctx, "rule-ttft")
+	require.NoError(t, err)
+	require.NotNil(t, got.Targets[0].TTFTTimeoutMs)
+	require.Equal(t, 800, *got.Targets[0].TTFTTimeoutMs)
+
+	got.Targets[0].TTFTTimeoutMs = nil
+	require.NoError(t, store.UpdateRoutingRule(ctx, got))
+	got, err = store.GetRoutingRule(ctx, "rule-ttft")
+	require.NoError(t, err)
+	require.Nil(t, got.Targets[0].TTFTTimeoutMs, "clearing the field must persist as NULL")
+}
+
+// TestGenerateRoutingRuleHash_TargetTTFTTimeout: a rule whose targets carry no
+// deadline keeps the hash it had before the field existed, and setting one
+// changes the hash.
+func TestGenerateRoutingRuleHash_TargetTTFTTimeout(t *testing.T) {
+	// Hash of this fixture from the implementation before ttft_timeout_ms
+	// existed. Comparing two current hashes would not catch a change to it.
+	const preTTFTHash = "f9808962adb5bd07a2da3521037890b40ebafbafc61881986c3830f6d362e053"
+
+	rule := *routingRuleFixture("rule-hash", 0, "openai")
+	require.NotEmpty(t, rule.Targets)
+	rule.Targets = append([]tables.TableRoutingTarget(nil), rule.Targets...)
+	unset, err := GenerateRoutingRuleHash(rule)
+	require.NoError(t, err)
+	require.Equal(t, preTTFTHash, unset, "a target without ttft_timeout_ms must keep its pre-upgrade hash")
+
+	rule.Targets[0].TTFTTimeoutMs = new(1500)
+	set, err := GenerateRoutingRuleHash(rule)
+	require.NoError(t, err)
+	require.NotEqual(t, unset, set, "setting ttft_timeout_ms must change the config hash")
+
+	rule.Targets[0].TTFTTimeoutMs = new(2000)
+	changed, err := GenerateRoutingRuleHash(rule)
+	require.NoError(t, err)
+	require.NotEqual(t, set, changed, "changing ttft_timeout_ms must change the config hash")
+
+	rule.Targets[0].TTFTTimeoutMs = nil
+	cleared, err := GenerateRoutingRuleHash(rule)
+	require.NoError(t, err)
+	require.Equal(t, unset, cleared, "a target without ttft_timeout_ms must keep its pre-upgrade hash")
+}
+
+// TestUpsertModelPricesBatch_VideoResolutionColumnsSurviveResync pins the
+// ON CONFLICT DO UPDATE path: a column missing from pricingSyncUpdateColumns is
+// written on the initial Create but silently dropped on every later sync of an
+// existing row.
+func TestUpsertModelPricesBatch_VideoResolutionColumnsSurviveResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	row := tables.TableModelPricing{Model: "sora-2-pro", Provider: "openai", Mode: "video_generation"}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	row.OutputCostPerVideoPerSecond480p = cost(0.10)
+	row.OutputCostPerVideoPerSecond720p = cost(0.30)
+	row.OutputCostPerVideoPerSecond1024p = cost(0.50)
+	row.OutputCostPerVideoPerSecond1080p = cost(0.70)
+	row.OutputCostPerVideoPerSecond4k = cost(0.60)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	var found *tables.TableModelPricing
+	for i := range got {
+		if got[i].Model == "sora-2-pro" {
+			found = &got[i]
+			break
+		}
+	}
+	require.NotNil(t, found)
+	require.NotNil(t, found.OutputCostPerVideoPerSecond480p, "output_cost_per_video_per_second_480p missing from pricingSyncUpdateColumns")
+	require.NotNil(t, found.OutputCostPerVideoPerSecond720p, "output_cost_per_video_per_second_720p missing from pricingSyncUpdateColumns")
+	require.NotNil(t, found.OutputCostPerVideoPerSecond1024p, "output_cost_per_video_per_second_1024p missing from pricingSyncUpdateColumns")
+	require.NotNil(t, found.OutputCostPerVideoPerSecond1080p, "output_cost_per_video_per_second_1080p missing from pricingSyncUpdateColumns")
+	require.NotNil(t, found.OutputCostPerVideoPerSecond4k, "output_cost_per_video_per_second_4k missing from pricingSyncUpdateColumns")
+	assert.Equal(t, 0.10, *found.OutputCostPerVideoPerSecond480p)
+	assert.Equal(t, 0.30, *found.OutputCostPerVideoPerSecond720p)
+	assert.Equal(t, 0.50, *found.OutputCostPerVideoPerSecond1024p)
+	assert.Equal(t, 0.70, *found.OutputCostPerVideoPerSecond1080p)
+	assert.Equal(t, 0.60, *found.OutputCostPerVideoPerSecond4k)
+}
+
+func TestUpsertModelPricesBatch_VideoTokenColumnSurvivesResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	rate := 0.000007
+
+	row := tables.TableModelPricing{Model: "dreamina-seedance-2-0-260128", Provider: "byteplus", Mode: "video_generation"}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	row.OutputCostPerVideoToken = &rate
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	var found *tables.TableModelPricing
+	for i := range got {
+		if got[i].Model == "dreamina-seedance-2-0-260128" {
+			found = &got[i]
+			break
+		}
+	}
+	require.NotNil(t, found)
+	require.NotNil(t, found.OutputCostPerVideoToken, "output_cost_per_video_token missing from pricingSyncUpdateColumns")
+	assert.Equal(t, rate, *found.OutputCostPerVideoToken)
+}
+
+func TestUpsertModelPricesBatch_CacheCreationAbove12hrColumnsSurviveResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+	ctx := context.Background()
+
+	row := tables.TableModelPricing{Model: "gpt-5.6-sol", Provider: "openai", Mode: "chat"}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	row.CacheCreationInputTokenCostAbove12hr = schemas.Ptr(0.00001)
+	row.CacheCreationInputTokenCostAbove12hrAbove272kTokens = schemas.Ptr(0.00002)
+	row.CacheCreationInputTokenCostAbove12hrPriority = schemas.Ptr(0.00002)
+	row.CacheCreationInputTokenCostAbove12hrAbove272kTokensPriority = schemas.Ptr(0.00004)
+	row.CacheCreationInputTokenCostAbove12hrFlex = schemas.Ptr(0.000005)
+	row.CacheCreationInputTokenCostAbove12hrAbove272kTokensFlex = schemas.Ptr(0.00001)
+	row.CacheCreationInputTokenCostAbove12hrUltrafast = schemas.Ptr(0.00015)
+	row.CacheCreationInputTokenCostAbove12hrAbove272kTokensUltrafast = schemas.Ptr(0.0003)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{row}))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	var found *tables.TableModelPricing
+	for i := range got {
+		if got[i].Model == "gpt-5.6-sol" {
+			found = &got[i]
+			break
+		}
+	}
+	require.NotNil(t, found)
+	for name, v := range map[string]*float64{
+		"cache_creation_input_token_cost_above_12hr":                      found.CacheCreationInputTokenCostAbove12hr,
+		"cache_creation_input_token_cost_above_12hr_above_272k_tokens":    found.CacheCreationInputTokenCostAbove12hrAbove272kTokens,
+		"cache_creation_input_token_cost_above_12hr_priority":             found.CacheCreationInputTokenCostAbove12hrPriority,
+		"cache_creation_input_token_cost_above_12hr_above_272k_priority":  found.CacheCreationInputTokenCostAbove12hrAbove272kTokensPriority,
+		"cache_creation_input_token_cost_above_12hr_flex":                 found.CacheCreationInputTokenCostAbove12hrFlex,
+		"cache_creation_input_token_cost_above_12hr_above_272k_flex":      found.CacheCreationInputTokenCostAbove12hrAbove272kTokensFlex,
+		"cache_creation_input_token_cost_above_12hr_ultrafast":            found.CacheCreationInputTokenCostAbove12hrUltrafast,
+		"cache_creation_input_token_cost_above_12hr_above_272k_ultrafast": found.CacheCreationInputTokenCostAbove12hrAbove272kTokensUltrafast,
+	} {
+		assert.NotNil(t, v, "%s missing from pricingSyncUpdateColumns", name)
+	}
+}
+
+// TestRDBConfigStore_CreatedAtSurvivesConfigSync is the general form of
+// TestRDBConfigStore_RoutingRuleCreatedAtSurvivesUpdate. GORM's Save selects every
+// column, so any entity rebuilt from config.json — which carries no created_at —
+// has its original insert timestamp overwritten with the zero time unless the
+// store carries the persisted value forward.
+func TestRDBConfigStore_CreatedAtSurvivesConfigSync(t *testing.T) {
+	ctx := context.Background()
+
+	// seed inserts the entity and returns its persisted created_at. sync re-saves it
+	// shaped exactly the way the config.json reconciler builds one: same ID, changed
+	// payload, zero CreatedAt. verify asserts the changed payload actually landed
+	// before returning the created_at that survived, so an Update that quietly did
+	// nothing cannot pass a case just by leaving the row alone.
+	tests := []struct {
+		name   string
+		seed   func(t *testing.T, store *RDBConfigStore) time.Time
+		sync   func(t *testing.T, store *RDBConfigStore)
+		verify func(t *testing.T, store *RDBConfigStore) time.Time
+	}{
+		{
+			name: "RateLimit",
+			seed: func(t *testing.T, store *RDBConfigStore) time.Time {
+				max := int64(1000)
+				require.NoError(t, store.CreateRateLimit(ctx, &tables.TableRateLimit{
+					ID: "rl-a", TokenMaxLimit: &max, TokenResetDuration: strPtr("1h"),
+				}))
+				created, err := store.GetRateLimit(ctx, "rl-a")
+				require.NoError(t, err)
+				return created.CreatedAt
+			},
+			sync: func(t *testing.T, store *RDBConfigStore) {
+				newMax := int64(2000)
+				require.NoError(t, store.UpdateRateLimit(ctx, &tables.TableRateLimit{
+					ID: "rl-a", TokenMaxLimit: &newMax, TokenResetDuration: strPtr("1h"),
+				}))
+			},
+			verify: func(t *testing.T, store *RDBConfigStore) time.Time {
+				got, err := store.GetRateLimit(ctx, "rl-a")
+				require.NoError(t, err)
+				require.Equal(t, int64(2000), *got.TokenMaxLimit)
+				return got.CreatedAt
+			},
+		},
+		{
+			name: "Team",
+			seed: func(t *testing.T, store *RDBConfigStore) time.Time {
+				require.NoError(t, store.CreateTeam(ctx, &tables.TableTeam{ID: "team-a", Name: "Team A"}))
+				created, err := store.GetTeam(ctx, "team-a")
+				require.NoError(t, err)
+				return created.CreatedAt
+			},
+			sync: func(t *testing.T, store *RDBConfigStore) {
+				require.NoError(t, store.UpdateTeam(ctx, &tables.TableTeam{ID: "team-a", Name: "Team A renamed"}))
+			},
+			verify: func(t *testing.T, store *RDBConfigStore) time.Time {
+				got, err := store.GetTeam(ctx, "team-a")
+				require.NoError(t, err)
+				require.Equal(t, "Team A renamed", got.Name)
+				return got.CreatedAt
+			},
+		},
+		{
+			name: "Customer",
+			seed: func(t *testing.T, store *RDBConfigStore) time.Time {
+				require.NoError(t, store.CreateCustomer(ctx, &tables.TableCustomer{ID: "cust-a", Name: "Customer A"}))
+				created, err := store.GetCustomer(ctx, "cust-a")
+				require.NoError(t, err)
+				return created.CreatedAt
+			},
+			sync: func(t *testing.T, store *RDBConfigStore) {
+				require.NoError(t, store.UpdateCustomer(ctx, &tables.TableCustomer{ID: "cust-a", Name: "Customer A renamed"}))
+			},
+			verify: func(t *testing.T, store *RDBConfigStore) time.Time {
+				got, err := store.GetCustomer(ctx, "cust-a")
+				require.NoError(t, err)
+				require.Equal(t, "Customer A renamed", got.Name)
+				return got.CreatedAt
+			},
+		},
+		{
+			name: "ModelConfig",
+			seed: func(t *testing.T, store *RDBConfigStore) time.Time {
+				require.NoError(t, store.CreateModelConfig(ctx, &tables.TableModelConfig{
+					ID: "mc-a", ModelName: "gpt-4o", Scope: "global",
+				}))
+				created, err := store.GetModelConfig(ctx, "global", nil, "gpt-4o", nil)
+				require.NoError(t, err)
+				return created.CreatedAt
+			},
+			sync: func(t *testing.T, store *RDBConfigStore) {
+				require.NoError(t, store.UpdateModelConfig(ctx, &tables.TableModelConfig{
+					ID: "mc-a", ModelName: "gpt-4o", Scope: "global", CalendarAligned: true,
+				}))
+			},
+			verify: func(t *testing.T, store *RDBConfigStore) time.Time {
+				got, err := store.GetModelConfig(ctx, "global", nil, "gpt-4o", nil)
+				require.NoError(t, err)
+				require.True(t, got.CalendarAligned)
+				return got.CreatedAt
+			},
+		},
+		{
+			name: "PricingOverride",
+			seed: func(t *testing.T, store *RDBConfigStore) time.Time {
+				require.NoError(t, store.CreatePricingOverride(ctx, &tables.TablePricingOverride{
+					ID: "po-a", Name: "Override A", ScopeKind: "global", MatchType: "exact", Pattern: "gpt-4o",
+				}))
+				created, err := store.GetPricingOverrideByID(ctx, "po-a")
+				require.NoError(t, err)
+				return created.CreatedAt
+			},
+			sync: func(t *testing.T, store *RDBConfigStore) {
+				require.NoError(t, store.UpdatePricingOverride(ctx, &tables.TablePricingOverride{
+					ID: "po-a", Name: "Override A renamed", ScopeKind: "global", MatchType: "exact", Pattern: "gpt-4o",
+				}))
+			},
+			verify: func(t *testing.T, store *RDBConfigStore) time.Time {
+				got, err := store.GetPricingOverrideByID(ctx, "po-a")
+				require.NoError(t, err)
+				require.Equal(t, "Override A renamed", got.Name)
+				return got.CreatedAt
+			},
+		},
+		{
+			// UpdatePlugin is a delete-and-reinsert, so without a carry-forward
+			// created_at is re-stamped to now() rather than zeroed.
+			name: "Plugin",
+			seed: func(t *testing.T, store *RDBConfigStore) time.Time {
+				require.NoError(t, store.CreatePlugin(ctx, &tables.TablePlugin{Name: "plug-a", Enabled: true}))
+				created, err := store.GetPlugin(ctx, "plug-a")
+				require.NoError(t, err)
+				return created.CreatedAt
+			},
+			sync: func(t *testing.T, store *RDBConfigStore) {
+				require.NoError(t, store.UpdatePlugin(ctx, &tables.TablePlugin{Name: "plug-a", Enabled: false}))
+			},
+			verify: func(t *testing.T, store *RDBConfigStore) time.Time {
+				got, err := store.GetPlugin(ctx, "plug-a")
+				require.NoError(t, err)
+				require.False(t, got.Enabled)
+				return got.CreatedAt
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := setupRDBTestStore(t)
+
+			createdAt := tt.seed(t, store)
+			require.False(t, createdAt.IsZero())
+
+			tt.sync(t, store)
+
+			syncedAt := tt.verify(t, store)
+			require.False(t, syncedAt.IsZero())
+			require.Equal(t, createdAt, syncedAt, "created_at must survive a config sync")
+		})
+	}
+}
+
+func TestListExpiredVirtualKeysForDeletion(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	past := now.Add(-time.Hour)
+	future := now.Add(time.Hour)
+
+	keys := []*tables.TableVirtualKey{
+		{ID: "vk-expired-flagged", Name: "expired flagged", Value: *schemas.NewSecretVar("v1"), ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
+		{ID: "vk-expired-inactive-flagged", Name: "expired inactive flagged", Value: *schemas.NewSecretVar("v2"), ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true), IsActive: schemas.Ptr(false)},
+		{ID: "vk-expired-unset", Name: "expired unset", Value: *schemas.NewSecretVar("v3"), ExpiresAt: &past},
+		{ID: "vk-expired-opt-out", Name: "expired opt out", Value: *schemas.NewSecretVar("v7"), ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(false)},
+		{ID: "vk-future-flagged", Name: "future flagged", Value: *schemas.NewSecretVar("v4"), ExpiresAt: &future, DeleteAfterExpire: schemas.Ptr(true)},
+		{ID: "vk-never-flagged", Name: "never flagged", Value: *schemas.NewSecretVar("v5"), DeleteAfterExpire: schemas.Ptr(true)},
+	}
+	for _, vk := range keys {
+		require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	}
+	// An omitted flag must round-trip as NULL, not the column default.
+	unset, err := store.GetVirtualKey(ctx, "vk-expired-unset")
+	require.NoError(t, err)
+	assert.Nil(t, unset.DeleteAfterExpire)
+
+	listIDs := func(includeUnset bool) []string {
+		got, err := store.ListExpiredVirtualKeysForDeletion(ctx, now, includeUnset)
+		require.NoError(t, err)
+		var ids []string
+		for _, vk := range got {
+			ids = append(ids, vk.ID)
+			assert.NotEmpty(t, vk.Name)
+		}
+		sort.Strings(ids)
+		return ids
+	}
+
+	// Client default off: only explicitly flagged keys.
+	assert.Equal(t, []string{"vk-expired-flagged", "vk-expired-inactive-flagged"}, listIDs(false))
+	// Client default on: unset keys join, explicit false stays out.
+	assert.Equal(t, []string{"vk-expired-flagged", "vk-expired-inactive-flagged", "vk-expired-unset"}, listIDs(true))
+
+	// A key whose expiry is exactly now counts as expired, matching IsExpiredAt.
+	boundary := &tables.TableVirtualKey{ID: "vk-boundary", Name: "boundary", Value: *schemas.NewSecretVar("v6"), ExpiresAt: &now, DeleteAfterExpire: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, boundary))
+	assert.Len(t, listIDs(false), 3)
+}
+
+func TestVirtualKeyDeleteAfterExpireUpdateRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	future := time.Now().UTC().Add(time.Hour)
+	vk := &tables.TableVirtualKey{ID: "vk-rt", Name: "rt", Value: *schemas.NewSecretVar("rt"), ExpiresAt: &future, DeleteAfterExpire: schemas.Ptr(true)}
+	require.NoError(t, store.CreateVirtualKey(ctx, vk))
+
+	// UpdateVirtualKey uses an explicit column list; NULL must persist through it.
+	vk.DeleteAfterExpire = nil
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	got, err := store.GetVirtualKey(ctx, vk.ID)
+	require.NoError(t, err)
+	assert.Nil(t, got.DeleteAfterExpire)
+
+	vk.DeleteAfterExpire = schemas.Ptr(false)
+	require.NoError(t, store.UpdateVirtualKey(ctx, vk))
+	got, err = store.GetVirtualKey(ctx, vk.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.DeleteAfterExpire)
+	assert.False(t, *got.DeleteAfterExpire)
+}
+
+func TestDeleteExpiredVirtualKey_RechecksEligibility(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	past := now.Add(-time.Hour)
+	future := now.Add(time.Hour)
+
+	keys := []*tables.TableVirtualKey{
+		{ID: "vk-eligible", Name: "eligible", Value: *schemas.NewSecretVar("e1"), ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(true)},
+		// Updated after the scan: the operator cleared the flag or extended the expiry.
+		{ID: "vk-opted-out", Name: "opted out", Value: *schemas.NewSecretVar("e2"), ExpiresAt: &past, DeleteAfterExpire: schemas.Ptr(false)},
+		{ID: "vk-extended", Name: "extended", Value: *schemas.NewSecretVar("e3"), ExpiresAt: &future, DeleteAfterExpire: schemas.Ptr(true)},
+		{ID: "vk-unset", Name: "unset", Value: *schemas.NewSecretVar("e4"), ExpiresAt: &past},
+	}
+	for _, vk := range keys {
+		require.NoError(t, store.CreateVirtualKey(ctx, vk))
+	}
+
+	for _, id := range []string{"vk-opted-out", "vk-extended", "vk-unset"} {
+		deleted, err := store.DeleteExpiredVirtualKey(ctx, id, now, false)
+		require.NoError(t, err)
+		assert.Nil(t, deleted, "%s no longer qualifies and must survive", id)
+		_, err = store.GetVirtualKey(ctx, id)
+		assert.NoError(t, err, "%s was deleted despite being ineligible", id)
+	}
+
+	deleted, err := store.DeleteExpiredVirtualKey(ctx, "vk-eligible", now, false)
+	require.NoError(t, err)
+	require.NotNil(t, deleted)
+	assert.Equal(t, "eligible", deleted.Name)
+	_, err = store.GetVirtualKey(ctx, "vk-eligible")
+	assert.ErrorIs(t, err, ErrNotFound)
+
+	// The job scanned with the default on, but an admin turned it off before the delete:
+	// the unset key must follow the current default and survive.
+	require.NoError(t, store.UpdateClientConfig(ctx, &ClientConfig{DeleteExpiredVirtualKeys: false}))
+	deleted, err = store.DeleteExpiredVirtualKey(ctx, "vk-unset", now, true)
+	require.NoError(t, err)
+	assert.Nil(t, deleted, "unset key was deleted after the client default was turned off")
+	_, err = store.GetVirtualKey(ctx, "vk-unset")
+	require.NoError(t, err)
+
+	// An unset flag follows the client default when it is on.
+	require.NoError(t, store.UpdateClientConfig(ctx, &ClientConfig{DeleteExpiredVirtualKeys: true}))
+	deleted, err = store.DeleteExpiredVirtualKey(ctx, "vk-unset", now, true)
+	require.NoError(t, err)
+	require.NotNil(t, deleted)
+
+	_, err = store.DeleteExpiredVirtualKey(ctx, "vk-missing", now, true)
+	assert.ErrorIs(t, err, ErrNotFound)
+}
+
+// TestUpsertModelPricesBatch_PriorityAbove272kCacheCreation_SurvivesResync guards
+// the pricingSyncUpdateColumns entry for the priority >272k cache-write column:
+// the first sync writes every column, only the ON CONFLICT DO UPDATE of the
+// second sync reveals a column missing from the explicit update list.
+func TestUpsertModelPricesBatch_PriorityAbove272kCacheCreation_SurvivesResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	cost := func(f float64) *float64 { return &f }
+
+	pricing := []tables.TableModelPricing{{
+		Model: "gpt-6-astra", Provider: "openai", Mode: "responses",
+		CacheCreationInputTokenCostPriority:                cost(0.000025),
+		CacheCreationInputTokenCostAbove272kTokensPriority: cost(0.00005),
+	}}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	pricing[0].CacheCreationInputTokenCostAbove272kTokensPriority = cost(0.00006)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.NotNil(t, got[0].CacheCreationInputTokenCostAbove272kTokensPriority)
+	assert.InDelta(t, 0.00006, *got[0].CacheCreationInputTokenCostAbove272kTokensPriority, 1e-12)
+}
+
+// TestUpsertModelPricesBatch_Above100kColumns_SurviveResync guards the
+// pricingSyncUpdateColumns entries for the >100k tier columns.
+func TestUpsertModelPricesBatch_Above100kColumns_SurviveResync(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	pricing := []tables.TableModelPricing{{
+		Model: "claude-haiku-5-5", Provider: "anthropic", Mode: "chat",
+		InputCostPerToken:                                  new(1e-07),
+		InputCostPerTokenAbove100kTokens:                   new(4e-07),
+		OutputCostPerTokenAbove100kTokens:                  new(2e-06),
+		CacheCreationInputTokenCostAbove100kTokens:         new(5e-07),
+		CacheReadInputTokenCostAbove100kTokens:             new(4e-08),
+		CacheCreationInputTokenCostAbove1hrAbove100kTokens: new(8e-07),
+	}}
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	pricing[0].InputCostPerTokenAbove100kTokens = new(5e-07)
+	pricing[0].OutputCostPerTokenAbove100kTokens = new(2.5e-06)
+	pricing[0].CacheCreationInputTokenCostAbove100kTokens = new(6.25e-07)
+	pricing[0].CacheReadInputTokenCostAbove100kTokens = new(5e-08)
+	pricing[0].CacheCreationInputTokenCostAbove1hrAbove100kTokens = new(1e-06)
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, pricing))
+
+	got, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.NotNil(t, got[0].InputCostPerTokenAbove100kTokens)
+	assert.InDelta(t, 5e-07, *got[0].InputCostPerTokenAbove100kTokens, 1e-15)
+	require.NotNil(t, got[0].OutputCostPerTokenAbove100kTokens)
+	assert.InDelta(t, 2.5e-06, *got[0].OutputCostPerTokenAbove100kTokens, 1e-15)
+	require.NotNil(t, got[0].CacheCreationInputTokenCostAbove100kTokens)
+	assert.InDelta(t, 6.25e-07, *got[0].CacheCreationInputTokenCostAbove100kTokens, 1e-15)
+	require.NotNil(t, got[0].CacheReadInputTokenCostAbove100kTokens)
+	assert.InDelta(t, 5e-08, *got[0].CacheReadInputTokenCostAbove100kTokens, 1e-15)
+	require.NotNil(t, got[0].CacheCreationInputTokenCostAbove1hrAbove100kTokens)
+	assert.InDelta(t, 1e-06, *got[0].CacheCreationInputTokenCostAbove1hrAbove100kTokens, 1e-15)
+}
+
+// TestProviderPassthroughRoundTrip pins passthrough through every provider write path and
+// both read paths. An empty allowlist must come back as a policy: it forwards nothing,
+// which is not the same as no policy, which forwards every route.
+func TestProviderPassthroughRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+	policy := &schemas.PassthroughPolicy{AllowedRoutes: []schemas.PassthroughRouteRule{
+		{Methods: []string{"POST"}, Path: "/v1/chat/completions"},
+		{Methods: []string{"GET", "DELETE"}, Path: "/v1/files/*"},
+	}}
+
+	require.NoError(t, store.UpdateProvidersConfig(ctx, map[schemas.ModelProvider]ProviderConfig{
+		schemas.OpenAI: {Passthrough: policy},
+	}))
+	all, err := store.GetProvidersConfig(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, policy, all[schemas.OpenAI].Passthrough)
+
+	require.NoError(t, store.AddProvider(ctx, schemas.Anthropic, ProviderConfig{Passthrough: policy}))
+	got, err := store.GetProviderConfig(ctx, schemas.Anthropic)
+	require.NoError(t, err)
+	assert.Equal(t, policy, got.Passthrough)
+
+	require.NoError(t, store.UpdateProvider(ctx, schemas.Anthropic, ProviderConfig{Passthrough: &schemas.PassthroughPolicy{AllowedRoutes: []schemas.PassthroughRouteRule{}}}))
+	got, err = store.GetProviderConfig(ctx, schemas.Anthropic)
+	require.NoError(t, err)
+	require.NotNil(t, got.Passthrough, "an empty allowlist must survive the round trip as a policy")
+	assert.Empty(t, got.Passthrough.AllowedRoutes)
+
+	require.NoError(t, store.UpdateProvider(ctx, schemas.Anthropic, ProviderConfig{}))
+	got, err = store.GetProviderConfig(ctx, schemas.Anthropic)
+	require.NoError(t, err)
+	assert.Nil(t, got.Passthrough, "updating with a nil policy must clear the stored column")
+}
+
+func TestUpdateClientConfig_CompatConvertDecisionToResponsesRoundTrip(t *testing.T) {
+	store := setupRDBTestStore(t)
+	ctx := context.Background()
+
+	base := func(enabled bool) *ClientConfig {
+		return &ClientConfig{
+			EnableLogging:        new(true),
+			InitialPoolSize:      100,
+			LogRetentionDays:     30,
+			MaxRequestBodySizeMB: 50,
+			Compat:               CompatConfig{ConvertDecisionToResponses: enabled},
+		}
+	}
+
+	require.NoError(t, store.UpdateClientConfig(ctx, base(true)))
+	result, err := store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.True(t, result.Compat.ConvertDecisionToResponses, "enabling the toggle must persist")
+
+	require.NoError(t, store.UpdateClientConfig(ctx, base(false)))
+	result, err = store.GetClientConfig(ctx)
+	require.NoError(t, err)
+	assert.False(t, result.Compat.ConvertDecisionToResponses, "disabling the toggle must persist")
+}
+
+func TestGenerateClientConfigHash_CompatConvertDecisionToResponses(t *testing.T) {
+	on := &ClientConfig{InitialPoolSize: 100, Compat: CompatConfig{ConvertDecisionToResponses: true}}
+	off := &ClientConfig{InitialPoolSize: 100}
+	onHash, err := on.GenerateClientConfigHash()
+	require.NoError(t, err)
+	offHash, err := off.GenerateClientConfigHash()
+	require.NoError(t, err)
+	assert.NotEqual(t, onHash, offHash, "toggling convert_decision_to_responses must change the hash")
+}
+
+// TestClientConfigUnmarshal_CompatConvertDecisionToResponsesDefaultsOff pins that,
+// unlike the other compat toggles, decision emulation stays off when config.json
+// omits it - both when compat is absent and when it is present without the field.
+func TestClientConfigUnmarshal_CompatConvertDecisionToResponsesDefaultsOff(t *testing.T) {
+	for name, raw := range map[string]string{
+		"compat absent":      `{}`,
+		"field absent":       `{"compat": {"convert_text_to_chat": true}}`,
+		"explicitly enabled": `{"compat": {"convert_decision_to_responses": true}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var c ClientConfig
+			require.NoError(t, json.Unmarshal([]byte(raw), &c))
+			assert.Equal(t, name == "explicitly enabled", c.Compat.ConvertDecisionToResponses)
+		})
+	}
+}
+
+// TestValidatePublicBaseURL permits public base paths and rejects credential-bearing components without echoing input.
+func TestValidatePublicBaseURL(t *testing.T) {
+	for _, value := range []string{"", "https://skills.example/path", "http://localhost:8080", "https://example.com/path%23section", "http://[::1]:8080"} {
+		require.NoError(t, ValidatePublicBaseURL(value))
+	}
+	for _, value := range []string{"https://user:password@example.com", "https://example.com?token=private", "https://example.com?", "https://example.com#private", "ftp://example.com", "not a URL", "https://:8080", "https://example.com#"} {
+		err := ValidatePublicBaseURL(value)
+		require.Error(t, err, value)
+		require.NotContains(t, err.Error(), value)
+	}
+}
+
+// A public URL setting accepts a URL of MaxPublicURLLength characters and refuses one longer.
+func TestValidatePublicBaseURLLength(t *testing.T) {
+	prefix := "https://example.com/"
+	require.NoError(t, ValidatePublicBaseURL(prefix+strings.Repeat("a", MaxPublicURLLength-len(prefix))))
+	err := ValidatePublicBaseURL(prefix + strings.Repeat("a", MaxPublicURLLength-len(prefix)+1))
+	require.ErrorContains(t, err, "at most 512 characters")
+}
+
+// vkMetadataPGSchema keeps these tests' tables apart from the shared test schema, so the whole
+// schema can be dropped afterwards.
+const vkMetadataPGSchema = "configstore_vk_metadata_test"
+
+// vkMetadataStoreBackends returns the SQLite store and, when the local test Postgres is reachable,
+// a Postgres store with the virtual key tables. The metadata filter is dialect-specific SQL, so
+// both must agree.
+func vkMetadataStoreBackends(t *testing.T) map[string]*RDBConfigStore {
+	t.Helper()
+	backends := map[string]*RDBConfigStore{"sqlite": setupRDBTestStore(t)}
+	if pg := trySetupPostgresVKMetadataStore(t); pg != nil {
+		backends["postgres"] = pg
+	}
+	return backends
+}
+
+// trySetupPostgresVKMetadataStore returns a Postgres store in its own schema, or nil when the
+// local test Postgres is not reachable. Once the server answers, any setup error (schema
+// creation, migration) fails the test instead of quietly dropping the Postgres backend, so the
+// dialect-specific metadata filter cannot go untested while the run still passes on SQLite.
+func trySetupPostgresVKMetadataStore(t *testing.T) *RDBConfigStore {
+	t.Helper()
+	s := trySetupPostgresSchemaStore(t, vkMetadataPGSchema,
+		&tables.TableCustomer{},
+		&tables.TableTeam{},
+		&tables.TableBudget{},
+		&tables.TableRateLimit{},
+		&tables.TableProvider{},
+		&tables.TableKey{},
+		&tables.TableVirtualKey{},
+		&tables.TableVirtualKeyProviderConfig{},
+		&tables.TableVirtualKeyProviderConfigKey{},
+	)
+	if s == nil {
+		return nil
+	}
+	require.NoError(t, s.DB().SetupJoinTable(&tables.TableVirtualKeyProviderConfig{}, "Keys", &tables.TableVirtualKeyProviderConfigKey{}))
+	return s
+}
+
+// trySetupPostgresSchemaStore returns a Postgres store whose tables for models live in their own
+// schema, dropped on cleanup, or nil when the local test Postgres is not reachable.
+func trySetupPostgresSchemaStore(t *testing.T, schema string, models ...interface{}) *RDBConfigStore {
+	t.Helper()
+	db, err := gorm.Open(postgres.Open(strings.Replace(postgresDSN, pgTestSchema, schema, 1)), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	if err != nil {
+		return nil
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil
+	}
+	if sqlDB.Ping() != nil {
+		_ = sqlDB.Close()
+		return nil
+	}
+	// Registered before the schema statements so the connection is closed even if they fail.
+	t.Cleanup(func() {
+		_ = db.Exec("DROP SCHEMA IF EXISTS " + schema + " CASCADE").Error
+		_ = sqlDB.Close()
+	})
+	require.NoError(t, db.Exec("DROP SCHEMA IF EXISTS "+schema+" CASCADE").Error)
+	require.NoError(t, db.Exec("CREATE SCHEMA "+schema).Error)
+	require.NoError(t, db.AutoMigrate(models...))
+	s := &RDBConfigStore{logger: nil}
+	s.db.Store(db)
+	s.migrateOnFreshFn = func(ctx context.Context, fn func(context.Context, *gorm.DB) error) error {
+		return fn(ctx, s.DB())
+	}
+	s.refreshPoolFn = func(ctx context.Context) error { return nil }
+	return s
+}
+
+func TestGetVirtualKeysPaginated_MetadataFiltersAndSearch(t *testing.T) {
+	for name, store := range vkMetadataStoreBackends(t) {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			seed := []*tables.TableVirtualKey{
+				{ID: "vk-md-a", Name: "alpha", Value: *schemas.NewSecretVar("vk-md-a-val"), Metadata: map[string]string{"cost_center": "cc-42", "env": "prod"}},
+				{ID: "vk-md-b", Name: "bravo", Value: *schemas.NewSecretVar("vk-md-b-val"), Metadata: map[string]string{"cost_center": "cc-42", "env": "dev"}},
+				{ID: "vk-md-c", Name: "charlie", Value: *schemas.NewSecretVar("vk-md-c-val"), Metadata: map[string]string{"cost_center": "cc-7", "owner.email": "Ops@Example.com", "quote": `say "hi"`}},
+				{ID: "vk-md-none", Name: "delta", Value: *schemas.NewSecretVar("vk-md-none-val")},
+				{ID: "vk-md-amp", Name: "echo", Value: *schemas.NewSecretVar("vk-md-amp-val"), Metadata: map[string]string{"vendor": "AT&T <us>"}},
+			}
+			for _, vk := range seed {
+				require.NoError(t, store.CreateVirtualKey(ctx, vk))
+			}
+
+			tests := []struct {
+				name    string
+				params  VirtualKeyQueryParams
+				wantIDs []string
+			}{
+				{name: "one pair", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{"cost_center": "cc-42"}}, wantIDs: []string{"vk-md-a", "vk-md-b"}},
+				{name: "pairs AND together", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{"cost_center": "cc-42", "env": "prod"}}, wantIDs: []string{"vk-md-a"}},
+				{name: "dotted key", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{"owner.email": "Ops@Example.com"}}, wantIDs: []string{"vk-md-c"}},
+				{name: "value with quotes", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{"quote": `say "hi"`}}, wantIDs: []string{"vk-md-c"}},
+				{name: "value match is exact", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{"cost_center": "cc-4"}}, wantIDs: nil},
+				{name: "unknown key", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{"team": "x"}}, wantIDs: nil},
+				{name: "invalid key matches nothing", params: VirtualKeyQueryParams{MetadataFilters: map[string]string{`a" OR 1=1 --`: "x"}}, wantIDs: nil},
+				{name: "filter narrows search", params: VirtualKeyQueryParams{Search: "a", MetadataFilters: map[string]string{"env": "dev"}}, wantIDs: []string{"vk-md-b"}},
+				{name: "search matches metadata value", params: VirtualKeyQueryParams{Search: "cc-7"}, wantIDs: []string{"vk-md-c"}},
+				{name: "search on metadata is case-insensitive", params: VirtualKeyQueryParams{Search: "ops@example"}, wantIDs: []string{"vk-md-c"}},
+				// The stored JSON escapes &, < and >, so the search term must be matched in that encoding.
+				{name: "search matches metadata values with & and <", params: VirtualKeyQueryParams{Search: "at&t <us"}, wantIDs: []string{"vk-md-amp"}},
+				// LIKE metacharacters in the term match literally: "cc_7" must not match "cc-7".
+				{name: "search treats _ literally in metadata", params: VirtualKeyQueryParams{Search: "cc_7"}, wantIDs: nil},
+			}
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					vks, total, err := store.GetVirtualKeysPaginated(ctx, tt.params)
+					require.NoError(t, err)
+					var got []string
+					for _, vk := range vks {
+						got = append(got, vk.ID)
+					}
+					sort.Strings(got)
+					assert.Equal(t, tt.wantIDs, got)
+					assert.Equal(t, int64(len(tt.wantIDs)), total)
+				})
+			}
+		})
+	}
+}
+
+// Saving by target updates the existing row in place: same ID and created_at,
+// new patches. Delete reports a missing row as ErrNotFound.
+func TestDatasheetOverride_UpsertByTargetAndDelete(t *testing.T) {
+	ctx := context.Background()
+	store := setupRDBTestStore(t)
+
+	first := &tables.TableDatasheetOverride{
+		ID: "first", Provider: "openai", Model: "gpt-4o", Mode: "chat",
+		PricingPatch: json.RawMessage(`{"context_length":64000}`),
+	}
+	require.NoError(t, store.UpsertDatasheetOverride(ctx, first))
+	other := &tables.TableDatasheetOverride{
+		ID: "other", Provider: "openai", Model: "gpt-4o", Mode: "responses",
+		ParamsPatch: json.RawMessage(`{"supports_mcp":true}`),
+	}
+	require.NoError(t, store.UpsertDatasheetOverride(ctx, other))
+
+	again := &tables.TableDatasheetOverride{
+		ID: "ignored-new-id", Provider: "openai", Model: "gpt-4o", Mode: "chat",
+		PricingPatch: json.RawMessage(`{"context_length":32000}`),
+		Baseline:     json.RawMessage(`{"pricing":{"context_length":128000}}`),
+	}
+	require.NoError(t, store.UpsertDatasheetOverride(ctx, again))
+	assert.Equal(t, "first", again.ID, "a save for an existing target keeps that row's ID")
+
+	rows, err := store.GetDatasheetOverrides(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	got, err := store.GetDatasheetOverrideByID(ctx, "first")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"context_length":32000}`, string(got.PricingPatch))
+	assert.JSONEq(t, `{"pricing":{"context_length":128000}}`, string(got.Baseline))
+	assert.Nil(t, got.ParamsPatch)
+	assert.Equal(t, first.CreatedAt.Unix(), got.CreatedAt.Unix())
+
+	require.NoError(t, store.DeleteDatasheetOverride(ctx, "first"))
+	require.ErrorIs(t, store.DeleteDatasheetOverride(ctx, "first"), ErrNotFound)
+	_, err = store.GetDatasheetOverrideByID(ctx, "first")
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+// Two overrides whose pricing patches target the same folded pricing row
+// cannot both be stored, whichever node writes them; overrides without a claim
+// never conflict, and re-saving the claim holder is not a conflict.
+func TestDatasheetOverride_PricingClaimIsUnique(t *testing.T) {
+	ctx := context.Background()
+	store := setupRDBTestStore(t)
+	claim := "m|bedrock|chat"
+	require.NoError(t, store.UpsertDatasheetOverride(ctx, &tables.TableDatasheetOverride{
+		ID: "bedrock", Provider: "bedrock", Model: "m", Mode: "chat", PricingClaim: &claim,
+		PricingPatch: json.RawMessage(`{"input_cost_per_token":5}`),
+	}))
+	err := store.UpsertDatasheetOverride(ctx, &tables.TableDatasheetOverride{
+		ID: "mantle", Provider: "bedrock_mantle", Model: "m", Mode: "chat", PricingClaim: &claim,
+		PricingPatch: json.RawMessage(`{"input_cost_per_token":6}`),
+	})
+	require.ErrorIs(t, err, ErrDatasheetPricingClaimTaken)
+	require.NoError(t, store.UpsertDatasheetOverride(ctx, &tables.TableDatasheetOverride{
+		ID: "mantle-params", Provider: "bedrock_mantle", Model: "m", Mode: "chat",
+		ParamsPatch: json.RawMessage(`{"max_output_tokens":200}`),
+	}), "an override without a pricing claim does not conflict")
+	require.NoError(t, store.UpsertDatasheetOverride(ctx, &tables.TableDatasheetOverride{
+		ID: "bedrock", Provider: "bedrock", Model: "m", Mode: "chat", PricingClaim: &claim,
+		PricingPatch: json.RawMessage(`{"input_cost_per_token":7}`),
+	}), "re-saving the claim holder is not a conflict")
+
+	rows, err := store.GetDatasheetOverrides(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	for _, r := range rows {
+		if r.ID == "bedrock" {
+			require.NotNil(t, r.PricingClaim)
+			assert.Equal(t, claim, *r.PricingClaim)
+		} else {
+			assert.Nil(t, r.PricingClaim)
+		}
+	}
+}
+
+// A context cancelled between the insert and the ID readback must not leave
+// the row saved behind an error: the caller would skip its cache refresh and
+// peer notification for a write that did land.
+func TestDatasheetOverride_UpsertCancelledAfterInsertSavesNothing(t *testing.T) {
+	// File-backed: a cancelled tx can discard its connection, and a fresh
+	// :memory: connection would be an empty database.
+	db, err := gorm.Open(sqlite.Open(t.TempDir()+"/datasheet.db"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&tables.TableDatasheetOverride{}))
+	store := &RDBConfigStore{}
+	store.db.Store(db)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, store.DB().Callback().Create().After("gorm:create").Register("test:cancel_after_datasheet_insert", func(db *gorm.DB) {
+		if db.Statement.Table == (tables.TableDatasheetOverride{}).TableName() {
+			cancel()
+		}
+	}))
+
+	err = store.UpsertDatasheetOverride(ctx, &tables.TableDatasheetOverride{
+		ID: "cancelled", Provider: "openai", Model: "gpt-4o", Mode: "chat",
+		PricingPatch: json.RawMessage(`{"context_length":64000}`),
+	})
+	require.Error(t, err, "the readback runs on a cancelled context")
+
+	rows, err := store.GetDatasheetOverrides(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, rows, "an upsert that returns an error must not have committed the row")
+}
+

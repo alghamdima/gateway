@@ -23,11 +23,13 @@ import {
   DetailsListItem,
 } from "~/modules/admin/layout/details-list";
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 
 import type { UpdateOrganizationPayload } from "@workspace/auth";
 
 const Name = ({ id }: { id: string }) => {
   const { t } = useTranslation(["common", "admin"]);
+  const canUpdate = useStaffPermission({ organizations: ["update"] });
   const queryClient = useQueryClient();
   const { data: organization } = useQuery(
     admin.queries.organizations.get({ id }),
@@ -85,7 +87,7 @@ const Name = ({ id }: { id: string }) => {
               {...field}
               id="admin-organization-name"
               aria-invalid={fieldState.invalid}
-              disabled={form.formState.isSubmitting}
+              disabled={form.formState.isSubmitting || !canUpdate}
               onChange={(e) => {
                 field.onChange(e.target.value);
                 void debouncedOnSubmit();
@@ -101,6 +103,7 @@ const Name = ({ id }: { id: string }) => {
 
 const Slug = ({ id }: { id: string }) => {
   const { t } = useTranslation(["common", "admin"]);
+  const canUpdate = useStaffPermission({ organizations: ["update"] });
   const queryClient = useQueryClient();
   const { data: organization } = useQuery(
     admin.queries.organizations.get({ id }),
@@ -160,7 +163,7 @@ const Slug = ({ id }: { id: string }) => {
                 id="admin-organization-slug"
                 aria-invalid={fieldState.invalid}
                 className="peer ps-6"
-                disabled={form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting || !canUpdate}
                 onChange={(e) => {
                   field.onChange(e.target.value);
                   void debouncedOnSubmit();

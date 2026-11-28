@@ -19,9 +19,7 @@ export default defineEnv({
    * Specify your server-side environment variables schema here.
    * This way you can ensure the app isn't built with invalid env vars.
    */
-  server: {
-    CONTACT_EMAIL: z.email(),
-  },
+  server: {},
 
   /**
    * Specify your client-side environment variables schema here.
@@ -33,7 +31,8 @@ export default defineEnv({
     NEXT_PUBLIC_AUTH_MAGIC_LINK: castStringToBool.optional().default(false),
     NEXT_PUBLIC_AUTH_EMAIL_OTP: castStringToBool.optional().default(false),
     NEXT_PUBLIC_AUTH_PASSKEY: castStringToBool.optional().default(true),
-    NEXT_PUBLIC_AUTH_ANONYMOUS: castStringToBool.optional().default(true),
+    // the server refuses anonymous sign-in whatever this says (packages/auth/src/server.ts)
+    NEXT_PUBLIC_AUTH_ANONYMOUS: castStringToBool.optional().default(false),
     NEXT_PUBLIC_GOOGLE_ONE_TAP_CLIENT_ID: z.string().optional().default(""),
 
     NEXT_PUBLIC_PRODUCT_NAME: z.string(),
@@ -55,6 +54,9 @@ export default defineEnv({
    */
   env: {
     ...process.env,
+    // named so the browser bundle gets the real value: `...process.env` is empty there, and the
+    // default ("development") made the browser render what the server had not
+    NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_PRODUCT_NAME: process.env.NEXT_PUBLIC_PRODUCT_NAME,
     NEXT_PUBLIC_URL: process.env.NEXT_PUBLIC_URL,
     NEXT_PUBLIC_DEFAULT_LOCALE: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,
@@ -75,16 +77,5 @@ export default defineEnv({
 
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    NEXT_PUBLIC_OPEN_PANEL_CLIENT_ID:
-      process.env.NEXT_PUBLIC_OPEN_PANEL_CLIENT_ID,
-    NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID:
-      process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_MEASUREMENT_ID,
-    NEXT_PUBLIC_UMAMI_HOST: process.env.NEXT_PUBLIC_UMAMI_HOST,
-    NEXT_PUBLIC_UMAMI_WEBSITE_ID: process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID,
-    NEXT_PUBLIC_PLAUSIBLE_HOST: process.env.NEXT_PUBLIC_PLAUSIBLE_HOST,
-    NEXT_PUBLIC_PLAUSIBLE_DOMAIN: process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN,
-    NEXT_PUBLIC_MIXPANEL_TOKEN: process.env.NEXT_PUBLIC_MIXPANEL_TOKEN,
-    NEXT_PUBLIC_VEMETRIC_PROJECT_TOKEN:
-      process.env.NEXT_PUBLIC_VEMETRIC_PROJECT_TOKEN,
   },
 });

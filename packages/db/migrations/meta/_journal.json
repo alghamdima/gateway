@@ -113,6 +113,230 @@
       "when": 1790099611582,
       "tag": "0015_first_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795369419264,
+      "tag": "0016_graceful_the_twelve",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795402170175,
+      "tag": "0017_pricing",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795418698895,
+      "tag": "0018_topup_fee_minimum",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795427035860,
+      "tag": "0019_auth_rate_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795429473779,
+      "tag": "0020_admin_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795439447778,
+      "tag": "0021_api_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795456499265,
+      "tag": "0022_key_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795482340327,
+      "tag": "0023_organization_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795504749219,
+      "tag": "0024_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795505596777,
+      "tag": "0025_low_balance_alerts",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795522240954,
+      "tag": "0026_ledger_role_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1795553575458,
+      "tag": "0027_provider_endpoints",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795555826719,
+      "tag": "0028_organization_data_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795557383205,
+      "tag": "0029_data_policy_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795564335804,
+      "tag": "0030_provider_terms_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795762731081,
+      "tag": "0031_topup_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795769979414,
+      "tag": "0032_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795772722750,
+      "tag": "0033_sar_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795775341501,
+      "tag": "0034_remove_markup",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1795776764944,
+      "tag": "0035_organization_topup_fee",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795778081734,
+      "tag": "0036_promo_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795781727536,
+      "tag": "0037_model_prices",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795785422100,
+      "tag": "0038_refunds_and_credit_expiry",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795788481544,
+      "tag": "0039_promo_clawback",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795793477012,
+      "tag": "0040_key_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795797013679,
+      "tag": "0041_activity_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1795855044734,
+      "tag": "0042_personal_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795856329716,
+      "tag": "0043_organization_limit",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795860008792,
+      "tag": "0044_credit_transfers",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1795861197954,
+      "tag": "0045_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1795871850870,
+      "tag": "0046_catalog_statistics",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795885579455,
+      "tag": "0047_site_and_contact",
+      "breakpoints": true
     }
   ]
 }

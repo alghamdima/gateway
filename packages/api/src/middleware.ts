@@ -54,6 +54,13 @@ export const enforceAdmin = createMiddleware<{
     });
   }
 
+  // staff need two-factor authentication on (ADR 0011)
+  if (!user.twoFactorEnabled) {
+    throw new HttpException(HttpStatusCode.FORBIDDEN, {
+      code: "error.twoFactorRequired",
+    });
+  }
+
   await next();
 });
 
@@ -214,9 +221,12 @@ export const validate = <
       const mapped = getValidationLocale(locale)().localeError(
         error as $ZodRawIssue,
       );
+      // a custom issue carries the message its rule wrote; the locale only has "Invalid input"
       const message =
-        (typeof mapped === "string" ? mapped : mapped?.message) ??
-        error.message;
+        error.code === "custom"
+          ? error.message
+          : ((typeof mapped === "string" ? mapped : mapped?.message) ??
+            error.message);
 
       throw new HttpException(HttpStatusCode.UNPROCESSABLE_ENTITY, {
         code: error.code,

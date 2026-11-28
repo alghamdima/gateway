@@ -1,0 +1,5 @@
+ALTER TABLE "pricing_settings" ADD COLUMN "topup_min_micro_usd" bigint DEFAULT 5000000 NOT NULL;--> statement-breakpoint
+ALTER TABLE "pricing_settings" ADD COLUMN "topup_max_micro_usd" bigint DEFAULT 1000000000 NOT NULL;--> statement-breakpoint
+ALTER TABLE "pricing_settings" ADD COLUMN "topup_presets_micro_usd" bigint[] DEFAULT '{10000000,25000000,50000000,100000000}'::bigint[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "pricing_settings" ADD CONSTRAINT "pricing_settings_topup_limits_range" CHECK ("pricing_settings"."topup_min_micro_usd" > 0 and "pricing_settings"."topup_max_micro_usd" >= "pricing_settings"."topup_min_micro_usd" and "pricing_settings"."topup_max_micro_usd" <= 1000000000000);--> statement-breakpoint
+ALTER TABLE "pricing_settings" ADD CONSTRAINT "pricing_settings_topup_presets_range" CHECK (cardinality("pricing_settings"."topup_presets_micro_usd") between 1 and 8 and array_position("pricing_settings"."topup_presets_micro_usd", null) is null and "pricing_settings"."topup_min_micro_usd" <= all("pricing_settings"."topup_presets_micro_usd") and "pricing_settings"."topup_max_micro_usd" >= all("pricing_settings"."topup_presets_micro_usd"));

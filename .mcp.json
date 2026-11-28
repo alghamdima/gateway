@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "turbostarter-docs": {
+      "type": "http",
+      "url": "https://www.turbostarter.dev/mcp"
+    }
+  }
+}

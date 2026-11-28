@@ -10,7 +10,8 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "dotenv -e ../../apps/web/.env.local -c -- email dev --port 3005 --dir src/templates"
+    "dev": "dotenv -e ../../apps/web/.env.local -c -- email dev --port 3005 --dir src/templates",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@react-email/ui": "6.9.5",

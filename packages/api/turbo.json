@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "env": [
+        "GATEWAY_E2E_BINARY",
+        "GATEWAY_URL",
+        "GATEWAY_ADMIN_USERNAME",
+        "GATEWAY_ADMIN_PASSWORD",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_TEST_SECRET_KEY",
+        "STRIPE_TEST_WEBHOOK_SECRET",
+        "CRON_SECRET",
+        "RECONCILIATION_ALERT_EMAIL"
+      ]
+    }
+  }
+}

@@ -12,43 +12,9 @@ import { MobileNavigation } from "./navigation/mobile-navigation";
 import { Navigation } from "./navigation/navigation";
 
 import type { Session } from "~/lib/auth/client";
+import type { SiteSettings } from "~/modules/marketing/site";
 
-const links = [
-  {
-    label: "product",
-    items: [
-      {
-        title: "marketing:product.mobile.ios.title",
-        description: "marketing:product.mobile.ios.description",
-        href: "https://apps.apple.com/app/id6754278899",
-        icon: Icons.AppleStroke,
-      },
-      {
-        title: "marketing:product.mobile.android.title",
-        description: "marketing:product.mobile.android.description",
-        href: "https://play.google.com/store/apps/details?id=com.turbostarter.core",
-        icon: Icons.AndroidStroke,
-      },
-      {
-        title: "marketing:product.extension.chrome.title",
-        description: "marketing:product.extension.chrome.description",
-        href: "https://chromewebstore.google.com/detail/bcjmonmlfbnngpkllpnpmnjajaciaboo",
-        icon: Icons.ChromeStroke,
-      },
-      {
-        title: "marketing:product.extension.firefox.title",
-        description: "marketing:product.extension.firefox.description",
-        href: "https://addons.mozilla.org/addon/turbostarter_",
-        icon: Icons.FirefoxStroke,
-      },
-      {
-        title: "marketing:product.extension.edge.title",
-        description: "marketing:product.extension.edge.description",
-        href: "https://microsoftedge.microsoft.com/addons/detail/turbostarter/ianbflanmmoeleokihabnmmcahhfijig",
-        icon: Icons.EdgeStroke,
-      },
-    ],
-  },
+const allLinks = [
   {
     label: "resources",
     items: [
@@ -58,43 +24,11 @@ const links = [
         href: pathsConfig.marketing.contact,
         icon: Icons.SendHorizontal,
       },
-      {
-        title: "marketing:roadmap.title",
-        description: "marketing:roadmap.description",
-        href: "https://github.com/orgs/turbostarter/projects/1",
-        icon: Icons.ChartNoAxesGantt,
-      },
-      {
-        title: "marketing:docs.title",
-        description: "marketing:docs.description",
-        href: "https://www.turbostarter.dev/docs/web",
-        icon: Icons.BookOpen,
-      },
-      {
-        title: "marketing:api.title",
-        description: "marketing:api.description",
-        href: "https://www.turbostarter.dev/docs/web/api/openapi",
-        icon: Icons.Webhook,
-      },
-      {
-        title: "marketing:mcp.title",
-        description: "marketing:mcp.description",
-        href: "https://www.turbostarter.dev/docs/web/installation/mcp",
-        icon: Icons.Plug,
-      },
-      {
-        title: "marketing:sourceCode.title",
-        description: "marketing:sourceCode.description",
-        href: "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
-        icon: Icons.Code,
-      },
-      {
-        title: "marketing:waitlist.label",
-        description: "marketing:waitlist.description",
-        href: pathsConfig.marketing.waitlist,
-        icon: Icons.ClockFading,
-      },
     ],
+  },
+  {
+    label: "marketing:models.label",
+    href: pathsConfig.marketing.models.index,
   },
   {
     label: "billing:pricing.label",
@@ -108,10 +42,19 @@ const links = [
 
 export const Header = ({
   initialSession,
+  site,
 }: {
   initialSession: Session | null;
+  site: SiteSettings;
 }) => {
   const { t } = useTranslation("common");
+  // the blog is linked only while staff have it switched on (SITE-01)
+  const links = allLinks.filter(
+    (link) =>
+      site.isBlogEnabled ||
+      !("href" in link) ||
+      link.href !== pathsConfig.marketing.blog.index,
+  );
   return (
     <header className="bg-background/80 sticky inset-0 top-(--banner-height,0px) z-40 w-full py-3 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 pr-4 sm:container">

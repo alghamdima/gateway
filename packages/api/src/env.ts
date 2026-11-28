@@ -2,22 +2,31 @@ import { defineEnv } from "envin";
 import * as z from "zod";
 
 import { preset as auth } from "@workspace/auth/env";
-import { preset as billingMobile } from "@workspace/billing-mobile/server/env";
 import { preset as billingWeb } from "@workspace/billing-web/env";
 import { preset as db } from "@workspace/db/env";
 import { preset as email } from "@workspace/email/env";
+import { preset as gateway } from "@workspace/gateway-client/env";
 import { preset as monitoring } from "@workspace/monitoring-web/env";
 import { envConfig, NodeEnv } from "@workspace/shared/constants";
 import { preset as storage } from "@workspace/storage/env";
+
+import { preset as internal } from "./modules/reconciliation/env";
 
 import type { Preset } from "envin/types";
 
 export const preset = {
   id: "api",
-  server: {
-    OPENAI_API_KEY: z.string().optional(), // change it to your provider API key (e.g. ANTHROPIC_API_KEY if you use Anthropic)
-  },
-  extends: [auth, billingWeb, billingMobile, db, email, storage, monitoring],
+  server: {},
+  extends: [
+    auth,
+    billingWeb,
+    db,
+    email,
+    gateway,
+    storage,
+    monitoring,
+    internal,
+  ],
 } as const satisfies Preset;
 
 export const env = defineEnv({

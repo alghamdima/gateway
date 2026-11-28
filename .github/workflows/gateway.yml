@@ -1,0 +1,95 @@
+name: CI / Gateway
+
+on:
+  pull_request:
+    branches: ["*"]
+    paths:
+      - "apps/gateway/**"
+      - "docs/platform/gateway-baseline/**"
+      - "packages/db/migrations/**"
+      - ".github/workflows/gateway.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "apps/gateway/**"
+      - "docs/platform/gateway-baseline/**"
+      - "packages/db/migrations/**"
+      - ".github/workflows/gateway.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # the job runs the whole Go suite and takes most of an hour; let a run finish and queue the next
+  # one instead of losing it to every push
+  cancel-in-progress: false
+
+jobs:
+  gateway:
+    name: 🚪 Gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: apps/gateway
+
+    # the credits plugin's tests run against real Postgres with the control plane's migrations
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: lemru
+          POSTGRES_PASSWORD: lemru
+          POSTGRES_DB: core
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lemru -d core"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      # The race-enabled build of the credits tests plus the full suite's build cache fill the
+      # runner's disk and cut the baseline run short. These preinstalled toolchains are not used.
+      - name: 🧹 Free disk space
+        working-directory: /
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: ✅ Checkout code
+        uses: actions/checkout@v7
+
+      - name: 🔨 Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/gateway/go.work
+          cache-dependency-path: apps/gateway/**/go.sum
+
+      - name: 🔨 Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/gateway/.nvmrc
+
+      - name: 🏷️ Rename tool tests
+        working-directory: apps/gateway/scripts/rename
+        run: GOWORK=off go test ./...
+
+      - name: 🏗️ Build
+        run: make build LOCAL=1
+
+      # unit tests, the ledger against Postgres, and the built gateway end to end with a mock provider
+      - name: 💳 Credits plugin tests
+        working-directory: apps/gateway/plugins/credits
+        run: CREDITS_E2E_BINARY=$(ls "$GITHUB_WORKSPACE"/apps/gateway/tmp/*-http) go test -count=1 -race ./...
+        env:
+          CREDITS_TEST_DATABASE_URL: postgresql://lemru:lemru@localhost:5432/core
+
+      - name: 🔎 Vet
+        run: |
+          for mod in $(go work edit -json | jq -r '.Use[].DiskPath'); do
+            (cd "$mod" && go vet ./...)
+          done
+
+      - name: 🧪 Test against the baseline
+        run: scripts/test.sh

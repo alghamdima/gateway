@@ -6,8 +6,18 @@ pre-commit:
       stage_fixed: true
       glob:
         - "*.{js,ts,tsx,jsx,mjs,cjs,json,css,md,mdx}"
+      # keep in sync with .prettierignore: oxfmt exits non-zero when every file it is given is ignored
+      exclude:
+        - "apps/gateway/**"
     lint:
       run: pnpm lint:fix {staged_files}
       stage_fixed: true
       glob:
         - "*.{js,ts,tsx,jsx,mjs,cjs}"
+      # keep in sync with .eslintignore
+      exclude:
+        - "apps/gateway/**"
+        - ".agents/**"
+        - ".claude/**"
+        - ".cursor/**"
+        - ".github/skills/**"

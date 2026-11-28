@@ -1,0 +1,427 @@
+"use client";
+
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+
+import { handle } from "@workspace/api/utils";
+import { useTranslation } from "@workspace/i18n";
+import { formatUsd } from "@workspace/shared/utils";
+import { Badge } from "@workspace/ui-web/badge";
+import { Button } from "@workspace/ui-web/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui-web/card";
+import {
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalDescription,
+  ModalHeader,
+  ModalTitle,
+} from "@workspace/ui-web/modal";
+import { Skeleton } from "@workspace/ui-web/skeleton";
+import { Spinner } from "@workspace/ui-web/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui-web/table";
+
+import { api } from "~/lib/api/client";
+import { formatMicroSar, MICRO_SAR } from "~/modules/keys/money";
+
+const PAGE_SIZE = 25;
+
+interface RecentRequestsProps {
+  readonly organizationId: string;
+}
+
+/** The latest charged requests; one opens its record (step 9.2). */
+export const RecentRequests = ({ organizationId }: RecentRequestsProps) => {
+  const { t, i18n } = useTranslation(["common", "organization"]);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const requests = useInfiniteQuery({
+    queryKey: ["activity", organizationId, "requests"],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      handle(api.activity[":organizationId"].requests.$get)({
+        param: { organizationId },
+        query: {
+          limit: String(PAGE_SIZE),
+          ...(pageParam ? { before: pageParam } : {}),
+        },
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.length === PAGE_SIZE ? lastPage.at(-1)?.createdAt : undefined,
+  });
+
+  const rows = requests.data?.pages.flat() ?? [];
+  const when = new Intl.DateTimeFormat(i18n.language, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  });
+  const count = (value: number) =>
+    new Intl.NumberFormat(i18n.language).format(value);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("organization:activity.recent.title")}</CardTitle>
+        <CardDescription>
+          {t("organization:activity.recent.description")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {requests.isPending && <Skeleton className="h-32 w-full" />}
+        {!requests.isPending && rows.length === 0 && (
+          <p className="text-muted-foreground text-sm">
+            {t("organization:activity.empty")}
+          </p>
+        )}
+        {rows.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("organization:activity.recent.when")}</TableHead>
+                <TableHead>{t("organization:activity.model")}</TableHead>
+                <TableHead>{t("organization:activity.key")}</TableHead>
+                <TableHead className="text-right">
+                  {t("organization:activity.tokens")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("organization:activity.spend")}
+                </TableHead>
+                <TableHead>
+                  <span className="sr-only">
+                    {t("organization:activity.recent.details")}
+                  </span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row, index) => (
+                <TableRow
+                  key={`${row.id ?? "none"}-${row.createdAt}-${index}`}
+                  className={row.id ? "cursor-pointer" : undefined}
+                  onClick={() => row.id && setOpenId(row.id)}
+                >
+                  <TableCell className="whitespace-nowrap">
+                    {when.format(new Date(row.createdAt))}
+                  </TableCell>
+                  <TableCell>
+                    {row.provider}/{row.model}
+                    {row.failed && (
+                      <Badge variant="destructive" className="ms-2">
+                        {t("organization:activity.recent.failed")}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {row.keyName ?? t("organization:activity.deletedKey")}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {count(row.promptTokens + row.completionTokens)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatMicroSar(row.cost, i18n.language)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {row.id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setOpenId(row.id);
+                        }}
+                      >
+                        {t("organization:activity.recent.details")}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {requests.hasNextPage && (
+          <Button
+            variant="outline"
+            onClick={() => requests.fetchNextPage()}
+            disabled={requests.isFetchingNextPage}
+          >
+            {requests.isFetchingNextPage ? (
+              <Spinner />
+            ) : (
+              t("organization:credits.history.more")
+            )}
+          </Button>
+        )}
+      </CardContent>
+      {openId && (
+        <RequestRecord
+          organizationId={organizationId}
+          id={openId}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+    </Card>
+  );
+};
+
+const RequestRecord = ({
+  organizationId,
+  id,
+  onClose,
+}: {
+  readonly organizationId: string;
+  readonly id: string;
+  readonly onClose: () => void;
+}) => {
+  const { t, i18n } = useTranslation(["common", "organization"]);
+  const record = useQuery({
+    queryKey: ["activity", organizationId, "requests", id],
+    queryFn: () =>
+      handle(api.activity[":organizationId"].requests[":id"].$get)({
+        param: { organizationId, id },
+      }),
+  });
+  // the API answers in SAR (the charge) with the provider's USD cost beside it
+  const sar = (value: number) =>
+    formatMicroSar(Math.round(value * MICRO_SAR), i18n.language);
+  const usd = (value: number) =>
+    formatUsd(value, i18n.language, { maximumFractionDigits: 6 });
+  const count = (value: number) =>
+    new Intl.NumberFormat(i18n.language).format(value);
+  const unknown = t("organization:activity.record.unknown");
+  const ms = (value: number) => `${count(Math.round(value))} ms`;
+  const data = record.data;
+  const facts = data
+    ? [
+        {
+          label: t("organization:activity.model"),
+          value: `${data.provider_name ?? ""}/${data.model ?? ""}`,
+        },
+        {
+          label: t("organization:activity.record.promptTokens"),
+          value: count(data.tokens_prompt),
+        },
+        {
+          label: t("organization:activity.record.completionTokens"),
+          value: count(data.tokens_completion),
+        },
+        {
+          label: t("organization:activity.spend"),
+          value: sar(data.total_cost),
+        },
+        {
+          label: t("organization:activity.record.upstreamCost"),
+          value: usd(data.upstream_cost_usd),
+        },
+        {
+          label: t("organization:activity.record.reasoningTokens"),
+          value: count(data.native_tokens_reasoning),
+        },
+        {
+          label: t("organization:activity.record.cachedTokens"),
+          value: count(data.native_tokens_cached),
+        },
+        {
+          label: t("organization:activity.record.latency"),
+          value: data.latency === null ? unknown : ms(data.latency),
+        },
+        {
+          label: t("organization:activity.record.totalLatency"),
+          value: data.total_latency === null ? unknown : ms(data.total_latency),
+        },
+        {
+          label: t("organization:activity.record.generationTime"),
+          value:
+            data.generation_time === null ? unknown : ms(data.generation_time),
+        },
+        {
+          label: t("organization:activity.record.speed"),
+          value:
+            data.tokens_per_second === null
+              ? unknown
+              : t("organization:activity.record.speedValue", {
+                  value: count(Math.round(data.tokens_per_second * 10) / 10),
+                }),
+        },
+        {
+          label: t("organization:activity.record.finishReason"),
+          value: data.finish_reason ?? unknown,
+        },
+        {
+          label: t("organization:activity.record.streamed"),
+          value:
+            data.streamed === null
+              ? unknown
+              : data.streamed
+                ? t("organization:activity.record.yes")
+                : t("organization:activity.record.no"),
+        },
+      ]
+    : [];
+
+  // where the request went and the policy in force then (ADR 0015)
+  const endpoint = data?.data_policy.endpoint;
+  const policy = data?.data_policy.policy;
+  const regionName = (region: string) =>
+    t(`organization:dataPolicy.regions.names.${region as "sa"}`);
+  const requirements = policy
+    ? [
+        policy.require_zero_retention &&
+          t("organization:dataPolicy.zeroRetention.label"),
+        policy.forbid_training && t("organization:dataPolicy.noTraining.label"),
+        policy.allowed_regions?.map(regionName).join(", "),
+        policy.allowed_providers?.join(", "),
+      ].filter((item): item is string => Boolean(item))
+    : [];
+  const evidence = endpoint
+    ? [
+        {
+          label: t("organization:dataPolicy.endpoints.region"),
+          value:
+            endpoint.region === null
+              ? t("organization:dataPolicy.endpoints.unknown")
+              : regionName(endpoint.region),
+        },
+        {
+          label: t("organization:dataPolicy.endpoints.retention"),
+          value: endpoint.zero_retention
+            ? t("organization:dataPolicy.endpoints.notKept")
+            : t("organization:dataPolicy.endpoints.mayKeep"),
+        },
+        {
+          label: t("organization:dataPolicy.endpoints.training"),
+          value: endpoint.never_trained_on
+            ? t("organization:dataPolicy.endpoints.neverTrains")
+            : t("organization:dataPolicy.endpoints.mayTrain"),
+        },
+        {
+          label: t("organization:activity.record.termsVerified"),
+          value: endpoint.verified_on ?? unknown,
+        },
+      ]
+    : [];
+
+  return (
+    <Modal
+      open
+      drawer={{ onOpenChange: (open) => !open && onClose() }}
+      dialog={{ onOpenChange: (open) => !open && onClose() }}
+    >
+      <ModalContent>
+        <ModalHeader>
+          <ModalTitle>{t("organization:activity.record.title")}</ModalTitle>
+          <ModalDescription className="font-mono text-xs break-all">
+            {id}
+          </ModalDescription>
+        </ModalHeader>
+        <ModalBody className="space-y-6">
+          {record.isPending && <Skeleton className="h-40 w-full" />}
+          {data && (
+            <>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                {facts.map((fact) => (
+                  <div key={fact.label} className="contents">
+                    <dt className="text-muted-foreground">{fact.label}</dt>
+                    <dd className="tabular-nums">{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {data.provider_responses.length > 1 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    {t("organization:activity.record.attempts")}
+                  </p>
+                  <ul className="space-y-1 text-sm">
+                    {data.provider_responses.map((attempt, index) => (
+                      <li
+                        key={`${attempt.created_at}-${index}`}
+                        className="flex justify-between gap-4"
+                      >
+                        <span>
+                          {attempt.provider}/{attempt.model}{" "}
+                          <Badge
+                            variant={
+                              attempt.status === "error"
+                                ? "destructive"
+                                : "outline"
+                            }
+                          >
+                            {attempt.status === "error"
+                              ? t("organization:activity.record.error")
+                              : t("organization:activity.record.success")}
+                          </Badge>
+                        </span>
+                        <span className="tabular-nums">
+                          {attempt.status_code !== null &&
+                            `${attempt.status_code} · `}
+                          {attempt.latency !== null &&
+                            `${ms(attempt.latency)} · `}
+                          {sar(attempt.cost)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {t("organization:activity.record.dataTitle")}
+                </p>
+                {endpoint ? (
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                    {evidence.map((fact) => (
+                      <div key={fact.label} className="contents">
+                        <dt className="text-muted-foreground">{fact.label}</dt>
+                        <dd>{fact.value}</dd>
+                      </div>
+                    ))}
+                    <div className="contents">
+                      <dt className="text-muted-foreground">
+                        {t("organization:activity.record.policy")}
+                      </dt>
+                      <dd>
+                        {policy && policy.version > 0
+                          ? t("organization:activity.record.policyVersion", {
+                              version: policy.version,
+                              requirements:
+                                requirements.join(" · ") ||
+                                t("organization:activity.record.policyOpen"),
+                            })
+                          : t("organization:activity.record.policyNone")}
+                      </dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {t("organization:activity.record.dataMissing")}
+                  </p>
+                )}
+                {endpoint?.terms_changed_since && (
+                  <p className="text-muted-foreground text-xs">
+                    {t("organization:activity.record.termsChanged")}
+                  </p>
+                )}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {t("organization:activity.record.note")}
+              </p>
+            </>
+          )}
+        </ModalBody>
+      </ModalContent>
+    </Modal>
+  );
+};

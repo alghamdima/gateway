@@ -1,8 +1,13 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { expo } from "@better-auth/expo";
 import { i18n, locales, TranslationDictionary } from "@better-auth/i18n";
 import { passkey } from "@better-auth/passkey";
-import { createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+  isAPIError,
+} from "better-auth/api";
+import { deleteSessionCookie } from "better-auth/cookies";
 import { betterAuth } from "better-auth/minimal";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -26,22 +31,89 @@ import { logger } from "@workspace/shared/logger";
 
 import { env } from "./env";
 import { hooks } from "./hooks";
+import { prepareAccountDeletion } from "./hooks/user/delete";
+import { AUTH_ADMIN_ACTIONS, clientIp, recordStaffAction } from "./lib/audit";
 import { syncSubscriptionSeats } from "./lib/server";
 import { getUrl, trustedOrigins } from "./lib/utils";
-import { ac, roles } from "./rbac";
+import {
+  ac,
+  isStaff,
+  roles,
+  STAFF_ROLE_NAMES,
+  staffAc,
+  staffRoles,
+} from "./rbac";
 import { AuthProvider, SocialProvider, VerificationType } from "./types";
 
+/**
+ * Where a staff member with two-factor authentication may get a session.
+ * Better Auth asks for the second factor only on password sign-ins; every
+ * other way in (magic link, email code, Google, GitHub, Apple, one-tap) would
+ * give staff a full session on their mailbox or social account alone
+ * (ADR 0011).
+ */
+const STAFF_SESSION_PATHS = new Set([
+  // the password step: the two-factor plugin turns it into a challenge
+  "/sign-in/email",
+  "/two-factor/verify-totp",
+  "/two-factor/verify-backup-code",
+  // a passkey is itself a strong second factor
+  "/passkey/verify-authentication",
+  "/sign-in/passkey",
+  // already signed in with both factors
+  "/change-password",
+  "/admin/impersonate-user",
+  "/admin/stop-impersonating",
+]);
+
+const refuseStaffSessionsWithoutSecondFactor = async (
+  ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
+) => {
+  const created = ctx.context.newSession;
+  if (!created || STAFF_SESSION_PATHS.has(ctx.path)) {
+    return;
+  }
+  // the hook context types the user loosely; read the two fields we need
+  const role = typeof created.user.role === "string" ? created.user.role : null;
+  if (!isStaff({ role }) || created.user.twoFactorEnabled !== true) {
+    return;
+  }
+  await ctx.context.internalAdapter.deleteSession(created.session.token);
+  deleteSessionCookie(ctx);
+  throw new APIError("FORBIDDEN", {
+    message:
+      "Staff accounts sign in with their password and authenticator app, or a passkey",
+  });
+};
+
 export const auth = betterAuth({
-  appName: "TurboStarter",
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60, // 5 minutes
+  appName: "Lemru",
+  // No cookie cache: every request reads the session from the database, so a
+  // ban, a revoked session or a changed role applies on the next request
+  // instead of up to five minutes later.
+  session: {},
+  rateLimit: {
+    // on in every environment, so it is exercised before production; counters
+    // are shared by every instance
+    enabled: true,
+    storage: "database",
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 3 },
+      "/request-password-reset": { window: 60, max: 3 },
+      "/sign-in/magic-link": { window: 60, max: 3 },
+      "/email-otp/send-verification-otp": { window: 60, max: 3 },
+      "/two-factor/verify-totp": { window: 60, max: 5 },
+      "/two-factor/verify-backup-code": { window: 60, max: 5 },
     },
   },
   user: {
     deleteUser: {
       enabled: true,
+      // before Better Auth deletes the sessions and sign-in accounts
+      beforeDelete: async (user) => {
+        await prepareAccountDeletion(user.id);
+      },
       sendDeleteAccountVerification: async ({ user, url }, request) =>
         sendEmail({
           to: user.email,
@@ -115,7 +187,48 @@ export const auth = betterAuth({
     user: hooks.user,
   },
   hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      // Anonymous accounts are off for a paid API: they would let anyone
+      // create accounts without an email. The plugin stays registered only so
+      // the existing schema and types keep working; its sign-in is refused.
+      if (ctx.path === "/sign-in/anonymous") {
+        throw new APIError("FORBIDDEN", {
+          message: "Anonymous sign-in is disabled",
+        });
+      }
+
+      // Staff act on every customer's account and money (ADR 0011): their
+      // admin actions need two-factor authentication turned on. Stopping an
+      // impersonation runs as the customer, who is not staff, so it passes.
+      // a staff member removing a user: the same checks, before anything is
+      // deleted (see prepareAccountDeletion)
+      if (ctx.path === "/admin/remove-user") {
+        const userId: unknown = ctx.body?.userId;
+        if (typeof userId === "string") {
+          await prepareAccountDeletion(userId);
+        }
+      }
+
+      if (ctx.path.startsWith("/admin/")) {
+        const session = await getSessionFromCtx(ctx);
+        // the hook context types the user loosely; read the two fields we need
+        const role =
+          typeof session?.user.role === "string" ? session.user.role : null;
+        if (
+          session &&
+          isStaff({ role }) &&
+          session.user.twoFactorEnabled !== true
+        ) {
+          throw new APIError("FORBIDDEN", {
+            message: "Turn on two-factor authentication to use admin actions",
+          });
+        }
+      }
+    }),
     after: createAuthMiddleware(async (ctx) => {
+      await refuseStaffSessionsWithoutSecondFactor(ctx);
+      await recordAuthAdminAction(ctx);
+
       if (ctx.path !== "/organization/leave") {
         return;
       }
@@ -131,7 +244,6 @@ export const auth = betterAuth({
       detection: ["cookie", "header"],
       translations: {
         en: locales.en,
-        es: locales.es,
       } satisfies Record<Locale, TranslationDictionary>,
       localeCookie: config.cookie,
       defaultLocale: config.defaultLocale,
@@ -170,9 +282,14 @@ export const auth = betterAuth({
     passkey(),
     twoFactor(),
     anonymous({
-      emailDomainName: "turbostarter.dev",
+      emailDomainName: "anonymous.invalid",
     }),
-    admin(),
+    admin({
+      ac: staffAc,
+      roles: staffRoles,
+      // impersonating any staff member needs "impersonate-admins", which no role has
+      adminRoles: [...STAFF_ROLE_NAMES],
+    }),
     organization({
       requireEmailVerificationOnInvitation: true,
       sendInvitationEmail: async (
@@ -215,7 +332,6 @@ export const auth = betterAuth({
       },
     }),
     oneTap(),
-    expo(),
     nextCookies(),
   ],
   socialProviders: {
@@ -234,7 +350,7 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    cookiePrefix: "turbostarter",
+    cookiePrefix: "lemru",
     database: {
       joins: true,
     },
@@ -252,6 +368,51 @@ export const auth = betterAuth({
   },
 });
 
+/**
+ * Records a successful Better Auth admin action in the audit log
+ * (ADR 0011). The request still carries the staff member's own session, so
+ * they are the actor, including for impersonate-user; for
+ * stop-impersonating the session is the customer's and names the staff
+ * member in impersonatedBy.
+ */
+async function recordAuthAdminAction(
+  ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
+) {
+  const entry = AUTH_ADMIN_ACTIONS[ctx.path];
+  if (!entry || isAPIError(ctx.context.returned)) {
+    return;
+  }
+  const session = await getSessionFromCtx(ctx);
+  if (!session) {
+    return;
+  }
+  const impersonatedBy =
+    typeof session.session.impersonatedBy === "string"
+      ? session.session.impersonatedBy
+      : null;
+  const body: Record<string, unknown> =
+    ctx.body && typeof ctx.body === "object" ? ctx.body : {};
+  const targetId =
+    typeof body.userId === "string"
+      ? body.userId
+      : impersonatedBy
+        ? session.user.id
+        : undefined;
+
+  await recordStaffAction({
+    actorId: impersonatedBy ?? session.user.id,
+    actorRole:
+      impersonatedBy === null && typeof session.user.role === "string"
+        ? session.user.role
+        : null,
+    action: entry.action,
+    targetType: "user",
+    targetId,
+    details: entry.details?.(body),
+    ipAddress: clientIp(ctx.request?.headers),
+  });
+}
+
 export type AuthErrorCode = keyof typeof auth.$ERROR_CODES;
 export type Session = typeof auth.$Infer.Session;
 export type User = Session["user"];
@@ -267,3 +428,5 @@ export type Permissions = NonNullable<
 
 export * from "./hooks";
 export * from "./lib/server";
+export * from "./lib/audit";
+export * from "./lib/personal";

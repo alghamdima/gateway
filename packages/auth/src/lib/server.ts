@@ -9,7 +9,7 @@ import {
   getOrganizationBillableSeatsCount,
 } from "@workspace/billing/server";
 import { and, eq, sql } from "@workspace/db";
-import { member, organization } from "@workspace/db/schema";
+import { member, organization, personalAccount } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
 import { MemberRole } from "../types";
@@ -61,14 +61,21 @@ export const getOrganizationsBlockingAccountDeletion = ({
       ),
     )
     .where(
-      eq(
-        sql<number>`(
+      and(
+        eq(
+          sql<number>`(
           select count(*)
           from ${member} as owners
           where owners.organization_id = ${organization.id}
             and owners.role = ${MemberRole.OWNER}
         )`,
-        1,
+          1,
+        ),
+        // the personal account is deleted with its user (ADR 0020)
+        sql`not exists (
+          select 1 from ${personalAccount}
+          where ${personalAccount.organizationId} = ${organization.id}
+        )`,
       ),
     );
 };

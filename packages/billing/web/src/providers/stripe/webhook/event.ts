@@ -1,11 +1,9 @@
-import { stripe } from "../sdk";
+import { Stripe } from "stripe";
 
-import type { Stripe } from "stripe";
-
+/** Stripe's own signature check; it needs the signing secret, not an API key. */
 export const constructEvent = (data: {
   payload: string;
   sig: string;
   secret: string;
-}): Stripe.Event => {
-  return stripe().webhooks.constructEvent(data.payload, data.sig, data.secret);
-};
+}): Stripe.Event =>
+  Stripe.webhooks.constructEvent(data.payload, data.sig, data.secret);

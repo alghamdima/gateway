@@ -198,7 +198,12 @@ export const I18nProvider = ({
   resources?: Resource;
 }) => {
   const [i18nClient, setI18nClient] = useState<i18n | null>(() => {
-    if (client) {
+    // One server process renders every locale: a shared instance there would keep the language
+    // of whichever request came first, so the server makes one per render.
+    // asked this way because packages without the DOM types compile this file too
+    const isBrowser = "window" in globalThis;
+
+    if (isBrowser && client) {
       return client;
     }
 
@@ -206,14 +211,19 @@ export const I18nProvider = ({
       return null;
     }
 
-    client = createI18nClientFromResources({
+    const created = createI18nClientFromResources({
       locale,
       defaultLocale,
       ns,
       resources,
     });
-    z.config(getValidationLocale(client.language)());
-    return client;
+    z.config(getValidationLocale(created.language)());
+
+    if (isBrowser) {
+      client = created;
+    }
+
+    return created;
   });
 
   useEffect(() => {

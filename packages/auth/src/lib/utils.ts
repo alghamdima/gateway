@@ -6,19 +6,26 @@ import {
   mergeSearchParams,
 } from "@workspace/shared/utils";
 
-import { MemberRole, UserRole } from "../types";
+import { isStaff } from "../rbac/staff";
+import { MemberRole } from "../types";
 
 import type { User } from "../types";
 
 export const trustedOrigins = [
-  "chrome-extension://",
-  "turbostarter://",
   /* Needed only for Apple ID authentication */
   "https://appleid.apple.com",
   ...(process.env.NODE_ENV !== "production"
-    ? ["http://localhost*", "https://localhost*", "exp://"]
+    ? ["http://localhost*", "https://localhost*"]
     : []),
 ];
+
+// The app's public address. Behind the reverse proxy a request's own URL is
+// the internal one (localhost), so the public origin has to be named here, or
+// links in emails (an invitation) point at the internal address.
+const ownOrigins = () => {
+  const origin = process.env.URL ? getOrigin(process.env.URL) : null;
+  return origin ? [origin] : [];
+};
 
 const isTrustedOrigin = (candidate: string, request?: Request) => {
   try {
@@ -29,6 +36,7 @@ const isTrustedOrigin = (candidate: string, request?: Request) => {
 
   const origins = [
     ...trustedOrigins,
+    ...ownOrigins(),
     ...(request?.url ? [new URL(request.url).origin] : []),
   ];
 
@@ -45,7 +53,6 @@ export const getUrl = ({
   type?: string;
 }) => {
   const passedUrl = request?.headers.get("x-url");
-  const expoOrigin = request?.headers.get("expo-origin");
 
   let resultUrl: URL;
 
@@ -53,20 +60,8 @@ export const getUrl = ({
     // Base on x-url; merge in params from provided `url` without overwriting existing keys
     resultUrl = new URL(passedUrl);
     if (url) {
-      const urlObj = new URL(
-        url,
-        getOrigin(resultUrl.toString()) ?? expoOrigin ?? undefined,
-      );
+      const urlObj = new URL(url, getOrigin(resultUrl.toString()) ?? undefined);
       mergeSearchParams(resultUrl, urlObj, { overwrite: false });
-    }
-  } else if (expoOrigin && isTrustedOrigin(expoOrigin, request)) {
-    // For Expo/mobile, base on expo-origin; if `url` has a query, adopt it entirely
-    resultUrl = new URL(expoOrigin);
-    if (url) {
-      const targetUrl = new URL(url);
-      if (targetUrl.search) {
-        mergeSearchParams(resultUrl, targetUrl, { replace: true });
-      }
     }
   } else {
     // For web, use the provided URL or fall back to the request URL
@@ -103,8 +98,8 @@ export const getAllRolesAtOrAbove = (role: MemberRole): MemberRole[] => {
   return hierarchy.slice(idx, hierarchy.length);
 };
 
-export const hasAdminPermission = (user: User) =>
-  user.role?.split(",").includes(UserRole.ADMIN) ?? false;
+/** Whether the user may open the admin console: any staff role (rbac/staff.ts). */
+export const hasAdminPermission = (user: User) => isStaff(user);
 
 export const toMemberRole = (role: unknown): MemberRole => {
   if (z.enum(MemberRole).safeParse(role).success) {

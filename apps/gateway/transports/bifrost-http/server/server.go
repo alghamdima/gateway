@@ -1,0 +1,2855 @@
+// Package server provides the HTTP server for Bifrost.
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math/rand"
+	"net"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/fasthttp/router"
+	bifrost "github.com/maximhq/bifrost/core"
+	"github.com/maximhq/bifrost/core/network"
+	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/configstore"
+	"github.com/maximhq/bifrost/framework/configstore/tables"
+	"github.com/maximhq/bifrost/framework/logstore"
+	"github.com/maximhq/bifrost/framework/modelcatalog"
+	dynamicPlugins "github.com/maximhq/bifrost/framework/plugins"
+	"github.com/maximhq/bifrost/framework/sidekiq"
+	"github.com/maximhq/bifrost/framework/tracing"
+	"github.com/maximhq/bifrost/framework/vectorstore"
+	"github.com/maximhq/bifrost/plugins/governance"
+	"github.com/maximhq/bifrost/plugins/logging"
+	"github.com/maximhq/bifrost/plugins/otel"
+	"github.com/maximhq/bifrost/plugins/routing"
+	"github.com/maximhq/bifrost/plugins/routing/complexity"
+	"github.com/maximhq/bifrost/plugins/semanticcache"
+	"github.com/maximhq/bifrost/plugins/telemetry"
+	"github.com/maximhq/bifrost/transports/v2/bifrost-http/handlers"
+	"github.com/maximhq/bifrost/transports/v2/bifrost-http/integrations"
+	"github.com/maximhq/bifrost/transports/v2/bifrost-http/lib"
+	bfws "github.com/maximhq/bifrost/transports/v2/bifrost-http/websocket"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
+	"gorm.io/gorm"
+)
+
+// Constants
+const (
+	DefaultHost           = "localhost"
+	DefaultPort           = "8080"
+	DefaultAppDir         = "" // Empty string means use OS-specific config directory
+	DefaultLogLevel       = string(schemas.LogLevelInfo)
+	DefaultLogOutputStyle = string(schemas.LoggerOutputTypeJSON)
+)
+
+// ServerCallbacks is a interface that defines the callbacks for the server.
+type ServerCallbacks interface {
+	// Plugins callbacks
+	ReloadPlugin(ctx context.Context, name string, path *string, pluginConfig any, placement *schemas.PluginPlacement, order *int) error
+	RemovePlugin(ctx context.Context, name string) error
+	GetPluginStatus(ctx context.Context) map[string]schemas.PluginStatus
+	GetLoadedPluginNames() []string
+	NormalizePluginConfig(name string, config map[string]any) (map[string]any, error)
+	ExpandPluginConfigForAPI(name string, config map[string]any) (map[string]any, error)
+	// Auth related callbacks
+	UpdateAuthConfig(ctx context.Context, authConfig *configstore.AuthConfig) error
+	ValidateSetupToken(token string) bool
+	ValidateConfiguredSetupToken(token string) bool
+	ReloadClientConfigFromConfigStore(ctx context.Context) error
+	// Pricing related callbacks
+	UpdateSyncConfig(ctx context.Context) error
+	ForceReloadPricing(ctx context.Context) error
+	UpsertPricingOverride(ctx context.Context, override *tables.TablePricingOverride) error
+	DeletePricingOverride(ctx context.Context, id string) error
+	// UpsertModelPricingAttributes writes the additional_attributes JSON on
+	// pricing rows. Enterprise wraps this so that after the local DB write
+	// succeeds it can broadcast a peer reload via the existing pricing
+	// EntityTypeModelCatalog/ActionReloadFromDB gossip path.
+	UpsertModelPricingAttributes(ctx context.Context, entries []handlers.ModelPricingAttributesEntry) error
+	// Proxy related callbacks
+	ReloadProxyConfig(ctx context.Context, config *tables.GlobalProxyConfig) error
+	// Client config related callbacks
+	ReloadHeaderFilterConfig(ctx context.Context, config *tables.GlobalHeaderFilterConfig) error
+	UpdateDropExcessRequests(ctx context.Context, value bool)
+	// Governance related callbacks
+	GetGovernanceData(ctx context.Context) *governance.GovernanceData
+	ReloadTeam(ctx context.Context, id string) (*tables.TableTeam, error)
+	RemoveTeam(ctx context.Context, id string) error
+	ReloadCustomer(ctx context.Context, id string) (*tables.TableCustomer, error)
+	RemoveCustomer(ctx context.Context, id string) error
+	// Virtual key related callbacks
+	ReloadVirtualKey(ctx context.Context, id string) (*tables.TableVirtualKey, error)
+	// ReloadVirtualKeys reloads many virtual keys exactly as ReloadVirtualKey
+	// reloads one, from batched reads. Enterprise also propagates it to peers.
+	ReloadVirtualKeys(ctx context.Context, ids []string) error
+	// ResetBudgetUsageInMemory clears usage for the given budgets in the governance
+	// store, leaving each reset boundary untouched. owner identifies the entity that
+	// owns them so enterprise can address the cluster broadcast that propagates the
+	// reset to peers.
+	ResetBudgetUsageInMemory(ctx context.Context, owner handlers.BudgetUsageResetOwner, budgetIDs []string) error
+	// AdoptCalendarAlignmentInMemory re-anchors an owner's budgets and rate limits
+	// onto their calendar boundaries after alignment was switched on, preserving
+	// usage. owner identifies the entity so enterprise can address the cluster
+	// broadcast, exactly as the usage reset above does.
+	AdoptCalendarAlignmentInMemory(ctx context.Context, owner handlers.BudgetUsageResetOwner, budgetIDs []string, rateLimitIDs []string) error
+	RemoveVirtualKey(ctx context.Context, id string) error
+	// Provider related callbacks
+	GetModelsForProvider(provider schemas.ModelProvider) []string
+	GetUnfilteredModelsForProvider(provider schemas.ModelProvider) []string
+	ReloadModelConfig(ctx context.Context, id string) (*tables.TableModelConfig, error)
+	ModelConfigIndexKey(model string, provider *string) string
+	RemoveModelConfig(ctx context.Context, id string) error
+	ReloadProvider(ctx context.Context, provider schemas.ModelProvider, isNew bool) (*tables.TableProvider, error)
+	RemoveProvider(ctx context.Context, provider schemas.ModelProvider) error
+	OnKeyAdded(ctx context.Context, provider schemas.ModelProvider, key schemas.Key) error
+	OnKeyUpdated(ctx context.Context, provider schemas.ModelProvider, key schemas.Key) error
+	OnKeyDeleted(ctx context.Context, provider schemas.ModelProvider, keyID string) error
+	RefreshLiveModelsForKey(ctx context.Context, provider schemas.ModelProvider, keyID string) error
+	RefreshLiveModelsForAllKeys(ctx context.Context, provider schemas.ModelProvider) error
+	// Routing related callbacks
+	ReloadRoutingRule(ctx context.Context, id string) error
+	RemoveRoutingRule(ctx context.Context, id string) error
+	ReloadComplexityAnalyzerConfig(ctx context.Context, config *complexity.AnalyzerConfig) error
+	ValidateComplexityAnalyzerConfig(ctx context.Context, config *complexity.AnalyzerConfig) error
+	GetComplexitySemanticStatus(ctx context.Context) (complexity.SemanticStatusInfo, error)
+	RetryComplexitySemanticWarmup(ctx context.Context) (complexity.SemanticStatusInfo, bool, error)
+	GetComplexityLLMStatus(ctx context.Context) (complexity.LLMStatusInfo, error)
+	ListComplexityGenerations(ctx context.Context) ([]complexity.GenerationInfo, error)
+	DeleteComplexityGeneration(ctx context.Context, namespace string) error
+	ReloadModelRouter(ctx context.Context, id string) error
+	ReloadModelRouterTargets(ctx context.Context, id string) error
+	ReloadModelRouterRouting(ctx context.Context, id string) error
+	RemoveModelRouter(ctx context.Context, id string) error
+	GetModelRouterStatus(ctx context.Context, id string) (complexity.SemanticStatusInfo, complexity.LLMStatusInfo, error)
+	RetryModelRouterWarmup(ctx context.Context, id string) (complexity.SemanticStatusInfo, bool, error)
+	// ResolveAccess answers what a request may reach, resolving it once onto the request's grant,
+	// for the listing routes that run outside the request pipeline and so cannot wait for a hook
+	// to resolve it.
+	ResolveAccess(ctx *schemas.BifrostContext) (schemas.Access, error)
+	// The models listing narrows its provider fan-out to what the request may reach.
+	NarrowListModelsProviders(bifrostCtx *schemas.BifrostContext)
+}
+
+// GovernanceRouteOverridesProvider lets downstream editions replace selected OSS governance route families.
+type GovernanceRouteOverridesProvider interface {
+	GetGovernanceRouteOverrides(ctx context.Context) handlers.GovernanceRouteOverrides
+}
+
+// LogRedactionMappingResolverProvider is implemented by servers that can attach reveal data to log-detail responses.
+type LogRedactionMappingResolverProvider interface {
+	// GetLogRedactionMappingResolver returns the resolver used by the logging handler.
+	GetLogRedactionMappingResolver() handlers.LogRedactionMappingResolver
+}
+
+// BifrostHTTPServer represents a HTTP server instance.
+type BifrostHTTPServer struct {
+	Ctx    *schemas.BifrostContext
+	cancel context.CancelFunc
+
+	Version string
+
+	Port     string
+	Host     string
+	AppDir   string
+	BasePath string // from -base-path / BIFROST_BASE_PATH; resolved against server.base_path in Bootstrap
+
+	// AllowSQLite lets the server start with a store on SQLite. Off by default: the product
+	// runs on Postgres only (see sqliteStores). The tests that start the binary set it.
+	AllowSQLite bool
+
+	LogLevel        string
+	LogOutputStyle  string
+	LogsCleaner     *logstore.LogsCleaner
+	AsyncJobCleaner *logstore.AsyncJobCleaner
+
+	Client *bifrost.Bifrost
+	Config *lib.Config
+
+	// HTTPClientFactory hands out clients for outbound traffic other than provider
+	// inference (plugin downloads, catalog sync) that honour
+	// the global proxy for their purpose and follow proxy changes live.
+	HTTPClientFactory *network.HTTPClientFactory
+
+	Server *fasthttp.Server
+	Router *router.Router
+
+	// unsubscribeCaptureDeletes releases the log-delete subscription that
+	// drops complexity request capture's vectors with their logs.
+	unsubscribeCaptureDeletes func()
+
+	WebSocketHandler   *handlers.WebSocketHandler
+	devPprofHandler    *handlers.DevPprofHandler
+	IntegrationHandler *handlers.IntegrationHandler
+	wsLiveHandler      *handlers.WSLiveHandler
+	wsSpeechHandler    *handlers.WSSpeechSessionHandler
+	webrtcLiveHandler  *handlers.WebRTCLiveHandler
+
+	AuthMiddleware     *handlers.AuthMiddleware
+	setupLockInstalled bool // OSS setup-lock gate guards /api (see AuthMiddleware.SetupLockMiddleware); never set on enterprise
+	CORSMiddleware     *handlers.CorsMiddleware
+	TracingMiddleware  *handlers.TracingMiddleware
+	// VirtualKeyAssigneeResolver supplies the user each VK is assigned to, batched
+	// per page. Optional; wired at server init when available, otherwise left nil
+	// so the VK read paths report no assignee (OSS has no user directory).
+	VirtualKeyAssigneeResolver handlers.VirtualKeyAssigneeResolver
+	SidekiqRunner              *sidekiq.Runner
+	// GovernanceHandler is kept so the expired-key cleanup scheduler can be started and stopped.
+	GovernanceHandler     *handlers.GovernanceHandler
+	SidekiqDispatcherStop func()
+
+	// Background live model catalog refresher. Guarded because the framework
+	// config handler can restart it from a request goroutine while the boot
+	// path or shutdown is touching it.
+	liveModelRefresherMu   sync.Mutex
+	liveModelRefresherStop func()
+
+	// refreshInFlight coordinates on-demand model refreshes. Distinct keys for
+	// the same provider may refresh concurrently, while an all-keys refresh is
+	// exclusive with every key refresh for that provider.
+	refreshInFlightMu sync.Mutex
+	refreshInFlight   map[schemas.ModelProvider]*providerRefreshState
+
+	wsPool *bfws.Pool
+}
+
+var logger schemas.Logger
+
+// SetLogger sets the logger for the server.
+func SetLogger(l schemas.Logger) {
+	logger = l
+}
+
+// NewBifrostHTTPServer creates a new instance of BifrostHTTPServer.
+func NewBifrostHTTPServer(version string) *BifrostHTTPServer {
+	return &BifrostHTTPServer{
+		Version:        version,
+		Port:           DefaultPort,
+		Host:           DefaultHost,
+		AppDir:         DefaultAppDir,
+		LogLevel:       DefaultLogLevel,
+		LogOutputStyle: DefaultLogOutputStyle,
+	}
+}
+
+type GovernanceInMemoryStore struct {
+	Config *lib.Config
+}
+
+// GetConfiguredProviders returns a snapshot of the configured provider map, built under the read
+// lock. Provider edits write to the live map in place, and the governance plugin indexes what
+// this returns after the lock is released (batchBaseProvider, modelMatcher), so handing back the
+// live map would be a concurrent map read and write, which is fatal rather than merely stale.
+// The copy is shallow: the configs themselves are shared and never modified by readers.
+func (s *GovernanceInMemoryStore) GetConfiguredProviders() map[schemas.ModelProvider]configstore.ProviderConfig {
+	s.Config.Mu.RLock()
+	defer s.Config.Mu.RUnlock()
+	snapshot := make(map[schemas.ModelProvider]configstore.ProviderConfig, len(s.Config.Providers))
+	for provider, config := range s.Config.Providers {
+		snapshot[provider] = config
+	}
+	return snapshot
+}
+
+// GetConfiguredProvider returns one provider's configuration, read under the lock without copying
+// the map, for the per-request model check that needs only that provider.
+func (s *GovernanceInMemoryStore) GetConfiguredProvider(provider schemas.ModelProvider) (configstore.ProviderConfig, bool) {
+	s.Config.Mu.RLock()
+	defer s.Config.Mu.RUnlock()
+	config, ok := s.Config.Providers[provider]
+	return config, ok
+}
+
+// GetConfiguredProviderNames builds the name slice under the lock, because provider edits write to
+// the map GetConfiguredProviders hands back in place: ranging that map after the lock is released
+// is a concurrent iteration and write, which is fatal rather than merely stale.
+func (s *GovernanceInMemoryStore) GetConfiguredProviderNames() []string {
+	providers, err := s.Config.GetAllProviders()
+	if err != nil {
+		return nil
+	}
+	names := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		names = append(names, string(provider))
+	}
+	return names
+}
+
+// markPluginDisabled marks a plugin as disabled in the plugin status
+func (s *BifrostHTTPServer) markPluginDisabled(name string) error {
+	return s.Config.UpdatePluginStatus(name, schemas.PluginStatusDisabled)
+}
+
+// getGovernancePluginName returns the governance plugin name from context or default
+func (s *BifrostHTTPServer) getGovernancePluginName() string {
+	return governancePluginNameFromContext(s.Ctx)
+}
+
+// governancePluginNameFromContext returns the governance plugin name carried on ctx, falling
+// back to the built-in name. Used where only a context is available, such as built-in plugin
+// instantiation.
+func governancePluginNameFromContext(ctx context.Context) string {
+	if ctx != nil {
+		if name, ok := ctx.Value(schemas.BifrostContextKeyGovernancePluginName).(string); ok && name != "" {
+			return name
+		}
+	}
+	return governance.PluginName
+}
+
+// getGovernancePlugin safely retrieves the governance plugin with proper locking.
+// It acquires a read lock, finds the plugin, releases the lock, performs type assertion,
+// and returns the BaseGovernancePlugin implementation or an error.
+func (s *BifrostHTTPServer) getGovernancePlugin() (governance.BaseGovernancePlugin, error) {
+	// Use type-safe finder from Config
+	return lib.FindPluginAs[governance.BaseGovernancePlugin](s.Config, s.getGovernancePluginName())
+}
+
+// ReloadVirtualKey reloads a virtual key from the in-memory store
+func (s *BifrostHTTPServer) ReloadVirtualKey(ctx context.Context, id string) (*tables.TableVirtualKey, error) {
+	// Load relationships for response
+	preloadedVk, err := s.Config.ConfigStore.RetryOnNotFound(ctx, func(ctx context.Context) (any, error) {
+		preloadedVk, err := s.Config.ConfigStore.GetVirtualKey(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return preloadedVk, nil
+	}, lib.DBLookupMaxRetries, 2*lib.DBLookupDelay)
+	if err != nil {
+		logger.Error("failed to load virtual key: %v", err)
+		return nil, err
+	}
+	if preloadedVk == nil {
+		logger.Error("virtual key not found")
+		return nil, fmt.Errorf("virtual key not found")
+	}
+	// Type assertion (should never happen)
+	virtualKey, ok := preloadedVk.(*tables.TableVirtualKey)
+	if !ok {
+		logger.Error("virtual key type assertion failed")
+		return nil, fmt.Errorf("virtual key type assertion failed")
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return nil, err
+	}
+	// Fetch VK-scoped model configs up front, alongside the VK load, so that a DB
+	// failure here aborts before we mutate any in-memory state. Reloading these
+	// reflects governance changes made via the VK sheet (syncVKGovernanceToModelConfigs)
+	// in memory immediately — both on the node that handled the update and on peers
+	// that receive this reload via the cluster gossip broadcast.
+	mcs, err := s.Config.ConfigStore.GetModelConfigsByScopeAndScopeIDs(
+		ctx, tables.ModelConfigScopeVirtualKey, []string{id},
+	)
+	if err != nil {
+		return virtualKey, fmt.Errorf("failed to reload VK-scoped model configs for VK %s: %w", id, err)
+	}
+	s.applyVirtualKeyReload(ctx, governancePlugin.GetGovernanceStore(), virtualKey, mcs)
+	return virtualKey, nil
+}
+
+// applyVirtualKeyReload installs a freshly loaded virtual key and its VK-scoped
+// model configs in memory and drops the caches bound to the key. It is the
+// in-memory half of ReloadVirtualKey, shared with ReloadVirtualKeys so a batched
+// reload leaves each key exactly as a per-key reload would.
+func (s *BifrostHTTPServer) applyVirtualKeyReload(ctx context.Context, store governance.GovernanceStore, virtualKey *tables.TableVirtualKey, mcs []tables.TableModelConfig) {
+	id := virtualKey.ID
+	store.UpdateVirtualKeyInMemory(ctx, virtualKey, nil, nil, nil)
+	// Snapshot in-memory VK-scoped config IDs before the upserts so we can evict
+	// the ones that no longer exist in the DB. Without this their stale budgets
+	// keep enforcing.
+	staleIDs := make(map[string]bool)
+	for _, mcID := range store.ScopedModelConfigIDs(tables.ModelConfigScopeVirtualKey, id) {
+		staleIDs[mcID] = true
+	}
+	for i := range mcs {
+		delete(staleIDs, mcs[i].ID)
+		store.UpdateModelConfigInMemory(ctx, &mcs[i])
+	}
+	for mcID := range staleIDs {
+		store.DeleteModelConfigInMemory(ctx, mcID)
+	}
+}
+
+// virtualKeysByIDs is the batched key read ReloadVirtualKeys needs;
+// RDBConfigStore provides it.
+type virtualKeysByIDs interface {
+	GetVirtualKeysByIDs(ctx context.Context, ids []string) ([]tables.TableVirtualKey, error)
+}
+
+// ReloadVirtualKeys reloads many virtual keys the way ReloadVirtualKey reloads
+// one: each key is re-read with every relation, its VK-scoped model configs
+// are installed and stale ones evicted, and its token and credential caches
+// are dropped. The keys and the model configs are each read once for all ids,
+// in chunks, instead of two reads per key; both reads finish before any
+// in-memory state changes. An id with no row is skipped. It returns an error,
+// changing nothing, when a read fails or the config store has no batched key
+// read, so the caller can fall back to ReloadVirtualKey per key.
+func (s *BifrostHTTPServer) ReloadVirtualKeys(ctx context.Context, ids []string) error {
+	seen := make(map[string]struct{}, len(ids))
+	unique := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if _, dup := seen[id]; dup || id == "" {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return nil
+	}
+	loader, ok := s.Config.ConfigStore.(virtualKeysByIDs)
+	if !ok {
+		return fmt.Errorf("config store does not support batched virtual key reads")
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	virtualKeys, err := loader.GetVirtualKeysByIDs(ctx, unique)
+	if err != nil {
+		return fmt.Errorf("failed to load virtual keys: %w", err)
+	}
+	mcs, err := s.Config.ConfigStore.GetModelConfigsByScopeAndScopeIDs(ctx, tables.ModelConfigScopeVirtualKey, unique)
+	if err != nil {
+		return fmt.Errorf("failed to reload VK-scoped model configs: %w", err)
+	}
+	mcsByVK := make(map[string][]tables.TableModelConfig, len(unique))
+	for i := range mcs {
+		if mcs[i].ScopeID != nil {
+			mcsByVK[*mcs[i].ScopeID] = append(mcsByVK[*mcs[i].ScopeID], mcs[i])
+		}
+	}
+	store := governancePlugin.GetGovernanceStore()
+	for i := range virtualKeys {
+		s.applyVirtualKeyReload(ctx, store, &virtualKeys[i], mcsByVK[virtualKeys[i].ID])
+		delete(seen, virtualKeys[i].ID)
+	}
+	for id := range seen {
+		logger.Debug("virtual key %s not found during batched reload; skipping", id)
+	}
+	return nil
+}
+
+// ResetBudgetUsageInMemory clears usage for the given budgets in the governance
+// store that enforces spend, leaving each reset boundary untouched.
+//
+// The database write happens inside the update transaction through
+// UpdateBudgetUsage, but the in-memory store is what enforcement actually reads,
+// and ReloadVirtualKey deliberately carries the cached usage forward on a config
+// reload. Without this step the reset would be visible in the database and
+// nowhere else, and the next dump tick would write the cached value back over it.
+//
+// Missing budgets are not an error: a budget can legitimately have been deleted
+// in the same request that asked for the reset.
+func (s *BifrostHTTPServer) ResetBudgetUsageInMemory(ctx context.Context, owner handlers.BudgetUsageResetOwner, budgetIDs []string) error {
+	if len(budgetIDs) == 0 {
+		return nil
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	store := governancePlugin.GetGovernanceStore()
+	for _, budgetID := range budgetIDs {
+		if _, ok := store.ResetBudgetUsageInMemory(ctx, budgetID); !ok {
+			logger.Debug("budget %s not present in the governance store; skipping usage reset", budgetID)
+		}
+	}
+	return nil
+}
+
+// AdoptCalendarAlignmentInMemory re-anchors an owner's budgets and rate limits
+// onto their calendar boundaries after alignment was switched on.
+//
+// Only meaningful on the false-to-true transition. The in-memory store is what
+// the reset sweep reads, and a window that opened before the current boundary
+// reads as already due the moment the flag flips, so without this the operator
+// loses the usage they were still accumulating. Adoption moves the boundary
+// forward instead, which every persistence path allows, and the next dump tick
+// carries the new boundary to the database the same way an ordinary reset does.
+//
+// Missing entries are not an error: a budget or rate limit can legitimately have
+// been deleted in the same request that turned alignment on.
+func (s *BifrostHTTPServer) AdoptCalendarAlignmentInMemory(ctx context.Context, owner handlers.BudgetUsageResetOwner, budgetIDs []string, rateLimitIDs []string) error {
+	if len(budgetIDs) == 0 && len(rateLimitIDs) == 0 {
+		return nil
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	store := governancePlugin.GetGovernanceStore()
+	now := time.Now()
+	for _, budgetID := range budgetIDs {
+		if !store.AdoptCalendarAlignmentInMemory(ctx, budgetID, now) {
+			logger.Debug("budget %s needed no calendar adoption (absent, unalignable, or already current)", budgetID)
+		}
+	}
+	for _, rateLimitID := range rateLimitIDs {
+		if !store.AdoptRateLimitCalendarAlignmentInMemory(ctx, rateLimitID, now) {
+			logger.Debug("rate limit %s needed no calendar adoption (absent, unalignable, or already current)", rateLimitID)
+		}
+	}
+	return nil
+}
+
+// RemoveVirtualKey removes a virtual key from the in-memory store
+func (s *BifrostHTTPServer) RemoveVirtualKey(ctx context.Context, id string) error {
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	preloadedVk, err := s.Config.ConfigStore.GetVirtualKey(ctx, id)
+	if err != nil {
+		if !errors.Is(err, configstore.ErrNotFound) {
+			return err
+		}
+	}
+	if preloadedVk == nil {
+		// This could be broadcast message from other server, so we will just clean up in-memory store
+		governancePlugin.GetGovernanceStore().DeleteVirtualKeyInMemory(ctx, id)
+		return nil
+	}
+	governancePlugin.GetGovernanceStore().DeleteVirtualKeyInMemory(ctx, id)
+	return nil
+}
+
+// ReloadTeam reloads a team from the in-memory store
+func (s *BifrostHTTPServer) ReloadTeam(ctx context.Context, id string) (*tables.TableTeam, error) {
+	// Load relationships for response
+	preloadedTeam, err := s.Config.ConfigStore.GetTeam(ctx, id)
+	if err != nil {
+		logger.Error("failed to load relationships for created team: %v", err)
+		return nil, err
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return nil, err
+	}
+	// Add to in-memory store
+	governancePlugin.GetGovernanceStore().UpdateTeamInMemory(ctx, preloadedTeam, nil)
+	return preloadedTeam, nil
+}
+
+// RemoveTeam removes a team from the in-memory store
+func (s *BifrostHTTPServer) RemoveTeam(ctx context.Context, id string) error {
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	preloadedTeam, err := s.Config.ConfigStore.GetTeam(ctx, id)
+	if err != nil {
+		if !errors.Is(err, configstore.ErrNotFound) {
+			return err
+		}
+	}
+	if preloadedTeam == nil {
+		// At-least deleting from in-memory store to avoid conflicts
+		governancePlugin.GetGovernanceStore().DeleteTeamInMemory(ctx, id)
+		return nil
+	}
+	governancePlugin.GetGovernanceStore().DeleteTeamInMemory(ctx, id)
+	return nil
+}
+
+// ReloadCustomer reloads a customer from the in-memory store
+func (s *BifrostHTTPServer) ReloadCustomer(ctx context.Context, id string) (*tables.TableCustomer, error) {
+	preloadedCustomer, err := s.Config.ConfigStore.GetCustomer(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return nil, err
+	}
+	// Add to in-memory store
+	governancePlugin.GetGovernanceStore().UpdateCustomerInMemory(ctx, preloadedCustomer, nil)
+	return preloadedCustomer, nil
+}
+
+// RemoveCustomer removes a customer from the in-memory store
+func (s *BifrostHTTPServer) RemoveCustomer(ctx context.Context, id string) error {
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	preloadedCustomer, err := s.Config.ConfigStore.GetCustomer(ctx, id)
+	if err != nil {
+		if !errors.Is(err, configstore.ErrNotFound) {
+			return err
+		}
+	}
+	if preloadedCustomer == nil {
+		// At-least deleting from in-memory store to avoid conflicts
+		governancePlugin.GetGovernanceStore().DeleteCustomerInMemory(ctx, id)
+		return nil
+	}
+	governancePlugin.GetGovernanceStore().DeleteCustomerInMemory(ctx, id)
+	return nil
+}
+
+// ModelConfigIndexKey reports the spelling the governance store indexes a model config
+// under (see LocalGovernanceStore.ModelConfigIndexKey); without the governance plugin it
+// falls back to the catalog-independent canonical name.
+func (s *BifrostHTTPServer) ModelConfigIndexKey(model string, provider *string) string {
+	if governancePlugin, err := s.getGovernancePlugin(); err == nil && governancePlugin != nil {
+		return governancePlugin.GetGovernanceStore().ModelConfigIndexKey(model, provider)
+	}
+	return governance.CanonicalModelConfigName(model, provider)
+}
+
+// modelConfigReloadReadTimeout bounds the store read a model config reload makes on the server's
+// own context, since it no longer inherits the caller's deadline.
+const modelConfigReloadReadTimeout = 30 * time.Second
+
+// ReloadModelConfig reloads a model config from the database into in-memory store
+// If usage was modified (e.g., reset due to config change), syncs it back to DB
+func (s *BifrostHTTPServer) ReloadModelConfig(ctx context.Context, id string) (*tables.TableModelConfig, error) {
+	// The reload loads the row it was told to load, whoever triggered it, so it reads on the
+	// server's own context: the caller's row-visibility scope must not stop a config the caller
+	// just wrote (for a target it cannot see) from reaching memory and peers.
+	readCtx, cancel := context.WithTimeout(s.backgroundCtx(), modelConfigReloadReadTimeout)
+	defer cancel()
+	preloadedMC, err := s.Config.ConfigStore.GetModelConfigByID(readCtx, id)
+	if err != nil {
+		logger.Error("failed to load model config: %v", err)
+		return nil, err
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return nil, err
+	}
+	// Update in memory and get back the potentially modified model config
+	updatedMC := governancePlugin.GetGovernanceStore().UpdateModelConfigInMemory(ctx, preloadedMC)
+	if updatedMC == nil {
+		return preloadedMC, nil
+	}
+
+	// Sync updated budget usage values back to database if they changed (per budget ID,
+	// since a model config may own multiple budgets).
+	preloadedUsage := make(map[string]float64, len(preloadedMC.Budgets))
+	for i := range preloadedMC.Budgets {
+		preloadedUsage[preloadedMC.Budgets[i].ID] = preloadedMC.Budgets[i].CurrentUsage
+	}
+	for i := range updatedMC.Budgets {
+		b := &updatedMC.Budgets[i]
+		if old, ok := preloadedUsage[b.ID]; ok && old != b.CurrentUsage {
+			if err := s.Config.ConfigStore.UpdateBudgetUsage(ctx, b.ID, b.CurrentUsage); err != nil {
+				logger.Error("failed to sync budget usage to database: %v", err)
+			}
+		}
+	}
+	if updatedMC.RateLimit != nil && preloadedMC.RateLimit != nil {
+		tokenUsageChanged := updatedMC.RateLimit.TokenCurrentUsage != preloadedMC.RateLimit.TokenCurrentUsage
+		requestUsageChanged := updatedMC.RateLimit.RequestCurrentUsage != preloadedMC.RateLimit.RequestCurrentUsage
+		if tokenUsageChanged || requestUsageChanged {
+			if err := s.Config.ConfigStore.UpdateRateLimitUsage(ctx, updatedMC.RateLimit.ID, updatedMC.RateLimit.TokenCurrentUsage, updatedMC.RateLimit.RequestCurrentUsage); err != nil {
+				logger.Error("failed to sync rate limit usage to database: %v", err)
+			}
+		}
+	}
+
+	return updatedMC, nil
+}
+
+// RemoveModelConfig removes a model config from the in-memory store
+func (s *BifrostHTTPServer) RemoveModelConfig(ctx context.Context, id string) error {
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	governancePlugin.GetGovernanceStore().DeleteModelConfigInMemory(ctx, id)
+	return nil
+}
+
+// ReloadProvider reloads persisted provider settings into the live client. isNew says whether the
+// write that called it added the provider rather than edited one; the reload is the same either
+// way, and a server that wraps this one can tell an operator's edit apart by it.
+func (s *BifrostHTTPServer) ReloadProvider(ctx context.Context, provider schemas.ModelProvider, isNew bool) (*tables.TableProvider, error) {
+	s.syncIgnoreProviderCost(provider)
+	if s.Config == nil || s.Config.ConfigStore == nil {
+		return nil, fmt.Errorf("config store not found")
+	}
+	if s.Config.ModelCatalog == nil {
+		return nil, fmt.Errorf("pricing manager not found")
+	}
+	if s.Client == nil {
+		return nil, fmt.Errorf("bifrost client not found")
+	}
+
+	// Load provider from DB
+	providerInfo, err := s.Config.ConfigStore.GetProvider(ctx, provider)
+	if err != nil {
+		logger.Error("failed to load provider: %v", err)
+		return nil, err
+	}
+
+	// Initialize updatedProvider
+	updatedProvider := providerInfo
+
+	// Sync model level budgets in governance plugin (if governance is enabled)
+	if s.Config.IsPluginLoaded(s.getGovernancePluginName()) {
+		governancePlugin, err := s.getGovernancePlugin()
+		if err != nil {
+			logger.Warn("governance plugin found but failed to get: %v", err)
+		} else {
+			// Update in memory and get back the potentially modified provider
+			govUpdated := governancePlugin.GetGovernanceStore().UpdateProviderInMemory(ctx, providerInfo)
+			if govUpdated != nil {
+				updatedProvider = govUpdated
+			}
+
+			// Sync updated usage values back to database if they changed
+			if updatedProvider.Budget != nil && providerInfo.Budget != nil {
+				if updatedProvider.Budget.CurrentUsage != providerInfo.Budget.CurrentUsage {
+					if err := s.Config.ConfigStore.UpdateBudgetUsage(ctx, updatedProvider.Budget.ID, updatedProvider.Budget.CurrentUsage); err != nil {
+						logger.Error("failed to sync budget usage to database: %v", err)
+					}
+				}
+			}
+			if updatedProvider.RateLimit != nil && providerInfo.RateLimit != nil {
+				tokenUsageChanged := updatedProvider.RateLimit.TokenCurrentUsage != providerInfo.RateLimit.TokenCurrentUsage
+				requestUsageChanged := updatedProvider.RateLimit.RequestCurrentUsage != providerInfo.RateLimit.RequestCurrentUsage
+				if tokenUsageChanged || requestUsageChanged {
+					if err := s.Config.ConfigStore.UpdateRateLimitUsage(ctx, updatedProvider.RateLimit.ID, updatedProvider.RateLimit.TokenCurrentUsage, updatedProvider.RateLimit.RequestCurrentUsage); err != nil {
+						logger.Error("failed to sync rate limit usage to database: %v", err)
+					}
+				}
+			}
+		}
+	}
+
+	// In-memory store holds the latest schemas.Key slice after the most recent
+	// CRUD write — read from there to avoid re-fetching + re-converting from DB.
+	inMemoryKeys, err := s.Config.GetProviderKeysRaw(provider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read provider keys for %s: %w", provider, err)
+	}
+	isKeylessProvider := providerInfo.CustomProviderConfig != nil && providerInfo.CustomProviderConfig.IsKeyLess
+	hasNoKeys := len(inMemoryKeys) == 0 && !isKeylessProvider
+
+	// Refresh keyconfig from the current key list, then reconcile the live
+	// entries against it before refetching per-key.
+	setKeyConfig(s.Config.ModelCatalog, provider, inMemoryKeys, isKeylessProvider)
+	if hasNoKeys {
+		// Nothing left to route through, and nothing will ever refresh these
+		// entries, so no cached response is still meaningful.
+		s.Config.ModelCatalog.InvalidateLiveProvider(provider)
+		logger.Warn("model discovery skipped for provider %s: no keys configured", provider)
+	} else {
+		// Prune only the keys that are gone or disabled and leave the
+		// survivors' entries in place for the refetch below to overwrite.
+		// FetchAndStoreLiveForKey writes nothing when the upstream call fails,
+		// so wiping the provider up front turned any transient list-models
+		// failure (5xx, rate limit, timeout, a restarting gateway) into an
+		// empty catalog for a provider that was perfectly healthy a moment
+		// earlier, with no background refresher to heal it.
+		//
+		// The trade is deliberate: entries survive a failed refetch even when
+		// this reload changed base_url or the custom provider config, so they
+		// can briefly describe the previous upstream. That is strictly the
+		// smaller blast radius, since an emptied catalog makes every model
+		// unroutable rather than just the ones that moved.
+		keep := make(map[string]struct{}, len(inMemoryKeys)+1)
+		if isKeylessProvider {
+			// Keyless providers cache only under the empty-string sentinel,
+			// which is also what the OnKey* helpers write under. Entries under
+			// a residual key's ID are never refetched, so they are pruned.
+			keep[""] = struct{}{}
+		} else {
+			for _, key := range inMemoryKeys {
+				// Mirror RefreshLiveModelsForProvider's skip rule: a disabled key
+				// is never refetched, so retaining its entries would serve models
+				// for a key core rejects at routing time.
+				if keyEnabled(key) {
+					keep[key.ID] = struct{}{}
+				}
+			}
+		}
+		s.Config.ModelCatalog.RetainLiveKeys(provider, keep)
+		s.RefreshLiveModelsForProvider(ctx, provider, inMemoryKeys)
+	}
+	return updatedProvider, nil
+}
+
+// syncIgnoreProviderCost pushes the provider's ignore_provider_cost setting into the model catalog.
+func (s *BifrostHTTPServer) syncIgnoreProviderCost(provider schemas.ModelProvider) {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return
+	}
+	pc, err := s.Config.GetProviderConfigRaw(provider)
+	s.Config.ModelCatalog.SetIgnoreProviderCost(provider, err == nil && pc != nil && pc.IgnoreProviderCost)
+}
+
+// RemoveProvider removes a provider from the in-memory store
+func (s *BifrostHTTPServer) RemoveProvider(ctx context.Context, provider schemas.ModelProvider) error {
+	err := s.Client.RemoveProvider(provider)
+	if err != nil && !strings.Contains(err.Error(), "not found") {
+		logger.Error("failed to remove provider from client: %v", err)
+		return err
+	}
+	err = s.Config.RemoveProvider(ctx, provider)
+	if err != nil && !errors.Is(err, lib.ErrNotFound) {
+		logger.Error("failed to remove provider from config: %v. Client and config may be out of sync, please restart bifrost", err)
+		return fmt.Errorf("failed to remove provider from config: %w. Client and config may be out of sync, please restart bifrost", err)
+	}
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		return err
+	}
+	governancePlugin.GetGovernanceStore().DeleteProviderInMemory(ctx, string(provider))
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("pricing manager not found")
+	}
+	s.Config.ModelCatalog.InvalidateLiveProvider(provider)
+	s.Config.ModelCatalog.RemoveKeyConfigForProvider(provider)
+	s.Config.ModelCatalog.SetIgnoreProviderCost(provider, false)
+
+	return nil
+}
+
+// OnKeyAdded refreshes the keyconfig snapshot and fetches list-models for the
+// new key only — 2 calls instead of ReloadProvider's 2×N. Called by the key
+// handler after a successful AddProviderKey write.
+func (s *BifrostHTTPServer) OnKeyAdded(ctx context.Context, provider schemas.ModelProvider, key schemas.Key) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("model catalog not found")
+	}
+	keys, err := s.Config.GetProviderKeysRaw(provider)
+	if err != nil {
+		return fmt.Errorf("failed to read provider keys for %s: %w", provider, err)
+	}
+	keyless := isKeylessProvider(provider, s.Config)
+	setKeyConfig(s.Config.ModelCatalog, provider, keys, keyless)
+	// Keyless providers: empty keyID sentinel.
+	keyID := key.ID
+	if keyless {
+		keyID = ""
+	}
+	// Skip the fetch for a disabled key — core rejects list-models calls
+	// scoped to a disabled key's ID, so it would just fail and fall back
+	// onto the (usually empty, for custom providers) static datasheet.
+	if !keyEnabled(key) {
+		return nil
+	}
+	s.FetchAndStoreLiveForKey(ctx, provider, keyID)
+	return nil
+}
+
+// OnKeyUpdated invalidates the affected key's live entries (the gate may have
+// changed even when Value didn't), refreshes the keyconfig, then refetches
+// for just that key. 2 calls regardless of N keys on the provider.
+func (s *BifrostHTTPServer) OnKeyUpdated(ctx context.Context, provider schemas.ModelProvider, key schemas.Key) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("model catalog not found")
+	}
+	keys, err := s.Config.GetProviderKeysRaw(provider)
+	if err != nil {
+		return fmt.Errorf("failed to read provider keys for %s: %w", provider, err)
+	}
+	keyless := isKeylessProvider(provider, s.Config)
+	setKeyConfig(s.Config.ModelCatalog, provider, keys, keyless)
+	keyID := key.ID
+	if keyless {
+		keyID = ""
+	}
+	s.Config.ModelCatalog.InvalidateLive(provider, keyID)
+	// Skip the fetch for a disabled key — the invalidate above still clears
+	// its stale cached entries, but re-fetching would just fail against core.
+	if !keyEnabled(key) {
+		return nil
+	}
+	s.FetchAndStoreLiveForKey(ctx, provider, keyID)
+	return nil
+}
+
+// OnKeyDeleted invalidates the deleted key's live entries and refreshes the
+// keyconfig. No list-models calls — the provider's remaining keys' cached
+// entries stay valid.
+func (s *BifrostHTTPServer) OnKeyDeleted(ctx context.Context, provider schemas.ModelProvider, keyID string) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("model catalog not found")
+	}
+	keys, err := s.Config.GetProviderKeysRaw(provider)
+	if err != nil {
+		return fmt.Errorf("failed to read provider keys for %s: %w", provider, err)
+	}
+	setKeyConfig(s.Config.ModelCatalog, provider, keys, isKeylessProvider(provider, s.Config))
+	s.Config.ModelCatalog.InvalidateLive(provider, keyID)
+	return nil
+}
+
+// keyEnabled reports whether a key should be treated as active for
+// scheduling model-discovery fetches. Enabled defaults to true when nil,
+// matching the convention core.getAllSupportedKeys uses to filter keys for
+// ListModels requests — a key discovery schedules a fetch for must be one
+// core will actually accept, or the call is a guaranteed
+// "no key found with id..." failure.
+func keyEnabled(key schemas.Key) bool {
+	return key.Enabled == nil || *key.Enabled
+}
+
+// isKeylessProvider returns true when the provider's config marks it
+// keyless. Used to pick the live-cache key for OnKey* helpers: keyless
+// providers cache under the empty-string sentinel.
+func isKeylessProvider(provider schemas.ModelProvider, cfg *lib.Config) bool {
+	if cfg == nil {
+		return false
+	}
+	pc, err := cfg.GetProviderConfigRaw(provider)
+	if err != nil || pc == nil || pc.CustomProviderConfig == nil {
+		return false
+	}
+	return pc.CustomProviderConfig.IsKeyLess
+}
+
+// setKeyConfig pushes the provider's keys into the catalog's keyconfig. Only a
+// keyless custom provider stays routable with zero keys; any other provider
+// left without a key must stop claiming models, or a bare model name can be
+// routed to it and fail with no_key_supports_model.
+func setKeyConfig(catalog *modelcatalog.ModelCatalog, provider schemas.ModelProvider, keys []schemas.Key, keyless bool) {
+	if keyless {
+		catalog.SetKeyConfigForKeylessProvider(provider, keys)
+		return
+	}
+	catalog.SetKeyConfigForProvider(provider, keys)
+}
+
+// GetGovernanceData returns the governance data
+func (s *BifrostHTTPServer) GetGovernanceData(ctx context.Context) *governance.GovernanceData {
+	// Use type-safe finder from Config
+	governancePlugin, err := lib.FindPluginAs[governance.BaseGovernancePlugin](s.Config, s.getGovernancePluginName())
+	if err != nil {
+		return nil
+	}
+	return governancePlugin.GetGovernanceStore().GetGovernanceData(ctx)
+}
+
+// getRoutingPlugin safely retrieves the routing plugin, or an error.
+//
+// The lookup must name *RoutingPlugin: Init registers a pointer, and FindPluginAs
+// type-asserts against its type parameter, which the compiler cannot check when that
+// parameter is generic. Asserting against the value type builds fine and fails at runtime.
+// Every lookup failure — the plugin missing, or registered under a different type — is a
+// server-side misconfiguration, so all of them are wrapped in ErrRoutingPluginUnavailable
+// and answered as such by the handlers, rather than as a rejection of the caller's payload.
+func (s *BifrostHTTPServer) getRoutingPlugin() (*routing.RoutingPlugin, error) {
+	plugin, err := lib.FindPluginAs[*routing.RoutingPlugin](s.Config, routing.PluginName)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", handlers.ErrRoutingPluginUnavailable, err)
+	}
+	return plugin, nil
+}
+
+// ValidateComplexityAnalyzerConfig checks runtime-only semantic dependencies
+// before a handler persists a complexity configuration.
+func (s *BifrostHTTPServer) ValidateComplexityAnalyzerConfig(_ context.Context, config *complexity.AnalyzerConfig) error {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return fmt.Errorf("routing plugin not found: %w", err)
+	}
+	return routingPlugin.ValidateComplexityAnalyzerConfig(config)
+}
+
+// GetComplexitySemanticStatus returns the current semantic classifier readiness
+// from the routing plugin.
+func (s *BifrostHTTPServer) GetComplexitySemanticStatus(_ context.Context) (complexity.SemanticStatusInfo, error) {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return complexity.SemanticStatusInfo{}, fmt.Errorf("routing plugin not found: %w", err)
+	}
+	return routingPlugin.ComplexitySemanticStatus(), nil
+}
+
+// RetryComplexitySemanticWarmup restarts a failed semantic warmup using its
+// saved configuration and reports whether the classifier accepted the retry.
+func (s *BifrostHTTPServer) RetryComplexitySemanticWarmup(_ context.Context) (complexity.SemanticStatusInfo, bool, error) {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return complexity.SemanticStatusInfo{}, false, fmt.Errorf("routing plugin not found: %w", err)
+	}
+	status, retried := routingPlugin.RetryComplexitySemanticWarmup()
+	return status, retried, nil
+}
+
+// ListComplexityGenerations reports the exemplar generations held in the
+// configured vector store.
+func (s *BifrostHTTPServer) ListComplexityGenerations(ctx context.Context) ([]complexity.GenerationInfo, error) {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return nil, fmt.Errorf("routing plugin not found: %w", err)
+	}
+	return routingPlugin.ListComplexityGenerations(ctx)
+}
+
+// DeleteComplexityGeneration removes one retired exemplar generation.
+func (s *BifrostHTTPServer) DeleteComplexityGeneration(ctx context.Context, namespace string) error {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return fmt.Errorf("routing plugin not found: %w", err)
+	}
+	return routingPlugin.DeleteComplexityGeneration(ctx, namespace)
+}
+
+// GetComplexityLLMStatus returns the llm fallback classifier's readiness from
+// the routing plugin.
+func (s *BifrostHTTPServer) GetComplexityLLMStatus(_ context.Context) (complexity.LLMStatusInfo, error) {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return complexity.LLMStatusInfo{}, fmt.Errorf("routing plugin not found: %w", err)
+	}
+	return routingPlugin.ComplexityLLMStatus(), nil
+}
+
+// ReloadComplexityAnalyzerConfig reloads the complexity analyzer config into the routing plugin.
+func (s *BifrostHTTPServer) ReloadComplexityAnalyzerConfig(ctx context.Context, config *complexity.AnalyzerConfig) error {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return fmt.Errorf("routing plugin not found: %w", err)
+	}
+	return routingPlugin.ReloadComplexityAnalyzerConfig(config)
+}
+
+// ReloadRoutingRule reloads a routing rule from the database into the routing plugin's rule cache
+func (s *BifrostHTTPServer) ReloadRoutingRule(ctx context.Context, id string) error {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return fmt.Errorf("routing plugin not found: %w", err)
+	}
+	rule, err := s.Config.ConfigStore.GetRoutingRule(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to get routing rule from config store: %w", err)
+	}
+	// Update the rule in the rule cache
+	if err := routingPlugin.GetRuleStore().UpsertRule(ctx, rule); err != nil {
+		return fmt.Errorf("failed to update routing rule in rule store: %w", err)
+	}
+	return nil
+}
+
+// RemoveRoutingRule removes a routing rule from the routing plugin's rule cache
+func (s *BifrostHTTPServer) RemoveRoutingRule(ctx context.Context, id string) error {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return fmt.Errorf("routing plugin not found: %w", err)
+	}
+	if err := routingPlugin.GetRuleStore().DeleteRule(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete routing rule from rule store: %w", err)
+	}
+	return nil
+}
+
+// ReloadClientConfigFromConfigStore reloads the client config from config store
+func (s *BifrostHTTPServer) ReloadClientConfigFromConfigStore(ctx context.Context) error {
+	if s.Config == nil || s.Config.ConfigStore == nil {
+		return fmt.Errorf("config store not found")
+	}
+	config, err := s.Config.ConfigStore.GetClientConfig(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get client config: %v", err)
+	}
+	if config == nil {
+		return fmt.Errorf("client config not found")
+	}
+	s.Config.Mu.Lock()
+	*s.Config.ClientConfig = *config
+	s.Config.Mu.Unlock()
+	if s.LogsCleaner != nil {
+		s.LogsCleaner.UpdateRetentionDays(config.LogRetentionDays)
+	}
+	// Reloading whitelisted routes from the client config
+	if s.AuthMiddleware != nil {
+		s.AuthMiddleware.UpdateWhitelistedRoutes(config.WhitelistedRoutes)
+		s.AuthMiddleware.UpdateAllowedOrigins(config.AllowedOrigins)
+	}
+	// Refresh the CORS middleware's immutable snapshot so its requests pick up the
+	// new AllowedOrigins/AllowedHeaders/DumpErrorsInConsoleLogs without racing the
+	// in-place ClientConfig mutation above.
+	if s.CORSMiddleware != nil {
+		s.CORSMiddleware.UpdateConfig(s.Config)
+	}
+	// Reloading config in bifrost client
+	if s.Client != nil {
+		account := lib.NewBaseAccount(s.Config)
+		s.Client.ReloadConfig(schemas.BifrostConfig{
+			Account:            account,
+			InitialPoolSize:    s.Config.ClientConfig.InitialPoolSize,
+			DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
+			LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
+			Logger:             logger,
+
+			// Read from this reload's snapshot: ClientConfig is rewritten under Mu
+			// by a concurrent config save.
+			UsageEstimationTokenizers: config.UsageEstimationTokenizers,
+		})
+	}
+	return nil
+}
+
+// UpdateAuthConfig updates auth config in the config store and updates the AuthMiddleware's in-memory config
+func (s *BifrostHTTPServer) UpdateAuthConfig(ctx context.Context, authConfig *configstore.AuthConfig) error {
+	if authConfig == nil {
+		return fmt.Errorf("auth config is nil")
+	}
+	if s.Config == nil || s.Config.ConfigStore == nil {
+		return fmt.Errorf("config store not found")
+	}
+	// Allow disabling auth without credentials, but require them when enabling
+	if authConfig.IsEnabled && (authConfig.AdminUserName == nil || authConfig.AdminUserName.GetValue() == "" || authConfig.AdminPassword == nil || authConfig.AdminPassword.GetValue() == "") {
+		return fmt.Errorf("username and password are required when auth is enabled")
+	}
+	// Update the config store
+	if err := s.Config.ConfigStore.UpdateAuthConfig(ctx, authConfig); err != nil {
+		return err
+	}
+	// Update the AuthMiddleware's in-memory config
+	if s.AuthMiddleware != nil {
+		// Fetch the updated config from the store to ensure we have the latest
+		updatedAuthConfig, err := s.Config.ConfigStore.GetAuthConfig(ctx)
+		if err != nil {
+			logger.Warn("failed to get auth config from store after update: %v", err)
+			// Still update with what we have
+			s.AuthMiddleware.UpdateAuthConfig(authConfig)
+		} else {
+			s.AuthMiddleware.UpdateAuthConfig(updatedAuthConfig)
+		}
+		// The first admin account now exists (or already did) — permanently
+		// invalidate the bootstrap setup token. No-op if already cleared.
+		s.AuthMiddleware.ClearBootstrapToken()
+	}
+	return nil
+}
+
+// ValidateSetupToken reports whether token is a valid one-time bootstrap setup token,
+// as required to create the very first admin account (see AuthMiddleware.bootstrapToken).
+// Once an admin account exists, this always returns true — the gate closes permanently.
+func (s *BifrostHTTPServer) ValidateSetupToken(token string) bool {
+	if s.AuthMiddleware == nil {
+		return true
+	}
+	return s.AuthMiddleware.CheckBootstrapToken(token)
+}
+
+// ValidateConfiguredSetupToken reports whether token matches the operator-configured setup
+// token (see AuthMiddleware.CheckConfiguredSetupToken). Unlike ValidateSetupToken it does not
+// open up once an admin account exists, and it is false when no token is configured or no
+// auth middleware is installed.
+func (s *BifrostHTTPServer) ValidateConfiguredSetupToken(token string) bool {
+	if s.AuthMiddleware == nil {
+		return false
+	}
+	return s.AuthMiddleware.CheckConfiguredSetupToken(token)
+}
+
+// UpdateDropExcessRequests updates excess requests config
+func (s *BifrostHTTPServer) UpdateDropExcessRequests(ctx context.Context, value bool) {
+	if s.Config == nil {
+		return
+	}
+	s.Client.UpdateDropExcessRequests(value)
+}
+
+// reloadObservabilityPlugins reloads all observability plugins in the tracing middleware
+func (s *BifrostHTTPServer) reloadObservabilityPlugins() {
+	observabilityPlugins := s.CollectObservabilityPlugins()
+	// Always update the tracing middleware, even with empty slice, to clear stale plugins
+	s.TracingMiddleware.SetObservabilityPlugins(observabilityPlugins, s.CollectObservabilityLimits())
+}
+
+// ReloadPricingManager reloads the pricing manager
+func (s *BifrostHTTPServer) UpdateSyncConfig(ctx context.Context) error {
+	if s.Config == nil {
+		return fmt.Errorf("config not found")
+	}
+	if s.Config.ModelCatalog == nil {
+		return fmt.Errorf("pricing manager not found")
+	}
+	// Snapshot the pricing pointer and release the read lock before restarting
+	// the refresher: that path takes Config.Mu.RLock again through
+	// LiveModelsSyncInterval, and sync.RWMutex read locks are not reentrant.
+	// Safe to use after unlocking because the config update path publishes a
+	// whole new FrameworkConfig rather than mutating this struct in place.
+	s.Config.Mu.RLock()
+	var pricing *modelcatalog.Config
+	if s.Config.FrameworkConfig != nil {
+		pricing = s.Config.FrameworkConfig.Pricing
+	}
+	s.Config.Mu.RUnlock()
+	if pricing == nil {
+		return fmt.Errorf("framework config not found")
+	}
+	// The live model refresher reads its interval from the same framework
+	// config block, so pick up a changed (or newly disabled) value here rather
+	// than waiting for a restart.
+	s.RestartLiveModelRefresher(s.backgroundCtx())
+	return s.Config.ModelCatalog.UpdateSyncConfig(ctx, pricing)
+}
+
+// ResolveAccess answers what the request may reach, so a route that never enters the request
+// pipeline decides from the same answer the pipeline would have used: resolved once, onto the
+// request's grant.
+//
+// Without governance there is nothing to resolve and nothing to restrict, which is why a
+// missing plugin returns nil rather than access permitting nothing.
+func (s *BifrostHTTPServer) ResolveAccess(ctx *schemas.BifrostContext) (schemas.Access, error) {
+	governancePlugin, err := s.getGovernancePlugin()
+	if err != nil {
+		logger.Warn("governance plugin not found: %v", err)
+		return nil, nil
+	}
+	return governancePlugin.ResolveAccess(ctx)
+}
+
+// NarrowListModelsProviders implements AccessResolver, so the native models route and the
+// integration ones narrow their fan-out by one rule rather than each carrying a copy of it.
+//
+// A request with nothing resolved keeps the fan-out it already had rather than being narrowed to
+// nothing, and so does a request nothing settled who it is: publishing an empty list here would
+// mean "no provider may serve this", turning an unrestricted listing into one that lists nothing.
+func (s *BifrostHTTPServer) NarrowListModelsProviders(ctx *schemas.BifrostContext) {
+	if ctx == nil {
+		return
+	}
+	access, err := s.ResolveAccess(ctx)
+	if err != nil || access == nil {
+		return
+	}
+	granted := access.GrantedProvidersForModel("")
+	providers := make([]schemas.ModelProvider, 0, len(granted))
+	for _, provider := range granted {
+		providers = append(providers, schemas.ModelProvider(provider))
+	}
+	ctx.SetValue(schemas.BifrostContextKeyAvailableProviders, providers)
+}
+
+// backgroundCtx returns the server-lifetime context background workers should
+// hang off. Falls back to context.Background() before Bootstrap has set s.Ctx.
+func (s *BifrostHTTPServer) backgroundCtx() context.Context {
+	if s.Ctx != nil {
+		return s.Ctx
+	}
+	return context.Background()
+}
+
+// liveRefreshProviderConcurrency bounds how many providers a single
+// RefreshAllLiveModels pass fetches at once. The bootstrap seed could fan out
+// across every provider unbounded because nothing else was in flight yet; the
+// background pass runs alongside live inference traffic, and each provider it
+// picks up itself fans out to (enabled keys x 2) upstream calls.
+const liveRefreshProviderConcurrency = 4
+
+// RefreshAllLiveModels runs a full per-provider live model refresh.
+//
+// Safe to call while providers are being edited, unlike the bootstrap seed it
+// replaced: the provider set and each provider's keys are read through the
+// Config accessors, which take Config.Mu.RLock and hand back copies, rather
+// than ranging Config.Providers directly.
+//
+// Deliberately does not invalidate anything first. Key and provider removals
+// already prune the cache through the CRUD handlers, and
+// FetchAndStoreLiveForKey writes nothing when a fetch fails, so leaving
+// entries in place keeps last-known-good models routable across a transient
+// upstream error instead of emptying a catalog that was healthy a moment ago.
+func (s *BifrostHTTPServer) RefreshAllLiveModels(ctx context.Context) {
+	if s.Config == nil || s.Config.ModelCatalog == nil || s.Client == nil {
+		return
+	}
+
+	providers, err := s.Config.GetAllProviders()
+	if err != nil {
+		logger.Warn("live model refresh skipped: failed to list providers: %v", err)
+		return
+	}
+
+	sem := make(chan struct{}, liveRefreshProviderConcurrency)
+	var wg sync.WaitGroup
+	for _, provider := range providers {
+		keys, err := s.Config.GetProviderKeysRaw(provider)
+		if err != nil {
+			// Removed between GetAllProviders and this read. OnProviderRemoved
+			// has already dropped its live entries, so there is nothing to do.
+			continue
+		}
+		wg.Add(1)
+		go func(p schemas.ModelProvider, k []schemas.Key) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			s.RefreshLiveModelsForProvider(ctx, p, k)
+		}(provider, keys)
+	}
+	wg.Wait()
+}
+
+// liveRefreshJitterFraction spreads each refresh cycle over
+// interval * [1-f, 1+f]. Pods in a deployment start within seconds of each
+// other, so an exact interval would have every replica fan out to every
+// upstream at the same instant, on every cycle, forever.
+const liveRefreshJitterFraction = 0.1
+
+// jitteredInterval scales d by a uniform random factor around 1.
+func jitteredInterval(d time.Duration) time.Duration {
+	factor := 1 - liveRefreshJitterFraction + 2*liveRefreshJitterFraction*rand.Float64()
+	return time.Duration(float64(d) * factor)
+}
+
+// LiveModelsSyncInterval returns the configured background refresh interval.
+// A non-positive result means the refresher is disabled.
+func (s *BifrostHTTPServer) LiveModelsSyncInterval() time.Duration {
+	if s.Config == nil {
+		return modelcatalog.DefaultLiveModelsSyncInterval
+	}
+	// FrameworkConfig is swapped wholesale by the config update handler, so the
+	// pointer read needs Config.Mu like every other accessor on this struct.
+	s.Config.Mu.RLock()
+	defer s.Config.Mu.RUnlock()
+	if s.Config.FrameworkConfig == nil || s.Config.FrameworkConfig.Pricing == nil {
+		return modelcatalog.DefaultLiveModelsSyncInterval
+	}
+	configured := s.Config.FrameworkConfig.Pricing.LiveModelsSyncInterval
+	if configured == nil {
+		return modelcatalog.DefaultLiveModelsSyncInterval
+	}
+	return time.Duration(*configured) * time.Second
+}
+
+// startLiveModelRefresher runs RefreshAllLiveModels on a jittered interval and
+// returns a func that stops it. A non-positive interval disables the refresher
+// and returns a no-op, which is the documented opt-out.
+//
+// Deliberately takes no distributed lock, unlike the pricing sync worker: the
+// live model cache is per-process in-memory, so every node has to refresh its
+// own copy. Electing a single refresher would leave every other node serving
+// its boot-time snapshot indefinitely.
+func (s *BifrostHTTPServer) startLiveModelRefresher(ctx context.Context, interval time.Duration) func() {
+	if interval <= 0 {
+		logger.Info("background live model refresh is disabled")
+		return func() {}
+	}
+	logger.Info("background live model refresh every %v (jittered +/-%d%%)", interval, int(liveRefreshJitterFraction*100))
+
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		// A timer rather than a ticker: the delay is resampled every cycle, so
+		// replicas that happen to align on one cycle drift apart on the next.
+		timer := time.NewTimer(jitteredInterval(interval))
+		defer timer.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				s.RefreshAllLiveModels(ctx)
+				timer.Reset(jitteredInterval(interval))
+			}
+		}
+	}()
+	return cancel
+}
+
+// RestartLiveModelRefresher stops any running refresher and starts a new one
+// at the currently configured interval. Called at boot and again whenever the
+// framework config changes, so a disabled-to-enabled edit (or vice versa)
+// takes effect without a restart. Exported so servers that replace the boot
+// path can start the refresher with its stop handle registered for the shared
+// cleanup and config-change restarts.
+func (s *BifrostHTTPServer) RestartLiveModelRefresher(ctx context.Context) {
+	s.liveModelRefresherMu.Lock()
+	defer s.liveModelRefresherMu.Unlock()
+	if s.liveModelRefresherStop != nil {
+		s.liveModelRefresherStop()
+	}
+	s.liveModelRefresherStop = s.startLiveModelRefresher(ctx, s.LiveModelsSyncInterval())
+}
+
+// stopLiveModelRefresher halts the background refresher if one is running.
+func (s *BifrostHTTPServer) stopLiveModelRefresher() {
+	s.liveModelRefresherMu.Lock()
+	defer s.liveModelRefresherMu.Unlock()
+	if s.liveModelRefresherStop != nil {
+		s.liveModelRefresherStop()
+		s.liveModelRefresherStop = nil
+	}
+}
+
+type providerRefreshState struct {
+	allKeys bool
+	keys    map[string]struct{}
+}
+
+// beginKeyRefresh claims an on-demand refresh slot for one provider key.
+// Refreshes for distinct keys may run concurrently, but the same key is
+// deduplicated and no key refresh may overlap an all-keys refresh.
+func (s *BifrostHTTPServer) beginKeyRefresh(provider schemas.ModelProvider, keyID string) (release func(), ok bool) {
+	s.refreshInFlightMu.Lock()
+	defer s.refreshInFlightMu.Unlock()
+
+	if s.refreshInFlight == nil {
+		s.refreshInFlight = make(map[schemas.ModelProvider]*providerRefreshState)
+	}
+	state := s.refreshInFlight[provider]
+	if state == nil {
+		state = &providerRefreshState{keys: make(map[string]struct{})}
+		s.refreshInFlight[provider] = state
+	}
+	if state.allKeys {
+		return nil, false
+	}
+	if _, exists := state.keys[keyID]; exists {
+		return nil, false
+	}
+	state.keys[keyID] = struct{}{}
+
+	return func() {
+		s.refreshInFlightMu.Lock()
+		defer s.refreshInFlightMu.Unlock()
+		current := s.refreshInFlight[provider]
+		if current != state {
+			return
+		}
+		delete(state.keys, keyID)
+		if len(state.keys) == 0 {
+			delete(s.refreshInFlight, provider)
+		}
+	}, true
+}
+
+// beginAllKeysRefresh claims an exclusive on-demand refresh slot for a
+// provider. It conflicts with both another all-keys refresh and any active
+// per-key refresh for that provider.
+func (s *BifrostHTTPServer) beginAllKeysRefresh(provider schemas.ModelProvider) (release func(), ok bool) {
+	s.refreshInFlightMu.Lock()
+	defer s.refreshInFlightMu.Unlock()
+
+	if s.refreshInFlight == nil {
+		s.refreshInFlight = make(map[schemas.ModelProvider]*providerRefreshState)
+	}
+	if _, exists := s.refreshInFlight[provider]; exists {
+		return nil, false
+	}
+	state := &providerRefreshState{allKeys: true}
+	s.refreshInFlight[provider] = state
+
+	return func() {
+		s.refreshInFlightMu.Lock()
+		defer s.refreshInFlightMu.Unlock()
+		if s.refreshInFlight[provider] == state {
+			delete(s.refreshInFlight, provider)
+		}
+	}, true
+}
+
+// RefreshLiveModelsForKey re-fetches list-models for one key on demand. It is
+// the ModelsManager entrypoint behind the per-key refresh button.
+func (s *BifrostHTTPServer) RefreshLiveModelsForKey(ctx context.Context, provider schemas.ModelProvider, keyID string) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil || s.Client == nil {
+		return fmt.Errorf("model catalog is not initialized")
+	}
+	release, ok := s.beginKeyRefresh(provider, keyID)
+	if !ok {
+		return handlers.ErrRefreshInProgress
+	}
+	defer release()
+
+	s.FetchAndStoreLiveForKey(ctx, provider, keyID)
+	return nil
+}
+
+// RefreshLiveModelsForAllKeys re-fetches list-models across every enabled key
+// of the provider on demand. It is the ModelsManager entrypoint behind the
+// provider-level refresh button.
+func (s *BifrostHTTPServer) RefreshLiveModelsForAllKeys(ctx context.Context, provider schemas.ModelProvider) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil || s.Client == nil {
+		return fmt.Errorf("model catalog is not initialized")
+	}
+	keys, err := s.Config.GetProviderKeysRaw(provider)
+	if err != nil {
+		return err
+	}
+	release, ok := s.beginAllKeysRefresh(provider)
+	if !ok {
+		return handlers.ErrRefreshInProgress
+	}
+	defer release()
+
+	s.RefreshLiveModelsForProvider(ctx, provider, keys)
+	return nil
+}
+
+// RefreshLiveModelsForProvider runs filtered + unfiltered list-models for the
+// provider, fanning out per key in parallel so the live cache ends up with
+// per-(provider, keyID) entries. Keyless providers cache under the "" sentinel.
+//
+// Callers are responsible for invalidating stale entries first when keys
+// have been removed from the provider's set.
+func (s *BifrostHTTPServer) RefreshLiveModelsForProvider(ctx context.Context, provider schemas.ModelProvider, keys []schemas.Key) {
+	// Keyless providers fetch once under the "" sentinel whatever keys are
+	// still stored: core skips key selection for them entirely, and a provider
+	// switched from keyed to keyless keeps its old (often disabled) keys, which
+	// must not decide whether discovery runs.
+	if isKeylessProvider(provider, s.Config) {
+		s.FetchAndStoreLiveForKey(ctx, provider, "")
+		return
+	}
+	if len(keys) == 0 {
+		// Empty key slice + non-keyless provider would write under the "" sentinel
+		// reserved for keyless providers — colliding with the keyless namespace and
+		// triggering an unauthenticated fetch for a provider that requires a key.
+		logger.Warn("model discovery skipped for provider %s: no keys configured", provider)
+		return
+	}
+	var wg sync.WaitGroup
+	enabledCount := 0
+	for _, key := range keys {
+		// Skip disabled keys — core rejects list-models calls scoped to a
+		// disabled key's ID ("no key found with id..."), so fetching for one
+		// is guaranteed to fail and only adds "falling back onto the static
+		// datasheet" log noise per disabled key.
+		if !keyEnabled(key) {
+			continue
+		}
+		enabledCount++
+		wg.Add(1)
+		go func(keyID string) {
+			defer wg.Done()
+			s.FetchAndStoreLiveForKey(ctx, provider, keyID)
+		}(key.ID)
+	}
+	if enabledCount == 0 {
+		logger.Warn("model discovery skipped for provider %s: no enabled keys configured", provider)
+		return
+	}
+	wg.Wait()
+}
+
+// FetchAndStoreLiveForKey issues the filtered and unfiltered list-models
+// calls for one (provider, keyID) in parallel and writes the results into
+// the catalog. Errors are logged and surfaced via updateKeyStatus when the
+// provider returns per-key statuses, but they do not abort the other call.
+// keyID="" scopes to "no specific key" — used for keyless providers and as
+// the legacy sentinel. Always validates keys for the providers that opt into
+// the check (today: OpenRouter, whose /v1/models is unauthenticated) so the
+// routing graph is the same at boot, after a key add, and after a reload —
+// stale-but-routable behavior would diverge otherwise.
+func (s *BifrostHTTPServer) FetchAndStoreLiveForKey(ctx context.Context, provider schemas.ModelProvider, keyID string) {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return
+	}
+	// Skip the fetch entirely when the provider has disabled list_models via
+	// allowed_requests — every per-(provider,keyID) call would just bounce with
+	// "operation not allowed", wasting two goroutines and one bfCtx per attempt.
+	if pc, err := s.Config.GetProviderConfigRaw(provider); err == nil && pc != nil &&
+		pc.CustomProviderConfig != nil &&
+		!pc.CustomProviderConfig.IsOperationAllowed(schemas.ListModelsRequest) {
+		return
+	}
+	// Captured before the upstream calls go out, and checked again by the
+	// catalog when each response commits. list-models can take seconds; a key
+	// deleted or disabled in that window has already had its entries dropped by
+	// the CRUD handler, and no later refresh pass fetches or prunes a key that
+	// is no longer configured — so an unguarded commit here would re-add that
+	// key's models and advertise them until the process restarted.
+	gen := s.Config.ModelCatalog.LiveGeneration(provider)
+	// One BifrostContext per goroutine. BifrostContext.SetValue mutates state
+	// in place, so the request-scoped metadata core sets during a routing pass
+	// (RequestID, FallbackIndex, span IDs, ...) would otherwise bleed between
+	// the filtered and unfiltered calls and conflate them in logs/billing.
+	newListModelsCtx := func() *schemas.BifrostContext {
+		c := schemas.NewBifrostContext(ctx, time.Now().Add(15*time.Second))
+		c.SetValue(schemas.BifrostContextKeySkipPluginPipeline, true)
+		c.SetValue(schemas.BifrostContextKeyValidateKeys, true)
+		return c
+	}
+
+	var keyIDPtr *string
+	if keyID != "" {
+		keyIDPtr = &keyID
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		bfCtx := newListModelsCtx()
+		defer bfCtx.Cancel()
+		resp, bfErr := s.Client.ListModelsRequest(bfCtx, &schemas.BifrostListModelsRequest{
+			Provider: provider,
+			KeyID:    keyIDPtr,
+		})
+		if bfErr != nil {
+			logger.Warn("filtered list-models failed for provider %s key %s: %v: falling back onto the static datasheet", provider, keyID, bifrost.GetErrorMessage(bfErr))
+			if len(bfErr.ExtraFields.KeyStatuses) > 0 && s.Config.ConfigStore != nil {
+				s.updateKeyStatus(ctx, bfErr.ExtraFields.KeyStatuses)
+			}
+			return
+		}
+		if resp == nil {
+			return
+		}
+		if !s.Config.ModelCatalog.UpsertLiveFromResponseIfCurrent(provider, keyID, false, resp, gen) {
+			// The key or provider changed while this call was in flight, so the
+			// result describes a configuration that no longer exists. Dropping
+			// the key statuses with it is deliberate: they are keyed by the same
+			// key ID and would write validity back onto a row that was just
+			// deleted or replaced.
+			logger.Debug("discarding stale filtered list-models result for provider %s key %s: the provider's keys changed while the fetch was in flight", provider, keyID)
+			return
+		}
+		if len(resp.KeyStatuses) > 0 && s.Config.ConfigStore != nil {
+			s.updateKeyStatus(ctx, resp.KeyStatuses)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		bfCtx := newListModelsCtx()
+		defer bfCtx.Cancel()
+		resp, bfErr := s.Client.ListModelsRequest(bfCtx, &schemas.BifrostListModelsRequest{
+			Provider:   provider,
+			KeyID:      keyIDPtr,
+			Unfiltered: true,
+		})
+		if bfErr != nil {
+			logger.Warn("unfiltered list-models failed for provider %s key %s: %v: falling back onto the static datasheet", provider, keyID, bifrost.GetErrorMessage(bfErr))
+			return
+		}
+		if resp == nil {
+			return
+		}
+		if !s.Config.ModelCatalog.UpsertLiveFromResponseIfCurrent(provider, keyID, true, resp, gen) {
+			logger.Debug("discarding stale unfiltered list-models result for provider %s key %s: the provider's keys changed while the fetch was in flight", provider, keyID)
+		}
+	}()
+	wg.Wait()
+}
+
+// ForceReloadPricing triggers an immediate pricing sync and resets the sync
+// timer. No longer triggers a list-models refresh — pricing reload is now
+// pricing-only.
+func (s *BifrostHTTPServer) ForceReloadPricing(ctx context.Context) error {
+	if s.Config == nil {
+		return fmt.Errorf("server config not initialized")
+	}
+	if s.Config.ModelCatalog != nil {
+		if err := s.Config.ModelCatalog.ForceReloadPricing(ctx); err != nil {
+			return fmt.Errorf("failed to force reload pricing: %w", err)
+		}
+	}
+	return nil
+}
+
+// ReloadPricingFromDBAndPopulateModelPool reloads the pricing from DB. The
+// list-models refresh that used to follow is gone — pricing reload is now
+// pricing-only.
+func (s *BifrostHTTPServer) ReloadPricingFromDBAndPopulateModelPool(ctx context.Context) error {
+	if s.Config == nil {
+		return fmt.Errorf("server config not initialized")
+	}
+	if s.Config.ModelCatalog != nil {
+		if err := s.Config.ModelCatalog.ReloadFromDB(ctx); err != nil {
+			return fmt.Errorf("failed to reload pricing from DB: %w", err)
+		}
+	}
+	return nil
+}
+
+// UpsertPricingOverride inserts or updates a pricing override in the in-memory model catalog.
+func (s *BifrostHTTPServer) UpsertPricingOverride(ctx context.Context, override *tables.TablePricingOverride) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("pricing manager not found")
+	}
+	return s.Config.ModelCatalog.UpsertPricingOverrides(override)
+}
+
+// DeletePricingOverride removes a pricing override from the in-memory model catalog.
+func (s *BifrostHTTPServer) DeletePricingOverride(ctx context.Context, id string) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("pricing manager not found")
+	}
+	s.Config.ModelCatalog.DeletePricingOverride(id)
+	return nil
+}
+
+// UpsertModelPricingAttributes writes the additional_attributes JSON for the
+// pricing rows keyed by (model, provider) for every entry in the batch. The
+// whole batch is wrapped in a single transaction so a missing pricing row
+// rolls back the lot. After a successful commit the in-memory pricing cache
+// is reloaded once. Enterprise overrides this method to broadcast a peer
+// reload after commit.
+func (s *BifrostHTTPServer) UpsertModelPricingAttributes(ctx context.Context, entries []handlers.ModelPricingAttributesEntry) error {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return fmt.Errorf("model catalog not initialized")
+	}
+	if s.Config.ConfigStore == nil {
+		return fmt.Errorf("model catalog requires a config store")
+	}
+	var missing []string
+	err := s.Config.ConfigStore.ExecuteTransaction(ctx, func(tx *gorm.DB) error {
+		for _, e := range entries {
+			rows, err := s.Config.ConfigStore.UpsertModelPricingAttributes(ctx, e.Model, e.Provider, e.AdditionalAttributes, tx)
+			if err != nil {
+				return err
+			}
+			if rows == 0 {
+				missing = append(missing, fmt.Sprintf("%s/%s", e.Provider, e.Model))
+			}
+		}
+		if len(missing) > 0 {
+			return fmt.Errorf("no pricing row for one or more (model, provider) entries: %s", strings.Join(missing, ", "))
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if err := s.Config.ModelCatalog.ReloadPricing(ctx); err != nil {
+		return fmt.Errorf("failed to reload pricing cache after attribute write: %w", err)
+	}
+	return nil
+}
+
+// ReloadProxyConfig reloads the proxy configuration
+func (s *BifrostHTTPServer) ReloadProxyConfig(ctx context.Context, config *tables.GlobalProxyConfig) error {
+	if s.Config == nil {
+		return fmt.Errorf("config not found")
+	}
+	// Point every factory client at the new proxy, then store the config and rebuild
+	// the providers that inherit it for inference. The config's factory is the one
+	// registered as the process default; a server that runs its own bootstrap
+	// (enterprise) may never set s.HTTPClientFactory, so update both.
+	if s.Config.HTTPClientFactory != nil {
+		s.Config.HTTPClientFactory.UpdateProxyConfig(config.ToNetwork())
+	}
+	if s.HTTPClientFactory != nil && s.HTTPClientFactory != s.Config.HTTPClientFactory {
+		s.HTTPClientFactory.UpdateProxyConfig(config.ToNetwork())
+	}
+	if err := s.Config.SetGlobalProxyConfig(config); err != nil {
+		return err
+	}
+	if config == nil {
+		logger.Info("proxy configuration removed")
+		return nil
+	}
+	logger.Info("proxy configuration reloaded: enabled=%t, type=%s", config.Enabled, config.Type)
+	return nil
+}
+
+// ReloadHeaderFilterConfig reloads the header filter configuration
+func (s *BifrostHTTPServer) ReloadHeaderFilterConfig(ctx context.Context, config *tables.GlobalHeaderFilterConfig) error {
+	if s.Config == nil {
+		return fmt.Errorf("config not found")
+	}
+	// Store the raw header filter config in ClientConfig
+	s.Config.ClientConfig.HeaderFilterConfig = config
+	// Compile into optimized matcher for O(1) per-request lookups
+	s.Config.SetHeaderMatcher(lib.NewHeaderMatcher(config))
+	allowlistLen := 0
+	denylistLen := 0
+	if config != nil {
+		allowlistLen = len(config.Allowlist)
+		denylistLen = len(config.Denylist)
+	}
+	logger.Info("header filter configuration reloaded: allowlist=%d, denylist=%d", allowlistLen, denylistLen)
+	return nil
+}
+
+// GetModelsForProvider returns all models for a specific provider from the model catalog
+func (s *BifrostHTTPServer) GetModelsForProvider(provider schemas.ModelProvider) []string {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return []string{}
+	}
+	return s.Config.ModelCatalog.GetModelsForProvider(provider)
+}
+
+// GetUnfilteredModelsForProvider returns all unfiltered models for a specific provider from the model catalog
+func (s *BifrostHTTPServer) GetUnfilteredModelsForProvider(provider schemas.ModelProvider) []string {
+	if s.Config == nil || s.Config.ModelCatalog == nil {
+		return []string{}
+	}
+	return s.Config.ModelCatalog.GetUnfilteredModelsForProvider(provider)
+}
+
+// GetPluginStatus returns the status of all plugins
+// Delegates to Config for centralized plugin status management
+func (s *BifrostHTTPServer) GetPluginStatus(ctx context.Context) map[string]schemas.PluginStatus {
+	return s.Config.GetPluginStatus()
+}
+
+// GetLoadedPluginNames returns the sanitized names of all currently loaded plugins,
+// matching the names embedded in their trace span names.
+func (s *BifrostHTTPServer) GetLoadedPluginNames() []string {
+	if s.Config == nil {
+		return []string{}
+	}
+	return s.Config.GetLoadedPluginNames()
+}
+
+// NormalizePluginConfig implements handlers.PluginsLoader. It looks up the plugin
+// by name in the ConfigMarshallers cache and calls MarshalConfigForStorage if found.
+// Returns nil, nil when the plugin is not loaded or does not implement ConfigMarshallerPlugin.
+func (s *BifrostHTTPServer) NormalizePluginConfig(name string, config map[string]any) (map[string]any, error) {
+	if m := s.Config.ConfigMarshallers.Load(); m != nil {
+		if cm, ok := (*m)[name]; ok {
+			return cm.MarshalConfigForStorage(config)
+		}
+	}
+	return nil, nil
+}
+
+// ExpandPluginConfigForAPI implements handlers.PluginsLoader. It looks up the plugin
+// by name in the ConfigMarshallers cache and calls RedactConfig if found.
+// Returns nil, nil when the plugin is not loaded or does not implement ConfigMarshallerPlugin.
+func (s *BifrostHTTPServer) ExpandPluginConfigForAPI(name string, config map[string]any) (map[string]any, error) {
+	if m := s.Config.ConfigMarshallers.Load(); m != nil {
+		if cm, ok := (*m)[name]; ok {
+			return cm.RedactConfig(config)
+		}
+	}
+	return nil, nil
+}
+
+// Helper to update error status
+// Uses UpdatePluginOverallStatus to create the status entry if it doesn't exist,
+// ensuring plugins that were never loaded can still have their error status tracked.
+// Always returns the original error so the actual failure reason is surfaced to the user.
+func (s *BifrostHTTPServer) updatePluginErrorStatus(name, step string, originalErr error) error {
+	logs := []string{fmt.Sprintf("error %s plugin %s: %v", step, name, originalErr)}
+	s.Config.UpdatePluginOverallStatus(name, name, schemas.PluginStatusError, logs, []schemas.PluginType{})
+	return originalErr
+}
+
+// SyncLoadedPlugin syncs a loaded plugin to the Bifrost client and updates the plugin status
+func (s *BifrostHTTPServer) SyncLoadedPlugin(ctx context.Context, name string, plugin schemas.BasePlugin, placement *schemas.PluginPlacement, order *int) error {
+	// 2. Register (replaces old version atomically)
+	if err := s.Config.ReloadPlugin(plugin); err != nil {
+		return s.updatePluginErrorStatus(plugin.GetName(), "registering", err)
+	}
+	// 2b. Set order info and re-sort
+	s.Config.SetPluginOrderInfo(plugin.GetName(), placement, order)
+	s.Config.SortAndRebuildPlugins()
+	// 3. Update Bifrost client
+	if err := s.Client.ReloadPlugin(plugin, InferPluginTypes(plugin)); err != nil {
+		return s.updatePluginErrorStatus(plugin.GetName(), "reloading bifrost config for", err)
+	}
+	// 3b. Sync plugin execution order from config to core
+	s.Client.ReorderPlugins(s.Config.GetPluginOrder())
+	// 4. Special handling for observability plugins
+	if _, ok := plugin.(schemas.ObservabilityPlugin); ok {
+		s.reloadObservabilityPlugins()
+	}
+	// 4b. Batch accounting is wired at bootstrap against the live logging and
+	// governance plugins. Reloading either swaps the instance — which cancels the
+	// old sweeper and leaves the sweeper holding a torn-down usage reporter — so
+	// it must be rewired here or batch accounting silently stops until restart.
+	// Safe to re-run: StartBatchAccountingSweeper cancels any prior sweeper.
+	if plugin.GetName() == logging.PluginName || plugin.GetName() == s.getGovernancePluginName() {
+		s.WireBatchAccountingSweeper()
+	}
+	// 5. Update plugin status
+	s.Config.UpdatePluginOverallStatus(plugin.GetName(), name, schemas.PluginStatusActive,
+		[]string{fmt.Sprintf("plugin %s reloaded successfully", name)}, InferPluginTypes(plugin))
+	return nil
+}
+
+// PluginInitContext returns the context to hand to a plugin constructor. A plugin outlives
+// the request that loaded it and derives long-lived contexts from this one, so it must be the
+// server-lifetime context, never the pooled *fasthttp.RequestCtx an admin reload arrives on.
+// Carries the bootstrap plugin-name values, which Ctx inherits.
+func (s *BifrostHTTPServer) PluginInitContext() context.Context {
+	if s.Ctx == nil {
+		return context.Background()
+	}
+	return s.Ctx
+}
+
+// ReloadPlugin reloads a plugin with new instance and updates Bifrost core.
+// The plugin is registered to the appropriate arrays based on which interfaces it implements.
+func (s *BifrostHTTPServer) ReloadPlugin(ctx context.Context, name string, path *string, pluginConfig any, placement *schemas.PluginPlacement, order *int) error {
+	logger.Debug("reloading plugin %s", name)
+	// 0. A semantic_cache config gets the same validation config.json does, here rather than when
+	// it is saved: the plugins API loads a plugin only when it is enabled, so a cache that no
+	// longer passes can still be disabled. A refused config changes nothing, status included.
+	if name == semanticcache.PluginName {
+		if err := s.Config.ValidateSemanticCacheConfig(&schemas.PluginConfig{Name: name, Config: pluginConfig}); err != nil {
+			return fmt.Errorf("%w: %w", lib.ErrInvalidPluginConfig, err)
+		}
+	}
+	// 1. Instantiate new version. When it fails, the running instance (if any)
+	// is left in place, so the status keeps describing that instance; only a
+	// plugin with nothing running is marked as errored.
+	plugin, err := InstantiatePlugin(s.PluginInitContext(), name, path, pluginConfig, s.Config)
+	if err != nil {
+		if s.Config.IsPluginLoaded(name) {
+			logger.Warn("plugin %s failed to load with its new config, the running instance stays in place: %v", name, err)
+			return err
+		}
+		return s.updatePluginErrorStatus(name, "loading", err)
+	}
+	// Wire the embedding executor on the new instance before syncing.
+	if semanticCachePlugin, ok := plugin.(*semanticcache.Plugin); ok {
+		semanticCachePlugin.SetEmbeddingRequestExecutor(s.Client.EmbeddingRequest)
+	}
+	// Both at once: applied separately, the classifier spends the gap between
+	// them configured for a store it has not been given, and warms a throwaway
+	// generation into the embedded one.
+	if routingComplexityPlugin, ok := plugin.(routing.ComplexityWarmupDependencySetter); ok {
+		routingComplexityPlugin.SetComplexityWarmupDependencies(s.Config.VectorStore, s.Client.EmbeddingRequest)
+	}
+	if routingWarmupObserverPlugin, ok := plugin.(routing.WarmupEmbedUsageObserverSetter); ok {
+		routingWarmupObserverPlugin.SetWarmupEmbedUsageObserver(s.ObserveWarmupRoutingEmbedding)
+	}
+	if routingChatPlugin, ok := plugin.(interface {
+		SetChatRequestExecutor(routing.ChatRequestExecutor)
+	}); ok {
+		routingChatPlugin.SetChatRequestExecutor(s.Client.ChatCompletionRequest)
+	}
+	if routingResponsesPlugin, ok := plugin.(routing.ResponsesExecutorSetter); ok {
+		routingResponsesPlugin.SetResponsesRequestExecutor(s.Client.ResponsesRequest)
+	}
+	if routingDecisionPlugin, ok := plugin.(routing.DecisionExecutorSetter); ok {
+		routingDecisionPlugin.SetDecisionRequestExecutor(s.Client.DecisionRequest)
+	}
+	if routingPlugin, ok := plugin.(*routing.RoutingPlugin); ok {
+		s.wireRoutingSuggestions(routingPlugin)
+	}
+	if err := s.SyncLoadedPlugin(ctx, name, plugin, placement, order); err != nil {
+		return err
+	}
+	return nil
+}
+
+// logRetentionSetter is a plugin that bounds what it keeps by the logs'
+// retention; the routing plugin's request capture is one.
+type logRetentionSetter interface {
+	SetLogRetention(days func() int)
+}
+
+// applyRoutingLogRetention tells a plugin that keeps per-log data how long
+// logs live, so captured request vectors never outlive their logs. It runs at
+// bootstrap and on every reload, since a reload builds a fresh plugin. The
+// retention is read at each sweep rather than once: LogsCleaner is built
+// later in Bootstrap, may be absent (0 means logs are kept forever), and its
+// retention can change at runtime.
+func (s *BifrostHTTPServer) applyRoutingLogRetention(plugin any) {
+	setter, ok := plugin.(logRetentionSetter)
+	if !ok {
+		return
+	}
+	setter.SetLogRetention(func() int {
+		if s.LogsCleaner == nil {
+			return 0
+		}
+		return s.LogsCleaner.RetentionDays()
+	})
+}
+
+// captureDropTimeout bounds dropping complexity request capture's vectors
+// once the routing plugin is gone.
+const captureDropTimeout = 30 * time.Second
+
+// subscribeCaptureDeletes makes deleted logs take their complexity captured
+// vectors with them. The previous subscription is released first, so a second
+// registration cannot leak the first.
+func (s *BifrostHTTPServer) subscribeCaptureDeletes(loggerPlugin *logging.LoggerPlugin) {
+	if s.unsubscribeCaptureDeletes != nil {
+		s.unsubscribeCaptureDeletes()
+		s.unsubscribeCaptureDeletes = nil
+	}
+	if loggerPlugin != nil {
+		s.unsubscribeCaptureDeletes = loggerPlugin.SubscribeLogDeleteCallback(s.forgetCapturedLogs)
+	}
+}
+
+// forgetCapturedLogs is the log-delete subscription for complexity request
+// capture: a deleted log takes its captured vector with it. The routing plugin
+// is looked up per delete rather than held, because a reload replaces the
+// instance and the subscription must follow it. With no routing plugin there
+// is nothing to forget: its captures were dropped when it went (see
+// dropCapturedRequests).
+func (s *BifrostHTTPServer) forgetCapturedLogs(ctx context.Context, ids []string) {
+	if routingPlugin, err := s.getRoutingPlugin(); err == nil {
+		routingPlugin.ForgetComplexityCapturedRequests(ctx, ids)
+	}
+}
+
+// dropCapturedRequests deletes every complexity capture namespace in the
+// configured vector store. Captured vectors exist only to feed the routing
+// plugin's phrase suggestions, and only that plugin forgets them with their
+// logs and ages them out, so once it is removed or disabled they would be
+// kept with no owner. Dropping them is the cleanup; a routing plugin added
+// back later starts capturing afresh. A drop that fails is logged and retried
+// at the next start without a routing plugin.
+func (s *BifrostHTTPServer) dropCapturedRequests(ctx context.Context) {
+	if s.Config == nil || s.Config.VectorStore == nil {
+		return
+	}
+	store := s.Config.VectorStore
+	dropCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), captureDropTimeout)
+	defer cancel()
+	namespaces, err := store.ListNamespaces(dropCtx, complexity.CaptureNamespacePrefix+"_")
+	if err != nil {
+		logger.Warn("failed to list complexity capture namespaces to drop after the routing plugin went: %v", err)
+		return
+	}
+	for _, ns := range namespaces {
+		if err := store.DeleteNamespace(dropCtx, ns); err != nil && !errors.Is(err, vectorstore.ErrNotFound) {
+			logger.Warn("failed to drop complexity capture namespace %s after the routing plugin went: %v", ns, err)
+		}
+	}
+}
+
+// dropCapturesOfDisabledRouting runs at startup when no routing plugin
+// loaded. Only a plugin disabled by config (governance off) gives up its
+// captures from an earlier run; one that failed to start keeps them for its
+// next start.
+func (s *BifrostHTTPServer) dropCapturesOfDisabledRouting(ctx context.Context) {
+	if status, ok := s.Config.GetPluginStatusByName(routing.PluginName); ok && status.Status == schemas.PluginStatusDisabled {
+		s.dropCapturedRequests(ctx)
+	}
+}
+
+// RemovePlugin removes a plugin from the server.
+// The plugin is removed from the plugin arrays it is in.
+func (s *BifrostHTTPServer) RemovePlugin(ctx context.Context, displayName string) error {
+	// Get the actual plugin name from the display name
+	name, ok := s.Config.GetPluginNameByDisplayName(displayName)
+	if !ok {
+		return dynamicPlugins.ErrPluginNotFound
+	}
+
+	// Check if plugin implements ObservabilityPlugin before removal
+	var isObservability bool
+	var err error
+	var plugin schemas.BasePlugin
+	if plugin, err = s.Config.FindPluginByName(name); err == nil {
+		_, isObservability = plugin.(schemas.ObservabilityPlugin)
+	}
+
+	// 1. Unregister from config
+	if err := s.Config.UnregisterPlugin(name); err != nil {
+		return err
+	}
+
+	// 2. Update Bifrost client
+	if err := s.Client.RemovePlugin(name, InferPluginTypes(plugin)); err != nil {
+		logger.Warn("failed to reload bifrost config after plugin removal: %v", err)
+	}
+
+	// 2a. Routing's captured request vectors have no owner without it. After
+	// the client removal, whose Cleanup has drained the capture writer, so no
+	// queued write recreates a namespace once it is dropped.
+	if name == routing.PluginName {
+		s.dropCapturedRequests(ctx)
+	}
+
+	// 3. Reload observability plugins if necessary
+	if isObservability {
+		s.reloadObservabilityPlugins()
+	}
+
+	// 4. Update status and marshaller
+	if isDisabled, _ := ctx.Value(handlers.PluginDisabledKey).(bool); isDisabled {
+		s.markPluginDisabled(name)
+	} else {
+		s.Config.DeletePluginOverallStatus(name)
+		// Plugin is being permanently deleted: remove its config marshaller too.
+		s.Config.RemoveConfigMarshaller(name)
+	}
+
+	return nil
+}
+
+// RegisterInferenceRoutes initializes the routes for the inference handler
+func (s *BifrostHTTPServer) RegisterInferenceRoutes(ctx context.Context, middlewares ...schemas.BifrostHTTPMiddleware) error {
+	// Initialize WebSocket pool and handler before integrations so it can be wired through
+	s.wsPool = bfws.NewPool(s.Config.WebSocketConfig.Pool)
+	wsResponsesHandler := handlers.NewWSResponsesHandler(s.Client, s.Config, s.wsPool)
+	wsRealtimeHandler := handlers.NewWSRealtimeHandler(s.Client, s.Config, s.wsPool)
+	s.wsLiveHandler = handlers.NewWSLiveHandler(s.Client, s.Config, s.wsPool)
+	s.wsSpeechHandler = handlers.NewWSSpeechSessionHandler(s.Client, s.Config, s.wsPool)
+	s.webrtcLiveHandler = handlers.NewWebRTCLiveHandler(s.Client, s.Config)
+	webrtcRealtimeHandler := handlers.NewWebRTCRealtimeHandler(s.Client, s.Config)
+	realtimeClientSecretsHandler := handlers.NewRealtimeClientSecretsHandler(s.Client, s.Config)
+
+	inferenceHandler := handlers.NewInferenceHandler(s, s.Client, s.Config)
+	s.IntegrationHandler = handlers.NewIntegrationHandler(s.Client, s.Config, s, wsResponsesHandler, wsRealtimeHandler, webrtcRealtimeHandler, realtimeClientSecretsHandler)
+	asyncHandler := handlers.NewAsyncHandler(s.Client, s.Config)
+	s.IntegrationHandler.RegisterRoutes(s.Router, middlewares...)
+	s.wsLiveHandler.RegisterRoutes(s.Router, middlewares...)
+	s.wsSpeechHandler.RegisterRoutes(s.Router, middlewares...)
+	s.webrtcLiveHandler.RegisterRoutes(s.Router, middlewares...)
+	handlers.NewLiveControlHandler(s.Client, s.Config).RegisterRoutes(s.Router, middlewares...)
+	inferenceHandler.RegisterRoutes(s.Router, middlewares...)
+	asyncHandler.RegisterRoutes(s.Router, middlewares...)
+	return nil
+}
+
+// RegisterAPIRoutes initializes the routes for the Bifrost HTTP server.
+func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks ServerCallbacks, middlewares ...schemas.BifrostHTTPMiddleware) error {
+	var err error
+	// Initializing plugin specific handlers
+	var loggingHandler *handlers.LoggingHandler
+	loggerPlugin, _ := lib.FindPluginAs[*logging.LoggerPlugin](s.Config, logging.PluginName)
+	var govLogManager logging.LogManager
+	if loggerPlugin != nil {
+		loggingHandler = handlers.NewLoggingHandler(loggerPlugin.GetPluginLogManager(), s, s.Config)
+		if resolverProvider, ok := callbacks.(LogRedactionMappingResolverProvider); ok {
+			loggingHandler.SetLogRedactionMappingResolver(resolverProvider.GetLogRedactionMappingResolver())
+		}
+		// Wire the sidekiq runner so cost recalculation runs as a durable background
+		// job. Registering the handler here (before RecoverIncomplete) lets a job
+		// interrupted by a restart resume on boot.
+		if s.SidekiqRunner != nil && s.Config != nil && s.Config.ConfigStore != nil {
+			loggingHandler.SetSidekiqBackend(s.SidekiqRunner, s.Config.ConfigStore)
+		}
+		govLogManager = loggerPlugin.GetPluginLogManager()
+	}
+	var governanceHandler *handlers.GovernanceHandler
+	governancePluginName := governance.PluginName
+	if name, ok := ctx.Value(schemas.BifrostContextKeyGovernancePluginName).(string); ok && name != "" {
+		governancePluginName = name
+	}
+	governancePlugin, _ := lib.FindPluginAs[schemas.LLMPlugin](s.Config, governancePluginName)
+	if governancePlugin != nil {
+		governanceHandler, err = handlers.NewGovernanceHandler(callbacks, s.Config.ConfigStore, govLogManager, s.VirtualKeyAssigneeResolver)
+		if err != nil {
+			return fmt.Errorf("failed to initialize governance handler: %v", err)
+		}
+		// Register the expired-key cleanup job before the dispatcher starts, since
+		// any node may claim it.
+		if s.SidekiqRunner != nil && s.Config != nil && s.Config.ConfigStore != nil {
+			governanceHandler.SetExpiryCleanupBackend(s.SidekiqRunner)
+		}
+		s.GovernanceHandler = governanceHandler
+	}
+	// Routing rules and the complexity analyzer config live in the config store, so these
+	// endpoints have nothing to serve when persistence is disabled (initStores leaves
+	// ConfigStore nil for config_store.enabled=false). Skip them rather than failing, which
+	// would abort registration for every other API route too.
+	var routingHandler *handlers.RoutingHandler
+	if s.Config.ConfigStore != nil {
+		routingHandler, err = handlers.NewRoutingHandler(callbacks, s.Config.ConfigStore)
+		if err != nil {
+			return fmt.Errorf("failed to initialize routing handler: %v", err)
+		}
+	}
+	// Resolve the semantic_cache plugin per request so plugin reloads via
+	// /api/plugins are honored — the previous boot-time capture left stale
+	// references and (worse) skipped route registration entirely when the
+	// plugin wasn't in config.json at startup, causing 405 on all cache-clear
+	// endpoints for the process lifetime.
+	cacheHandler := handlers.NewCacheHandler(func() handlers.CacheClearer {
+		p, err := lib.FindPluginAs[*semanticcache.Plugin](s.Config, semanticcache.PluginName)
+		if err != nil || p == nil {
+			return nil
+		}
+		return p
+	})
+	// Websocket handler needs to go below UI handler
+	logger.Debug("initializing websocket server")
+	if s.WebSocketHandler == nil {
+		s.WebSocketHandler = handlers.NewWebSocketHandler(s.Ctx, s.Config.ClientConfig.AllowedOrigins)
+	}
+	s.subscribeCaptureDeletes(loggerPlugin)
+	// Start WebSocket heartbeat
+	s.WebSocketHandler.StartHeartbeat()
+	// Adding telemetry middleware
+	// Chaining all middlewares
+	// lib.ChainMiddlewares chains multiple middlewares together
+	healthHandler := handlers.NewHealthHandler(s.Config)
+	providerHandler := handlers.NewProviderHandler(callbacks, s.Config, s.Client)
+	configHandler := handlers.NewConfigHandler(callbacks, s.Config)
+	pluginsHandler := handlers.NewPluginsHandler(callbacks, s.Config.ConfigStore)
+	// Going ahead with API handlers
+	healthHandler.RegisterRoutes(s.Router, middlewares...)
+	providerHandler.RegisterRoutes(s.Router, middlewares...)
+	configHandler.RegisterRoutes(s.Router, middlewares...)
+	if pluginsHandler != nil {
+		pluginsHandler.RegisterRoutes(s.Router, middlewares...)
+	}
+	cacheHandler.RegisterRoutes(s.Router, middlewares...)
+	if governanceHandler != nil {
+		var overrides handlers.GovernanceRouteOverrides
+		if provider, ok := callbacks.(GovernanceRouteOverridesProvider); ok {
+			overrides = provider.GetGovernanceRouteOverrides(ctx)
+		}
+		governanceHandler.RegisterRoutesWithOverrides(s.Router, overrides, middlewares...)
+	}
+	if routingHandler != nil {
+		routingHandler.RegisterRoutes(s.Router, middlewares...)
+	}
+	if loggingHandler != nil {
+		loggingHandler.RegisterRoutes(s.Router, middlewares...)
+	}
+	if s.WebSocketHandler != nil {
+		s.WebSocketHandler.RegisterRoutes(s.Router, middlewares...)
+	}
+	if s.Config.ConfigStore != nil && s.SidekiqRunner != nil {
+		handlers.NewSidekiqHandler(s.Config.ConfigStore, s.SidekiqRunner).RegisterRoutes(s.Router, middlewares...)
+	}
+	// Register dev pprof handler only in dev mode
+	if handlers.IsDevMode() {
+		logger.Info("dev mode enabled, registering pprof endpoints")
+		s.devPprofHandler = handlers.NewDevPprofHandler()
+		s.devPprofHandler.RegisterRoutes(s.Router, middlewares...)
+	}
+	metricsGatherer := prometheus.GathererFunc(func() ([]*dto.MetricFamily, error) {
+		plugin, err := lib.FindPluginAs[*telemetry.PrometheusPlugin](s.Config, telemetry.PluginName)
+		if err != nil || plugin == nil {
+			return nil, nil
+		}
+		return plugin.GetMetricsGatherer().Gather()
+	})
+	metricsAdapter := fasthttpadaptor.NewFastHTTPHandler(promhttp.HandlerFor(metricsGatherer, promhttp.HandlerOpts{}))
+	metricsHandler := func(ctx *fasthttp.RequestCtx) {
+		plugin, err := lib.FindPluginAs[*telemetry.PrometheusPlugin](s.Config, telemetry.PluginName)
+		if err != nil || plugin == nil || !plugin.IsMetricsEnabled() {
+			handlers.SendError(ctx, fasthttp.StatusNotFound, "Route not found: "+string(ctx.Path()))
+			return
+		}
+		metricsAdapter(ctx)
+	}
+	s.Router.GET("/metrics", lib.ChainMiddlewares(metricsHandler, middlewares...))
+	// 404 handler
+	s.Router.NotFound = func(ctx *fasthttp.RequestCtx) {
+		handlers.SendError(ctx, fasthttp.StatusNotFound, "Route not found: "+string(ctx.Path()))
+	}
+	return nil
+}
+
+// ObserveWarmupRoutingEmbedding forwards semantic-routing warmup embedding
+// usage from the routing plugin to the telemetry plugin's routing overhead
+// counters. The telemetry plugin is resolved per call (warmup is rare — boot
+// and config changes only) so a reloaded telemetry instance, with its fresh
+// registry, is picked up without re-wiring routing.
+//
+// Exported because embedders that reimplement Bootstrap rather than calling it
+// must repeat this wiring themselves, and an unexported method is unreachable
+// from their package even through the embedded server. Warmup embeds carry no
+// request or response, so an embedder that misses this observer loses the usage
+// entirely — it cannot be recovered from the routing metadata path.
+func (s *BifrostHTTPServer) ObserveWarmupRoutingEmbedding(provider, model string, inputTokens int) {
+	plugin, err := lib.FindPluginAs[*telemetry.PrometheusPlugin](s.Config, telemetry.PluginName)
+	if err != nil || plugin == nil {
+		return
+	}
+	plugin.ObserveWarmupRoutingEmbedding(provider, model, inputTokens)
+}
+
+// GetAllRedactedKeys gets all redacted keys from the config store
+func (s *BifrostHTTPServer) GetAllRedactedKeys(ctx context.Context, ids []string) []schemas.Key {
+	if s.Config == nil || s.Config.ConfigStore == nil {
+		return nil
+	}
+	redactedKeys, err := s.Config.ConfigStore.GetAllRedactedKeys(ctx, ids)
+	if err != nil {
+		logger.Error("failed to get all redacted keys: %v", err)
+		return nil
+	}
+	return redactedKeys
+}
+
+// GetAllRedactedVirtualKeys gets all redacted virtual keys from the config store
+func (s *BifrostHTTPServer) GetAllRedactedVirtualKeys(ctx context.Context, ids []string) []tables.TableVirtualKey {
+	if s.Config == nil || s.Config.ConfigStore == nil {
+		return nil
+	}
+	virtualKeys, err := s.Config.ConfigStore.GetRedactedVirtualKeys(ctx, ids)
+	if err != nil {
+		logger.Error("failed to get all redacted virtual keys: %v", err)
+		return nil
+	}
+	return virtualKeys
+}
+
+// GetAllRedactedRoutingRules gets all redacted routing rules from the config store
+func (s *BifrostHTTPServer) GetAllRedactedRoutingRules(ctx context.Context, ids []string) []tables.TableRoutingRule {
+	if s.Config == nil || s.Config.ConfigStore == nil {
+		return nil
+	}
+	routingRules, err := s.Config.ConfigStore.GetRedactedRoutingRules(ctx, ids)
+	if err != nil {
+		logger.Error("failed to get all redacted routing rules: %v", err)
+		return nil
+	}
+	return routingRules
+}
+
+// prometheusHTTPMiddleware records Prometheus HTTP metrics. The plugin is resolved per
+// request rather than captured once, for the same reason as the otel middleware: a config
+// reload swaps in a freshly constructed instance, and a pointer captured at startup kept
+// recording into the orphaned one, so http_* series stopped appearing on /metrics after
+// any reload. Requests still pass through when no telemetry plugin is loaded.
+func (s *BifrostHTTPServer) prometheusHTTPMiddleware() schemas.BifrostHTTPMiddleware {
+	return func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			prometheusPlugin, err := lib.FindPluginAs[*telemetry.PrometheusPlugin](s.Config, telemetry.PluginName)
+			if err != nil {
+				next(ctx)
+				return
+			}
+			prometheusPlugin.HTTPMiddleware(next)(ctx)
+		}
+	}
+}
+
+// PrepareCommonMiddlewares gets the common middlewares for the Bifrost HTTP server
+func (s *BifrostHTTPServer) PrepareCommonMiddlewares() []schemas.BifrostHTTPMiddleware {
+	commonMiddlewares := []schemas.BifrostHTTPMiddleware{}
+	// Copy the matched route template saved by the router (SaveMatchedRoutePath) into a
+	// stable, router-agnostic user value so metrics middlewares below can label by route
+	// template instead of the raw URL path.
+	commonMiddlewares = append(commonMiddlewares, func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			if route, ok := ctx.UserValue(router.MatchedRoutePathParam).(string); ok && route != "" {
+				ctx.SetUserValue(string(schemas.BifrostContextKeyHTTPRoute), route)
+				// Drop the router's randomized key so it doesn't leak into request PathParams.
+				ctx.RemoveUserValue(router.MatchedRoutePathParam)
+			}
+			next(ctx)
+		}
+	})
+	// Preparing middlewares
+	commonMiddlewares = append(commonMiddlewares, s.prometheusHTTPMiddleware())
+	// OTel HTTP metrics (http_requests_total etc., pushed via OTLP). The otel plugin is
+	// resolved per request rather than captured here: a config reload swaps in a freshly
+	// constructed plugin instance, and a pointer captured at startup would keep recording
+	// against exporters whose meter provider has been shut down.
+	commonMiddlewares = append(commonMiddlewares, func(next fasthttp.RequestHandler) fasthttp.RequestHandler {
+		return func(ctx *fasthttp.RequestCtx) {
+			start := time.Now()
+			reqSize := float64(ctx.Request.Header.ContentLength())
+			next(ctx)
+			otelPlugin, err := lib.FindPluginAs[*otel.OtelPlugin](s.Config, otel.PluginName)
+			if err != nil {
+				return
+			}
+			// Label by the matched route template when available (set by the middleware
+			// above) so path params (model names, batch/file IDs) don't explode cardinality.
+			path := string(ctx.Path())
+			if route, ok := ctx.UserValue(string(schemas.BifrostContextKeyHTTPRoute)).(string); ok && route != "" {
+				path = route
+			}
+			otelPlugin.RecordHTTPMetrics(ctx,
+				path,
+				string(ctx.Method()),
+				strconv.Itoa(ctx.Response.StatusCode()),
+				time.Since(start).Seconds(),
+				reqSize,
+				float64(ctx.Response.Header.ContentLength()),
+			)
+		}
+	})
+	return commonMiddlewares
+}
+
+// refuseSQLite is the startup rule that the gateway runs on Postgres only: it returns an error
+// naming each store of config that is on SQLite, unless allowed, which the tests that start the
+// binary are.
+func refuseSQLite(config *lib.Config, allowed bool) error {
+	stores := sqliteStores(config)
+	if allowed || len(stores) == 0 {
+		return nil
+	}
+	return fmt.Errorf("the %s on SQLite, which this gateway does not run on: the credits ledger and the request statistics need Postgres. Set config_store and logs_store to postgres in config.json. A missing section falls back to SQLite; -allow-sqlite accepts it for local tests only", strings.Join(stores, " and "))
+}
+
+// sqliteStores names the stores of config that run on SQLite, as "config store is" or "log
+// store is", ready for a message. The product runs on Postgres only: a store on SQLite is a
+// config.json without that store's section, or one that names sqlite outright. The config
+// store is asked for its dialect because a defaulted one records no config; the log store has
+// no handle to ask, and always records the config it was opened with.
+func sqliteStores(config *lib.Config) []string {
+	if config == nil {
+		return nil
+	}
+	var stores []string
+	if config.ConfigStore != nil {
+		if db := config.ConfigStore.DB(); db != nil && db.Dialector.Name() == "sqlite" {
+			stores = append(stores, "config store is")
+		}
+	}
+	if config.LogsStore != nil && config.LogsStoreConfig != nil && config.LogsStoreConfig.Type == logstore.LogStoreTypeSQLite {
+		stores = append(stores, "log store is")
+	}
+	return stores
+}
+
+// ApplyBasePath resolves the base path from the -base-path flag value in
+// s.BasePath and server.base_path in s.Config, then stores the normalized
+// result on s.BasePath, on s.Config.ServerConfig (created when absent) and in
+// lib.SetBasePath. Bootstrap calls it right after loading the config, before
+// any handler is built; a build with its own bootstrap calls it at the same
+// point.
+func (s *BifrostHTTPServer) ApplyBasePath() error {
+	basePath, err := lib.ResolveBasePath(s.BasePath, s.Config.ServerConfig)
+	if err != nil {
+		return fmt.Errorf("invalid base path: %w", err)
+	}
+	if s.Config.ServerConfig == nil {
+		s.Config.ServerConfig = &lib.ServerConfig{ReadBufferSize: 1024 * 64}
+	}
+	s.BasePath = basePath
+	s.Config.ServerConfig.BasePath = basePath
+	lib.SetBasePath(basePath)
+	return nil
+}
+
+// Bootstrap initializes the Bifrost HTTP server with all necessary components.
+// It:
+// 1. Initializes Prometheus collectors for monitoring
+// 2. Reads and parses configuration from the specified config file
+// 3. Initializes the Bifrost client with the configuration
+// 4. Sets up HTTP routes for text and chat completions
+//
+// The server exposes the following endpoints:
+//   - POST /v1/text/completions: For text completion requests
+//   - POST /v1/chat/completions: For chat completion requests
+//   - GET /metrics: For Prometheus metrics
+func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
+	var err error
+	ctx = context.WithValue(ctx, schemas.BifrostContextKeyRuntimeVersion, s.Version)
+	s.Ctx, s.cancel = schemas.NewBifrostContextWithCancel(ctx)
+	handlers.SetVersion(s.Version)
+	configDir := GetDefaultConfigDir(s.AppDir)
+	// Ensure app directory exists
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create app directory %s: %v", configDir, err)
+	}
+	// Initialize high-performance configuration store with dedicated database
+	s.Config, err = lib.LoadConfig(ctx, configDir)
+	if err != nil {
+		return fmt.Errorf("failed to load config %v", err)
+	}
+	if err := refuseSQLite(s.Config, s.AllowSQLite); err != nil {
+		s.Config.Close(ctx)
+		return err
+	}
+	// The base path is resolved once, before any handler is built.
+	if err := s.ApplyBasePath(); err != nil {
+		return err
+	}
+	if s.Config.KVStore != nil {
+		integrations.RegisterKVDecoders(s.Config.KVStore)
+	}
+	// Outbound clients for non-inference traffic, built by LoadConfig on the global
+	// proxy it loaded.
+	s.HTTPClientFactory = s.Config.HTTPClientFactory
+	// Initialize WebSocket handler early so plugins can wire event broadcasters during Init.
+	// Log callbacks are registered later in RegisterAPIRoutes when logging plugin is available.
+	s.WebSocketHandler = handlers.NewWebSocketHandler(s.Ctx, s.Config.ClientConfig.AllowedOrigins)
+	s.Config.EventBroadcaster = s.WebSocketHandler.BroadcastEvent
+	// Initializing plugin loader. Allowlist entries are validated now - a malformed entry
+	// fails server startup rather than silently no-oping, since this is security-relaxing
+	// config for SSRF protection on custom plugin downloads.
+	var pluginDownloadAllowlist *network.Allowlist
+	if s.Config.ServerConfig != nil && len(s.Config.ServerConfig.PluginDownloadPrivateAllowlist) > 0 {
+		pluginDownloadAllowlist, err = network.NewAllowlist(s.Config.ServerConfig.PluginDownloadPrivateAllowlist)
+		if err != nil {
+			return fmt.Errorf("invalid server.plugin_download_private_allowlist: %w", err)
+		}
+	}
+	s.Config.PluginLoader = dynamicPlugins.NewSharedObjectPluginLoader(pluginDownloadAllowlist, dynamicPlugins.WithHTTPClientFactory(s.HTTPClientFactory))
+	// Initialize log retention cleaner if log store is configured
+	if s.Config.LogsStore != nil {
+		// If log retention days remains 0, then we wont be initializing the log retention cleaner
+		logRetentionDays := 0
+		if s.Config.ConfigStore != nil {
+			// Get logs store config from config store
+			clientConfig, err := s.Config.ConfigStore.GetClientConfig(ctx)
+			if err != nil {
+				logger.Warn("failed to get logs store config: %v", err)
+				// So we wont be initializing the log retention cleaner
+			}
+			if clientConfig != nil {
+				logRetentionDays = clientConfig.LogRetentionDays
+			}
+		} else {
+			// We will check if the config file has the log retention days set
+			logRetentionDays = s.Config.ClientConfig.LogRetentionDays
+		}
+		logger.Info("log retention days: %d", logRetentionDays)
+		if logRetentionDays > 0 {
+			// Type assert to get RDBLogStore (which implements LogRetentionManager)
+			if rdbStore, ok := s.Config.LogsStore.(logstore.LogRetentionManager); ok {
+				cleanerConfig := logstore.CleanerConfig{
+					RetentionDays: logRetentionDays,
+				}
+				s.LogsCleaner = logstore.NewLogsCleaner(rdbStore, cleanerConfig, logger)
+				s.LogsCleaner.StartCleanupRoutine()
+				logger.Info("log retention cleaner initialized with %d days retention",
+					logRetentionDays)
+			}
+		}
+	}
+	// Initialize async job cleaner if log store is configured
+	if s.Config.LogsStore != nil {
+		s.AsyncJobCleaner = logstore.NewAsyncJobCleaner(s.Config.LogsStore, logger)
+		s.AsyncJobCleaner.StartCleanupRoutine()
+	}
+	// Load all plugins
+	if err := s.LoadPlugins(ctx); err != nil {
+		return fmt.Errorf("failed to instantiate plugins: %v", err)
+	}
+
+	// Initialize async job executor (requires LogsStore + governance plugin)
+	if s.Config.LogsStore != nil {
+		governancePlugin, govErr := lib.FindPluginAs[governance.BaseGovernancePlugin](s.Config, s.getGovernancePluginName())
+		if govErr == nil {
+			s.Config.AsyncJobExecutor = logstore.NewAsyncJobExecutor(s.Config.LogsStore, governancePlugin.GetGovernanceStore(), logger)
+			logger.Info("async job executor initialized")
+		}
+	}
+
+	// Initialize bifrost client
+	// Create account backed by the high-performance store (all processing is done in LoadFromDatabase)
+	// The account interface now benefits from ultra-fast config access times via in-memory storage
+	account := lib.NewBaseAccount(s.Config)
+	s.Client, err = bifrost.Init(ctx, schemas.BifrostConfig{
+		Account:            account,
+		InitialPoolSize:    s.Config.ClientConfig.InitialPoolSize,
+		DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
+		LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
+		Logger:             logger,
+		KVStore:            s.Config.KVStore,
+		ModelCatalog:       s.Config.ModelCatalog,
+
+		UsageEstimationTokenizers: s.Config.ClientConfig.UsageEstimationTokenizers,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize bifrost: %v", err)
+	}
+	logger.Info("bifrost client initialized")
+	// Sync plugin execution order from config to core (defensive — Init receives sorted list,
+	// but this ensures order consistency if the loading path changes in the future)
+	s.Client.ReorderPlugins(s.Config.GetPluginOrder())
+	// Seed the catalog: push the initial keyconfig snapshot and fetch per-key
+	// live models for every provider concurrently.
+	logger.Info("listing all models and adding to model catalog")
+	if s.Config.ModelCatalog != nil {
+		snapshot := make(map[schemas.ModelProvider][]schemas.Key, len(s.Config.Providers))
+		var ignoreProviderCost, keyless []schemas.ModelProvider
+		for provider, providerConfig := range s.Config.Providers {
+			snapshot[provider] = providerConfig.Keys
+			if providerConfig.IgnoreProviderCost {
+				ignoreProviderCost = append(ignoreProviderCost, provider)
+			}
+			if providerConfig.CustomProviderConfig != nil && providerConfig.CustomProviderConfig.IsKeyLess {
+				keyless = append(keyless, provider)
+			}
+		}
+		s.Config.ModelCatalog.ReplaceKeyConfig(snapshot, keyless...)
+		s.Config.ModelCatalog.ReplaceIgnoreProviderCost(ignoreProviderCost)
+
+		s.RefreshAllLiveModels(ctx)
+	}
+	logger.Info("models added to catalog")
+	s.Config.SetBifrostClient(s.Client)
+	s.WireBatchAccountingSweeper()
+	// Initialize routes
+	s.Router = router.New()
+	// Save the matched route template on each request
+	// so metrics can use it as the `path` label instead of the raw URL path.
+	s.Router.SaveMatchedRoutePath = true
+	// Initialize CORS middleware
+	s.CORSMiddleware = handlers.NewCorsMiddleware(s.Config)
+	commonMiddlewares := s.PrepareCommonMiddlewares()
+	apiMiddlewares := commonMiddlewares
+	inferenceMiddlewares := commonMiddlewares
+	if s.Config.ConfigStore == nil {
+		logger.Error("auth middleware requires config store, skipping auth middleware initialization")
+		// No auth runs in this mode, so mark every API request as bypassed; otherwise the
+		// handlers that require genuine auth for dangerous changes see an unmarked request and
+		// let it through.
+		apiMiddlewares = append(apiMiddlewares, handlers.AuthBypassedMiddleware(s.Config.ClientConfig.AllowedOrigins, s.Config.ClientConfig.WhitelistedRoutes))
+	} else {
+		s.AuthMiddleware, err = handlers.InitAuthMiddleware(s.Config.ConfigStore, s.Config.SetupToken)
+		if err != nil {
+			return fmt.Errorf("failed to initialize auth middleware: %v", err)
+		}
+		if ctx.Value(schemas.BifrostContextKeyIsEnterprise) == nil {
+			// OSS only: lock /api behind the setup token while dashboard auth is not
+			// active. It must run before APIMiddleware, whose auth-off branch lets
+			// every request through.
+			apiMiddlewares = append(apiMiddlewares, s.AuthMiddleware.SetupLockMiddleware(), s.AuthMiddleware.APIMiddleware())
+			s.setupLockInstalled = true
+		}
+	}
+	// Add semantic cache plugin embedding request executor if it exists
+	semanticCachePlugin, err := lib.FindPluginAs[*semanticcache.Plugin](s.Config, semanticcache.PluginName)
+	if err == nil && semanticCachePlugin != nil {
+		semanticCachePlugin.SetEmbeddingRequestExecutor(s.Client.EmbeddingRequest)
+	}
+	// Wire the routing plugin's semantic-classification embedding path. The
+	// executor cannot be passed at Init: the plugin is built while the bifrost
+	// client is still being assembled.
+	if routingPlugin, err := s.getRoutingPlugin(); err == nil {
+		// Store and executor together: warmup depends on both, and applying them
+		// one at a time warms a throwaway generation into the embedded store
+		// before the second call redirects it.
+		routingPlugin.SetComplexityWarmupDependencies(s.Config.VectorStore, s.Client.EmbeddingRequest)
+		routingPlugin.SetWarmupEmbedUsageObserver(s.ObserveWarmupRoutingEmbedding)
+		routingPlugin.SetChatRequestExecutor(s.Client.ChatCompletionRequest)
+		routingPlugin.SetResponsesRequestExecutor(s.Client.ResponsesRequest)
+		routingPlugin.SetDecisionRequestExecutor(s.Client.DecisionRequest)
+	} else {
+		go s.dropCapturesOfDisabledRouting(s.Ctx) // off the boot path
+	}
+
+	// Initialize Sidekiq runner for background jobs
+	if s.Config != nil && s.Config.ConfigStore != nil {
+		s.SidekiqRunner = sidekiq.New(s.Config.ConfigStore, logger, 4, "")
+		s.registerComplexitySuggestionsJob(s.SidekiqRunner)
+	}
+	// After the runner exists, so phrase suggestion runs are queued on it.
+	if routingPlugin, err := s.getRoutingPlugin(); err == nil {
+		s.wireRoutingSuggestions(routingPlugin)
+	}
+
+	// Register routes
+	// The /api chain is registered now: apiMiddlewares and
+	// inferenceMiddlewares grow from the same commonMiddlewares array, so an append
+	// to the inference chain below can overwrite an /api entry that fit in its
+	// spare capacity (AuthBypassedMiddleware, without a config store).
+	err = s.RegisterAPIRoutes(s.Ctx, s, apiMiddlewares...)
+	if err != nil {
+		return fmt.Errorf("failed to initialize routes: %v", err)
+	}
+	// Registering inference routes
+	// The pre-auth plugin phase runs immediately before the auth middlewares so a plugin can
+	// supply or translate the credentials they read (see schemas.HTTPTransportPreAuthHook).
+	// Skipped entirely when no transport plugin is loaded.
+	inferenceMiddlewares = append(inferenceMiddlewares, handlers.TransportPreAuthInterceptorMiddleware(s.Config))
+	if ctx.Value(schemas.BifrostContextKeyIsEnterprise) == nil && s.AuthMiddleware != nil {
+		inferenceMiddlewares = append(inferenceMiddlewares, s.AuthMiddleware.InferenceMiddleware())
+	}
+	// Once auth is done we will first add the Tracing middleware
+	// Always add tracing middleware when tracer is enabled - it creates traces and sets traceID in context
+	// The observability plugins are optional (can be empty if only logging is enabled)
+	// Curating observability plugins
+	observabilityPlugins := s.CollectObservabilityPlugins()
+	// This enables the central streaming accumulator for both use cases
+	// Initializing tracer with embedded streaming accumulator
+	traceStore := tracing.NewTraceStore(60*time.Minute, logger)
+	tracer := tracing.NewTracer(traceStore, s.Config.ModelCatalog, logger)
+	tracer.SetObservabilityPlugins(observabilityPlugins, s.CollectObservabilityLimits())
+	s.Client.SetTracer(tracer)
+	s.TracingMiddleware = handlers.NewTracingMiddleware(tracer)
+	// Wire the settlement tracer now that it exists (WireBatchAccountingSweeper ran earlier, before it did).
+	s.setSettlementTracer()
+	// TransportInterceptor runs AFTER the auth middlewares so HTTPTransportPreHook observes an
+	// authenticated request, and inside TracingMiddleware so the tracing defer runs AFTER
+	// transport post-hooks (capturing HTTPTransportPostHook plugin logs).
+	// Recovery sits directly inside Tracing (see handlers.InferenceOuterMiddlewares).
+	// Order: Tracing.pre → Recovery → PreAuthInterceptor → auth → TransportInterceptor.pre → handler →
+	//        TransportInterceptor.post → Recovery.defer → Tracing.defer
+	inferenceMiddlewares = append(inferenceMiddlewares, handlers.TransportInterceptorMiddleware(s.Config))
+	outerMiddlewares := handlers.InferenceOuterMiddlewares(s.TracingMiddleware, s.CORSMiddleware)
+	inferenceMiddlewares = append(outerMiddlewares, inferenceMiddlewares...)
+
+	err = s.RegisterInferenceRoutes(s.Ctx, inferenceMiddlewares...)
+	if err != nil {
+		return fmt.Errorf("failed to initialize inference routes: %v", err)
+	}
+	// Serve a minimal robots.txt so crawlers/CLI tools (e.g. Claude Code) don't
+	// trigger 404 warnings when probing the host before marketplace fetches.
+	s.Router.GET("/robots.txt", func(ctx *fasthttp.RequestCtx) {
+		ctx.SetContentType("text/plain; charset=utf-8")
+		ctx.SetBodyString("User-agent: *\nAllow: /\n")
+	})
+	// No dashboard is served from here: the product's only frontend is the web
+	// app, which talks to the /api routes above. A path no route claims is a 404.
+	if err := lib.CheckBasePathCollision(s.BasePath, s.Router.List()); err != nil {
+		return err
+	}
+
+	// Start the Sidekiq dispatcher: on every node it periodically claims pending and
+	// stale (orphaned) jobs, with an atomic claim guaranteeing exactly one node runs
+	// each job. Subsumes startup recovery of jobs left behind by a crash or restart.
+	if s.SidekiqRunner != nil {
+		s.SidekiqDispatcherStop = s.SidekiqRunner.StartDispatcher(sidekiq.DispatchInterval, sidekiq.StaleAfter)
+	}
+	if s.GovernanceHandler != nil {
+		s.GovernanceHandler.StartExpiryCleanupScheduler(s.Ctx)
+	}
+
+	// Checking if config has server config and use it to set read buffer size
+	logger.Debug("server read buffer size: %d", s.Config.ServerConfig.ReadBufferSize)
+	maxRequestBodySizeMB := s.Config.ClientConfig.MaxRequestBodySizeMB
+	lib.ApplyBodyBufferPoolLimit(s.Config.ServerConfig, maxRequestBodySizeMB*1024*1024)
+	// Create fasthttp server instance
+	s.Server = newFastHTTPServer(handlers.ServerRootHandler(s.CORSMiddleware, s.Config, s.Router.Handler), maxRequestBodySizeMB, s.Config.ServerConfig.ReadBufferSize, logger.Warn)
+	// Keep the live model catalog current after boot. Without this, a model an
+	// upstream starts serving mid-uptime stays invisible until a restart or a
+	// key edit, since nothing else re-fetches list-models.
+	s.RestartLiveModelRefresher(s.Ctx)
+	return nil
+}
+
+// Start starts the HTTP server at the specified host and port
+// Also watches signals and errors
+func (s *BifrostHTTPServer) Start() error {
+	// Printing plugin status in a table
+	for _, pluginStatus := range s.Config.GetPluginStatus() {
+		logger.Info("plugin status: %s - %s", pluginStatus.Name, pluginStatus.Status)
+	}
+	// Create channels for signal and error handling
+	sigChan := make(chan os.Signal, 1)
+	errChan := make(chan error, 1)
+	// Watching for signals
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// Start server in a goroutine
+	serverAddr := net.JoinHostPort(s.Host, s.Port)
+	ln, err := net.Listen("tcp", serverAddr)
+	if err != nil {
+		return fmt.Errorf("failed to create listener on %s: %v", serverAddr, err)
+	}
+	go func() {
+		logger.Info("successfully started bifrost, serving UI on http://%s%s/", serverAddr, s.BasePath)
+		if err := s.Server.Serve(ln); err != nil {
+			errChan <- err
+		}
+	}()
+	// Wait for either termination signal or server error
+	select {
+	case sig := <-sigChan:
+		logger.Info("received signal %v, initiating graceful shutdown...", sig)
+		if s.IntegrationHandler != nil {
+			logger.Info("closing realtime transport sessions...")
+			s.IntegrationHandler.Close()
+		}
+		if s.wsLiveHandler != nil {
+			s.wsLiveHandler.Close()
+		}
+		if s.wsSpeechHandler != nil {
+			s.wsSpeechHandler.Close()
+		}
+		if s.webrtcLiveHandler != nil {
+			s.webrtcLiveHandler.Close()
+		}
+		// Create shutdown context with timeout
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		// Perform graceful shutdown
+		if err := s.Server.Shutdown(); err != nil {
+			logger.Error("error during graceful shutdown: %v", err)
+		} else {
+			logger.Info("server gracefully shutdown")
+		}
+		// Cancelling main context
+		if s.cancel != nil {
+			s.cancel()
+		}
+		// Wait for shutdown to complete or timeout
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			logger.Info("shutting down bifrost client...")
+			s.Client.Shutdown()
+			logger.Info("bifrost client shutdown completed")
+			logger.Info("cleaning up storage engines...")
+			// Cleanup server-specific components
+			if s.LogsCleaner != nil {
+				logger.Info("stopping log retention cleaner...")
+				s.LogsCleaner.StopCleanupRoutine()
+			}
+			if s.AsyncJobCleaner != nil {
+				logger.Info("stopping async job cleaner...")
+				s.AsyncJobCleaner.StopCleanupRoutine()
+			}
+			if s.GovernanceHandler != nil {
+				s.GovernanceHandler.StopExpiryCleanupScheduler()
+			}
+			if s.SidekiqDispatcherStop != nil {
+				logger.Info("stopping sidekiq dispatcher...")
+				s.SidekiqDispatcherStop()
+			}
+			logger.Info("stopping live model refresher...")
+			s.stopLiveModelRefresher()
+			if s.SidekiqRunner != nil {
+				logger.Info("stopping sidekiq runner...")
+				s.SidekiqRunner.Shutdown()
+			}
+			if s.devPprofHandler != nil {
+				logger.Info("stopping dev pprof handler...")
+				s.devPprofHandler.Cleanup()
+			}
+			if s.wsPool != nil {
+				logger.Info("closing websocket connection pool...")
+				s.wsPool.Close()
+			}
+			// Cleanup Config and all its background components
+			if s.Config != nil {
+				s.Config.Close(shutdownCtx)
+			}
+			logger.Info("storage engines cleanup completed")
+		}()
+		select {
+		case <-done:
+			logger.Info("cleanup completed")
+		case <-shutdownCtx.Done():
+			logger.Warn("cleanup timed out after 30 seconds")
+		}
+
+	case err := <-errChan:
+		s.cleanupAfterServeError()
+		return err
+	}
+	return nil
+}
+
+// cleanupAfterServeError releases what Start had set up when Serve itself
+// fails: open realtime sessions and the websocket pool
+// cache, whose exported bare repositories live in temp directories that only
+// Close removes. The graceful-shutdown path above does the same as part of
+// its full teardown.
+func (s *BifrostHTTPServer) cleanupAfterServeError() {
+	if s.IntegrationHandler != nil {
+		s.IntegrationHandler.Close()
+	}
+	if s.wsLiveHandler != nil {
+		s.wsLiveHandler.Close()
+	}
+	if s.wsSpeechHandler != nil {
+		s.wsSpeechHandler.Close()
+	}
+	if s.webrtcLiveHandler != nil {
+		s.webrtcLiveHandler.Close()
+	}
+	if s.wsPool != nil {
+		s.wsPool.Close()
+	}
+}
+
+// newFastHTTPServer builds the gateway's fasthttp server around root, which must be wrapped by
+// handlers.ServerRootHandler (it holds handlers.RequestBodyMiddleware).
+//
+// Request bodies are streamed (StreamRequestBody) and multipart forms are not parsed while the
+// request is read (DisablePreParseMultipartForm). fasthttp's parse at read time buffers the first
+// 16 MB of every uploaded file before spilling it to disk, ~64 MB allocated per upload whatever
+// its size; parsed later from the stream, the file spills after 8 KB. RequestBodyMiddleware reads
+// every non-multipart body into memory as before and enforces MaxRequestBodySize, which a
+// streaming server no longer does itself.
+func newFastHTTPServer(root fasthttp.RequestHandler, maxRequestBodySizeMB, readBufferSize int, warn func(format string, args ...any)) *fasthttp.Server {
+	return &fasthttp.Server{
+		Handler:                      root,
+		MaxRequestBodySize:           maxRequestBodySizeMB * 1024 * 1024,
+		ReadBufferSize:               readBufferSize,
+		StreamRequestBody:            true,
+		DisablePreParseMultipartForm: true,
+		// Explain an oversized body (413 naming the configured limit) instead of fasthttp's generic 400.
+		ErrorHandler: lib.RequestErrorHandler(maxRequestBodySizeMB, warn),
+	}
+}

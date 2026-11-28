@@ -71,3 +71,28 @@ dist/
 
 # content collections
 .content-collections
+
+# gateway (Go)
+apps/gateway/tmp/
+apps/gateway/data/
+apps/gateway/transports/bifrost-http/ui/
+apps/gateway/**/*.db
+apps/gateway/**/*.db-shm
+apps/gateway/**/*.db-wal
+!apps/gateway/ui/next-env.d.ts
+
+# gateway build outputs (upstream's own .gitignore is not imported)
+apps/gateway/tmp/
+apps/gateway/go.work.sum
+apps/gateway/transports/bifrost-http/ui/
+apps/gateway/ui/app/routeTree.gen.ts
+apps/gateway/**/*.tsbuildinfo
+apps/gateway/**/*.db
+apps/gateway/**/*.db-shm
+apps/gateway/**/*.db-wal
+apps/gateway/**/:memory:
+apps/gateway/examples/mcps/*/bin/
+apps/gateway/tests/redis-certs/
+
+# written by `next dev` on start; the repo root AGENTS.md already carries these rules
+apps/web/AGENTS.md

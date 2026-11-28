@@ -1,0 +1,2 @@
+ALTER TABLE "pricing_settings" ADD COLUMN "topup_fee_min_micro_usd" bigint DEFAULT 800000 NOT NULL;--> statement-breakpoint
+ALTER TABLE "pricing_settings" ADD CONSTRAINT "pricing_settings_topup_fee_min_range" CHECK ("pricing_settings"."topup_fee_min_micro_usd" between 0 and 100000000);

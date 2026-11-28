@@ -9,6 +9,7 @@ import {
   getOrderByFromSort,
   inArray,
   ilike,
+  or,
   sql,
 } from "@workspace/db";
 import {
@@ -16,7 +17,9 @@ import {
   member,
   order,
   organization,
+  personalAccount,
   subscription,
+  user,
 } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
 
@@ -36,7 +39,13 @@ export const getOrganizations = async (input: GetOrganizationsInput) => {
   const offset = (input.page - 1) * input.perPage;
 
   const where = and(
-    input.q ? ilike(organization.name, `%${input.q}%`) : undefined,
+    // a personal account (ADR 0020) is named "Personal": staff find it by its owner's email
+    input.q
+      ? or(
+          ilike(organization.name, `%${input.q}%`),
+          ilike(user.email, `%${input.q}%`),
+        )
+      : undefined,
     input.createdAt
       ? between(
           organization.createdAt,
@@ -73,6 +82,10 @@ export const getOrganizations = async (input: GetOrganizationsInput) => {
         slug: organization.slug,
         logo: organization.logo,
         createdAt: organization.createdAt,
+        // set only for a personal account: whose it is
+        personalOwnerEmail: sql<string | null>`MAX(${user.email})`.as(
+          "personal_owner_email",
+        ),
         members: sql<number>`CAST(COUNT(${member.id}) AS INTEGER)`.as(
           "members",
         ),
@@ -80,6 +93,11 @@ export const getOrganizations = async (input: GetOrganizationsInput) => {
       })
       .from(organization)
       .leftJoin(member, eq(member.organizationId, organization.id))
+      .leftJoin(
+        personalAccount,
+        eq(personalAccount.organizationId, organization.id),
+      )
+      .leftJoin(user, eq(user.id, personalAccount.userId))
       .where(where)
       .groupBy(organization.id)
       .having(having)
@@ -111,11 +129,19 @@ export const getOrganizations = async (input: GetOrganizationsInput) => {
 };
 
 export const getOrganization = async ({ id }: { id: string }) => {
-  return (
-    (await db.query.organization.findFirst({
-      where: eq(organization.id, id),
-    })) ?? null
-  );
+  const found = await db.query.organization.findFirst({
+    where: eq(organization.id, id),
+  });
+  if (!found) {
+    return null;
+  }
+  const [owner] = await db
+    .select({ email: user.email })
+    .from(personalAccount)
+    .innerJoin(user, eq(user.id, personalAccount.userId))
+    .where(eq(personalAccount.organizationId, id));
+  // set only for a personal account (ADR 0020): whose it is
+  return { ...found, personalOwnerEmail: owner?.email ?? null };
 };
 
 export const getOrganizationSubscriptions = async ({

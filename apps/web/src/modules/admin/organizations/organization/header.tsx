@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui-web/avatar";
 
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import {
   DashboardHeader,
   DashboardHeaderTitle,
@@ -18,6 +19,7 @@ interface OrganizationHeaderProps {
 }
 
 export const OrganizationHeader = ({ id }: OrganizationHeaderProps) => {
+  const canDelete = useStaffPermission({ organizations: ["delete"] });
   const { data: organization } = useQuery(
     admin.queries.organizations.get({ id }),
   );
@@ -43,13 +45,13 @@ export const OrganizationHeader = ({ id }: OrganizationHeaderProps) => {
 
           <div className="flex items-center gap-2">
             <DashboardHeaderDescription>
-              /{organization?.slug}
+              {organization?.personalOwnerEmail ?? `/${organization?.slug}`}
             </DashboardHeaderDescription>
           </div>
         </div>
       </div>
 
-      <Delete id={id} />
+      {canDelete && <Delete id={id} />}
     </DashboardHeader>
   );
 };

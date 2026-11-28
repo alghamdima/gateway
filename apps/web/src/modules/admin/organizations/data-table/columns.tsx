@@ -55,6 +55,11 @@ export const useColumns = (options?: {
             <span className="group-hover:text-primary truncate font-medium underline underline-offset-4">
               {row.original.name}
             </span>
+            {row.original.personalOwnerEmail && (
+              <span className="text-muted-foreground truncate text-sm">
+                {row.original.personalOwnerEmail}
+              </span>
+            )}
           </TurboLink>
         );
       },

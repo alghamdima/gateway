@@ -11,13 +11,13 @@ export const Footer = ({ origin }: FooterProps) => {
     <>
       <Img
         src={`${origin}/images/logo.png`}
-        alt="Turbostarter Logo"
+        alt={env.PRODUCT_NAME ?? ""}
         height={45}
         className="mt-12"
       />
       <Text className="text-muted-foreground max-w-[250px] leading-normal">
         <Link
-          href="https://www.turbostarter.dev"
+          href={origin}
           className="text-muted-foreground"
           style={{ textDecoration: "underline" }}
         >

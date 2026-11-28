@@ -6,6 +6,7 @@ import {
   boolean,
   integer,
   index,
+  bigint,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -25,6 +26,17 @@ export const user = pgTable("user", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
+});
+
+/**
+ * Better Auth's rate-limit counters, kept in the database so every instance of
+ * the web app shares them (in memory, each instance would count on its own).
+ */
+export const rateLimit = pgTable("rate_limit", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: bigint("last_request", { mode: "number" }).notNull(),
 });
 
 export const session = pgTable(

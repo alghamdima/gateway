@@ -1,12 +1,24 @@
-import * as z from "zod";
+import {
+  CONTACT_COMPANY_MAX,
+  CONTACT_MESSAGE_MAX,
+  CONTACT_NAME_MAX,
+  CONTACT_TOPICS,
+  contactRequestSchema,
+} from "@workspace/api/schema";
 
-export const MAX_NAME_LENGTH = 100;
-export const MAX_MESSAGE_LENGTH = 4000;
+import type { ContactRequestInput } from "@workspace/api/schema";
 
-export const contactFormSchema = z.object({
-  name: z.string().trim().min(2).max(MAX_NAME_LENGTH),
-  email: z.email().max(254),
-  message: z.string().trim().min(10).max(MAX_MESSAGE_LENGTH),
-});
+export {
+  CONTACT_COMPANY_MAX,
+  CONTACT_MESSAGE_MAX,
+  CONTACT_NAME_MAX,
+  CONTACT_TOPICS,
+  contactRequestSchema,
+};
 
-export type ContactFormPayload = z.infer<typeof contactFormSchema>;
+export type ContactTopic = (typeof CONTACT_TOPICS)[number];
+export type ContactFormPayload = ContactRequestInput;
+
+/** The topic a link asks for (`/contact?topic=sales`), or the first one. */
+export const topicFrom = (value: string | undefined): ContactTopic =>
+  CONTACT_TOPICS.find((topic) => topic === value) ?? CONTACT_TOPICS[0];

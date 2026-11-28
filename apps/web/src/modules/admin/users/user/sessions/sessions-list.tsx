@@ -10,6 +10,7 @@ import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 
 interface SessionsListProps {
   readonly id: string;
@@ -22,6 +23,7 @@ export const SessionsList = ({ id }: SessionsListProps) => {
   const { data: sessions, isLoading } = useQuery(
     admin.queries.users.getSessions({ id }),
   );
+  const canRevoke = useStaffPermission({ session: ["revoke"] });
 
   const revoke = useMutation({
     ...admin.mutations.users.sessions.revoke,
@@ -61,7 +63,10 @@ export const SessionsList = ({ id }: SessionsListProps) => {
             variant="outline"
             size="sm"
             onClick={() => revokeAll.mutate({ userId: id })}
-            disabled={revokeAll.isPending && revokeAll.variables.userId === id}
+            disabled={
+              !canRevoke ||
+              (revokeAll.isPending && revokeAll.variables.userId === id)
+            }
           >
             {revokeAll.isPending && revokeAll.variables.userId === id ? (
               <Spinner className="size-4" />
@@ -101,8 +106,9 @@ export const SessionsList = ({ id }: SessionsListProps) => {
                   variant="ghost"
                   size="icon"
                   disabled={
-                    revoke.isPending &&
-                    revoke.variables.sessionToken === session.token
+                    !canRevoke ||
+                    (revoke.isPending &&
+                      revoke.variables.sessionToken === session.token)
                   }
                   onClick={() => revoke.mutate({ sessionToken: session.token })}
                   className="shrink-0"

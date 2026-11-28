@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { hasAdminPermission } from "@workspace/auth";
+import { hasAdminPermission, hasStaffPermission } from "@workspace/auth";
 import { Icons } from "@workspace/ui-web/icons";
 import { SidebarInset, SidebarProvider } from "@workspace/ui-web/sidebar";
 
@@ -12,6 +12,8 @@ import { DashboardInset } from "~/modules/common/layout/dashboard/inset";
 import { DashboardSidebar } from "~/modules/common/layout/dashboard/sidebar/index";
 import { DashboardSidebarSkeleton } from "~/modules/common/layout/dashboard/sidebar/skeleton";
 import { TurboLink } from "~/modules/common/turbo-link";
+
+import type { StaffPermissions, User } from "@workspace/auth";
 
 const menu = [
   {
@@ -40,15 +42,105 @@ const menu = [
         exact: false,
         icon: <Icons.HandCoins />,
       },
+      {
+        title: "pricing",
+        href: pathsConfig.admin.pricing.index,
+        icon: <Icons.Percent />,
+      },
+      {
+        title: "keySettings",
+        href: pathsConfig.admin.keySettings.index,
+        icon: <Icons.Key />,
+      },
+      {
+        title: "accountSettings",
+        href: pathsConfig.admin.accountSettings.index,
+        icon: <Icons.UsersRound />,
+      },
+      {
+        title: "catalogSettings",
+        href: pathsConfig.admin.catalogSettings.index,
+        icon: <Icons.TrendingUp />,
+      },
+      {
+        title: "siteSettings",
+        href: pathsConfig.admin.siteSettings.index,
+        icon: <Icons.Globe2 />,
+      },
+      {
+        title: "contactRequests",
+        href: pathsConfig.admin.contactRequests.index,
+        exact: false,
+        icon: <Icons.SendHorizontal />,
+      },
+      {
+        title: "modelPrices",
+        href: pathsConfig.admin.modelPrices.index,
+        icon: <Icons.ChartNoAxesGantt />,
+      },
+      {
+        title: "payments",
+        href: pathsConfig.admin.payments.index,
+        icon: <Icons.CreditCard />,
+      },
+      {
+        title: "promoCodes",
+        href: pathsConfig.admin.promoCodes.index,
+        exact: false,
+        icon: <Icons.Gift />,
+      },
+      {
+        title: "providers",
+        href: pathsConfig.admin.providers.index,
+        icon: <Icons.Globe2 />,
+      },
+      {
+        title: "requests",
+        href: pathsConfig.admin.requests.index,
+        icon: <Icons.TrendingUp />,
+      },
+      {
+        title: "audit",
+        href: pathsConfig.admin.audit.index,
+        icon: <Icons.ScrollText />,
+      },
+      {
+        title: "reconciliation",
+        href: pathsConfig.admin.reconciliation.index,
+        icon: <Icons.BadgeCheck />,
+      },
     ],
   },
 ];
 
-export default function AdminLayout({
+/** Menu entries only some staff roles may open (ADR 0011). The API refuses the rest anyway. */
+const RESTRICTED: Record<string, StaffPermissions> = {
+  [pathsConfig.admin.audit.index]: { audit: ["read"] },
+  [pathsConfig.admin.providers.index]: { providers: ["read"] },
+  [pathsConfig.admin.promoCodes.index]: { promoCodes: ["read"] },
+  [pathsConfig.admin.siteSettings.index]: { site: ["read"] },
+  [pathsConfig.admin.contactRequests.index]: { contact: ["read"] },
+  [pathsConfig.admin.reconciliation.index]: { credits: ["read"] },
+};
+
+const menuFor = (user: User) =>
+  menu.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const needs = RESTRICTED[item.href];
+      return !needs || hasStaffPermission(user, needs);
+    }),
+  }));
+
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // before the page renders: an admin page reads the admin API, which refuses
+  // anyone else, and that refusal would show as a 500 instead of the redirect
+  await getStaffUser();
+
   return (
     <SidebarProvider>
       <Suspense fallback={<DashboardSidebarSkeleton />}>
@@ -63,6 +155,27 @@ export default function AdminLayout({
 }
 
 async function AuthenticatedAdminSidebar() {
+  const user = await getStaffUser();
+
+  return (
+    <DashboardSidebar
+      user={user}
+      menu={menuFor(user)}
+      header={
+        <TurboLink
+          href={pathsConfig.index}
+          className="flex items-center gap-3 p-2 transition-[padding] group-data-[collapsible=icon]:p-0.5"
+        >
+          <Icons.Logo className="text-primary h-8 transition-[width,height]" />
+          <Icons.LogoText className="text-foreground h-4 group-data-[collapsible=icon]:hidden" />
+        </TurboLink>
+      }
+    />
+  );
+}
+
+/** The signed-in staff member, or a redirect for anyone else. The session is read once per request. */
+async function getStaffUser() {
   const session = await getSession();
 
   if (!session?.user) {
@@ -75,19 +188,10 @@ async function AuthenticatedAdminSidebar() {
     return redirect(pathsConfig.dashboard.user.index);
   }
 
-  return (
-    <DashboardSidebar
-      user={user}
-      menu={menu}
-      header={
-        <TurboLink
-          href={pathsConfig.index}
-          className="flex items-center gap-3 p-2 transition-[padding] group-data-[collapsible=icon]:p-0.5"
-        >
-          <Icons.Logo className="text-primary h-8 transition-[width,height]" />
-          <Icons.LogoText className="text-foreground h-4 group-data-[collapsible=icon]:hidden" />
-        </TurboLink>
-      }
-    />
-  );
+  // staff need two-factor authentication on (ADR 0011); the API refuses them without it
+  if (!user.twoFactorEnabled) {
+    return redirect(pathsConfig.dashboard.user.settings.security);
+  }
+
+  return user;
 }

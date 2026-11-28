@@ -3,6 +3,7 @@ import { getPathname, config } from "@workspace/i18n";
 
 import { appConfig } from "~/config/app";
 import { pathsConfig } from "~/config/paths";
+import { getSiteSettings } from "~/modules/marketing/site";
 
 import type { MetadataRoute } from "next";
 
@@ -32,7 +33,17 @@ const getEntry = (path: string) => ({
   },
 });
 
-export default function sitemap(): MetadataRoute.Sitemap {
+/** Built on request: which parts of the site are on is read from the database (SITE-01). */
+export const dynamic = "force-dynamic";
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { isBlogEnabled } = await getSiteSettings();
+  const blogPosts = isBlogEnabled
+    ? getContentItems({
+        collection: CollectionType.BLOG,
+        locale: appConfig.locale,
+      }).items
+    : [];
   return [
     {
       ...getEntry(pathsConfig.index),
@@ -52,16 +63,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
     },
-    {
-      ...getEntry(pathsConfig.marketing.blog.index),
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    ...getContentItems({
-      collection: CollectionType.BLOG,
-      locale: appConfig.locale,
-    }).items.map<MetadataRoute.Sitemap[number]>((post) =>
+    ...(isBlogEnabled
+      ? [
+          {
+            ...getEntry(pathsConfig.marketing.blog.index),
+            lastModified: new Date(),
+            changeFrequency: "monthly" as const,
+            priority: 0.8,
+          },
+        ]
+      : []),
+    ...blogPosts.map<MetadataRoute.Sitemap[number]>((post) =>
       Object.assign({}, getEntry(pathsConfig.marketing.blog.post(post.slug)), {
         lastModified: new Date(post.lastModifiedAt),
         changeFrequency: "monthly" as const,

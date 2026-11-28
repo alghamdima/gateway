@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemberRole, UserRole } from "../../types";
 import {
@@ -36,6 +36,20 @@ describe("getUrl", () => {
     expect(url.origin).toBe("http://localhost:3000");
   });
 
+  it("should trust the app's public address behind a reverse proxy", () => {
+    vi.stubEnv("URL", "https://app.example.com");
+    // what the server sees behind the proxy
+    const request = new Request(
+      "https://localhost:3000/api/auth/organization/invite-member",
+      { headers: { "x-url": "https://app.example.com/auth/join" } },
+    );
+
+    const url = getUrl({ request });
+
+    expect(url.toString()).toBe("https://app.example.com/auth/join");
+    vi.unstubAllEnvs();
+  });
+
   it("should ignore untrusted x-url and fall back to request url", () => {
     const request = new Request(BASE_URL, {
       headers: { "x-url": "https://evil.com/phish" },
@@ -45,47 +59,14 @@ describe("getUrl", () => {
     expect(url.hostname).toBe("localhost");
   });
 
-  it("should use expo-origin header if present (mobile)", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "expo-origin": "exp://192.168.1.1:8081" },
-    });
-    const url = getUrl({ request });
-    expect(url.toString()).toBe("exp://192.168.1.1:8081");
-  });
-
-  it("should replace params from passed url into expo-origin", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "expo-origin": "exp://host" },
-    });
-    const url = getUrl({
-      request,
-      url: "https://ignored.com?foo=bar",
-    });
-    expect(url.searchParams.get("foo")).toBe("bar");
-    expect(url.protocol).toBe("exp:");
-    expect(url.host).toBe("host");
-  });
-
-  it("should ignore untrusted expo-origin and fall back to provided url", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "expo-origin": "evil://phish" },
-    });
-    const url = getUrl({
-      request,
-      url: "http://localhost:3000/api/auth/magic-link/verify?token=abc",
-    });
-    expect(url.toString()).toBe(
-      "http://localhost:3000/api/auth/magic-link/verify?token=abc",
-    );
-  });
-
-  it("should use turbostarter scheme from x-url", () => {
-    const request = new Request(BASE_URL, {
-      headers: { "x-url": "turbostarter://setup/auth/join" },
-    });
-    const url = getUrl({ request });
-    expect(url.toString()).toBe("turbostarter://setup/auth/join");
-  });
+  it.each(["turbostarter://setup/auth/join", "chrome-extension://abc/popup"])(
+    "should not trust the removed app origin %s",
+    (origin) => {
+      const request = new Request(BASE_URL, { headers: { "x-url": origin } });
+      const url = getUrl({ request });
+      expect(url.origin).toBe(BASE_URL);
+    },
+  );
 
   it("should fallback to request url for web", () => {
     const request = new Request("https://web.com/current");

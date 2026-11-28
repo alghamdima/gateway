@@ -1,8 +1,10 @@
+import { refuseIfPersonal } from "../../lib/personal";
 import { syncSubscriptionSeats } from "../../lib/server";
 import { OrganizationHooks } from "./types";
 
 export const { beforeRemoveMember, afterRemoveMember } = {
-  beforeRemoveMember: async () => {
+  beforeRemoveMember: async ({ organization }) => {
+    await refuseIfPersonal(organization.id);
     /**
      * Here you can communicate what will happen to the organization after removing a member.
      * For example, for one-time per-seat purchase you can signal that removing member

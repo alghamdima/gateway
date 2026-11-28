@@ -9,32 +9,9 @@ import { Icons } from "@workspace/ui-web/components/icons";
 import { pathsConfig } from "~/config/paths";
 import { TurboLink } from "~/modules/common/turbo-link";
 
+import type { SiteSettings } from "~/modules/marketing/site";
+
 const links = [
-  {
-    label: "common:product",
-    items: [
-      {
-        title: "marketing:product.mobile.ios.title",
-        href: "https://apps.apple.com/app/id6754278899",
-      },
-      {
-        title: "marketing:product.mobile.android.title",
-        href: "https://play.google.com/store/apps/details?id=com.turbostarter.core",
-      },
-      {
-        title: "marketing:product.extension.chrome.title",
-        href: "https://chromewebstore.google.com/detail/bcjmonmlfbnngpkllpnpmnjajaciaboo",
-      },
-      {
-        title: "marketing:product.extension.firefox.title",
-        href: "https://addons.mozilla.org/addon/turbostarter_",
-      },
-      {
-        title: "marketing:product.extension.edge.title",
-        href: "https://microsoftedge.microsoft.com/addons/detail/turbostarter/ianbflanmmoeleokihabnmmcahhfijig",
-      },
-    ],
-  },
   {
     label: "resources",
     items: [
@@ -43,20 +20,8 @@ const links = [
         href: pathsConfig.marketing.contact,
       },
       {
-        title: "marketing:roadmap.title",
-        href: "https://github.com/orgs/turbostarter/projects/1",
-      },
-      {
-        title: "marketing:docs.title",
-        href: "https://www.turbostarter.dev/docs/web",
-      },
-      {
-        title: "marketing:cta.buy.button",
-        href: "https://turbostarter.lemonsqueezy.com/buy/b4a3d6cd-bf86-4cf0-af3f-78fa10f9636c?enabled=542201",
-      },
-      {
-        title: "marketing:api.title",
-        href: "#",
+        title: "marketing:models.label",
+        href: pathsConfig.marketing.models.index,
       },
     ],
   },
@@ -96,8 +61,11 @@ const links = [
   },
 ] as const;
 
-export const FooterNavigation = () => {
+export const FooterNavigation = ({ site }: { site: SiteSettings }) => {
   const { t } = useTranslation(["common", "marketing", "billing"]);
+  // the blog is linked only while staff have it switched on (SITE-01)
+  const isHidden = (href: string) =>
+    !site.isBlogEnabled && href === pathsConfig.marketing.blog.index;
 
   return (
     <div className="mt-1 grid w-full max-w-200 grid-cols-2 gap-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -108,25 +76,27 @@ export const FooterNavigation = () => {
           </span>
           <nav>
             <ul className="flex flex-col gap-3">
-              {link.items.map((item) => (
-                <li
-                  key={item.title}
-                  className="text-muted-foreground hover:text-foreground relative text-sm transition-colors"
-                >
-                  {"component" in item ? (
-                    <item.component className="cursor-pointer">
-                      {t(item.title)}
-                    </item.component>
-                  ) : (
-                    <TurboLink href={item.href}>
-                      {t(item.title)}
-                      {isExternal(item.href) && (
-                        <Icons.ArrowUpRight className="-mt-1 inline size-2.5" />
-                      )}
-                    </TurboLink>
-                  )}
-                </li>
-              ))}
+              {link.items.map((item) =>
+                "href" in item && isHidden(item.href) ? null : (
+                  <li
+                    key={item.title}
+                    className="text-muted-foreground hover:text-foreground relative text-sm transition-colors"
+                  >
+                    {"component" in item ? (
+                      <item.component className="cursor-pointer">
+                        {t(item.title)}
+                      </item.component>
+                    ) : (
+                      <TurboLink href={item.href}>
+                        {t(item.title)}
+                        {isExternal(item.href) && (
+                          <Icons.ArrowUpRight className="-mt-1 inline size-2.5" />
+                        )}
+                      </TurboLink>
+                    )}
+                  </li>
+                ),
+              )}
             </ul>
           </nav>
         </div>

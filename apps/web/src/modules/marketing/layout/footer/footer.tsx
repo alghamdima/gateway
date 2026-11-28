@@ -1,4 +1,3 @@
-import { BuiltWith } from "@workspace/ui-web/built-with";
 import { Icons } from "@workspace/ui-web/icons";
 
 import { appConfig } from "~/config/app";
@@ -8,35 +7,13 @@ import { I18nControls } from "~/modules/common/i18n/controls";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { FooterNavigation } from "~/modules/marketing/layout/footer/navigation";
 import { StatusIndicator } from "~/modules/marketing/layout/status-indicator";
-
-const socials = [
-  {
-    id: "x",
-    href: "https://x.com/turbostarter_",
-    icon: Icons.Twitter,
-  },
-  {
-    id: "github",
-    href: "https://github.com/turbostarter",
-    icon: Icons.Github,
-  },
-
-  {
-    id: "facebook",
-    href: "#",
-    icon: Icons.Facebook,
-  },
-  {
-    id: "linkedin",
-    href: "#",
-    icon: Icons.Linkedin,
-  },
-];
+import { getSiteSettings } from "~/modules/marketing/site";
 
 export const Footer = async () => {
-  const { t } = await getTranslation({
-    ns: ["common", "marketing", "billing"],
-  });
+  const [{ t }, site] = await Promise.all([
+    getTranslation({ ns: ["common", "marketing", "billing"] }),
+    getSiteSettings(),
+  ]);
 
   return (
     <footer className="mt-auto w-full border-t px-6 pt-8 pb-6 sm:pt-10 sm:pb-8 md:pt-14 md:pb-10 lg:pt-16">
@@ -57,24 +34,9 @@ export const Footer = async () => {
             </p>
 
             <I18nControls />
-
-            <div className="mt-2 flex items-center gap-2.5">
-              {socials.map((social) => (
-                <a
-                  key={social.id}
-                  href={social.href}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={social.id}
-                >
-                  <social.icon className="size-7" />
-                </a>
-              ))}
-            </div>
           </div>
 
-          <FooterNavigation />
+          <FooterNavigation site={site} />
         </div>
         <div className="mt-8 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
@@ -88,7 +50,6 @@ export const Footer = async () => {
             </div>
 
             <div className="flex flex-col items-center gap-1 sm:items-end">
-              <BuiltWith />
               <p className="text-muted-foreground text-xs sm:pr-0.5">
                 {`v${appConfig.version}`}
               </p>

@@ -1,0 +1,285 @@
+package grant
+
+import (
+	"slices"
+	"strings"
+
+	"github.com/maximhq/bifrost/core/schemas"
+)
+
+// Wildcard marks an unrestricted list: every value is allowed, or every value is blocked, depending
+// on which kind of list carries it.
+//
+// The lists a permit carries are schemas.WhiteList and schemas.BlackList, so what a list means
+// travels on its type: a list holding only the wildcard is unrestricted, an empty list holds
+// nothing, and membership ignores case. Key IDs are the one exception: they are identifiers, so
+// whoever matches them does so exactly rather than through the type's membership methods (see
+// composeKeyIDs), and only their wildcard is read off the type.
+const Wildcard = "*"
+
+// PermitType identifies what kind of source a permit's access comes from. These are the values a
+// schemas.Permit reports from Type. An open string: kinds are declared by whoever resolves permits
+// of that kind, so this package needs no list of them.
+type PermitType string
+
+// The permit kinds this package names. The type stays open, so these are not the only kinds that
+// can exist. They are the ones PrettyString can render, which is why they are declared here rather
+// than wherever permits of each kind are resolved: a refusal has to read the same whichever kind it
+// names.
+const (
+	// PermitVirtualKey marks permits whose access comes from a virtual key.
+	PermitVirtualKey PermitType = "vk"
+)
+
+// PrettyString is what a refusal calls this permit kind: "virtual key", not "vk". Every kind is named here because every kind is declared here - the labels
+// are fixed words, so there is nothing for another build to supply. A kind with no case renders as
+// its identifier, which is ugly but still says what ran out.
+func (t PermitType) PrettyString() string {
+	switch t {
+	case PermitVirtualKey:
+		return "virtual key"
+	default:
+		return string(t)
+	}
+}
+
+// Permit is the one implementation of schemas.Permit.
+//
+// It is a snapshot for one attempt. The provider permits carry a copy of the configuration they
+// came from, so a source reloaded mid-attempt cannot change what that attempt has already resolved.
+// A later attempt builds its own and picks the reload up.
+type Permit struct {
+	permitType PermitType
+	id         string
+	name       string
+	isActive   bool
+	isExpired  bool
+
+	providerPermits   []schemas.ProviderPermit
+	allowAllProviders bool
+
+	level int
+}
+
+// PermitOption configures a Permit at construction. Options keep NewPermit's required arguments
+// stable while letting a source set the occasional extra, so a resolver that does not need one is
+// unaffected.
+type PermitOption func(*Permit)
+
+// WithAllowAllProviders grants every provider, including ones the permit holds no provider permit
+// for: those are allowed with all models and all keys, while a provider it does hold a permit for
+// still applies that permit's rules. See schemas.Permit.AllowsAllProviders.
+func WithAllowAllProviders(allow bool) PermitOption {
+	return func(p *Permit) { p.allowAllProviders = allow }
+}
+
+// WithLevel places the permit on the caller's side when levels intersect (see schemas.Permit.Level).
+// The default, 0, is the caller's own; negative levels are ignored.
+func WithLevel(level int) PermitOption {
+	return func(p *Permit) {
+		if level > 0 {
+			p.level = level
+		}
+	}
+}
+
+// NewPermit builds a Permit. See schemas.Permit for what each value means. The lists are deep
+// copied, down to each entry's own slices and its Weight pointer, so a resolver that keeps its
+// slices (or the value behind a Weight pointer) cannot alter what an attempt was admitted under.
+func NewPermit(
+	permitType PermitType,
+	id string,
+	name string,
+	isActive bool,
+	isExpired bool,
+	providerPermits []schemas.ProviderPermit,
+	opts ...PermitOption,
+) *Permit {
+	p := &Permit{
+		permitType:      permitType,
+		id:              id,
+		name:            name,
+		isActive:        isActive,
+		isExpired:       isExpired,
+		providerPermits: cloneProviderPermits(providerPermits),
+	}
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p
+}
+
+// cloneProviderPermits deep-copies each entry: slices.Clone on the outer slice only copies the
+// struct values, and AllowedModels, BlacklistedModels, KeyIDs, and the value behind Weight would
+// otherwise still alias the source's own slices and pointer.
+func cloneProviderPermits(providerPermits []schemas.ProviderPermit) []schemas.ProviderPermit {
+	cloned := slices.Clone(providerPermits)
+	for i := range cloned {
+		cloned[i].AllowedModels = slices.Clone(cloned[i].AllowedModels)
+		cloned[i].BlacklistedModels = slices.Clone(cloned[i].BlacklistedModels)
+		cloned[i].KeyIDs = slices.Clone(cloned[i].KeyIDs)
+		if cloned[i].Weight != nil {
+			weight := *cloned[i].Weight
+			cloned[i].Weight = &weight
+		}
+	}
+	return cloned
+}
+
+// Type implements schemas.Permit.
+func (p *Permit) Type() string {
+	if p == nil {
+		return ""
+	}
+	return string(p.permitType)
+}
+
+// ID implements schemas.Permit.
+func (p *Permit) ID() string {
+	if p == nil {
+		return ""
+	}
+	return p.id
+}
+
+// Name implements schemas.Permit.
+func (p *Permit) Name() string {
+	if p == nil {
+		return ""
+	}
+	return p.name
+}
+
+// IsActive implements schemas.Permit.
+func (p *Permit) IsActive() bool {
+	return p != nil && p.isActive
+}
+
+// IsExpired implements schemas.Permit.
+func (p *Permit) IsExpired() bool {
+	return p != nil && p.isExpired
+}
+
+// ProviderPermits implements schemas.Permit. A copy, not the permit's own slice: the permit is a
+// snapshot for the whole attempt, read by every consumer that asks what it permits, and a caller
+// mutating what it got back must not change what the next reader sees.
+func (p *Permit) ProviderPermits() []schemas.ProviderPermit {
+	if p == nil {
+		return nil
+	}
+	return cloneProviderPermits(p.providerPermits)
+}
+
+// AllowsAllProviders implements schemas.Permit.
+func (p *Permit) AllowsAllProviders() bool {
+	return p != nil && p.allowAllProviders
+}
+
+// Level implements schemas.Permit.
+func (p *Permit) Level() int {
+	if p == nil {
+		return 0
+	}
+	return p.level
+}
+
+// The rules below are written against schemas.Permit rather than *Permit, so the fold asks every
+// permit it holds the same questions whichever implementation answers them.
+
+// isNilPermit reports whether p is nothing at all, including an interface holding a nil pointer.
+func isNilPermit(p schemas.Permit) bool {
+	return isNil(p)
+}
+
+// allowsProvider reports whether the permit permits provider at all. A permit with no provider
+// permit permits none (deny by default), and so does a permit that is not there, unless the permit
+// allows all providers, which grants even a provider it holds no permit for.
+func allowsProvider(p schemas.Permit, provider string) bool {
+	if isNilPermit(p) {
+		return false
+	}
+	for _, pp := range p.ProviderPermits() {
+		if pp.Provider == provider {
+			return true
+		}
+	}
+	return p.AllowsAllProviders()
+}
+
+// blacklistsModel reports whether any of the permit's provider permits for provider blocks model.
+// One blocking provider permit blocks the provider for that model outright.
+func blacklistsModel(p schemas.Permit, provider string, model string) bool {
+	if isNilPermit(p) {
+		return false
+	}
+	for _, pp := range p.ProviderPermits() {
+		if pp.Provider == provider && pp.BlacklistedModels.IsBlocked(model) {
+			return true
+		}
+	}
+	return false
+}
+
+// allowsModelByName is the name-matching counterpart of Access.permitAllowsModel, for the coarse
+// provider gates that must not resolve model names.
+//
+// blacklistsModel is checked first, across every provider-permit entry for provider, before any
+// entry gets to allow the model: a permit can hold more than one provider-permit entry for the
+// same provider (two provider configs on one key, for instance), and one entry allowing what a
+// later entry blacklists must not let the model through first.
+func allowsModelByName(p schemas.Permit, provider string, model string) bool {
+	if isNilPermit(p) {
+		return false
+	}
+	if model != "" && blacklistsModel(p, provider, model) {
+		return false
+	}
+	found := false
+	for _, pp := range p.ProviderPermits() {
+		if pp.Provider != provider {
+			continue
+		}
+		found = true
+		if model == "" {
+			return true
+		}
+		if providerPermitAllowsModel(&pp, model) {
+			return true
+		}
+	}
+	// A provider the permit lists keeps its own model rules even under allow-all; only a provider it
+	// lists no permit for is opened up by allow-all, and then every model of it is allowed.
+	if !found && p.AllowsAllProviders() {
+		return true
+	}
+	return false
+}
+
+// providerPermitAllowsModel applies one provider permit's model rules by name only, resolving
+// nothing. An empty model means there is nothing to filter on, which keeps the permit.
+func providerPermitAllowsModel(pp *schemas.ProviderPermit, model string) bool {
+	if model == "" {
+		return true
+	}
+	return pp.AllowedModels.IsAllowed(model) && !pp.BlacklistedModels.IsBlocked(model)
+}
+
+// eachProviderPermit visits the permit's provider permits. A provider named by nothing but
+// whitespace is skipped: no comparison anywhere would match it, so it could only ever be selected
+// and then fail downstream. visit returns false to stop, which this reports back.
+func eachProviderPermit(p schemas.Permit, visit func(pp *schemas.ProviderPermit) bool) bool {
+	if isNilPermit(p) {
+		return true
+	}
+	pps := p.ProviderPermits()
+	for i := range pps {
+		pp := &pps[i]
+		if strings.TrimSpace(pp.Provider) == "" {
+			continue
+		}
+		if !visit(pp) {
+			return false
+		}
+	}
+	return true
+}

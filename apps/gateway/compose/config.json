@@ -1,0 +1,48 @@
+{
+  "encryption_key": "env.GATEWAY_ENCRYPTION_KEY",
+  "auth_config": {
+    "is_enabled": true,
+    "admin_username": "env.GATEWAY_ADMIN_USER",
+    "admin_password": "env.GATEWAY_ADMIN_PASSWORD"
+  },
+  "client": {
+    "disable_content_logging": true,
+    "allow_per_request_content_storage_override": false,
+    "allow_per_request_raw_override": false,
+    "log_retention_days": 90,
+    "enforce_auth_on_inference": true
+  },
+  "plugins": [
+    {
+      "name": "credits",
+      "enabled": true,
+      "config": {
+        "database_url": "env.GATEWAY_LEDGER_DATABASE_URL"
+      }
+    }
+  ],
+  "config_store": {
+    "enabled": true,
+    "type": "postgres",
+    "config": {
+      "host": "env.GATEWAY_DB_HOST",
+      "port": "env.GATEWAY_DB_PORT",
+      "user": "env.GATEWAY_DB_USER",
+      "password": "env.GATEWAY_DB_PASSWORD",
+      "db_name": "env.GATEWAY_DB_NAME",
+      "ssl_mode": "disable"
+    }
+  },
+  "logs_store": {
+    "enabled": true,
+    "type": "postgres",
+    "config": {
+      "host": "env.GATEWAY_DB_HOST",
+      "port": "env.GATEWAY_DB_PORT",
+      "user": "env.GATEWAY_DB_USER",
+      "password": "env.GATEWAY_DB_PASSWORD",
+      "db_name": "env.GATEWAY_DB_NAME",
+      "ssl_mode": "disable"
+    }
+  }
+}

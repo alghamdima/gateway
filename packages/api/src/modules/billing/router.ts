@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import { Permissions, User } from "@workspace/auth";
-import * as mobile from "@workspace/billing-mobile/server";
 import {
   checkoutSchema,
   getBillingPortalSchema,
@@ -14,12 +13,15 @@ import {
   getCustomersByReferenceId,
   getCustomersWithPurchasesByReferenceId,
 } from "@workspace/billing/server";
+import { HttpStatusCode } from "@workspace/shared/constants";
+import { HttpException } from "@workspace/shared/utils";
 
 import {
   enforceAuth,
   enforceOrganizationPermission,
   validate,
 } from "../../middleware";
+import { topUpWebhookCallbacks } from "../credits/top-up";
 
 const enforceAccessToReference = (permissions: Permissions["billing"]) =>
   createMiddleware<
@@ -122,5 +124,13 @@ export const billingRouter = new Hono()
         }),
       ),
   )
-  .post(`/webhook/${web.provider}`, (c) => web.webhookHandler(c.req.raw))
-  .post(`/webhook/${mobile.provider}`, (c) => mobile.webhookHandler(c.req.raw));
+  // one URL per payment provider; each verifies its own signatures (ADMIN-03)
+  .post("/webhook/:provider", (c) => {
+    const strategy = web.getBillingProvider(c.req.param("provider"));
+    if (!strategy) {
+      throw new HttpException(HttpStatusCode.NOT_FOUND, {
+        code: "error.notFound",
+      });
+    }
+    return strategy.webhookHandler(c.req.raw, topUpWebhookCallbacks);
+  });

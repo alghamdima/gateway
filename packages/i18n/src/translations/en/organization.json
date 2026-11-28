@@ -53,7 +53,7 @@
     },
     "invitation": {
       "title": "Join {{organizationName}}",
-      "description": "<bold>{{inviterEmail}}</bold> has invited you to join <bold>{{organizationName}}</bold> on TurboStarter.",
+      "description": "<bold>{{inviterEmail}}</bold> has invited you to join <bold>{{organizationName}}</bold> on Lemru.",
       "skip": "Skip to dashboard"
     },
     "user": {
@@ -83,8 +83,8 @@
       "success_other": "Members invited successfully!",
       "email": {
         "subject": "You have been invited to join an organization",
-        "preview": "Join {{inviter}} on TurboStarter",
-        "body": "<bold>{{inviter}}</bold> has invited you to join <bold>{{organization}}</bold> on TurboStarter.",
+        "preview": "Join {{inviter}} on Lemru",
+        "body": "<bold>{{inviter}}</bold> has invited you to join <bold>{{organization}}</bold> on Lemru.",
         "or": "Or, copy and paste this link into your browser:",
         "cta": "Join {{organization}}",
         "disclaimer": "If you were not expecting this invitation, there's nothing to worry about, you can safely ignore this email."
@@ -131,7 +131,7 @@
   },
   "delete": {
     "title": "Delete organization",
-    "description": "Permanently remove this organization and all of its contents from the TurboStarter platform. This action is not reversible, so please continue with caution.",
+    "description": "Permanently remove this organization and all of its contents from the Lemru platform. This action is not reversible, so please continue with caution.",
     "cta": "Delete organization",
     "disclaimer": "You are about to delete this organization. \n\nAfter deleting it, all organization data (including members and teams) will be permanently deleted and cannot be recovered. \n\nDo you want to continue?",
     "success": "Organization deleted successfully!",
@@ -217,5 +217,445 @@
       "cannotDeletePreDefinedRole": "You cannot delete a pre-defined role.",
       "roleNameAlreadyTaken": "The role name is already taken."
     }
+  },
+  "keys": {
+    "title": "API keys",
+    "description": "Keys call the models through the API and spend this organization's credits. Owners and admins manage them.",
+    "search": {
+      "placeholder": "Search by name or paste a key…",
+      "label": "Search keys",
+      "empty": "No key matches this search.",
+      "clear": "Clear search"
+    },
+    "create": {
+      "cta": "New key",
+      "title": "Create an API key",
+      "description": "A key's expiration is set now and cannot be changed later."
+    },
+    "error": {
+      "expiryBeyondMaxLifetime": "This expiration is longer than the platform allows. Choose a shorter one."
+    },
+    "edit": {
+      "success": "Key updated."
+    },
+    "disable": {
+      "cta": "Disable",
+      "title": "Disable key",
+      "description": "Are you sure you want to disable {{name}}? You can re-enable it later.",
+      "success": "Key disabled."
+    },
+    "enable": {
+      "cta": "Enable",
+      "success": "Key enabled."
+    },
+    "delete": {
+      "cta": "Delete",
+      "title": "Delete key",
+      "description": "Are you sure you want to delete {{name}}? This action cannot be undone.",
+      "success": "Key deleted."
+    },
+    "secret": {
+      "title": "Your new key",
+      "description": "Please copy it now and write it down somewhere safe. You will not be able to see it again.",
+      "copy": "Copy key",
+      "done": "I have copied it"
+    },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "expired": "Expired"
+    },
+    "form": {
+      "name": {
+        "label": "Name",
+        "description": "Choose a clear, descriptive name to identify this key.",
+        "placeholder": "Production"
+      },
+      "expiry": {
+        "label": "Expiration",
+        "preview": "Key will expire on: {{date}}",
+        "previewNever": "This key will not expire.",
+        "readOnly": "Expiration cannot be modified. Create a new API key for a new expiration time.",
+        "never": "No expiration",
+        "neverValue": "Never",
+        "1h": "1 hour",
+        "1d": "1 day",
+        "7d": "7 days",
+        "30d": "30 days",
+        "90d": "90 days",
+        "180d": "180 days",
+        "1y": "1 year",
+        "maximum": "The platform allows keys to live at most {{lifetime}}."
+      },
+      "limit": {
+        "label": "Credit limit",
+        "choice": "Credit limit",
+        "custom": "Custom amount",
+        "none": "No limit",
+        "amount": "Amount in SAR",
+        "invalid": "Enter an amount above 0, up to 4,000,000.",
+        "helper": "Requests are rejected once this key has used {{amount}} in total, until you raise its credit limit.",
+        "helperReset": "Requests are rejected once this key has used {{amount}} in a {{window}}, until it resets or you raise its credit limit.",
+        "helperNone": "No limit: this key can spend the organization's whole balance.",
+        "description": "Once the credits consumed by this key reach this amount, the key stops working. Leave blank for no limit."
+      },
+      "reset": {
+        "label": "Reset limit every…",
+        "description": "When the credit limit resets: daily at midnight UTC, weekly on Monday, or monthly on the 1st.",
+        "never": "N/A",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "window": {
+          "daily": "day (UTC)",
+          "weekly": "week (from Monday, UTC)",
+          "monthly": "month (from the 1st, UTC)"
+        },
+        "badge": {
+          "never": "Total",
+          "daily": "Daily",
+          "weekly": "Weekly",
+          "monthly": "Monthly"
+        }
+      }
+    },
+    "list": {
+      "empty": "No API keys yet. Create your first key to start calling models.",
+      "key": "Key",
+      "lastUsed": "Last used",
+      "expires": "Expires {{date}}",
+      "neverExpires": "Never expires",
+      "total": "Total",
+      "limit": "Key limit",
+      "status": "Status",
+      "noLimit": "No limit",
+      "never": "Never",
+      "actions": "Actions for {{name}}",
+      "open": "Open",
+      "count_one": "{{count}} key",
+      "count_other": "{{count}} keys"
+    },
+    "page": {
+      "back": "API keys",
+      "notFound": "This key does not exist, or it was deleted.",
+      "activity": "Activity",
+      "created": "Created {{date}}",
+      "details": "Details",
+      "spend": "Spend in the last 30 days",
+      "noSpend": "No spend in this window.",
+      "usage": "Usage",
+      "usageDescription": "Charged requests, in SAR. Weeks start on Monday and every period is in UTC.",
+      "total": "Total",
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "metadata": "Metadata",
+      "createdAt": "Created",
+      "lastUsed": "Last used",
+      "lastUsedNever": "Never",
+      "budget": "Budget",
+      "budgetLabel": "Key limit",
+      "budgetUsed": "{{used}} / {{limit}}",
+      "budgetRemaining": "{{remaining}} remaining",
+      "budgetResets": "Resets {{date}}",
+      "budgetNone": "No limit on this key.",
+      "danger": "Danger zone",
+      "disableTitle": "Disable key",
+      "disableDescription": "Prevent this key from being used. You can re-enable it later.",
+      "enableTitle": "Enable key",
+      "enableDescription": "Let this key be used again.",
+      "deleteTitle": "Delete key",
+      "deleteDescription": "Permanently delete this key. This action cannot be undone.",
+      "expiredNote": "This key has expired. Create a new key to keep calling models."
+    }
+  },
+  "credits": {
+    "lowBalance": {
+      "title": "Low-balance email",
+      "on": "Owners and admins are emailed when available credits drop below {{threshold}}, once until credits are added.",
+      "off": "Low-balance emails are off.",
+      "threshold": "Email below",
+      "invalid": "Enter an amount above 0, in riyals and halalas.",
+      "turnOff": "Turn off",
+      "saved": "Low-balance email saved.",
+      "email": {
+        "subject": "{{organization}} is running low on credits",
+        "subjectShort": "Your credits are running low",
+        "preview": "{{organization}} has {{available}} left",
+        "body": "{{organization}} has {{available}} of credits left, below {{threshold}}. When credits run out, requests are refused with 402 until you add more.",
+        "cta": "Add credits"
+      }
+    },
+    "topUp": {
+      "title": "Add credits",
+      "description": "A one-time card payment. Credits are spent on model requests by every key in this organization.",
+      "amount": "Amount of credits",
+      "credits": "Credits",
+      "fee": "Payment processing fee",
+      "total": "Total charged",
+      "pay": "Pay {{total}}",
+      "feeNote": "The fee is added to the payment and is never taken from your credits. Credits are added when the payment is confirmed, usually within seconds.",
+      "invalid": "Enter an amount between {{min}} and {{max}}, in riyals and halalas.",
+      "returned": {
+        "success": {
+          "title": "Payment received",
+          "description": "Your credits are added as soon as the payment is confirmed. This page updates by itself."
+        },
+        "cancelled": {
+          "title": "Payment cancelled",
+          "description": "Nothing was charged."
+        }
+      },
+      "unavailable": {
+        "title": "Top-ups are temporarily unavailable",
+        "description": "Adding credits is paused for now. Your balance and API keys keep working as usual. Please check back later."
+      },
+      "promo": {
+        "label": "Promo code",
+        "placeholder": "Enter a code",
+        "apply": "Apply",
+        "remove": "Remove",
+        "applied": "Code {{code}} applied.",
+        "baseFee": "Payment processing fee",
+        "discount": "Discount ({{code}})",
+        "bonus": "Bonus credit ({{code}})",
+        "received": "Credits you receive"
+      }
+    },
+    "title": "Credits",
+    "description": "What this organization has to spend on models. Requests in flight hold the most they can cost until they finish.",
+    "available": "Available",
+    "balance": "Balance",
+    "held": "Held by requests in flight",
+    "history": {
+      "title": "History",
+      "empty": "No entries yet.",
+      "when": "When",
+      "kind": "Type",
+      "amount": "Amount",
+      "more": "Show older"
+    },
+    "kinds": {
+      "top_up": "Top-up",
+      "usage": "Usage",
+      "refund": "Refund",
+      "adjustment": "Adjustment",
+      "promo": "Promotion",
+      "expiry": "Expired",
+      "promo_clawback": "Promotion taken back",
+      "transfer_out": "Moved to an organization",
+      "transfer_in": "Moved in by a member"
+    },
+    "redeem": {
+      "title": "Redeem a code",
+      "description": "Have a code for free credit? Enter it here: the credit is added at once.",
+      "label": "Code",
+      "placeholder": "Enter a code",
+      "submit": "Redeem",
+      "success": "{{credit}} of credit added with code {{code}}."
+    },
+    "lots": {
+      "title": "Your credit by purchase",
+      "description": "Each top-up, promotion or credit from us, what is left of it and when it expires. Requests spend the credit that expires first.",
+      "added": "Added",
+      "source": "From",
+      "remaining": "Left",
+      "expires": "Expires",
+      "never": "Never",
+      "sources": {
+        "top_up": "Top-up",
+        "promo": "Promotion",
+        "adjustment": "Credit from Lemru",
+        "transfer": "Moved in by a member"
+      },
+      "expiring": {
+        "title": "{{amount}} of credit expires within {{days}} days",
+        "description": "The first of it expires on {{date}}. Credit that is left when it expires is removed from your balance."
+      },
+      "refund": {
+        "label": "Refund",
+        "until": "Refundable until {{date}}",
+        "policy": "A top-up's unused credit can be refunded within the refund window shown on its button. The payment processing fee and promotional credit are not refunded. If the top-up came with a promotional bonus, the unused part of the bonus is removed with the refund, in proportion to the credit refunded; bonus already spent is yours to keep.",
+        "confirm": {
+          "title": "Refund this top-up?",
+          "description": "You get back {{amount}}: the unused part of the {{granted}} of credit this top-up bought. Credit already spent and the payment processing fee are not refunded. The money goes back to the card you paid with, usually within 5 to 10 days.",
+          "bonus": "This top-up came with a promotional bonus: {{bonus}} of it, the unused part in proportion to the credit refunded, is removed from your balance too. It is not paid out. Bonus already spent is not taken back.",
+          "action": "Refund {{amount}}"
+        },
+        "done": {
+          "succeeded": "{{amount}} refunded. It is on its way back to your card.",
+          "pending": "Refund of {{amount}} requested. The credit stays held until the payment provider confirms it."
+        },
+        "states": {
+          "pending": "Refund in progress",
+          "succeeded": "Refunded",
+          "failed": "Refund failed: contact support",
+          "refunded": "Refunded by support"
+        }
+      }
+    },
+    "transfer": {
+      "title": "Move credits to an organization",
+      "description": "Give an organization you belong to some of the credit you bought in your personal account.",
+      "available": "{{amount}} can be moved now.",
+      "to": {
+        "label": "Organization",
+        "placeholder": "Choose an organization",
+        "required": "Choose an organization."
+      },
+      "amount": {
+        "label": "Amount (SAR)",
+        "invalid": "Enter an amount up to {{max}}, with at most two decimals."
+      },
+      "code": {
+        "label": "Authenticator code",
+        "invalid": "Enter the 6-digit code from your authenticator app."
+      },
+      "submit": "Move credits",
+      "done": "{{amount}} moved to {{organization}}.",
+      "rules": "Credit moves one way: it cannot be moved back or refunded afterwards. Only credit you bought can be moved, not promotional or free credit, and it keeps its expiry date. Credit held by requests in progress or by a pending refund stays here.",
+      "noOrganizations": "You are not a member of an organization yet. Create one, or accept an invitation, to move credit to it.",
+      "twoFactor": {
+        "required": "Turn on two-factor authentication to move credits: each move asks for a fresh code.",
+        "cta": "Open security settings"
+      },
+      "waiting": {
+        "memberTenure": "You joined this organization recently. It can receive your credit from {{when}}.",
+        "cooldown": "This organization has just received a transfer. It can receive the next from {{when}}."
+      }
+    }
+  },
+  "dataPolicy": {
+    "title": "Data policy",
+    "description": "Decide where this organization's requests may be processed and what a provider may do with them. The policy applies to every API key, and a request that no endpoint can serve under it is refused, never sent elsewhere.",
+    "saved": "Data policy saved and applied to every key.",
+    "saveFailed": "The policy could not be applied to every key. Save again to retry.",
+    "notApplied": "This policy is not on every key yet. Save it again to finish applying it.",
+    "unavailable": "The data policy could not be loaded. Try again shortly.",
+    "readOnly": "Owners and admins can change the data policy.",
+    "nothingMatches": "No endpoint matches these requirements: every request would be refused.",
+    "zeroRetention": {
+      "label": "Require zero data retention",
+      "description": "Only endpoints that keep no prompts or completions. Endpoints with unknown retention are excluded."
+    },
+    "noTraining": {
+      "label": "Never train on our data",
+      "description": "Only endpoints that never train on what you send. Endpoints with unknown terms are excluded."
+    },
+    "regions": {
+      "label": "Limit where requests are processed",
+      "description": "Only endpoints in the regions you choose.",
+      "names": {
+        "sa": "Saudi Arabia",
+        "eu": "European Union",
+        "us": "United States",
+        "other": "Elsewhere"
+      }
+    },
+    "providers": {
+      "label": "Limit providers",
+      "description": "Only the providers you choose."
+    },
+    "endpoints": {
+      "title": "Endpoints",
+      "description": "{{matching}} of {{total}} endpoints match the requirements above.",
+      "empty": "No endpoints are available yet.",
+      "provider": "Provider",
+      "region": "Processing region",
+      "retention": "Retention",
+      "training": "Training",
+      "status": "Status",
+      "unknown": "Unknown",
+      "notKept": "Not kept",
+      "mayKeep": "May be kept",
+      "neverTrains": "Never",
+      "mayTrain": "May train",
+      "allowed": "Allowed",
+      "blocked": "Blocked"
+    }
+  },
+  "activity": {
+    "recent": {
+      "title": "Recent requests",
+      "description": "Each charged request, newest first, its attempts together. Free requests and failed attempts cost nothing and are not listed. Open one to see its record; the id is the x-bifrost-request-id response header, also readable with GET /api/v1/generation?id=.",
+      "when": "When",
+      "details": "Details",
+      "failed": "Failed"
+    },
+    "record": {
+      "upstreamCost": "Provider cost (USD)",
+      "dataTitle": "Where it was processed",
+      "termsVerified": "Terms verified on",
+      "policy": "Policy in force",
+      "policyVersion": "Version {{version}}: {{requirements}}",
+      "policyOpen": "no restrictions",
+      "policyNone": "None set",
+      "dataMissing": "Not recorded for this request.",
+      "termsChanged": "The endpoint's terms were edited after this request. These are the terms recorded when it was made.",
+      "title": "Request",
+      "yes": "Yes",
+      "no": "No",
+      "unknown": "Not available",
+      "promptTokens": "Prompt tokens",
+      "completionTokens": "Completion tokens",
+      "reasoningTokens": "of which reasoning",
+      "cachedTokens": "Prompt tokens from cache",
+      "latency": "Time to first token",
+      "totalLatency": "Total latency",
+      "generationTime": "Generation time",
+      "speed": "Speed",
+      "speedValue": "{{value}} tokens/s",
+      "finishReason": "Finish reason",
+      "streamed": "Streamed",
+      "attempts": "Attempts",
+      "success": "Answered",
+      "error": "Failed",
+      "note": "Timings, finish reason, streaming and the attempts come from request logs, kept for their retention period. Time to first token is the whole latency for a request that was not streamed. The charge and token counts are kept for good. Prompts and completions are never stored."
+    },
+    "title": "Activity",
+    "description": "This organization's requests, spend and tokens, by day, model and key. A request is counted once however many providers were tried, free and failed ones included; requests refused before reaching a model are counted apart. Prompts and completions are not stored.",
+    "window": "Period",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "spend": "Spend",
+    "requests": "Requests",
+    "tokens": "Tokens",
+    "refused": "Refused requests",
+    "cacheHitRate": "Cache hit rate",
+    "timeToFirstToken": "Time to first token (p50 / p90)",
+    "notAvailable": "—",
+    "requestLogUnavailable": "Request counts, refusals and timings come from the request log, which could not be read just now. Spend and tokens are complete.",
+    "requestLogNote": "Requests, refusals and timings come from the request log and cover its retention period; spend and tokens come from the ledger and are kept for good.",
+    "tokenBreakdown": "Tokens",
+    "tokenBreakdownDescription": "Charged requests. Reasoning is part of the completion; cached tokens are part of the prompt.",
+    "promptTokens": "Prompt",
+    "cachedTokens": "from cache",
+    "uncachedTokens": "not cached",
+    "cacheWriteTokens": "written to cache",
+    "completionTokens": "Completion",
+    "reasoningTokens": "reasoning",
+    "refusals": "Refused requests by reason",
+    "refusalsDescription": "Refused before any model was called, so never charged. The reason is the error's metadata.reason (see the API's error contract).",
+    "noRefusals": "No requests were refused in this period.",
+    "reason": "Reason",
+    "status": "Status",
+    "performance": "Performance",
+    "performanceDescription": "Successful requests, measured on the attempt that answered. Time to first token is the whole latency for a request that was not streamed.",
+    "latencyAverage": "Average",
+    "latencyP50": "Median (p50)",
+    "latencyP90": "p90",
+    "totalLatency": "Total latency",
+    "generationTime": "Generation time (average)",
+    "throughput": "Speed (average)",
+    "throughputValue": "{{value}} tokens/s",
+    "milliseconds": "{{value}} ms",
+    "failedRequests": "{{count}} failed on every provider",
+    "byDay": "Spend by day (UTC)",
+    "byModel": "By model",
+    "byKey": "By key",
+    "model": "Model",
+    "key": "Key",
+    "deletedKey": "Deleted key",
+    "empty": "No requests in this period."
   }
 }

@@ -18,6 +18,7 @@ import { Spinner } from "@workspace/ui-web/spinner";
 import { toast } from "@workspace/ui-web/toast";
 
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 import { SetPasswordModal } from "~/modules/admin/users/user/accounts/set-password";
 import { SocialIcons } from "~/modules/auth/form/social-providers";
 
@@ -53,6 +54,8 @@ export const AccountActions = ({
   const queryClient = useQueryClient();
 
   const SetPassword = useSetPasswordAction(account.userId);
+  const canSetPassword = useStaffPermission({ user: ["set-password"] });
+  const canDeleteAccount = useStaffPermission({ user: ["update"] });
 
   const deleteAccount = useMutation({
     ...admin.mutations.users.accounts.delete,
@@ -70,34 +73,36 @@ export const AccountActions = ({
   });
 
   const groups = [
-    account.providerId === "credential"
+    account.providerId === "credential" && canSetPassword
       ? [<SetPassword.Trigger key="set-password" />]
       : null,
-    [
-      [
-        (() => {
-          const isPending =
-            deleteAccount.isPending &&
-            deleteAccount.variables.accountId === account.id;
+    canDeleteAccount
+      ? [
+          [
+            (() => {
+              const isPending =
+                deleteAccount.isPending &&
+                deleteAccount.variables.accountId === account.id;
 
-          return (
-            <DropdownMenuItem
-              variant="destructive"
-              key="delete"
-              onClick={() =>
-                deleteAccount.mutate({
-                  accountId: account.id,
-                  id: account.userId,
-                })
-              }
-            >
-              {t("delete")}
-              {isPending && <Spinner className="ml-auto text-current" />}
-            </DropdownMenuItem>
-          );
-        })(),
-      ],
-    ],
+              return (
+                <DropdownMenuItem
+                  variant="destructive"
+                  key="delete"
+                  onClick={() =>
+                    deleteAccount.mutate({
+                      accountId: account.id,
+                      id: account.userId,
+                    })
+                  }
+                >
+                  {t("delete")}
+                  {isPending && <Spinner className="ml-auto text-current" />}
+                </DropdownMenuItem>
+              );
+            })(),
+          ],
+        ]
+      : null,
   ].filter((group) => group?.filter(Boolean).length);
 
   return (

@@ -9,12 +9,16 @@ import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { getQueryClient } from "~/lib/query/server";
 import { admin } from "~/modules/admin/lib/api";
+import { OrganizationCredits } from "~/modules/admin/organizations/organization/credits";
+import { OrganizationDataPolicy } from "~/modules/admin/organizations/organization/data-policy";
 import { OrganizationDetails } from "~/modules/admin/organizations/organization/details";
 import { OrganizationHeader } from "~/modules/admin/organizations/organization/header";
 import { InvitationsDataTable } from "~/modules/admin/organizations/organization/invitations/data-table/invitations-data-table";
 import { MembersDataTable } from "~/modules/admin/organizations/organization/members/data-table/members-data-table";
 import { OrdersDataTable } from "~/modules/admin/organizations/organization/orders/data-table/orders-data-table";
+import { OrganizationRateLimit } from "~/modules/admin/organizations/organization/rate-limit";
 import { SubscriptionsDataTable } from "~/modules/admin/organizations/organization/subscriptions/data-table/subscriptions-data-table";
+import { OrganizationTopupFee } from "~/modules/admin/organizations/organization/topup-fee";
 
 export const generateMetadata = async ({
   params,
@@ -62,6 +66,22 @@ export default async function OrganizationPage({
   );
 
   const sections = [
+    {
+      label: t("credits"),
+      component: <OrganizationCredits organizationId={id} />,
+    },
+    {
+      label: t("topupFee"),
+      component: <OrganizationTopupFee organizationId={id} />,
+    },
+    {
+      label: t("rateLimit"),
+      component: <OrganizationRateLimit organizationId={id} />,
+    },
+    {
+      label: t("dataPolicy"),
+      component: <OrganizationDataPolicy organizationId={id} />,
+    },
     {
       label: t("members"),
       component: <MembersDataTable organizationId={id} />,

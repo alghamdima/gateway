@@ -1,0 +1,187 @@
+{
+  "version": 2,
+  "skills": {
+    "api-design-principles": {
+      "source": "wshobson/agents",
+      "commit": "42203085cfc5736204bf0f6d436dff7e1da0bf3f",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/api-design-principles/SKILL.md",
+      "computedHash": "cd8889e86d651fbc7ec5f1cdf1920cdc0fa6bd2ca6ca01b8d93e9d2f6b54c7a6"
+    },
+    "architecture-decision-records": {
+      "source": "wshobson/agents",
+      "commit": "42203085cfc5736204bf0f6d436dff7e1da0bf3f",
+      "sourceType": "github",
+      "skillPath": "plugins/documentation-generation/skills/architecture-decision-records/SKILL.md",
+      "computedHash": "91ce0d21af91eb510f2deabda57e95bb84584593a2e1ea8a873122d2a582357f"
+    },
+    "better-auth-security-best-practices": {
+      "source": "better-auth/skills",
+      "commit": "20c9e88a5c007461a703f1c213572b073196113e",
+      "sourceType": "github",
+      "skillPath": "security/SKILL.md",
+      "computedHash": "36e9710eaa13c61c00bec00a4902fdc6ed829e6de13127238ae57494e93c1d9d"
+    },
+    "competitive-teardown": {
+      "source": "alirezarezvani/claude-skills",
+      "commit": "f8593c4941210a621a6629ce1da9e07897976d5f",
+      "sourceType": "github",
+      "skillPath": "product-team/skills/competitive-teardown/SKILL.md",
+      "computedHash": "c356077a635f5e980d24941e826ba45fbc31385153e06fd9e58198ea967f2324"
+    },
+    "database-designer": {
+      "source": "alirezarezvani/claude-skills",
+      "commit": "f8593c4941210a621a6629ce1da9e07897976d5f",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/database-designer/SKILL.md",
+      "computedHash": "8b5ef2c5a0a321cc7fedffe15f301aba4ed45c2d771d19dd584614c094040328"
+    },
+    "drizzle-best-practices": {
+      "source": "honra-io/drizzle-best-practices",
+      "commit": "c1bc07273a843190f5f9ce6e12b957864d93ee8f",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "1d260367bb6b59d9411a3c9c9ad6022e300029b6809a60b42046e70b3644ece0"
+    },
+    "golang-concurrency": {
+      "source": "samber/cc-skills-golang",
+      "commit": "d68d80aec298e1b74b37c2a472c002b5217248b3",
+      "sourceType": "github",
+      "skillPath": "skills/golang-concurrency/SKILL.md",
+      "computedHash": "c6c1829be72bba6eb7b2346561bb895605c65eacf35a2535bfca9828006a69e0"
+    },
+    "golang-how-to": {
+      "source": "samber/cc-skills-golang",
+      "commit": "d68d80aec298e1b74b37c2a472c002b5217248b3",
+      "sourceType": "github",
+      "skillPath": "skills/golang-how-to/SKILL.md",
+      "computedHash": "17f53db31d588f0798df5736dedf3f6b4655d658a2669a92d72bd33f0de7717b"
+    },
+    "golang-performance": {
+      "source": "samber/cc-skills-golang",
+      "commit": "d68d80aec298e1b74b37c2a472c002b5217248b3",
+      "sourceType": "github",
+      "skillPath": "skills/golang-performance/SKILL.md",
+      "computedHash": "d27f7392a17e63117abd26def53f53bf1b8e3e551fa9f89e8b46303f5813847c"
+    },
+    "golang-refactoring": {
+      "source": "samber/cc-skills-golang",
+      "commit": "d68d80aec298e1b74b37c2a472c002b5217248b3",
+      "sourceType": "github",
+      "skillPath": "skills/golang-refactoring/SKILL.md",
+      "computedHash": "afcb3185fb37cddc213ed99c4cd4bbb2459b78048de5b59503537e79ca220eb3"
+    },
+    "golang-security": {
+      "source": "samber/cc-skills-golang",
+      "commit": "d68d80aec298e1b74b37c2a472c002b5217248b3",
+      "sourceType": "github",
+      "skillPath": "skills/golang-security/SKILL.md",
+      "computedHash": "050d04076da4c392e80620b26688de64aab74da46f486f1fc784fa8a2f3b0444"
+    },
+    "golang-testing": {
+      "source": "samber/cc-skills-golang",
+      "commit": "d68d80aec298e1b74b37c2a472c002b5217248b3",
+      "sourceType": "github",
+      "skillPath": "skills/golang-testing/SKILL.md",
+      "computedHash": "adfaf95d45383e8e579de1770ea0f25d0729b3e94e0b003ea08d1646646f7247"
+    },
+    "hono": {
+      "source": "honojs/skills",
+      "commit": "e54ce51f6effaeb574ebd2629e89e086e14a2db3",
+      "sourceType": "github",
+      "skillPath": "skills/hono/SKILL.md",
+      "computedHash": "b9aa6ed86fce02216f2f43c4b5c651ba0055f0785a568d84fc446721fc832172"
+    },
+    "metronome": {
+      "source": "stripe/ai",
+      "commit": "1bb486909cc36ce608181c2af62c4716ba9cd7c7",
+      "sourceType": "github",
+      "skillPath": "skills/metronome/SKILL.md",
+      "computedHash": "df7120c011045d316246d1eeb97269b213083958ec0585dee8e579d91a70e894"
+    },
+    "migration-architect": {
+      "source": "alirezarezvani/claude-skills",
+      "commit": "f8593c4941210a621a6629ce1da9e07897976d5f",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/migration-architect/SKILL.md",
+      "computedHash": "fbd2e9263ac94a0da1a65219e2c3d8d539233c5e7895552039aab385dd74c793"
+    },
+    "open-responses": {
+      "source": "OpenRouterTeam/skills",
+      "commit": "a110aad6072364da5e8017efc7a7873262164b11",
+      "sourceType": "github",
+      "skillPath": "open-responses/SKILL.md",
+      "computedHash": "4c0af9b609abcd7a89838e4383314c8455ebc006f954d8b46c692956d5129979"
+    },
+    "openrouter-analytics-schema": {
+      "source": "OpenRouterTeam/skills",
+      "commit": "a110aad6072364da5e8017efc7a7873262164b11",
+      "sourceType": "github",
+      "skillPath": "skills/openrouter-analytics-schema/SKILL.md",
+      "computedHash": "5377d28c37113109fa43d7eaf09dcc6d71cd859341eb8b74385cfbe1546f7030"
+    },
+    "openrouter-generations": {
+      "source": "OpenRouterTeam/skills",
+      "commit": "a110aad6072364da5e8017efc7a7873262164b11",
+      "sourceType": "github",
+      "skillPath": "skills/openrouter-generations/SKILL.md",
+      "computedHash": "21528f3e4382c5e9322ae8c5ac4ed13547b518ae14b2fd5e91fd9ae9e44dafa9"
+    },
+    "openrouter-models": {
+      "source": "OpenRouterTeam/skills",
+      "commit": "a110aad6072364da5e8017efc7a7873262164b11",
+      "sourceType": "github",
+      "skillPath": "skills/openrouter-models/SKILL.md",
+      "computedHash": "0d6c3c19a3f07bcd568701fed22fb97babc2d0387b42aeaa7900ddd6b0f1a4a0"
+    },
+    "openrouter-oauth": {
+      "source": "OpenRouterTeam/skills",
+      "commit": "a110aad6072364da5e8017efc7a7873262164b11",
+      "sourceType": "github",
+      "skillPath": "skills/openrouter-oauth/SKILL.md",
+      "computedHash": "ed2e58f7813e47eaefa0c45fb2a8c6f96b0980430f21c508602d82054cfba921"
+    },
+    "organization-best-practices": {
+      "source": "better-auth/skills",
+      "commit": "20c9e88a5c007461a703f1c213572b073196113e",
+      "sourceType": "github",
+      "skillPath": "better-auth/organization/SKILL.md",
+      "computedHash": "e5b1238c3b62c789918fe397ed52787742e50944343de33f459629f29b0fe922"
+    },
+    "postgresql-table-design": {
+      "source": "wshobson/agents",
+      "commit": "42203085cfc5736204bf0f6d436dff7e1da0bf3f",
+      "sourceType": "github",
+      "skillPath": "plugins/database-design/skills/postgresql-table-design/SKILL.md",
+      "computedHash": "c2d9f4b5037b4320be0cc2489eeb287d3147477ae1f48b33f5f897e2c562ed06"
+    },
+    "senior-architect": {
+      "source": "alirezarezvani/claude-skills",
+      "commit": "f8593c4941210a621a6629ce1da9e07897976d5f",
+      "sourceType": "github",
+      "skillPath": "engineering-team/skills/senior-architect/SKILL.md",
+      "computedHash": "b147e81a6c240edb917368608c7d6f99e6b4cd8cfcbf4be4c0abe6cbeb467dd1"
+    },
+    "stripe-best-practices": {
+      "source": "stripe/ai",
+      "commit": "1bb486909cc36ce608181c2af62c4716ba9cd7c7",
+      "sourceType": "github",
+      "skillPath": "skills/stripe-best-practices/SKILL.md",
+      "computedHash": "abf8e949bcbcc38081c03eb66b22e741c3cf1be6bae627546d711e6d32327a09"
+    },
+    "stripe-implementation-planner": {
+      "source": "stripe/ai",
+      "commit": "1bb486909cc36ce608181c2af62c4716ba9cd7c7",
+      "sourceType": "github",
+      "skillPath": "skills/stripe-implementation-planner/SKILL.md",
+      "computedHash": "0e9dfdb7060c3cefad1e395bef23bd76e4b424eb64d6653a382ed959ac94116b"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "3eb972c2d7c818e544e35cc33ea8d7147d4d78ae08142ef40037b0fbac7a2505"
+    }
+  }
+}

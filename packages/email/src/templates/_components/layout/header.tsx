@@ -8,7 +8,7 @@ export const Header = ({ origin }: HeaderProps) => {
   return (
     <Img
       src={`${origin}/images/logo-text.png`}
-      alt="Turbostarter Logo"
+      alt=""
       className="mb-10"
       height={45}
     />

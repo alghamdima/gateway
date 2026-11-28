@@ -1,0 +1,887 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import type { User } from "@workspace/auth";
+import type { TestDatabase } from "@workspace/db/testing";
+import type postgres from "postgres";
+
+// Needs real Postgres: the bounds, the single row, the append-only history and
+// the gateway role's grants are enforced by the database. Skips without
+// DATABASE_URL.
+const adminUrl = process.env.DATABASE_URL;
+
+// The router's middleware imports the auth server and the translations (JSX the
+// test runner does not compile); the request test needs only the English
+// validation messages.
+const audited = vi.hoisted(() => [] as Record<string, unknown>[]);
+vi.mock("@workspace/auth/server", () => ({
+  auth: {},
+  clientIp: () => null,
+  recordStaffAction: async (entry: Record<string, unknown>) => {
+    audited.push(entry);
+  },
+}));
+vi.mock("@workspace/i18n", async () => {
+  const z = await import("zod");
+  return { getValidationLocale: () => z.locales.en };
+});
+vi.mock("@workspace/i18n/server", () => ({ getLocaleFromRequest: () => "en" }));
+
+const SAR = 1_000_000;
+
+/**
+ * What the migration seeds besides the fee: top-ups of SAR 20 to SAR 3,750,
+ * quick picks 40/100/200/400, and the peg (3.75) with no bank spread.
+ */
+const LIMITS = {
+  topupMinMicroSar: 20 * SAR,
+  topupMaxMicroSar: 3750 * SAR,
+  topupPresetsMicroSar: [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR],
+  usdToSarRateE6: 3_750_000,
+  fxSpreadBps: 0,
+};
+
+/** The pricing router behind the real staff access check, as an admin. */
+const adminApp = async () => {
+  const { Hono } = await import("hono");
+  const { HttpException } = await import("@workspace/shared/utils");
+  const { enforceStaffAccess } = await import("../../admin/access-middleware");
+  const { pricingRouter } = await import("../router");
+  const staff: User = {
+    id: "staff_markup",
+    name: "Staff",
+    email: "markup@example.com",
+    emailVerified: true,
+    banned: false,
+    isAnonymous: false,
+    twoFactorEnabled: false,
+    role: "admin",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  return new Hono<{ Variables: { user: User } }>()
+    .use(async (c, next) => {
+      c.set("user", staff);
+      await next();
+    })
+    .use("/api/admin/*", enforceStaffAccess)
+    .route("/api/admin/pricing", pricingRouter)
+    .onError((error) =>
+      Response.json(
+        { message: error.message },
+        { status: error instanceof HttpException ? error.status : 500 },
+      ),
+    );
+};
+
+describe.skipIf(!adminUrl)("admin pricing", () => {
+  let database: TestDatabase;
+  let sql: postgres.Sql;
+  let pricing: typeof import("../pricing");
+
+  const changes = async (target?: string) =>
+    sql<
+      {
+        id: number;
+        target: string;
+        before: Record<string, number> | null;
+        after: Record<string, number> | null;
+        changed_by: string;
+      }[]
+    >`select id, target, before, after, changed_by from pricing_change
+      where ${target ? sql`target = ${target}` : sql`true`} order by id`;
+
+  beforeAll(async () => {
+    const { createTestDatabase } = await import("@workspace/db/testing");
+    database = await createTestDatabase(adminUrl ?? "");
+    process.env.DATABASE_URL = database.url;
+
+    sql = (await import("postgres")).default(database.url, { max: 4 });
+    pricing = await import("../pricing");
+  });
+
+  afterAll(async () => {
+    const { db } = await import("@workspace/db/server");
+    await db.$client.end();
+    await sql.end();
+    await database.drop();
+  });
+
+  it("starts at a 5.5% top-up fee (SAR 3 minimum), top-ups of SAR 20 to SAR 3,750 and the peg", async () => {
+    const pricingNow = await pricing.getPricing();
+    expect(pricingNow.settings).toMatchObject({
+      topupFeeBps: 550,
+      topupFeeMinMicroSar: 3_000_000,
+      ...LIMITS,
+      effectiveUsdToSarRateE6: 3_750_000,
+    });
+    // there is no markup on requests (ADR 0010): nothing to set or show
+    expect(Object.keys(pricingNow)).toEqual(["settings", "creditTerms"]);
+    expect(
+      Object.keys(pricingNow.settings).filter((key) => /markup/i.test(key)),
+    ).toEqual([]);
+  });
+
+  it("has no markup in the database for anything to read", async () => {
+    const [row] = await sql<{ table: string | null; columns: number }[]>`
+      select to_regclass('public.provider_markup')::text as table,
+        (select count(*)::int from information_schema.columns
+          where table_name = 'pricing_settings' and column_name like '%markup%') as columns`;
+    expect(row).toEqual({ table: null, columns: 0 });
+  });
+
+  it("records who changed the settings, and from what to what", async () => {
+    const before = await pricing.getPricingSettings();
+    const { settings: after } = await pricing.updatePricingSettings({
+      topupFeeBps: 500,
+      topupFeeMinMicroSar: 1_000_000,
+      ...LIMITS,
+      staffId: "staff_1",
+    });
+    expect(after).toMatchObject({
+      topupFeeBps: 500,
+      updatedBy: "staff_1",
+    });
+
+    const [last] = (await changes("settings")).slice(-1);
+    expect(last).toMatchObject({
+      before: {
+        topupFeeBps: before.topupFeeBps,
+        topupFeeMinMicroSar: before.topupFeeMinMicroSar,
+        topupMinMicroSar: before.topupMinMicroSar,
+        topupMaxMicroSar: before.topupMaxMicroSar,
+        topupPresetsMicroSar: before.topupPresetsMicroSar,
+      },
+      after: {
+        topupFeeBps: 500,
+        topupFeeMinMicroSar: 1_000_000,
+        ...LIMITS,
+      },
+      changed_by: "staff_1",
+    });
+  });
+
+  it("refuses values outside the bounds and records nothing", async () => {
+    const count = (await changes()).length;
+    const current = await pricing.getPricingSettings();
+
+    await expect(
+      pricing.updatePricingSettings({
+        topupFeeBps: 10_001,
+        topupFeeMinMicroSar: 3_000_000,
+        ...LIMITS,
+        staffId: "staff_1",
+      }),
+    ).rejects.toMatchObject({
+      cause: { constraint_name: "pricing_settings_topup_fee_range" },
+    });
+    await expect(
+      pricing.updatePricingSettings({
+        topupFeeBps: 0,
+        topupFeeMinMicroSar: 400_000_001,
+        ...LIMITS,
+        staffId: "staff_1",
+      }),
+    ).rejects.toMatchObject({
+      cause: { constraint_name: "pricing_settings_topup_fee_min_range" },
+    });
+
+    expect(await pricing.getPricingSettings()).toEqual(current);
+    expect(await changes()).toHaveLength(count);
+  });
+
+  it("keeps the history in order when staff save at the same time", async () => {
+    await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        pricing.updatePricingSettings({
+          topupFeeBps: 100 + i,
+          topupFeeMinMicroSar: 3_000_000,
+          ...LIMITS,
+          staffId: `staff_${i}`,
+        }),
+      ),
+    );
+
+    // each change starts from the values the previous one left
+    const history = await changes("settings");
+    for (let i = 1; i < history.length; i++) {
+      expect(history[i]?.before).toEqual(history[i - 1]?.after);
+    }
+    const { settings } = await pricing.getPricing();
+    expect(history.at(-1)?.after).toEqual({
+      topupFeeBps: settings.topupFeeBps,
+      topupFeeMinMicroSar: settings.topupFeeMinMicroSar,
+      topupMinMicroSar: settings.topupMinMicroSar,
+      topupMaxMicroSar: settings.topupMaxMicroSar,
+      topupPresetsMicroSar: settings.topupPresetsMicroSar,
+      usdToSarRateE6: settings.usdToSarRateE6,
+      fxSpreadBps: settings.fxSpreadBps,
+      effectiveUsdToSarRateE6: settings.effectiveUsdToSarRateE6,
+    });
+  });
+
+  it("lists the latest changes first, with who made them", async () => {
+    await sql`insert into "user" (id, name, email, email_verified, created_at, updated_at)
+      values ('staff_named', 'Sara Admin', 'sara@example.com', true, now(), now())`;
+    await pricing.updatePricingSettings({
+      topupFeeBps: 542,
+      topupFeeMinMicroSar: 3_000_000,
+      ...LIMITS,
+      staffId: "staff_named",
+    });
+    const [latest, previous] = await pricing.getPricingChanges(2);
+    expect(latest).toMatchObject({
+      target: "settings",
+      after: { topupFeeBps: 542 },
+      changedBy: "staff_named",
+      changedByName: "Sara Admin",
+    });
+    expect(previous?.id).toBeLessThan(latest?.id ?? 0);
+  });
+
+  it("keeps the history append-only", async () => {
+    await expect(
+      sql`update pricing_change set changed_by = 'x'`,
+    ).rejects.toThrow(/append-only/);
+    await expect(sql`delete from pricing_change`).rejects.toThrow(
+      /append-only/,
+    );
+  });
+
+  it("lets the gateway read the rate and nothing more", async () => {
+    await sql.begin(async (tx) => {
+      await tx`set local role gateway_ledger`;
+      // what the credits plugin reads (apps/gateway/plugins/credits/rates.go)
+      const rows =
+        await tx`select usd_to_sar_rate_e6, fx_spread_bps from pricing_settings where id = 1`;
+      expect(rows).toHaveLength(1);
+    });
+    for (const statement of [
+      "update pricing_settings set fx_spread_bps = 0",
+      "select * from pricing_change",
+    ]) {
+      await expect(
+        sql.begin(async (tx) => {
+          await tx`set local role gateway_ledger`;
+          await tx.unsafe(statement);
+        }),
+      ).rejects.toThrow(/permission denied/);
+    }
+  });
+
+  describe("top-up limits (ADMIN-05)", () => {
+    const fees = {
+      topupFeeBps: 550,
+      topupFeeMinMicroSar: 3_000_000,
+      usdToSarRateE6: 3_750_000,
+      fxSpreadBps: 0,
+    };
+
+    it("records the limits and quick picks before and after, picks once and smallest first", async () => {
+      const before = await pricing.getPricingSettings();
+      const { settings: after } = await pricing.updatePricingSettings({
+        ...fees,
+        topupMinMicroSar: 20 * SAR,
+        topupMaxMicroSar: 5000 * SAR,
+        topupPresetsMicroSar: [500 * SAR, 20 * SAR, 100 * SAR, 20 * SAR],
+        staffId: "staff_limits",
+      });
+      expect(after).toMatchObject({
+        topupMinMicroSar: 20 * SAR,
+        topupMaxMicroSar: 5000 * SAR,
+        topupPresetsMicroSar: [20 * SAR, 100 * SAR, 500 * SAR],
+      });
+
+      const [last] = (await changes("settings")).slice(-1);
+      expect(last).toMatchObject({
+        before: {
+          topupMinMicroSar: before.topupMinMicroSar,
+          topupMaxMicroSar: before.topupMaxMicroSar,
+          topupPresetsMicroSar: before.topupPresetsMicroSar,
+        },
+        after: {
+          topupMinMicroSar: 20 * SAR,
+          topupMaxMicroSar: 5000 * SAR,
+          topupPresetsMicroSar: [20 * SAR, 100 * SAR, 500 * SAR],
+        },
+        changed_by: "staff_limits",
+      });
+
+      await pricing.updatePricingSettings({
+        ...fees,
+        ...LIMITS,
+        staffId: "staff_limits",
+      });
+    });
+
+    it.each([
+      ["a minimum of zero", { topupMinMicroSar: 0 }, "limits"],
+      [
+        "a maximum under the minimum",
+        { topupMinMicroSar: 100 * SAR, topupMaxMicroSar: 99 * SAR },
+        "limits",
+      ],
+      [
+        "a maximum over the SAR 4,000,000 ceiling",
+        { topupMaxMicroSar: 4_000_000 * SAR + 1 },
+        "limits",
+      ],
+      ["no quick picks", { topupPresetsMicroSar: [] }, "presets"],
+      [
+        "nine quick picks",
+        {
+          topupPresetsMicroSar: Array.from(
+            { length: 9 },
+            (_, i) => (20 + i) * SAR,
+          ),
+        },
+        "presets",
+      ],
+      [
+        "a quick pick under the minimum",
+        { topupPresetsMicroSar: [19 * SAR, 40 * SAR] },
+        "presets",
+      ],
+      [
+        "a quick pick over the maximum",
+        { topupPresetsMicroSar: [40 * SAR, 3751 * SAR] },
+        "presets",
+      ],
+    ])(
+      "the database refuses %s and records nothing",
+      async (_, change, check) => {
+        const count = (await changes()).length;
+        const current = await pricing.getPricingSettings();
+
+        await expect(
+          pricing.updatePricingSettings({
+            ...fees,
+            ...LIMITS,
+            ...change,
+            staffId: "staff_1",
+          }),
+        ).rejects.toMatchObject({
+          cause: { constraint_name: `pricing_settings_topup_${check}_range` },
+        });
+
+        expect(await pricing.getPricingSettings()).toEqual(current);
+        expect(await changes()).toHaveLength(count);
+      },
+    );
+
+    it("answers the admin API with the rule a cross-field check broke", async () => {
+      const { Hono } = await import("hono");
+      const { HttpException } = await import("@workspace/shared/utils");
+      const { pricingRouter } = await import("../router");
+      const staff: User = {
+        id: "staff_http",
+        name: "Staff",
+        email: "staff@example.com",
+        emailVerified: true,
+        banned: false,
+        isAnonymous: false,
+        twoFactorEnabled: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      // enforceAdmin puts the signed-in staff user here in the real app
+      const app = new Hono<{ Variables: { user: User } }>()
+        .use(async (c, next) => {
+          c.set("user", staff);
+          await next();
+        })
+        .route("/", pricingRouter)
+        .onError((error) =>
+          Response.json(
+            { message: error.message },
+            { status: error instanceof HttpException ? error.status : 500 },
+          ),
+        );
+      const put = (body: Record<string, unknown>) =>
+        app.request("/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...fees, ...LIMITS, ...body }),
+        });
+
+      const maxBelowMin = await put({
+        topupMinMicroSar: 50 * SAR,
+        topupMaxMicroSar: 40 * SAR,
+        topupPresetsMicroSar: [50 * SAR],
+      });
+      expect(maxBelowMin.status).toBe(422);
+      expect(await maxBelowMin.json()).toEqual({
+        message: "The top-up maximum must be at least the minimum",
+      });
+
+      const presetOutside = await put({ topupPresetsMicroSar: [2 * SAR] });
+      expect(presetOutside.status).toBe(422);
+      expect(await presetOutside.json()).toEqual({
+        message: "Each quick-pick amount must be within the top-up limits",
+      });
+
+      const valid = await put({ topupMaxMicroSar: 2000 * SAR });
+      expect(valid.status).toBe(200);
+      expect(await valid.json()).toMatchObject({
+        topupMaxMicroSar: 2000 * SAR,
+        updatedBy: "staff_http",
+      });
+      await put({});
+    });
+  });
+
+  describe("USD to SAR rate and bank spread (ADMIN-06)", () => {
+    const others = {
+      topupFeeBps: 550,
+      topupFeeMinMicroSar: 3_000_000,
+      topupMinMicroSar: 20 * SAR,
+      topupMaxMicroSar: 3750 * SAR,
+      topupPresetsMicroSar: [40 * SAR, 100 * SAR, 200 * SAR, 400 * SAR],
+    };
+
+    it("records the rate, the spread and the effective rate before and after", async () => {
+      await pricing.updatePricingSettings({
+        ...others,
+        usdToSarRateE6: 3_750_000,
+        fxSpreadBps: 0,
+        staffId: "staff_fx",
+      });
+      const { settings } = await pricing.updatePricingSettings({
+        ...others,
+        usdToSarRateE6: 3_760_000,
+        fxSpreadBps: 250,
+        staffId: "staff_fx",
+      });
+      // 3.76 + 2.5% = 3.854, worked out from the two stored values
+      expect(settings).toMatchObject({
+        usdToSarRateE6: 3_760_000,
+        fxSpreadBps: 250,
+        effectiveUsdToSarRateE6: 3_854_000,
+      });
+      expect(await pricing.getPricingSettings()).toMatchObject({
+        effectiveUsdToSarRateE6: 3_854_000,
+      });
+
+      const [last] = (await changes("settings")).slice(-1);
+      expect(last).toMatchObject({
+        before: {
+          usdToSarRateE6: 3_750_000,
+          fxSpreadBps: 0,
+          effectiveUsdToSarRateE6: 3_750_000,
+        },
+        after: {
+          usdToSarRateE6: 3_760_000,
+          fxSpreadBps: 250,
+          effectiveUsdToSarRateE6: 3_854_000,
+        },
+        changed_by: "staff_fx",
+      });
+
+      await pricing.updatePricingSettings({
+        ...others,
+        ...LIMITS,
+        staffId: "staff_fx",
+      });
+    });
+
+    it.each([
+      ["a rate under 3", { usdToSarRateE6: 2_999_999 }, "usd_to_sar_rate"],
+      ["a rate over 5", { usdToSarRateE6: 5_000_001 }, "usd_to_sar_rate"],
+      [
+        "a rate typed ten times too big",
+        { usdToSarRateE6: 37_500_000 },
+        "usd_to_sar_rate",
+      ],
+      ["a spread over 10%", { fxSpreadBps: 1001 }, "fx_spread"],
+      ["a negative spread", { fxSpreadBps: -1 }, "fx_spread"],
+    ])(
+      "the database refuses %s and records nothing",
+      async (_, change, check) => {
+        const count = (await changes()).length;
+        const current = await pricing.getPricingSettings();
+
+        await expect(
+          pricing.updatePricingSettings({
+            ...others,
+            ...LIMITS,
+            ...change,
+            staffId: "staff_1",
+          }),
+        ).rejects.toMatchObject({
+          cause: { constraint_name: `pricing_settings_${check}_range` },
+        });
+
+        expect(await pricing.getPricingSettings()).toEqual(current);
+        expect(await changes()).toHaveLength(count);
+      },
+    );
+
+    it.each([
+      [3_000_000, true],
+      [5_000_000, true],
+      [2_999_999, false],
+      [5_000_001, false],
+      [3.75, false],
+    ])("the admin API takes a rate of %d: %s", async (rate, isValid) => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      expect(
+        updatePricingSettingsSchema.safeParse({
+          ...others,
+          ...LIMITS,
+          usdToSarRateE6: rate,
+        }).success,
+      ).toBe(isValid);
+    });
+
+    it.each([
+      [0, true],
+      [1000, true],
+      [1001, false],
+      [-1, false],
+    ])(
+      "the admin API takes a spread of %d bps: %s",
+      async (spread, isValid) => {
+        const { updatePricingSettingsSchema } = await import("../../../schema");
+        expect(
+          updatePricingSettingsSchema.safeParse({
+            ...others,
+            ...LIMITS,
+            fxSpreadBps: spread,
+          }).success,
+        ).toBe(isValid);
+      },
+    );
+
+    it("writes the values before and after to the admin audit log", async () => {
+      const { Hono } = await import("hono");
+      const { enforceStaffAccess } =
+        await import("../../admin/access-middleware");
+      const { pricingRouter } = await import("../router");
+      const staff: User = {
+        id: "staff_audit",
+        name: "Staff",
+        email: "audit@example.com",
+        emailVerified: true,
+        banned: false,
+        isAnonymous: false,
+        twoFactorEnabled: false,
+        role: "admin",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const app = new Hono<{ Variables: { user: User } }>()
+        .use(async (c, next) => {
+          c.set("user", staff);
+          await next();
+        })
+        .use("/api/admin/*", enforceStaffAccess)
+        .route("/api/admin/pricing", pricingRouter);
+
+      audited.length = 0;
+      const response = await app.request("/api/admin/pricing/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...others,
+          ...LIMITS,
+          usdToSarRateE6: 3_800_000,
+          fxSpreadBps: 100,
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(audited).toHaveLength(1);
+      expect(audited[0]).toMatchObject({
+        actorId: "staff_audit",
+        action: "pricing.update",
+        details: {
+          before: { usdToSarRateE6: 3_750_000, fxSpreadBps: 0 },
+          after: {
+            usdToSarRateE6: 3_800_000,
+            fxSpreadBps: 100,
+            effectiveUsdToSarRateE6: 3_838_000,
+          },
+        },
+      });
+
+      await pricing.updatePricingSettings({
+        ...others,
+        ...LIMITS,
+        staffId: "staff_audit",
+      });
+    });
+  });
+
+  describe("refund window and credit expiry (ADMIN-23)", () => {
+    const put = async (body: Record<string, unknown>) =>
+      (await adminApp()).request("/api/admin/pricing/credit-terms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    it("starts at a 24-hour refund window and credit that expires after 365 days", async () => {
+      expect((await pricing.getPricing()).creditTerms).toEqual({
+        refundWindowHours: 24,
+        creditExpiryDays: 365,
+      });
+    });
+
+    it("records the values before and after in pricing_change and the audit log", async () => {
+      audited.length = 0;
+      const response = await put({
+        refundWindowHours: 48,
+        creditExpiryDays: null,
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        refundWindowHours: 48,
+        creditExpiryDays: null,
+      });
+      const [last] = (await changes("credit_terms")).slice(-1);
+      expect(last).toMatchObject({
+        before: { refundWindowHours: 24, creditExpiryDays: 365 },
+        after: { refundWindowHours: 48, creditExpiryDays: null },
+        changed_by: "staff_markup",
+      });
+      expect(audited).toHaveLength(1);
+      expect(audited[0]).toMatchObject({
+        action: "pricing.credit-terms",
+        details: {
+          before: { refundWindowHours: 24, creditExpiryDays: 365 },
+          after: { refundWindowHours: 48, creditExpiryDays: null },
+        },
+      });
+      // 0 hours switches self-serve refunds off
+      expect(
+        (await put({ refundWindowHours: 0, creditExpiryDays: 365 })).status,
+      ).toBe(200);
+      await pricing.updateCreditTerms({
+        refundWindowHours: 24,
+        creditExpiryDays: 365,
+        staffId: "staff_markup",
+      });
+    });
+
+    it.each([
+      { refundWindowHours: 721, creditExpiryDays: 365 },
+      { refundWindowHours: -1, creditExpiryDays: 365 },
+      { refundWindowHours: 1.5, creditExpiryDays: 365 },
+      { refundWindowHours: 24, creditExpiryDays: 0 },
+      { refundWindowHours: 24, creditExpiryDays: 3651 },
+      { refundWindowHours: 24 },
+    ])("refuses %o and records nothing", async (body) => {
+      const count = (await changes("credit_terms")).length;
+      audited.length = 0;
+      expect((await put(body)).status).toBe(422);
+      expect(audited).toHaveLength(0);
+      expect(await changes("credit_terms")).toHaveLength(count);
+    });
+
+    it.each([
+      ["refund_window_hours", 721, "pricing_settings_refund_window_range"],
+      ["refund_window_hours", -1, "pricing_settings_refund_window_range"],
+      ["credit_expiry_days", 0, "pricing_settings_credit_expiry_range"],
+      ["credit_expiry_days", 3651, "pricing_settings_credit_expiry_range"],
+    ])(
+      "the database refuses %s = %d too",
+      async (column, value, constraint) => {
+        await expect(
+          sql`update pricing_settings set ${sql(column)} = ${value} where id = 1`,
+        ).rejects.toMatchObject({ constraint_name: constraint });
+      },
+    );
+  });
+
+  describe("no markup on requests (ADR 0010)", () => {
+    it.each([
+      ["PUT", "/api/admin/pricing/providers/openai"],
+      ["DELETE", "/api/admin/pricing/providers/openai"],
+    ])(
+      "refuses %s %s, even to an admin, and records nothing",
+      async (method, path) => {
+        const app = await adminApp();
+        const count = (await changes()).length;
+        audited.length = 0;
+        const response = await app.request(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markupBps: 2000 }),
+        });
+        expect([403, 404]).toContain(response.status);
+        expect(audited).toHaveLength(0);
+        expect(await changes()).toHaveLength(count);
+      },
+    );
+
+    it("ignores a markup an old form still sends with the settings", async () => {
+      const app = await adminApp();
+      const response = await app.request("/api/admin/pricing/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topupFeeBps: 550,
+          topupFeeMinMicroSar: 3_000_000,
+          ...LIMITS,
+          defaultMarkupBps: 2000,
+        }),
+      });
+      expect(response.status).toBe(200);
+      const saved = (await response.json()) as Record<string, unknown>;
+      expect(saved).not.toHaveProperty("defaultMarkupBps");
+      const [last] = (await changes("settings")).slice(-1);
+      expect(last?.after).not.toHaveProperty("defaultMarkupBps");
+      expect(last?.changed_by).toBe("staff_markup");
+    });
+
+    it("lists a change recorded while markups existed, as it was", async () => {
+      await sql`insert into pricing_change (target, before, after, changed_by)
+        values ('provider:openai', null, ${sql.json({ markupBps: 500 })}, 'staff_old')`;
+      const [latest] = await pricing.getPricingChanges(1);
+      expect(latest).toMatchObject({
+        target: "provider:openai",
+        before: null,
+        after: { markupBps: 500 },
+        changedBy: "staff_old",
+      });
+    });
+  });
+
+  describe("input the admin API accepts", () => {
+    it.each([
+      [
+        {
+          topupFeeBps: 10_000,
+          topupFeeMinMicroSar: 0,
+          ...LIMITS,
+        },
+        true,
+      ],
+      [
+        {
+          topupFeeBps: 10_001,
+          topupFeeMinMicroSar: 0,
+          ...LIMITS,
+        },
+        false,
+      ],
+      [
+        {
+          topupFeeBps: 550,
+          topupFeeMinMicroSar: -1,
+          ...LIMITS,
+        },
+        false,
+      ],
+      [
+        {
+          topupFeeBps: 550,
+          topupFeeMinMicroSar: 0.5,
+          ...LIMITS,
+        },
+        false,
+      ],
+      [{ topupFeeBps: 550 }, false],
+      [{ topupFeeBps: 550, topupFeeMinMicroSar: 0 }, false],
+    ])("settings %j", async (input, isValid) => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      expect(updatePricingSettingsSchema.safeParse(input).success).toBe(
+        isValid,
+      );
+    });
+
+    it.each([
+      ["the seeded limits", {}, true],
+      [
+        "a maximum equal to the minimum",
+        { topupMaxMicroSar: 20 * SAR, topupPresetsMicroSar: [20 * SAR] },
+        true,
+      ],
+      [
+        "eight quick picks",
+        {
+          topupPresetsMicroSar: Array.from(
+            { length: 8 },
+            (_, i) => (20 + i) * SAR,
+          ),
+        },
+        true,
+      ],
+      [
+        "a maximum under the minimum",
+        { topupMaxMicroSar: 19 * SAR, topupPresetsMicroSar: [19 * SAR] },
+        false,
+      ],
+      ["a minimum of zero", { topupMinMicroSar: 0 }, false],
+      [
+        "a maximum over the ceiling",
+        { topupMaxMicroSar: 4_000_000 * SAR + 10_000 },
+        false,
+      ],
+      [
+        "an amount that is not whole halalas",
+        { topupMinMicroSar: 20 * SAR + 1 },
+        false,
+      ],
+      ["no quick picks", { topupPresetsMicroSar: [] }, false],
+      [
+        "nine quick picks",
+        {
+          topupPresetsMicroSar: Array.from(
+            { length: 9 },
+            (_, i) => (20 + i) * SAR,
+          ),
+        },
+        false,
+      ],
+      [
+        "a quick pick under the minimum",
+        { topupPresetsMicroSar: [1 * SAR] },
+        false,
+      ],
+      [
+        "a quick pick over the maximum",
+        { topupPresetsMicroSar: [4000 * SAR] },
+        false,
+      ],
+    ])("top-up limits: %s", async (_, change, isValid) => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      expect(
+        updatePricingSettingsSchema.safeParse({
+          topupFeeBps: 550,
+          topupFeeMinMicroSar: 3_000_000,
+          ...LIMITS,
+          ...change,
+        }).success,
+      ).toBe(isValid);
+    });
+
+    it("names the field and the rule when the limits do not fit together", async () => {
+      const { updatePricingSettingsSchema } = await import("../../../schema");
+      const issues = (change: Record<string, unknown>) =>
+        updatePricingSettingsSchema
+          .safeParse({
+            topupFeeBps: 550,
+            topupFeeMinMicroSar: 3_000_000,
+            ...LIMITS,
+            ...change,
+          })
+          .error?.issues.map(({ path, message }) => ({ path, message }));
+
+      expect(
+        issues({
+          topupMinMicroSar: 50 * SAR,
+          topupMaxMicroSar: 40 * SAR,
+          topupPresetsMicroSar: [45 * SAR],
+        }),
+      ).toContainEqual({
+        path: ["topupMaxMicroSar"],
+        message: "The top-up maximum must be at least the minimum",
+      });
+      expect(issues({ topupPresetsMicroSar: [40 * SAR, 3751 * SAR] })).toEqual([
+        {
+          path: ["topupPresetsMicroSar", 1],
+          message: "Each quick-pick amount must be within the top-up limits",
+        },
+      ]);
+    });
+  });
+});

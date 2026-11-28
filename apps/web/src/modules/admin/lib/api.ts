@@ -1,4 +1,8 @@
-import { mutationOptions, queryOptions } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  mutationOptions,
+  queryOptions,
+} from "@tanstack/react-query";
 
 import {
   getInvitationsResponseSchema,
@@ -21,6 +25,7 @@ import type { User } from "@workspace/auth";
 import type { InferRequestType } from "hono/client";
 
 const KEY = "admin";
+const AUDIT_PAGE_SIZE = 100;
 
 const queries = {
   users: {
@@ -193,6 +198,140 @@ const queries = {
         })({ query, param: { id } }),
     }),
   },
+  audit: {
+    list: () =>
+      infiniteQueryOptions({
+        queryKey: [KEY, "audit"],
+        initialPageParam: undefined as number | undefined,
+        queryFn: ({ pageParam }) =>
+          handle(api.admin.audit.$get)({
+            query: {
+              limit: String(AUDIT_PAGE_SIZE),
+              ...(pageParam === undefined ? {} : { before: String(pageParam) }),
+            },
+          }),
+        getNextPageParam: (lastPage) =>
+          lastPage.length === AUDIT_PAGE_SIZE ? lastPage.at(-1)?.id : undefined,
+      }),
+  },
+  pricing: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "pricing"],
+        queryFn: () => handle(api.admin.pricing.$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "pricing", "changes"],
+        queryFn: () => handle(api.admin.pricing.changes.$get)(),
+      }),
+  },
+  keySettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "key-settings"],
+        queryFn: () => handle(api.admin["key-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "key-settings", "changes"],
+        queryFn: () => handle(api.admin["key-settings"].changes.$get)(),
+      }),
+  },
+  catalogSettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "catalog-settings"],
+        queryFn: () => handle(api.admin["catalog-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "catalog-settings", "changes"],
+        queryFn: () => handle(api.admin["catalog-settings"].changes.$get)(),
+      }),
+  },
+  siteSettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "site-settings"],
+        queryFn: () => handle(api.admin["site-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "site-settings", "changes"],
+        queryFn: () => handle(api.admin["site-settings"].changes.$get)(),
+      }),
+  },
+  contactRequests: {
+    list: (
+      query: InferRequestType<
+        (typeof api.admin)["contact-requests"]["$get"]
+      >["query"],
+    ) =>
+      queryOptions({
+        queryKey: [KEY, "contact-requests", query],
+        queryFn: () => handle(api.admin["contact-requests"].$get)({ query }),
+      }),
+    get: (id: string) =>
+      queryOptions({
+        queryKey: [KEY, "contact-requests", id],
+        queryFn: () =>
+          handle(api.admin["contact-requests"][":id"].$get)({ param: { id } }),
+      }),
+  },
+  accountSettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "account-settings"],
+        queryFn: () => handle(api.admin["account-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "account-settings", "changes"],
+        queryFn: () => handle(api.admin["account-settings"].changes.$get)(),
+      }),
+    getUserLimit: (userId: string) =>
+      queryOptions({
+        queryKey: [KEY, "account-settings", "users", userId],
+        queryFn: () =>
+          handle(api.admin["account-settings"].users[":userId"].$get)({
+            param: { userId },
+          }),
+      }),
+  },
+  payments: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "payments"],
+        queryFn: () => handle(api.admin.payments.$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "payments", "changes"],
+        queryFn: () => handle(api.admin.payments.changes.$get)(),
+      }),
+  },
+  requests: {
+    list: (
+      query: InferRequestType<typeof api.admin.requests.$get>["query"] = {},
+    ) =>
+      queryOptions({
+        queryKey: [KEY, "requests", query],
+        queryFn: () => handle(api.admin.requests.$get)({ query }),
+      }),
+  },
+  providers: {
+    getCatalog: () =>
+      queryOptions({
+        queryKey: [KEY, "providers"],
+        queryFn: () => handle(api.admin.providers.$get)(),
+      }),
+    getAccounts: () =>
+      queryOptions({
+        queryKey: [KEY, "providers", "accounts"],
+        queryFn: () => handle(api.admin.providers.accounts.$get)(),
+      }),
+  },
 };
 
 const mutations = {
@@ -325,6 +464,197 @@ const mutations = {
           }),
       }),
     },
+  },
+  pricing: {
+    updateSettings: mutationOptions({
+      mutationKey: [KEY, "pricing", "settings", "update"],
+      mutationFn: (
+        json: InferRequestType<typeof api.admin.pricing.settings.$put>["json"],
+      ) => handle(api.admin.pricing.settings.$put)({ json }),
+    }),
+    updateCreditTerms: mutationOptions({
+      mutationKey: [KEY, "pricing", "credit-terms", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin.pricing)["credit-terms"]["$put"]
+        >["json"],
+      ) => handle(api.admin.pricing["credit-terms"].$put)({ json }),
+    }),
+  },
+  keySettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "key-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["key-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["key-settings"].$put)({ json }),
+    }),
+  },
+  catalogSettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "catalog-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["catalog-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["catalog-settings"].$put)({ json }),
+    }),
+  },
+  siteSettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "site-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["site-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["site-settings"].$put)({ json }),
+    }),
+  },
+  contactRequests: {
+    update: mutationOptions({
+      mutationKey: [KEY, "contact-requests", "update"],
+      mutationFn: ({
+        id,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin)["contact-requests"][":id"]["$put"]
+      >["json"] & { id: string }) =>
+        handle(api.admin["contact-requests"][":id"].$put)({
+          param: { id },
+          json,
+        }),
+    }),
+  },
+  accountSettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "account-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["account-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["account-settings"].$put)({ json }),
+    }),
+    setUserLimit: mutationOptions({
+      mutationKey: [KEY, "account-settings", "users", "update"],
+      mutationFn: ({
+        userId,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin)["account-settings"]["users"][":userId"]["$put"]
+      >["json"] & { userId: string }) =>
+        handle(api.admin["account-settings"].users[":userId"].$put)({
+          param: { userId },
+          json,
+        }),
+    }),
+  },
+  payments: {
+    updateSettings: mutationOptions({
+      mutationKey: [KEY, "payments", "settings", "update"],
+      mutationFn: (
+        json: InferRequestType<typeof api.admin.payments.settings.$put>["json"],
+      ) => handle(api.admin.payments.settings.$put)({ json }),
+    }),
+    updateProvider: mutationOptions({
+      mutationKey: [KEY, "payments", "providers", "update"],
+      mutationFn: ({
+        provider,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.payments.providers)[":provider"]["$put"]
+      >["json"] & {
+        provider: InferRequestType<
+          (typeof api.admin.payments.providers)[":provider"]["$put"]
+        >["param"]["provider"];
+      }) =>
+        handle(api.admin.payments.providers[":provider"].$put)({
+          param: { provider },
+          json,
+        }),
+    }),
+  },
+  providers: {
+    syncPrices: mutationOptions({
+      mutationKey: [KEY, "providers", "price-sync"],
+      mutationFn: () => handle(api.admin.providers["price-sync"].$post)(),
+    }),
+    createAccount: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "create"],
+      mutationFn: (
+        json: InferRequestType<
+          typeof api.admin.providers.accounts.$post
+        >["json"],
+      ) => handle(api.admin.providers.accounts.$post)({ json }),
+    }),
+    deleteAccount: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "delete"],
+      mutationFn: ({ provider }: { provider: string }) =>
+        handle(api.admin.providers.accounts[":provider"].$delete)({
+          param: { provider },
+        }),
+    }),
+    refreshModels: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "refresh-models"],
+      mutationFn: ({ provider }: { provider: string }) =>
+        handle(
+          api.admin.providers.accounts[":provider"]["refresh-models"].$post,
+        )({ param: { provider } }),
+    }),
+    createKey: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "keys", "create"],
+      mutationFn: ({
+        provider,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.providers.accounts)[":provider"]["keys"]["$post"]
+      >["json"] & { provider: string }) =>
+        handle(api.admin.providers.accounts[":provider"].keys.$post)({
+          param: { provider },
+          json,
+        }),
+    }),
+    updateKey: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "keys", "update"],
+      mutationFn: ({
+        provider,
+        keyId,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.providers.accounts)[":provider"]["keys"][":keyId"]["$put"]
+      >["json"] & { provider: string; keyId: string }) =>
+        handle(api.admin.providers.accounts[":provider"].keys[":keyId"].$put)({
+          param: { provider, keyId },
+          json,
+        }),
+    }),
+    deleteKey: mutationOptions({
+      mutationKey: [KEY, "providers", "accounts", "keys", "delete"],
+      mutationFn: ({ provider, keyId }: { provider: string; keyId: string }) =>
+        handle(
+          api.admin.providers.accounts[":provider"].keys[":keyId"].$delete,
+        )({ param: { provider, keyId } }),
+    }),
+    setTerms: mutationOptions({
+      mutationKey: [KEY, "providers", "terms", "set"],
+      mutationFn: ({
+        keyId,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin.providers)[":keyId"]["terms"]["$put"]
+      >["json"] & { keyId: string }) =>
+        handle(api.admin.providers[":keyId"].terms.$put)({
+          param: { keyId },
+          json,
+        }),
+    }),
+    removeTerms: mutationOptions({
+      mutationKey: [KEY, "providers", "terms", "remove"],
+      mutationFn: ({ keyId }: { keyId: string }) =>
+        handle(api.admin.providers[":keyId"].terms.$delete)({
+          param: { keyId },
+        }),
+    }),
   },
 };
 

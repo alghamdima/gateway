@@ -2,8 +2,7 @@
   "pricing": {
     "label": "Pricing",
     "title": "This is where you start earning",
-    "description": "Configure pricing based on your use-case and start charging your customers.",
-    "disclaimer": "Mix and match config to create the perfect pricing for your business. <reference>Check docs for more information.</reference>"
+    "description": "Configure pricing based on your use-case and start charging your customers."
   },
   "settings": {
     "subscriptions": {
@@ -81,7 +80,6 @@
     "checkoutRetrieve": "An error occurred while retrieving the checkout session.",
     "portal": "An error occurred while getting the portal URL.",
     "invalidProvider": "Invalid billing provider!",
-    "lemonSqueezy": "Lemon Squeezy API internal error!",
     "variantNotFound": "Variant not found!",
     "priceNotFound": "Price not found!",
     "customerNotFound": "Customer not found!",
@@ -101,7 +99,32 @@
     "promotionCodeRetrieve": "Could not retrieve promotion code.",
     "usageRetrieve": "Could not retrieve usage from billing provider.",
     "subscriptionItemNotFound": "No subscription item was found for this subscription.",
-    "subscriptionUpdate": "Unable to update the subscription in the billing provider."
+    "subscriptionUpdate": "Unable to update the subscription in the billing provider.",
+    "topUpAmount": "The amount is outside the top-up limits. Refresh the page and try again.",
+    "topUpsUnavailable": "Top-ups are temporarily unavailable. Please try again later.",
+    "refund": {
+      "notFound": "This purchase was not found.",
+      "notRefundable": "Only a top-up can be refunded.",
+      "refundsOff": "Self-serve refunds are switched off. Contact support.",
+      "windowClosed": "The refund window for this top-up has passed.",
+      "alreadyRefunded": "This top-up has already been refunded.",
+      "failed": "The payment provider could not refund this top-up. Contact support.",
+      "nothingLeft": "All of this top-up's credit has been spent: there is nothing left to refund.",
+      "creditInUse": "Requests in progress are holding part of this credit. Try again in a minute.",
+      "providerUnavailable": "The payment provider could not be reached. Try again in a minute: you will not be refunded twice."
+    },
+    "transfer": {
+      "noPersonalAccount": "Your personal account was not found. Contact support.",
+      "notAnOrganization": "Credit can only be moved to an organization.",
+      "notMember": "You are not a member of this organization.",
+      "memberTooNew": "You joined this organization too recently for it to receive your credit. Try again later.",
+      "organizationCoolingDown": "This organization has just received a transfer. Try again later.",
+      "insufficientCredit": "You do not have that much bought credit free to move. Refresh the page and try again.",
+      "keyReused": "This transfer was already sent with different details. Refresh the page and try again.",
+      "twoFactorRequired": "Turn on two-factor authentication to move credits.",
+      "invalidCode": "That code is not right. Enter the current code from your authenticator app.",
+      "tooManyAttempts": "Too many attempts. Wait a minute and try again."
+    }
   },
   "subscription": {
     "status": {
@@ -141,5 +164,19 @@
   "model": {
     "one-time": "One-time",
     "recurring": "Recurring"
+  },
+  "promo": {
+    "refused": {
+      "unknown": "This code does not exist. Check the spelling and try again.",
+      "paused": "This code is paused for now.",
+      "not_started": "This code is not valid yet.",
+      "expired": "This code has expired.",
+      "wrong_kind": "This code cannot be used here.",
+      "not_for_organization": "This code is not available for this organization.",
+      "used_up": "This code has been fully used.",
+      "already_used": "This organization has already used this code.",
+      "below_minimum": "This code needs a larger top-up.",
+      "no_effect": "This code changes nothing on this top-up."
+    }
   }
 }

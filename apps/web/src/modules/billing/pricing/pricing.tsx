@@ -1,11 +1,9 @@
 "use client";
 
 import { getFilteredPlans } from "@workspace/billing";
-import { Trans } from "@workspace/i18n";
 import { Skeleton } from "@workspace/ui-web/skeleton";
 
 import { usePricingControls } from "~/modules/billing/pricing/controls";
-import { TurboLink } from "~/modules/common/turbo-link";
 import { Section, SectionHeader } from "~/modules/marketing/layout/section";
 
 import { PricingHeader } from "./layout/header";
@@ -24,23 +22,6 @@ export const Pricing = () => {
     <Section id="pricing" className="gap-10 sm:gap-12 md:gap-16 lg:gap-20">
       <PricingHeader />
       <Plans plans={filteredPlans} />
-
-      <p className="text-muted-foreground max-w-md text-center text-sm">
-        <Trans
-          i18nKey="pricing.disclaimer"
-          ns="billing"
-          components={{
-            reference: (
-              <TurboLink
-                href="https://www.turbostarter.dev/docs/web/billing/overview"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-4 hover:no-underline"
-              />
-            ),
-          }}
-        />
-      </p>
     </Section>
   );
 };

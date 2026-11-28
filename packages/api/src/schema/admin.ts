@@ -8,6 +8,20 @@ import {
 } from "@workspace/auth";
 import { PaymentStatus, SubscriptionStatus } from "@workspace/billing";
 import {
+  MAX_CREDIT_EXPIRY_DAYS,
+  MAX_REFUND_WINDOW_HOURS,
+  MAX_TOPUP_FEE_BPS,
+  MAX_TOPUP_FEE_MIN_MICRO_SAR,
+  MAX_TOPUP_FEE_NOTE_LENGTH,
+  MAX_TOPUP_MICRO_SAR,
+  MAX_TOPUP_PRESETS,
+  MAX_FX_SPREAD_BPS,
+  MAX_USD_TO_SAR_RATE_E6,
+  MIN_USD_TO_SAR_RATE_E6,
+  PAYMENT_MODES,
+  PAYMENT_PROVIDERS,
+  PROVIDER_AGREEMENTS,
+  PROVIDER_REGIONS,
   selectCustomerSchema,
   selectOrderSchema,
   selectSubscriptionSchema,
@@ -208,6 +222,8 @@ export const getOrganizationsResponseSchema = z.object({
       slug: z.string().nullish(),
       logo: z.string().nullish(),
       createdAt: z.coerce.date(),
+      // set only for a personal account (ADR 0020): whose it is
+      personalOwnerEmail: z.string().nullish(),
       members: z.number(),
     }),
   ),
@@ -228,6 +244,7 @@ export const getOrganizationResponseSchema = z
     slug: z.string().nullish(),
     logo: z.string().nullish(),
     createdAt: z.coerce.date(),
+    personalOwnerEmail: z.string().nullish(),
   })
   .nullable();
 
@@ -316,3 +333,288 @@ export const getCustomersResponseSchema = z.object({
 });
 
 export type GetCustomersResponse = z.infer<typeof getCustomersResponseSchema>;
+
+const perMinuteSchema = (max: number) =>
+  z.number().int().positive().max(max).nullable();
+
+/** Both null removes the organization's rate limit. */
+export const setOrganizationRateLimitSchema = z.object({
+  requestsPerMinute: perMinuteSchema(1_000_000),
+  tokensPerMinute: perMinuteSchema(10_000_000_000),
+});
+
+export const adjustOrganizationCreditsSchema = z.object({
+  /** Signed micro-SAR (1 SAR = 1,000,000): positive adds credit, negative removes it. */
+  amount: z
+    .number()
+    .int()
+    .refine((value) => value !== 0),
+  reason: z.string().trim().min(3).max(500),
+  /** Send the same key when retrying, so one decision is never applied twice. */
+  idempotencyKey: z.string().min(8).max(200).optional(),
+});
+
+export type AdjustOrganizationCreditsInput = z.infer<
+  typeof adjustOrganizationCreditsSchema
+>;
+
+/** The admin form checks the same ceilings before sending. */
+export {
+  MAX_CREDIT_EXPIRY_DAYS,
+  MAX_FX_SPREAD_BPS,
+  MAX_REFUND_WINDOW_HOURS,
+  MAX_TOPUP_MICRO_SAR,
+  MAX_TOPUP_PRESETS,
+  MAX_USD_TO_SAR_RATE_E6,
+  MIN_USD_TO_SAR_RATE_E6,
+};
+
+/** A top-up amount in micro-SAR: whole halalas, above zero, under the typo ceiling. */
+const topupAmountMicroSarSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(MAX_TOPUP_MICRO_SAR)
+  .refine((value) => value % 10_000 === 0, {
+    message: "Must be a whole number of halalas",
+  });
+
+/**
+ * The same rules as the database checks on pricing_settings (packages/db/src/schema/pricing.ts).
+ * There is no markup on requests: the platform's revenue is the top-up fee (ADR 0010).
+ */
+export const updatePricingSettingsSchema = z
+  .object({
+    /** Basis points added on a top-up payment. */
+    topupFeeBps: z.number().int().min(0).max(MAX_TOPUP_FEE_BPS),
+    /** The least fee a top-up pays, in micro-SAR (1 SAR = 1,000,000). */
+    topupFeeMinMicroSar: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_TOPUP_FEE_MIN_MICRO_SAR),
+    /** The least credit one top-up may buy, in micro-SAR. */
+    topupMinMicroSar: topupAmountMicroSarSchema,
+    /** The most credit one top-up may buy, in micro-SAR. */
+    topupMaxMicroSar: topupAmountMicroSarSchema,
+    /** The quick-pick amounts of the top-up form, in micro-SAR. */
+    topupPresetsMicroSar: z
+      .array(topupAmountMicroSarSchema)
+      .min(1)
+      .max(MAX_TOPUP_PRESETS),
+    /**
+     * The official USD to SAR rate × 1,000,000 (3.75 is 3,750,000). The range
+     * is a ceiling against a typo, as in the database.
+     */
+    usdToSarRateE6: z
+      .number()
+      .int()
+      .min(MIN_USD_TO_SAR_RATE_E6, {
+        message: "The USD to SAR rate must be between 3 and 5",
+      })
+      .max(MAX_USD_TO_SAR_RATE_E6, {
+        message: "The USD to SAR rate must be between 3 and 5",
+      }),
+    /** The bank's conversion commission in bps, added to the official rate: 100 = 1%. */
+    fxSpreadBps: z.number().int().min(0).max(MAX_FX_SPREAD_BPS, {
+      message: "The bank's spread must be between 0% and 10%",
+    }),
+  })
+  .superRefine((value, ctx) => {
+    if (value.topupMaxMicroSar < value.topupMinMicroSar) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["topupMaxMicroSar"],
+        message: "The top-up maximum must be at least the minimum",
+      });
+    }
+    value.topupPresetsMicroSar.forEach((preset, index) => {
+      if (preset < value.topupMinMicroSar || preset > value.topupMaxMicroSar) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["topupPresetsMicroSar", index],
+          message: "Each quick-pick amount must be within the top-up limits",
+        });
+      }
+    });
+  });
+
+export type UpdatePricingSettingsInput = z.infer<
+  typeof updatePricingSettingsSchema
+>;
+
+/**
+ * The refund window and the credit expiry (ADMIN-23), with the database's
+ * bounds on pricing_settings: 0 hours switches self-serve refunds off, null
+ * days means credit never expires.
+ */
+export const updateCreditTermsSchema = z.object({
+  refundWindowHours: z
+    .number()
+    .int()
+    .min(0, { message: "The refund window cannot be negative" })
+    .max(MAX_REFUND_WINDOW_HOURS, {
+      message: `The refund window must be at most ${MAX_REFUND_WINDOW_HOURS} hours`,
+    }),
+  creditExpiryDays: z
+    .number()
+    .int()
+    .min(1, { message: "Credit must last at least one day, or never expire" })
+    .max(MAX_CREDIT_EXPIRY_DAYS, {
+      message: `Credit expiry must be at most ${MAX_CREDIT_EXPIRY_DAYS} days`,
+    })
+    .nullable(),
+});
+
+export type UpdateCreditTermsInput = z.infer<typeof updateCreditTermsSchema>;
+
+/**
+ * One organization's top-up fee (ADMIN-24): a null field uses the default's
+ * value, at least one must be set. The bounds are the default's.
+ */
+export const setOrganizationTopupFeeSchema = z
+  .object({
+    /** 100 bps = 1%; null uses the default percentage. */
+    feeBps: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_TOPUP_FEE_BPS, {
+        message: "The fee must be between 0% and 100%",
+      })
+      .nullable(),
+    /** micro-SAR; null uses the default minimum. */
+    feeMinMicroSar: z
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_TOPUP_FEE_MIN_MICRO_SAR, {
+        message: "The fee minimum must be at most SAR 400",
+      })
+      .nullable(),
+    /** From this moment the default applies again; null never expires. */
+    expiresAt: z.coerce
+      .date()
+      .refine((value) => value.getTime() > Date.now(), {
+        message: "The expiry must be in the future",
+      })
+      .nullable(),
+    note: z.string().trim().max(MAX_TOPUP_FEE_NOTE_LENGTH),
+  })
+  .refine((value) => value.feeBps !== null || value.feeMinMicroSar !== null, {
+    message: "Set a fee percentage or a minimum, or clear the fee instead",
+    path: ["feeBps"],
+  });
+
+export type SetOrganizationTopupFeeInput = z.infer<
+  typeof setOrganizationTopupFeeSchema
+>;
+
+/** A payment provider the product implements (ADMIN-03). */
+export const paymentProviderSchema = z.enum(PAYMENT_PROVIDERS);
+
+export const updatePaymentSettingsSchema = z.object({
+  /** Off refuses new checkouts; payments already started still credit. */
+  topupsEnabled: z.boolean(),
+  /** The provider new checkouts go to. */
+  activeProvider: paymentProviderSchema,
+});
+
+export const updatePaymentProviderSchema = z.object({
+  enabled: z.boolean(),
+  mode: z.enum(PAYMENT_MODES),
+});
+
+export type UpdatePaymentSettingsInput = z.infer<
+  typeof updatePaymentSettingsSchema
+>;
+export type UpdatePaymentProviderInput = z.infer<
+  typeof updatePaymentProviderSchema
+>;
+
+/** The gateway's key_id for a provider key. */
+export const providerKeyIdSchema = z.string().min(1).max(255);
+
+/**
+ * The data terms of one provider key (ADR 0015). Null retention or training
+ * is "unknown", which a policy treats as the worst case.
+ */
+export const setProviderTermsSchema = z.object({
+  region: z.enum(PROVIDER_REGIONS),
+  retentionDays: z.number().int().min(0).max(36_500).nullable(),
+  trainsOnData: z.boolean().nullable(),
+  agreement: z.enum(PROVIDER_AGREEMENTS),
+  source: z.string().trim().min(1).max(500),
+  verifiedOn: z.iso.date(),
+});
+
+export type SetProviderTermsInput = z.infer<typeof setProviderTermsSchema>;
+
+/** A provider's name in the gateway: what a model id starts with ("openai/gpt-..."). */
+export const providerNameSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9][a-z0-9_-]{0,62}$/);
+
+/**
+ * A provider the gateway knows by name, or one of our own: then `baseProvider`
+ * names the protocol it speaks and `baseUrl` where it is.
+ */
+export const createProviderAccountSchema = z
+  .object({
+    name: providerNameSchema,
+    baseProvider: providerNameSchema.optional(),
+    baseUrl: z.url().max(500).optional(),
+  })
+  .refine((value) => Boolean(value.baseProvider) === Boolean(value.baseUrl), {
+    path: ["baseUrl"],
+  });
+
+export type CreateProviderAccountInput = z.infer<
+  typeof createProviderAccountSchema
+>;
+
+const providerKeyModelsSchema = z
+  .array(z.string().trim().min(1).max(200))
+  .min(1)
+  .max(500);
+
+/** `value` is the secret. It is sent to the gateway and stored nowhere else. */
+export const createProviderKeySchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  value: z.string().min(1).max(4000),
+  models: providerKeyModelsSchema.optional(),
+  weight: z.number().min(0).max(100).optional(),
+});
+
+export type CreateProviderKeyInput = z.infer<typeof createProviderKeySchema>;
+
+export const updateProviderKeySchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    value: z.string().min(1).max(4000).optional(),
+    models: providerKeyModelsSchema.optional(),
+    weight: z.number().min(0).max(100).optional(),
+    isEnabled: z.boolean().optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined));
+
+export type UpdateProviderKeyInput = z.infer<typeof updateProviderKeySchema>;
+
+/** The staff request log: newest first, optionally one organization or one outcome. */
+export const getStaffRequestsInputSchema = z.object({
+  organizationId: z.string().min(1).max(100).optional(),
+  status: z.enum(["success", "error"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+});
+
+export type GetStaffRequestsInput = z.infer<typeof getStaffRequestsInputSchema>;
+
+export const getAdminActionsInputSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  before: z.coerce.number().int().positive().optional(),
+  actorId: z.string().min(1).max(100).optional(),
+});
+
+export type GetAdminActionsInput = z.infer<typeof getAdminActionsInputSchema>;

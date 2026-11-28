@@ -1,7 +1,8 @@
-import { auth } from "@workspace/auth/server";
+import { auth, isPersonalOrganization } from "@workspace/auth/server";
 import { and, eq } from "@workspace/db";
 import { invitation, member, organization } from "@workspace/db/schema";
 import { db } from "@workspace/db/server";
+import { removeOrganizationFromGateway } from "@workspace/gateway-client/server";
 import { HttpStatusCode } from "@workspace/shared/constants";
 import { HttpException } from "@workspace/shared/utils";
 
@@ -10,8 +11,24 @@ import type {
   UpdateOrganizationPayload,
 } from "@workspace/auth";
 
-export const deleteOrganization = async ({ id }: { id: string }) =>
-  db.delete(organization).where(eq(organization.id, id));
+// A personal account has one member, its owner, and goes when the user's
+// account is deleted (ADR 0020): staff cannot rename it, delete it on its own
+// or change its membership either.
+const refusePersonalAccount = async (organizationId: string) => {
+  if (await isPersonalOrganization(organizationId)) {
+    throw new HttpException(HttpStatusCode.CONFLICT, {
+      message:
+        "This is a user's personal account: it cannot be renamed, deleted or given members. Delete the user's account to remove it.",
+    });
+  }
+};
+
+/** Its keys and customer leave the gateway first (ADR 0004); a gateway failure stops the deletion. */
+export const deleteOrganization = async ({ id }: { id: string }) => {
+  await refusePersonalAccount(id);
+  await removeOrganizationFromGateway(id);
+  return db.delete(organization).where(eq(organization.id, id));
+};
 
 export const updateOrganization = async ({
   id,
@@ -20,6 +37,7 @@ export const updateOrganization = async ({
   id: string;
   data: UpdateOrganizationPayload;
 }) => {
+  await refusePersonalAccount(id);
   if (typeof data.slug === "string") {
     const current = await db.query.organization.findFirst({
       where: eq(organization.id, id),
@@ -66,10 +84,12 @@ export const deleteOrganizationMember = async ({
 }: {
   id: string;
   organizationId: string;
-}) =>
-  db
+}) => {
+  await refusePersonalAccount(organizationId);
+  return db
     .delete(member)
     .where(and(eq(member.id, id), eq(member.organizationId, organizationId)));
+};
 
 export const updateOrganizationMember = async ({
   id,
@@ -79,8 +99,10 @@ export const updateOrganizationMember = async ({
   id: string;
   organizationId: string;
   data: UpdateMemberPayload;
-}) =>
-  db
+}) => {
+  await refusePersonalAccount(organizationId);
+  return db
     .update(member)
     .set(data)
     .where(and(eq(member.id, id), eq(member.organizationId, organizationId)));
+};

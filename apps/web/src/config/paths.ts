@@ -22,11 +22,59 @@ const pathsConfig = {
       index: `${ADMIN_PREFIX}/customers`,
       customer: (id: string) => `${ADMIN_PREFIX}/customers/${id}`,
     },
+    pricing: {
+      index: `${ADMIN_PREFIX}/pricing`,
+    },
+    keySettings: {
+      index: `${ADMIN_PREFIX}/key-settings`,
+    },
+    accountSettings: {
+      index: `${ADMIN_PREFIX}/account-settings`,
+    },
+    catalogSettings: {
+      index: `${ADMIN_PREFIX}/catalog-settings`,
+    },
+    siteSettings: {
+      index: `${ADMIN_PREFIX}/site-settings`,
+    },
+    contactRequests: {
+      index: `${ADMIN_PREFIX}/contact-requests`,
+      request: (id: number | string) =>
+        `${ADMIN_PREFIX}/contact-requests/${id}`,
+    },
+    modelPrices: {
+      index: `${ADMIN_PREFIX}/model-prices`,
+    },
+    payments: {
+      index: `${ADMIN_PREFIX}/payments`,
+    },
+    promoCodes: {
+      index: `${ADMIN_PREFIX}/promo-codes`,
+      new: `${ADMIN_PREFIX}/promo-codes/new`,
+      code: (id: string) => `${ADMIN_PREFIX}/promo-codes/${id}`,
+    },
+    providers: {
+      index: `${ADMIN_PREFIX}/providers`,
+    },
+    audit: {
+      index: `${ADMIN_PREFIX}/audit`,
+    },
+    requests: {
+      index: `${ADMIN_PREFIX}/requests`,
+    },
+    reconciliation: {
+      index: `${ADMIN_PREFIX}/reconciliation`,
+    },
   },
   marketing: {
     pricing: "/pricing",
     contact: "/contact",
-    waitlist: "/waitlist",
+    models: {
+      index: "/models",
+      // a model id is provider/name; each part is encoded on its own
+      model: (id: string) =>
+        `/models/${id.split("/").map(encodeURIComponent).join("/")}`,
+    },
     blog: {
       index: BLOG_PREFIX,
       post: (slug: string) => `${BLOG_PREFIX}/${slug}`,
@@ -41,10 +89,10 @@ const pathsConfig = {
     updatePassword: `${AUTH_PREFIX}/password/update`,
     error: `${AUTH_PREFIX}/error`,
   },
+  onboarding: "/onboarding",
   dashboard: {
     user: {
       index: DASHBOARD_PREFIX,
-      ai: `${DASHBOARD_PREFIX}/ai`,
       settings: {
         index: `${DASHBOARD_PREFIX}/settings`,
         security: `${DASHBOARD_PREFIX}/settings/security`,
@@ -58,6 +106,11 @@ const pathsConfig = {
         billing: `${DASHBOARD_PREFIX}/${slug}/settings/billing`,
       },
       members: `${DASHBOARD_PREFIX}/${slug}/members`,
+      keys: `${DASHBOARD_PREFIX}/${slug}/keys`,
+      key: (id: string) => `${DASHBOARD_PREFIX}/${slug}/keys/${id}`,
+      credits: `${DASHBOARD_PREFIX}/${slug}/credits`,
+      activity: `${DASHBOARD_PREFIX}/${slug}/activity`,
+      dataPolicy: `${DASHBOARD_PREFIX}/${slug}/data-policy`,
     }),
   },
 } as const;

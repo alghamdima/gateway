@@ -1,6 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
-import { getOrganization } from "~/lib/auth/server";
+import { pathsConfig } from "~/config/paths";
+import {
+  getOrganization,
+  getPersonalAccountForSession,
+} from "~/lib/auth/server";
 import { getMetadata } from "~/lib/metadata";
 import { DeleteOrganization } from "~/modules/organization/settings/delete-organization";
 import { EditLogo } from "~/modules/organization/settings/edit-logo";
@@ -22,6 +26,11 @@ export default async function SettingsPage({
 
   if (!activeOrganization) {
     return notFound();
+  }
+
+  // a personal account has no members and no organization settings (ADR 0020)
+  if ((await getPersonalAccountForSession())?.id === activeOrganization.id) {
+    return redirect(pathsConfig.dashboard.organization(organization).index);
   }
 
   return (

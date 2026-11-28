@@ -24,9 +24,11 @@ import {
   DetailsListItem,
 } from "~/modules/admin/layout/details-list";
 import { admin } from "~/modules/admin/lib/api";
+import { useStaffPermission } from "~/modules/admin/lib/use-staff-permission";
 
 const Role = ({ id }: { id: string }) => {
   const { t } = useTranslation(["common", "admin"]);
+  const canSetRole = useStaffPermission({ user: ["set-role"] });
 
   const queryClient = useQueryClient();
   const { data: user } = useQuery(admin.queries.users.get({ id }));
@@ -78,7 +80,7 @@ const Role = ({ id }: { id: string }) => {
                     }),
                   )();
                 }}
-                disabled={form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting || !canSetRole}
               >
                 <SelectTrigger
                   id="admin-user-role"
@@ -106,6 +108,7 @@ const Role = ({ id }: { id: string }) => {
 
 const Name = ({ id }: { id: string }) => {
   const { t } = useTranslation(["common", "admin"]);
+  const canUpdate = useStaffPermission({ user: ["update"] });
   const queryClient = useQueryClient();
   const { data: user } = useQuery(admin.queries.users.get({ id }));
 
@@ -156,7 +159,7 @@ const Name = ({ id }: { id: string }) => {
               {...field}
               id="admin-user-name"
               aria-invalid={fieldState.invalid}
-              disabled={form.formState.isSubmitting}
+              disabled={form.formState.isSubmitting || !canUpdate}
               onChange={(e) => {
                 field.onChange(e.target.value);
                 void debouncedOnSubmit();
