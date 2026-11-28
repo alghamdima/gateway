@@ -80,17 +80,22 @@ The mobile app and the browser extension of the template were removed on 2026-11
 
 ## What is next, in order
 
-1. **Switch on the request types, one at a time** (`PLAN.md`, "Switching on request types"): first end-to-end tests for embeddings and responses, which are billed already; then speech and transcription; then images; realtime, rerank, batch and files later.
-2. **The playground.** The template's chat demo is removed (page, API route and the `ai` packages): it called OpenAI directly for any signed-in user, outside credits and outside the data policy. The owner wants a playground like OpenRouter's chat. Build it as a new module that calls the gateway with the organization's key, so credits and the data policy apply.
-3. **Response cache, opt-in.** The owner keeps the gateway's semantic cache and routing between providers. The cache must be off unless the customer asks for it per request (OpenRouter does it with a header), and never on in the in-Kingdom deployment or for an organization whose policy forbids retention.
-4. **Arabic**, with right-to-left layout, in the web app and in emails.
-5. **The gateway rename** to Lemru (`apps/gateway/scripts/rename`): name `Lemru`, prefix `lm`. It needs a registered domain that resolves. Until then one upstream name reaches the customer: the activity page mentions the header `x-bifrost-request-id`.
-6. **Payments for Saudi Arabia**, once the owner picks a gateway: a new provider module beside Stripe in `packages/billing`.
+The one order of work is the table at the top of `SPEC.md` section 5 ("The order now", owner 2026-11-28). The target is OpenRouter's product, its plan table included (`SPEC.md`, PLANS). In short:
+
+1. **Engine cleanup** (in progress). Left: remove the organization hooks that point at tables this build does not have (business units, users, access profiles, roles, the project tag), following the removal rule in `AGENTS.md`. Teams stay: a team is the engine's side of a workspace. Then the template's subscriptions (BILL-11) and decisions D10 and D11.
+2. **The model page**, stage 2 of `plans/model-page.md`.
+3. **Workspaces and budgets** (ORG-14, ORG-15).
+4. **Plans** (PLANS-01 to PLANS-08).
+5. **Playground**, with Try and Compare. It is a new module that calls the gateway with the account's key, so credits and the data policy apply.
+6. **Several providers per model, and regions.** Waits on a second provider account.
+7. **Management keys, notifications, BYOK, SSO.**
+8. **Request types one by one, Arabic, the Saudi payment gateway, the rename** to Lemru (`apps/gateway/scripts/rename`; it needs a registered domain). The response cache stays opt-in per request and never on in the in-Kingdom deployment (ROUTE-07).
 
 ## Waiting on the owner
 
 - A domain, hosting for both deployments, a logo (the current mark is a placeholder).
-- Teams, business units and projects in the engine: the owner asked to remove them (2026-11-28). They are not a leftover like the four above: they are owner kinds in the engine's limits model (budgets, rate limits, access profiles and the identity of a request: `plugins/governance/store.go`, `framework/grant`, `framework/configstore/tables/{team,virtualkey,budget}.go`) and columns of the request log and its materialized views (`framework/logstore`), about 700 references in 45 files. The product uses customer and virtual key only (`packages/gateway-client`). Removing them means reducing the limits model to customer and virtual key, which is a planned change to the path that enforces customers' limits, with the governance and credits tests (race detector) at every step. Not started; needs a plan the owner approves.
+- Decisions D10 (the template's blog, waitlist and contact pages) and D11 (refuse SQLite as a way to run the engine) in `SPEC.md` section 3.
+- For the work in order: credit on the OpenAI account (every live request on staging fails upstream until then), the data-terms row for that provider, and a second provider account (step 6).
 - The payment gateway. Stripe's availability to a Saudi-registered business is disputed between sources and Stripe does not route mada; the local options are Moyasar, Tap, HyperPay and PayTabs, all quoted on request.
 - The chargeback rule (proposal: suspend the organization's keys when a dispute opens; deduct the amount if it is lost).
 - Legal pages: the three under `packages/cms` are the template's text.
