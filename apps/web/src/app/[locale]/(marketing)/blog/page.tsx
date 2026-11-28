@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 import Image from "next/image";
+import { notFound } from "next/navigation";
 
 import { CollectionType, ContentStatus, getContentItems } from "@workspace/cms";
 import { SortOrder } from "@workspace/shared/constants";
@@ -24,6 +25,7 @@ import {
   SectionHeader,
   SectionTitle,
 } from "~/modules/marketing/layout/section";
+import { getSiteSettings } from "~/modules/marketing/site";
 
 import type { ContentTag } from "@workspace/cms";
 
@@ -42,6 +44,10 @@ export default async function BlogPage({
   searchParams: Promise<{ tag?: ContentTag }>;
   params: Promise<{ locale: string }>;
 }) {
+  // the blog answers only while staff have it switched on (SITE-01)
+  if (!(await getSiteSettings()).isBlogEnabled) {
+    return notFound();
+  }
   const tag = (await searchParams).tag;
   const locale = (await params).locale;
 

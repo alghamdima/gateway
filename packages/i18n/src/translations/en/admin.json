@@ -899,5 +899,94 @@
       "public": "shown",
       "hidden": "hidden"
     }
+  },
+  "siteSettings": {
+    "header": {
+      "title": "Public site",
+      "description": "Which parts of the public site are switched on, and where contact messages are announced."
+    },
+    "saved": "Saved.",
+    "blog": {
+      "title": "Blog",
+      "description": "While this is off, the blog's pages answer \"not found\" and the site does not link to them or list them in the sitemap. Switch it on when the first post is ready.",
+      "label": "Show the blog"
+    },
+    "changes": {
+      "title": "History",
+      "description": "Every change to these settings.",
+      "empty": "No changes yet.",
+      "fields": {
+        "isBlogEnabled": "Blog",
+        "contactEmail": "Email about contact messages"
+      },
+      "on": "on",
+      "off": "off",
+      "none": "none"
+    },
+    "contactEmail": {
+      "title": "Email about contact messages",
+      "description": "Every message sent through the contact page is kept under Contact messages. Set an address here to also get an email when one arrives; leave it empty to get none.",
+      "label": "Send an email to",
+      "placeholder": "sales@example.com",
+      "invalid": "Enter an email address, or leave it empty.",
+      "save": "Save"
+    }
+  },
+  "contactRequests": {
+    "header": {
+      "title": "Contact messages",
+      "description": "What people sent through the contact page: sales and Enterprise enquiries, providers who want to offer their models, and requests for help."
+    },
+    "waiting_one": "{{count}} message waits for a first answer.",
+    "waiting_other": "{{count}} messages wait for a first answer.",
+    "waitingNone": "No message waits for a first answer.",
+    "list": {
+      "allStatuses": "Every status",
+      "allTopics": "Every topic",
+      "status": "Status",
+      "topic": "Topic",
+      "from": "From",
+      "company": "Company",
+      "received": "Received",
+      "empty": "No messages.",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{page}} of {{pages}}"
+    },
+    "topic": {
+      "sales": "Sales",
+      "provider": "Provider",
+      "support": "Help",
+      "other": "Other"
+    },
+    "status": {
+      "new": "New",
+      "in_progress": "In progress",
+      "closed": "Closed"
+    },
+    "detail": {
+      "back": "All messages",
+      "message": "Message",
+      "sender": "Sender",
+      "name": "Name",
+      "email": "Email",
+      "company": "Company",
+      "account": "Account",
+      "accountLink": "Open their account",
+      "noAccount": "Sent without signing in",
+      "received": "Received",
+      "reply": "Reply by email",
+      "replySubject": "Re: your message to {{product}}",
+      "handling": {
+        "title": "Where it stands",
+        "description": "Set the status as you go, and keep what was said and agreed in the note. The sender never sees the note.",
+        "status": "Status",
+        "note": "Note",
+        "notePlaceholder": "What you answered, what was agreed, what is next",
+        "save": "Save",
+        "saved": "Saved.",
+        "lastChange": "Last changed {{when}} by {{who}}"
+      }
+    }
   }
 }

@@ -179,7 +179,7 @@ export const DashboardSidebar = memo<DashboardSidebarProps>(
                               onClick={() => setOpenMobile(false)}
                               render={
                                 <TurboLink
-                                  href={pathsConfig.marketing.contact}
+                                  href={`${pathsConfig.marketing.contact}?topic=support`}
                                 />
                               }
                             >
@@ -194,7 +194,7 @@ export const DashboardSidebar = memo<DashboardSidebarProps>(
                               onClick={() => setOpenMobile(false)}
                               render={
                                 <TurboLink
-                                  href={pathsConfig.marketing.contact}
+                                  href={`${pathsConfig.marketing.contact}?topic=support`}
                                 />
                               }
                             >

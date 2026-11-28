@@ -172,6 +172,31 @@ export const ADMIN_ACCESS_RULES: readonly AccessRule[] = [
     audit: { action: "catalog.settings", target: "catalog-settings" },
   },
 
+  // what is switched on the public site (SITE-01)
+  {
+    method: "GET",
+    path: /^\/site-settings(\/changes)?$/,
+    needs: { site: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: /^\/site-settings$/,
+    needs: { site: ["update"] },
+    audit: { action: "site.settings", target: "site-settings" },
+  },
+  // the messages sent through the contact page (SITE-03)
+  {
+    method: "GET",
+    path: new RegExp(`^/contact-requests(/${ID})?$`),
+    needs: { contact: ["read"] },
+  },
+  {
+    method: "PUT",
+    path: new RegExp(`^/contact-requests/${ID}$`),
+    needs: { contact: ["update"] },
+    audit: { action: "contact.update", target: "contact-request" },
+  },
+
   // the model price table (ADMIN-09, ADR 0018): the same permission as the other prices
   {
     method: "GET",
@@ -384,7 +409,8 @@ export const auditTarget = (path: string) => {
     segments[0] === "key-settings" ||
     // /account-settings/users/u1 is about user u1
     segments[0] === "account-settings" ||
-    segments[0] === "catalog-settings"
+    segments[0] === "catalog-settings" ||
+    segments[0] === "site-settings"
   ) {
     return segments.at(-1);
   }

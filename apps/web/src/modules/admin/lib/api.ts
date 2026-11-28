@@ -250,6 +250,35 @@ const queries = {
         queryFn: () => handle(api.admin["catalog-settings"].changes.$get)(),
       }),
   },
+  siteSettings: {
+    get: () =>
+      queryOptions({
+        queryKey: [KEY, "site-settings"],
+        queryFn: () => handle(api.admin["site-settings"].$get)(),
+      }),
+    getChanges: () =>
+      queryOptions({
+        queryKey: [KEY, "site-settings", "changes"],
+        queryFn: () => handle(api.admin["site-settings"].changes.$get)(),
+      }),
+  },
+  contactRequests: {
+    list: (
+      query: InferRequestType<
+        (typeof api.admin)["contact-requests"]["$get"]
+      >["query"],
+    ) =>
+      queryOptions({
+        queryKey: [KEY, "contact-requests", query],
+        queryFn: () => handle(api.admin["contact-requests"].$get)({ query }),
+      }),
+    get: (id: string) =>
+      queryOptions({
+        queryKey: [KEY, "contact-requests", id],
+        queryFn: () =>
+          handle(api.admin["contact-requests"][":id"].$get)({ param: { id } }),
+      }),
+  },
   accountSettings: {
     get: () =>
       queryOptions({
@@ -470,6 +499,31 @@ const mutations = {
           (typeof api.admin)["catalog-settings"]["$put"]
         >["json"],
       ) => handle(api.admin["catalog-settings"].$put)({ json }),
+    }),
+  },
+  siteSettings: {
+    update: mutationOptions({
+      mutationKey: [KEY, "site-settings", "update"],
+      mutationFn: (
+        json: InferRequestType<
+          (typeof api.admin)["site-settings"]["$put"]
+        >["json"],
+      ) => handle(api.admin["site-settings"].$put)({ json }),
+    }),
+  },
+  contactRequests: {
+    update: mutationOptions({
+      mutationKey: [KEY, "contact-requests", "update"],
+      mutationFn: ({
+        id,
+        ...json
+      }: InferRequestType<
+        (typeof api.admin)["contact-requests"][":id"]["$put"]
+      >["json"] & { id: string }) =>
+        handle(api.admin["contact-requests"][":id"].$put)({
+          param: { id },
+          json,
+        }),
     }),
   },
   accountSettings: {

@@ -34,6 +34,14 @@ const pathsConfig = {
     catalogSettings: {
       index: `${ADMIN_PREFIX}/catalog-settings`,
     },
+    siteSettings: {
+      index: `${ADMIN_PREFIX}/site-settings`,
+    },
+    contactRequests: {
+      index: `${ADMIN_PREFIX}/contact-requests`,
+      request: (id: number | string) =>
+        `${ADMIN_PREFIX}/contact-requests/${id}`,
+    },
     modelPrices: {
       index: `${ADMIN_PREFIX}/model-prices`,
     },
@@ -61,7 +69,6 @@ const pathsConfig = {
   marketing: {
     pricing: "/pricing",
     contact: "/contact",
-    waitlist: "/waitlist",
     models: {
       index: "/models",
       // a model id is provider/name; each part is encoded on its own

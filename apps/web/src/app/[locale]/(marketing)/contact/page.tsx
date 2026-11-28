@@ -1,6 +1,7 @@
 import { getTranslation } from "~/lib/i18n";
 import { getMetadata } from "~/lib/metadata";
 import { ContactForm } from "~/modules/marketing/contact/contact-form";
+import { topicFrom } from "~/modules/marketing/contact/utils/schema";
 import {
   Section,
   SectionBadge,
@@ -14,8 +15,15 @@ export const generateMetadata = getMetadata({
   description: "marketing:contact.description",
 });
 
-export default async function ContactPage() {
-  const { t } = await getTranslation({ ns: "marketing" });
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topic?: string }>;
+}) {
+  const [{ t }, { topic }] = await Promise.all([
+    getTranslation({ ns: "marketing" }),
+    searchParams,
+  ]);
   return (
     <Section>
       <SectionHeader>
@@ -24,7 +32,7 @@ export default async function ContactPage() {
         <SectionDescription>{t("contact.description")}</SectionDescription>
       </SectionHeader>
 
-      <ContactForm />
+      <ContactForm topic={topicFrom(topic)} />
     </Section>
   );
 }

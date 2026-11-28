@@ -46,8 +46,10 @@ export type EmailTemplate = (typeof EmailTemplate)[keyof typeof EmailTemplate];
 
 export type EmailVariables = AuthEmailVariables & {
   [EmailTemplate.CONTACT_FORM]: {
+    topic: string;
     name: string;
     email: string;
+    company?: string;
     message: string;
   };
   [EmailTemplate.RECONCILIATION_ALERT]: {

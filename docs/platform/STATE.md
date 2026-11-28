@@ -76,13 +76,14 @@ The mobile app and the browser extension of the template were removed on 2026-11
 - Switched off, not removed: speech, transcription, images, video, realtime, rerank, batch and files keep their code and routes; `plugins/credits` refuses them with a 403 until each is switched on.
 - English only. Spanish was removed.
 - The template's leftovers are gone: seven analytics vendors (PostHog stays), demo charts, demo blog posts, the chat demo.
+- The public site (owner, 2026-11-28; SPEC SITE-01 to SITE-03, migration `0047`): the waitlist page is deleted; the blog is switched on and off at `/admin/site-settings` (off to start with: it has no posts) and disappears from the header, footer and sitemap while off; the contact page is rebuilt with a topic and a company, every message is kept in `contact_request` and read at `/admin/contact-requests`, where staff reply by email and keep a status and a note. The email about a new message goes to the address staff set on the same settings screen, in place of the `CONTACT_EMAIL` environment value. Checked in a browser on staging: a message sent as a visitor, its status changed as staff, the blog switched on and off, the email received.
 - Engine cleanup, second pass (owner, 2026-11-28): four leftovers of the removed admin UI are out of `apps/gateway`, each with its routes, store methods, tables and tests, and a migration that drops its tables from an older database: dashboard notifications, feature flags, the skills repository and the UI's login sessions (`apps/gateway/MODIFICATIONS.md`, "Features outside the product"). The management API now takes the admin username and password on every call (Basic, or Bearer of their base64 form): no session token, cookie or websocket ticket is accepted. The gateway database went from 47 tables to 40. Kept on purpose: the ClickHouse log store and the object-storage offload of large log payloads (both are for log volume at scale), the job queue (sidekiq: the expired-key cleanup and the routing suggestions), SQLite (the engine's tests run on it).
 
 ## What is next, in order
 
 The one order of work is the table at the top of `SPEC.md` section 5 ("The order now", owner 2026-11-28). The target is OpenRouter's product, its plan table included (`SPEC.md`, PLANS). In short:
 
-1. **Engine cleanup** (in progress). Left: remove the organization hooks that point at tables this build does not have (business units, users, access profiles, roles, the project tag), following the removal rule in `AGENTS.md`. Teams stay: a team is the engine's side of a workspace. Then the template's subscriptions (BILL-11) and decisions D10 and D11.
+1. **Engine cleanup** (in progress). Left: remove the organization hooks that point at tables this build does not have (business units, users, access profiles, roles, the project tag), following the removal rule in `AGENTS.md`. Teams stay: a team is the engine's side of a workspace. Then the template's subscriptions (BILL-11) and decision D11.
 2. **The model page**, stage 2 of `plans/model-page.md`.
 3. **Workspaces and budgets** (ORG-14, ORG-15).
 4. **Plans** (PLANS-01 to PLANS-08).
@@ -94,7 +95,8 @@ The one order of work is the table at the top of `SPEC.md` section 5 ("The order
 ## Waiting on the owner
 
 - A domain, hosting for both deployments, a logo (the current mark is a placeholder).
-- Decisions D10 (the template's blog, waitlist and contact pages) and D11 (refuse SQLite as a way to run the engine) in `SPEC.md` section 3.
+- Decision D11 (refuse SQLite as a way to run the engine) in `SPEC.md` section 3.
+- The address for the email about contact messages, at `/admin/site-settings`: staging holds a test address.
 - For the work in order: credit on the OpenAI account (every live request on staging fails upstream until then), the data-terms row for that provider, and a second provider account (step 6).
 - The payment gateway. Stripe's availability to a Saudi-registered business is disputed between sources and Stripe does not route mada; the local options are Moyasar, Tap, HyperPay and PayTabs, all quoted on request.
 - The chargeback rule (proposal: suspend the organization's keys when a dispute opens; deduct the amount if it is lost).

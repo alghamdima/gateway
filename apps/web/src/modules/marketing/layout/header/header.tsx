@@ -12,8 +12,9 @@ import { MobileNavigation } from "./navigation/mobile-navigation";
 import { Navigation } from "./navigation/navigation";
 
 import type { Session } from "~/lib/auth/client";
+import type { SiteSettings } from "~/modules/marketing/site";
 
-const links = [
+const allLinks = [
   {
     label: "resources",
     items: [
@@ -22,12 +23,6 @@ const links = [
         description: "marketing:contact.description",
         href: pathsConfig.marketing.contact,
         icon: Icons.SendHorizontal,
-      },
-      {
-        title: "marketing:waitlist.label",
-        description: "marketing:waitlist.description",
-        href: pathsConfig.marketing.waitlist,
-        icon: Icons.ClockFading,
       },
     ],
   },
@@ -47,10 +42,19 @@ const links = [
 
 export const Header = ({
   initialSession,
+  site,
 }: {
   initialSession: Session | null;
+  site: SiteSettings;
 }) => {
   const { t } = useTranslation("common");
+  // the blog is linked only while staff have it switched on (SITE-01)
+  const links = allLinks.filter(
+    (link) =>
+      site.isBlogEnabled ||
+      !("href" in link) ||
+      link.href !== pathsConfig.marketing.blog.index,
+  );
   return (
     <header className="bg-background/80 sticky inset-0 top-(--banner-height,0px) z-40 w-full py-3 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 pr-4 sm:container">

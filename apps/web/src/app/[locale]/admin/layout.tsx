@@ -63,6 +63,17 @@ const menu = [
         icon: <Icons.TrendingUp />,
       },
       {
+        title: "siteSettings",
+        href: pathsConfig.admin.siteSettings.index,
+        icon: <Icons.Globe2 />,
+      },
+      {
+        title: "contactRequests",
+        href: pathsConfig.admin.contactRequests.index,
+        exact: false,
+        icon: <Icons.SendHorizontal />,
+      },
+      {
         title: "modelPrices",
         href: pathsConfig.admin.modelPrices.index,
         icon: <Icons.ChartNoAxesGantt />,
@@ -107,6 +118,8 @@ const RESTRICTED: Record<string, StaffPermissions> = {
   [pathsConfig.admin.audit.index]: { audit: ["read"] },
   [pathsConfig.admin.providers.index]: { providers: ["read"] },
   [pathsConfig.admin.promoCodes.index]: { promoCodes: ["read"] },
+  [pathsConfig.admin.siteSettings.index]: { site: ["read"] },
+  [pathsConfig.admin.contactRequests.index]: { contact: ["read"] },
   [pathsConfig.admin.reconciliation.index]: { credits: ["read"] },
 };
 

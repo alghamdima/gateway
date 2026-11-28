@@ -20,6 +20,7 @@ import { onboardingRouter } from "./modules/onboarding/router";
 import { organizationRouter } from "./modules/organization/router";
 import { promoCodesRouter } from "./modules/promo-codes/router";
 import { internalRouter } from "./modules/reconciliation/router";
+import { siteRouter } from "./modules/site/router";
 import { userRouter } from "./modules/user/router";
 import { v1Router } from "./modules/v1/router";
 import { monitor } from "./monitor";
@@ -60,6 +61,7 @@ const appRouter = new Hono()
   .route("/onboarding", onboardingRouter)
   .route("/organizations", organizationRouter)
   .route("/promo-codes", promoCodesRouter)
+  .route("/site", siteRouter)
   .route("/user", userRouter)
   .route("/v1", v1Router)
   .onError(onError);

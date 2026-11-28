@@ -9,6 +9,10 @@ import { paymentsRouter } from "../payments/router";
 import { pricingRouter } from "../pricing/router";
 import { promoCodesAdminRouter } from "../promo-codes/router";
 import { listReconciliationRuns } from "../reconciliation/reconcile";
+import {
+  contactRequestsAdminRouter,
+  siteSettingsAdminRouter,
+} from "../site/admin-router";
 import { enforceStaffAccess } from "./access-middleware";
 import { auditRouter } from "./audit/router";
 import { getCustomersCount } from "./customers/queries";
@@ -31,6 +35,8 @@ export const adminRouter = new Hono()
   .route("/key-settings", keySettingsAdminRouter)
   .route("/account-settings", accountSettingsAdminRouter)
   .route("/catalog-settings", catalogSettingsAdminRouter)
+  .route("/site-settings", siteSettingsAdminRouter)
+  .route("/contact-requests", contactRequestsAdminRouter)
   .route("/model-prices", modelPricesAdminRouter)
   .route("/payments", paymentsRouter)
   .route("/promo-codes", promoCodesAdminRouter)

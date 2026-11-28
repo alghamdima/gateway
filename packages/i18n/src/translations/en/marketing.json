@@ -111,9 +111,9 @@
   },
   "contact": {
     "label": "Contact",
-    "title": "Get in touch with us today for support",
+    "title": "Talk to us",
     "cta": "Talk to sales",
-    "description": "Reach us for assistance or feedback",
+    "description": "Sales and Enterprise plans, offering your models as a provider, or help with your account",
     "form": {
       "name": {
         "placeholder": "John Doe"
@@ -127,7 +127,21 @@
       "submit": "Send message",
       "success": {
         "title": "Message sent!",
-        "description": "Thank you for your message. We'll get back to you soon."
+        "description": "Thank you. We have your message and will reply by email."
+      },
+      "topic": {
+        "label": "What is this about?",
+        "options": {
+          "sales": "Sales and Enterprise plans",
+          "provider": "I am a model provider",
+          "support": "Help with my account",
+          "other": "Something else"
+        }
+      },
+      "company": {
+        "label": "Company",
+        "placeholder": "Acme Inc.",
+        "optional": "optional"
       }
     },
     "email": {
@@ -192,18 +206,6 @@
     "installing": {
       "title": "Installing update...",
       "description": "The update is being installed. Please wait a moment."
-    }
-  },
-  "waitlist": {
-    "label": "Waitlist",
-    "description": "Hear from us when we launch",
-    "title": "Get notified when we're launching",
-    "subtitle": "Leave your email and we will tell you when Lemru opens.",
-    "submit": "Notify me",
-    "success": {
-      "title": "You're on the list!",
-      "description": "We'll notify you when we launch.",
-      "cta": "See ya!"
     }
   },
   "status": {

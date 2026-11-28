@@ -330,6 +330,13 @@
       "when": 1795871850870,
       "tag": "0046_catalog_statistics",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795885579455,
+      "tag": "0047_site_and_contact",
+      "breakpoints": true
     }
   ]
 }

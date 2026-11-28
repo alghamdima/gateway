@@ -7,11 +7,13 @@ import { I18nControls } from "~/modules/common/i18n/controls";
 import { TurboLink } from "~/modules/common/turbo-link";
 import { FooterNavigation } from "~/modules/marketing/layout/footer/navigation";
 import { StatusIndicator } from "~/modules/marketing/layout/status-indicator";
+import { getSiteSettings } from "~/modules/marketing/site";
 
 export const Footer = async () => {
-  const { t } = await getTranslation({
-    ns: ["common", "marketing", "billing"],
-  });
+  const [{ t }, site] = await Promise.all([
+    getTranslation({ ns: ["common", "marketing", "billing"] }),
+    getSiteSettings(),
+  ]);
 
   return (
     <footer className="mt-auto w-full border-t px-6 pt-8 pb-6 sm:pt-10 sm:pb-8 md:pt-14 md:pb-10 lg:pt-16">
@@ -34,7 +36,7 @@ export const Footer = async () => {
             <I18nControls />
           </div>
 
-          <FooterNavigation />
+          <FooterNavigation site={site} />
         </div>
         <div className="mt-8 pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">

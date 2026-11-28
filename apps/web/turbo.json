@@ -6,8 +6,6 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "next-env.d.ts"],
       "env": [
-        "CONTACT_EMAIL",
-
         "BETTER_AUTH_URL",
         "BETTER_AUTH_SECRET",
         "APPLE_CLIENT_ID",

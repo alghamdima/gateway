@@ -3,11 +3,7 @@ import duration from "dayjs/plugin/duration";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
-import {
-  CollectionType,
-  getContentItemBySlug,
-  getContentItems,
-} from "@workspace/cms";
+import { CollectionType, getContentItemBySlug } from "@workspace/cms";
 import { badgeVariants } from "@workspace/ui-web/badge";
 
 import { appConfig } from "~/config/app";
@@ -22,6 +18,7 @@ import {
   SectionHeader,
   SectionTitle,
 } from "~/modules/marketing/layout/section";
+import { getSiteSettings } from "~/modules/marketing/site";
 
 dayjs.extend(duration);
 
@@ -31,6 +28,10 @@ export default async function Page({
   params: Promise<{ slug: string; locale: string }>;
 }) {
   const { slug, locale } = await params;
+  // the blog answers only while staff have it switched on (SITE-01)
+  if (!(await getSiteSettings()).isBlogEnabled) {
+    return notFound();
+  }
   const item = getContentItemBySlug({
     collection: CollectionType.BLOG,
     slug,
@@ -127,25 +128,15 @@ export default async function Page({
   );
 }
 
-export function generateStaticParams() {
-  return getContentItems({ collection: CollectionType.BLOG }).items.map(
-    (post) => ({
-      slug: post.slug,
-    }),
-  );
-}
-
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string; locale: string }>;
 }) {
   const { slug, locale } = await params;
-  const item = getContentItemBySlug({
-    collection: CollectionType.BLOG,
-    slug,
-    locale,
-  });
+  const item = (await getSiteSettings()).isBlogEnabled
+    ? getContentItemBySlug({ collection: CollectionType.BLOG, slug, locale })
+    : null;
 
   if (!item) {
     return notFound();
