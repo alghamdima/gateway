@@ -81,16 +81,11 @@ The mobile app and the browser extension of the template were removed on 2026-11
 
 ## What is next, in order
 
-The one order of work is the table at the top of `SPEC.md` section 5 ("The order now", owner 2026-11-28). The target is OpenRouter's product, its plan table included (`SPEC.md`, PLANS). In short:
+The one order of work is at the top of `SPEC.md` section 5 ("The order now"). The owner set its shape on 2026-11-28: cleanup first, then the foundations in the order they depend on each other, then the features. The target is OpenRouter's product, its plan table included (`SPEC.md`, PLANS).
 
-1. **Engine cleanup**: done (2026-11-28). The engine also refuses to start on SQLite now (`-allow-sqlite` for tests). Two removals moved to the step that redesigns their area: the engine's organization hooks (business units, the project tag, users, access profiles, roles) to step 3, the template's subscriptions (BILL-11) to step 4.
-2. **The model page**, stage 2 of `plans/model-page.md`. Next.
-3. **Workspaces and budgets** (ORG-14, ORG-15).
-4. **Plans** (PLANS-01 to PLANS-08).
-5. **Playground**, with Try and Compare. It is a new module that calls the gateway with the account's key, so credits and the data policy apply.
-6. **Several providers per model, and regions.** Waits on a second provider account.
-7. **Management keys, notifications, BYOK, SSO.**
-8. **Request types one by one, Arabic, the Saudi payment gateway, the rename** to Lemru (`apps/gateway/scripts/rename`; it needs a registered domain). The response cache stays opt-in per request and never on in the in-Kingdom deployment (ROUTE-07).
+- **Part A, cleanup.** A1 is done (the admin UI's leftovers in the engine, SQLite refused, the waitlist page). Next is **A2**: the engine's organization hooks nothing here uses (business units, the project tag, access profiles, roles), with the request log's summary views rebuilt once; team and user stay, for workspaces and members. Then **A3**, the template's subscriptions (BILL-11), and **A4**, smaller leftovers.
+- **Part B, foundations.** B1 the catalog (a staff-edited record per model, a model mapped to its endpoints); B2 organizations (workspaces on the engine's teams, member roles); B3 plans (the plan an account is on, and the one check a feature makes against it).
+- **Part C, features.** The model page and catalog list; budgets per workspace and member; plans to the customer with the pricing page; the playground with Try and Compare; routing between providers and regions (waits on a second provider account); management keys and notifications; BYOK and SSO; request types one by one; blog management, Arabic, the Saudi payment gateway, the rename.
 
 ## Waiting on the owner
 
