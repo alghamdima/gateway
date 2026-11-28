@@ -60,10 +60,6 @@ func (m *mockHandlerStore) GetKVStore() *kvstore.Store {
 	return nil
 }
 
-func (m *mockHandlerStore) GetMCPHeaderCombinedAllowlist() schemas.WhiteList {
-	return m.mcpHeaderCombinedAllowlist
-}
-
 func (m *mockHandlerStore) ShouldAllowPerRequestStorageOverride() bool {
 	return false
 }
@@ -96,14 +92,6 @@ func (m *mockHandlerStore) IsProviderConfigured(provider schemas.ModelProvider) 
 func (m *mockHandlerStore) GetCustomProviderPassthrough(provider schemas.ModelProvider) (schemas.ModelProvider, bool, bool) {
 	custom, ok := m.customProviders[provider]
 	return custom.base, custom.passthrough, ok
-}
-
-func (m *mockHandlerStore) GetMCPExternalServerURL() string {
-	return ""
-}
-
-func (m *mockHandlerStore) GetMCPExternalClientURL() string {
-	return ""
 }
 
 func (m *mockHandlerStore) GetModelCatalog() *modelcatalog.ModelCatalog {

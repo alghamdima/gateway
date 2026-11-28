@@ -516,10 +516,6 @@ func TestTableProvider_NoProxyConfig_NoEncryption(t *testing.T) {
 }
 
 // ============================================================================
-// TableMCPClient encryption tests
-// ============================================================================
-
-// ============================================================================
 // TablePlugin encryption tests
 // ============================================================================
 
@@ -608,14 +604,6 @@ func TestTableVirtualKey_HashComputedBeforeEncryption(t *testing.T) {
 	// Hash should be of the plaintext, not the ciphertext
 	assert.Equal(t, encrypt.HashSHA256("plaintext-value"), raw["value_hash"])
 }
-
-// ============================================================================
-// TableOauthConfig encryption tests
-// ============================================================================
-
-// ============================================================================
-// TableOauthToken encryption tests
-// ============================================================================
 
 // ============================================================================
 // TableVectorStoreConfig encryption tests
@@ -1030,10 +1018,6 @@ func TestTableKey_BedrockEndpointsCleared_RoundTrip(t *testing.T) {
 	assert.Nil(t, found.BedrockKeyConfig.Endpoints)
 	assert.Equal(t, "eu-west-2", found.BedrockKeyConfig.Region.GetValue())
 }
-
-// ============================================================================
-// MCP — edge cases for connection string / headers combinations
-// ============================================================================
 
 // ============================================================================
 // Round-trip update tests for remaining tables
@@ -1478,7 +1462,6 @@ func trySetupPostgresDB(t *testing.T) *gorm.DB {
 	// Order matters on Postgres: referenced tables must be created before
 	// tables that FK-reference them (SQLite defers FK checks; Postgres does not).
 	// TableProvider must precede TableKey (config_keys.provider_id → config_providers).
-	// TableOauthConfig must precede TableMCPClient (config_mcp_clients.oauth_config_id → oauth_configs).
 	err = db.AutoMigrate(
 		&TableProvider{},
 		&TableKey{},
@@ -1494,11 +1477,8 @@ func trySetupPostgresDB(t *testing.T) *gorm.DB {
 	t.Cleanup(func() {
 		db.Exec("DELETE FROM config_keys")
 		db.Exec("DELETE FROM config_providers")
-		db.Exec("DELETE FROM config_mcp_clients")
 		db.Exec("DELETE FROM config_plugins")
 		db.Exec("DELETE FROM governance_virtual_keys")
-		db.Exec("DELETE FROM oauth_configs")
-		db.Exec("DELETE FROM oauth_tokens")
 		db.Exec("DELETE FROM config_vector_store")
 	})
 

@@ -54,18 +54,12 @@ func (s testWSHandlerStore) GetKVStore() *kvstore.Store {
 	return nil
 }
 
-func (s testWSHandlerStore) GetMCPHeaderCombinedAllowlist() schemas.WhiteList {
-	return nil
-}
-
 func (s testWSHandlerStore) ShouldAllowPerRequestStorageOverride() bool      { return false }
 func (s testWSHandlerStore) ShouldAllowPerRequestRawOverride() bool          { return false }
 func (s testWSHandlerStore) ShouldAllowDirectKeys() bool                     { return s.allowDirectKeys }
 func (s testWSHandlerStore) ShouldSendExtraFieldsInHeaders() bool            { return false }
 func (s testWSHandlerStore) ShouldCaptureClientIP() bool                     { return false }
 func (s testWSHandlerStore) IsProviderConfigured(schemas.ModelProvider) bool { return false }
-func (s testWSHandlerStore) GetMCPExternalServerURL() string                 { return "" }
-func (s testWSHandlerStore) GetMCPExternalClientURL() string                 { return "" }
 
 func (s testWSHandlerStore) GetCustomProviderPassthrough(schemas.ModelProvider) (schemas.ModelProvider, bool, bool) {
 	return "", false, false

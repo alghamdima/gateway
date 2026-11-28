@@ -337,8 +337,6 @@ github.com/maximhq/bifrost/plugins/governance v1.12.3 h1:jFNgovekmrmtVw3kd6BDOar
 github.com/maximhq/bifrost/plugins/governance v1.12.3/go.mod h1:IFb5NkBvd1hpR+bRlCCJXgYeEl5/2tLwMxM3X3gTVtQ=
 github.com/maximhq/bifrost/plugins/logging v1.12.3 h1:LIoU0czRFE4BB4gE2XsRzar+wTh+AnchwvG/6KnCU1c=
 github.com/maximhq/bifrost/plugins/logging v1.12.3/go.mod h1:vkYohT0elmV0zEjXgTGCxqPwiE6MTn70KB4OqrGwfC8=
-github.com/maximhq/bifrost/plugins/mocker v1.6.18 h1:tkYeMeX+gv2q0y4qZvrj4QHW96Qtizwji11gvxAG+/Q=
-github.com/maximhq/bifrost/plugins/mocker v1.6.18/go.mod h1:BS2SDTfEZpVCe3r6AsC9Z4vQJ3KizmOCsZgZROjawwA=
 github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.18 h1:V+u7eNFueV1jOclq78stPp8FssyR6woLVAK0f9hYYrY=
 github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.18/go.mod h1:JykusnWdYMk3nXK5bYnfCJHcyHzyEB46HfAeu32i/sU=
 github.com/maximhq/bifrost/plugins/otel v1.6.8 h1:CPPCJMCyX1/uXsx8DsLo3omN0zQKk9KsJp3nEE17GpI=

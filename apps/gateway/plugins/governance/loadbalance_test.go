@@ -230,7 +230,7 @@ func TestLoadBalanceProvider_DuplicateProviderConfigsBothCount(t *testing.T) {
 	vk := buildVirtualKeyWithProviders("vk1", "sk-bf-lb", "LB VK",
 		[]configstoreTables.TableVirtualKeyProviderConfig{first, second})
 
-	access := grant.NewAccess([]schemas.Permit{vkPermit(vk, nil)}, "", nil, "", nil)
+	access := grant.NewAccess([]schemas.Permit{vkPermit(vk)}, "", nil, "", nil)
 	assert.Len(t, access.ProvidersForModel("llama-3.1-8b-instant"), 2)
 }
 

@@ -2684,17 +2684,6 @@ func WithListModelsTestRetry(
 	return lastResponse, lastError
 }
 
-// checkListModelsRetryConditions checks if any list models retry conditions are met
-func checkListModelsRetryConditions(response *schemas.BifrostListModelsResponse, err *schemas.BifrostError, context TestRetryContext, conditions []ListModelsRetryCondition) (bool, string) {
-	for _, condition := range conditions {
-		if shouldRetry, reason := condition.ShouldRetry(response, err, context); shouldRetry {
-			return true, fmt.Sprintf("%s: %s", condition.GetConditionName(), reason)
-		}
-	}
-
-	return false, ""
-}
-
 // =============================================================================
 // BATCH API RETRY FUNCTIONS
 // =============================================================================

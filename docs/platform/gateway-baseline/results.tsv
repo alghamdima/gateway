@@ -7859,7 +7859,6 @@ plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestLoadBalance
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestLoadBalanceProvider_ZeroWeightIsAFallbackOnly	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestLocalGovernanceStore_GetGovernanceUsageDataExcludesUnrelatedState	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestMandatoryAuthAcceptsAnAuthenticatedIdentity	pass
-plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestMockInMemoryStore_ClientNamesCoverEveryConfiguredClient	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelConfigScopesForIgnoresExtraScopedIDsResolvers	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelConfigScopesIncludeTheProjectScopingARequest	pass
 plugins/governance	github.com/maximhq/bifrost/plugins/governance	TestModelLimitOnAliasTargetGovernsTheAliasThroughTheHookChain	pass
@@ -8380,15 +8379,6 @@ plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestValidateUserAgent
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestValidateWriterConfigBounds	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestVirtualKeyMetadataContextKeyValue	pass
 plugins/logging	github.com/maximhq/bifrost/plugins/logging	TestWriterConfigDefaultsAndInitOverrides	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	-	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_CustomSuccessRule	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_DefaultMockRule	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_Disabled	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_ErrorResponse	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_GetName	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_MessageTemplate	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_Statistics	pass
-plugins/mocker	github.com/maximhq/bifrost/plugins/mocker	TestMockerPlugin_ValidationErrors	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	-	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	TestInitRequiresACatalog	pass
 plugins/modelcatalogresolver	github.com/maximhq/bifrost/plugins/modelcatalogresolver	TestPreRequestHook	pass

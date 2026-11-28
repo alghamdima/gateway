@@ -126,18 +126,15 @@ func (s testHandlerStore) GetHeaderMatcher() *lib.HeaderMatcher { return nil }
 func (s testHandlerStore) GetStreamChunkInterceptor() lib.StreamChunkInterceptor {
 	return nil
 }
-func (s testHandlerStore) GetAsyncJobExecutor() *logstore.AsyncJobExecutor  { return nil }
-func (s testHandlerStore) GetAsyncJobResultTTL() int                        { return 0 }
-func (s testHandlerStore) GetKVStore() *kvstore.Store                       { return s.kv }
-func (s testHandlerStore) GetMCPHeaderCombinedAllowlist() schemas.WhiteList { return nil }
-func (s testHandlerStore) ShouldAllowPerRequestStorageOverride() bool       { return false }
-func (s testHandlerStore) ShouldAllowPerRequestRawOverride() bool           { return false }
-func (s testHandlerStore) ShouldAllowDirectKeys() bool                      { return false }
-func (s testHandlerStore) ShouldSendExtraFieldsInHeaders() bool             { return false }
-func (s testHandlerStore) ShouldCaptureClientIP() bool                      { return false }
-func (s testHandlerStore) IsProviderConfigured(schemas.ModelProvider) bool  { return false }
-func (s testHandlerStore) GetMCPExternalServerURL() string                  { return "" }
-func (s testHandlerStore) GetMCPExternalClientURL() string                  { return "" }
+func (s testHandlerStore) GetAsyncJobExecutor() *logstore.AsyncJobExecutor { return nil }
+func (s testHandlerStore) GetAsyncJobResultTTL() int                       { return 0 }
+func (s testHandlerStore) GetKVStore() *kvstore.Store                      { return s.kv }
+func (s testHandlerStore) ShouldAllowPerRequestStorageOverride() bool      { return false }
+func (s testHandlerStore) ShouldAllowPerRequestRawOverride() bool          { return false }
+func (s testHandlerStore) ShouldAllowDirectKeys() bool                     { return false }
+func (s testHandlerStore) ShouldSendExtraFieldsInHeaders() bool            { return false }
+func (s testHandlerStore) ShouldCaptureClientIP() bool                     { return false }
+func (s testHandlerStore) IsProviderConfigured(schemas.ModelProvider) bool { return false }
 
 func (s testHandlerStore) GetCustomProviderPassthrough(schemas.ModelProvider) (schemas.ModelProvider, bool, bool) {
 	return "", false, false

@@ -19440,15 +19440,6 @@ func TestLoadPlugins_OtelPluginSpanFilterPassthrough(t *testing.T) {
 	require.ElementsMatch(t, []any{"logging", "compat"}, plugins)
 }
 
-// parseConfigData round-trips raw config JSON through ConfigData.UnmarshalJSON
-// so section-presence tracking behaves exactly as it does for a real file.
-func parseConfigData(t *testing.T, raw string) *ConfigData {
-	t.Helper()
-	var configData ConfigData
-	require.NoError(t, json.Unmarshal([]byte(raw), &configData))
-	return &configData
-}
-
 func TestResolveSetupToken_Unset(t *testing.T) {
 	t.Setenv("BIFROST_SETUP_TOKEN", "")
 	assert.Empty(t, resolveSetupToken(&ConfigData{}))

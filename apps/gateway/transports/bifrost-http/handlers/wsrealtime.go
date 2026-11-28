@@ -1305,9 +1305,8 @@ func selectRealtimeRelayError(errs ...error) error {
 }
 
 var (
-	errRealtimeModelRequired    = errorf("model or deployment query parameter is required for realtime websocket")
-	errRealtimeModelFormat      = errorf("model query parameter must resolve to provider/model for realtime websocket")
-	errRealtimeDeploymentFormat = errorf("deployment query parameter must resolve to provider/model for realtime websocket")
+	errRealtimeModelRequired = errorf("model or deployment query parameter is required for realtime websocket")
+	errRealtimeModelFormat   = errorf("model query parameter must resolve to provider/model for realtime websocket")
 )
 
 // nativeProtocol is a provider's own protocol that a client speaks on an integration route, which the gateway

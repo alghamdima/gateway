@@ -7,7 +7,6 @@ use (
 	./plugins/credits
 	./plugins/governance
 	./plugins/logging
-	./plugins/mocker
 	./plugins/modelcatalogresolver
 	./plugins/otel
 	./plugins/routing

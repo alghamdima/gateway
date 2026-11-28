@@ -1,7 +1,6 @@
 package governance
 
 import (
-	"maps"
 	"testing"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -13,10 +12,7 @@ import (
 
 // mockInMemoryStore is a test double for InMemoryStore.
 type mockInMemoryStore struct {
-	allowedByDefaultClients map[string]string // clientID → clientName
-	clientNames             map[string]string // clientID → clientName, configured clients that are not allowed by default
-	clientSlugs             map[string]string // endpoint slug → clientID
-	configuredProviders     map[schemas.ModelProvider]configstore.ProviderConfig
+	configuredProviders map[schemas.ModelProvider]configstore.ProviderConfig
 }
 
 func (m *mockInMemoryStore) GetConfiguredProviders() map[schemas.ModelProvider]configstore.ProviderConfig {
@@ -29,48 +25,6 @@ func (m *mockInMemoryStore) GetConfiguredProviderNames() []string {
 		names = append(names, string(provider))
 	}
 	return names
-}
-
-func (m *mockInMemoryStore) GetMCPClientsAllowedByDefault() map[string]string {
-	return m.allowedByDefaultClients
-}
-
-// GetMCPClientNames answers as the production store does: every configured client, of which the ones
-// allowed by default are a subset.
-func (m *mockInMemoryStore) GetMCPClientNames() map[string]string {
-	names := make(map[string]string, len(m.clientNames)+len(m.allowedByDefaultClients))
-	maps.Copy(names, m.clientNames)
-	maps.Copy(names, m.allowedByDefaultClients)
-	return names
-}
-
-func (m *mockInMemoryStore) GetMCPClientBySlug(slug string) (string, string, bool) {
-	id, ok := m.clientSlugs[slug]
-	if !ok {
-		return "", "", false
-	}
-	return id, m.GetMCPClientNames()[id], true
-}
-
-// ============================================================================
-// per-tool checks: AllowByDefault scenarios
-// ============================================================================
-
-// The mock has to keep the two questions apart the way the production store does: a client that is
-// configured but not allowed by default is still resolvable by name.
-func TestMockInMemoryStore_ClientNamesCoverEveryConfiguredClient(t *testing.T) {
-	store := &mockInMemoryStore{
-		allowedByDefaultClients: map[string]string{"open-id": "open"},
-		clientNames:             map[string]string{"private-id": "private"},
-	}
-
-	names := store.GetMCPClientNames()
-	if names["open-id"] != "open" || names["private-id"] != "private" || len(names) != 2 {
-		t.Fatalf("GetMCPClientNames should name every configured client, got %v", names)
-	}
-	if allowAll := store.GetMCPClientsAllowedByDefault(); len(allowAll) != 1 || allowAll["open-id"] != "open" {
-		t.Fatalf("GetMCPClientsAllowedByDefault should stay the allowed-by-default subset, got %v", allowAll)
-	}
 }
 
 // A permit that grants every provider names none, so the providers it grants by the flag alone are

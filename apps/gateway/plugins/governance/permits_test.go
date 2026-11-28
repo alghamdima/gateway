@@ -36,16 +36,16 @@ func permitWithProviders(permitType grant.PermitType, id, name string, providers
 // the built-in virtual key source
 // ---------------------------------------------------------------------------
 
-// vkPermit builds the permit a key confers, with the given clients allowed by default. The builder
-// belongs to the store that owns the key data, so tests reach it through one.
-func vkPermit(vk *configstoreTables.TableVirtualKey, openClients map[string]string) *grant.Permit {
-	store := &LocalGovernanceStore{inMemoryStore: &mockInMemoryStore{allowedByDefaultClients: openClients}}
+// vkPermit builds the permit a key confers. The builder belongs to the store that owns the key
+// data, so tests reach it through one.
+func vkPermit(vk *configstoreTables.TableVirtualKey) *grant.Permit {
+	store := &LocalGovernanceStore{inMemoryStore: &mockInMemoryStore{}}
 	return store.permitForVirtualKey(emptyCtx(), vk)
 }
 
 // vkAccess is the access a request carrying only vk's permit has.
-func vkAccess(vk *configstoreTables.TableVirtualKey, openClients map[string]string) schemas.Access {
-	return grant.NewAccess([]schemas.Permit{vkPermit(vk, openClients)}, "", nil, "", nil)
+func vkAccess(vk *configstoreTables.TableVirtualKey) schemas.Access {
+	return grant.NewAccess([]schemas.Permit{vkPermit(vk)}, "", nil, "", nil)
 }
 
 // A key also answers to where it sits in the organization, so its holder limits carry its team's
@@ -166,7 +166,7 @@ func holderKindsOf(limits []schemas.Limit) []string {
 func TestPermitForVirtualKey_Identity(t *testing.T) {
 	vk := buildVirtualKey("vk-1", "sk-bf-test", "Data Team Key", true)
 
-	permit := vkPermit(vk, nil)
+	permit := vkPermit(vk)
 
 	require.NotNil(t, permit)
 	assert.Equal(t, string(grant.PermitVirtualKey), permit.Type())
@@ -175,7 +175,7 @@ func TestPermitForVirtualKey_Identity(t *testing.T) {
 	assert.True(t, permit.IsActive())
 	assert.False(t, permit.IsExpired())
 
-	assert.Nil(t, vkPermit(nil, nil), "no key, no permit")
+	assert.Nil(t, vkPermit(nil), "no key, no permit")
 }
 
 func TestPermitForVirtualKey_ProviderPermits(t *testing.T) {
@@ -203,7 +203,7 @@ func TestPermitForVirtualKey_ProviderPermits(t *testing.T) {
 		},
 	}
 
-	permit := vkPermit(vk, nil)
+	permit := vkPermit(vk)
 	require.Len(t, permit.ProviderPermits(), 3)
 
 	openai := permit.ProviderPermits()[0]
@@ -332,7 +332,7 @@ func TestPermitForVirtualKey_ProviderAndModelRules(t *testing.T) {
 		{Provider: "anthropic", AllowedModels: schemas.WhiteList{"*"}},
 		{Provider: "bedrock", AllowedModels: schemas.WhiteList{}},
 	}
-	access := vkAccess(vk, nil)
+	access := vkAccess(vk)
 
 	assert.True(t, access.IsProviderAllowed("openai"))
 	assert.True(t, access.IsProviderAllowed("anthropic"))
@@ -348,7 +348,7 @@ func TestPermitForVirtualKey_ProviderAndModelRules(t *testing.T) {
 
 	// A key with no provider config at all permits nothing: deny by default.
 	bare := buildVirtualKey("vk-2", "sk-bf-bare", "Bare Key", true)
-	bareAccess := vkAccess(bare, nil)
+	bareAccess := vkAccess(bare)
 	assert.False(t, bareAccess.IsProviderAllowed("openai"))
 	assert.False(t, bareAccess.IsModelAllowed("openai", "gpt-4o"))
 }
@@ -362,7 +362,7 @@ func TestPermitForVirtualKey_KeysForModel(t *testing.T) {
 		{Provider: "openai", AllowedModels: schemas.WhiteList{"*"}, Keys: []configstoreTables.TableKey{{KeyID: "key-us-2"}}},
 		{Provider: "anthropic", AllowedModels: schemas.WhiteList{"*"}, AllowAllKeys: true},
 	}
-	access := vkAccess(vk, nil)
+	access := vkAccess(vk)
 
 	keyIDs, restricted := access.KeysForModel("openai", "gpt-4o")
 	assert.True(t, restricted)
@@ -840,7 +840,7 @@ func benchStore(b *testing.B, vk *configstoreTables.TableVirtualKey) *LocalGover
 	b.Helper()
 	store, err := NewLocalGovernanceStore(context.Background(), NewMockLogger(), nil, &configstore.GovernanceConfig{
 		VirtualKeys: []configstoreTables.TableVirtualKey{*vk},
-	}, nil, &mockInMemoryStore{allowedByDefaultClients: map[string]string{"sentry-id": "sentry", "pager-id": "pager"}})
+	}, nil, &mockInMemoryStore{})
 	if err != nil {
 		b.Fatal(err)
 	}

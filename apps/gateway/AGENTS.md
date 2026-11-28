@@ -88,7 +88,6 @@ bifrost/
 │   ├── logging/                   # Request/response audit logging
 │   ├── semanticcache/             # Semantic response caching via vector store
 │   ├── otel/                      # OpenTelemetry tracing
-│   ├── mocker/                    # Mock responses for testing
 │   └── compat/                    # LiteLLM SDK compatibility (HTTP transport)
 │
 ├── ui/                            # React + vite web interface

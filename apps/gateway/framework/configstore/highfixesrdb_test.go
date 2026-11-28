@@ -114,7 +114,7 @@ func deleteTarget(sql string) string {
 func createTestVK(t *testing.T, db *gorm.DB, id string, createdAt time.Time) {
 	t.Helper()
 	vk := tables.TableVirtualKey{ID: id, Name: "name-" + id, Value: *schemas.NewSecretVar("value-" + id), CreatedAt: createdAt, UpdatedAt: createdAt}
-	require.NoError(t, db.Omit("ProviderConfigs", "MCPConfigs").Create(&vk).Error)
+	require.NoError(t, db.Omit("ProviderConfigs").Create(&vk).Error)
 }
 
 // providerFixture is the state built by buildProviderFixture.

@@ -49,17 +49,12 @@ func (s testHandlerStore) GetStreamChunkInterceptor() StreamChunkInterceptor    
 func (s testHandlerStore) GetAsyncJobExecutor() *logstore.AsyncJobExecutor       { return nil }
 func (s testHandlerStore) GetAsyncJobResultTTL() int                             { return 0 }
 func (s testHandlerStore) GetKVStore() *kvstore.Store                            { return nil }
-func (s testHandlerStore) GetMCPHeaderCombinedAllowlist() schemas.WhiteList {
-	return schemas.WhiteList{}
-}
-func (s testHandlerStore) ShouldAllowPerRequestStorageOverride() bool      { return false }
-func (s testHandlerStore) ShouldAllowPerRequestRawOverride() bool          { return false }
-func (s testHandlerStore) ShouldAllowDirectKeys() bool                     { return s.allowDirectKeys }
-func (s testHandlerStore) ShouldSendExtraFieldsInHeaders() bool            { return s.extraFieldsInHeaders }
-func (s testHandlerStore) ShouldCaptureClientIP() bool                     { return s.captureClientIP }
-func (s testHandlerStore) IsProviderConfigured(schemas.ModelProvider) bool { return false }
-func (s testHandlerStore) GetMCPExternalServerURL() string                 { return "" }
-func (s testHandlerStore) GetMCPExternalClientURL() string                 { return "" }
+func (s testHandlerStore) ShouldAllowPerRequestStorageOverride() bool            { return false }
+func (s testHandlerStore) ShouldAllowPerRequestRawOverride() bool                { return false }
+func (s testHandlerStore) ShouldAllowDirectKeys() bool                           { return s.allowDirectKeys }
+func (s testHandlerStore) ShouldSendExtraFieldsInHeaders() bool                  { return s.extraFieldsInHeaders }
+func (s testHandlerStore) ShouldCaptureClientIP() bool                           { return s.captureClientIP }
+func (s testHandlerStore) IsProviderConfigured(schemas.ModelProvider) bool       { return false }
 
 func (s testHandlerStore) GetCustomProviderPassthrough(schemas.ModelProvider) (schemas.ModelProvider, bool, bool) {
 	return "", false, false
@@ -1710,7 +1705,7 @@ func gwKey(name string, weight float64) schemas.Key {
 }
 
 // gwProviders reports the gateway's configured providers to governance, as the server's
-// GovernanceInMemoryStore does, with no MCP clients or agents.
+// GovernanceInMemoryStore does.
 type gwProviders struct {
 	config *Config
 }
@@ -1732,15 +1727,6 @@ func (p gwProviders) GetConfiguredProviderNames() []string {
 	}
 	return names
 }
-
-// GetMCPClientsAllowedByDefault implements governance.InMemoryStore.
-func (gwProviders) GetMCPClientsAllowedByDefault() map[string]string { return nil }
-
-// GetMCPClientNames implements governance.InMemoryStore.
-func (gwProviders) GetMCPClientNames() map[string]string { return nil }
-
-// GetMCPClientBySlug implements governance.InMemoryStore.
-func (gwProviders) GetMCPClientBySlug(string) (string, string, bool) { return "", "", false }
 
 // gateway is one in-process gateway: the transport's provider config and account, the governance
 // and routing plugins over their stores, core, and the session store.
