@@ -1299,7 +1299,7 @@ func TestBudgetResolver_EvaluateAnswersFromTheAccessOnTheContext(t *testing.T) {
 // key: the state a store that grants access to something other than a key leaves behind.
 func keylessAccessCtx(base schemas.Permit) *schemas.BifrostContext {
 	ctx := emptyCtx()
-	ctx.Grant().SetAccess(grant.NewAccess([]schemas.Permit{base}, "", nil, "", nil))
+	ctx.Grant().SetAccess(grant.NewAccess([]schemas.Permit{base}, "", nil))
 	return ctx
 }
 
@@ -1808,7 +1808,7 @@ func TestLiteralAccessKeepsTheLevelsThatCapTheAccess(t *testing.T) {
 		Provider: "openai", AllowedModels: []string{"gpt-4o-mini"}, KeyIDs: []string{"*"},
 	}}, grant.WithLevel(1))
 	store := &mockInMemoryStore{configuredProviders: map[schemas.ModelProvider]configstore.ProviderConfig{schemas.OpenAI: {}}}
-	access := grant.NewAccess([]schemas.Permit{caller, team}, grant.Intersect, nil, "", nil)
+	access := grant.NewAccess([]schemas.Permit{caller, team}, grant.Intersect, nil)
 	require.False(t, access.IsModelAllowed("openai", "gpt-4o"), "the team level caps gpt-4o")
 
 	literal := literalAccessFor(access, modelcatalog.NewTestCatalog(nil), store)

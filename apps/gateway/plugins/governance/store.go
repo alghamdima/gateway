@@ -131,14 +131,13 @@ type GovernanceStore interface {
 	GetGovernanceUsageData(ctx context.Context) *GovernanceData
 	GetVirtualKey(ctx context.Context, vkValue string) (*configstoreTables.TableVirtualKey, bool)
 	GetVirtualKeyByID(ctx context.Context, vkID string) (*configstoreTables.TableVirtualKey, bool)
-	// ResolvePermits reports the permits a request carries: the ones its caller holds, the permit
-	// scoping the request, and the mode composing them.
+	// ResolvePermits reports the permits a request's caller holds, and how their levels combine.
 	//
 	// Everything is resolved from the request itself, starting with the identity the transport
 	// settled on its grant, so a caller needs nothing but the context to ask.
 	//
-	// A store that knows only about virtual keys answers with the presented key's permit and nothing
-	// scoping it. A store that resolves other holders answers for those too, including a caller whose
+	// A store that knows only about virtual keys answers with the presented key's permit. A store
+	// that resolves other holders answers for those too, including a caller whose
 	// permits do not come from a key at all, and it may answer with several: a caller holding more
 	// than one is read as holding all of them at once.
 	//
@@ -146,8 +145,8 @@ type GovernanceStore interface {
 	// request that presented nothing carries no access and is governed as unrestricted, and one that
 	// presented something this store resolves permits from, which resolved to nothing, is refused.
 	//
-	// levelMode says how the caller's levels combine (see grant.NewAccess), separately from mode.
-	ResolvePermits(ctx *schemas.BifrostContext) (bases []schemas.Permit, levelMode grant.CompositionMode, scoping schemas.Permit, mode grant.CompositionMode)
+	// levelMode says how the caller's levels combine (see grant.NewAccess).
+	ResolvePermits(ctx *schemas.BifrostContext) (bases []schemas.Permit, levelMode grant.CompositionMode)
 	// GatherLimits assembles every limit an attempt answers to, once its provider and model are
 	// known: the deployment's own for the pair, what funds each holder the request carries, and what
 	// funds their use of the provider. Which holders pay is the store's to say: a store that composes
@@ -1231,23 +1230,23 @@ func (gs *LocalGovernanceStore) GetVirtualKeyByID(ctx context.Context, vkID stri
 
 // ResolvePermits reports the permits a request carries. This store knows only about virtual keys,
 // so the presented key's permit is the whole answer and nothing scopes it.
-func (gs *LocalGovernanceStore) ResolvePermits(ctx *schemas.BifrostContext) ([]schemas.Permit, grant.CompositionMode, schemas.Permit, grant.CompositionMode) {
+func (gs *LocalGovernanceStore) ResolvePermits(ctx *schemas.BifrostContext) ([]schemas.Permit, grant.CompositionMode) {
 	virtualKeyValue := PresentedVirtualKey(ctx)
 	if virtualKeyValue == "" {
 		// A key is the only thing this store resolves permits from, so no key means nothing granted
 		// this request anything. It carries no access, which is what a request with no credential has
 		// always been: unrestricted, and still bound by the deployment's own limits, which are gathered
 		// for it whether or not it carries a permit.
-		return nil, "", nil, ""
+		return nil, ""
 	}
 	virtualKey, ok := gs.GetVirtualKey(ctx, virtualKeyValue)
 	if !ok || virtualKey == nil {
 		// A credential was presented and resolves to nothing. That is refused, not widened: the
 		// funnel's identity step tells the two apart by what was presented.
-		return nil, "", nil, ""
+		return nil, ""
 	}
 	StampVirtualKeyScope(ctx, virtualKey)
-	return []schemas.Permit{gs.permitForVirtualKey(ctx, virtualKey)}, "", nil, ""
+	return []schemas.Permit{gs.permitForVirtualKey(ctx, virtualKey)}, ""
 }
 
 // PresentedVirtualKey is the virtual key the request presented, read off the identity the
@@ -1702,23 +1701,11 @@ func (gs *LocalGovernanceStore) organizationLimitsForVirtualKey(ctx context.Cont
 	}
 
 	customerID := ""
-	customerFromTeam := false
 	switch {
 	case vk.CustomerID != nil && *vk.CustomerID != "":
 		customerID = *vk.CustomerID
 	case vk.Team != nil && vk.Team.CustomerID != nil && *vk.Team.CustomerID != "":
 		customerID = *vk.Team.CustomerID
-		customerFromTeam = true
-	}
-
-	// A request can be scoped to one customer of the key's team, and then only that customer pays.
-	// The customer a key reaches through its team is dropped when the request is scoped to a
-	// different one: the scoped customer is enforced by whoever scoped it, and charging the team's
-	// as well would bill a customer the request was explicitly directed away from. A customer the
-	// key names directly is not reached through a team, so scoping cannot redirect it.
-	if scopedCustomerID, _ := ctx.Value(schemas.BifrostContextKeyGovernanceScopedCustomerID).(string); customerFromTeam &&
-		scopedCustomerID != "" && scopedCustomerID != customerID {
-		customerID = ""
 	}
 
 	if customerID != "" {
@@ -4757,11 +4744,7 @@ func (gs *LocalGovernanceStore) GatherLimits(ctx *schemas.BifrostContext, access
 	if access == nil {
 		return budgets, rateLimits, nil
 	}
-	carried := access.Bases()
-	if scoping := access.Scoping(); scoping != nil {
-		carried = append(carried, scoping)
-	}
-	for _, permit := range carried {
+	for _, permit := range access.Bases() {
 		heldBudgets, heldRateLimits := gs.HolderLimits(ctx, permit)
 		budgets = append(budgets, heldBudgets...)
 		rateLimits = append(rateLimits, heldRateLimits...)

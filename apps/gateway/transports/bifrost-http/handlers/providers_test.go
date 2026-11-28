@@ -2949,7 +2949,7 @@ func TestParseVKValueFromRequest(t *testing.T) {
 // express what the caller may reach rather than a copy of the key's rows.
 func accessForProviderPermits(permits ...schemas.ProviderPermit) schemas.Access {
 	permit := grant.NewPermit(grant.PermitVirtualKey, "vk-test", "Test VK", true, false, permits)
-	return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
+	return grant.NewAccess([]schemas.Permit{permit}, "", nil)
 }
 
 // accessAllowingAllProviders builds the access a caller permitted every provider carries, the way
@@ -2959,7 +2959,7 @@ func accessAllowingAllProviders(configured []string, permits ...schemas.Provider
 	permit := grant.NewPermit(grant.PermitVirtualKey, "vk-test", "Test VK", true, false,
 		governanceplugin.AppendAllProviderPermits(permits, configured),
 		grant.WithAllowAllProviders(true))
-	return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
+	return grant.NewAccess([]schemas.Permit{permit}, "", nil)
 }
 
 // A caller permitted every provider is listed every provider, including ones it holds no provider
@@ -3384,7 +3384,7 @@ func TestListModels_UnfilteredListingSkipsCallerAccess(t *testing.T) {
 
 	sessionAccess := func(permits ...schemas.ProviderPermit) schemas.Access {
 		permit := grant.NewPermit(grant.PermitType("test_session"), "session-test", "Test Session", true, false, permits)
-		return grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
+		return grant.NewAccess([]schemas.Permit{permit}, "", nil)
 	}
 	signedIn := func(ctx *fasthttp.RequestCtx) {
 		ctx.SetUserValue(schemas.BifrostContextKeyAuthCredential, grant.NewCredential(grant.CredentialSessionToken, "session-token"))

@@ -121,34 +121,25 @@ type Permit interface {
 	Level() int
 }
 
-// Access is an attempt's resolved access: the permits the caller holds, the permit scoping the
-// request, and the mode composing the two. It is built once per attempt and never mutated, so every
-// consumer of that attempt sees one answer.
+// Access is an attempt's resolved access: the permits the caller holds. It is built once per attempt
+// and never mutated, so every consumer of that attempt sees one answer.
 //
 // The caller's permits are read as one: what any of them permits, the caller may reach, any key
 // any of them allows may serve it, and every one of them that permits it pays for it (see
-// PermitsForModel). There is one scoping permit at most, composed under one mode.
+// PermitsForModel).
 //
 // With intersecting levels (see LevelMode), the lowest level present grants and each level above it
-// caps. The scoping permit composes with the capped result.
+// caps.
 //
-// Either side may be empty. No caller permits means the caller holds no access of their own, which
-// is not the same as holding a permit that permits nothing. No scoping permit means the mode is
-// irrelevant and the answer is what the caller's permits permit.
+// No caller permits means the caller holds no access of their own, which is not the same as holding
+// a permit that permits nothing.
 type Access interface {
 	// Bases returns the permits that grant, in attribution order: all of them, or the lowest level
 	// when levels intersect. Empty when the caller holds none.
 	Bases() []Permit
 	// LevelMode returns how the caller's levels combine: "intersect" caps by every level, anything
-	// else reads the permits as one. Separate from Mode, which is the scoping permit's.
+	// else reads the permits as one.
 	LevelMode() string
-	// Scoping returns the permit scoping this request, or nil when nothing scopes it.
-	Scoping() Permit
-	// Mode returns the composition mode governing this request, as the resolver that built it names
-	// modes. It is meaningless when nothing scopes the request.
-	Mode() string
-	// IsScoped reports whether a scoping permit applies to this request.
-	IsScoped() bool
 
 	// IsProviderAllowed reports whether the request may use provider at all.
 	IsProviderAllowed(provider string) bool
@@ -165,25 +156,24 @@ type Access interface {
 
 	// PermitsForModel returns the permits the request answers to for model on provider: every one
 	// of the caller's permits that permits the pair, then every capping level permit that permits
-	// it, then the scoping permit whenever the request is scoped. Nil when the request may not use
+	// it. Nil when the request may not use
 	// the pair at all. An empty model asks about the provider alone.
 	//
 	// This is the attribution rule, and what the pair costs is gathered against every permit named
 	// here. The caller's permits are read as one, so each of them that permits the pair covers the
 	// request and each is charged; there is no affording something because a different budget has
-	// room. The scoping permit is named whether or not it was the one that admitted the pair,
-	// because the request happens inside the scope and is that scope's spend.
+	// room.
 	PermitsForModel(provider string, model string) []Permit
 
 	// KeysForModel returns the provider keys the request may use for model on provider, and whether
 	// that list is restrictive at all: any key any of the caller's permitting permits allows,
-	// narrowed by each capping level, then composed with the scoping permit's under the mode.
+	// narrowed by each capping level.
 	// restricted is false when every key of the provider is allowed, in which case keyIDs is nil;
 	// when restricted is true, only keyIDs may be used and an empty list allows none.
 	KeysForModel(provider string, model string) (keyIDs []string, restricted bool)
 	// ProvidersForModel returns every provider permit the request may serve model from, in
-	// evaluation order: the caller's permits first, each in full and in their order, then providers
-	// gained purely through the scoping permit. Weight is passed through untouched: filtering
+	// evaluation order: the caller's permits, each in full and in their order. Weight is passed
+	// through untouched: filtering
 	// unweighted candidates, and applying budget and rate-limit exclusions, is the caller's decision.
 	ProvidersForModel(model string) []ProviderCandidate
 	// GrantedProvidersForModel returns the providers that permit model, for consumers that gate on the
@@ -221,13 +211,12 @@ type ProviderPermit struct {
 	AllowedModels     WhiteList // ["*"] allows all models; empty allows none (deny by default)
 	BlacklistedModels BlackList // blocked models; wins over AllowedModels
 	KeyIDs            WhiteList // ["*"] allows all keys of the provider; empty allows none.
-	//                             Composes with the other side's list, but only where that side also
+	//                             Composes with a capping level's list, but only where that level also
 	//                             authorizes the request for the provider: a permit the request is not
 	//                             proceeding on does not get to say which keys serve it.
 	Weight *float64 // load-balancing weight; nil means the provider is not a load-balancing
 	//                  candidate. Unlike the permissions, this does not compose: there is no
-	//                  meaningful intersection of two preferences, so a scoping permit that
-	//                  expresses one wins as the more specific context.
+	//                  meaningful intersection of two preferences.
 }
 
 // ProviderCandidate is one way a request could be served: a provider, with the weight and keys it

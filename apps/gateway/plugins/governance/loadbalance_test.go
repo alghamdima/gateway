@@ -149,9 +149,9 @@ func lbCtx() *schemas.BifrostContext {
 	return ctx
 }
 
-// A provider the request holds only through a composed permit is a candidate, and carries that
-// permit's weight: the whole point of composing permits onto a request rather than beside it.
-func TestLoadBalanceProvider_ComposedProviderParticipates(t *testing.T) {
+// A provider the caller holds only through another of its permits is a candidate, and carries that
+// permit's weight: the caller's permits are read as one.
+func TestLoadBalanceProvider_ProviderOfAnotherCallerPermitParticipates(t *testing.T) {
 	vk := buildVirtualKeyWithProviders("vk1", "sk-bf-lb", "LB VK", nil)
 	contributed := grant.NewPermit("other", "o1", "Pool", true, false, []schemas.ProviderPermit{{
 		Provider:      "groq",
@@ -159,31 +159,11 @@ func TestLoadBalanceProvider_ComposedProviderParticipates(t *testing.T) {
 		KeyIDs:        []string{"key-shared"},
 		Weight:        schemas.Ptr(2.0),
 	}})
-	p := newLoadBalanceTestPluginWithStore(t, vk, &permitStore{
-		scoping: contributed,
-		mode:    grant.Union,
-	})
+	p := newLoadBalanceTestPluginWithStore(t, vk, &permitStore{above: []schemas.Permit{contributed}})
 
 	got, err := loadBalance(t, p, lbCtx(), "llama-3.1-8b-instant")
 	require.NoError(t, err)
-	assert.Equal(t, "groq/llama-3.1-8b-instant", got, "the composed provider serves the request")
-}
-
-// Under intersect, a provider the composed permit does not permit is never a candidate, however
-// the key is configured.
-func TestLoadBalanceProvider_IntersectRemovedProviderIsNeverACandidate(t *testing.T) {
-	vk := buildVirtualKeyWithProviders("vk1", "sk-bf-lb", "LB VK", []configstoreTables.TableVirtualKeyProviderConfig{
-		buildProviderConfig("groq", []string{"*"}),
-	})
-	narrow := permitWithProviders("other", "o1", "Narrow", "openai")
-	p := newLoadBalanceTestPluginWithStore(t, vk, &permitStore{
-		scoping: narrow,
-		mode:    grant.Intersect,
-	})
-
-	got, err := loadBalance(t, p, lbCtx(), "llama-3.1-8b-instant")
-	require.NoError(t, err)
-	assert.Equal(t, "llama-3.1-8b-instant", got, "no provider is eligible, so the model is untouched")
+	assert.Equal(t, "groq/llama-3.1-8b-instant", got, "the other permit's provider serves the request")
 }
 
 // A provider with no weight is not a candidate for selection: composing a permit onto a request
@@ -230,7 +210,7 @@ func TestLoadBalanceProvider_DuplicateProviderConfigsBothCount(t *testing.T) {
 	vk := buildVirtualKeyWithProviders("vk1", "sk-bf-lb", "LB VK",
 		[]configstoreTables.TableVirtualKeyProviderConfig{first, second})
 
-	access := grant.NewAccess([]schemas.Permit{vkPermit(vk)}, "", nil, "", nil)
+	access := grant.NewAccess([]schemas.Permit{vkPermit(vk)}, "", nil)
 	assert.Len(t, access.ProvidersForModel("llama-3.1-8b-instant"), 2)
 }
 
@@ -291,10 +271,9 @@ func TestPublishRoutingAllowlist(t *testing.T) {
 		assert.Equal(t, []schemas.ModelProvider{"anthropic"}, allowed)
 	})
 
-	t.Run("a composed permit widens the allowlist under union", func(t *testing.T) {
+	t.Run("another caller permit widens the allowlist", func(t *testing.T) {
 		p := newLoadBalanceTestPluginWithStore(t, vk, &permitStore{
-			scoping: permitWithProviders("other", "o1", "Pool", "anthropic"),
-			mode:    grant.Union,
+			above: []schemas.Permit{permitWithProviders("other", "o1", "Pool", "anthropic")},
 		})
 		ctx := lbCtx()
 
@@ -440,7 +419,7 @@ func TestCandidateExclusionConsultsProviderScopedModelConfigs(t *testing.T) {
 	require.NoError(t, err)
 
 	permit := permitWithProviders(grant.PermitVirtualKey, "vk-1", "Key", "openai", "azure")
-	access := grant.NewAccess([]schemas.Permit{permit}, "", nil, "", nil)
+	access := grant.NewAccess([]schemas.Permit{permit}, "", nil)
 
 	decision, exclusionErr := store.CheckProviderCandidateExclusion(emptyCtx(), access, schemas.ProviderCandidate{Provider: "openai"}, "gpt-5")
 	require.Error(t, exclusionErr, "the exact-pair budget is spent, so openai cannot serve the model")
@@ -489,7 +468,7 @@ func TestCandidateExclusionConsultsTheVirtualKeysProviderLimits(t *testing.T) {
 				RateLimits:  rateLimits,
 			}, nil, nil)
 			require.NoError(t, err)
-			access := grant.NewAccess([]schemas.Permit{permitWithProviders(grant.PermitVirtualKey, vk.ID, vk.Name, "openai", "azure")}, "", nil, "", nil)
+			access := grant.NewAccess([]schemas.Permit{permitWithProviders(grant.PermitVirtualKey, vk.ID, vk.Name, "openai", "azure")}, "", nil)
 
 			decision, exclusionErr := store.CheckProviderCandidateExclusion(emptyCtx(), access, schemas.ProviderCandidate{Provider: "openai"}, "gpt-4o")
 			// openai's own limit on the key is spent, so it is no candidate, for that limit and no other reason.

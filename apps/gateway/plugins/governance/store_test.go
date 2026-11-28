@@ -2459,7 +2459,7 @@ func TestGovernanceStore_KeyAliasTargetsResolvedOncePerAttempt(t *testing.T) {
 		access := grant.NewAccess([]schemas.Permit{
 			permitWithProviders(grant.PermitVirtualKey, "vk-a", "a", "bedrock"),
 			permitWithProviders(grant.PermitVirtualKey, "vk-b", "b", "bedrock"),
-		}, "", nil, "", nil)
+		}, "", nil)
 		budgets, _, err := store.GatherLimits(ctx, access, schemas.Bedrock, "claude-sonnet")
 		require.NoError(t, err)
 		var got []string

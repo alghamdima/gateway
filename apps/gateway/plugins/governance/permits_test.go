@@ -45,7 +45,7 @@ func vkPermit(vk *configstoreTables.TableVirtualKey) *grant.Permit {
 
 // vkAccess is the access a request carrying only vk's permit has.
 func vkAccess(vk *configstoreTables.TableVirtualKey) schemas.Access {
-	return grant.NewAccess([]schemas.Permit{vkPermit(vk)}, "", nil, "", nil)
+	return grant.NewAccess([]schemas.Permit{vkPermit(vk)}, "", nil)
 }
 
 // A key also answers to where it sits in the organization, so its holder limits carry its team's
@@ -385,9 +385,7 @@ type permitStore struct {
 	baseOverride schemas.Permit
 	// bases replaces the caller's side with several permits at once, for a caller that holds more
 	// than one. It wins over baseOverride when both are set.
-	bases   []schemas.Permit
-	scoping schemas.Permit
-	mode    grant.CompositionMode
+	bases []schemas.Permit
 	// above is appended to the store's bases; levelMode is returned as is.
 	above     []schemas.Permit
 	levelMode grant.CompositionMode
@@ -397,10 +395,10 @@ type permitStore struct {
 	calls           int
 }
 
-func (s *permitStore) ResolvePermits(ctx *schemas.BifrostContext) ([]schemas.Permit, grant.CompositionMode, schemas.Permit, grant.CompositionMode) {
+func (s *permitStore) ResolvePermits(ctx *schemas.BifrostContext) ([]schemas.Permit, grant.CompositionMode) {
 	s.calls++
 	if s.resolvesNothing {
-		return nil, "", nil, ""
+		return nil, ""
 	}
 	var bases []schemas.Permit
 	switch {
@@ -409,9 +407,9 @@ func (s *permitStore) ResolvePermits(ctx *schemas.BifrostContext) ([]schemas.Per
 	case s.baseOverride != nil:
 		bases = []schemas.Permit{s.baseOverride}
 	default:
-		bases, _, _, _ = s.GovernanceStore.ResolvePermits(ctx)
+		bases, _ = s.GovernanceStore.ResolvePermits(ctx)
 	}
-	return append(bases, s.above...), s.levelMode, s.scoping, s.mode
+	return append(bases, s.above...), s.levelMode
 }
 
 // newAccessTestPlugin builds a plugin over a store that serves vk, optionally wrapped so the
@@ -447,19 +445,15 @@ func TestResolveAccess(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, access)
-		assert.False(t, access.IsScoped())
-		assert.Equal(t, "", access.Mode())
+		assert.Equal(t, "", access.LevelMode())
 		require.Len(t, access.Bases(), 1)
 		assert.Equal(t, vk.ID, access.Bases()[0].ID())
 		assert.Equal(t, string(grant.PermitVirtualKey), access.Bases()[0].Type())
 		assert.True(t, access.IsModelAllowed("openai", "gpt-4o"))
 	})
 
-	t.Run("a permit the store scopes the request with is folded in", func(t *testing.T) {
-		store := &permitStore{
-			scoping: permitWithProviders("other", "o1", "Other", "anthropic"),
-			mode:    grant.Union,
-		}
+	t.Run("a further permit the store answers with is folded in", func(t *testing.T) {
+		store := &permitStore{above: []schemas.Permit{permitWithProviders("other", "o1", "Other", "anthropic")}}
 		plugin := newAccessTestPlugin(t, vk, store)
 
 		access, err := plugin.ResolveAccess(newPreRequestCtx())
@@ -467,10 +461,8 @@ func TestResolveAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, access)
 		assert.Equal(t, 1, store.calls, "asked once per resolution")
-		assert.True(t, access.IsScoped())
-		assert.Equal(t, string(grant.Union), access.Mode())
 		assert.True(t, access.IsProviderAllowed("openai"), "the key's own provider")
-		assert.True(t, access.IsProviderAllowed("anthropic"), "the permit scoping the request")
+		assert.True(t, access.IsProviderAllowed("anthropic"), "the further permit's provider")
 	})
 
 	t.Run("a store answering with intersecting levels caps the caller's permits", func(t *testing.T) {
@@ -573,8 +565,7 @@ func TestResolveAccessHoldsAcrossAttempts(t *testing.T) {
 	require.False(t, first.IsProviderAllowed("anthropic"))
 
 	// A permit widened while the first attempt was in flight, and the next attempt starting.
-	store.scoping = permitWithProviders("other", "o1", "Other", "anthropic")
-	store.mode = grant.Union
+	store.above = []schemas.Permit{permitWithProviders("other", "o1", "Other", "anthropic")}
 	resolveLimits(ctx, store, schemas.Anthropic, "claude-sonnet-4")
 
 	second, err := plugin.ResolveAccess(ctx)
@@ -777,10 +768,7 @@ func TestPresentedVirtualKey(t *testing.T) {
 
 func TestPreRequestHookRecordsAccess(t *testing.T) {
 	vk := buildAccessTestVK()
-	store := &permitStore{
-		scoping: permitWithProviders("other", "o1", "Other", "anthropic"),
-		mode:    grant.Union,
-	}
+	store := &permitStore{above: []schemas.Permit{permitWithProviders("other", "o1", "Other", "anthropic")}}
 	plugin := newAccessTestPlugin(t, vk, store)
 	ctx := newPreRequestCtx()
 
@@ -788,7 +776,7 @@ func TestPreRequestHookRecordsAccess(t *testing.T) {
 
 	access := ctx.Grant().Access()
 	require.NotNil(t, access, "the hook resolves access for every request carrying a key")
-	require.Len(t, access.Bases(), 1)
+	require.Len(t, access.Bases(), 2)
 	assert.Equal(t, vk.ID, access.Bases()[0].ID())
 	assert.True(t, access.IsModelAllowed("openai", "gpt-4o"))
 	assert.True(t, access.IsProviderAllowed("anthropic"), "the store's contribution reached the hook")
@@ -1310,7 +1298,7 @@ func TestPermitFindsItsOwnScopedModelConfigs(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := resolverCtx(store, "sk-bf-scoped")
-	bases, _, _, _ := store.ResolvePermits(ctx)
+	bases, _ := store.ResolvePermits(ctx)
 	require.Len(t, bases, 1)
 	require.Equal(t, string(grant.PermitVirtualKey), bases[0].Type(), "the type production stamps, not a scope name")
 
@@ -1323,53 +1311,6 @@ func TestPermitFindsItsOwnScopedModelConfigs(t *testing.T) {
 			assert.Equal(t, string(grant.LimitHolderVirtualKeyModelConfig), budget.HolderKind, "attributed to the key's own model config")
 		}
 	}
-}
-
-// TestEvaluateJudgesEveryPermit covers the state check on the permit scoping a request, not just
-// on the ones its caller holds.
-//
-// A scoping permit that has been deactivated or has expired grants nothing, exactly as a base permit
-// in that state does. Nothing in the fold reads either flag (it answers what a permit enumerates,
-// not whether the permit may still be used), so if this step asks only about the bases, a dead
-// scoping permit goes on permitting everything it names, with nothing anywhere to catch it.
-func TestEvaluateJudgesEveryPermit(t *testing.T) {
-	vk := buildAccessTestVK()
-	base := permitWithProviders("other", "h1", "Holder", "openai")
-	request := &EvaluationRequest{Provider: schemas.OpenAI, Model: "gpt-4o"}
-
-	scopingIn := func(isActive, isExpired bool) *permitStore {
-		providers := permitWithProviders("scope", "s1", "Scope", "openai").ProviderPermits()
-		scoping := grant.NewPermit("scope", "s1", "Scope", isActive, isExpired, providers)
-		return &permitStore{baseOverride: base, scoping: scoping, mode: grant.Intersect}
-	}
-
-	for name, tc := range map[string]struct {
-		isActive  bool
-		isExpired bool
-		want      string
-	}{
-		"deactivated": {isActive: false, isExpired: false, want: "scope is inactive"},
-		"expired":     {isActive: true, isExpired: true, want: "scope has expired"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			plugin := newAccessTestPlugin(t, vk, scopingIn(tc.isActive, tc.isExpired))
-
-			result, bifrostErr := plugin.Evaluate(emptyCtx(), request)
-
-			require.NotNil(t, bifrostErr, "a scoping permit that can no longer be used still scoped the request")
-			assert.Equal(t, DecisionAccessBlocked, result.Decision)
-			assert.Equal(t, tc.want, result.Reason)
-		})
-	}
-
-	t.Run("a scoping permit in good standing is left alone", func(t *testing.T) {
-		plugin := newAccessTestPlugin(t, vk, scopingIn(true, false))
-
-		result, bifrostErr := plugin.Evaluate(emptyCtx(), request)
-
-		assert.Nil(t, bifrostErr)
-		assert.Equal(t, DecisionAllow, result.Decision)
-	})
 }
 
 // settlingErrorStore wraps a real store so GatherLimits fails the way a store composing several

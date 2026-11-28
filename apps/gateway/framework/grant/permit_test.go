@@ -116,8 +116,6 @@ func TestPermit_NilReceiver(t *testing.T) {
 	assert.False(t, allowsProvider(permit, "openai"))
 	assert.False(t, blacklistsModel(permit, "openai", "gpt-4o"))
 	assert.False(t, allowsModelByName(permit, "openai", "gpt-4o"))
-	assert.Nil(t, providerPermitFor(permit, "openai"))
-	assert.Nil(t, weightedProviderPermitFor(permit, "openai"))
 
 	visited := false
 	assert.True(t, eachProviderPermit(permit, func(*schemas.ProviderPermit) bool {
@@ -186,32 +184,6 @@ func TestProviderPermitAllowsModel(t *testing.T) {
 
 	nothing := &schemas.ProviderPermit{Provider: "openai"}
 	assert.False(t, providerPermitAllowsModel(nothing, "gpt-4o"), "an empty allowlist permits nothing")
-}
-
-func TestProviderPermitFor(t *testing.T) {
-	permit := newPermit(permitSpec{
-		Type: PermitVirtualKey, ID: "vk1",
-		ProviderPermits: []schemas.ProviderPermit{
-			{Provider: "openai", KeyIDs: []string{"key-a"}},
-			{Provider: "openai", KeyIDs: []string{"key-b"}, Weight: ptr(0.4)},
-			{Provider: "bedrock", KeyIDs: []string{"key-c"}},
-		},
-	})
-
-	t.Run("the first provider permit for the provider", func(t *testing.T) {
-		found := providerPermitFor(permit, "openai")
-		require.NotNil(t, found)
-		assert.Equal(t, schemas.WhiteList{"key-a"}, found.KeyIDs)
-		assert.Nil(t, providerPermitFor(permit, "cohere"))
-	})
-
-	t.Run("the first that sets a weight", func(t *testing.T) {
-		found := weightedProviderPermitFor(permit, "openai")
-		require.NotNil(t, found)
-		assert.Equal(t, schemas.WhiteList{"key-b"}, found.KeyIDs)
-		assert.Nil(t, weightedProviderPermitFor(permit, "bedrock"), "held, and unweighted")
-		assert.Nil(t, weightedProviderPermitFor(permit, "cohere"))
-	})
 }
 
 // eachProviderPermit is the walk the fold shares, and it stops when the visitor says so: the

@@ -718,50 +718,41 @@ func (p *GovernancePlugin) Evaluate(ctx *schemas.BifrostContext, evaluationReque
 // reads the answer off it. Nil when every permit the request carries may be used, or it carries
 // none, which the funnel answers separately by what was presented.
 //
-// Every slot is judged, because a request scoped by a second permit answers to both, and a permit
-// that has been deactivated or has expired grants nothing whichever slot it sits in. Nothing in the
-// fold reads either flag (it answers what a permit enumerates, not whether the permit may still be
-// used), so a scoping permit nobody checked here would go on permitting everything it names.
+// Nothing in the fold reads either flag (it answers what a permit enumerates, not whether the
+// permit may still be used), so a permit nobody checked here would go on permitting everything it
+// names.
 func unusablePermit(access schemas.Access) *EvaluationResult {
 	if access == nil {
 		return nil
 	}
-	permits := make([]schemas.Permit, 0, len(access.Bases())+1)
-	permits = append(permits, access.Bases()...)
-	permits = append(permits, access.Scoping())
-	bases := len(access.Bases())
-	for i, permit := range permits {
+	for _, permit := range access.Bases() {
 		if permit == nil {
 			continue
 		}
 		// A credential the caller presented that may not be used is a failed authentication, 401,
-		// as for one that does not exist (SPEC API-08); a scope it named is a permission, 403.
-		credential := i < bases
+		// as for one that does not exist (SPEC API-08).
 		if !permit.IsActive() {
 			return &EvaluationResult{
 				Decision: DecisionAccessBlocked,
 				Reason:   fmt.Sprintf("%s is inactive", grant.PermitType(permit.Type()).PrettyString()),
-				Refusal:  unusablePermitRefusal(credential, "key_disabled", "scope_inactive", "This API key is disabled. Enable it again in the dashboard, or use another key."),
+				Refusal:  unusablePermitRefusal("key_disabled", "This API key is disabled. Enable it again in the dashboard, or use another key."),
 			}
 		}
 		if permit.IsExpired() {
 			return &EvaluationResult{
 				Decision: DecisionAccessBlocked,
 				Reason:   fmt.Sprintf("%s has expired", grant.PermitType(permit.Type()).PrettyString()),
-				Refusal:  unusablePermitRefusal(credential, "key_expired", "scope_expired", "This API key has expired, and its expiry cannot be changed. Create a new key in the dashboard."),
+				Refusal:  unusablePermitRefusal("key_expired", "This API key has expired, and its expiry cannot be changed. Create a new key in the dashboard."),
 			}
 		}
 	}
 	return nil
 }
 
-// unusablePermitRefusal is what a caller is told about a permit that may not be used: a credential
-// is answered 401 with the given reason, a scope 403.
-func unusablePermitRefusal(credential bool, credentialReason, scopeReason, credentialHint string) *schemas.Refusal {
-	if credential {
-		return &schemas.Refusal{StatusCode: 401, LimitSource: schemas.LimitSourceKey, Reason: credentialReason, RemedyHint: credentialHint}
-	}
-	return &schemas.Refusal{LimitSource: schemas.LimitSourceKey, Reason: scopeReason, RemedyHint: "The scope this request named can no longer be used."}
+// unusablePermitRefusal is what a caller is told about a credential that may not be used: 401 with
+// the given reason.
+func unusablePermitRefusal(reason, hint string) *schemas.Refusal {
+	return &schemas.Refusal{StatusCode: 401, LimitSource: schemas.LimitSourceKey, Reason: reason, RemedyHint: hint}
 }
 
 // refusal builds the error a governance decision refuses a request with, in the product's error
@@ -897,8 +888,8 @@ func (p *GovernancePlugin) decide(ctx *schemas.BifrostContext, result *Evaluatio
 // request that fails over changes its provider, not its caller. What an attempt answers to in
 // limits is settled separately, once its provider and model are known (see resolveLimitsWith).
 //
-// Resolving is the store's answer to what permits the request carries, folded under one
-// composition mode. Because the store decides that, a deployment resolving permit holders beyond
+// Resolving is the store's answer to what permits the request carries, folded by how their levels
+// combine. Because the store decides that, a deployment resolving permit holders beyond
 // virtual keys answers for them here without this path changing.
 //
 // Two places call it. The request hook, because that is where a request's grant decisions start on
@@ -924,19 +915,19 @@ func (p *GovernancePlugin) ResolveAccess(ctx *schemas.BifrostContext) (schemas.A
 	if access := g.Access(); access != nil {
 		return access, nil
 	}
-	bases, levelMode, scoping, mode := p.store.ResolvePermits(ctx)
-	if len(bases) == 0 && scoping == nil {
+	bases, levelMode := p.store.ResolvePermits(ctx)
+	if len(bases) == 0 {
 		return nil, nil
 	}
-	access := p.newAccess(ctx, bases, levelMode, scoping, mode)
+	access := p.newAccess(ctx, bases, levelMode)
 	g.SetAccess(access)
 	return access, nil
 }
 
 // newAccess folds the permits into an access whose model checks resolve key aliases the way key
 // selection will for this request: through the model catalog, over the keys that can serve it.
-func (p *GovernancePlugin) newAccess(ctx *schemas.BifrostContext, bases []schemas.Permit, levelMode grant.CompositionMode, scoping schemas.Permit, mode grant.CompositionMode) *grant.Access {
-	return grant.NewAccess(bases, levelMode, scoping, mode, nil).
+func (p *GovernancePlugin) newAccess(ctx *schemas.BifrostContext, bases []schemas.Permit, levelMode grant.CompositionMode) *grant.Access {
+	return grant.NewAccess(bases, levelMode, nil).
 		WithKeyScopedMatcher(p.modelMatcher(ctx)).
 		WithAliasTargets(p.aliasTargets(ctx))
 }

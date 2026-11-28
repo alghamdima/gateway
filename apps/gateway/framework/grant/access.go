@@ -6,14 +6,14 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
-// CompositionMode is how a scoping permit combines with the permits the caller holds. These are
-// the values a schemas.Access reports from Mode.
+// CompositionMode is how the caller's permit levels combine, and how two key restrictions fold.
+// These are the values a schemas.Access reports from LevelMode.
 type CompositionMode string
 
 const (
-	// Intersect permits what the caller's permits and the scoping permit both permit.
+	// Intersect permits what every side permits.
 	Intersect CompositionMode = "intersect"
-	// Union permits what either of them permits.
+	// Union permits what any side permits.
 	Union CompositionMode = "union"
 )
 
@@ -35,9 +35,6 @@ type ModelMatcher func(provider, model string, allowed []string) bool
 // one of them that permits the pair pays for it (see PermitsForModel). Their order is the order the
 // resolver gave them, and is the order candidates and refusals are reported in.
 //
-// There is one scoping slot, not a list. A request is scoped by at most one thing at a time, and
-// composing under one mode is what keeps every answer here decidable.
-//
 // The caller's permits sit at the levels the resolver gave them (see schemas.Permit.Level). Within a
 // level they always union; levelMode says whether levels union or intersect. Under Intersect the
 // lowest level present grants and each level above it caps. Capping levels never add access.
@@ -45,8 +42,6 @@ type Access struct {
 	// bases is every permit the caller holds, as given. Levels are read off each permit when needed.
 	bases        []schemas.Permit
 	levelMode    CompositionMode
-	scoping      schemas.Permit
-	mode         CompositionMode
 	matcher      ModelMatcher
 	keyMatcher   KeyScopedModelMatcher // optional; replaces matcher when set
 	aliasTargets AliasTargets          // optional; what a requested name can become through key aliases
@@ -95,30 +90,21 @@ func (a *Access) WithAliasTargets(f AliasTargets) *Access {
 	return a
 }
 
-// NewAccess folds the permits the caller holds together with the permit scoping this request.
+// NewAccess folds the permits the caller holds.
 //
 // levelMode is how the caller's levels combine: Intersect makes each level above the lowest cap it,
-// anything else (Union, or "") reads every permit as one. mode is the scoping permit's, separately.
-//
-// A request composes under exactly one mode. Choosing it belongs to whoever resolved the permits:
-// that layer knows what it asked and what answered. Passing no scoping permit leaves the mode
-// irrelevant and the answer is the caller's permits alone. Nil entries in bases are dropped, so a
+// anything else (Union, or "") reads every permit as one. Nil entries in bases are dropped, so a
 // resolver that found nothing for one source does not have to say so twice.
-func NewAccess(bases []schemas.Permit, levelMode CompositionMode, scoping schemas.Permit, mode CompositionMode, matcher ModelMatcher) *Access {
+func NewAccess(bases []schemas.Permit, levelMode CompositionMode, matcher ModelMatcher) *Access {
 	held := make([]schemas.Permit, 0, len(bases))
 	for _, base := range bases {
 		if !isNilPermit(base) {
 			held = append(held, base)
 		}
 	}
-	if isNilPermit(scoping) {
-		scoping = nil
-	}
 	return &Access{
 		bases:     held,
 		levelMode: levelMode,
-		scoping:   scoping,
-		mode:      mode,
 		matcher:   matcher,
 	}
 }
@@ -190,37 +176,12 @@ func (a *Access) LevelMode() string {
 	return string(a.levelMode)
 }
 
-// Scoping implements schemas.Access.
-func (a *Access) Scoping() schemas.Permit {
-	if a == nil {
-		return nil
-	}
-	return a.scoping
-}
-
-// Mode implements schemas.Access.
-func (a *Access) Mode() string {
-	if a == nil {
-		return ""
-	}
-	return string(a.mode)
-}
-
-// IsScoped implements schemas.Access.
-func (a *Access) IsScoped() bool {
-	return a != nil && a.scoping != nil
-}
-
 // IsProviderAllowed implements schemas.Access.
 func (a *Access) IsProviderAllowed(provider string) bool {
 	if a == nil {
 		return false
 	}
-	base := a.callerAllows(func(p schemas.Permit) bool { return allowsProvider(p, provider) })
-	if a.scoping == nil {
-		return base
-	}
-	return a.compose(base, allowsProvider(a.scoping, provider))
+	return a.callerAllows(func(p schemas.Permit) bool { return allowsProvider(p, provider) })
 }
 
 // IsModelAllowed implements schemas.Access.
@@ -228,11 +189,7 @@ func (a *Access) IsModelAllowed(provider string, model string) bool {
 	if a == nil {
 		return false
 	}
-	base := a.callerAllows(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) })
-	if a.scoping == nil {
-		return base
-	}
-	return a.compose(base, a.permitAllowsModel(a.scoping, provider, model))
+	return a.callerAllows(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) })
 }
 
 // AllowsEveryModel implements schemas.Access.
@@ -240,11 +197,7 @@ func (a *Access) AllowsEveryModel(provider string) bool {
 	if a == nil {
 		return false
 	}
-	base := a.callerAllows(func(p schemas.Permit) bool { return permitAllowsEveryModel(p, provider) })
-	if a.scoping == nil {
-		return base
-	}
-	return a.compose(base, permitAllowsEveryModel(a.scoping, provider))
+	return a.callerAllows(func(p schemas.Permit) bool { return permitAllowsEveryModel(p, provider) })
 }
 
 // permitAllowsEveryModel reports whether the permit permits every model on provider. Its provider
@@ -280,26 +233,20 @@ func (a *Access) PermitsForModel(provider string, model string) []schemas.Permit
 	if a == nil || !a.IsModelAllowed(provider, model) {
 		return nil
 	}
-	permits := make([]schemas.Permit, 0, len(a.bases)+1)
-	// The caller's side is named only when it allowed the pair; otherwise a union scope admitted it.
+	permits := make([]schemas.Permit, 0, len(a.bases))
 	allowsPair := func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }
-	if a.callerAllows(allowsPair) {
-		for _, base := range a.granting() {
-			if allowsPair(base) {
-				permits = append(permits, base)
-			}
-		}
-		// The capping levels it passed are named too, so their limits apply.
-		for _, level := range a.levelsAbove() {
-			for _, permit := range a.permitsAt(level) {
-				if allowsPair(permit) {
-					permits = append(permits, permit)
-				}
-			}
+	for _, base := range a.granting() {
+		if allowsPair(base) {
+			permits = append(permits, base)
 		}
 	}
-	if a.scoping != nil {
-		permits = append(permits, a.scoping)
+	// The capping levels it passed are named too, so their limits apply.
+	for _, level := range a.levelsAbove() {
+		for _, permit := range a.permitsAt(level) {
+			if allowsPair(permit) {
+				permits = append(permits, permit)
+			}
+		}
 	}
 	return permits
 }
@@ -308,11 +255,8 @@ func (a *Access) PermitsForModel(provider string, model string) []schemas.Permit
 //
 // The caller's side is the union of every key restriction its permitting permits hold for the
 // provider, across all of their provider permits for it: the caller's permits are read as one, and
-// a request served by any of them may use any key any of them allows. That is composed with the
-// scoping permit's restriction only where the scoping permit also authorizes the pair. A scoping
-// permit that narrows a request to two of the provider's keys has to mean it, and taking the
-// caller's list instead would hand the request a key the scope refused; but a permit the request is
-// not proceeding on has no say, which is why the model is asked for.
+// a request served by any of them may use any key any of them allows. Capping levels narrow it. A
+// permit that does not authorize the pair has no say, which is why the model is asked for.
 //
 // The result is a plain []string rather than any list type of the permit's own: it is handed
 // straight to consumers that type-assert []string, where a named slice type would fail the
@@ -322,29 +266,10 @@ func (a *Access) KeysForModel(provider string, model string) (keyIDs []string, r
 		// The request cannot proceed on this provider, so there is no key restriction to report.
 		return nil, false
 	}
-	var callerKeys schemas.WhiteList
-	callerHolds := false
-	// Only a caller side that allows the pair restricts keys; otherwise a union scope admitted it.
-	if a.callerAllows(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }) {
-		callerKeys, callerHolds = a.unionKeysHeldBy(a.granting(), provider, model)
-		callerKeys, callerHolds = a.capKeys(callerKeys, callerHolds, provider, model)
-	}
-	var scopeKeys schemas.WhiteList
-	scopeHolds := false
-	if a.scoping != nil {
-		scopeKeys, scopeHolds = a.unionKeysHeldBy([]schemas.Permit{a.scoping}, provider, model)
-	}
-	var granted schemas.WhiteList
-	switch {
-	case callerHolds && scopeHolds:
-		granted = composeKeyIDs(callerKeys, scopeKeys, a.mode)
-	case callerHolds:
-		granted = callerKeys
-	case scopeHolds:
-		// The request proceeds on the scoping permit alone, so its restriction is the whole of it.
-		granted = scopeKeys
-	default:
-		// Neither side holds a provider permit, so there is no restriction to report. That is a
+	granted, holds := a.unionKeysHeldBy(a.granting(), provider, model)
+	granted, holds = a.capKeys(granted, holds, provider, model)
+	if !holds {
+		// No permit holds a provider permit, so there is no restriction to report. That is a
 		// different answer from a permit whose restriction happens to name no key, which must not
 		// read as "every key is allowed", so it is decided here, on whether a provider permit was
 		// found at all, rather than on whether the list came back empty.
@@ -385,7 +310,7 @@ func (a *Access) RestrictsKeys(provider string) bool {
 		}
 		return false
 	}
-	return slices.ContainsFunc(a.bases, restricts) || restricts(a.scoping)
+	return slices.ContainsFunc(a.bases, restricts)
 }
 
 // capKeys narrows the caller's keys by each capping level that restricts this provider's keys. A
@@ -433,14 +358,14 @@ func (a *Access) ProvidersForModel(model string) []schemas.ProviderCandidate {
 	}
 
 	candidates := make([]schemas.ProviderCandidate, 0, a.providerPermitCount())
-	a.eachProviderPermit(func(owner schemas.Permit, pp *schemas.ProviderPermit, isBase bool) bool {
+	a.eachProviderPermit(func(owner schemas.Permit, pp *schemas.ProviderPermit) bool {
 		provider := pp.Provider
 		// Three separate questions, none of which implies another. Whether the composed access
 		// permits the pair at all:
 		if !a.IsModelAllowed(provider, model) {
 			return false
 		}
-		// Whether *this* permit permits it: under a union the other side may be the one authorizing
+		// Whether *this* permit permits it: another of the caller's permits may be the one authorizing
 		// the request, and a permit that blacklists the model must not serve it. One blacklisting
 		// provider permit blocks the provider for that model across the whole permit, so a
 		// permissive one cannot reopen it, and so does one that blacklists a model the name becomes through
@@ -453,46 +378,18 @@ func (a *Access) ProvidersForModel(model string) []schemas.ProviderCandidate {
 		if !a.permitsModel(pp, model, pp.KeyIDs) {
 			return false
 		}
-		// A candidate a capping level refuses can only be a union scope's, which serves it itself.
-		if isBase && !a.capsAllow(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }) {
+		// A candidate a capping level refuses is not offered.
+		if !a.capsAllow(func(p schemas.Permit) bool { return a.permitAllowsModel(p, provider, model) }) {
 			return false
 		}
-		// Weight does not compose, because it is a preference rather than a permission and there is
-		// no meaningful intersection of two preferences. Instead the scoping permit wins where it
-		// expresses one: it is the more specific context, so a scope that wants a provider preferred
-		// differently inside it says so and is obeyed. Where it expresses none, the candidate's own
-		// weight stands.
-		selectedWeight := pp.Weight
-		if isBase && a.scoping != nil {
-			if scoped := weightedProviderPermitFor(a.scoping, provider); scoped != nil {
-				selectedWeight = scoped.Weight
-			}
-		}
-		// Only the permits that actually permit model on this provider have a say. A permit that is
-		// not authorizing this request does not get to restrict which of the provider's keys serve
-		// it; under a union that is the whole point, since the request is proceeding on the other
-		// side's authority alone. So the composition is the exception here, not the rule: the
-		// candidate's own keys stand unless the scoping permit both authorizes the model and holds
-		// the provider. A candidate offered through the scoping permit alone composes with nothing,
-		// because it is offered only where none of the caller's permits could serve the model. Per
-		// candidate the keys are this provider permit's own; KeysForModel is where the caller's
-		// permits are read as one.
-		selectedKeyIDs := pp.KeyIDs
-		// Narrow the candidate's keys by the capping levels.
-		if isBase {
-			selectedKeyIDs = a.capCandidateKeys(selectedKeyIDs, provider, model)
-		}
-		// The scope composes with the narrowed keys, matching KeysForModel.
-		if isBase && a.scoping != nil && a.permitAllowsModel(a.scoping, provider, model) {
-			if scoped := providerPermitFor(a.scoping, provider); scoped != nil {
-				selectedKeyIDs = composeKeyIDs(selectedKeyIDs, scoped.KeyIDs, a.mode)
-			}
-		}
+		// Per candidate the keys are this provider permit's own, narrowed by the capping levels;
+		// KeysForModel is where the caller's permits are read as one.
+		selectedKeyIDs := a.capCandidateKeys(pp.KeyIDs, provider, model)
 		// A copy, as in KeysForModel: selectedKeyIDs is the permit's own slice whenever nothing composed
 		// it, and a consumer editing the candidate must not edit the permit through it.
 		candidates = append(candidates, schemas.ProviderCandidate{
 			Provider: provider,
-			Weight:   selectedWeight,
+			Weight:   pp.Weight,
 			KeyIDs:   slices.Clone(selectedKeyIDs),
 		})
 		return true
@@ -522,30 +419,16 @@ func (a *Access) GrantedProvidersForModel(model string) []string {
 	}
 
 	allowed := make([]string, 0, a.providerPermitCount())
-	if a.IsScoped() && a.mode != Union && a.mode != Intersect {
-		// Unrecognized mode: permit nothing, as everywhere else.
-		return allowed
-	}
-	intersecting := a.IsScoped() && a.mode == Intersect
-
 	seen := make(map[string]struct{})
-	a.eachProviderPermit(func(_ schemas.Permit, pp *schemas.ProviderPermit, isBase bool) bool {
+	a.eachProviderPermit(func(_ schemas.Permit, pp *schemas.ProviderPermit) bool {
 		if _, dup := seen[pp.Provider]; dup {
 			return true
 		}
 		if !providerPermitAllowsModel(pp, model) {
 			return false
 		}
-		// Capping levels narrow only the caller's providers, not ones a union scope adds.
-		if isBase && !a.capsAllow(func(p schemas.Permit) bool { return allowsModelByName(p, pp.Provider, model) }) {
+		if !a.capsAllow(func(p schemas.Permit) bool { return allowsModelByName(p, pp.Provider, model) }) {
 			return false
-		}
-		if intersecting {
-			// A scoping permit cannot widen an intersection, and what the caller holds must also be
-			// permitted by the scoping permit.
-			if !isBase || !allowsModelByName(a.scoping, pp.Provider, model) {
-				return false
-			}
 		}
 		seen[pp.Provider] = struct{}{}
 		allowed = append(allowed, pp.Provider)
@@ -555,34 +438,19 @@ func (a *Access) GrantedProvidersForModel(model string) []string {
 }
 
 // eachProviderPermit visits the provider permits the request could be served from: every provider
-// permit of every one of the caller's permits, in order, then the scoping permit's for providers
-// none of them could serve. The coarse provider gate and candidate selection walk it identically
-// rather than each keeping its own copy of the rule.
+// permit of every one of the caller's permits, in order. The coarse provider gate and candidate
+// selection walk it identically rather than each keeping its own copy of the rule.
 //
 // The caller's permits do not shadow one another: they are read as one permit, and within one
 // permit two provider permits for the same provider are both offered, which is what lets a holder
-// run a provider under two weights or key sets. Only the scoping permit is shadowed, and only for
-// providers the caller's permits actually served, which accept reports. Shadowing on merely
-// *holding* a provider would lose it whenever the caller holds it but cannot serve this particular
-// request; under a union that is a request the access permits, through the scoping permit, with
-// nothing left to serve it.
-func (a *Access) eachProviderPermit(accept func(owner schemas.Permit, pp *schemas.ProviderPermit, isBase bool) bool) {
-	served := make(map[string]struct{})
+// run a provider under two weights or key sets.
+func (a *Access) eachProviderPermit(accept func(owner schemas.Permit, pp *schemas.ProviderPermit) bool) {
 	for _, base := range a.granting() {
 		eachProviderPermit(base, func(pp *schemas.ProviderPermit) bool {
-			if accept(base, pp, true) {
-				served[pp.Provider] = struct{}{}
-			}
+			accept(base, pp)
 			return true
 		})
 	}
-	eachProviderPermit(a.scoping, func(pp *schemas.ProviderPermit) bool {
-		if _, done := served[pp.Provider]; done {
-			return true
-		}
-		accept(a.scoping, pp, false)
-		return true
-	})
 }
 
 // providerPermitCount is how many provider permits the request holds across every permit, for
@@ -592,9 +460,6 @@ func (a *Access) providerPermitCount() int {
 	for _, base := range a.bases {
 		count += len(base.ProviderPermits())
 	}
-	if a.scoping != nil {
-		count += len(a.scoping.ProviderPermits())
-	}
 	return count
 }
 
@@ -602,10 +467,9 @@ func (a *Access) providerPermitCount() int {
 //
 // What is named is whatever refused and whose permission would have changed the answer. The
 // caller's permits are read as one, so when none of them permits the pair all of them refused and
-// all are named: a caller holding two profiles is told that neither permits the model, not that one
-// of them does not. Under an intersection, when one of them permits it and the scoping permit does
-// not, the scoping permit alone stands in the way and alone is named. Under a union both sides must
-// have refused, and both are named. A caller holding no permit at all has nothing to be named.
+// all are named: a caller holding two permits is told that neither permits the model, not that one
+// of them does not. When they allow but a capping level refuses, that level is named. A caller
+// holding no permit at all has nothing to be named.
 func (a *Access) DeniedPermitsForModel(provider string, model string) []schemas.Permit {
 	if a == nil {
 		return nil
@@ -624,30 +488,13 @@ func (a *Access) deniedBy(permits func(schemas.Permit) bool, capped bool) []sche
 		refusingCaps = a.refusingCaps(permits)
 		baseAllows = len(refusingCaps) == 0
 	}
-	if a.scoping == nil {
-		if baseAllows {
-			return nil
-		}
-		if len(refusingCaps) > 0 {
-			return refusingCaps
-		}
-		return a.refusingBases()
-	}
-	scopingAllows := permits(a.scoping)
-	if a.compose(baseAllows, scopingAllows) {
+	if baseAllows {
 		return nil
 	}
-	if baseAllows {
-		return []schemas.Permit{a.scoping}
+	if len(refusingCaps) > 0 {
+		return refusingCaps
 	}
-	refused := refusingCaps
-	if len(refused) == 0 {
-		refused = a.refusingBases()
-	}
-	if a.mode == Union && !scopingAllows {
-		refused = append(refused, a.scoping)
-	}
-	return refused
+	return a.refusingBases()
 }
 
 // refusingBases returns the granting level's permits, to name when none of them allowed.
@@ -714,19 +561,6 @@ func (a *Access) anyBase(permits func(schemas.Permit) bool) bool {
 		if permits(base) {
 			return true
 		}
-	}
-	return false
-}
-
-// compose applies the request's composition mode between the two sides' verdicts. It is only
-// meaningful with a scoping permit; callers answer the unscoped case with the caller's permits
-// alone. An unrecognized mode permits nothing.
-func (a *Access) compose(baseAllows, scopingAllows bool) bool {
-	switch a.mode {
-	case Union:
-		return baseAllows || scopingAllows
-	case Intersect:
-		return baseAllows && scopingAllows
 	}
 	return false
 }

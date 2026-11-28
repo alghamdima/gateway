@@ -357,5 +357,5 @@ func literalAccessFor(access schemas.Access, catalog *modelcatalog.ModelCatalog,
 	if full, ok := access.(*grant.Access); ok {
 		return full.WithModelMatcher(matcher)
 	}
-	return grant.NewAccess(access.Bases(), grant.CompositionMode(access.LevelMode()), access.Scoping(), grant.CompositionMode(access.Mode()), matcher)
+	return grant.NewAccess(access.Bases(), grant.CompositionMode(access.LevelMode()), matcher)
 }

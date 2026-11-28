@@ -96,7 +96,7 @@ func TestPermitForVirtualKeyGrantsEveryConfiguredProvider(t *testing.T) {
 			Provider: string(schemas.Bedrock), AllowedModels: schemas.WhiteList{"anthropic.claude-haiku-4-5"}, AllowAllKeys: true,
 		}},
 	}
-	access := grant.NewAccess([]schemas.Permit{store.permitForVirtualKey(emptyCtx(), vk)}, "", nil, "", nil)
+	access := grant.NewAccess([]schemas.Permit{store.permitForVirtualKey(emptyCtx(), vk)}, "", nil)
 
 	assert.ElementsMatch(t, []string{"openai", "anthropic", "bedrock"}, access.GrantedProvidersForModel(""),
 		"a provider the key names no config for is still granted")
@@ -108,7 +108,7 @@ func TestPermitForVirtualKeyGrantsEveryConfiguredProvider(t *testing.T) {
 
 	t.Run("without the flag only the named providers are granted", func(t *testing.T) {
 		vk.AllowAllProviders = false
-		access := grant.NewAccess([]schemas.Permit{store.permitForVirtualKey(emptyCtx(), vk)}, "", nil, "", nil)
+		access := grant.NewAccess([]schemas.Permit{store.permitForVirtualKey(emptyCtx(), vk)}, "", nil)
 
 		assert.Equal(t, []string{"bedrock"}, access.GrantedProvidersForModel(""))
 		assert.False(t, access.IsModelAllowed("anthropic", "claude-haiku-4-5"))

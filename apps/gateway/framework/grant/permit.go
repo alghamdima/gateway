@@ -264,37 +264,6 @@ func providerPermitAllowsModel(pp *schemas.ProviderPermit, model string) bool {
 	return pp.AllowedModels.IsAllowed(model) && !pp.BlacklistedModels.IsBlocked(model)
 }
 
-// weightedProviderPermitFor returns the permit's first provider permit for provider that sets a
-// weight, or nil when none does.
-func weightedProviderPermitFor(p schemas.Permit, provider string) *schemas.ProviderPermit {
-	if isNilPermit(p) {
-		return nil
-	}
-	pps := p.ProviderPermits()
-	for i := range pps {
-		pp := &pps[i]
-		if pp.Provider == provider && pp.Weight != nil {
-			return pp
-		}
-	}
-	return nil
-}
-
-// providerPermitFor returns the permit's first provider permit for provider, or nil when it holds
-// none.
-func providerPermitFor(p schemas.Permit, provider string) *schemas.ProviderPermit {
-	if isNilPermit(p) {
-		return nil
-	}
-	pps := p.ProviderPermits()
-	for i := range pps {
-		if pps[i].Provider == provider {
-			return &pps[i]
-		}
-	}
-	return nil
-}
-
 // eachProviderPermit visits the permit's provider permits. A provider named by nothing but
 // whitespace is skipped: no comparison anywhere would match it, so it could only ever be selected
 // and then fail downstream. visit returns false to stop, which this reports back.
